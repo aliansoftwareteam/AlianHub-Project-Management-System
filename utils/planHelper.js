@@ -1,7 +1,7 @@
 const { default: mongoose } = require('mongoose');
 const NodeCache = require( "node-cache" );
 const cache = new NodeCache({ stdTTL: 3600 });
-const { getCompanyDataFun } = require("../modules/company/controller/updateCompany")
+const { getCompanyDataFun } = require("../modules/company/controller/update-company")
 
 exports.getCachedCompanyData = async(companyId) => {
     return new Promise(async(resolve,reject) => {

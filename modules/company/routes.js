@@ -1,7 +1,7 @@
 const ctrl = require('./controller');
 const multer = require("multer");
-const { handleEvents } = require('./eventController');
-const updateCompanyCtrl = require('./controller/updateCompany');
+const { handleEvents } = require('./event-controller');
+const updateCompanyCtrl = require('./controller/update-company');
 const upload = multer({ dest: "wasabiUploads/" });
 exports.init = (app) => {
     /**

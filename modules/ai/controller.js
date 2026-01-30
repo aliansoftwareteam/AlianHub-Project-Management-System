@@ -8,9 +8,9 @@ const logger = require("../../Config/loggerConfig");
 const { SCHEMA_TYPE } = require("../../Config/schemaType")
 const fs = require('fs');
 const path = require('path');
-const { emitListener } = require("./eventController.js");
+const { emitListener } = require("./event-controller.js");
 const { getCachedPromptData, getCachedAllPromptData, getCachedCategoryData, getCachedAiModelData } = require("../../utils/enterpriseHelper.js");
-const { updateCompanyFun, getCompanyDataFun } = require('../company/controller/updateCompany.js');
+const { updateCompanyFun, getCompanyDataFun } = require('../company/controller/update-company.js');
 const { updateMemberFunction } = require('../settings/Members/controller.js');
 const aiPrompts = require('../../utils/aiPrompts.json');
 

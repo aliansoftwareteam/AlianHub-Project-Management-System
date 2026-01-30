@@ -403,7 +403,7 @@ exports.getBucketSizeStorage = () => {
 const multer = require('multer');
 const jwt = require('jsonwebtoken');
 const sharp = require('sharp');
-const { updateCompanyFun, getCompanyDataFun } = require('../../../company/controller/updateCompany');
+const { updateCompanyFun, getCompanyDataFun } = require('../../../company/controller/update-company');
 
 const storage = multer.diskStorage({
     destination: function (req, _, cb) {

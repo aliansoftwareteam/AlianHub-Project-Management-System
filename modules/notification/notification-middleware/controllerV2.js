@@ -1,13 +1,13 @@
 const pushController = require('./push-controllerV2')
 const emailController = require('./email-controllerV2')
 const { NODE_ENV } = require("../../../Config/config");
-const { getCompanyDataFun } = require("../../company/controller/updateCompany");
+const { getCompanyDataFun } = require("../../company/controller/update-company");
 const socketEmitter = require('../../../event/socketEventEmitter');
 
 const logger = require('../../../Config/loggerConfig');
 
 const { getNotificationSetttings } = require("../prepare-notification-data/settings-controllerV2");
-const { sendFCMNotification } = require("./sendNotification");
+const { sendFCMNotification } = require("./send-notification");
 const config = require('../../../Config/config');
 const { getUsersDetails } = require("../prepare-notification-data/user-controllerV2");
 const fs = require('fs');

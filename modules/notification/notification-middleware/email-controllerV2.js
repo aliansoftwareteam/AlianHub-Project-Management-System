@@ -1,5 +1,5 @@
 const emailNotificationHandlerCtrl = require("../email-notification-handler/controllerV2")
-const emailCtrl = require('../sendEmail/controllerV2')
+const emailCtrl = require('../send-email/controllerV2')
 const logger = require("../../../Config/loggerConfig")
 exports.emailNotificationManage = (payload) => {
     return new Promise((resolve,reject) => {

@@ -1,10 +1,10 @@
-const logger = require("../../../Config/loggerConfig");
-const config = require("../../../Config/config");
+const logger = require("../../../Config/loggerConfig.js");
+const config = require("../../../Config/config.js");
 const sendMail = require("../../service.js");
 const sendEmailNotification = require("../../template/sendEmailNotification.js")
 const moment = require('moment')
-const { Notification_key, TemplateType } = require("../../../Config/notificationKey");
-const { removeDocument, UpdateDocument } = require("../notification-middleware/push-controllerV2")
+const { Notification_key, TemplateType } = require("../../../Config/notificationKey.js");
+const { removeDocument, UpdateDocument } = require("../notification-middleware/push-controllerV2.js")
 exports.sendEmailHandlerSingle = (EmailDetails) => {
   return new Promise(async (resolve, reject) => {
     try {

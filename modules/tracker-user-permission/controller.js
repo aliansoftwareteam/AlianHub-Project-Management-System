@@ -2,7 +2,7 @@ const logger = require("../../Config/loggerConfig");
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose");
-const { updateCompanyFun } = require("../company/controller/updateCompany");
+const { updateCompanyFun } = require("../company/controller/update-company");
 const { updateMemberFunction } = require('../settings/Members/controller.js');
 
 exports.handleTrackerUserPermission = (req,res) => {

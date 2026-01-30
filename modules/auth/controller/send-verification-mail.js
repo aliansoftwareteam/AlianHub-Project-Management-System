@@ -1,8 +1,8 @@
-const mongoRef = require('../../../utils/mongo-handler/mongoQueries');
+const mongoRef = require('../../../utils/mongo-handler/mongoQueries.js');
 const senVerificationMailTemplate = require("../../template/sendEmailVerification.js")
 const sendMail = require("../../service.js");
-const config = require("../../../Config/config");
-const { dbCollections } = require('../../../Config/collections');
+const config = require("../../../Config/config.js");
+const { dbCollections } = require('../../../Config/collections.js');
 
 
 /**

@@ -1,15 +1,15 @@
-const createUserCtrl = require("./controller/createUser");
-const sendVerifcationCtrl = require("./controller/sendVerificationMail");
-const verifyEmailCtrl = require("./controller/verifyEmail");
-const sendForgotPasswordCtrl = require("./controller/sendForgotPasswordMail");
+const createUserCtrl = require("./controller/create-user");
+const sendVerifcationCtrl = require("./controller/send-verification-mail");
+const verifyEmailCtrl = require("./controller/verify-email");
+const sendForgotPasswordCtrl = require("./controller/send-forgot-password-mail");
 const mongoRef = require('../../utils/mongo-handler/mongoQueries');
-const sendInvitationCtrl = require("./controller/sendInvitation");
-const verifyInvitationCtrl = require("./controller/verifyInvitation");
+const sendInvitationCtrl = require("./controller/send-invitation");
+const verifyInvitationCtrl = require("./controller/verify-invitation");
 const { replaceObjectKey } = require("./helper");
 const {myCache} = require('../../Config/config');
 const logger = require('../../Config/loggerConfig');
 const {removeCache} = require('../../utils/commonFunctions');
-const { handleEvents } = require('../company/eventController');
+const { handleEvents } = require('../company/event-controller');
 exports.init = (app) => {
     app.post("/api/v2/createUser", createUserCtrl.createUserV2);
     /**

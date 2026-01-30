@@ -4,7 +4,7 @@ const { dbCollections } = require("../../Config/collections");
 const logger = require("../../Config/loggerConfig");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
-const { getCompanyDataFun } = require("../company/controller/updateCompany");
+const { getCompanyDataFun } = require("../company/controller/update-company");
 const socketEmitter = require("../../event/socketEventEmitter");
 
 const projectQueues = {};

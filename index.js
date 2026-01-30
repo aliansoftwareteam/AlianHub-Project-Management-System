@@ -94,7 +94,7 @@ function initializeControllers() {
     require('./modules/task-index/init').init(app);
     require('./modules/create-project/init.js').init(app);
     require('./modules/notification-count/init').init(app);
-    require('./modules/notification/sendEmail/init').init(app);
+    require('./modules/notification/send-email/init').init(app);
     require('./modules/tracker-user-permission/init').init(app);
     require('./modules/check-install-step/init').init(app);
     require('./modules/saas-admin/init').init(app);

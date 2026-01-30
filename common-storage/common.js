@@ -1,6 +1,6 @@
 const loggerConfig = require("../Config/loggerConfig");
 const { SCHEMA_TYPE } = require("../Config/schemaType");
-const { updateCompanyFun } = require("../modules/company/controller/updateCompany");
+const { updateCompanyFun } = require("../modules/company/controller/update-company");
 const { uploadMainFileForbase64Thumbnail, uploadFileWasabiPromise, getBucketSize, createCompanyDataWasabi, getUserProfilePresignedUrl, getPresignedUrl, copyWasabiImage, cleanUpTrackshotStorage } = require("../modules/storage/wasabi/controller");
 const fs = require("fs");
 

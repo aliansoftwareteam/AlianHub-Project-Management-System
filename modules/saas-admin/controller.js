@@ -1,7 +1,7 @@
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const logger = require("../../Config/loggerConfig");
 const { dbCollections } = require("../../Config/collections");
-const { updateCompanyFun, getCompanyDataFun } = require("../company/controller/updateCompany");
+const { updateCompanyFun, getCompanyDataFun } = require("../company/controller/update-company");
 
 /**
  * @returns {Promise<String>} A Promise that resolves when porcess of company data add is completed.

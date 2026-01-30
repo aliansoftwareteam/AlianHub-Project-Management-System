@@ -1,7 +1,7 @@
 const { MongoDbCrudOpration} = require("../../../utils/mongo-handler/mongoQueries");
 const { SCHEMA_TYPE } = require("../../../Config/schemaType")
 const logger = require("../../../Config/loggerConfig")
-const { getCompanyDataFun } = require("../../company/controller/updateCompany");
+const { getCompanyDataFun } = require("../../company/controller/update-company");
 exports.fetchDetailsOfCompanies = (companies = []) => {
   return new Promise((resolve, reject) => {
     try {

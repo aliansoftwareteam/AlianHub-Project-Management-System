@@ -1,5 +1,5 @@
 const ctrl = require('./controller');
-const { handleEvents } = require('./eventController');
+const { handleEvents } = require('./event-controller');
 
 exports.init = (app) => {
     app.post('/api/v1/generatePrompt', ctrl.generatePrompt);

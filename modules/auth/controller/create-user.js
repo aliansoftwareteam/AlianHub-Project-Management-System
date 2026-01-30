@@ -1,6 +1,6 @@
 const logger = require("../../../Config/loggerConfig");
 const mongoRef = require('../../../utils/mongo-handler/mongoQueries');
-const sendMailRef = require("./sendVerificationMail")
+const sendMailRef = require("./send-verification-mail")
 const {generateJWTToken} = require('../../../Config/jwt');
 const { dbCollections } = require('../../../Config/collections');
 const ctr = require("../controller");

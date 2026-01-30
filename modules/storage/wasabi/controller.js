@@ -11,7 +11,7 @@ const { SCHEMA_TYPE } = require('../../../Config/schemaType.js');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries.js');
 const { default: mongoose } = require('mongoose');
 const {myCache, requestHandler} = require('../../../Config/config');
-const { updateCompanyFun, getCompanyDataFun } = require('../../company/controller/updateCompany.js');
+const { updateCompanyFun, getCompanyDataFun } = require('../../company/controller/update-company.js');
 /**
  * S3 client configuration for create bucket
  */

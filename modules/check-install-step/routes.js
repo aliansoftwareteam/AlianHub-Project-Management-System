@@ -1,6 +1,6 @@
 const ctrl = require('./controller');
-const { handleEvents } = require('./eventController');
-const createCompanyctrl = require('./createCompany');
+const { handleEvents } = require('./event-controller');
+const createCompanyctrl = require('./create-company');
 
 exports.init = (app) => {
     //

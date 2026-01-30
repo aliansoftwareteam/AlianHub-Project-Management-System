@@ -5,7 +5,7 @@ const logger = require("../../Config/loggerConfig");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries.js");
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const hlp = require("../tasks/helpers/helper");
-const {updateProjectInternal} = require("../project/controller/updateProject.js");
+const {updateProjectInternal} = require("../project/controller/update-project.js");
 const mongoose = require("mongoose")
 const { settingsCollectionDocs } = require("../../Config/collections");
 

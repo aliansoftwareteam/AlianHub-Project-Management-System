@@ -1,15 +1,15 @@
-const Projectctrl = require('./controller/getProjectById');
-const projectListCtrl = require('./controller/getProjectList');
-const updateProjectCtrl = require('./controller/updateProject');
-const projectAlltaskUpdateCtrl = require('./controller/projectAlltaskUpdate');
-const projectSprintFolderCtrl = require('./controller/getSprintFolder');
-const projectSprintUpdateCtrl = require('./controller/updateSprint');
-const projectFilterCtrl = require('./controller/getProjectFilterData');
-const manageGlobalFilterCtrl = require('./controller/manageGlobalFilter');
+const Projectctrl = require('./controller/get-project-by-id');
+const projectListCtrl = require('./controller/get-project-list');
+const updateProjectCtrl = require('./controller/update-project');
+const projectAlltaskUpdateCtrl = require('./controller/project-all-task-update');
+const projectSprintFolderCtrl = require('./controller/get-sprint-folder');
+const projectSprintUpdateCtrl = require('./controller/update-sprint');
+const projectFilterCtrl = require('./controller/get-project-filter-data');
+const manageGlobalFilterCtrl = require('./controller/manage-global-filter');
 const checklistCtrl = require('./controller/checklist');
 const tagsCtrl = require('./controller/tags');
 
-const getQueryCtrl = require('./controller/getQueryFun')
+const getQueryCtrl = require('./controller/get-query-fun')
 exports.init = (app) => {
     app.post('/api/v1/project/search',projectFilterCtrl.projectFilter);
     app.get('/api/v1/project/:id', Projectctrl.getProjectById);
