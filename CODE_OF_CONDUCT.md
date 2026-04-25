@@ -54,7 +54,7 @@ Interactions outside GitHub are out of scope unless they directly impact project
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be reported by contacting:
 
-📧 **[abc@example.com](mailto:abc@example.com)**
+📧 **[sales@aliansoftware.net](mailto:sales@aliansoftware.net)**
 
 Reports must include sufficient detail to allow investigation. Anonymous reporting is **not supported**.
 
