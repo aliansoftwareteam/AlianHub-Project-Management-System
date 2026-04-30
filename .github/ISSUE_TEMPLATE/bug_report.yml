@@ -1,8 +1,58 @@
 name: Bug report
 description: Create a report to help us improve
-title: "[BUG]"
+title: "[BUG] "
 labels: ["bug"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug.
+
+        Please do **not** use this form for security vulnerabilities or sensitive disclosures.
+        Use the private security advisory flow instead:
+        https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/security/advisories/new
+
+  - type: dropdown
+    attributes:
+      label: Affected area
+      description: Which part of the product is affected?
+      options:
+        - Backend API
+        - Web frontend
+        - Installer
+        - Desktop time tracker
+        - Authentication / sessions
+        - Storage / uploads
+        - Notifications / chat
+        - Timesheet / tracker
+        - Project / task management
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: Version or commit
+      description: Release version, branch, or commit SHA if known.
+      placeholder: e.g. 14.0.26, main, or a commit SHA
+    validations:
+      required: false
+
+  - type: dropdown
+    attributes:
+      label: Environment
+      description: Where does this issue reproduce?
+      options:
+        - Production
+        - Staging
+        - Local development
+        - Desktop tracker
+        - Installer
+        - Not sure
+    validations:
+      required: true
+
   - type: textarea
     attributes:
       label: Describe the bug
@@ -24,12 +74,40 @@ body:
     validations:
       required: true
 
+  - type: dropdown
+    attributes:
+      label: Reproduction reliability
+      description: How often can you reproduce this bug?
+      options:
+        - Always
+        - Often
+        - Sometimes
+        - Rarely
+        - Only once so far
+    validations:
+      required: true
+
   - type: textarea
     attributes:
       label: Expected behavior
       description: A clear and concise description of what you expected to happen.
     validations:
       required: true
+
+  - type: textarea
+    attributes:
+      label: Actual behavior
+      description: What actually happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Logs, screenshots, or recordings
+      description: Add logs, screenshots, stack traces, or screen recordings if available.
+      placeholder: Paste logs or drag screenshots here.
+    validations:
+      required: false
 
   - type: textarea
     attributes:

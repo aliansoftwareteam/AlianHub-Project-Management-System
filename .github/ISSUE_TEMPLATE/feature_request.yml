@@ -1,34 +1,66 @@
 name: Feature request
 description: Suggest an idea for this project
-title: "[FEAT]"
+title: "[FEAT] "
 labels: ["enhancement"]
 body:
-    - type: textarea
-      attributes:
-        label: Is your feature request related to a problem? Please describe.
-        description: A clear and concise description of what the problem is.
-        placeholder: >
-          Ex. I'm always frustrated when [...]
-      validations:
-        required: true
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for product or developer-experience improvements.
+        If you are reporting a bug, please use the bug report form instead.
 
-    - type: textarea
-      attributes:
-        label: Describe alternatives you've considered
-        description: A clear and concise description of any alternative solutions or features you've considered
-      validations:
-        required: false
+  - type: dropdown
+    attributes:
+      label: Affected area
+      description: Which area would this feature improve?
+      options:
+        - Backend API
+        - Web frontend
+        - Installer
+        - Desktop time tracker
+        - Authentication / sessions
+        - Storage / uploads
+        - Notifications / chat
+        - Timesheet / tracker
+        - Project / task management
+        - Documentation / onboarding
+        - Other
+    validations:
+      required: true
 
-    - type: textarea
-      attributes:
-        label: Additional context
-        description: Add any other context or screenshots about the feature request here.
-      validations:
-        required: false
+  - type: textarea
+    attributes:
+      label: Problem statement
+      description: What problem are you trying to solve?
+      placeholder: >
+        Describe the current pain point, workflow gap, or limitation.
+    validations:
+      required: true
 
-    - type: textarea
-      attributes:
-        label: Describe the thing to improve
-        description: A clear and concise description of problems and what you would like to see
-      validations:
-        required: true
+  - type: textarea
+    attributes:
+      label: Proposed improvement
+      description: Describe the feature, behavior, or change you want to see.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: User impact
+      description: Who benefits from this and how does it improve their workflow?
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Alternatives considered
+      description: What workarounds or alternative approaches have you considered?
+    validations:
+      required: false
+
+  - type: textarea
+    attributes:
+      label: Additional context
+      description: Add screenshots, examples, references, or related issues if relevant.
+    validations:
+      required: false

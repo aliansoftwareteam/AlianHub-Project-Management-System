@@ -1,27 +1,44 @@
 name: Documentation
 description: Help us improve documentations
-title: "[DOC]"
+title: "[DOC] "
 labels: ["documentation"]
 body:
-    - type: textarea
-      attributes:
-        label: Documentation issue
-        description: Is this issue related to an existing part of the documentation? If so, please provide a link
-        placeholder: >
-            Helpful info about this issue.
-      validations:
-        required: true
+  - type: input
+    attributes:
+      label: Current documentation location
+      description: Link or file path to the existing page, section, or file if applicable.
+      placeholder: e.g. README.md, help.alianhub.com, or a direct URL
+    validations:
+      required: false
 
-    - type: textarea
-      attributes:
-        label: Describe the thing to improve
-        description: A clear and concise description of problems and what you would like to see
-      validations:
-        required: true
+  - type: textarea
+    attributes:
+      label: Documentation problem
+      description: What is missing, unclear, inaccurate, or outdated?
+      placeholder: >
+        Describe the gap or confusion you encountered.
+    validations:
+      required: true
 
-    - type: textarea
-      attributes:
-        label: Describe the solution (optional)
-        description: Ideas about what we should do to improve experience of beginners and readers. It may be new pages to add, grammar fixes etc.
-      validations:
-        required: false
+  - type: textarea
+    attributes:
+      label: Proposed improvement
+      description: What should be added, clarified, corrected, or reorganized?
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Who is affected
+      description: Who is blocked by this issue and during which workflow?
+      placeholder: >
+        Example: new self-hosting users during installation, contributors during setup, or admins configuring billing.
+    validations:
+      required: false
+
+  - type: textarea
+    attributes:
+      label: Additional context
+      description: Add screenshots, examples, or related references if useful.
+    validations:
+      required: false

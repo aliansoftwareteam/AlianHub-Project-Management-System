@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability report
+    url: https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/security/advisories/new
+    about: Report suspected vulnerabilities privately. Do not open public issues for security-sensitive findings.
+  - name: Documentation and setup guide
+    url: https://help.alianhub.com
+    about: Review installation and usage documentation before opening a support or documentation issue.
+  - name: AlianHub website
+    url: https://alianhub.com
+    about: Product overview, links, and public project information.
