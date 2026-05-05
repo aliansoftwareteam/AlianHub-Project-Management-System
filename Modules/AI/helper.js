@@ -44,5 +44,8 @@ exports.deleteChat = (chatId) => {
 }
 
 exports.removeChat = (chatId) => {
-    requestedPrompts[chatId].chats.splice(requestedPrompts[chatId].chats.length -1,1);
+    const user = requestedPrompts[chatId];
+    if (user && user.chats.length > 0) {
+        user.chats.splice(user.chats.length - 1, 1);
+    }
 }
