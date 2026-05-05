@@ -68,13 +68,13 @@ exports.handleConnection = async (companyId) => {
                             .then((conData) => {
                                 // console.log("REQUESTED DB FOUND", db);
                                 updateConnectionRecord(db, conData);
-                                // removeFromArray(db)
+                                removeFromArray(db)
                                 locals = conData.connection
                                 resolve({ status: true, database: locals });
                             })
                             .catch((error) => {
                                 // throw error;
-                                // removeFromArray(db)
+                                removeFromArray(db)
                                 // console.log("REQUESTED DB NOT FOUND", db);
                                 reject({ status: false, statusText: error.message });
                             })
@@ -83,14 +83,14 @@ exports.handleConnection = async (companyId) => {
                     requestedDbs.push(db);
                    createConnection(db)
                         .then((conData) => {
-                            // removeFromArray(db)
+                            removeFromArray(db)
                             // console.log("REQUESTED DB FOUND", db);
                             updateConnectionRecord(db, conData);
                             locals = conData.connection
                             resolve({ status: true, database: locals });
                         })
                         .catch((error) => {
-                            // removeFromArray(db)
+                            removeFromArray(db)
                             // console.log("REQUESTED DB NOT FOUND", db);
                             reject({ status: false, statusText: error.message });
                             // throw error;
