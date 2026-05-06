@@ -47,6 +47,9 @@ module.exports = {
     AI_API_KEY:process.env.AI_API_KEY,
     AI_MODEL:process.env.AI_MODEL,
 
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL,
+
     STORAGE_TYPE:process.env.STORAGE_TYPE,
 
     UNDER_MAINTENANCE: process.env.UNDER_MAINTENANCE,
