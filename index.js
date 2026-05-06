@@ -2,6 +2,18 @@ const express = require("express");
 const fs = require("fs");
 var cors = require('cors');
 const path = require('path');
+
+// Global error handlers — catch crashes and log before Render kills the process
+process.on('uncaughtException', (err) => {
+    console.error('[FATAL] uncaughtException:', err.message);
+    console.error(err.stack);
+    process.exit(1);
+});
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('[FATAL] unhandledRejection at:', promise);
+    console.error('[FATAL] Reason:', reason);
+    process.exit(1);
+});
 const bodyParser = require("body-parser");
 const config =  require('./Config/config.js');
 const awsRef =  require('./Config/aws.js');
