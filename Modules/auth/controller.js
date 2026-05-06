@@ -815,6 +815,18 @@ exports.resetPassword = async (req, res, next) => {
             next();
             return;
         }
+        // Security fix: validate token against DB to prevent token reuse after reset
+        // JWT signature alone is not sufficient — the stored token must match exactly.
+        // After a successful reset, token is cleared (""), so any replay is rejected.
+        const tokenRecord = await mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, {
+            type: dbCollections.USER_AUTH,
+            data: [{ _id: reqData.id, token: reqData.token }]
+        }, "findOne");
+        if (!(tokenRecord && tokenRecord._id)) {
+            req.errorMessageObject = {message: "Reset link is invalid or has already been used.", key: 5};
+            next();
+            return;
+        }
         const salt = await bcrypt.genSalt(10);
         const setNewPass = reqData.id + reqData.password;
         const passwordHash = await bcrypt.hash(setNewPass, salt);
