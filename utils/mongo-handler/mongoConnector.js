@@ -32,8 +32,9 @@ exports.connect = (db) => {
             MONGODB_URL = installation?.envVar?.MONGODB_URL;
         }
         try {
+            const baseMongoUrl = MONGODB_URL.replace(/\/+$/, ''); // strip trailing slashes
             const connection = await mongoose.createConnection(
-                `${MONGODB_URL}/${db}?authSource=admin`, // CONNECTION STRING
+                `${baseMongoUrl}/${db}?authSource=admin`, // CONNECTION STRING
                 {
                     waitQueueTimeoutMS: 30000, // WAIT_QUEUE_TIMEOUT
                     maxPoolSize: 3, // MAX_POOL_SIZE
