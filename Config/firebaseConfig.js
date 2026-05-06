@@ -1,16 +1,29 @@
-const admin = require("firebase-admin");
-const config =  require('./config');
+const path = require('path');
 
 //Initialize Admin
-var serviceAccount = require(config.SERVICE_FILE);
+let admin = null;
+let fcm = null;
+
 try {
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
-    });
-} catch(error) {
-    console.log("Firebase Error:", error);
+    admin = require("firebase-admin");
+    const config = require('./config');
+
+    if (!config.SERVICE_FILE) {
+        console.log("Firebase: SERVICE_FILE not configured — push notifications disabled.");
+    } else {
+        const serviceFilePath = path.resolve(__dirname, '..', config.SERVICE_FILE);
+        const serviceAccount = require(serviceFilePath);
+        admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount)
+        });
+        fcm = admin.messaging();
+        console.log("Firebase: initialized successfully.");
+    }
+} catch (error) {
+    console.log("Firebase Error (push notifications disabled):", error.message);
+    // Provide a stub so callers don't crash when admin is null
+    admin = admin || {};
 }
-const fcm = admin.messaging();
 
 module.exports = {
     admin,
