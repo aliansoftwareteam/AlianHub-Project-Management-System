@@ -2,6 +2,9 @@
   "name": "alian-hub-v3",
   "version": "14.0.26",
   "main": "index.js",
+  "engines": {
+    "node": "20.x"
+  },
   "dependencies": {
     "@aws-sdk/client-iam": "3.864.0",
     "@aws-sdk/client-s3": "3.864.0",
