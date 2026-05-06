@@ -33,8 +33,12 @@ exports.connect = (db) => {
         }
         try {
             const baseMongoUrl = MONGODB_URL.replace(/\/+$/, ''); // strip trailing slashes
+            // Note: do NOT append ?authSource=admin for mongodb+srv — Atlas SRV TXT records handle auth
+            const connStr = baseMongoUrl.startsWith('mongodb+srv')
+                ? `${baseMongoUrl}/${db}`
+                : `${baseMongoUrl}/${db}?authSource=admin`;
             const connection = await mongoose.createConnection(
-                `${baseMongoUrl}/${db}?authSource=admin`, // CONNECTION STRING
+                connStr, // CONNECTION STRING
                 {
                     waitQueueTimeoutMS: 30000, // WAIT_QUEUE_TIMEOUT
                     maxPoolSize: 3, // MAX_POOL_SIZE
