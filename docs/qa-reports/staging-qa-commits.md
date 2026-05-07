@@ -1,7 +1,28 @@
 # Staging QA — Commit Reference
 
 **Branch:** `staging`  
-**Last Updated:** 2026-05-06
+**Last Updated:** 2026-05-07
+
+---
+
+## Repo Structure Quick-Win Fixes
+
+| Date & Time | Commit Hash | Message |
+|-------------|-------------|---------|
+| 2026-05-07 | `96cee86` | merge(staging): pull in fix/repo-structure — gitignore, env.example, controller renames |
+| 2026-05-07 | `69712b4` | fix(repo-structure): naming fixes, gitignore updates, env.example overhaul |
+
+### What each fix covers
+
+| Commit | Fix | Files Changed |
+|--------|-----|---------------|
+| `69712b4` | Add runtime dirs to `.gitignore` (wasabiUploads/, thumbnails/ etc.) | `.gitignore` |
+| `69712b4` | Complete `.env.example` rewrite — all 28+ keys, grouped, marked required/optional | `.env.example` |
+| `69712b4` | Rename `Apps/controllers.js` → `controller.js` + update import | `Modules/Apps/` |
+| `69712b4` | Rename `trackerDownload/controllers.js` → `controller.js` + update import | `Modules/trackerDownload/` |
+| `69712b4` | QA docs added (auth report, repo audit, this file) | `docs/qa-reports/` |
+
+**Branch:** `fix/repo-structure` (branched from `main`) → merged into `staging` → PR to `main` pending
 
 ---
 
