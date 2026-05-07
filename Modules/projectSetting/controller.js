@@ -1,4 +1,4 @@
-const { resolve } = require('path');
+const path = require('path');
 const {dbCollections} = require('../../Config/collections');
 const logger = require("../../Config/loggerConfig");
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
@@ -6,15 +6,9 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const { updateCommentSprint } = require("../Comments/controller");
 
 const fp = `${__dirname}/`;
-const {writeFile} = require("fs");
 const mongoose = require("mongoose");
 const socketEmitter = require('../../event/socketEventEmitter');
 
-function writeData(fileName, data) {
-    writeFile(`${fp}/${fileName}.json`, JSON.stringify(data, null, 4), (err) => {
-        if(err) throw err;
-    })
-}
 
 exports.changeTaskType = async (req, res) => {
     try {
@@ -241,7 +235,6 @@ async function batchUpdate(updateArray, cid) {
             const loopFun = () => {
                 console.log("TOTAL: ", count, "/", updateArray.length, "==", ((count * 100) / updateArray.length).toFixed(2));
                 if(count >= updateArray.length) {
-                    writeData(`updateArray`, results)
                     resolve(results)
                     console.log("END");
                     return;
@@ -310,31 +303,33 @@ exports.migrateSprintsFun = async (req, res) => {
         projects = projects.concat(mainChat);
         console.log(projects.length,"length");
 
-        let promisesArr = [];
-        let count = 0;
-        let countFunction = (project) => {
-            if (count >= projects.length) {
-                resolve();
-                console.log(`END PROJECT`);
-                return;
-            } else {
-                promisesArr.push(
-                    exports.migrateProject(project,req.body.companyId).then(() => {
-                        count++;
-                        countFunction(projects[count]);
-                    }).catch((error) => {
-                        console.error(error,`error in migrateProject ${project._id}`)
+        // Process projects sequentially and collect all promises
+        const migrateAll = () => new Promise((resolveMigration) => {
+            let count = 0;
+            const countFunction = (project) => {
+                if (count >= projects.length) {
+                    console.log(`END PROJECT`);
+                    resolveMigration();
+                    return;
+                }
+                exports.migrateProject(project, req.body.companyId)
+                    .then(() => {
                         count++;
                         countFunction(projects[count]);
                     })
-                )
-            }
-        }
-        countFunction(projects[count]);
-        await Promise.allSettled(promisesArr).then(() => {
+                    .catch((error) => {
+                        console.error(error, `error in migrateProject ${project?._id}`);
+                        count++;
+                        countFunction(projects[count]);
+                    });
+            };
+            countFunction(projects[count]);
+        });
+
+        await migrateAll().then(() => {
             res.send({ status: true, statusText: "done"});
         }).catch((error) => {
-            console.log(`Error in Promise Project ${project._id}: ${error}`);
+            console.log(`Error in migration Promise: ${error}`);
         });
 
     } catch (error) {
