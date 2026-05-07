@@ -26,6 +26,11 @@ logs
 log/
 *.log
 
+# Runtime generated upload/storage directories
+wasabiUploads/
+wasabiUploadsLocal/
+thumbnails/
+
 # Runtime data
 pids
 *.pid

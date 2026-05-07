@@ -1,4 +1,4 @@
-const ctrl = require('./controllers');
+const ctrl = require('./controller');
 
 exports.init = (app) => {
     app.delete('/api/v1/tracker/delete/:id', ctrl.deleteTracker);
