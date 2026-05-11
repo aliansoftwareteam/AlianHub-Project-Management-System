@@ -20,9 +20,12 @@ const awsRef =  require('./Config/aws.js');
 const logger = require("./Config/loggerConfig");
 const packJOSNData = require("./package.json");
 const { makeDefaultBrandSettings } = require("./Modules/Admin/common/controller.js");
+const { corsOriginDelegate } = require('./utils/cors.js');
 
 const app = express();
-app.use(cors({origin: '*'}));
+// CORS — BUG-002 / #56. Replace wildcard with an env-driven allow-list.
+// See utils/cors.js for the exact rules and supported env vars.
+app.use(cors({ origin: corsOriginDelegate }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 app.use(bodyParser.json({limit: '50mb'}));
 app.use(bodyParser.raw({limit: '50mb'}));
