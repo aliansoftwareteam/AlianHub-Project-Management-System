@@ -1,8 +1,22 @@
+const crypto = require('crypto');
 const logger = require("../../../Config/loggerConfig");
 const mongoRef = require('../../../utils/mongo-handler/mongoQueries');
 const sendMail = require("../../service.js");
 const config = require("../../../Config/config");
 const { dbCollections } = require('../../../Config/collections');
+
+/**
+ * Generate a password-reset token (BUG-005 / #59 fix).
+ *
+ * The previous implementation built an 8-char alphanumeric token via
+ * `Math.random()` — ~48 bits of entropy and not cryptographically secure,
+ * which made the reset link feasibly brute-forceable. Replace with 32 bytes
+ * (256 bits) of `crypto.randomBytes`, hex-encoded to 64 chars, so the
+ * reset URL stays URL-safe without further encoding.
+ *
+ * Exported for the regression test at .claude/tests/test-bug-005.js.
+ */
+exports.generateResetToken = () => crypto.randomBytes(32).toString('hex');
 
 /**
  * Send Forgot Password Email
@@ -43,11 +57,7 @@ exports.sendForgotPasswordEmail = (req,res) => {
         }
         mongoRef.MongoDbCrudOpration('global', object, "findOne").then((response)=>{
             let userEmail = req.body.email.toLowerCase();
-            let temp = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-            let token = '';
-            for ( let i = 0; i < 8; i++ ) {
-                token += temp.charAt(Math.floor(Math.random() * temp.length));
-            }
+            const token = exports.generateResetToken();
             let obj = {
                 type: dbCollections.USERS,
                 data: [
