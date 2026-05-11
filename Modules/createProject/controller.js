@@ -90,6 +90,19 @@ exports.createProjectFun = async(req, res) => {
                     exports.removeProjectCount(req.body.CompanyId,req.body.isPrivateSpace);
                     res.send({status:false, statusText: error});
                 });
+            } else {
+                // BUG-010 / #64 fix: previously this branch was missing, so
+                // when `checkProjectPlan` resolved with `{status: false}`
+                // (e.g. a future refactor moves a failure path from `reject`
+                // to `resolve`) the request would hang until the proxy timed
+                // out. `checkProjectPlan` increments the project count
+                // before validating limits, so we must also roll the count
+                // back here to mirror the .catch branch below.
+                exports.removeProjectCount(req.body.CompanyId, req.body.isPrivateSpace);
+                res.status(400).send({
+                    status: false,
+                    statusText: (data && data.statusText) || 'Project plan check did not pass.',
+                });
             }
         }).catch((error) => {
             if(error?.countRollBack === false && error.countRollBack !== undefined){
