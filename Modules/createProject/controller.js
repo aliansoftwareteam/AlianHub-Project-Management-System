@@ -101,7 +101,16 @@ exports.createProjectFun = async(req, res) => {
             }
         })
     } catch (error) {
-        reject(error)
+        // BUG-009 / #63 fix: `createProjectFun` is `async (req, res)`, not a
+        // `new Promise` constructor body — `reject` is not defined in this
+        // scope. Reaching this branch previously threw a ReferenceError that
+        // masked the real error and left the request hanging until the
+        // client / proxy timed out. Respond with the actual error instead.
+        logger.error(`createProjectFun error: ${error && error.message ? error.message : error}`);
+        res.status(400).send({
+            status: false,
+            statusText: error && error.message ? error.message : error,
+        });
     }
 };
 
