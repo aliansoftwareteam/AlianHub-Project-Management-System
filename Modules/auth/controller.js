@@ -1,6 +1,5 @@
 const mongoC = require("../../utils/mongo-handler/mongoQueries")
 const { dbCollections } = require('../../Config/collections');
-const fs = require("fs");
 const bcrypt = require('bcrypt');
 const config = require("../../Config/config");
 const logger = require("../../Config/loggerConfig");
@@ -105,16 +104,6 @@ exports.addAndRemoveUserInMongodbNotificationCount = (companyId,userId,type) => 
         }
     })
 }
-
-exports.checkAvaibility = (req,res) => {
-    try {
-        let validateFile = fs.readFileSync('./utils/licensesValidate.js', 'utf-8')
-        res.status(200).json({file: validateFile})
-    } catch (error) {
-        res.status(400).json({message: error.message ? error.message : error});
-    }
-}
-
 
 exports.generateTokenV2Fun = (uid, refreshToken, cb) => {
     try {

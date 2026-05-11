@@ -6,9 +6,6 @@ exports.init = (app) => {
     app.post('/api/v1/removeUserNotification',  ctrl.removeUserNotification);
 
 
-    app.get("/api/v1/checkAvaibility", ctrl.checkAvaibility);
-    
-
     /**
      * @swagger
      *  components:
