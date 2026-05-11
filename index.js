@@ -101,14 +101,16 @@ function initializeControllers() {
     startInterval();
     const { currentDirectory } = require(`./common-storage/common-${process.env.STORAGE_TYPE}.js`);
     const { preCompanySetup, } = require("./Modules/Company/controller2.js");
-    app.get("/api/v1/setPresetCompany/:id", (req, res) => {
-        if (req.params && req.params.id && req.params.id === config.PRECOMPANYKEY) {
-            preCompanySetup();
-            res.send('Preset Company Process Start Successful');
-        } else {
-            res.send('Unauthorized');
-        }
-    })
+    const { requirePresetKey } = require("./utils/presetKeyAuth.js");
+    // BUG-008 / #62 fix: was `GET /api/v1/setPresetCompany/:id` with the
+    // PRECOMPANYKEY secret as a URL path segment — that leaked into
+    // reverse-proxy logs, browser history, and Referer headers. Now POST
+    // with the key in the `x-preset-key` header, constant-time compared,
+    // and a proper 401/404 on failure (see utils/presetKeyAuth.js).
+    app.post("/api/v1/setPresetCompany", requirePresetKey, (req, res) => {
+        preCompanySetup();
+        res.status(200).json({ status: true, message: 'Preset Company Process Start Successful' });
+    });
     //IMPORT CUSTOM FILES
     require('./Modules/Auth/init').init(app);
     require('./Modules/notification1/init').init(app);

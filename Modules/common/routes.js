@@ -3,6 +3,7 @@ const fs = require("fs");
 const config =  require('../../Config/config.js');
 const { connections } = require("../../middlewares/mongoConnector/helper.js");
 const commonctrl = require('./controller.js');
+const { requirePresetKey } = require('../../utils/presetKeyAuth.js');
 
 /**
  * Init
@@ -24,17 +25,16 @@ exports.init = (app) => {
     });
 
     // Get Connections
-    app.get("/connections/:id", (req, res) => {
-        if (req.params && req.params.id && req.params.id === config.PRECOMPANYKEY) {
-            const connectionsJSON = connections.map((x) => ({
-                db: x.db,
-                createdAt: new Date(x.createdAt),
-                lastRequest: new Date(x.lastRequest)
-            }))
-            res.json({data: connectionsJSON, total: connectionsJSON.length});
-        } else {
-            res.send('Unauthorized');
-        }
+    // BUG-008 / #62 fix: was `GET /connections/:id` with the PRECOMPANYKEY
+    // secret as a URL path segment. Now POST with the key in the
+    // `x-preset-key` header, constant-time compared by the middleware.
+    app.post("/connections", requirePresetKey, (req, res) => {
+        const connectionsJSON = connections.map((x) => ({
+            db: x.db,
+            createdAt: new Date(x.createdAt),
+            lastRequest: new Date(x.lastRequest)
+        }));
+        res.json({ data: connectionsJSON, total: connectionsJSON.length });
     });
 
     /**
