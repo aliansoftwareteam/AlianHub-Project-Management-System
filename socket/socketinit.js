@@ -6,6 +6,7 @@ const {companiesSocketHandler} = require('./controller/companiesSocket');
 const {userNotificationCountHandler} = require('./controller/userNotificationCount');
 const { instrument } = require('@socket.io/admin-ui');
 const jwt = require('jsonwebtoken');
+const { corsOriginDelegate } = require('../utils/cors.js');
 exports.changeStreams = [];
 const EventEmitter = require('events');
 exports.emitter = new EventEmitter();
@@ -14,8 +15,12 @@ exports.rooms = [];
 exports.initSocket = (server) => {
 
     let io = new Server(server, {
+        // CORS — BUG-003 / #57. Replace `origin: '*'` (which combined with
+        // `credentials: true` let any origin open an authenticated websocket
+        // as the logged-in user) with the same env-driven allow-list used by
+        // the Express HTTP layer (see utils/cors.js).
         cors: {
-            origin: '*',
+            origin: corsOriginDelegate,
             methods: ['GET', 'POST'],
             credentials: true,
         },
