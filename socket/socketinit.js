@@ -6,10 +6,40 @@ const {companiesSocketHandler} = require('./controller/companiesSocket');
 const {userNotificationCountHandler} = require('./controller/userNotificationCount');
 const { instrument } = require('@socket.io/admin-ui');
 const jwt = require('jsonwebtoken');
+const logger = require('../Config/loggerConfig');
 exports.changeStreams = [];
 const EventEmitter = require('events');
 exports.emitter = new EventEmitter();
 exports.rooms = [];
+
+/**
+ * Build the @socket.io/admin-ui config from env (BUG-004 / #58 fix).
+ *
+ * The previous code hardcoded `username: "alian"` and a committed bcrypt
+ * hash with `mode: "development"` — anyone with the repo could compute the
+ * hash offline (or read it from the source) and reach the admin namespace.
+ *
+ * New behaviour:
+ *   - Both SOCKETIO_ADMIN_USERNAME and SOCKETIO_ADMIN_PASSWORD_HASH must be
+ *     set, non-empty, and non-whitespace. Otherwise the admin UI is
+ *     disabled entirely (default-off).
+ *   - `mode` follows NODE_ENV — "production" enables TLS-only protection
+ *     on the admin namespace.
+ *
+ * Exported for the regression test at .claude/tests/test-bug-004.js.
+ */
+exports.getAdminUiConfig = (env = process.env) => {
+    const username = typeof env.SOCKETIO_ADMIN_USERNAME === 'string'
+        ? env.SOCKETIO_ADMIN_USERNAME.trim() : '';
+    const passwordHash = typeof env.SOCKETIO_ADMIN_PASSWORD_HASH === 'string'
+        ? env.SOCKETIO_ADMIN_PASSWORD_HASH.trim() : '';
+    if (!username || !passwordHash) return null;
+    return {
+        auth: { type: 'basic', username, password: passwordHash },
+        namespaceName: '/admin',
+        mode: env.NODE_ENV === 'production' ? 'production' : 'development',
+    };
+};
 
 exports.initSocket = (server) => {
 
@@ -34,15 +64,13 @@ exports.initSocket = (server) => {
             next();
         });
     });
-    instrument(io, {
-        auth: {
-            type: "basic",
-            username: "alian",
-            password: "$2a$12$HHemhzmTrC8Dmf2Gd9v/Teo9oiCxfYJb.St3HKMBx1L3wJmZLeX5u"
-        }, 
-        namespaceName: '/admin', 
-        mode: "development"
-    });
+    const adminUiConfig = exports.getAdminUiConfig();
+    if (adminUiConfig) {
+        instrument(io, adminUiConfig);
+        logger.info(`Socket.io admin UI enabled at /admin (mode=${adminUiConfig.mode})`);
+    } else {
+        logger.info('Socket.io admin UI disabled — set SOCKETIO_ADMIN_USERNAME and SOCKETIO_ADMIN_PASSWORD_HASH to enable.');
+    }
 
     userNamespace.on('connection', (socket) => {
         const {userRole} = socket.handshake.query;
