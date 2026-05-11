@@ -45,5 +45,8 @@
     "basic-install": "node installation.js && npm run start"
   },
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "jest": "^30.4.2"
+  }
 }
