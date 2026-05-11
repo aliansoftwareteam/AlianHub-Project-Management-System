@@ -269,14 +269,8 @@ exports.removeSession = (req, cb) => {
             }]
         }
         mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, obj, "deleteMany").then((resData)=>{
-            if (!(resData && resData.deletedCount)) {
-                cb({
-                    status: false,
-                    message: "session not found"
-                });
-                return;
-            }
-            
+            // Treat "no session found" as success — the user is already logged out.
+            // Only propagate failures if the DB operation itself throws (handled in .catch).
             cb({
                 status: true,
                 data: resData,

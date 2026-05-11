@@ -212,7 +212,7 @@ exports.sendInvitationEmailFun = (bodyData) => {
                                     let link = `${config.WEBURL}/#/invitation?companyId=${companyId}-${re._id}`;
                                     sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),re);
                                 } else {
-                                    let link = `${config.WEBURL}/#/verify-invitation?id=${btoa(`userId=${userId}&companyId=${companyId}&docId=${re._id}&linkId=${token}`)})}`;
+                                    let link = `${config.WEBURL}/#/verify-invitation?id=${btoa(`userId=${userId}&companyId=${companyId}&docId=${re._id}&linkId=${token}`)}`;
                                     sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),re);
                                 }
                             }).catch((error) => {
