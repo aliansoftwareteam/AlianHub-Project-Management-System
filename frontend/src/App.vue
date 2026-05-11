@@ -97,7 +97,7 @@ import { useCustomComposable } from '@/composable';
 import { apiRequest,apiRequestWithoutCompnay } from './services';
 import * as env from '@/config/env';
 import {tabSyncHelper} from '@/utils/tabSyncs.js';
-import Cookies from 'js-cookie'
+import { tokenStore } from '@/services/tokenStore';
 const {tabSync} = tabSyncHelper();
 const mainTour = ref();
 
@@ -157,7 +157,7 @@ watch(() => getters['settings/rules'], (val) => {
 	rules.value = val;
 })
 watch(route, (newVal) => {
-	const token = Cookies.get('accessToken') || '';
+	const token = tokenStore.getAccessToken();
     if(newVal?.name === 'Support'){
         if(token && !companyId.value){
             return router.push({name : 'Create_Company'});
@@ -498,7 +498,7 @@ async function changeCompany(cid) {
     try {
         const uid = userId.value || localStorage.getItem("userId");
         const companyDetail = getters['settings/companies'].find((x) => x._id === cid)
-		const token = Cookies.get('accessToken') || '';
+		const token = tokenStore.getAccessToken();
         if(!companyDetail && !getters['settings/companies'].length && token){
             router.push({name : 'Create_Company'});
             return;

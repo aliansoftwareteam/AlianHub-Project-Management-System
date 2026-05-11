@@ -1,5 +1,5 @@
-import Cookies from 'js-cookie';
 import { useCustomComposable } from '@/composable/index.js';
+import { tokenStore } from '@/services/tokenStore';
 const { checkPermission } = useCustomComposable();
 
 export const mutateMongoUpdatedTask = (state, payload) => {
@@ -285,7 +285,7 @@ export const mutateUpdateFirebaseTasks = (state, payload) => {
                     const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data._id);
                     
                     if (data.islocalSnapStop && data.islocalSnapStop === true) {     
-                        if (data.updateToken?.user !== Cookies.get('accessToken')) {     
+                        if (data.updateToken?.user !== tokenStore.getAccessToken()) {
                             if(taskIndex !== -1) {
                                 state.tasks[pid][sprintId].tasks[taskIndex] = {...state.tasks[pid][sprintId].tasks[taskIndex], ...data};
                             }else{

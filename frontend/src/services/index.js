@@ -1,8 +1,8 @@
 import axios from 'axios';
 import * as env from '@/config/env';
-import Cookies from 'js-cookie';
 import Store from "@/store/index";
 import { useCustomComposable } from '@/composable';
+import { tokenStore } from '@/services/tokenStore';
 const { logOut } = useAuth();
 const apiHost = env.API_URI;
 export const axiosInstance = axios.create({ baseURL: apiHost });
@@ -15,7 +15,7 @@ export const axiosInstanceWithoutSecureWithFormData = axios.create({ baseURL: ap
 
 
 axiosInstance.interceptors.request.use((req) => {
-    const token = Cookies.get('accessToken') || '';
+    const token = tokenStore.getAccessToken();
     const companyId = localStorage.getItem('selectedCompany') || "";
     const headers = {
         'Accept': 'application/json',
@@ -30,7 +30,7 @@ axiosInstance.interceptors.request.use((req) => {
 });
 
 axiosInstanceWithFormData.interceptors.request.use((req) => {
-    const token = Cookies.get('accessToken') || '';
+    const token = tokenStore.getAccessToken();
     const companyId = localStorage.getItem('selectedCompany') || "";
     const headers = {
         'Content-Type': 'multipart/form-data',
@@ -44,7 +44,7 @@ axiosInstanceWithFormData.interceptors.request.use((req) => {
 });
 
 axiosInstanceWithoutCompany.interceptors.request.use((req) => {
-    const token = Cookies.get('accessToken') || '';
+    const token = tokenStore.getAccessToken();
     const headers = {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
@@ -57,7 +57,7 @@ axiosInstanceWithoutCompany.interceptors.request.use((req) => {
 });
 
 axiosInstanceWithoutCompanyWithFormData.interceptors.request.use((req) => {
-    const token = Cookies.get('accessToken') || '';
+    const token = tokenStore.getAccessToken();
     const headers = {
         'Content-Type': 'multipart/form-data',
         'Authorization': 'Bearer ' + token
@@ -97,7 +97,7 @@ export const getAuth = async (id,isFirst) => {
         let data = {
             uid: id
         };
-        const refreshToken = Cookies.get('refreshToken') || '';
+        const refreshToken = tokenStore.getRefreshToken();
 
         if(refreshToken){
             let headers = {
@@ -107,6 +107,12 @@ export const getAuth = async (id,isFirst) => {
             };
             let url = env.GENERATETOKEN_V2;
             axios.post(apiHost + url, data, { headers }).then((result) => {
+                // BUG-006 fix: persist the fresh access token in sessionStorage
+                // so subsequent requests can read it via tokenStore (the cookie
+                // is now HttpOnly and unavailable to JS).
+                if (result.data && result.data.token) {
+                    tokenStore.setAccessToken(result.data.token);
+                }
                 if (isFirst) {
                     localStorage.setItem('updateToken', result.data.token)
                 }
@@ -296,8 +302,7 @@ export function useAuth() {
         localStorage.removeItem("webTokens");
         localStorage.removeItem("updateToken");
         localStorage.removeItem('logged');
-        Cookies.remove('refreshToken');
-        Cookies.remove('accessToken');
+        tokenStore.clear();
         if(value?.withOutRefresh !== true){
             window.location.reload();
         }
@@ -305,7 +310,7 @@ export function useAuth() {
 
     async function logOut(data) {
         try {
-            const refreshToken = Cookies.get('refreshToken') || '';
+            const refreshToken = tokenStore.getRefreshToken();
             const userId = localStorage.getItem('userId') || '';
             
             const cleanup = async (value) => {

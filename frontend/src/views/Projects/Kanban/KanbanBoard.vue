@@ -50,7 +50,7 @@
 import { ref, defineProps, nextTick, inject, watch, onMounted, computed } from 'vue'
 import Draggable from 'vuedraggable'
 import { useStore } from "vuex";
-import Cookies from "js-cookie";
+import { tokenStore } from '@/services/tokenStore';
 
 //Cmponents
 import BoardViewTaskCreateVue from "@/views/Projects/Kanban/BoardViewTaskCreate"
@@ -296,7 +296,7 @@ const updateEvent = (event, task) => {
                 status: updatedStatus,
                 'statusType': task.type,
                 'statusKey': task.key,
-                'updateToken': { user: Cookies.get('accessToken'), timeStamp: uniqueeTime },
+                'updateToken': { user: tokenStore.getAccessToken(), timeStamp: uniqueeTime },
                 'islocalSnapStop': true
             }
         }

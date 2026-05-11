@@ -300,7 +300,7 @@ import { taskListHelper, useUpdateTasks } from '@/views/Projects/helper';
 import taskClass from "@/utils/TaskOperations";
 
 // COMPONENTS
-import Cookies from 'js-cookie';
+import { tokenStore } from '@/services/tokenStore';
 import Task from '../Task/Task.vue';
 import { useToast } from 'vue-toast-notification';
 import Toggle from "@/components/atom/Toggle/Toggle.vue";
@@ -937,7 +937,7 @@ function updateItem(type,e, item) {
                     status: updatedStatus,
                     'statusType': item.type,
                     'statusKey': item.key,
-                    'updateToken': {user: Cookies.get('accessToken'),timeStamp: uniqueeTime},
+                    'updateToken': {user: tokenStore.getAccessToken(),timeStamp: uniqueeTime},
                     'islocalSnapStop': true
                 }
             }

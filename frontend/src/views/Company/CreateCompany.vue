@@ -193,6 +193,7 @@
     import { apiRequestWithoutCompnay,useAuth } from "../../services";
     import { useI18n } from "vue-i18n";
     import Cookies from "js-cookie";
+    import { tokenStore } from '@/services/tokenStore';
     import phone from "phone";
     const {makeUniqueId,debounce} = useCustomComposable();
     const { t } = useI18n();
@@ -322,7 +323,7 @@
         (async() => {
             try {
                 const localUserId = localStorage.getItem("userId");
-                const token = Cookies.get('accessToken') || '';
+                const token = tokenStore.getAccessToken();
                 if(companyId.value && token){
                     router.push({name : 'dashboard'});
                     return;

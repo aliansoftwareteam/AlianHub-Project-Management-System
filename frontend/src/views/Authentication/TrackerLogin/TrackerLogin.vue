@@ -11,9 +11,9 @@
 </template>
 <script setup>
     import {onMounted,inject} from 'vue';
-    import Cookies from 'js-cookie';
+    import { tokenStore } from '@/services/tokenStore';
     const userId = inject("$userId");
-    const refreshToken = Cookies.get('refreshToken') || '';
+    const refreshToken = tokenStore.getRefreshToken();
     onMounted(()=>{
         redirect();
     })

@@ -12,6 +12,7 @@ import dashboard from "../plugins/dashboard/router";
 import { apiRequestWithoutCompnay } from '@/services'
 import * as env from '@/config/env';
 import Cookies from 'js-cookie'
+import { tokenStore } from '@/services/tokenStore';
 
 
 const routes = [
@@ -74,7 +75,7 @@ router.beforeEach(async(to, _, next) => {
 		// CHECK META FOR AUTH REQUIRED
 		// const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
 		const requiresAuth = to.meta.requiresAuth;
-		const token = Cookies.get('accessToken') || '';
+		const token = tokenStore.getAccessToken();
 		// SET PAGE TITLE
 		setTitle({title: to.meta.title, prefix: jsonData?.productName ? `${jsonData.productName} | ` : ''});
 

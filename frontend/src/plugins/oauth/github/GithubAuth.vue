@@ -7,7 +7,7 @@
 
 <script setup>
 import { onMounted, ref, defineProps } from "vue";
-import Cookies from 'js-cookie';
+import { tokenStore } from '@/services/tokenStore';
 import { useToast } from 'vue-toast-notification';
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from "vue-i18n";
@@ -109,6 +109,12 @@ const login = async (userInfo) => {
 
         // Call login API
         const user = await apiRequestWithoutSecure("post", env.LOGIN, object);
+        // BUG-006 fix: capture tokens from the JSON response now that the
+        // cookies are HttpOnly.
+        tokenStore.setTokens({
+            accessToken: user?.data?.accessToken,
+            refreshToken: user?.data?.refreshToken,
+        });
         const userId = user.data.uid;
         localStorage.setItem("userId", userId);
 
@@ -120,8 +126,7 @@ const login = async (userInfo) => {
         userData.value = userResponse?.data?.data.userData;
         if (userResponse.data.status == false) {
             localStorage.removeItem("updateToken");
-            Cookies.remove('refreshToken');
-            Cookies.remove('accessToken');
+            tokenStore.clear();
             throw new Error('MongoDB Error from Api')
         }
 
@@ -129,8 +134,7 @@ const login = async (userInfo) => {
         let cid = localStorage.getItem("selectedCompany") ?? companyID;
         if (!uData.isEmailVerified) {
             localStorage.removeItem("updateToken");
-            Cookies.remove('refreshToken');
-            Cookies.remove('accessToken');
+            tokenStore.clear();
             throw new Error("Verify your email and try again");
         }
 
@@ -191,8 +195,7 @@ const login = async (userInfo) => {
             $toast.error(t("Toast.something_went_wrong"), { position: 'top-right' });
         }
         
-        Cookies.remove('refreshToken');
-        Cookies.remove('accessToken');
+        tokenStore.clear();
         localStorage.removeItem("updateToken");
         localStorage.removeItem("userId");
         localStorage.removeItem("isLogging");

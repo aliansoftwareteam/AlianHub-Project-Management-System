@@ -1,5 +1,5 @@
-import Cookies from 'js-cookie';
 import { io } from 'socket.io-client';
+import { tokenStore } from '@/services/tokenStore';
 
 export function socketHelper() {
     function connectServer(serverURL, namespace, query) {
@@ -7,7 +7,7 @@ export function socketHelper() {
             try {
                 let socket = io(`${serverURL}/${namespace}`, {
                     query,
-                    auth: { token: Cookies.get('accessToken') }
+                    auth: { token: tokenStore.getAccessToken() }
                 });
                 socket.on('connect_error', (error) => {
                     reject(error);

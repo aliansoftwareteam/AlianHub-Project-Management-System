@@ -208,8 +208,11 @@ exports.generateTokenV2 = async (req, res) => {
                 return;
             }
             const setCookie = {
+                // BUG-006 / #60 fix: HttpOnly so DOM XSS can't read the cookie.
+                // The token is also returned in the JSON body so the frontend
+                // can stash it in sessionStorage for the Authorization header.
                 maxAge: serviceCtr.convertToSeconds(process.env.JWT_EXP)*1000,
-                httpOnly: false,
+                httpOnly: true,
                 secure: config.NODE_ENV === "production",
                 sameSite: config.NODE_ENV === "production" ? "Strict" : "Lax",
                 domain: process.env.NODE_ENV === "production" ? req.hostname : undefined
@@ -550,8 +553,12 @@ exports.loginAuth = (req, res, next) => {
                             return;
                         }
                         const setCookie = {
+                            // BUG-006 / #60 fix: HttpOnly applies to both
+                            // accessToken and refreshToken cookies. Tokens
+                            // are also in the JSON response below so the
+                            // frontend can stash them in sessionStorage.
                             maxAge: serviceCtr.convertToSeconds(process.env.JWT_EXP)*1000,
-                            httpOnly: false,
+                            httpOnly: true,
                             secure: config.NODE_ENV === "production",
                             sameSite: config.NODE_ENV === "production" ? "Strict" : "Lax",
                             domain: process.env.NODE_ENV === "production" ? req.hostname : undefined,

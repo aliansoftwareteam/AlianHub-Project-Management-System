@@ -111,7 +111,7 @@
 
 <script setup>
 // PACKAGES
-import Cookies from 'js-cookie';
+import { tokenStore } from '@/services/tokenStore';
 import {  defineComponent, inject } from "vue";
 
 // COMPONENTS
@@ -266,24 +266,30 @@ defineComponent({
                 isLoginType: "frontend"
             }
             const user = await apiRequestWithoutSecure("post",env.LOGIN,object);
-            
+
             if (user.status !== 200) {
                 isSpinner.value = false;
                 submitted.value = false;
-                Cookies.remove('refreshToken');
-                Cookies.remove('accessToken');
+                tokenStore.clear();
                 $toast.error(t("Toast.something_went_wrong"), { position: 'top-right' });
                 return; // Exit early
             }
             if(user?.data?.isResetPassword === true){
                 isSpinner.value = false;
                 submitted.value = false;
-                Cookies.remove('refreshToken');
-                Cookies.remove('accessToken');
+                tokenStore.clear();
                 errorMessage.value = t("Toast.Password_reset_link");
                 // $toast.warning(t("Toast.Password_reset_link"),{position: 'top-right'});
                 return;
             }
+            // BUG-006 fix: capture tokens from the JSON response now that the
+            // server-set cookies are HttpOnly. The login endpoint returns both
+            // access and refresh tokens in the body — stash them so subsequent
+            // requests can read them via tokenStore.
+            tokenStore.setTokens({
+                accessToken: user?.data?.accessToken,
+                refreshToken: user?.data?.refreshToken,
+            });
             const userId = user.data.uid;
 
             localStorage.setItem("userId", userId);
@@ -297,8 +303,7 @@ defineComponent({
                 isSpinner.value = false;
                 submitted.value = false;
                 localStorage.removeItem("updateToken");
-                Cookies.remove('refreshToken');
-                Cookies.remove('accessToken');
+                tokenStore.clear();
                 throw new Error('MongoDB Error from Api')
             }
 
@@ -308,8 +313,7 @@ defineComponent({
                 isSpinner.value = false;
                 submitted.value = false;
                 localStorage.removeItem("updateToken");
-                Cookies.remove('refreshToken');
-                Cookies.remove('accessToken');
+                tokenStore.clear();
                 throw new Error("Verify your email and try again");
             }
 
@@ -356,8 +360,7 @@ defineComponent({
             isSpinner.value = false;
             submitted.value = false;
             localStorage.removeItem("updateToken");
-            Cookies.remove('refreshToken');
-            Cookies.remove('accessToken');
+            tokenStore.clear();
             if(error?.response?.data?.isEmailVerified === false && error?.response?.data?.userData) {
                 userData.value = error?.response?.data?.userData;
             }
