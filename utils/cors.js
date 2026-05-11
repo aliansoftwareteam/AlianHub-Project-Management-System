@@ -1,12 +1,10 @@
 /**
- * CORS allow-list helpers — shared between the Express HTTP layer
- * (BUG-002 / #56) and the Socket.io transport (BUG-003 / #57).
+ * CORS allow-list helpers (BUG-002 / #56 fix).
  *
- * Previously both layers accepted `origin: '*'`, which combined with
- * credentialed cookies and JS-readable tokens opened a CSRF / token-theft
- * path from any third-party origin. This module builds an allow-list from
+ * Previously the Express app accepted `cors({origin: '*'})`, so any browser
+ * origin could call any API route. This module builds an allow-list from
  * environment variables and returns an `origin` callback compatible with
- * the `cors` middleware shape used by both Express and engine.io.
+ * the `cors` middleware.
  *
  * Allow-list sources (deduped, trailing slashes stripped):
  *   - WEBURL          (the configured frontend URL — required in prod)
