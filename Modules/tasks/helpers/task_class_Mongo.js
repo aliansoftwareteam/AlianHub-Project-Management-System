@@ -5,7 +5,7 @@ const { HandleHistory,HandleTask,convertToSubTaskFunction, moveTaskFunction, con
 const { createTask, taskAssigneeAdd, taskAssigneeRemove,taskAssigneeReplace, taskNameEdit, taskPriorityChange, taskStatusChange, taskAttachmentAdd, taskAttachmentRemove, taskTypeChage, taskTotalEstimate } = require('./notificationTemplate')
 const { HandleBothNotification } = require("./handleNotification")
 const logger = require("../../../Config/loggerConfig")
-const { addSprintFun, updateSprintFun } = require("../../sprints/controller")
+const { addSprintFun, updateSprintFun } = require("../../Sprints/controller")
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { default: mongoose } = require("mongoose")
@@ -15,11 +15,11 @@ const { buildQueryObject, buildHistoryObject, convertToDisplayFormat } = require
 const socketEmitter = require('../../../event/socketEventEmitter');
 const { addCommentCollection, updateCommentCollection } = require('../../Comments/controller')
 const { updateMainChat } = require('../../MainChats/controller');
-const { replaceObjectKey } = require("../../auth/helper");
+const { replaceObjectKey } = require("../../Auth/helper");
 const { emitListener } = require("../../Company/eventController.js");
 const { createCustomFields } = require("./helper.js");
 const { removeCache } = require('../../../utils/commonFunctions.js');
-const { updateRemainingTime } = require('../../logTime/controllerV2.js');
+const { updateRemainingTime } = require('../../LogTime/controllerV2.js');
 class Task {
     create({data, user, projectData ,indexObj, setNotif}) {
         return new Promise((resolve,reject) => {

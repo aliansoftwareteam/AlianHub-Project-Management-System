@@ -1,7 +1,7 @@
 const { default: mongoose } = require("mongoose");
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
-const { replaceObjectKey, relapceUndefinedvals } = require("../../auth/helper");
+const { replaceObjectKey, relapceUndefinedvals } = require("../../Auth/helper");
 
 exports.getTaskByQyery = async(req,res) => {
     try {

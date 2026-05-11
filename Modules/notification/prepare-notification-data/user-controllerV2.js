@@ -1,5 +1,5 @@
 const { default: mongoose } = require("mongoose");
-const { getUserByQueyFun } = require("../../usersModule/controller");
+const { getUserByQueyFun } = require("../../Users/controller");
 const { schema } = require("../../../utils/mongo-handler/schema");
 exports.getUsersDetails = (UserIDs) => {
    return new Promise((resolve, reject) => {

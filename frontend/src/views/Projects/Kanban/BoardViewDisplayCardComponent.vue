@@ -139,7 +139,7 @@
                             :class="(myCounts || myParentCounts) > 0 ? 'mr-5px' : ''"
                             :style="`border-radius: ${element?.DueDate ? '5px' : '50%'}; padding: ${element?.DueDate ? '3px 6px' : '6px'};`"
                         >
-                            <img class="mr-5px" v-if="element?.DueDate" src="@/assets/images/svg/compoment_inactive_icons/comp_calender_inactive.svg" />
+                            <img class="mr-5px" v-if="element?.DueDate" src="@/assets/images/svg/component-inactive-icons/comp_calender_inactive.svg" />
                             <DueDateCompo
                                 v-if="!showArchiveVar && checkPermission('task.task_due_date',projectData?.isGlobalPermission) === true && checkPermission('task.task_list',projectData?.isGlobalPermission) === true && showArchiveVar === false" 
                                 id="due-date-task"

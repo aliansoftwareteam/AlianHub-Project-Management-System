@@ -7,7 +7,7 @@ const ctr = require("../controller");
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const mongoose = require("mongoose");
 const { importUserNotifications } = require("../../../utils/data");
-const { addAndRemoveUserInMongodbNotificationCount } = require("../../auth/controller");
+const { addAndRemoveUserInMongodbNotificationCount } = require("../../Auth/controller");
 
 
 exports.authenticateToken = "";

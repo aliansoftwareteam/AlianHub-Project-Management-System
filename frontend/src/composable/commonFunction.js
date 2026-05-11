@@ -119,58 +119,58 @@ export const projectComponentsIcons = (key) => {
 
     let data = [
         {
-            icon: require("@/assets/images/svg/compoment_inactive_icons/comp_list_inactive.svg"),
-            activeIcon: require("@/assets/images/svg/compoment_active_icons/comp_list_active.svg"),
+            icon: require("@/assets/images/svg/component-inactive-icons/comp_list_inactive.svg"),
+            activeIcon: require("@/assets/images/svg/component-active-icons/comp_list_active.svg"),
             keyName: "ProjectListView"
         },
         {
-            icon: require("@/assets/images/svg/compoment_inactive_icons/comp_board_inactive.svg"),
-            activeIcon: require("@/assets/images/svg/compoment_active_icons/comp_board_active.svg"),
+            icon: require("@/assets/images/svg/component-inactive-icons/comp_board_inactive.svg"),
+            activeIcon: require("@/assets/images/svg/component-active-icons/comp_board_active.svg"),
             keyName: "ProjectKanban"
         },
         {
-            icon: require("@/assets/images/svg/compoment_inactive_icons/comp_project_detail_inactive.svg"),
-            activeIcon: require("@/assets/images/svg/compoment_active_icons/comp_project_details_active.svg"),
+            icon: require("@/assets/images/svg/component-inactive-icons/comp_project_detail_inactive.svg"),
+            activeIcon: require("@/assets/images/svg/component-active-icons/comp_project_details_active.svg"),
             keyName: "ProjectDetail"
         },
         {
-            icon: require("@/assets/images/svg/compoment_inactive_icons/comp_comments_inactive.svg"),
-            activeIcon: require("@/assets/images/svg/compoment_active_icons/comp_comments_active.svg"),
+            icon: require("@/assets/images/svg/component-inactive-icons/comp_comments_inactive.svg"),
+            activeIcon: require("@/assets/images/svg/component-active-icons/comp_comments_active.svg"),
             keyName: "Comments"
         },
         {
-            icon: require("@/assets/images/svg/compoment_inactive_icons/comp_calender_inactive.svg"),
-            activeIcon: require("@/assets/images/svg/compoment_active_icons/comp_calender_active.svg"),
+            icon: require("@/assets/images/svg/component-inactive-icons/comp_calender_inactive.svg"),
+            activeIcon: require("@/assets/images/svg/component-active-icons/comp_calender_active.svg"),
             keyName: "Calendar"
         },
         {
-            icon: require("@/assets/images/svg/compoment_inactive_icons/comp_activity_inactive.svg"),
-            activeIcon: require("@/assets/images/svg/compoment_active_icons/comp_activity_active.svg"),
+            icon: require("@/assets/images/svg/component-inactive-icons/comp_activity_inactive.svg"),
+            activeIcon: require("@/assets/images/svg/component-active-icons/comp_activity_active.svg"),
             keyName: "ActivityLog"
         },
         {
-            icon: require("@/assets/images/svg/compoment_inactive_icons/comp_workload_inactive.svg"),
-            activeIcon: require("@/assets/images/svg/compoment_active_icons/comp_workload_active.svg"),
+            icon: require("@/assets/images/svg/component-inactive-icons/comp_workload_inactive.svg"),
+            activeIcon: require("@/assets/images/svg/component-active-icons/comp_workload_active.svg"),
             keyName: "Workload"
         },
         {
-            icon: require("@/assets/images/svg/compoment_inactive_icons/comp_gantt_inactive.svg"),
-            activeIcon: require("@/assets/images/svg/compoment_active_icons/comp_gantt_active.svg"),
+            icon: require("@/assets/images/svg/component-inactive-icons/comp_gantt_inactive.svg"),
+            activeIcon: require("@/assets/images/svg/component-active-icons/comp_gantt_active.svg"),
             keyName: "Gantt"
         },
         {
-            icon: require("@/assets/images/svg/compoment_inactive_icons/comp_table_inactive.svg"),
-            activeIcon: require("@/assets/images/svg/compoment_active_icons/comp_table_active.svg"),
+            icon: require("@/assets/images/svg/component-inactive-icons/comp_table_inactive.svg"),
+            activeIcon: require("@/assets/images/svg/component-active-icons/comp_table_active.svg"),
             keyName: "TableView"
         },
         {
-            icon: require("@/assets/images/svg/compoment_inactive_icons/comp_timeline_inactive.svg"),
-            activeIcon: require("@/assets/images/svg/compoment_active_icons/comp_timeline_active.svg"),
+            icon: require("@/assets/images/svg/component-inactive-icons/comp_timeline_inactive.svg"),
+            activeIcon: require("@/assets/images/svg/component-active-icons/comp_timeline_active.svg"),
             keyName: "Timeline"
         },
         {
-            icon: require("@/assets/images/svg/compoment_inactive_icons/comp_embed_inactive.svg"),
-            activeIcon: require("@/assets/images/svg/compoment_active_icons/comp_embed_active.svg"),
+            icon: require("@/assets/images/svg/component-inactive-icons/comp_embed_inactive.svg"),
+            activeIcon: require("@/assets/images/svg/component-active-icons/comp_embed_active.svg"),
             keyName: "Embed"
         }
     ];

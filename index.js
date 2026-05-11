@@ -110,13 +110,13 @@ function initializeControllers() {
         }
     })
     //IMPORT CUSTOM FILES
-    require('./Modules/auth/init').init(app);
+    require('./Modules/Auth/init').init(app);
     require('./Modules/notification1/init').init(app);
-    require('./Modules/import_settings/init').init(app);
-    require('./Modules/tasks/init.js').init(app);
-    require('./Modules/sprints/init.js').init(app);
-    require('./Modules/logTime/init.js').init(app);
-    require('./Modules/milestone/init.js').init(app);
+    require('./Modules/ImportSettings/init').init(app);
+    require('./Modules/Tasks/init.js').init(app);
+    require('./Modules/Sprints/init.js').init(app);
+    require('./Modules/LogTime/init.js').init(app);
+    require('./Modules/Milestone/init.js').init(app);
     require('./Modules/Company/init.js').init(app);
     require('./Modules/trackerDownload/init.js').init(app);
     require('./Modules/notification/notification-middleware/init').init(app);
@@ -127,26 +127,26 @@ function initializeControllers() {
     require('./Modules/notification-count/init').init(app);
     require('./Modules/notification/sendEmail/init').init(app);
     require('./Modules/trackerUserPermission/init').init(app);
-    require('./Modules/checkinstallstep/init').init(app);
+    require('./Modules/CheckInstallStep/init').init(app);
     require('./Modules/SaasAdmin/init').init(app);
     if(process.env.NODE_ENV === "production") {
         require('./cron.js')
     }
     require('./Modules/Admin/admin.js').init(app);
     require('./Modules/emailTemplate/init').init(app);
-    require('./Modules/email-notification/init').init(app);
+    require('./Modules/EmailNotification/init').init(app);
     require(`./Modules/storage/${currentDirectory}/init`).init(app);
     require('./Modules/AI/init').init(app);
-    require('./Modules/usersModule/init').init(app);
+    require('./Modules/Users/init').init(app);
     require('./Modules/Project/init').init(app);
     require('./Modules/Teams/init').init(app);
     require('./Modules/tours/init').init(app);
-    require('./Modules/AdvanceGlobalFilter/init.js').init(app);
+    require('./Modules/AdvancedGlobalFilter/init.js').init(app);
     require('./Modules/settings/settingCurrency/init').init(app);
     require('./Modules/settings/settingNotifications/init').init(app);
     require('./Modules/projectRules/init').init(app);
     require('./Modules/EstimatedTime/init').init(app);
-    require('./Modules/customField/init').init(app);
+    require('./Modules/CustomField/init').init(app);
     require('./Modules/ProjectTemplates/init').init(app);
     require('./Modules/settings/templates/init').init(app);
     require('./Modules/settings/ProjectStatusTemplate/init').init(app);
@@ -172,12 +172,12 @@ function initializeControllers() {
     require('./Modules/MediaFiles/init').init(app);
     require("./Modules/SubscriptionPlan/init").init(app);
     require("./Modules/subscription/init").init(app);
-    require("./Modules/PlaneFeature/init").init(app);
+    require("./Modules/PlanFeature/init").init(app);
     require("./Modules/Invoice/init").init(app);
     require("./Modules/generateMongoId/init").init(app);
     require("./Modules/UserDashboard/init.js").init(app);
-    require("./Modules/affiliate/init").init(app);
-    require("./Modules/oAuth/init.js").init(app);
+    require("./Modules/Affiliate/init").init(app);
+    require("./Modules/OAuth/init.js").init(app);
     require("./Modules/githubOAuth/init.js").init(app);
     require("./Modules/googleOAuth/init.js").init(app);
 }
@@ -206,7 +206,7 @@ if (!process.env.STORAGE_TYPE) {
     process.env.STORAGE_TYPE = "wasabi";
 }
 
-require('./Modules/checkinstallstep/init').init(app);
+require('./Modules/CheckInstallStep/init').init(app);
 
 // SWAGGER CONFIGURATION
 require('./Modules/swaggerAPI/init').init(app, config.APIURL);

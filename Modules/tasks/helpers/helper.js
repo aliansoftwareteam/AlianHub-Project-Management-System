@@ -5,7 +5,7 @@ const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { taskCheckListEdit, taskCheckList, taskCheckListRemove, taskCheckListChecked, taskCheckListAssignee, taskCheckListAssigneeRemove } = require('./notificationTemplate');
 const { default: mongoose } = require("mongoose");
-const { insertCustomFieldPromise } = require('../../customField/controller');
+const { insertCustomFieldPromise } = require('../../CustomField/controller');
 
 
 /* ------------- HANDLE HISTIRY FOR ALL THE ACTIVITIES ------------- */

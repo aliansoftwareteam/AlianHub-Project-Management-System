@@ -3,7 +3,7 @@ const {removeCache} = require('../../../utils/commonFunctions');
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { default: mongoose } = require("mongoose");
-const { replaceObjectKey } = require("../../auth/helper");
+const { replaceObjectKey } = require("../../Auth/helper");
 const socketEmitter = require("../../../event/socketEventEmitter");
 
 exports.updateCompany = async(req,res) => {
