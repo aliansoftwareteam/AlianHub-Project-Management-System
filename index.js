@@ -172,12 +172,12 @@ function initializeControllers() {
     require('./Modules/MediaFiles/init').init(app);
     require("./Modules/SubscriptionPlan/init").init(app);
     require("./Modules/subscription/init").init(app);
-    require("./Modules/PlaneFeature/init").init(app);
+    require("./Modules/PlanFeature/init").init(app);
     require("./Modules/Invoice/init").init(app);
     require("./Modules/generateMongoId/init").init(app);
     require("./Modules/UserDashboard/init.js").init(app);
-    require("./Modules/affiliate/init").init(app);
-    require("./Modules/oAuth/init.js").init(app);
+    require("./Modules/Affiliate/init").init(app);
+    require("./Modules/OAuth/init.js").init(app);
     require("./Modules/githubOAuth/init.js").init(app);
     require("./Modules/googleOAuth/init.js").init(app);
 }

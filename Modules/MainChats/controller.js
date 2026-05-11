@@ -2,7 +2,7 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { myCache } = require('../../Config/config');
 const { removeCache } = require("../../utils/commonFunctions");
-const { replaceObjectKey } = require("../auth/helper");
+const { replaceObjectKey } = require("../Auth/helper");
 const logger = require('../../Config/loggerConfig.js');
 exports.getChats = async (req, res) => {
     try {

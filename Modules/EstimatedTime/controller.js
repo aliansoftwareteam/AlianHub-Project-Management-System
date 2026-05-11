@@ -2,7 +2,7 @@ const { default: mongoose } = require("mongoose");
 const loggerConfig = require("../../Config/loggerConfig");
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
-const { replaceObjectKey } = require("../auth/helper");
+const { replaceObjectKey } = require("../Auth/helper");
 const socketEmitter = require("../../event/socketEventEmitter");
 
 exports.getEstimatedTime = async(req,res) => {

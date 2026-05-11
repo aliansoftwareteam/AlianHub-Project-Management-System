@@ -1,13 +1,13 @@
 // const AWS = require('aws-sdk');
 const { SCHEMA_TYPE } = require("../../Config/schemaType.js");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries.js");
-const iCtr = require('../import_settings/controller.js');
-const { addAndRemoveUserInMongodbNotificationCount } = require("../auth/controller.js");
+const iCtr = require('../ImportSettings/controller.js');
+const { addAndRemoveUserInMongodbNotificationCount } = require("../Auth/controller.js");
 const logger = require('../../Config/loggerConfig.js');
 const { default: mongoose } = require("mongoose");
 const { emitListener } = require("./eventController.js");
-const createUserRef = require("../auth/controller/createUser.js");
-const sendMailRef = require("../auth/controller/sendVerificationMail.js")
+const createUserRef = require("../Auth/controller/createUser.js");
+const sendMailRef = require("../Auth/controller/sendVerificationMail.js")
 const { dbCollections } = require("../../Config/collections.js");
 // const { installSteps, envVar } = require("./controller.js");
 const mainCtr = require("./controller.js");
@@ -15,8 +15,8 @@ const installStepsFilePath = __dirname + "/../../installationSteps.json";
 const defaultSubscriptionDataRef = require("./defaultSubscriptionData.js")
 const serviceFun = require("../serviceFunction.js");
 const { updateCompanyFun } = require("../Company/controller/updateCompany.js");
-const { updateUserFun, getUserByQueyFun } = require("../usersModule/controller.js");
-const { storeRefferalCode } = require("../affiliate/controller.js");
+const { updateUserFun, getUserByQueyFun } = require("../Users/controller.js");
+const { storeRefferalCode } = require("../Affiliate/controller.js");
 const { handleCreateCompanyDataStorageFun } = require(`../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
 
 

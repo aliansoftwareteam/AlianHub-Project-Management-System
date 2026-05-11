@@ -1,5 +1,5 @@
-const { HandleBothNotification } = require('../tasks/helpers/handleNotification');
-const { HandleHistory } = require('../tasks/helpers/helper');
+const { HandleBothNotification } = require('../Tasks/helpers/handleNotification');
+const { HandleHistory } = require('../Tasks/helpers/helper');
 
 exports.init = (app) => {
     /**

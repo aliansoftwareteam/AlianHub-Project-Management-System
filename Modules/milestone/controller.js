@@ -1,10 +1,10 @@
 const { myCache } = require("../../Config/config");
 const { removeCache } = require("../../utils/commonFunctions");
-const {HandleBothNotification} = require("../tasks/helpers/handleNotification");
+const {HandleBothNotification} = require("../Tasks/helpers/handleNotification");
 const logger = require("../../Config/loggerConfig");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries.js");
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
-const hlp = require("../tasks/helpers/helper");
+const hlp = require("../Tasks/helpers/helper");
 const {updateProjectInternal} = require("../Project/controller/updateProject.js");
 const mongoose = require("mongoose")
 const { settingsCollectionDocs } = require("../../Config/collections");

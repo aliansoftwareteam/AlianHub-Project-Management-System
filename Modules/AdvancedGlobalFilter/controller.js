@@ -2,7 +2,7 @@ const mongoose = require("mongoose")
 const logger = require("../../Config/loggerConfig");
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
-const { replaceObjectKey } = require("../auth/helper");
+const { replaceObjectKey } = require("../Auth/helper");
 
 /**
  * Helper functions

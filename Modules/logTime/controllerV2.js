@@ -1,7 +1,7 @@
 const { DateTime } = require('luxon');
-const hlp = require("../tasks/helpers/helper");
-const notiTemp = require("../tasks/helpers/notificationTemplate")
-const { HandleBothNotification } = require("../tasks/helpers/handleNotification");
+const hlp = require("../Tasks/helpers/helper");
+const notiTemp = require("../Tasks/helpers/notificationTemplate")
+const { HandleBothNotification } = require("../Tasks/helpers/handleNotification");
 const moment = require("moment");
 const logger = require("../../Config/loggerConfig");
 const { SCHEMA_TYPE } = require("../../Config/schemaType")
@@ -9,7 +9,7 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const mongoose = require("mongoose")
 
 const fs = require("fs");
-const { updateUserFun } = require('../usersModule/controller');
+const { updateUserFun } = require('../Users/controller');
 const { myCache } = require('../../Config/config');
 const { updateProjectInternal } = require('../Project/controller/updateProject');
 const loggerConfig = require('../../Config/loggerConfig');

@@ -1,5 +1,5 @@
 const { SCHEMA_TYPE } = require("../../Config/schemaType.js");
-const { replaceObjectKey } = require("../auth/helper");
+const { replaceObjectKey } = require("../Auth/helper");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries.js");
 
 exports.getSubscriptions = async(req, res) => {

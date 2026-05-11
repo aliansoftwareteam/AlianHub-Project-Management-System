@@ -3,7 +3,7 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const mongoose = require("mongoose")
 const logger = require("../../Config/loggerConfig");
 const { handleTaskAttachmentsDuplicateFunctionality } = require(`../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
-const { replaceObjectKey } = require("../auth/helper");
+const { replaceObjectKey } = require("../Auth/helper");
 const socketEmitter = require('../../event/socketEventEmitter');
 /**
  * This endpoint is used to save data in comments collection

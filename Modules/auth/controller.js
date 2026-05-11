@@ -11,7 +11,7 @@ const helperCtr = require("./helper.js");
 const sesstionCtr = require("./session.js");
 const mongoose = require("mongoose");
 const { removeCache } = require("../../utils/commonFunctions.js");
-const { updateUserFun } = require("../usersModule/controller.js");
+const { updateUserFun } = require("../Users/controller.js");
 
 
 

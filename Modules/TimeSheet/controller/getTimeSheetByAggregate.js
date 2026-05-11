@@ -1,6 +1,6 @@
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
-const { replaceObjectKey } = require("../../auth/helper");
+const { replaceObjectKey } = require("../../Auth/helper");
 
 exports.getTimeSheetByAggregate = async (req,res) => {
     try {
