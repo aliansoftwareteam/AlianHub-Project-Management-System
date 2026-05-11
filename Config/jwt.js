@@ -4,6 +4,23 @@ const mongoC = require("../utils/mongo-handler/mongoQueries");
 const { dbCollections } = require("../Config/collections.js");
 const {myCache} = require('./config');
 
+// Mongo ObjectId pattern — used to reject regex/control characters in the
+// `companyid` request header before any token-membership check.
+const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
+
+// Strict membership check against a JWT `aud` claim that may be a comma-joined
+// string (current shape — see `generateJWTToken`) or an array. Replaces the
+// previous `new RegExp(companyId)` audience option, which let header values
+// like `.*` match any audience and cross tenants.
+const isCompanyInAudience = (audClaim, companyId) => {
+    if (!audClaim || !companyId) return false;
+    const list = Array.isArray(audClaim)
+        ? audClaim
+        : String(audClaim).split(',');
+    const target = String(companyId).trim();
+    return list.some((entry) => String(entry).trim() === target);
+};
+
 
 const generateToken = (time) => {
     return jwt.sign({}, process.env.JWT_SECRET, {
@@ -172,16 +189,23 @@ const verifyJWTTokenWithC = (req, res, next) => {
                 isJwtError: true
             });
         }
+        if (!OBJECT_ID_PATTERN.test(companyId)) {
+            return res.status(401).json({
+                status: false,
+                error: 'Invalid company id',
+                statusText: 'Unauthorized',
+                isJwtError: true
+            });
+        }
         if (token) {
             if (token.startsWith('Bearer ')) {
                 // Remove Bearer from string
                 token = token.slice(7, token.length);
             }
-            const generateRegex = new RegExp(companyId, '');
-            const isValid = jwt.verify(token, process.env.JWT_SECRET, {audience: generateRegex});
-            if (isValid) {
+            const isValid = jwt.verify(token, process.env.JWT_SECRET);
+            if (isValid && isCompanyInAudience(isValid.aud, companyId)) {
                 const { uid } = isValid;
-                
+
                 req.uid = uid;
                 next();
             } else {
@@ -223,14 +247,30 @@ const verifyJWTTokenWithCV2 = (req, res, next) => {
             isJwtError: true
         });
     }
+    if (!OBJECT_ID_PATTERN.test(companyId)) {
+        return res.status(401).json({
+            status: false,
+            error: 'Invalid company id',
+            statusText: 'Unauthorized',
+            isJwtError: true
+        });
+    }
     if (token) {
         try {
             if (token.startsWith('Bearer ')) {
                 // Remove Bearer from string
                 token = token.slice(7, token.length);
             }
-            const generateRegex = new RegExp(companyId, '');
-            const isValid = jwt.verify(token, process.env.JWT_SECRET, {audience: generateRegex});
+            const isValid = jwt.verify(token, process.env.JWT_SECRET);
+            if (!isCompanyInAudience(isValid.aud, companyId)) {
+                res.clearCookie('accessToken');
+                return res.status(401).json({
+                    status: false,
+                    error: 'Unauthorized',
+                    statusText: 'Unauthorized',
+                    isJwtError: true
+                });
+            }
             checkToken(isValid, req, res, next);
         } catch (error) {
             res.clearCookie('accessToken');
