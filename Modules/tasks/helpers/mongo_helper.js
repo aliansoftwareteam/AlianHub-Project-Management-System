@@ -77,23 +77,33 @@ exports.HandleTask = async (companyId, object, isUpdate, id = null, userData) =>
 
                 const sanitizedNewTaskName = serviceFun.sanitizeInput(object.TaskName);
                 MongoDbCrudOpration(companyId, objSchema, isUpdate ? 'updateOne' : 'save')
-                    .then((response) => {
+                    .then(async (response) => {
                         socketEmitter.emit('insert', { type: "insert", data: response , module: 'task'});
-                        resolve({ status: true, id: isUpdate? id : response._id, message: "Task created successfully." });
                         const historyObj = {
                             message: `<b>${userData.Employee_Name}</b> has created new <b>${sanitizedNewTaskName}</b> ${object.TaskType.replace(/_/g, '-')}.`,
                             key: "Task_Created",
                             sprintId: object.sprintId,
                             mainChat: object?.mainChat || false
                         }
-                        exports.HandleHistory('task', companyId, object.ProjectID, isUpdate? id : response._id, historyObj, userData)
-                        .catch((error) => {
-                            reject(error);
-                        })
-                        exports.HandleHistory('project',companyId, object.ProjectID, null, historyObj, userData)
-                        .catch((error) => {
-                            reject(error);
-                        })
+                        // BUG-016 / #70 fix: previously this block called
+                        // `resolve(...)` first and then chained two
+                        // `HandleHistory(...).catch(reject)` calls. Calling
+                        // `reject` on an already-settled Promise is a no-op,
+                        // so history failures were silently swallowed. Await
+                        // both history calls via `Promise.allSettled` (so a
+                        // failure on one doesn't block the other) and log
+                        // any failures before resolving.
+                        await Promise.allSettled([
+                            exports.HandleHistory('task', companyId, object.ProjectID, isUpdate ? id : response._id, historyObj, userData)
+                                .catch((error) => {
+                                    logger.error(`HandleTask task-history error: ${error && error.message ? error.message : error}`);
+                                }),
+                            exports.HandleHistory('project', companyId, object.ProjectID, null, historyObj, userData)
+                                .catch((error) => {
+                                    logger.error(`HandleTask project-history error: ${error && error.message ? error.message : error}`);
+                                }),
+                        ]);
+                        resolve({ status: true, id: isUpdate ? id : response._id, message: "Task created successfully." });
                     }).catch(error => {
                         reject(error);
                     })
@@ -333,7 +343,13 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                         });
                     }
                 }).catch((error) => {
-                    reject(error);
+                    // BUG-016 / #70 fix: this `.catch` is chained to the
+                    // inner `MongoDbCrudOpration().then(...)`. By the time
+                    // this fires, the outer Promise may already have been
+                    // resolved by the inner `resolve({status:true, ...})`,
+                    // so `reject(error)` would be a no-op. Log instead so
+                    // the failure is visible.
+                    logger.error(`convertToSubTaskFunction inner update error: ${error && error.message ? error.message : error}`);
                 })
             })
         } catch (error) {
