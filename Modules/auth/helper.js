@@ -162,8 +162,31 @@ exports.sendTooManyRequestMail = (ip, data) => {
 }
 
 
+/**
+ * Auth rate-limit configuration (BUG-012 / #66 fix).
+ *
+ * The previous implementation hard-coded 9 attempts inside a 10-minute
+ * window with a 10-minute block — permissive enough to let a patient
+ * attacker grind ~9 attempts per IP per 10 minutes indefinitely. The
+ * variable name (`fiveMinutes`) also disagreed with its value (10 min).
+ *
+ * Move the three knobs to environment variables with safer defaults:
+ *   - AUTH_RATE_LIMIT_MAX_ATTEMPTS    default 5
+ *   - AUTH_RATE_LIMIT_WINDOW_MS       default 15 min
+ *   - AUTH_RATE_LIMIT_BLOCK_MS        default 30 min
+ *
+ * Read at request time so an operator can adjust without restarting.
+ * Exported for the regression test at .claude/tests/test-bug-012.js.
+ */
+exports.getRateLimitConfig = () => ({
+    MAX_ATTEMPTS: Math.max(1, Number(process.env.AUTH_RATE_LIMIT_MAX_ATTEMPTS) || 5),
+    WINDOW_MS: Math.max(1000, Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000),
+    BLOCK_MS: Math.max(1000, Number(process.env.AUTH_RATE_LIMIT_BLOCK_MS) || 30 * 60 * 1000),
+});
+
 exports.manageResetAttempt = (ip, data, cb) => {
     try {
+        const { MAX_ATTEMPTS, WINDOW_MS, BLOCK_MS } = exports.getRateLimitConfig();
         const managecount = (attempt) => {
             const now = new Date();
             // Check if the user is blocked
@@ -177,9 +200,9 @@ exports.manageResetAttempt = (ip, data, cb) => {
                 };
             }
 
-            // Reset the attempt count if more than 10 minutes have passed since the first attempt
-            const fiveMinutes = 10 * 60 * 1000;
-            if (now - attempt.firstAttemptTime > fiveMinutes) {
+            // Reset the attempt count if the rolling window has passed
+            // since the first attempt in this series.
+            if (attempt.firstAttemptTime && (now - attempt.firstAttemptTime > WINDOW_MS)) {
                 attempt.attempts = 0;
                 attempt.firstAttemptTime = now;
                 attempt.blockedUntil = null;
@@ -187,8 +210,8 @@ exports.manageResetAttempt = (ip, data, cb) => {
 
             // Increment attempts and check limit
             attempt.attempts += 1;
-            if (attempt.attempts > 9) {
-                attempt.blockedUntil = new Date(now.getTime() + 10 * 60 * 1000); // Block for 10 minutes
+            if (attempt.attempts >= MAX_ATTEMPTS) {
+                attempt.blockedUntil = new Date(now.getTime() + BLOCK_MS);
                 attempt.attempts = 0; // Reset attempt count after blocking
                 attempt.firstAttemptTime = null; // Clear the first attempt time after blocking
             }
