@@ -1,4 +1,7 @@
-const moment = require('moment');
+// BUG-042 / #96 — replaced `moment` with luxon. Used only by
+// `changeDateFormat`; `formatDate` accepts moment-style tokens via the
+// luxon mapping baked into the helper.
+const { formatDate } = require('../../../utils/dateHelpers');
 const logger = require("../../../Config/loggerConfig");
 const { DateTime } = require('luxon');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
@@ -55,11 +58,12 @@ exports.HandleHistory = (type, companyId, projectId, taskId, object, userData) =
 
 /* ------------- HANDLE HISTIRY FOR ALL THE ACTIVITIES ------------- */
 exports.changeDateFormat = (date, format) => {
-    if (date.seconds) {
-        return moment(new Date(date.seconds * 1000)).format(format);
-    } else {
-        return moment(new Date(date)).format(format);
+    // BUG-042 / #96: luxon-backed helper accepts moment-style tokens
+    // (YYYY, MM, DD, …) so callers don't need to change.
+    if (date && date.seconds) {
+        return formatDate(date.seconds * 1000, format);
     }
+    return formatDate(date, format);
 }
 
 //Checklist history Object
