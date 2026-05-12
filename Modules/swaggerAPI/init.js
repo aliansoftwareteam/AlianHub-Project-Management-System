@@ -21,8 +21,8 @@ exports.init = (app, apiUrl) => {
             ],
         },
         apis: [
-            "./Modules/auth/routes.js",
-            "./Modules/auth/routes2.js",
+            "./Modules/Auth/routes.js",
+            "./Modules/Auth/routes2.js",
             "./Modules/notification1/routes.js",
             "./Modules/import_settings1/routes.js",
             "./Modules/remove-sprint-operations/routes.js",

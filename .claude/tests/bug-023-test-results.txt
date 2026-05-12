@@ -1,0 +1,31 @@
+
+=== getLimits — defaults / env ===
+  PASS  default MAX_BYTES is 25 MB
+  PASS  default MAX_PIXELS is 50 megapixels
+  PASS  env override MAX_BYTES applies
+  PASS  env override MAX_PIXELS applies
+  PASS  zero MAX_BYTES is clamped to defaults
+  PASS  non-numeric MAX_PIXELS falls back to default
+
+=== checkFileSizeBytes — threshold ===
+  PASS  512 bytes passes
+  PASS  2048 bytes throws ImageGuardError
+  PASS  error carries statusCode 413
+
+=== guardBuffer — pixel-bomb rejection ===
+  PASS  8×8 buffer (≤ limit) passes
+  PASS  16×16 buffer is rejected (pixel-bomb)
+  PASS  rejection details include width/height/pixels
+
+=== guardFile — file size + dimensions ===
+  PASS  5×5 file (25 pixels) passes both limits
+  PASS  20×20 file is rejected on pixel count
+  PASS  checkPathSize rejects files > MAX_BYTES
+
+=== source — every sharp() callsite is preceded by a guard ===
+  PASS  Modules\storage\wasabi\controller.js imports imageGuard
+  PASS  Modules\storage\server\helpers\bucket.helper.js imports imageGuard
+
+========================================
+Tests: 17 | Passed: 17 | Failed: 0
+========================================

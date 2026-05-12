@@ -1,0 +1,246 @@
+const logger = require("../../../Config/loggerConfig");
+const { default: mongoose } = require("mongoose");
+const { SCHEMA_TYPE } = require("../../../Config/schemaType");
+const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
+const { dbCollections } = require("../../../Config/collections");
+const { addAndRemoveUserInMongodbNotificationCount } = require("../controller");
+// BUG-040 / #94 — drop the `atob` npm shim; Node has had `atob`
+// available as a runtime global since v16. Same intent (decode a
+// base64 string), one less unmaintained dependency, smaller install.
+const atob = (input) => Buffer.from(input, 'base64').toString('binary');
+const { updateUserFun, getUserByQueyFun } = require("../../Users/controller");
+const { updateMemberFunction } = require('../../settings/Members/controller');
+
+/**
+ * BUG-011 / #65 fix: parse the base64 invitation blob into a *local*
+ * object with a fixed key allow-list. Previously the handler did:
+ *
+ *     for (let i = 0; i < idArray.length; i += 1) {
+ *         const aidArray = idArray[i].split('=');
+ *         finalObj[aidArray[0]] = aidArray[1];
+ *     }
+ *     req.body = finalObj;
+ *
+ * — i.e. any key in the attacker-controlled blob was merged into
+ * `req.body` and downstream code (here and elsewhere) saw whatever the
+ * attacker wanted under whatever name.
+ *
+ * Now: build a local object, only copy keys from a fixed allow-list,
+ * and leave `req.body` untouched.
+ */
+const ALLOWED_INVITE_KEYS = new Set(['userId', 'companyId', 'linkId', 'docId']);
+
+// Strict base64 check — the npm `atob` package is permissive and happily
+// returns garbage on malformed input, so we gate on the alphabet first.
+const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
+
+exports.parseInviteBlob = (encoded) => {
+    if (typeof encoded !== 'string' || !encoded) return null;
+    if (!BASE64_RE.test(encoded)) return null;
+    let decoded;
+    try {
+        decoded = atob(encoded);
+    } catch (_) {
+        return null;
+    }
+    if (typeof decoded !== 'string' || !decoded) return null;
+    const out = {};
+    const parts = decoded.split('&');
+    for (let i = 0; i < parts.length; i += 1) {
+        const eq = parts[i].indexOf('=');
+        if (eq < 0) continue;
+        const key = parts[i].slice(0, eq);
+        const value = parts[i].slice(eq + 1); // preserve any `=` inside the value
+        if (ALLOWED_INVITE_KEYS.has(key)) {
+            out[key] = value;
+        }
+    }
+    // If nothing recognised was extracted, treat the blob as invalid.
+    if (Object.keys(out).length === 0) return null;
+    return out;
+};
+
+/**
+ * Check Permission
+ * @param {Object} req
+ * @param {Object} res
+ * @returns
+ */
+exports.checkPermission = (req, res) => {
+    if (!(req.body && req.body.id)) {
+        res.json({
+            status: false,
+            key: 1,
+            statusText: "Invalid URL id."
+        });
+        return;
+    }
+
+    const invite = exports.parseInviteBlob(req.body.id);
+    if (!invite) {
+        res.json({
+            status: false,
+            key: 1,
+            statusText: "Invalid URL."
+        });
+        return;
+    }
+
+    if (!invite.userId) {
+        res.json({
+            status: true,
+            key: 2,
+            companyId: invite.companyId,
+            linkId: invite.linkId,
+            statusText: "User Not Found."
+        });
+        return;
+    }
+
+    if (!invite.companyId) {
+        res.json({
+            status: false,
+            key: 1,
+            statusText: "Invalid URL."
+        });
+        return;
+    }
+
+    if (!invite.linkId) {
+        res.json({
+            status: false,
+            key: 1,
+            statusText: "Invalid URL."
+        });
+        return;
+    }
+
+    try {
+        const query = {
+            _id: new mongoose.Types.ObjectId(invite.userId)
+        }
+        getUserByQueyFun(query)
+        .then((resp) => {
+            const snap = resp[0];
+            if(!snap) {
+                res.send({
+                    status: true,
+                    key: 2,
+                    companyId: invite.companyId,
+                    linkId: invite.linkId,
+                    statusText: "User Not Found."
+                });
+                return;
+            }
+            const companyUserQuery = {
+                type: dbCollections.COMPANY_USERS,
+                data: [
+                    {
+                        _id: new mongoose.Types.ObjectId(invite.docId)
+                    }
+                ]
+            }
+            MongoDbCrudOpration(invite.companyId, companyUserQuery, "findOne")
+            .then((cUser) => {
+                if(!cUser) {
+                    res.send({
+                        status: false,
+                        key: 1,
+                        statusText: "Invalid URL."
+                    });
+                    return;
+                }
+                let userData = {};
+                userData = cUser;
+
+                if (userData.status === 2) {
+                    res.send({
+                        status: false,
+                        key: 3,
+                        statusText: "You already accepted the invitation."
+                    });
+                    return;
+                }
+                if (new Date(new Date(userData.sendInvitationTime).getTime()+(24*60*60*1000)) < new Date()) {
+                    res.send({
+                        status: false,
+                        key: 4,
+                        statusText: "Link is Expired."
+                    });
+                    return;
+                }
+                if (userData.linkId !== invite.linkId) {
+                    res.send({
+                        status: false,
+                        key: 4,
+                        statusText: "Link is Expired."
+                    });
+                    return;
+                }
+                res.json({
+                    status: true,
+                    key: 5,
+                    companyId: invite.companyId
+                });
+
+                const memberObject = [
+                    {
+                        _id: new mongoose.Types.ObjectId(invite.docId)
+                    }, {
+                        $set: {
+                            status: 2,
+                            linkId: ""
+                        }
+                    }
+                ]
+
+                updateMemberFunction(invite.companyId, memberObject, "updateOne")
+                .then(() => {
+                    const userUpdateQuery = {
+                        type: dbCollections.USERS,
+                        data: [
+                            {
+                                _id: new mongoose.Types.ObjectId(invite.userId)
+                            }, {
+                                $push: {
+                                    AssignCompany: invite.companyId
+                                }
+                            }
+                        ]
+                    }
+                    updateUserFun(SCHEMA_TYPE.GOLBAL, userUpdateQuery, "updateOne", invite.companyId, invite.userId)
+                    .catch((error) => {
+                        logger.error(`ERROR in update user: ${error.message}`);
+                    })
+
+                    addAndRemoveUserInMongodbNotificationCount(invite.companyId, invite.userId, "Add").catch((error)=>{
+                        logger.error(`ERROR in create user In mongodb: ${error}`)
+                    })
+                })
+                .catch((error) => {
+                    logger.error(`ERROR in update company_users: ${error.message}`);
+                })
+            }).catch((CError) => {
+                logger.error(`Check Permission Error: ${CError}`);
+                res.send({
+                    status: false,
+                    key: 1,
+                    statusText: "Invalid URL."
+                });
+            });
+        }).catch((error) => {
+            logger.error(`Check Permission Error: ${error}`);
+            res.send({
+                status: false,
+                key: 1,
+                statusText: "Invalid URL."
+            });
+        })
+    } catch (error) {
+        res.send({
+            status: false,
+            key: 1,
+            statusText: "Invalid URL."
+        });
+    }
+};

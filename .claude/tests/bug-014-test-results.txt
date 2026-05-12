@@ -1,0 +1,53 @@
+
+=== input validation — uid ===
+  PASS  missing uid → "uid is required."
+  PASS  empty-string uid → "uid is required."
+  PASS  array uid → "uid is required."
+  PASS  numeric uid → "uid is required."
+
+=== input validation — token ===
+  PASS  missing token → "token is required."
+  PASS  empty-string token → "token is required."
+  PASS  BUG-014 attack vector — array token blocked early
+  PASS  object token blocked early
+  PASS  number token blocked early
+  PASS  null token blocked early
+
+=== user not found ===
+  PASS  returns "Couldn’t find your Account"
+  PASS  sendCount is exactly 1
+
+=== user already verified ===
+  PASS  returns alreadyVarified
+  PASS  clears the verificationToken in DB
+
+=== stored token empty (the original bypass vector) ===
+  PASS  attack: {token:[]} blocked at input
+  PASS  non-empty token vs empty stored → "This link is expired"
+  PASS  did NOT mark user verified (no findOneAndUpdate)
+  PASS  response was sent exactly once (no hang)
+
+=== stored verificationTokenTime missing / invalid → expired (not bypassed) ===
+  PASS  null verificationTokenTime → "expired" (pre-fix: silently bypassed)
+  PASS  invalid verificationTokenTime → "expired"
+
+=== token expired (>10 min) ===
+  PASS  11 min old token → "expired"
+
+=== valid token, but does not match ===
+  PASS  mismatched non-empty token → "expired"
+  PASS  no DB write on mismatch
+
+=== happy path — valid, non-expired, matching token ===
+  PASS  success response
+  PASS  DB updated: isEmailVerified=true, verificationToken=""
+
+=== source — bypass-prone patterns are gone ===
+  PASS  no executable `==` token comparison (uses ===)
+  PASS  source uses strict typeof check on req.body.uid
+  PASS  source uses strict typeof check on req.body.token
+  PASS  source rejects empty stored verificationToken
+
+========================================
+Tests: 29 | Passed: 29 | Failed: 0
+========================================

@@ -1,0 +1,11 @@
+PASS: computeLiveTaskCount returns the aggregate count
+PASS: computeLiveTaskCount issued an aggregate against TASKS
+PASS: reconciliation uses the BUG-032 filter shape `{ $in: [0, undefined] }`
+PASS: reconcileSprintTaskCount resolves with the corrected count
+PASS: reconcileSprintTaskCount issued a findOneAndUpdate against SPRINTS
+PASS: reconcileSprintTaskCount $sets `tasks: 3` (the recomputed value)
+PASS: reconcileSprintTaskCount returns null for missing sprintId
+PASS: no Mongo calls issued for empty sprintId
+PASS: scheduleReconciliation runs once per sprintId in the array
+
+All BUG-033 assertions passed.

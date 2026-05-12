@@ -1,0 +1,21 @@
+PASS: trigger has role="button"
+PASS: trigger has tabindex="0"
+PASS: trigger has aria-haspopup="listbox"
+PASS: trigger has aria-expanded bound to dropdownVisible
+PASS: trigger has aria-controls bound to the panel id
+PASS: trigger handles Enter
+PASS: trigger handles Space
+PASS: trigger handles Escape
+PASS: trigger handles ArrowDown
+PASS: floating panel has role="listbox"
+PASS: panel handles Escape
+PASS: close affordance is a <button> tag
+PASS: close button carries the dropdown-close-btn class
+PASS: close button has aria-label="Close"
+PASS: close button declares type="button"
+PASS: closeDropdown function defined
+PASS: openAndFocusFirstOption function defined
+PASS: style strips native button chrome
+PASS: style preserves :focus-visible on close button
+
+All BUG-047 assertions passed.

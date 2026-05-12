@@ -203,18 +203,21 @@ export const getPaginatedTasks = ({state, commit}, payload) => {
     
                     // SET CURSOR
                     if(responseData && responseData.length) {
-                        responseData.forEach(async (task) => {
+                        // BUG-017 / #71 fix: body is fully synchronous (Date
+                        // construction + Vuex commit). Drop the unused
+                        // `async` keyword.
+                        responseData.forEach((task) => {
                             const doc = task;
-    
+
                             if(doc.startDate && doc.startDate > 0) {
                                 doc.startDate = new Date(doc.startDate * 1000);
                             }
-    
+
                             if(doc.DueDate && doc.DueDate > 0) {
                                 doc.DueDate = new Date(doc.DueDate * 1000);
                                 // doc.dueDateDeadLine = doc.dueDateDeadLine.map((x) => JSON.parse(x)).map((x) => ({date: new Date(x.date * 1000)}));
                             }
-    
+
                             commit('mutateTypesenseTasks', {found: resCount, nextPage: {[indexKey]: (cursor || 0) + responseData?.length || 0}, pid: pid, sprintId: sprintId, data: {...doc}})
                         })
                     } else {
@@ -258,20 +261,22 @@ export const tabSyncTaskCommit = ({state,commit},payload) => {
         resCount = {[foundKey]: response.data[0]?.count?.[0]?.count || 0}
         // SET CURSOR
         if(responseData && responseData.length) {
-            responseData.forEach(async (task) => {
+            // BUG-017 / #71 fix: body is fully synchronous. Drop the unused
+            // `async` keyword.
+            responseData.forEach((task) => {
                 const doc = task;
-    
+
                 if(doc.favouriteTasks && doc.favouriteTasks.length && typeof doc.favouriteTasks[0] === "string") {
                     doc.favouriteTasks = doc.favouriteTasks.map((x) => ({...x}))
                 }
                 if(doc.startDate && doc.startDate > 0) {
                     doc.startDate = new Date(doc.startDate * 1000);
                 }
-    
+
                 if(doc.DueDate && doc.DueDate > 0) {
                     doc.DueDate = new Date(doc.DueDate * 1000);
                 }
-    
+
                 commit('mutateTypesenseTasks', {found: resCount, nextPage: {[indexKey]: (cursor || 0) + responseData?.length || 0}, pid: pid, sprintId: sprintId, data: {...doc}})
             })
         } else {

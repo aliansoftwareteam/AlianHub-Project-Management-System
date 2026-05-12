@@ -1,4 +1,5 @@
-const moment = require('moment')
+// BUG-042 / #96 — replaced `moment.calendar()` with luxon-backed helper.
+const { formatNotificationDate } = require('../../../utils/dateHelpers');
 const { Notification_key, TemplateType } = require("../../../Config/notificationKey.js");
 
 exports.manageEmailData = (EmailDetails) => {
@@ -56,14 +57,12 @@ function manageEmailTemplateBody(EmailDetails) {
     var body = []
     var name = EmailDetails.notification.User_Employee_Name
     var profile = EmailDetails.notification.User_Employee_profileImage
-    var date = EmailDetails.notification?.createdAt?.seconds ? moment(new Date(EmailDetails.notification?.createdAt?.seconds * 1000)).calendar(null, {
-      lastDay: 'DD-MM-YYYY HH:MM A [IST]',
-      sameDay: 'DD-MM-YYYY HH:MM A [IST]',
-      nextDay: 'DD-MM-YYYY HH:MM A [IST]',
-      lastWeek: 'DD-MM-YYYY HH:MM A [IST]',
-      nextWeek: 'DD-MM-YYYY HH:MM A [IST]',
-      sameElse: 'DD-MM-YYYY HH:MM A [IST]'
-    }) : "N/A"
+    // BUG-042 / #96: helper accepts the legacy {seconds} timestamp
+    // shape directly and emits the same DD-MM-YYYY HH:MM A [IST] string
+    // the moment.calendar() call did.
+    var date = EmailDetails.notification?.createdAt?.seconds
+        ? formatNotificationDate(EmailDetails.notification?.createdAt)
+        : "N/A";
     if (requireField.includes(TemplateType.CREATE)) {
 
       var createObj = []

@@ -1,0 +1,13 @@
+PASS: cron.js reads CRON_TZ from env with UTC default
+PASS: at least four scheduleJob calls present (found 4)
+PASS: scheduleJob[0] uses { rule: ... } object form
+PASS: scheduleJob[0] passes a tz option
+PASS: scheduleJob[1] uses { rule: ... } object form
+PASS: scheduleJob[1] passes a tz option
+PASS: scheduleJob[2] uses { rule: ... } object form
+PASS: scheduleJob[2] passes a tz option
+PASS: scheduleJob[3] uses { rule: ... } object form
+PASS: scheduleJob[3] passes a tz option
+PASS: no scheduleJob still uses the bare cron-string form
+
+All BUG-035 assertions passed.

@@ -3,7 +3,14 @@ const { schema } = require('./schema');
 const taskSchema = new Schema(schema.tasks, { strict: false, timestamps: true });
 const commentSchema = new Schema(schema.comments, { strict: false, timestamps: true });
 const timeSheetSchema = new Schema(schema.timesheet, { strict: false, timestamps: true });
-const historySchema = new Schema(schema.history);
+// BUG-046 / #100 — every other schema in this file already uses
+// `{ timestamps: true }` so Mongoose owns `createdAt`/`updatedAt` as
+// BSON Dates. The history schema alone declared them as String/Date
+// fields the callers populated manually with `DateTime.utc().ts`
+// (a numeric millis value). That produced inconsistent shapes
+// (number vs Date) across documents. Letting Mongoose own them gives
+// us proper BSON Dates without callers having to remember to set them.
+const historySchema = new Schema(schema.history, { strict: false, timestamps: true });
 const userIdSchema = new Schema(schema.userId, { strict: false, timestamps: true });
 const usersSchema = new Schema(schema.users, { strict: true,timestamps: true});
 const adminDetailSchema = new Schema(schema.adminDetail, { strict: false,timestamps: true});
@@ -54,6 +61,64 @@ sessionsSchema.index({ createdAt: 1 }, { expireAfterSeconds: Number(process.env.
 const referCodeSchema = new Schema(schema.refferalcodes, {strict: true, timestamps: true});
 const refferalmapping = new Schema(schema.refferalmapping, {strict: true, timestamps: true});
 const globalSettingsSchema = new Schema(schema.globalSettings, {strict: true, timestamps: true});
+
+// BUG-021 / #75 — Indexes for the hottest query paths. Each company has its
+// own MongoDB database, so `companyId` itself is the database name and need
+// not be indexed; what matters is the per-DB filter fields. Compound order
+// follows ESR (Equality → Sort → Range) where applicable.
+//
+// All indexes are background-built and idempotent (Mongoose's
+// ensureIndexes/syncIndexes only creates missing ones at startup).
+
+// --- Per-company collections -------------------------------------------------
+
+// tasks: list / filter / lookup hot paths.
+taskSchema.index({ ProjectID: 1, sprintId: 1, deletedStatusKey: 1 });
+taskSchema.index({ sprintId: 1, deletedStatusKey: 1 });
+taskSchema.index({ AssigneeUserId: 1 });
+taskSchema.index({ ParentTaskId: 1 });
+taskSchema.index({ TaskKey: 1 });
+
+// comments: every comment is fetched by task/sprint/project triplet.
+commentSchema.index({ 'objId.taskId': 1, deletedStatusKey: 1 });
+commentSchema.index({ 'objId.sprintId': 1 });
+commentSchema.index({ 'objId.projectId': 1 });
+
+// history: by task and by project (timeline display).
+historySchema.index({ TaskId: 1, createdAt: -1 });
+historySchema.index({ ProjectId: 1, createdAt: -1 });
+
+// timesheet: by task ID (timesheet linking) and by user.
+timeSheetSchema.index({ TicketID: 1 });
+timeSheetSchema.index({ userId: 1, ProjectId: 1 });
+
+// userId notification counters — keyed by user.
+userIdSchema.index({ userId: 1 });
+
+// sprints/folders/projects: secondary lookups.
+sprints.index({ ProjectID: 1, deletedStatusKey: 1 });
+folders.index({ ProjectID: 1 });
+projectsSchema.index({ deletedStatusKey: 1 });
+
+// --- Global DB collections (the "global" company DB) ------------------------
+
+// users: login lookup by email is the hottest path; membership lookup by
+// AssignCompany is required by BUG-013's per-request membership re-check.
+usersSchema.index({ Employee_Email: 1 });
+usersSchema.index({ AssignCompany: 1 });
+
+// userAuth: email is the lookup key.
+userAuthSchema.index({ email: 1 });
+
+// companyUsers: lookup by userId + invitation status.
+companyUserSchema.index({ userId: 1 });
+
+// sessions: refresh-token lookup is what `Config/jwt.js` does.
+sessionsSchema.index({ refreshToken: 1 });
+sessionsSchema.index({ userId: 1 });
+
+// resetAttempt: keyed by IP.
+resetAttemptSchema.index({ ip: 1 });
 module.exports = { 
     timeSheetSchema, 
     historySchema, 

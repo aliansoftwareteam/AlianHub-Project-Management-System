@@ -26,9 +26,19 @@ const app = express();
 // CORS — BUG-002 / #56. Replace wildcard with an env-driven allow-list.
 // See utils/cors.js for the exact rules and supported env vars.
 app.use(cors({ origin: corsOriginDelegate }));
-app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
-app.use(bodyParser.json({limit: '50mb'}));
-app.use(bodyParser.raw({limit: '50mb'}));
+// BUG-037 / #91 — body limits.
+// Previously every endpoint accepted 50MB JSON/url-encoded/raw bodies,
+// so any unauthenticated POST could spend the request loop buffering
+// 50MB before validation even runs. Drop the default to 2MB (well above
+// typical JSON payloads — comments, settings, project data — but blocks
+// the trivial multi-MB DoS). File uploads use `multer` and have their
+// own limits (see Modules/storage/**), so this only constrains
+// body-parser-handled paths. Operators with bulk-import or large-form
+// use cases can raise it via the `BODY_LIMIT` env var.
+const BODY_LIMIT = process.env.BODY_LIMIT || '2mb';
+app.use(bodyParser.urlencoded({ extended: true, limit: BODY_LIMIT }));
+app.use(bodyParser.json({ limit: BODY_LIMIT }));
+app.use(bodyParser.raw({ limit: BODY_LIMIT }));
 
 // Set Maintenance Mode
 if (!config.UNDER_MAINTENANCE || config.UNDER_MAINTENANCE == "false") {

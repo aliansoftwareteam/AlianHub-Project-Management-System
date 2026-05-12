@@ -348,7 +348,8 @@ const getMongoData = async() => {
             }
         });
         if(arrayData.length > 0) {
-            arrayData.forEach(async(x,index) => {
+            // BUG-017 / #71 fix: body is fully synchronous — drop `async`.
+            arrayData.forEach((x, index) => {
                 let bfileSize = x.mediaSize ? x.mediaSize : 0;
                 let convertedKbSize = parseFloat(parseInt(bfileSize) / Math.pow(1024, 1)).toFixed(2) + 'KB';
                 const fileExt = x.mediaOriginalName.split('.').pop();
@@ -416,12 +417,14 @@ function debouncer(timeout = 1000) {
 const addAttachmentData = () => {
     try {
         let attachmentData = [];
-        props.selectedData.attachments.forEach(async(ele)=>{
+        // BUG-017 / #71 fix: body is fully synchronous — drop `async`.
+        props.selectedData.attachments.forEach((ele) => {
             if(ele.type == 'audio' && audioAttachmentList.value.findIndex((e)=>{return e.id == ele.id}) == -1) {
                 attachmentData.push({...ele,mediaURL:ele.url,mediaName:ele.filename,mediaSize:ele.size,from:'attachment',createdAt:ele.createdAt})
             }
         })
-        attachmentData.forEach(async(x) => {
+        // BUG-017 / #71 fix: body is fully synchronous — drop `async`.
+        attachmentData.forEach((x) => {
             let bfileSize = x.mediaSize ? x.mediaSize : 0;
             let convertedKbSize = parseFloat(parseInt(bfileSize) / Math.pow(1024, 1)).toFixed(2) + 'KB';
             const fileExt = x.mediaName.split('.').pop();
