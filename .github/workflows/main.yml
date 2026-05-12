@@ -1,0 +1,48 @@
+name: Deploy to DigitalOcean
+on:
+  push:
+    branches:
+      - staging
+  pull_request:
+    types:
+      - closed
+    branches:
+      - staging
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    if: github.event_name == 'push' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DO_HOST }}
+          username: ${{ secrets.DO_USER }}
+          key: ${{ secrets.DO_SSH_KEY }}
+          script: |
+            set -e
+            echo "🔧 Loading NVM..."
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            nvm use 22
+
+            echo "🚀 Starting deployment..."
+            cd /node/ALIAN/staging/
+
+            echo "📥 Pull latest code"
+            git reset --hard staging
+            git fetch origin staging
+
+            echo "📦 Backend setup"
+            npm install
+            pm2 restart 19
+
+            echo "🎨 Frontend build"
+            cd /frontend
+            npm install
+            npm run build
+            pm2 restart 19
+
+            echo "✅ Deployment completed"
