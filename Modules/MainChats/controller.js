@@ -68,7 +68,12 @@ exports.setChats = async (req, res) => {
             type: SCHEMA_TYPE.TASKS,
             data: query
         };
-        setChat = await MongoDbCrudOpration(req.headers['companyid'], setChatsObj, 'find');
+        // BUG-019 / #73 fix: `setChat = await ...` without a declaration
+        // keyword created an implicit global. In non-strict mode that's a
+        // cross-request leak vector (the global is shared between
+        // concurrent invocations); in strict mode the assignment throws
+        // ReferenceError on first call.
+        const setChat = await MongoDbCrudOpration(req.headers['companyid'], setChatsObj, 'find');
         res.status(200).json(setChat)
     } catch (error) {
         logger.error('Error getting setChats query:', JSON.stringify(error));
