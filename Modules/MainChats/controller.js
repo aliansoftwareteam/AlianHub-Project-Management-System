@@ -33,7 +33,9 @@ exports.getChats = async (req, res) => {
 
         res.status(200).json(chats);
     } catch (error) {
-        console.error('Error fetching chats:', error);
+        // BUG-025 / #79 fix: route via Winston so the message lands in the
+        // structured log instead of leaking the stack to stdout.
+        logger.error(`Error fetching chats: ${error && error.message ? error.message : error}`);
         res.status(404).json({ message: 'An error occurred while fetching the chats', error: error.message });
     }
 }
@@ -50,11 +52,13 @@ exports.updateMainChat = (companyId, chatObj) => {
                 resolve(result);
             })
             .catch((error) => {
-                console.error("Error in updateMainChat:", error);
+                // BUG-025 / #79 fix: route via Winston.
+                logger.error(`updateMainChat error: ${error && error.message ? error.message : error}`);
                 reject({ message: "An error occurred while updating the main chat.", error: error.message });
             })
         } catch (error) {
-            console.error("Error updating main chat:", error);
+            // BUG-025 / #79 fix: route via Winston.
+            logger.error(`updateMainChat sync error: ${error && error.message ? error.message : error}`);
             reject({ message: "An error occurred while updating the main chat.", error: error.message });
         }
     });
