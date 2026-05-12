@@ -1,0 +1,51 @@
+
+=== getMembershipCacheTtlSeconds — defaults / env ===
+  PASS  default is 60s
+  PASS  env override takes effect
+  PASS  zero disables caching (returns 0)
+  PASS  non-numeric falls back to default
+
+=== verifyCompanyMembership — input validation ===
+  PASS  returns false for missing uid
+  PASS  returns false for missing companyId
+  PASS  returns false for non-ObjectId uid
+  PASS  returns false for non-ObjectId companyId
+  PASS  no Mongo call for invalid inputs
+
+=== verifyCompanyMembership — cache miss → hit → invalidate ===
+  PASS  first call returns true (member)
+  PASS  first call issued exactly 1 Mongo lookup
+  PASS  second call returns true
+  PASS  second call did NOT hit Mongo (cache hit)
+  PASS  after invalidate(uid, companyId) → Mongo lookup happens again
+  PASS  non-member returns false
+  PASS  negative result is cached too
+
+=== invalidateMembershipCache(uid) — wipes all entries for that user ===
+  PASS  cached both companies
+  PASS  both companies re-queried after uid-wide invalidate
+
+=== verifyJWTTokenWithC — 403 when membership check fails ===
+  PASS  verifyJWTTokenWithC → 403 when user is not a current member
+  PASS  verifyJWTTokenWithC → next() NOT called when non-member
+  PASS  verifyJWTTokenWithC → response body sets isLogout flag
+  PASS  verifyJWTTokenWithC → statusText is Forbidden
+
+=== verifyJWTTokenWithC — pass-through when member ===
+  PASS  verifyJWTTokenWithC → next() called when membership confirmed
+  PASS  verifyJWTTokenWithC → req.uid is set from the token
+
+=== verifyJWTTokenWithCV2 — 403 when membership check fails ===
+  PASS  verifyJWTTokenWithCV2 → 403 on non-member
+  PASS  verifyJWTTokenWithCV2 → next() NOT called
+
+=== source — middlewares exist + helpers exported ===
+  PASS  verifyJWTTokenWithC is now async
+  PASS  verifyJWTTokenWithCV2 is now async
+  PASS  verifyCompanyMembership is called inside both middlewares
+  PASS  module exports verifyCompanyMembership
+  PASS  module exports invalidateMembershipCache
+
+========================================
+Tests: 31 | Passed: 31 | Failed: 0
+========================================

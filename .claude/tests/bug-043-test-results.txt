@@ -1,0 +1,13 @@
+PASS: Modal close affordance is a <button type="button"> with @click=closeModal
+PASS: Modal close button carries an aria-label
+PASS: Modal no longer has a bare <img @click="closeModal"> (handler now on the button)
+PASS: modal style.css defines .cancel__icon-btn
+PASS: modal style.css preserves :focus-visible for the close button
+PASS: download-all-btn appears inside a <button> tag
+PASS: download-all-btn carries @click=downloadAllImages()
+PASS: download-all-btn declares type="button"
+PASS: Attachments no longer has <span @click=downloadAllImages>
+PASS: Attachments style defines .download-all-btn
+PASS: Attachments style preserves :focus-visible on Download All
+
+All BUG-043 assertions passed.

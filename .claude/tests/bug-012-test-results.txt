@@ -1,0 +1,36 @@
+
+=== getRateLimitConfig — defaults ===
+  PASS  default MAX_ATTEMPTS is 5 (was 9)
+  PASS  default WINDOW_MS is 15 minutes
+  PASS  default BLOCK_MS is 30 minutes (was 10 min)
+
+=== getRateLimitConfig — env overrides ===
+  PASS  env override on MAX_ATTEMPTS
+  PASS  env override on WINDOW_MS
+  PASS  env override on BLOCK_MS
+
+=== getRateLimitConfig — clamping / safety ===
+  PASS  MAX_ATTEMPTS clamped to >=1 when env is 0
+  PASS  WINDOW_MS clamped to >=1000 when env is 0
+  PASS  BLOCK_MS clamped to >=1000 when env is 0
+  PASS  non-numeric MAX_ATTEMPTS falls back to default 5
+  PASS  non-numeric WINDOW_MS falls back to default
+  PASS  empty BLOCK_MS falls back to default
+
+=== source — magic numbers replaced with the helper ===
+  PASS  no `fiveMinutes` variable anywhere (the bad name is gone)
+  PASS  no executable `attempts > 9` check (old threshold gone)
+  PASS  no executable `10 \* 60 \* 1000` literal in the attempt logic
+  PASS  manageResetAttempt now reads MAX_ATTEMPTS from getRateLimitConfig
+  PASS  threshold check uses the MAX_ATTEMPTS variable
+  PASS  window check uses WINDOW_MS
+  PASS  block-duration uses BLOCK_MS
+
+=== .env.example documents the new vars ===
+  PASS  .env.example declares AUTH_RATE_LIMIT_MAX_ATTEMPTS
+  PASS  .env.example declares AUTH_RATE_LIMIT_WINDOW_MS
+  PASS  .env.example declares AUTH_RATE_LIMIT_BLOCK_MS
+
+========================================
+Tests: 22 | Passed: 22 | Failed: 0
+========================================

@@ -1,0 +1,14 @@
+PASS: package.json no longer lists `aws-sdk`
+PASS: package.json lists `@aws-sdk/client-ses` (the v3 SES client)
+PASS: Config/aws.js has no live require('aws-sdk') (found 0)
+PASS: Config/aws.js has no live require('aws-sdk/...') (found 0)
+PASS: Modules/servicewithAWS.js has no live require('aws-sdk') (found 0)
+PASS: Modules/servicewithAWS.js has no live require('aws-sdk/...') (found 0)
+PASS: Config/aws.js imports SESClient from @aws-sdk/client-ses
+PASS: Config/aws.js imports SendEmailCommand
+PASS: Config/aws.js exposes a v2-shaped sendEmail(params, callback) shim
+PASS: servicewithAWS.js no longer calls AWS.config.update (was v2-only)
+PASS: servicewithAWS.js no longer instantiates `new AWS.SES` (was v2-only)
+PASS: sendEmail shim invokes callback with v2-shaped (err, data)
+
+All BUG-041 assertions passed.

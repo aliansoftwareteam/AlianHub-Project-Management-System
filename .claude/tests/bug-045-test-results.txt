@@ -1,0 +1,9 @@
+
+> alian-hub-v3@14.0.26 test
+> jest
+
+Test Suites: 3 skipped, 1 passed, 1 of 4 total
+Tests:       16 skipped, 3 passed, 19 total
+Snapshots:   0 total
+Time:        0.395 s, estimated 1 s
+Ran all test suites.
