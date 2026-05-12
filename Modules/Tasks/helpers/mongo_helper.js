@@ -1,4 +1,5 @@
-const moment = require('moment');
+// BUG-042 / #96 — replaced `moment` with luxon-backed helper.
+const { formatDate } = require('../../../utils/dateHelpers');
 const logger = require("../../../Config/loggerConfig");
 const { DateTime } = require('luxon');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
@@ -166,11 +167,11 @@ exports.HandleHistory = (type, companyId, projectId, taskId, object, userData) =
 
 /* ------------- HANDLE HISTIRY FOR ALL THE ACTIVITIES ------------- */
 exports.changeDateFormat = (date, format) => {
-    if (date.seconds) {
-        return moment(new Date(date.seconds * 1000)).format(format);
-    } else {
-        return moment(new Date(date)).format(format);
+    // BUG-042 / #96: identical replacement for the helper.js sibling.
+    if (date && date.seconds) {
+        return formatDate(date.seconds * 1000, format);
     }
+    return formatDate(date, format);
 }
 
 exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTask, task, oldProject, isMainSubTask,isSubTask,userData) => {

@@ -2,7 +2,10 @@ const { DateTime } = require('luxon');
 const hlp = require("../Tasks/helpers/helper");
 const notiTemp = require("../Tasks/helpers/notificationTemplate")
 const { HandleBothNotification } = require("../Tasks/helpers/handleNotification");
-const moment = require("moment");
+// BUG-042 / #96 — replaced `moment` with luxon. logTime/controllerV2.js
+// already imports `DateTime` above; the helper centralises the
+// "format a JS Date as YYYY-MM-DD" call this file used moment for.
+const { formatDate } = require("../../utils/dateHelpers");
 const logger = require("../../Config/loggerConfig");
 const { SCHEMA_TYPE } = require("../../Config/schemaType")
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
@@ -534,7 +537,7 @@ exports.deleteManualLogtime = async (req, res) => {
     }
     MongoDbCrudOpration(companyId, obj, "deleteOne")
         .then((response) => {
-            let date = moment(new Date(req.body.logTimeDate)).format("YYYY-MM-DD");
+            let date = formatDate(new Date(req.body.logTimeDate), 'yyyy-LL-dd');
             const hours = Math.floor(req.body.timeDuration / 60);
             const remainingMinutes = req.body.timeDuration % 60;
             const hoursStr = String(hours).padStart(2, '0');

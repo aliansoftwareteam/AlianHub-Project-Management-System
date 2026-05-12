@@ -2,7 +2,8 @@ const logger = require("../../../Config/loggerConfig");
 const config = require("../../../Config/config");
 const sendMail = require("../../service.js");
 const sendEmailNotification = require("../../Template/sendEmailNotification.js")
-const moment = require('moment')
+// BUG-042 / #96 — replaced `moment.calendar()` with luxon-backed helper.
+const { formatNotificationDate } = require('../../../utils/dateHelpers');
 const { Notification_key, TemplateType } = require("../../../Config/notificationKey");
 const { removeDocument, UpdateDocument } = require("../notification-middleware/push-controllerV2")
 exports.sendEmailHandlerSingle = (EmailDetails) => {
@@ -136,14 +137,13 @@ function manageEmailTemplateBody(EmailDetails) {
       var name = EmailDetails.notification.User_Employee_Name
       var profile = EmailDetails.notification.User_Employee_profileImage
       var notificationType=  EmailDetails?.notification?.type
-      var date = EmailDetails.notification?.createdAt ? moment(new Date(EmailDetails.notification?.createdAt)).calendar(null, {
-        lastDay: 'DD-MM-YYYY HH:MM A [IST]',
-        sameDay: 'DD-MM-YYYY HH:MM A [IST]',
-        nextDay: 'DD-MM-YYYY HH:MM A [IST]',
-        lastWeek: 'DD-MM-YYYY HH:MM A [IST]',
-        nextWeek: 'DD-MM-YYYY HH:MM A [IST]',
-        sameElse: 'DD-MM-YYYY HH:MM A [IST]'
-      }) : "N/A"
+      // Original used `moment.calendar()` with all six branches set to
+      // the same format string — i.e. a no-op wrapper. Helper preserves
+      // the exact output (including the pre-existing HH:MM token quirk
+      // where MM = month, not minutes).
+      var date = EmailDetails.notification?.createdAt
+          ? formatNotificationDate(EmailDetails.notification?.createdAt)
+          : "N/A";
       if (requireField.includes(TemplateType.CREATE)) {
 
         var createObj = []
