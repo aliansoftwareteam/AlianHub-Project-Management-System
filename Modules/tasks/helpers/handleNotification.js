@@ -27,6 +27,11 @@ exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId
                     }
 
                 }).catch(error => {
+                    // BUG-031 / #85 fix: was a silent `return null` which
+                    // turned every DB failure into "no data" downstream.
+                    // Log so the failure is visible in ops; still return
+                    // null so the notification flow continues (best-effort).
+                    logger.error(`HandleBothNotification: fetchProjectDetailsSingle failed: ${error && error.message ? error.message : error}`);
                     return null
                 })
             }
@@ -37,8 +42,10 @@ exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId
                     } else {
                         return null
                     }
-    
+
                 }).catch(error => {
+                    // BUG-031 / #85 fix: same pattern as above.
+                    logger.error(`HandleBothNotification: fetchTaskDetails failed: ${error && error.message ? error.message : error}`);
                     return null
                 })
             }
