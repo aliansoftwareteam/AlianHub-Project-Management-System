@@ -8,9 +8,11 @@
   "dependencies": {
     "@aws-sdk/client-iam": "3.864.0",
     "@aws-sdk/client-s3": "3.864.0",
+    "@aws-sdk/client-ses": "^3.1045.0",
     "@aws-sdk/s3-request-presigner": "3.864.0",
     "@socket.io/admin-ui": "^0.5.1",
     "archiver": "7.0.1",
+    "atob": "2.1.2",
     "aws-sdk": "2.1692.0",
     "axios": "^1.12.2",
     "bcrypt": "5.1.1",
