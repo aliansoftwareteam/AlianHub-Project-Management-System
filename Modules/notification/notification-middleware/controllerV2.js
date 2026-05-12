@@ -17,9 +17,16 @@ var brandSettings = null;
 const filePath = path.join(__dirname, '../../../brandSettings.json');
 
 exports.sendFcmNotificationsHandler = async (req, res) => {
-    if (fs.existsSync(filePath)) {
-      const fileContent = fs.readFileSync(filePath, 'utf-8');
-      brandSettings = fileContent ? JSON.parse(fileContent) : null;
+    // BUG-024 / #78 fix: was `fs.readFileSync` on every notification request,
+    // which blocks the event loop and stalls every other route under load.
+    // Switch to the async API so the read doesn't block.
+    try {
+      if (fs.existsSync(filePath)) {
+        const fileContent = await fs.promises.readFile(filePath, 'utf-8');
+        brandSettings = fileContent ? JSON.parse(fileContent) : null;
+      }
+    } catch (err) {
+      logger.error(`brandSettings read failed: ${err.message || err}`);
     }
     const { userIdArray, key, companyId, message, type, senderUserDetail, actionUrl } = req.body;
 

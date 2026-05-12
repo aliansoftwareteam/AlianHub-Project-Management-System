@@ -26,7 +26,10 @@ async function batchUpdate(arr, eventId) {
 
             let results = []
             const loopFun = () => {
-                console.log("TOTAL: ", count, "/", arr.length, "==", ((count * 100) / arr.length).toFixed(2));
+                // BUG-025 / #79 fix: route through Winston so the message
+                // lands in the structured log instead of stdout (raw
+                // counts/PII can leak into shared log aggregators).
+                logger.info(`Invitation batch progress: ${count}/${arr.length} (${((count * 100) / arr.length).toFixed(2)}%)`);
                 if (((count * 100) / arr.length) < 100) {
                     emitListener(eventId, { step: ((count * 100) / arr.length).toFixed(2) });
                 } else {
@@ -34,7 +37,7 @@ async function batchUpdate(arr, eventId) {
                 }
                 if(count >= arr.length) {
                     resolve(results)
-                    console.log("END");
+                    logger.info('Invitation batch complete');
                     return;
                 } else {
                     try {
@@ -78,7 +81,8 @@ async function batchUpdate(arr, eventId) {
                             });
 
                     } catch (e) {
-                        console.error(`UPDATE failed batch: ${batch}`);
+                        // BUG-025 / #79 fix: route via Winston.
+                        logger.error(`Invitation batch ${batch} failed: ${e.message || e}`);
                         reject(new Error(`Unexpected error in batch ${batch}`));
                     }
                 };
@@ -137,10 +141,11 @@ exports.sendInvitationEmailFun = (bodyData) => {
                 try {
                     updateCompanyFun(SCHEMA_TYPE.GOLBAL,updateObj,"findOneAndUpdate",companyId)
                     .catch((error) => {
-                        console.error(error,"ERROR:")
+                        // BUG-025 / #79 fix: route via Winston.
+                        logger.error(`updateCompanyFun (sendInvitation): ${error && error.message ? error.message : error}`);
                     })
                 } catch (error) {
-                    console.error(error,"ERROR:")
+                    logger.error(`updateCompanyFun (sendInvitation): ${error && error.message ? error.message : error}`);
                 }
             }
     
@@ -362,7 +367,8 @@ exports.sendInvitationEmail = (req,res) => {
             }
             updateCompanyFun(SCHEMA_TYPE.GOLBAL,updateObj,"findOneAndUpdate",companyId)
             .catch((error) => {
-                console.error(error,"ERROR:")
+                // BUG-025 / #79 fix: route via Winston.
+                logger.error(`updateCompanyFun (sendInvitation cleanup): ${error && error.message ? error.message : error}`);
             })
         }
 
@@ -596,10 +602,12 @@ exports.decreaseUserCount = (companyId) => {
         }
         updateCompanyFun(SCHEMA_TYPE.GOLBAL,updateObj,"updateOne",companyId)
         .catch((error) => {
-            console.error(error,"error in USER COUNT DECREMENT:");
+            // BUG-025 / #79 fix: route via Winston.
+            logger.error(`USER COUNT DECREMENT failed: ${error && error.message ? error.message : error}`);
         })
     } catch (error) {
-        console.error(error,"ERROR IN DECREASE COUNT FUNCTION:");
+        // BUG-025 / #79 fix: route via Winston.
+        logger.error(`decreaseUserCount error: ${error && error.message ? error.message : error}`);
     }
 }
 
