@@ -6,6 +6,7 @@ const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const fs = require("fs");
 const logger = require("../../../Config/loggerConfig.js");
 const sharp = require('sharp');
+const { guardFile, guardBuffer } = require('../../../utils/imageGuard.js');
 const thumbnailArray = require("../../../thumbnail.json");
 const { SCHEMA_TYPE } = require('../../../Config/schemaType.js');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries.js');
@@ -195,11 +196,18 @@ exports.uploadPriority = (companyId) => {
  *                            Rejects with an error message if any issues occur during the upload process.
  */
 exports.uploadThumbnailFileFromBase64 = (base64,path,name,width,height,companyId, isUserProfile = false) =>{
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
         const base64Data = base64.replace(/^data:image\/png;base64,/, '');
         const buffer = Buffer.from(base64Data, 'base64');
         const fileExtension = name.split('.')[1];
         const fileName = `${name.split('.')[0]}-${width}x${height}.${fileExtension}`
+        // BUG-023 / #77 fix: validate size + dimensions before sharp.
+        try {
+            await guardBuffer(buffer);
+        } catch (err) {
+            reject(err);
+            return;
+        }
         sharp(buffer)
         .resize(width, height, (!isUserProfile ? {fit: "inside"}: {}))
         .withMetadata()
@@ -608,7 +616,14 @@ exports.getUserProfilePresignedUrlCallBackFunction = async (params) => {
  */
 exports.uploadThumbnailFile = (file,x,y,path,companyId,isUserProfile = false) => {
     let outputFile = `thumbnails/${file.filename}${x}${y}.${file.mimetype.split("/")[1]}`;
-    return new Promise((resolve,reject) => {
+    return new Promise(async (resolve,reject) => {
+        // BUG-023 / #77 fix: validate size + dimensions before sharp.
+        try {
+            await guardFile(file.path);
+        } catch (err) {
+            reject(err);
+            return;
+        }
         sharp(file.path)
         .resize(x, y, (!isUserProfile ? {fit: "inside"}: {}))
         .withMetadata()

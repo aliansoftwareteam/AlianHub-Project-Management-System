@@ -6,6 +6,7 @@ const loggerConfig = require('../../../../Config/loggerConfig');
 const { default: mongoose } = require("mongoose");
 const { SCHEMA_TYPE } = require('../../../../Config/schemaType');
 const thumbnailArray = require('../../../../thumbnail.json');
+const { guardFile, guardBuffer } = require('../../../../utils/imageGuard.js');
 
 exports.iconsThumbnailGenerator = (fpath,companyId,file,bufferString,fileNameWithRan,thumbnailKey) => {
     return new Promise((resolve, reject) => {
@@ -497,6 +498,9 @@ exports.uploadStorageThumbnailFile = async (filePath, x, y, companyId, file) => 
     try {
         fs.mkdirSync(outputDir, { recursive: true });
 
+        // BUG-023 / #77 fix: validate size + dimensions before sharp.
+        await guardFile(file.path);
+
         await sharp(file.path)
             .resize(x, y)
             .toFile(outputFile);
@@ -524,8 +528,12 @@ exports.uploadStorageThumbnailFilev2 = async (filePath, x, y, companyId, file,bu
         let sharpInstance;
         if (bufferString) {
             const buffer = Buffer.from(bufferString, 'base64');
+            // BUG-023 / #77 fix: validate size + dimensions before sharp.
+            await guardBuffer(buffer);
             sharpInstance = sharp(buffer);
         } else {
+            // BUG-023 / #77 fix: validate size + dimensions before sharp.
+            await guardFile(file.path);
             sharpInstance = sharp(file.path);
         }
 
