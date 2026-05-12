@@ -14,6 +14,8 @@ const pjson = require('../../package.json');
 const { requestHandler } = require('../../Config/config.js');
 const aiModals = require('../../utils/aiModals.json');
 const { makeUniqueId } = require('../../utils/commonFunctions.js');
+// BUG-036 / #90 — path-traversal-safe resolver for the firebase service-account file.
+const { resolveServiceFile } = require('../../utils/safeServiceFile.js');
 
 exports.envVar = {
     "JWT_SECRET": require('crypto').randomBytes(16).toString('hex'),
@@ -257,7 +259,13 @@ exports.checkStorageConnection = (req, cb) => {
 exports.checkFirebaseConnection = async (req, cb) => {
     try {
         const bodyData = req.body;
-        const serviceAccount = require("../"+process.env.SERVICE_FILE);
+        // BUG-036 / #90 fix: was `require("../" + process.env.SERVICE_FILE)`,
+        // which allowed arbitrary JS/JSON inside the repo to be loaded if the
+        // env var was attacker-influenced (e.g. via the installation wizard).
+        // resolveServiceFile() pins the path inside the project root and
+        // requires a `.json` extension so a stray .js file can't be executed.
+        const serviceAccountPath = resolveServiceFile(process.env.SERVICE_FILE);
+        const serviceAccount = require(serviceAccountPath);
         admin1.initializeApp({
             credential: admin1.credential.cert(serviceAccount)
         }, "install-step-firebase"+ new Date().getTime());
