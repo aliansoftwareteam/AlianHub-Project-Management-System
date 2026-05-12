@@ -1,0 +1,16 @@
+PASS: root package.json no longer lists `moment`
+PASS: Modules/Config/utils backend code has no live require('moment') (found none)
+PASS: Modules/logTime/controllerV2.js requires dateHelpers and uses formatDate
+PASS: Modules/notification/sendEmail/controllerV2.js requires dateHelpers and uses formatNotificationDate
+PASS: Modules/notification/sendEmail/controller.js requires dateHelpers and uses formatNotificationDate
+PASS: Modules/tasks/helpers/helper.js requires dateHelpers and uses formatDate
+PASS: Modules/tasks/helpers/mongo_helper.js requires dateHelpers and uses formatDate
+PASS: translator: YYYY-MM-DD → yyyy-LL-dd
+PASS: translator: preserves HH:mm:ss, swaps DD/MM/YYYY
+PASS: translator: luxon-style input passes through
+PASS: formatDate('YYYY-MM-DD') = 2024-01-15
+PASS: formatDate accepts luxon-style too
+PASS: formatNotificationDate output matches 'DD-MM-YYYY HH:MM A [IST]' shape (got 15-01-2024 16:01 PM [IST])
+PASS: formatDate handles {seconds} timestamp shape (got 2024-01-15)
+
+All BUG-042 assertions passed.

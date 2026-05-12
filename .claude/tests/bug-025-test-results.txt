@@ -1,0 +1,10 @@
+
+=== source — no executable console.{log,error} calls remain ===
+  PASS  Modules/auth/controller/sendInvitation.js: 0 executable console.* calls
+  PASS  Modules/auth/controller/sendInvitation.js: uses Winston logger
+  PASS  Modules/MainChats/controller.js: 0 executable console.* calls
+  PASS  Modules/MainChats/controller.js: uses Winston logger
+
+========================================
+Tests: 4 | Passed: 4 | Failed: 0
+========================================

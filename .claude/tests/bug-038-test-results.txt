@@ -1,0 +1,8 @@
+PASS: config.js reads S3_CONNECTION_TIMEOUT_MS from env
+PASS: config.js reads S3_SOCKET_TIMEOUT_MS from env
+PASS: config.js defaults to 30000ms (30s)
+PASS: no remaining hard-coded 300_000ms (5min) timeout
+PASS: config exposes requestHandler
+PASS: NodeHttpHandler accepts numeric env-derived timeouts
+
+All BUG-038 assertions passed.
