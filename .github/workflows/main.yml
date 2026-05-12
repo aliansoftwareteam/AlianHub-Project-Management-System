@@ -40,7 +40,7 @@ jobs:
             pm2 restart 19
 
             echo "🎨 Frontend build"
-            cd ../frontend
+            cd frontend
             npm install
             # npm run build
             pm2 restart 19
