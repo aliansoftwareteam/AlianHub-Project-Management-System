@@ -15,7 +15,7 @@ const { MongoDbCrudOpration } = require("./mongo-handler/mongoQueries");
 const { SCHEMA_TYPE } = require("../Config/schemaType");
 const {defaultCustomFields} = require("../utils/Tempates/customFields");
 const {defaultProjectTours} = require("../utils/Tempates/projectTours");
-const { addSprintFun } = require('../Modules/sprints/controller');
+const { addSprintFun } = require('../Modules/Sprints/controller');
 const { updateMainChat } = require('../Modules/MainChats/controller');
 //IMPORT CURRENCY
 exports.importCurrency = (companyName) => {

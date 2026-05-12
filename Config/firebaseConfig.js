@@ -1,8 +1,11 @@
-const path = require('path');
-
 //Initialize Admin
 let admin = null;
 let fcm = null;
+
+// BUG-036 / #90 — share the path-traversal-safe resolver with the
+// installation wizard so both entry points apply the same allow-list
+// (must be inside the project root, must be `.json`, must exist).
+const { resolveServiceFile } = require('../utils/safeServiceFile');
 
 try {
     admin = require("firebase-admin");
@@ -11,7 +14,7 @@ try {
     if (!config.SERVICE_FILE) {
         console.log("Firebase: SERVICE_FILE not configured — push notifications disabled.");
     } else {
-        const serviceFilePath = path.resolve(__dirname, '..', config.SERVICE_FILE);
+        const serviceFilePath = resolveServiceFile(config.SERVICE_FILE);
         const serviceAccount = require(serviceFilePath);
         admin.initializeApp({
             credential: admin.credential.cert(serviceAccount)

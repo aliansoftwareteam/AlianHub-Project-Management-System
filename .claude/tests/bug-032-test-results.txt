@@ -1,0 +1,11 @@
+PASS: Comments.getPaginatedMessages issued an aggregate
+PASS: Comments.getPaginatedMessages includes `{ isDeleted: { $ne: true } }`
+PASS: Comments.searchMessageFromMainChat issued a find
+PASS: Comments.searchMessageFromMainChat uses `$ne: true` (keeps legacy docs)
+PASS: getSprintFolder count branch issued a sprints aggregate
+PASS: getSprintFolder count branch filters `deletedStatusKey: { $nin: [1] }`
+PASS: getTabSynctTaskWithTable issued a tasks aggregate
+PASS: getTabSynctTaskWithTable still has a deletedStatusKey filter
+PASS: getTabSynctTaskWithTable now allows `deletedStatusKey: { $in: [0, undefined] }` (length >= 2 incl. 0)
+
+All BUG-032 assertions passed.

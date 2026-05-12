@@ -1,0 +1,39 @@
+
+=== parseInviteBlob — unit ===
+  PASS  rejects empty input → null
+  PASS  rejects non-string input → null
+  PASS  rejects invalid base64 → null
+  PASS  all 4 allowed keys parsed
+  PASS  disallowed keys dropped — role
+  PASS  disallowed keys dropped — isAdmin
+  PASS  disallowed keys dropped — password
+  PASS  disallowed keys dropped — __proto__
+  PASS  Object.prototype is not polluted
+  PASS  value containing "=" is preserved verbatim
+  PASS  parts without "=" are skipped
+
+=== checkPermission — early-return paths ===
+  PASS  missing req.body.id → key=1, "Invalid URL id."
+  PASS  invalid base64 → key=1, "Invalid URL."
+  PASS  missing userId → key=2 "User Not Found."
+  PASS  missing userId → response echoes parsed companyId
+  PASS  missing userId → response echoes parsed linkId
+  PASS  userId but missing companyId → key=1 "Invalid URL."
+  PASS  userId+companyId but missing linkId → key=1 "Invalid URL."
+
+=== req.body is NOT mutated ===
+  PASS  req.body still references the same object after call
+  PASS  req.body still has only the original `id` field
+  PASS  req.body.role was NOT injected by the handler
+  PASS  req.body.isAdmin was NOT injected by the handler
+  PASS  req.body.userId was NOT injected by the handler
+
+=== source — req.body assignment is gone ===
+  PASS  source no longer contains `req.body = finalObj`
+  PASS  source no longer contains any `req.body =` assignment
+  PASS  source exports parseInviteBlob
+  PASS  source has the ALLOWED_INVITE_KEYS allow-list
+
+========================================
+Tests: 27 | Passed: 27 | Failed: 0
+========================================

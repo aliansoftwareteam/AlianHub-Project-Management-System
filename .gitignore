@@ -138,4 +138,6 @@ frontend/config/firebase-messaging-sw.js.production
 frontend/config/temp
 frontend/public/firebase-messaging-sw.js
 
-/storagefirebase-adminsdk.json
+/storage/firebase-adminsdk.json
+/firebase-adminsdk.json
+package-lock.json

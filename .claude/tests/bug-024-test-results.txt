@@ -1,0 +1,21 @@
+
+=== source — no executable fs.readFileSync remains in scoped handlers ===
+  PASS  Modules/storage/wasabi/controller.js: 0 executable fs.readFileSync calls
+  PASS  Modules/storage/wasabi/controller.js: uses fs.promises.readFile
+  PASS  Modules/notification/notification-middleware/controllerV2.js: 0 executable fs.readFileSync calls
+  PASS  Modules/notification/notification-middleware/controllerV2.js: uses fs.promises.readFile
+
+=== module loads without syntax errors after the refactor ===
+  PASS  Modules/storage/wasabi/controller.js: module loads (no SyntaxError)
+Firebase Error (push notifications disabled): Cannot find module 'D:\node-server\alian-hub\firebase-adminsdk.json'
+Require stack:
+- D:\node-server\alian-hub\AlianHub-Project-Management-System\Config\firebaseConfig.js
+- D:\node-server\alian-hub\AlianHub-Project-Management-System\Modules\notification\notification-middleware\sendNotification.js
+- D:\node-server\alian-hub\AlianHub-Project-Management-System\Modules\notification\notification-middleware\push-controllerV2.js
+- D:\node-server\alian-hub\AlianHub-Project-Management-System\Modules\notification\notification-middleware\controllerV2.js
+- D:\node-server\alian-hub\AlianHub-Project-Management-System\server.js
+  PASS  Modules/notification/notification-middleware/controllerV2.js: module loads (no SyntaxError)
+
+========================================
+Tests: 6 | Passed: 6 | Failed: 0
+========================================

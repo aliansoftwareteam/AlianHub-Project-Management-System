@@ -1,0 +1,15 @@
+PASS: verifyGithubAccessToken helper exists
+PASS: GitHub verifier round-trips through api.github.com/user
+PASS: GitHub verifier rejects id mismatch
+PASS: GitHub verifier compares email against the provider response
+PASS: GitHub strict mode is env-gated for back-compat
+PASS: verifyGoogleIdToken helper exists
+PASS: Google verifier uses google-auth-library
+PASS: Google verifier passes audience to verifyIdToken
+PASS: Google verifier rejects sub mismatch
+PASS: Google verifier compares email against the verified payload
+PASS: Google verifier reads GOOGLE_OAUTH_CLIENT_ID from env
+PASS: verifier returns the parsed GitHub response
+PASS: mismatch case would trigger the rejection branch
+
+All BUG-039 assertions passed.

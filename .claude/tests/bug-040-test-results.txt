@@ -1,0 +1,11 @@
+PASS: package.json no longer lists `atob`
+PASS: package.json no longer lists `btoa`
+PASS: `require("atob")` no longer resolves
+PASS: `require("btoa")` no longer resolves
+PASS: verifyInvitation.js no longer requires `atob`
+PASS: sendInvitation.js no longer requires `btoa`
+PASS: verifyInvitation.js uses Buffer-based replacement
+PASS: sendInvitation.js uses Buffer-based replacement
+PASS: Buffer-based atob/btoa replacement round-trips correctly
+
+All BUG-040 assertions passed.

@@ -135,11 +135,17 @@ exports.getSprintFolder = async (req,res) => {
 
         if (req.query.collection) {
             if (req.query.collection === 'sprints' || req.query.collection === 'folders') {
-                if (req.query.count) {          
+                if (req.query.count) {
                     let data = [
                         {
                             $match: {
-                                projectId: new mongoose.Types.ObjectId(projectId)
+                                projectId: new mongoose.Types.ObjectId(projectId),
+                                // BUG-032 / #86 fix: count was including
+                                // soft-deleted sprints/folders, which made the
+                                // sidebar counters disagree with the actual
+                                // list (the list-rendering branches below use
+                                // `deletedStatusKey: { $nin: [1] }`).
+                                deletedStatusKey: { $nin: [1] }
                             }
                         },
                     ]

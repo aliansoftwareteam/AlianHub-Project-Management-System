@@ -1,0 +1,13 @@
+PASS: returns absolute path for valid relative .json file inside root
+PASS: rejects empty SERVICE_FILE
+PASS: rejects undefined SERVICE_FILE
+PASS: rejects path-traversal escape (../../../../etc/passwd)
+PASS: rejects absolute paths
+PASS: rejects Windows-style absolute paths
+PASS: rejects non-.json extensions
+PASS: rejects missing file
+PASS: installer controller uses resolveServiceFile()
+PASS: installer no longer uses the unsafe require concat
+PASS: firebaseConfig uses resolveServiceFile()
+
+All BUG-036 assertions passed.

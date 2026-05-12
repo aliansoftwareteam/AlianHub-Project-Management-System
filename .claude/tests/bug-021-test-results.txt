@@ -1,0 +1,32 @@
+
+=== Per-company collections ===
+  PASS  tasks: { ProjectID, sprintId, deletedStatusKey }
+  PASS  tasks: { sprintId, deletedStatusKey }
+  PASS  tasks: { AssigneeUserId }
+  PASS  tasks: { ParentTaskId }
+  PASS  tasks: { TaskKey }
+  PASS  comments: { "objId.taskId", deletedStatusKey }
+  PASS  comments: { "objId.sprintId" }
+  PASS  comments: { "objId.projectId" }
+  PASS  history: { TaskId, createdAt: -1 }
+  PASS  history: { ProjectId, createdAt: -1 }
+  PASS  timesheet: { TicketID }
+  PASS  timesheet: { userId, ProjectId }
+  PASS  userId: { userId }
+  PASS  sprints: { ProjectID, deletedStatusKey }
+  PASS  folders: { ProjectID }
+  PASS  projects: { deletedStatusKey }
+
+=== Global DB collections ===
+  PASS  users: { Employee_Email }
+  PASS  users: { AssignCompany }  (used by BUG-013 membership re-check)
+  PASS  userAuth: { email }
+  PASS  companyUsers: { userId }
+  PASS  sessions: { refreshToken }
+  PASS  sessions: { userId }
+  PASS  sessions: { createdAt }  (pre-existing TTL, still there)
+  PASS  resetAttempt: { ip }
+
+========================================
+Tests: 24 | Passed: 24 | Failed: 0
+========================================

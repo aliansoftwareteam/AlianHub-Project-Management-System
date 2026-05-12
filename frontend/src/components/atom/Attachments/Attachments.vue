@@ -21,8 +21,18 @@
                     <Skelaton style="height: 30px;width: 114px;" class="border-radius-6-px mb-5px" />
                 </span>
                 <template v-else>
-                    <span v-if="visibleAttachments.length > 0" class="d-block text-right p-1 blue text-decoration-underline font-weight-500 font-size-14 cursor-pointer"
-                        @click="downloadAllImages()">Download All</span>
+                    <!--
+                        BUG-043 / #97 fix: clickable <span> had no
+                        role/aria-label/keyboard focus. Replace with a
+                        real <button type="button"> so keyboard users can
+                        Tab + Enter to trigger Download All.
+                    -->
+                    <button
+                        v-if="visibleAttachments.length > 0"
+                        type="button"
+                        class="download-all-btn d-block text-right p-1 blue text-decoration-underline font-weight-500 font-size-14 cursor-pointer"
+                        @click="downloadAllImages()"
+                    >Download All</button>
                 </template>
                 <label for="UploadedFile" v-if="permission === true">
                     <div class="cursor-link cursor-pointer" v-if="props.isMainSpinner === true || isLoadingAttachments">
@@ -533,5 +543,23 @@ watch(
     visibility: hidden;
     position: relative;
     margin-left: 10px;
+}
+
+/*
+ * BUG-043 / #97 — the Download All control was a <span> with a click
+ * handler; replaced with a <button>. Strip native button chrome so the
+ * visual result matches the old <span>, but keep focus-visible for
+ * keyboard accessibility.
+ */
+.download-all-btn {
+    background: none;
+    border: 0;
+    font: inherit;
+    color: inherit;
+}
+.download-all-btn:focus-visible {
+    outline: 2px solid #2f3990;
+    outline-offset: 2px;
+    border-radius: 2px;
 }
 </style>

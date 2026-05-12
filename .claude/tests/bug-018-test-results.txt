@@ -1,0 +1,24 @@
+
+=== createProject — all prerequisites reject → outer rejects with reasons ===
+  PASS  createProject rejected (did NOT hang)
+  PASS  rejection statusText mentions prerequisites
+  PASS  rejection includes rejectedCount = 5
+  PASS  rejection includes totalCount = 5
+  PASS  rejection includes 5 reasons
+  PASS  each reason carries the actual error message
+
+=== createProject — partial rejection (1 of 5) → outer rejects with 1 reason ===
+  PASS  partial-rejection: outer rejects
+  PASS  partial-rejection: rejectedCount = 1, totalCount = 5
+  PASS  partial-rejection: reason text preserved
+
+=== source — else branch surfaces the reasons array ===
+  PASS  reject body includes rejectedCount
+  PASS  reject body includes totalCount
+  PASS  reject body includes a reasons array
+  PASS  rejected.map builds a per-failure list
+  PASS  logger.error includes the JSON-serialised reasons
+
+========================================
+Tests: 14 | Passed: 14 | Failed: 0
+========================================

@@ -1,0 +1,29 @@
+
+=== HandleTask — history calls awaited before resolve ===
+(node:27384) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.
+ SDK releases are limited to address critical bug fixes and security issues only.
+
+Please migrate your code to use AWS SDK for JavaScript (v3).
+For more information, check the blog post at https://a.co/cUPnyil
+(Use `node --trace-warnings ...` to show where the warning was created)
+  PASS  HandleTask resolved with status:true
+  PASS  Mongo save was called
+  PASS  BOTH history calls happened before resolve
+
+=== HandleTask — history failure does NOT reject ===
+  PASS  HandleTask did NOT reject when history failed (pre-fix: silently lost)
+  PASS  both history attempts ran (allSettled, not all-or-nothing)
+
+=== HandleTask — DB failure rejects (unchanged behaviour) ===
+  PASS  HandleTask rejected on DB failure
+  PASS  history NOT called when DB save failed
+
+=== source — reject-after-resolve patterns removed ===
+  PASS  HandleTask: no `HandleHistory(...).catch(reject)` chain remains
+  PASS  HandleTask: source uses Promise.allSettled for the history calls
+  PASS  HandleTask: resolve(...) is AFTER the allSettled await
+  PASS  convertToSubTaskFunction: no inner .catch still calls a bare reject
+
+========================================
+Tests: 11 | Passed: 11 | Failed: 0
+========================================

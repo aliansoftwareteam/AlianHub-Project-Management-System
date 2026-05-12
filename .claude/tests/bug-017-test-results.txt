@@ -1,0 +1,16 @@
+
+=== bucket.helper.js — uploadIamgesInStorage waits for every file copy ===
+  PASS  all 3 copyFile calls completed before resolve
+  PASS  the function waited (elapsed >= one timer tick)
+  PASS  copies ran in parallel (peak in-flight > 1)
+
+=== source — no forEach(async) remains in executable code ===
+  PASS  no executable .forEach(async ...) calls remain anywhere
+
+=== source — Category B fixes use proper async patterns ===
+  PASS  AI/controller.js: uses for...of with await for chunkObjects
+  PASS  bucket.helper.js: uses Promise.allSettled(imageArray.map(...))
+
+========================================
+Tests: 6 | Passed: 6 | Failed: 0
+========================================
