@@ -2,14 +2,12 @@ const nodemailer = require("nodemailer");
 const config =  require('../Config/config.js');
 const awsRef = require('../Config/aws.js');
 const logger = require("../Config/loggerConfig.js");
-const AWS = require('aws-sdk');
 
-AWS.config.update({
-    accessKeyId: config.AWS_SES_KEY,
-    secretAccessKey: config.AWS_SES_SECRET,
-    region: config.AWS_SES_REGION
-});
-const ses = new AWS.SES({apiVersion: '2010-12-01',region: config.AWS_SES_REGION });
+// BUG-041 / #95 — drop the duplicate `aws-sdk` v2 import. The SES
+// client lives in Config/aws.js as the v3-based `awsRef.ses` shim, and
+// the v3 raw client (`awsRef.sesClient`) is exposed for nodemailer's
+// `SES` transport which historically needed a v2 client instance.
+const ses = awsRef.sesClient;
 
 /**
  * Send email with AWS
@@ -134,8 +132,11 @@ exports.SendNotificationEmail = async (subject, html, toMail, isHtml, cb) => {
  * @param {*} cb 
  */
 exports.sendAttachMail = (subject, html, toMail,attachMents, cb) => {
+    // BUG-041 / #95 — nodemailer 6.x accepts the v3 SES transport as
+    // `{ SES: { ses, aws } }`. `aws` is the @aws-sdk/client-ses module
+    // (used for command classes), `ses` is the v3 client instance.
     let transporter = nodemailer.createTransport({
-        SES: ses
+        SES: { ses, aws: require('@aws-sdk/client-ses') }
     });
     transporter.sendMail({
         from: config.AWS_SES_FROM_DEFAULT, // sender address

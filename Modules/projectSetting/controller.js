@@ -54,7 +54,10 @@ exports.changeTaskType = async (req, res) => {
             promisesArr.push(
                 new Promise((resolve1, reject1) => {
                     try {
-                        req.body.taskTypeKey.forEach(async(key) => {
+                        // BUG-017 / #71 fix: body has no `await` (it uses
+                        // .then/.catch on MongoDbCrudOpration), so the
+                        // `async` keyword was misleading. Plain forEach.
+                        req.body.taskTypeKey.forEach((key) => {
                             if(key === task.TaskTypeKey){
                                 let newStatus = req.body.oldTaskType.filter((y) => y.key === key)[0]?.convertType;
                                 if(newStatus){
@@ -151,11 +154,16 @@ exports.changeTaskStatus = async (req, res) => {
                 tasks.push(x)
             })
         })
-        tasks.forEach(async(task) => {
+        // BUG-017 / #71 fix: this outer forEach only pushes synchronously
+        // constructed Promise objects, no `await` — drop the `async`.
+        tasks.forEach((task) => {
             promisesArr.push(
                 new Promise((resolve, reject) => {
                     try {
-                        req.body.taskStatusKey.forEach(async(key) => {
+                        // BUG-017 / #71 fix: same shape as the changeTaskType
+                        // version above — inner body uses .then/.catch, no
+                        // `await`, so `async` is misleading.
+                        req.body.taskStatusKey.forEach((key) => {
                             if(key === task.statusKey){
                                 let newStatus = req.body.oldTaskStatus.filter((y) => y.key === key)[0]?.convertStatus;
                                 if(newStatus){
