@@ -3,7 +3,14 @@ const { schema } = require('./schema');
 const taskSchema = new Schema(schema.tasks, { strict: false, timestamps: true });
 const commentSchema = new Schema(schema.comments, { strict: false, timestamps: true });
 const timeSheetSchema = new Schema(schema.timesheet, { strict: false, timestamps: true });
-const historySchema = new Schema(schema.history);
+// BUG-046 / #100 — every other schema in this file already uses
+// `{ timestamps: true }` so Mongoose owns `createdAt`/`updatedAt` as
+// BSON Dates. The history schema alone declared them as String/Date
+// fields the callers populated manually with `DateTime.utc().ts`
+// (a numeric millis value). That produced inconsistent shapes
+// (number vs Date) across documents. Letting Mongoose own them gives
+// us proper BSON Dates without callers having to remember to set them.
+const historySchema = new Schema(schema.history, { strict: false, timestamps: true });
 const userIdSchema = new Schema(schema.userId, { strict: false, timestamps: true });
 const usersSchema = new Schema(schema.users, { strict: true,timestamps: true});
 const adminDetailSchema = new Schema(schema.adminDetail, { strict: false,timestamps: true});

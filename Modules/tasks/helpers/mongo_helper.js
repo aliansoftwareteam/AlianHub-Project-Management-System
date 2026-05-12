@@ -122,7 +122,11 @@ exports.HandleHistory = (type, companyId, projectId, taskId, object, userData) =
             if (type == "Logtask") {
                 obj.Type = "task";
             }
-            const utcDateTime = DateTime.utc();
+            // BUG-046 / #100 fix: drop the manual `DateTime.utc().ts`
+            // (millis) timestamps. The history schema now declares
+            // `timestamps: true`, so Mongoose populates `createdAt` /
+            // `updatedAt` as BSON Dates automatically — and the shape
+            // stays consistent across all documents.
             const data = {
                 'Type': type,
                 'Key': object.key,
@@ -130,8 +134,6 @@ exports.HandleHistory = (type, companyId, projectId, taskId, object, userData) =
                 'ProjectId': projectId,
                 'TaskId': taskId !== null ? taskId : "",
                 'Message': object.message,
-                createdAt:utcDateTime.ts,
-                updatedAt:utcDateTime.ts,
             }
             let typeSchema = SCHEMA_TYPE.HISTORY
           

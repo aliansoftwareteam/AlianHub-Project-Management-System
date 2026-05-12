@@ -23,7 +23,10 @@ exports.HandleHistory = (type, companyId, projectId, taskId, object, userData) =
             if (type == "Logtask") {
                 obj.Type = "task";
             }
-            const utcDateTime = DateTime.utc();
+            // BUG-046 / #100 fix: drop the manual `DateTime.utc().ts`
+            // (millis) timestamps. Mongoose handles createdAt/updatedAt
+            // automatically now that the history schema declares
+            // `timestamps: true`.
             const data = {
                 'Type': type,
                 'Key': object.key,
@@ -31,8 +34,6 @@ exports.HandleHistory = (type, companyId, projectId, taskId, object, userData) =
                 'ProjectId': projectId,
                 'TaskId': taskId !== null ? taskId : "",
                 'Message': object.message,
-                createdAt:utcDateTime.ts,
-                updatedAt:utcDateTime.ts,
             }
             let typeSchema = SCHEMA_TYPE.HISTORY
           

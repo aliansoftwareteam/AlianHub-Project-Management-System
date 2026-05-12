@@ -245,13 +245,17 @@ const schema = {
             type: String,
             required: true,
         },
+        // BUG-046 / #100: createdAt/updatedAt are populated by Mongoose
+        // (`timestamps: true` on historySchema). Keep the field
+        // declarations so older code paths that still reference the
+        // shape don't break, but drop `required: true` — Mongoose
+        // sets them on `.save()` automatically; requiring them on every
+        // update would reject legacy docs that lacked them.
         createdAt: {
             type: Date,
-            required: true,
         },
         updatedAt: {
             type: Date,
-            required: true,
         },
     },
     userId: {
