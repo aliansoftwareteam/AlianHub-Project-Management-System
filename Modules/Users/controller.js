@@ -71,7 +71,11 @@ exports.checkUserAndCompany = (req, res) => {
 
     try {
         MongoDbCrudOpration('global', obj, "findOne").then((response)=>{
-            if(response && response.isEmailVerified == false) {
+            // BUG-026 / #80 fix: use strict equality. Pre-fix `== false`
+            // also matched 0, "", null, undefined, NaN — so a user document
+            // missing the field entirely (legacy data) would pass through
+            // the "Email Not Verified" branch unintentionally.
+            if(response && response.isEmailVerified === false) {
                 res.send({
                     status: false,
                     statusText: "Email Not Verified",
