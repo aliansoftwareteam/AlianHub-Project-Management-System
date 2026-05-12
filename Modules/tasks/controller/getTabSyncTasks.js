@@ -105,7 +105,15 @@ exports.getTabSynctTaskWithTable = (companyId,req) => {
                                 $and:[
                                     {ProjectID: {$in : [new mongoose.Types.ObjectId(req.body.pid)]}},
                                     {sprintId: {$eq :new mongoose.Types.ObjectId(req.body.sprintId)}},
-                                    {deletedStatusKey: { $in: [0] }},
+                                    // BUG-032 / #86 fix: was `{ $in: [0] }` which
+                                    // excluded legacy tasks that pre-date the
+                                    // soft-delete field. Tasks where
+                                    // `deletedStatusKey` is unset (undefined)
+                                    // are still active and must be returned —
+                                    // matches the pattern used by getTaskCount
+                                    // (`{$in: [0, 2, undefined]}`) and the
+                                    // sibling getTabSynctTaskWithoutTable.
+                                    {deletedStatusKey: { $in: [0, undefined] }},
                                     {updatedAt: {$gte: new Date(Number(req.body.tabLeaveTime))},}
                                 ]
                             },

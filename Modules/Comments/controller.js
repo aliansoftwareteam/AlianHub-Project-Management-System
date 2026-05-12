@@ -125,6 +125,12 @@ exports.getPaginatedMessages = async (req, res) => {
             $match: {
                 $and: [
                     { projectId: new mongoose.Types.ObjectId(projectId) },
+                    // BUG-032 / #86 fix: align soft-delete handling with the other
+                    // comment-listing endpoints (searchMessageFromMainChat /
+                    // searchComments). Without this filter, soft-deleted comments
+                    // (isDeleted === true) reappeared in main-chat pagination.
+                    // `$ne: true` keeps documents whose flag is missing/false.
+                    { isDeleted: { $ne: true } },
                     ...(sprintId ? [{ sprintId: new mongoose.Types.ObjectId(sprintId) }] : []),
                     ...(tabLeaveTime ? [{ updatedAt: { $gte: new Date(Number(tabLeaveTime)) } }] : []),
                     ...(!isDefault && mainChat
@@ -193,7 +199,11 @@ exports.searchMessageFromMainChat = async (req, res) => {
                               ]
                           }
                         : {}),
-                    isDeleted: false
+                    // BUG-032 / #86 fix: legacy comments may not have an
+                    // isDeleted field. Using `$ne: true` keeps them in results
+                    // while still excluding soft-deleted ones (consistent with
+                    // searchComments).
+                    isDeleted: { $ne: true }
                 },
                 {},
                 { sort: { createdAt: 1 } },
