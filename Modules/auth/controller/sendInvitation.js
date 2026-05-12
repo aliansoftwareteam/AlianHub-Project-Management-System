@@ -2,7 +2,10 @@ const config = require("../../../Config/config");
 const { dbCollections } = require('../../../Config/collections');
 const sendMail = require("../../service.js");
 const mongoRef = require('../../../utils/mongo-handler/mongoQueries');
-const btoa = require('btoa');
+// BUG-040 / #94 — drop the `btoa` npm shim; Node has had `btoa`
+// available as a runtime global since v16. Tiny inline replacement
+// keeps the call sites readable.
+const btoa = (input) => Buffer.from(input, 'binary').toString('base64');
 const { SCHEMA_TYPE } = require("../../../Config/schemaType.js");
 const mongoose = require("mongoose");
 const { updateCompanyFun } = require("../../Company/controller/updateCompany.js");
