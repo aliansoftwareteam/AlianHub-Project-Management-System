@@ -160,8 +160,19 @@ exports.manualLogTime = async (req, res) => {
         return;
     }
     const { type = SCHEMA_TYPE.TIMESHEET } = req.body;
-    let diffArr = req.body.timeDuration.split(':');
-    let diffMin = (+diffArr[0]) * 60 + (+diffArr[1]);
+    // BUG-029 / #83 fix: the existing validation at line 53 only blocks
+    // falsy timeDuration. A non-string value (number, array, object) or a
+    // string without a colon (e.g. "1") would crash here with a TypeError
+    // or silently store NaN in the DB. Validate the shape explicitly.
+    if (typeof req.body.timeDuration !== 'string' || !/^\d+:\d+$/.test(req.body.timeDuration)) {
+        res.send({
+            status: false,
+            statusText: "timeDuration must be a string in HH:MM format"
+        });
+        return;
+    }
+    const diffArr = req.body.timeDuration.split(':');
+    const diffMin = (+diffArr[0]) * 60 + (+diffArr[1]);
     let data = {
         ProjectId: req.body.projectId,
         LogStartTime: getTimeStamp(req.body.timeZone, req.body.logTimeDate, req.body.startLogTime),
