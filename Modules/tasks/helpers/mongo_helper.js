@@ -12,6 +12,8 @@ const { getCachedCompanyData } = require('../../../utils/planHelper');
 const serviceFun = require("../../serviceFunction");
 const socketEmitter = require('../../../event/socketEventEmitter');
 const { updateCommentCollection, addCommentCollection } = require('../../Comments/controller');
+// BUG-033 / #87 — self-healing reconciliation for sprint task counts.
+const { reconcileSprintTaskCount, scheduleReconciliation } = require('./reconcileTaskCount');
 
 /* ------------- TASK ------------- */
 exports.HandleTask = async (companyId, object, isUpdate, id = null, userData) => {
@@ -326,6 +328,8 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                         }
                         updateSprintFun(incObj).catch((error) => {
                             logger.error(`error in update task count : ${error}`)
+                            // BUG-033 / #87 fix: reconcile drift on count failure.
+                            scheduleReconciliation(companyId, task.sprintId);
                         });
                         const decObj = {
                             body: {
@@ -340,6 +344,8 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                         }
                         updateSprintFun(decObj).catch((error) => {
                             logger.error(`error in update task count : ${error}`)
+                            // BUG-033 / #87 fix: reconcile drift on count failure.
+                            scheduleReconciliation(companyId, convertTask.sprintId);
                         });
                     }
                 }).catch((error) => {
@@ -483,6 +489,11 @@ exports.moveTaskFunction = (companyId, projectData, sprintObj, moveTask, oldSpri
                     }
                     updateSprintFun(incObj).catch((error) => {
                         logger.error(`error in update task count : ${error}`)
+                        // BUG-033 / #87 fix: a failed `$inc` here leaves the
+                        // sprint's denormalised `tasks` count drifted from
+                        // reality. Trigger an off-loop reconciliation that
+                        // recomputes from the tasks collection.
+                        scheduleReconciliation(companyId, sprintObj.id);
                     });
                     const decObj = {
                         body: {
@@ -497,9 +508,18 @@ exports.moveTaskFunction = (companyId, projectData, sprintObj, moveTask, oldSpri
                     }
                     updateSprintFun(decObj).catch((error) => {
                         logger.error(`error in update task count : ${error}`)
+                        // BUG-033 / #87 fix: same drift risk on the source
+                        // sprint when the dec call fails.
+                        scheduleReconciliation(companyId, oldSprintObj.id);
                     });
                 }).catch((error)=>{
                     logger.error(`${error} ERROR IN MONGO QUERY`);
+                    // BUG-033 / #87 fix: the primary findOneAndUpdate above
+                    // marked the source task `deletedStatusKey:1`. If the
+                    // re-insert into the destination sprint fails here we're
+                    // left with both sprints' counts mid-flight. Reconcile
+                    // both ends so the user sees correct numbers.
+                    scheduleReconciliation(companyId, [sprintObj?.id, oldSprintObj?.id]);
                 })
             })
         } catch (error) {
@@ -679,6 +699,8 @@ exports.mergeSubTask = (companyId, subTask, mergeTask, projectData, oldProject) 
                     }
                     updateSprintFun(incCountObj).catch((error) => {
                         logger.error(`error in update task count : ${error}`)
+                        // BUG-033 / #87 fix: reconcile drift on count failure.
+                        scheduleReconciliation(companyId, mergeTask.sprintId);
                     });
                     const decObj = {
                         body: {
@@ -693,6 +715,8 @@ exports.mergeSubTask = (companyId, subTask, mergeTask, projectData, oldProject) 
                     }
                     updateSprintFun(decObj).catch((error) => {
                         logger.error(`error in update task count : ${error}`)
+                        // BUG-033 / #87 fix: reconcile drift on count failure.
+                        scheduleReconciliation(companyId, subTask.sprintId);
                     });
                 }
                 exports.removeCommentCount(companyId,projectData.id,subTask.sprintId,subTask._id).catch((error) => {
