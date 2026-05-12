@@ -74,7 +74,8 @@ exports.manualLogTime = async (req, res) => {
     if (!(req.body && req.body.companyId)) {
         res.send({
             status: false,
-            statusText: "ProjectId is required"
+            // BUG-028 / #82 fix: was copy-paste error "ProjectId is required".
+            statusText: "CompanyId is required"
         })
         return;
     }
