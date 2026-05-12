@@ -9,10 +9,59 @@ const { updateUserFun, getUserByQueyFun } = require("../../Users/controller");
 const { updateMemberFunction } = require('../../settings/Members/controller');
 
 /**
+ * BUG-011 / #65 fix: parse the base64 invitation blob into a *local*
+ * object with a fixed key allow-list. Previously the handler did:
+ *
+ *     for (let i = 0; i < idArray.length; i += 1) {
+ *         const aidArray = idArray[i].split('=');
+ *         finalObj[aidArray[0]] = aidArray[1];
+ *     }
+ *     req.body = finalObj;
+ *
+ * — i.e. any key in the attacker-controlled blob was merged into
+ * `req.body` and downstream code (here and elsewhere) saw whatever the
+ * attacker wanted under whatever name.
+ *
+ * Now: build a local object, only copy keys from a fixed allow-list,
+ * and leave `req.body` untouched.
+ */
+const ALLOWED_INVITE_KEYS = new Set(['userId', 'companyId', 'linkId', 'docId']);
+
+// Strict base64 check — the npm `atob` package is permissive and happily
+// returns garbage on malformed input, so we gate on the alphabet first.
+const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
+
+exports.parseInviteBlob = (encoded) => {
+    if (typeof encoded !== 'string' || !encoded) return null;
+    if (!BASE64_RE.test(encoded)) return null;
+    let decoded;
+    try {
+        decoded = atob(encoded);
+    } catch (_) {
+        return null;
+    }
+    if (typeof decoded !== 'string' || !decoded) return null;
+    const out = {};
+    const parts = decoded.split('&');
+    for (let i = 0; i < parts.length; i += 1) {
+        const eq = parts[i].indexOf('=');
+        if (eq < 0) continue;
+        const key = parts[i].slice(0, eq);
+        const value = parts[i].slice(eq + 1); // preserve any `=` inside the value
+        if (ALLOWED_INVITE_KEYS.has(key)) {
+            out[key] = value;
+        }
+    }
+    // If nothing recognised was extracted, treat the blob as invalid.
+    if (Object.keys(out).length === 0) return null;
+    return out;
+};
+
+/**
  * Check Permission
- * @param {Object} req 
- * @param {Object} res 
- * @returns 
+ * @param {Object} req
+ * @param {Object} res
+ * @returns
  */
 exports.checkPermission = (req, res) => {
     if (!(req.body && req.body.id)) {
@@ -23,10 +72,9 @@ exports.checkPermission = (req, res) => {
         });
         return;
     }
-    const id = atob(req.body.id);
 
-    const idArray = id.split('&');
-    if (!(idArray && idArray.length)) {
+    const invite = exports.parseInviteBlob(req.body.id);
+    if (!invite) {
         res.json({
             status: false,
             key: 1,
@@ -34,24 +82,19 @@ exports.checkPermission = (req, res) => {
         });
         return;
     }
-    let finalObj = {};
-    for (let i = 0; i < idArray.length; i += 1) {
-        const aidArray = idArray[i].split('=');
-        finalObj[aidArray[0]] = aidArray[1];
-    }
-    req.body = finalObj;
-    if (!(req.body && req.body.userId)) {
+
+    if (!invite.userId) {
         res.json({
             status: true,
             key: 2,
-            companyId: req.body.companyId,
-            linkId: req.body.linkId,
+            companyId: invite.companyId,
+            linkId: invite.linkId,
             statusText: "User Not Found."
         });
         return;
     }
 
-    if (!(req.body && req.body.companyId)) {
+    if (!invite.companyId) {
         res.json({
             status: false,
             key: 1,
@@ -60,7 +103,7 @@ exports.checkPermission = (req, res) => {
         return;
     }
 
-    if (!(req.body && req.body.linkId)) {
+    if (!invite.linkId) {
         res.json({
             status: false,
             key: 1,
@@ -71,7 +114,7 @@ exports.checkPermission = (req, res) => {
 
     try {
         const query = {
-            _id: new mongoose.Types.ObjectId(req.body.userId)
+            _id: new mongoose.Types.ObjectId(invite.userId)
         }
         getUserByQueyFun(query)
         .then((resp) => {
@@ -80,8 +123,8 @@ exports.checkPermission = (req, res) => {
                 res.send({
                     status: true,
                     key: 2,
-                    companyId: req.body.companyId,
-                    linkId: req.body.linkId,
+                    companyId: invite.companyId,
+                    linkId: invite.linkId,
                     statusText: "User Not Found."
                 });
                 return;
@@ -90,11 +133,11 @@ exports.checkPermission = (req, res) => {
                 type: dbCollections.COMPANY_USERS,
                 data: [
                     {
-                        _id: new mongoose.Types.ObjectId(req.body.docId)
+                        _id: new mongoose.Types.ObjectId(invite.docId)
                     }
                 ]
             }
-            MongoDbCrudOpration(req.body.companyId, companyUserQuery, "findOne")
+            MongoDbCrudOpration(invite.companyId, companyUserQuery, "findOne")
             .then((cUser) => {
                 if(!cUser) {
                     res.send({
@@ -123,7 +166,7 @@ exports.checkPermission = (req, res) => {
                     });
                     return;
                 }
-                if (userData.linkId !== req.body.linkId) {
+                if (userData.linkId !== invite.linkId) {
                     res.send({
                         status: false,
                         key: 4,
@@ -134,12 +177,12 @@ exports.checkPermission = (req, res) => {
                 res.json({
                     status: true,
                     key: 5,
-                    companyId: req.body.companyId
+                    companyId: invite.companyId
                 });
 
                 const memberObject = [
                     {
-                        _id: new mongoose.Types.ObjectId(req.body.docId)
+                        _id: new mongoose.Types.ObjectId(invite.docId)
                     }, {
                         $set: {
                             status: 2,
@@ -148,26 +191,26 @@ exports.checkPermission = (req, res) => {
                     }
                 ]
 
-                updateMemberFunction(req.body.companyId, memberObject, "updateOne")
+                updateMemberFunction(invite.companyId, memberObject, "updateOne")
                 .then(() => {
                     const userUpdateQuery = {
                         type: dbCollections.USERS,
                         data: [
                             {
-                                _id: new mongoose.Types.ObjectId(req.body.userId)
+                                _id: new mongoose.Types.ObjectId(invite.userId)
                             }, {
                                 $push: {
-                                    AssignCompany: req.body.companyId
+                                    AssignCompany: invite.companyId
                                 }
                             }
                         ]
                     }
-                    updateUserFun(SCHEMA_TYPE.GOLBAL, userUpdateQuery, "updateOne",req.body.companyId,req.body.userId)
+                    updateUserFun(SCHEMA_TYPE.GOLBAL, userUpdateQuery, "updateOne", invite.companyId, invite.userId)
                     .catch((error) => {
                         logger.error(`ERROR in update user: ${error.message}`);
                     })
 
-                    addAndRemoveUserInMongodbNotificationCount(req.body.companyId,req.body.userId,"Add").catch((error)=>{
+                    addAndRemoveUserInMongodbNotificationCount(invite.companyId, invite.userId, "Add").catch((error)=>{
                         logger.error(`ERROR in create user In mongodb: ${error}`)
                     })
                 })
