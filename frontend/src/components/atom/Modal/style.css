@@ -77,8 +77,30 @@
     height: 100vh;
 }
 .cancel__icon-img{
-    width: 15px !important; 
+    width: 15px !important;
     height: 15px !important;
+}
+/*
+ * BUG-043 / #97 — the modal close button must look identical to the
+ * old clickable <img>: no chrome, just the icon. Strip native button
+ * styling and let the inner <img> carry the visible size. Preserve
+ * focus visibility so keyboard users can see the focused state.
+ */
+.cancel__icon-btn {
+    background: none;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    line-height: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.cancel__icon-btn:focus-visible {
+    outline: 2px solid #2f3990;
+    outline-offset: 2px;
+    border-radius: 2px;
 }
 .setting_task_priority .outline-secondary {
     background: #2f3990 !important;
