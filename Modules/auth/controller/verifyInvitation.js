@@ -4,7 +4,10 @@ const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { dbCollections } = require("../../../Config/collections");
 const { addAndRemoveUserInMongodbNotificationCount } = require("../controller");
-const atob = require('atob');
+// BUG-040 / #94 — drop the `atob` npm shim; Node has had `atob`
+// available as a runtime global since v16. Same intent (decode a
+// base64 string), one less unmaintained dependency, smaller install.
+const atob = (input) => Buffer.from(input, 'base64').toString('binary');
 const { updateUserFun, getUserByQueyFun } = require("../../Users/controller");
 const { updateMemberFunction } = require('../../settings/Members/controller');
 
