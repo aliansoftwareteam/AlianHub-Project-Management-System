@@ -176,28 +176,38 @@ exports.formatBucketSize = (size, unit) => {
     }
 }
 
-async function copyFile(source, destination) {
-    try {
-        await fs.cp(source, destination,(err, data) => {
+// BUG-017 / #71: this helper used `await fs.cp(source, destination, callback)`,
+// but `fs.cp` is callback-style and returns `undefined` — `await undefined`
+// resolves immediately, so the function returned before the copy was done.
+// That made the surrounding `Promise.allSettled(imageArray.map(...))` fix
+// in `uploadIamgesInStorage` toothless on its own. Promisify the callback
+// here so the awaits up the chain actually wait.
+function copyFile(source, destination) {
+    return new Promise((resolve) => {
+        fs.cp(source, destination, (err) => {
             if (err) {
                 loggerConfig.error('Error copying file:', err);
             } else {
                 loggerConfig.info('File copied successfully');
             }
+            resolve();
         });
-    } catch (error) {
-        loggerConfig.error('Error copying file:', error);
-    }
+    });
 }
 exports.uploadIamgesInStorage = (imageArray,companyId) => {
     return new Promise(async (resolve, reject) => {
         try {
-            imageArray.forEach(async(x)=>{
+            // BUG-017 / #71 fix: the previous `imageArray.forEach(async ...)`
+            // didn't wait for the copyFile awaits, so `resolve()` fired
+            // before any file had finished copying. Use `Promise.allSettled`
+            // so independent copies run in parallel and a single failure
+            // doesn't abort the batch.
+            await Promise.allSettled(imageArray.map(async (x) => {
                 const destPath = path.join(__dirname, '../../../../storage', companyId, x.path);
                 const srcPath = path.join(__dirname, '/../../../../wasabiUploadsLocal', x.filePath);
-                await copyFile(srcPath,destPath)
-            });
-            resolve()
+                await copyFile(srcPath, destPath);
+            }));
+            resolve();
         } catch (error) {
             reject(error);
         }
