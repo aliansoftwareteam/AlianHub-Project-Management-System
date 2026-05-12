@@ -6,7 +6,22 @@
                 <div class="modal-header d-flex align-items-center justify-content-between" :class="headerClasses" v-if="header">
                     <slot name="header">
                         <span>{{title}}</span>
-                        <img v-if="closeIcon" :src="cancelIcon" class="cursor-pointer cancel__icon-img" alt="close" @click.prevent="closeModal()">
+                        <!--
+                            BUG-043 / #97 fix: the close affordance was a bare
+                            <img> with a click handler — no role, no
+                            aria-label, no keyboard focus. Wrap in a real
+                            <button type="button"> so keyboard users can Tab
+                            to it and dismiss the modal with Enter/Space.
+                        -->
+                        <button
+                            v-if="closeIcon"
+                            type="button"
+                            class="cursor-pointer cancel__icon-btn"
+                            :aria-label="$t ? ($t('Projects.close') || 'Close') : 'Close'"
+                            @click.prevent="closeModal()"
+                        >
+                            <img :src="cancelIcon" class="cancel__icon-img" alt="">
+                        </button>
                     </slot>
                 </div>
                 <div class="modal-body" :class="bodyClasses">
