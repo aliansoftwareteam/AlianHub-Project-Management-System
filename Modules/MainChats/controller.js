@@ -4,6 +4,17 @@ const { myCache } = require('../../Config/config');
 const { removeCache } = require("../../utils/commonFunctions");
 const { replaceObjectKey } = require("../Auth/helper");
 const logger = require('../../Config/loggerConfig.js');
+
+// BUG-020 / #74 fix: the cache writer in `getChats` used
+//   `mainChat:${req.headers['companyid']}`
+// while the invalidator in `updateMainChat` built a different key from the
+// updated *document's* _id via `JSON.parse(JSON.stringify(result))?._id`.
+// The two keys never matched, so cache invalidation was a no-op and stale
+// chats stuck around until the 3600s TTL expired. Centralise the key
+// builder so set/remove use the same shape.
+const mainChatCacheKey = (companyId) => `mainChat:${companyId}`;
+exports.mainChatCacheKey = mainChatCacheKey;
+
 exports.getChats = async (req, res) => {
     try {
         const chatsObj = {
@@ -11,8 +22,8 @@ exports.getChats = async (req, res) => {
             data: []
         };
 
-        const mainChatCacheKey = `mainChat:${req.headers['companyid']}`; 
-        let chats = myCache.get(mainChatCacheKey);
+        const cacheKey = mainChatCacheKey(req.headers['companyid']);
+        let chats = myCache.get(cacheKey);
         let isFromCache = true;
         if (!chats) {
             isFromCache = false;
@@ -22,12 +33,12 @@ exports.getChats = async (req, res) => {
                 return res.status(404).json({ message: "Chats not found" });
             }
 
-            myCache.set(mainChatCacheKey, chats, 3600); 
+            myCache.set(cacheKey, chats, 3600);
         }
         if (isFromCache) {
             res.set({
                 'FromCache': 'true',
-                'cacheExpireTime': myCache.getTtl(mainChatCacheKey)
+                'cacheExpireTime': myCache.getTtl(cacheKey)
             });
         }
 
@@ -46,7 +57,11 @@ exports.updateMainChat = (companyId, chatObj) => {
                 data: chatObj
             };
             MongoDbCrudOpration(companyId, objSchema, 'findOneAndUpdate').then((result) => {
-                removeCache(`mainChat:${JSON.parse(JSON.stringify(result))?._id}`, true);
+                // BUG-020 / #74 fix: use the same key the setter uses
+                // (`mainChat:${companyId}`). The old key was built from the
+                // updated document's `_id`, which never matched the setter's
+                // companyId-keyed entry — cache invalidation was a no-op.
+                removeCache(mainChatCacheKey(companyId), true);
                 resolve(result);
             })
             .catch((error) => {
