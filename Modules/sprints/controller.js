@@ -41,13 +41,27 @@ exports.updateChannelsCounts = (companyId, private, type) => {
         requestQueue.enqueue(() => {
             updateCompanyFun(SCHEMA_TYPE.GOLBAL,query,"findOneAndUpdate",companyId,true)
             .then((response) => {
+                // BUG-030 / #84 fix: pre-fix code went straight to
+                // `JSON.stringify(response.data)` and then read deeply
+                // nested fields. If response.data was undefined (race
+                // with a newly-created project, or a malformed write)
+                // the chain crashed with TypeError on `data.projectCount.privateChannels`.
+                // Guard against missing layers and resolve(false) (the
+                // "not allowed" outcome) instead of throwing.
+                if (!response || response.data === undefined || response.data === null) {
+                    logger.warn(`checkProjectCount: missing response.data for company ${companyId}`);
+                    resolve(false);
+                    return;
+                }
                 if (response) {
                     const data = JSON.parse(JSON.stringify(response.data));
 
-                    const privateChannels = data.projectCount.privateChannels || 0;
-                    const maxPrivateChannels = data.planFeature.maxPrivateChannels;
-                    const publicChannels = data.projectCount.publicChannels || 0;
-                    const maxPublicChannels = data.planFeature.maxPublicChannels;
+                    const projectCount = data.projectCount || {};
+                    const planFeature = data.planFeature || {};
+                    const privateChannels = projectCount.privateChannels || 0;
+                    const maxPrivateChannels = planFeature.maxPrivateChannels;
+                    const publicChannels = projectCount.publicChannels || 0;
+                    const maxPublicChannels = planFeature.maxPublicChannels;
 
                     if(private) {
                         if(maxPrivateChannels === null) {
