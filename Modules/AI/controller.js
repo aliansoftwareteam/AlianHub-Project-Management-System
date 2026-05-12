@@ -384,15 +384,24 @@ exports.generateWithStream = (axiosData,header,userId,companyId,uniqueUserId,eve
                 .map((chunk) => chunk.replace(/^data: /, '').trim())
                 .filter((chunk) => chunk !== undefined && chunk !== '' && chunk !== '[DONE]')
                 .map((chunk) => JSON.parse(chunk));
-                chunkObjects.forEach(async(chunk) => {
-                    if (chunk.choices && chunk.choices.length > 0 && chunk.choices[0].delta.content){
-                        delayProvider(chunk.choices[0].delta.content,eventId)
-                    }else if(chunk.usage){
-                        const userUpdate = await exports.limitCountUpdate(userId,companyId,chunk.usage.total_tokens);
-                        emitListener(eventId, {step: "COUNT",value : userUpdate});
+                // BUG-017 / #71 fix: this loop has an `await` inside (the
+                // `limitCountUpdate` call) so the previous `.forEach(async ...)`
+                // was fire-and-forget — `resolve(fullText)` ran before the
+                // quota update settled, so quota failures were invisible.
+                // `for ... of` + `await` guarantees the update is fully
+                // applied before we continue.
+                for (const chunk of chunkObjects) {
+                    if (chunk.choices && chunk.choices.length > 0 && chunk.choices[0].delta.content) {
+                        delayProvider(chunk.choices[0].delta.content, eventId);
+                    } else if (chunk.usage) {
+                        const userUpdate = await exports.limitCountUpdate(userId, companyId, chunk.usage.total_tokens);
+                        emitListener(eventId, { step: "COUNT", value: userUpdate });
                     }
-                });
-                chunkObjects.forEach(async(chunk) => {
+                }
+                // BUG-017 / #71 fix: this loop has no `await` inside — just
+                // string concatenation — so the `async` keyword on the
+                // callback was misleading. Plain `forEach` is correct here.
+                chunkObjects.forEach((chunk) => {
                     if (chunk.choices && chunk.choices.length > 0 && chunk.choices[0].delta.content){
                         fullText += chunk.choices[0].delta.content;
                     }

@@ -610,8 +610,28 @@ exports.createProject = async (req) => {
                         reject({status: false, statusText: err});
                         logger.error(`add create project: ${err}`);
                     });
-                }else{
-                    reject({status: false, statusText: 'error in createProject'});
+                } else {
+                    // BUG-018 / #72 fix: the existing else already rejected
+                    // the outer Promise (so the audit's literal "hangs"
+                    // claim never reproduced — `Promise.allSettled` never
+                    // rejects either, so the outer .then always fires).
+                    // The real bug was that every per-query reason in
+                    // `rejected` was discarded. Surface the actual reasons
+                    // so the caller and the log have something to debug.
+                    const reasons = rejected.map((r, idx) => ({
+                        index: idx,
+                        reason: r && r.reason && r.reason.message
+                            ? r.reason.message
+                            : String(r && r.reason !== undefined ? r.reason : 'unknown'),
+                    }));
+                    logger.error(`createProject prerequisite query failures (${rejected.length}/${results.length}): ${JSON.stringify(reasons)}`);
+                    reject({
+                        status: false,
+                        statusText: 'error in createProject prerequisites',
+                        rejectedCount: rejected.length,
+                        totalCount: results.length,
+                        reasons,
+                    });
                 }
             }).catch((error) => {
                 reject({status: false, statusText: error});

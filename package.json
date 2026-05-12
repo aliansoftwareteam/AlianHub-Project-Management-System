@@ -13,10 +13,10 @@
     "@socket.io/admin-ui": "^0.5.1",
     "archiver": "7.0.1",
     "atob": "2.1.2",
+    "aws-sdk": "2.1692.0",
     "axios": "^1.12.2",
     "bcrypt": "5.1.1",
     "body-parser": "1.20.3",
-    "btoa": "1.2.1",
     "chargebee": "2.19.0",
     "cors": "2.8.5",
     "dotenv": "16.4.7",
@@ -33,12 +33,13 @@
     "node-cache": "5.1.2",
     "node-schedule": "2.1.1",
     "nodemailer": "6.9.16",
-    "sharp": "0.32.6",
+    "sharp": "^0.34.5",
     "socket.io": "4.8.1",
     "swagger-jsdoc": "6.2.8",
     "swagger-ui-express": "5.0.1",
     "ua-parser-js": "2.0.0",
-    "winston": "3.17.0"
+    "winston": "3.17.0",
+    "winston-daily-rotate-file": "^5.0.0"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
