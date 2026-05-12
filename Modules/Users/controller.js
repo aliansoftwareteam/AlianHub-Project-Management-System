@@ -69,14 +69,27 @@ exports.checkUserAndCompany = (req, res) => {
         ]
     }
 
+    // BUG-027 / #81 fix: this handler has six different res.send sites
+    // across nested .then / .catch chains. Pre-fix, a sync throw in
+    // res.send (e.g. ERR_HTTP_HEADERS_SENT triggered by middleware) on
+    // the inner .then could land in the inner .catch which would also
+    // try to res.send — and the outer .catch would do it a third time.
+    // Wrap every res.send through a `sendOnce` so duplicate writes are
+    // suppressed instead of throwing.
+    let responded = false;
+    const sendOnce = (payload) => {
+        if (responded) {
+            logger.warn('checkUserAndCompany suppressed a duplicate res.send');
+            return;
+        }
+        responded = true;
+        res.send(payload);
+    };
+
     try {
         MongoDbCrudOpration('global', obj, "findOne").then((response)=>{
-            // BUG-026 / #80 fix: use strict equality. Pre-fix `== false`
-            // also matched 0, "", null, undefined, NaN — so a user document
-            // missing the field entirely (legacy data) would pass through
-            // the "Email Not Verified" branch unintentionally.
             if(response && response.isEmailVerified === false) {
-                res.send({
+                sendOnce({
                     status: false,
                     statusText: "Email Not Verified",
                     data: {userData:response}
@@ -97,14 +110,14 @@ exports.checkUserAndCompany = (req, res) => {
 
                 MongoDbCrudOpration('global', cObj, "findOne").then((company)=>{
                     if(company) {
-                        res.send({
+                        sendOnce({
                             status: true,
                             statusText: "Comapny Found",
                             data: {isCompanyFind: true,companyId: company._id,userData:response}
                         });
                         return;
                     } else {
-                        res.send({
+                        sendOnce({
                             status: true,
                             statusText: "Comapny Not Found",
                             data: {isCompanyFind: false,companyId: '',userData:response}
@@ -112,7 +125,7 @@ exports.checkUserAndCompany = (req, res) => {
                         return;
                     }
                 }).catch((error)=>{
-                    res.send({
+                    sendOnce({
                         status: false,
                         statusText: "Comapny Not Found",
                         data: {isCompanyFind: false,companyId: '',userData:response}
@@ -121,7 +134,7 @@ exports.checkUserAndCompany = (req, res) => {
                 })
 
             } else {
-                res.send({
+                sendOnce({
                     status: true,
                     statusText: "Comapny Not Found",
                     data: {isCompanyFind: false,companyId: '',userData:response}
@@ -129,7 +142,7 @@ exports.checkUserAndCompany = (req, res) => {
                 return;
             }
         }).catch((error)=>{
-            res.send({
+            sendOnce({
                 status: false,
                 statusText: "User Not Found",
                 data: {isCompanyFind: false,companyId: '',userData: null}
@@ -137,7 +150,7 @@ exports.checkUserAndCompany = (req, res) => {
             logger.error('USER STATUS UPDATE ERROR checkUserAndCompany: ',error);
         })
     } catch (error) {
-        res.send({
+        sendOnce({
             status: false,
             statusText: "User Not Found",
             data: {}
