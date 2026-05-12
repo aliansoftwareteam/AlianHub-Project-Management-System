@@ -76,9 +76,16 @@ exports.createNewBucketInWasabi = (companyId) => {
  *                            Rejects with an error message if any issues occur during the upload process.
  */
 exports.updateLocalWasabiFiles = (companyId, path, file) => {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
         let updatedFilePath = path
-        const fileContent = fs.readFileSync(file);
+        // BUG-024 / #78 fix: async read so this doesn't block the event loop.
+        let fileContent;
+        try {
+            fileContent = await fs.promises.readFile(file);
+        } catch (err) {
+            reject(`Error reading file: ${err.message || err}`);
+            return;
+        }
         const bucketName = companyId;
         const fileName = updatedFilePath;
         
@@ -627,11 +634,18 @@ exports.uploadThumbnailFile = (file,x,y,path,companyId,isUserProfile = false) =>
         sharp(file.path)
         .resize(x, y, (!isUserProfile ? {fit: "inside"}: {}))
         .withMetadata()
-        .toFile(outputFile, (err) => {
+        .toFile(outputFile, async (err) => {
             if (err) {
                 reject(err);
             } else {
-                const fileContent = fs.readFileSync(`thumbnails/${file.filename}${x}${y}.${file.mimetype.split("/")[1]}`);
+                // BUG-024 / #78 fix: async read (callback is now async).
+                let fileContent;
+                try {
+                    fileContent = await fs.promises.readFile(`thumbnails/${file.filename}${x}${y}.${file.mimetype.split("/")[1]}`);
+                } catch (err2) {
+                    reject(`Error reading thumbnail: ${err2.message || err2}`);
+                    return;
+                }
                 const bucketName = isUserProfile ? awsRef.userProfileBucket : companyId;
                 const fileExtension = path.split('.')[1];
                 const fileName = `${path.split('.')[0]}-${x}x${y}.${fileExtension}`
@@ -680,7 +694,7 @@ exports.uploadThumbnailFile = (file,x,y,path,companyId,isUserProfile = false) =>
  *                            Rejects with an error message if any issues occur during the upload process.
  */
 exports.uploadFileWasabiPromise = (companyId, path, file, replaceFile, fileObject, thumbanilKey,isUserProfile = false) => {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
         try {
             let updatedFilePath = ''
             if (!isUserProfile) {
@@ -707,7 +721,14 @@ exports.uploadFileWasabiPromise = (companyId, path, file, replaceFile, fileObjec
                 }
                 const promises = [];
                 let filePathArray = [];
-                const fileContent = fs.readFileSync(file);
+                // BUG-024 / #78 fix: async read.
+                let fileContent;
+                try {
+                    fileContent = await fs.promises.readFile(file);
+                } catch (err) {
+                    reject(`Error reading file: ${err.message || err}`);
+                    return;
+                }
                 const bucketName = isUserProfile ? awsRef.userProfileBucket : companyId;
                 const fileName = updatedFilePath;
               
@@ -770,14 +791,21 @@ exports.uploadFileWasabiPromise = (companyId, path, file, replaceFile, fileObjec
                     });
                 }
             } else {
-                const fileContent = fs.readFileSync(file);
+                // BUG-024 / #78 fix: async read.
+                let fileContent;
+                try {
+                    fileContent = await fs.promises.readFile(file);
+                } catch (err) {
+                    reject(`Error reading file: ${err.message || err}`);
+                    return;
+                }
                 const bucketName = isUserProfile ? awsRef.userProfileBucket : companyId;
                 const fileName = updatedFilePath;
                 const params = {
                     Bucket: bucketName,
                     Key: fileName,
                     Body: fileContent,
-                    ContentType: exports.getContentType(fileName) 
+                    ContentType: exports.getContentType(fileName)
                 };
                 try {
                     s3Client.send(new PutObjectCommand(params))
@@ -1022,7 +1050,8 @@ exports.getContentType = (key) => {
  * @returns 
  */
 exports.uploadPublicAssetsToWasabi = async (path, file) => {
-    const fileContent = fs.readFileSync(file);
+    // BUG-024 / #78 fix: async read so we don't block the event loop.
+    const fileContent = await fs.promises.readFile(file);
     const bucketName = process.env.USERPROFILEBUCKET;
     const fileName = `public_assets/${path}`;
 
