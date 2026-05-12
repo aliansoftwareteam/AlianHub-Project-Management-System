@@ -42,7 +42,7 @@ jobs:
             echo "🎨 Frontend build"
             cd /frontend
             npm install
-            npm run build
+            # npm run build
             pm2 restart 19
 
             echo "✅ Deployment completed"
