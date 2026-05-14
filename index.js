@@ -140,7 +140,6 @@ function initializeControllers() {
     require('./Modules/notification-count/init').init(app);
     require('./Modules/notification/sendEmail/init').init(app);
     require('./Modules/trackerUserPermission/init').init(app);
-    require('./Modules/CheckInstallStep/init').init(app);
     require('./Modules/SaasAdmin/init').init(app);
     if(process.env.NODE_ENV === "production") {
         require('./cron.js')
@@ -194,11 +193,6 @@ function initializeControllers() {
     require("./Modules/githubOAuth/init.js").init(app);
     require("./Modules/googleOAuth/init.js").init(app);
 }
-
-// FIRES EVENT WHEN THE ENV IS UPDATED
-fs.watchFile(__dirname+'/.env', () => {
-    initializeControllers();
-})
 
 // SET MIDDLEWARE
 // require('./Config/setMiddleware.js').setMiddlewareWithC(app);
