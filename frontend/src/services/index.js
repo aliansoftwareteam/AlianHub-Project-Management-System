@@ -184,7 +184,7 @@ export const apiRequest = (type, endPoint, data, dataType, options) => {
                         }else if (err?.response?.data?.isJwtError) {
                             const userId = localStorage.getItem('userId') || "";
                             await getAuth(userId);
-                            apiRequest(type, endPoint, data).then((sData)=>{
+                            apiRequest(type, endPoint, data, dataType, options).then((sData)=>{
                                 resolve(sData);
                             }).catch((err) => {
                                 reject(err);
@@ -234,7 +234,7 @@ export const apiRequestWithoutCompnay = (type, endPoint, data, dataType,options)
                     } else if (err?.response?.data?.isJwtError) {
                         const userId = localStorage.getItem('userId') || "";
                         await getAuth(userId);
-                        apiRequestWithoutCompnay(type, endPoint, data).then((sData)=>{
+                        apiRequestWithoutCompnay(type, endPoint, data, dataType, options).then((sData)=>{
                             resolve(sData);
                         }).catch((err) => {
                             reject(err);
