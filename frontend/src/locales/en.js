@@ -1707,6 +1707,8 @@ export default {
         "Assignee added successfully": "Assignee added successfully",
         "Assignee removed successfully": "Assignee removed successfully",
         "Assignee not updated": "Assignee not updated",
+        Created_by_updated_successfully: "Created by updated successfully",
+        Created_by_not_updated: "Created by not updated",
         Task_updated_successfully: "Task updated successfully",
         Task_restored_successfully: "Task restored successfully",
         Task_archived_successfully: "Task archived successfully",

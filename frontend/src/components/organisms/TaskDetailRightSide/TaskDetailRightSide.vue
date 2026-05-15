@@ -54,23 +54,50 @@
             <div class="d-flex task-detail-right-side-label">
                 <h4>{{$t('Comment.created_by')}}</h4>
                 <Skelaton v-if="!task?.Task_Leader && isMainSpinner" style="height: 30px;" class="w-30px border-radius-50-per"/>
-                <div v-else class="d-flex align-items-center">
-                    <UserProfile
-                        :data="{
-                            image: taskLeaderData.Employee_profileImageURL, 
-                            title: taskLeaderData.Employee_Name
-                        }"
-                        :showDot="false"
-                        width="30px"
-                        :thumbnail="'30x30'"
-                    />
-                    <span 
-                        class="black text-ellipsis task-created-by" 
-                        :class="{'font-size-13 font-weight-400' : clientWidth > 767, 'font-size-16' : clientWidth <=767}"
-                        :title="taskLeaderData?.Employee_Name || 'N/A'">
-                        {{ taskLeaderData?.Employee_Name || 'N/A' }}
-                    </span>
-                </div>
+                <template v-else>
+                    <!-- Editable picker — gated by the same permission as Assignee. -->
+                    <div
+                        v-if="checkPermission('task.task_assignee',project?.isGlobalPermission) === true && checkPermission('task.task_list',project?.isGlobalPermission) == true"
+                        class="d-flex align-items-center"
+                    >
+                        <Assignee
+                            :numOfUsers="1"
+                            :users="task.Task_Leader ? [task.Task_Leader] : []"
+                            :addUser="true"
+                            :options="permittedOptions"
+                            @selected="updateTaskLeader($event)"
+                            imageWidth="30px"
+                            :showAddUser="false"
+                            :zIndexAssigne="props.zIndexAssigne"
+                            :isDisplayTeam="false"
+                            :multiSelect="false"
+                        />
+                        <span
+                            class="black text-ellipsis task-created-by ml-5px"
+                            :class="{'font-size-13 font-weight-400' : clientWidth > 767, 'font-size-16' : clientWidth <=767}"
+                            :title="taskLeaderData?.Employee_Name || 'N/A'">
+                            {{ taskLeaderData?.Employee_Name || 'N/A' }}
+                        </span>
+                    </div>
+                    <!-- Read-only display — original behaviour for users without permission. -->
+                    <div v-else class="d-flex align-items-center">
+                        <UserProfile
+                            :data="{
+                                image: taskLeaderData.Employee_profileImageURL,
+                                title: taskLeaderData.Employee_Name
+                            }"
+                            :showDot="false"
+                            width="30px"
+                            :thumbnail="'30x30'"
+                        />
+                        <span
+                            class="black text-ellipsis task-created-by"
+                            :class="{'font-size-13 font-weight-400' : clientWidth > 767, 'font-size-16' : clientWidth <=767}"
+                            :title="taskLeaderData?.Employee_Name || 'N/A'">
+                            {{ taskLeaderData?.Employee_Name || 'N/A' }}
+                        </span>
+                    </div>
+                </template>
             </div>
             <div class="d-flex task-detail-right-side-label" v-if="checkPermission('task.task_priority',project?.isGlobalPermission) !== null && checkApps('Priority')">
                 <h4>{{$t('Projects.priority')}}</h4>
@@ -354,6 +381,44 @@ const updateAssignee = (event, type) =>{
     } catch (error) {
         console.error(error);
         $toast.error(t('Toast.Assignee_not_updated'),{position: 'top-right'});
+    }
+}
+
+const updateTaskLeader = (event) => {
+    try {
+        if (!event || !event.id) return;
+        if (event.id === props.task.Task_Leader) return;
+        const userData = getUserData();
+
+        const updateObject = {
+            Task_Leader: event.id
+        }
+
+        const projectData = {
+            _id: project.value._id,
+            CompanyId: project.value.CompanyId,
+            lastTaskId: project.value.lastTaskId,
+            ProjectName: project.value.ProjectName,
+            ProjectCode: project.value.ProjectCode
+        }
+
+        taskClass.updateTaskLeader({
+            firebaseObj: updateObject,
+            projectData: projectData,
+            taskData: props.task,
+            employeeName: getUser(event.id).Employee_Name,
+            userData
+        })
+        .then(() => {
+            $toast.success(t('Toast.Created_by_updated_successfully'), { position: 'top-right' });
+        })
+        .catch((error) => {
+            console.error("ERROR in updateTaskLeader: ", error);
+            $toast.error(t('Toast.Created_by_not_updated'), { position: 'top-right' });
+        })
+    } catch (error) {
+        console.error(error);
+        $toast.error(t('Toast.Created_by_not_updated'), { position: 'top-right' });
     }
 }
 
