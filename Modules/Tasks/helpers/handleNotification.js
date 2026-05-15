@@ -93,9 +93,21 @@ exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId
                     reject({ status: false, message: "No watchers" });
                     return
                 }
+                // Task_Leader (the task creator) must honour the same
+                // project-level watcher setting as everyone else. Without
+                // this guard, the union below bypassed the "Ignore" filter
+                // entirely — a creator who set the project to Ignore would
+                // still receive in-app and email notifications because the
+                // downstream per-event NOTIFICATIONS_SETTINGS check is a
+                // separate preference layer and defaults email=true.
+                const creatorIgnoringProject = taskData?.Task_Leader && projectData?.watchers?.[taskData.Task_Leader] === "ignore";
+                const includeCreator = taskData?.Task_Leader && !creatorIgnoringProject;
                 let users = [];
                 if (taskId !== undefined) {
-                    users = Array.from(new Set([taskData.Task_Leader, ...watchers]));
+                    users = Array.from(new Set([
+                        ...(includeCreator ? [taskData.Task_Leader] : []),
+                        ...watchers
+                    ]));
                 } else {
                     users = Array.from(new Set([...taskData.AssigneeUserId, ...doc.data().LeadUserId, ...watchers]));
                 }
@@ -138,10 +150,16 @@ exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId
             } else if(projectData && type === 'project'){
                 let watchers = projectData?.watchers || {};
                 let ownerId = userData.companyOwnerId;
-                
+
                 let filteredIds = Object.keys(watchers).filter(id =>  watchers[id] === 'all_activity' || (watchers[id] === 'participating_mentions' && mentionUserId?.includes(id)));
+                // Company owner must also honour the project-level "Ignore"
+                // setting — the previous unconditional union forced them
+                // into the recipient list and downstream into the email
+                // pipeline regardless of their stated preference.
+                const ownerIgnoringProject = ownerId && watchers[ownerId] === 'ignore';
+                const includeOwner = ownerId && !ownerIgnoringProject;
                 let users = [];
-                users = Array.from(new Set([...filteredIds, ...(ownerId ? [ownerId] : [])]));
+                users = Array.from(new Set([...filteredIds, ...(includeOwner ? [ownerId] : [])]));
                 const obj = {
                     "createdAt": new Date(),
                     "key": object.key,
