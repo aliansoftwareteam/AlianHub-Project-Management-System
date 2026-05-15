@@ -327,6 +327,58 @@ class Task {
         })
     }
 
+    /* -------------- UPDATE TASK LEADER (CREATED BY) -----------------*/
+
+    updateTaskLeader({ firebaseObj, projectData, taskData, employeeName, userData, isUpdateTask = true }) {
+        return new Promise((resolve, reject) => {
+            try {
+                const newLeaderId = firebaseObj && firebaseObj.Task_Leader;
+                if (!newLeaderId) {
+                    reject({ status: false, error: new Error("Task_Leader is required") });
+                    return;
+                }
+
+                const { sprintId, ProjectID } = taskData;
+
+                // Optimistic UI: mirror what updateAssignee does for AssigneeUserId
+                Store.commit('projectData/mutateUpdateFirebaseTasks', {
+                    snap: null,
+                    op: "modified",
+                    pid: ProjectID,
+                    sprintId,
+                    data: { ...taskData, Task_Leader: newLeaderId },
+                    updatedFields: { ...firebaseObj }
+                });
+
+                apiRequest("patch", env.V2_TASKS, {
+                    action: "updateTaskLeader",
+                    firebaseObj,
+                    projectData,
+                    taskData,
+                    employeeName,
+                    isUpdateTask,
+                    userData: {
+                        "Employee_Name": userData.Employee_Name,
+                        "id": userData.id,
+                        "companyOwnerId": userData.companyOwnerId
+                    }
+                })
+                .then((response) => {
+                    if (response.data.status) {
+                        resolve({ status: true, statusText: "Task leader updated successfully" });
+                    } else {
+                        reject({ status: false, error: response.data.error });
+                    }
+                })
+                .catch((error) => {
+                    reject({ status: false, error: error });
+                });
+            } catch (error) {
+                reject({ status: false, error: error });
+            }
+        });
+    }
+
     /* -------------- UPDATE TASK WATCHER -----------------*/
     updateWatcher({companyId, projectId, sprintId, taskId, userId, add,userData,employeeName, watchers: watchersArr}) {
         return new Promise((resolve,reject) => {

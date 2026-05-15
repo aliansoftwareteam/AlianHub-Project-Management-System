@@ -831,6 +831,76 @@ class Task {
         })
     }
 
+    /* -------------- UPDATE TASK LEADER (CREATED BY) FUNCTION FOR TASK -----------------*/
+
+    updateTaskLeader({firebaseObj, projectData, taskData, employeeName, userData, isUpdateTask}) {
+        return new Promise((resolve, reject) => {
+            try {
+                const newLeaderId = firebaseObj && firebaseObj.Task_Leader;
+                if (!newLeaderId) {
+                    reject(new Error("Task_Leader is required"));
+                    return;
+                }
+
+                // SIDE-EFFECTS ONLY (history) — parity with updateAssignee/updateStatus/updatePriority
+                if (isUpdateTask === false) {
+                    const historyObj = {
+                        key: "TaskLeader_Changed",
+                        message: `<b>${userData.Employee_Name}</b> has changed <b>Created by</b> to <b>${employeeName}</b>.`,
+                        sprintId: taskData.sprintId,
+                    };
+                    HandleHistory('task', projectData.CompanyId, projectData._id, taskData._id, historyObj, userData)
+                    .catch((error) => {
+                        logger.error(`ERROR in history: ${error.message}`);
+                    });
+                    resolve({status: true, statusText: "Task leader updated successfully"});
+                    return;
+                }
+
+                // DB-WRITE PATH
+                const findObj = {
+                    type: dbCollections.TASKS,
+                    data: [{ _id: taskData._id }]
+                };
+                MongoDbCrudOpration(projectData.CompanyId, findObj, "findOne").then((response) => {
+                    if (!response) {
+                        throw new Error("Task document does not exist!");
+                    }
+
+                    const mongoUpdateObj = { $set: { Task_Leader: newLeaderId } };
+                    const updateObj = {
+                        type: SCHEMA_TYPE.TASKS,
+                        data: [
+                            { _id: new mongoose.Types.ObjectId(taskData._id) },
+                            mongoUpdateObj,
+                            { returnDocument: "after" }
+                        ]
+                    };
+                    MongoDbCrudOpration(projectData.CompanyId, updateObj, "findOneAndUpdate").then((result) => {
+                        socketEmitter.emit('update', { type: "update", data: result, updatedFields: { Task_Leader: newLeaderId }, module: 'task' });
+                        resolve({status: true, statusText: "Task leader updated successfully"});
+
+                        const historyObj = {
+                            key: "TaskLeader_Changed",
+                            message: `<b>${userData.Employee_Name}</b> has changed <b>Created by</b> to <b>${employeeName}</b>.`,
+                            sprintId: taskData.sprintId,
+                        };
+                        HandleHistory('task', projectData.CompanyId, projectData._id, taskData._id, historyObj, userData)
+                        .catch((error) => {
+                            logger.error(`ERROR in history: ${error.message}`);
+                        });
+                    }).catch((error) => {
+                        reject(error);
+                    });
+                }).catch((error) => {
+                    reject(error);
+                });
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
+
     /* -------------- (AUTO RUN ON TASK CREATE) UPDATE TASK KEY -----------------*/
     updateTaskKey({companyId, projectCode, projectId, taskId, taskTypeKey, sprintId, mainChat = false,isParentTask=true , indexObj = {}}) {
         return new Promise((resolve, reject) => {
