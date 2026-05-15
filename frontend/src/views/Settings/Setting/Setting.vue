@@ -19,6 +19,13 @@
                 <SettingMilestoneStatus v-if="checkPermission('settings.settings_project_milestone_status') !== null"
                     :editPermission="checkPermission('settings.settings_project_milestone_status')" />
                 <SettingCurrency v-if="checkPermission('project.project_milestone') !== null" />
+                <!--
+                    Screenshot retention is gated inside the component itself
+                    (renders nothing unless companyUser.roleType === 1), so we
+                    can mount it unconditionally here and let it self-hide for
+                    non-owners.
+                -->
+                <SettingScreenshotRetention />
             </div>
         </div>
     </div>
@@ -35,6 +42,7 @@ import SettingMilestoneWeeklyRange from "@/components/molecules/Setting/SettingM
 import SettingMilestoneStatus from "@/components/molecules/Setting/SettingMilestoneStatus.vue";
 import settingFileExtesnsions from "@/components/molecules/Setting/SettingFileExtensions.vue";
 import SettingCurrency from "@/components/molecules/Setting/SettingCurrencys.vue";
+import SettingScreenshotRetention from "@/components/molecules/Setting/SettingScreenshotRetention.vue";
 import { defineComponent} from "vue";
 import { useCustomComposable } from '@/composable';
 const accesDenied = require("@/assets/images/access_denied_img.png");
@@ -47,7 +55,8 @@ defineComponent({
         SettingTaskPriorityVue,
         SettingMilestoneWeeklyRange,
         settingFileExtesnsions,
-        SettingCurrency
+        SettingCurrency,
+        SettingScreenshotRetention
     }
 })
 
