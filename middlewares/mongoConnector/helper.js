@@ -15,7 +15,7 @@ exports.connections = [];
 exports.updateConnectionRecord = (db, conData = {}) => {
     const index = exports.connections.findIndex((x) => x.db === db)
     if (index !== -1) {
-        exports.connections[index].lastRequset = new Date().getTime();
+        exports.connections[index].lastRequest = new Date().getTime();
         // console.log("EXISTING CONNECTION", exports.connections.map((x) => ({ db: x.db, last: x.lastRequest })));
     } else {
         exports.connections.push({ ...conData })
