@@ -74,7 +74,7 @@ const $toast = useToast();
 const { getters } = useStore();
 
 const userId = inject('$userId');
-const companyId = inject('$companyId');
+// const companyId = inject('$companyId');
 
 // Owner gate — mirrors the BillingHistoryTab convention. Component
 // renders nothing for non-owners (the <template v-if="isOwner"> above).
