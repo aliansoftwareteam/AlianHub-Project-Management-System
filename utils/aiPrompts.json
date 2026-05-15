@@ -14400,5 +14400,45 @@
             }
         ],
         "stream": true
+    },
+    {
+        "_id": "67ff000000000000aicard001",
+        "title": "Dashboard Card Generator",
+        "categoryRef": 1,
+        "fields": [
+            {
+                "type": "textArea",
+                "rules": "required | min:5 | max:500",
+                "value": "",
+                "title": "Describe the card",
+                "placeHolder": "e.g. Show a pie chart of urgent open tasks for the AlianHub project",
+                "defaultValue": "",
+                "key": "USER_REQUEST"
+            },
+            {
+                "type": "hidden",
+                "rules": "",
+                "value": "",
+                "title": "Card catalogue",
+                "placeHolder": "",
+                "defaultValue": "",
+                "key": "CARD_CATALOGUE"
+            },
+            {
+                "type": "hidden",
+                "rules": "",
+                "value": "",
+                "title": "User context",
+                "placeHolder": "",
+                "defaultValue": "",
+                "key": "USER_CONTEXT"
+            }
+        ],
+        "outputFormat": "{\"componentId\":\"\",\"cardData\":{\"fieldName\":\"\",\"projectId\":[],\"isParentTask\":true},\"filterData\":[]}",
+        "predefinedPrompt": "You are a JSON generator for the AlianHub project-management dashboard. Convert the user's request into a single JSON object describing one dashboard card. Output ONLY the JSON object.\n\nUser request: USER_REQUEST\n\nAvailable card types — each `*` line is one card. Indented lines list its configurable cardData fields with type, validation, and (for enums) the exact id=name mapping you must use:\nCARD_CATALOGUE\n\nRuntime context (use these IDs / keys VERBATIM; do not invent new ones). Shape: { projects:[{id,name}], statusKeys:[\"...\"], priorityKeys:[\"...\"], members:[{id,name}], taskTypes:[{key,name}] }\nUSER_CONTEXT\n\nRules:\n- componentId MUST be one of the `*` keys in CARD_CATALOGUE. Pick the one whose description best matches the user's intent.\n- cardData MUST include every field listed under the chosen componentId — not just fieldName / projectId. Omitted fields will render as `undefined` in the dashboard.\n- For each cardData field, follow the field's declared type:\n    * text → a non-empty string (respect max length from rules).\n    * boolean → true or false (default to true for isParentTask unless the user asks for subtasks).\n    * enum → use the numeric id from the {id=name, ...} mapping, NOT the name. Example: for logtype {1=track_time, 2=manual_time, 3=both}, output 3 for \"both\", 1 for \"tracked time only\".\n    * \"array of enum ids\" → multi-select. Output an ARRAY of valid ids (e.g. TASKLIST.fields takes [3, 4, 5] for due-date + priority + task-key columns). Never collapse to a single id.\n    * \"array of project IDs\" → array of _id strings from USER_CONTEXT.projects[].id (match by name case-insensitively when the user names a project; otherwise pick the first available project).\n    * \"array of user IDs\" → array of userId strings from USER_CONTEXT.members[].id (match by name case-insensitively when the user names a person; otherwise return an empty array meaning \"all assignees\").\n    * \"array of status keys\" → array of statusKey strings from USER_CONTEXT.statusKeys. Empty array means \"all statuses\".\n    * fieldName is a short human title (3-100 chars) derived from the user's request.\n- filterData is an array of {filterOn, comparisonsData, operator, value}. filterOn must be one of: statusKey, DueDate, Task_Priority, Task_Leader, TaskTypeKey, tagsArray, AssigneeUserId. operator is always \"in\". value is always []. Return [] if no filter is requested.\n- comparisonsData values must be drawn from USER_CONTEXT as follows:\n    statusKey      → USER_CONTEXT.statusKeys\n    Task_Priority  → USER_CONTEXT.priorityKeys\n    AssigneeUserId → USER_CONTEXT.members[].id (match the user's name input case-insensitively)\n    Task_Leader    → USER_CONTEXT.members[].id\n    TaskTypeKey    → USER_CONTEXT.taskTypes[].key\n    tagsArray      → raw tag strings the user typed (there is no catalogue)\n    DueDate        → ISO date strings derived from the user's request\n- If the request cannot be mapped to any card, return {\"componentId\":\"\",\"error\":\"<short reason>\"}.\n\nExamples (placeholder IDs in <angle brackets> — substitute real values from USER_CONTEXT):\n\nUser request: \"Pie chart of workload by status for the Alpha project\"\nOutput: {\"componentId\":\"WorkloadByStatusPieChartCard\",\"cardData\":{\"fieldName\":\"Workload by Status\",\"projectId\":[\"<alpha-id>\"],\"isParentTask\":true,\"isPercentage\":false,\"isShowLegend\":false},\"filterData\":[]}\n\nUser request: \"Bar chart of tasks grouped by assignee for Marketing\"\nOutput: {\"componentId\":\"TasksByAssigneeBarChartCard\",\"cardData\":{\"fieldName\":\"Tasks by Assignee\",\"projectId\":[\"<marketing-id>\"],\"isParentTask\":true,\"isShowLegend\":false,\"isShowDataLabels\":false},\"filterData\":[]}\n\nUser request: \"List of my urgent open tasks\"\nOutput: {\"componentId\":\"TASKLIST\",\"cardData\":{\"fieldName\":\"Urgent Open Tasks\",\"projectId\":[\"<first-project-id>\"],\"isParentTask\":true},\"filterData\":[{\"filterOn\":\"Task_Priority\",\"comparisonsData\":[\"urgent\"],\"operator\":\"in\",\"value\":[]},{\"filterOn\":\"statusKey\",\"comparisonsData\":[\"todo\",\"inProgress\"],\"operator\":\"in\",\"value\":[]}]}\n\nUser request: \"Tasks assigned to Alice in the Marketing project\"\nOutput: {\"componentId\":\"TASKLIST\",\"cardData\":{\"fieldName\":\"Tasks Assigned to Alice\",\"projectId\":[\"<marketing-id>\"],\"isParentTask\":true},\"filterData\":[{\"filterOn\":\"AssigneeUserId\",\"comparisonsData\":[\"<alice-user-id>\"],\"operator\":\"in\",\"value\":[]}]}\n\nUser request: \"Time tracked summary for the engineering team this week\"\nOutput: {\"componentId\":\"TimeEstimatedWorkloadComp\",\"cardData\":{\"fieldName\":\"Time Tracked Summary\",\"projectId\":[\"<eng-id>\"],\"AssigneeUserId\":[\"<member1>\",\"<member2>\"],\"logtype\":1,\"timerange\":3,\"isParentTask\":true},\"filterData\":[]}\n\nUser request: \"Average tracked time this month for the design team\"\nOutput: {\"componentId\":\"TotalUrgentTasksComp\",\"cardData\":{\"fieldName\":\"Avg Tracked Time\",\"projectId\":[\"<design-id>\"],\"AssigneeUserId\":[\"<member1>\"],\"measure\":2,\"calculation\":2,\"timerange\":5,\"taskLabel\":\"Average\",\"isParentTask\":true},\"filterData\":[]}\n\nUser request: \"Task list for AlianHub showing comments, assignees and priority\"\nOutput: {\"componentId\":\"TASKLIST\",\"cardData\":{\"fieldName\":\"Tasks\",\"fields\":[1,2,4],\"projectId\":[\"<alianhub-id>\"],\"groupBy\":0},\"filterData\":[]}\n\nUser request: \"Queue of tasks that are To Do or In Progress\"\nOutput: {\"componentId\":\"QueueListComp\",\"cardData\":{\"fieldName\":\"Open Queue\",\"statusArray\":[\"todo\",\"inProgress\"]},\"filterData\":[]}\n\nUser request: \"Pie chart for a project that does not exist\"\nOutput: {\"componentId\":\"\",\"error\":\"No matching project found in your workspace.\"}\n\nReturn the JSON object for the user's request now. Schema reminder:",
+        "responseFormat": { "type": "json_object" },
+        "temperature": 0.2,
+        "displayButton": [],
+        "stream": false
     }
 ]

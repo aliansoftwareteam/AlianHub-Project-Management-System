@@ -38,14 +38,30 @@ exports.generatePrompt = (req,res) => {
                         if (promptsText.toLowerCase().includes(prompt.key.toLowerCase())) {
                             var parts = promptsText.split(prompt.key);
                             promptsText = parts.join(prompt.value);
-                            promptsText = promptsText + promptRes.outputFormat
                         }
                     })
+                    // Append the schema reminder once after all substitutions.
+                    // Previously this lived INSIDE the forEach above, so a
+                    // prompt with N substitution keys ended up with N copies
+                    // of `outputFormat` glued to the end — wasted tokens and
+                    // potentially confusing for the model.
+                    promptsText = promptsText + promptRes.outputFormat;
                     addChat(req.body.uniqueUserId,{role: "user",content: promptsText });
                     let curlUrl = "https://api.openai.com/v1/chat/completions";
                     let axiosData = {
                         "model": config.AI_MODEL,
                         "messages": [{"role": "user", "content": `${JSON.stringify(promptsText)}`}]
+                    }
+                    // Optional per-prompt OpenAI parameters declared on the
+                    // prompt entry in utils/aiPrompts.json. Backwards-
+                    // compatible: prompts that don't declare these keep the
+                    // OpenAI defaults (and the streaming branch keeps its
+                    // own hardcoded response_format below).
+                    if (promptRes.responseFormat) {
+                        axiosData.response_format = promptRes.responseFormat;
+                    }
+                    if (typeof promptRes.temperature === 'number') {
+                        axiosData.temperature = promptRes.temperature;
                     }
                     const header = {
                         headers: {

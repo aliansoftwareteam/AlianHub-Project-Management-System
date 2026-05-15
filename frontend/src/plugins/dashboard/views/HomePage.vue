@@ -128,6 +128,13 @@
                 </div>
             </template>
         </AdvanceSearchModal>
+        <!-- AI Create Card sidebar — opened from Home.vue via openAiSidebar(). -->
+        <AICardSidebar
+            v-model:visible="aiSidebarVisible"
+            :allProjectsArray="props.allProjectsArray"
+            :cardComponent="cardComponent"
+            @card-generated="handleAiCardGenerated"
+        />
     </div>
 </template>
 <script setup>
@@ -138,6 +145,7 @@
     import FeatureCard from '@/components/atom/FeatureCard/FeatureCard.vue';
     import DashBoardCard from '@/components/molecules/DashBoardCard/DashBoardCard.vue';
     import CardFieldComponent from '@/components/molecules/CardFieldComponent/CardFieldComponent.vue';
+    import AICardSidebar from '../components/AICardSidebar.vue';
 
     //Charts
     import { useStore } from 'vuex';
@@ -608,6 +616,30 @@
         cardTab.value = 1;
         fieldArray.value = {};
     };
+
+    // ====== AI Create Card =================================================
+    // Reuses handleCardAddOnDashboard() so the AI flow lands on the exact same
+    // backend write path as the manual modal — no new server routes, no risk
+    // of the two flows diverging in shape.
+    const aiSidebarVisible = ref(false);
+    const openAiSidebar = () => {
+        aiSidebarVisible.value = true;
+    };
+    const handleAiCardGenerated = (aiPayload) => {
+        if (!aiPayload || !aiPayload.componentId) return;
+        const catalogue = cardComponent.value.find((c) => c.key === aiPayload.componentId);
+        if (!catalogue) {
+            $toast.error(t('AICard.error_unknown_card'), { position: 'top-right' });
+            return;
+        }
+        // fieldArray is the catalogue-entry pointer that handleCardAddOnDashboard
+        // reads (it pulls .key as componentId and ._id as cardId). Mirror exactly
+        // what the manual flow sets before submitting.
+        fieldArray.value = JSON.parse(JSON.stringify(catalogue));
+        isEditCard.value = false;
+        editCardId.value = null;
+        handleCardAddOnDashboard(aiPayload.cardData, aiPayload.filterData || []);
+    };
     const searchFunction = () => {
         let dataArray = structureCards(cardComponent.value)
         filterCardComponent.value = dataArray;
@@ -644,7 +676,7 @@
             currentLayout.value = response.data?.data;
         }
     }
-    defineExpose({ handleToggle });
+    defineExpose({ handleToggle, openAiSidebar });
 </script>
 <style>
     .center_no_record_found {

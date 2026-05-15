@@ -10,6 +10,16 @@
                     <img :src="companyUser.dashboardLocked ? unlockImage : lockImage" alt="lock" class="mr-5px" />{{ companyUser.dashboardLocked ? $t('Home.unlock') : $t('Home.lock') }}
                 </button>
                 <button class="text-capitalize outline-primary" @click="addItem">{{ $t(`dashboardCard.add_card`) }}</button>
+                <!-- AI Create Card — gated by the company's AI plan feature so it
+                     stays hidden on plans that don't include AI. Same gate the
+                     existing Write-with-AI / Suggest-Subtasks buttons use. -->
+                <button
+                    v-if="aiEnabled"
+                    class="text-capitalize btn-primary cursor-pointer border-0 ml-10px"
+                    @click="openAiCardSidebar"
+                >
+                    {{ $t('AICard.button_label') }}
+                </button>
             </div>
         </div>
         <div class="d-flex main_component-wrapper" :class="[{'flex-column' : clientWidth <= 991}]">
@@ -295,6 +305,16 @@ const getData = () => {
 
 const addItem = () => {
     myRefsss.value.handleToggle();
+};
+
+// Gate the AI button on the same plan flag the rest of the AI features use.
+// Falsy → button stays hidden, plan-upgrade prompt is handled by useAiApiFunction
+// downstream so users on free plans never see this entry point.
+const selectedCompanyData = computed(() => getters['settings/selectedCompany']);
+const aiEnabled = computed(() => !!selectedCompanyData.value?.planFeature?.aiPermission);
+
+const openAiCardSidebar = () => {
+    myRefsss.value && myRefsss.value.openAiSidebar();
 };
 
 const dragFunction = (value) => {
