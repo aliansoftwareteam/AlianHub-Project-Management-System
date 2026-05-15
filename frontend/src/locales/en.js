@@ -347,6 +347,8 @@ export default {
         Logout: "Logout",
         Mark_all_as_read: "Mark all as read",
         Mark_all_as_complete: "Mark all as Complete",
+        View_Archive: "View Archive",
+        View_Unread: "View Unread",
         designation: "Designation",
         upgrade_now: "Upgrade Now",
         load_more: "Load more",
