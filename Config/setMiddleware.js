@@ -213,8 +213,12 @@ exports.setMiddlewareWithCV2 = (app) => {
 
 /**
  * Middleware
- * @param {*} app 
+ * @param {*} app
  */
 exports.setMiddlewareV2 = (app) => {
     app.use(verifyJWTToken, jwt.verifyJWTTokenV2)
+    // Defense-in-depth: if any of these routes happens to carry a companyId
+    // (body/params/query/header), enforce it matches the JWT audience.
+    // Routes without a companyId scope pass through unchanged.
+    app.use(verifyJWTToken, jwt.requireCompanyAud)
 };

@@ -1,8 +1,14 @@
 const { Schema } = require('mongoose');
 const { schema } = require('./schema');
-const taskSchema = new Schema(schema.tasks, { strict: false, timestamps: true });
-const commentSchema = new Schema(schema.comments, { strict: false, timestamps: true });
-const timeSheetSchema = new Schema(schema.timesheet, { strict: false, timestamps: true });
+// P1-SEC-11 — Core entity schemas hardened to `strict: true`. The
+// field lists in `./schema.js` cover every known write path; unknown
+// fields are now silently dropped instead of persisted, which blocks
+// the "send `{ roleType: 1 }` in the task body and watch it stick"
+// privilege-escalation surface flagged in the security audit. If a
+// new legitimate field needs to land, declare it in `./schema.js`.
+const taskSchema = new Schema(schema.tasks, { strict: true, timestamps: true });
+const commentSchema = new Schema(schema.comments, { strict: true, timestamps: true });
+const timeSheetSchema = new Schema(schema.timesheet, { strict: true, timestamps: true });
 // BUG-046 / #100 — every other schema in this file already uses
 // `{ timestamps: true }` so Mongoose owns `createdAt`/`updatedAt` as
 // BSON Dates. The history schema alone declared them as String/Date
@@ -10,10 +16,14 @@ const timeSheetSchema = new Schema(schema.timesheet, { strict: false, timestamps
 // (a numeric millis value). That produced inconsistent shapes
 // (number vs Date) across documents. Letting Mongoose own them gives
 // us proper BSON Dates without callers having to remember to set them.
-const historySchema = new Schema(schema.history, { strict: false, timestamps: true });
+const historySchema = new Schema(schema.history, { strict: true, timestamps: true });
+// `userId` here is the per-user *notification counters* document. It
+// intentionally carries a dynamic set of keys (one entry per task /
+// sprint / project) so `strict: false` is required — flipping it would
+// silently drop every count increment.
 const userIdSchema = new Schema(schema.userId, { strict: false, timestamps: true });
 const usersSchema = new Schema(schema.users, { strict: true,timestamps: true});
-const adminDetailSchema = new Schema(schema.adminDetail, { strict: false,timestamps: true});
+const adminDetailSchema = new Schema(schema.adminDetail, { strict: true,timestamps: true});
 const wasabicredentials = new Schema(schema.wasabicredentials, {strict: true, timestamps: true});
 const ProjectTemplate = new Schema(schema.ProjectTemplate, {strict: true, timestamps: true});
 const timeTrackerDownload = new Schema(schema.timeTrackerDownload, {strict: true, timestamps: true});
@@ -37,14 +47,25 @@ const notificationsSchema = new Schema(schema.notifications, {strict: true, time
 const notificationsSettingsSchema= new Schema(schema.notificationsSettings, {strict: true, timestamps: true})
 const mentionsSchema= new Schema(schema.mentions, {strict: true, timestamps: true})
 const projectRulesSchema= new Schema(schema.projectRules, {strict: true, timestamps: true})
-const subscriptionPlanSchema = new Schema(schema.subscriptionPlan, {strict: false, timestamps: true});
+const subscriptionPlanSchema = new Schema(schema.subscriptionPlan, {strict: true, timestamps: true});
+// `planFeature` / `planFeatureDisplay` intentionally hold an open-ended
+// feature map that varies by plan tier (`maxProjects`, `maxStorage`,
+// etc.) — the only schema-declared field is `planName`. Locking it down
+// would lose every feature flag at write time.
 const planFeatureSchema = new Schema(schema.planFeature, {strict: false, timestamps: true});
 const planFeatureDisplaySchema = new Schema(schema.planFeature, {strict: false, timestamps: true});
+// Chargebee mirror collections. The shape comes from Chargebee's
+// webhook payloads (different per object type, evolving with their API)
+// — we store them verbatim. Schema strictness would drop fields the
+// billing flow needs.
 const subscriptionsSchema = new Schema(schema.subscriptions, {strict: false, timestamps: true});
 const invoiceSchema = new Schema(schema.invoices, {strict: false,timestamps: true});
-const globalCustomFieldsSchema= new Schema(schema.globalCustomFields, {strict: false, timestamps: true})
-const customFieldsSchema= new Schema(schema.customFields, {strict: false, timestamps: true})
 const creditNoteSchema= new Schema(schema.creditNotes, {strict: false, timestamps: true})
+const globalCustomFieldsSchema= new Schema(schema.globalCustomFields, {strict: true, timestamps: true})
+// `customFields` is the user-defined field-definition collection. Each
+// row's schema varies by `cfType` (text vs select vs date vs …), so the
+// shape is genuinely dynamic by design.
+const customFieldsSchema= new Schema(schema.customFields, {strict: false, timestamps: true})
 const sprints = new Schema(schema.sprints, { strict: true,timestamps: true});
 const folders = new Schema(schema.folders, { strict: true,timestamps: true});
 const restrictedExtensions = new Schema(schema.restrictedExtensions, { strict: true,timestamps: true});

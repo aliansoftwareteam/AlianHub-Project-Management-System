@@ -5,6 +5,7 @@ const logger = require("../../Config/loggerConfig");
 const { handleTaskAttachmentsDuplicateFunctionality } = require(`../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
 const { replaceObjectKey } = require("../Auth/helper");
 const socketEmitter = require('../../event/socketEventEmitter');
+const { escapeRegex } = require("../../utils/escapeRegex");
 /**
  * This endpoint is used to save data in comments collection
  * @param {*} req 
@@ -194,8 +195,8 @@ exports.searchMessageFromMainChat = async (req, res) => {
                     ...(searchText && searchText !== ''
                         ? {
                               $or: [
-                                  { mediaName: { $regex: new RegExp(`${searchText}`, "i") } },
-                                  { message: { $regex: new RegExp(`${searchText}`, "i") } }
+                                  { mediaName: { $regex: escapeRegex(searchText), $options: "i" } },
+                                  { message: { $regex: escapeRegex(searchText), $options: "i" } }
                               ]
                           }
                         : {}),
@@ -263,10 +264,10 @@ exports.searchComments = async (req, res) => {
                         ? [
                             {
                                 $or: [
-                                    { message: { $regex: searchStr, $options: "i" } },
-                                    { mediaURL: { $regex: searchStr, $options: "i" } },
-                                    { mediaName: { $regex: searchStr, $options: "i" } },
-                                    { mediaOriginalName: { $regex: searchStr, $options: "i" } },
+                                    { message: { $regex: escapeRegex(searchStr), $options: "i" } },
+                                    { mediaURL: { $regex: escapeRegex(searchStr), $options: "i" } },
+                                    { mediaName: { $regex: escapeRegex(searchStr), $options: "i" } },
+                                    { mediaOriginalName: { $regex: escapeRegex(searchStr), $options: "i" } },
                                 ],
                             },
                         ]

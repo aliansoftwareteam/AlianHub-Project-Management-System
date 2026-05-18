@@ -33,17 +33,17 @@ if (guard) {
         });
 
         test('getLimits respects env overrides', () => {
-            const originalBytes = process.env.IMAGE_MAX_BYTES;
-            const originalPixels = process.env.IMAGE_MAX_PIXELS;
+            const originalBytes = process.env.MAX_IMAGE_FILE_BYTES;
+            const originalPixels = process.env.MAX_IMAGE_PIXELS;
             try {
-                process.env.IMAGE_MAX_BYTES = '524288';   // 512KB
-                process.env.IMAGE_MAX_PIXELS = '1000000'; // 1MP
+                process.env.MAX_IMAGE_FILE_BYTES = '524288';   // 512KB
+                process.env.MAX_IMAGE_PIXELS = '1000000'; // 1MP
                 const limits = guard.getLimits();
                 expect(limits.MAX_BYTES).toBe(524288);
                 expect(limits.MAX_PIXELS).toBe(1000000);
             } finally {
-                process.env.IMAGE_MAX_BYTES = originalBytes;
-                process.env.IMAGE_MAX_PIXELS = originalPixels;
+                process.env.MAX_IMAGE_FILE_BYTES = originalBytes;
+                process.env.MAX_IMAGE_PIXELS = originalPixels;
             }
         });
     });

@@ -452,6 +452,57 @@ const verifyJWTTokenV2 = (req, res, next) => {
     }
 }
 
+/**
+ * Defense-in-depth check: when a request carries a companyId (in body,
+ * path params, query, or the `companyid` header), verify it appears in
+ * the JWT audience claim. Routes that legitimately operate without a
+ * company scope pass through unchanged.
+ *
+ * Non-ObjectId candidates (e.g. the global "USER_PROFILES" bucket name
+ * used for user profile pictures) pass through too — they aren't real
+ * company tenants, and the controllers that accept them have their own
+ * authorization for that bucket. Forcing them through this check would
+ * 400-block legitimate uploads.
+ *
+ * Applied after `verifyJWTTokenV2` so `req.aud` is already populated.
+ */
+const requireCompanyAud = (req, res, next) => {
+    try {
+        const candidate =
+            (req.body && (req.body.companyId || req.body.CompanyId)) ||
+            (req.params && req.params.companyId) ||
+            (req.query && req.query.companyId) ||
+            (req.headers && req.headers.companyid) ||
+            null;
+
+        if (!candidate) return next();
+
+        const companyId = String(candidate).trim();
+        // Skip enforcement for non-ObjectId values (special buckets like
+        // USER_PROFILES). Those aren't tenants and have controller-level
+        // checks.
+        if (!OBJECT_ID_PATTERN.test(companyId)) {
+            return next();
+        }
+        if (!isCompanyInAudience(req.aud, companyId)) {
+            return res.status(403).json({
+                status: false,
+                error: 'You do not have access to this company',
+                statusText: 'Forbidden',
+                isJwtError: true,
+            });
+        }
+        return next();
+    } catch (error) {
+        return res.status(401).json({
+            status: false,
+            error: error.message,
+            statusText: 'Unauthorized',
+            isJwtError: true,
+        });
+    }
+};
+
 const verifyToken = (token) => {
         if (token) {
             try {
@@ -507,6 +558,7 @@ module.exports = {
     verifyJWTTokenV2: verifyJWTTokenV2,
     verifyToken: verifyToken,
     removeCacheAndCookie: removeCacheAndCookie,
+    requireCompanyAud: requireCompanyAud,
     // BUG-013 / #67
     verifyCompanyMembership: verifyCompanyMembership,
     invalidateMembershipCache: invalidateMembershipCache,

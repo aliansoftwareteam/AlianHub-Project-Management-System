@@ -1,17 +1,55 @@
-name: Deploy to DigitalOcean
+name: CI / Deploy
 on:
   push:
     branches:
       - staging
   pull_request:
     types:
+      - opened
+      - synchronize
+      - reopened
       - closed
     branches:
       - staging
   workflow_dispatch:
 
 jobs:
+  validate:
+    # Run on every push and on every PR event (including closed-merged).
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install backend dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run backend tests
+        run: npm test
+
+      # Audit is advisory until the firebase-admin transitive-dep CVEs are
+      # resolved (P3-DEP-37). Findings still appear in the workflow log.
+      - name: Backend security audit (advisory)
+        run: npm audit --omit=dev --audit-level=high
+        continue-on-error: true
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install --no-audit --no-fund
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
   deploy:
+    needs: validate
     if: github.event_name == 'push' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:

@@ -36,8 +36,12 @@ exports.resolveServiceFile = function resolveServiceFile(relativePath) {
     }
 
     // Reject absolute paths outright — installer should always point
-    // somewhere inside the deployment.
-    if (path.isAbsolute(relativePath)) {
+    // somewhere inside the deployment. Check both POSIX and Windows
+    // shapes regardless of host OS so a Linux host still rejects a
+    // payload like `C:\Windows\System32\...` (path.isAbsolute is
+    // platform-bound and would otherwise treat that as a relative
+    // filename and fall through to the .json check).
+    if (path.isAbsolute(relativePath) || path.win32.isAbsolute(relativePath)) {
         throw new Error('SERVICE_FILE must be a path relative to the project root.');
     }
 

@@ -2,7 +2,12 @@ const ctrl = require('./controller');
 const multer = require("multer");
 const { handleEvents } = require('./eventController');
 const updateCompanyCtrl = require('./controller/updateCompany');
-const upload = multer({ dest: "wasabiUploads/" });
+const { DEFAULT_LIMITS, safeFileFilter } = require('../../utils/uploadConfig');
+const upload = multer({
+    dest: "wasabiUploads/",
+    limits: DEFAULT_LIMITS,
+    fileFilter: safeFileFilter,
+});
 exports.init = (app) => {
     /**
     * @swagger

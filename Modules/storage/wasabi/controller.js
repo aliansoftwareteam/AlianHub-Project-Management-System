@@ -1,5 +1,3 @@
-
-// const AWS = require('aws-sdk');
 const awsRef = require('../../../Config/aws.js');
 const { S3Client, GetObjectCommand ,CreateBucketCommand , PutObjectCommand ,DeleteObjectCommand,ListObjectsV2Command, CopyObjectCommand, DeleteBucketCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
@@ -25,6 +23,28 @@ let s3Client = new S3Client({
     endpoint: awsRef.wasabiEndPoint,
     requestHandler
 });
+
+/**
+ * Normalize an @aws-sdk/client-s3 error into a structured log line + a
+ * reject message that includes the AWS error Code instead of just the
+ * generic toString. Wasabi/S3 returns codes like AccessDenied,
+ * NoSuchBucket, InvalidAccessKeyId, SignatureDoesNotMatch, etc. — those
+ * are the actionable signal.
+ */
+const formatS3UploadError = (error, context = {}) => {
+    const code = error?.Code || error?.name || 'UnknownError';
+    const message = error?.message || String(error);
+    const status = error?.$metadata?.httpStatusCode;
+    const requestId = error?.$metadata?.requestId;
+    const op = context.op || 'PutObject';
+    const bucket = context.bucket || '';
+    const key = context.key || '';
+    logger.error(
+        `[S3] ${op} failed code=${code} status=${status || ''} ` +
+        `bucket=${bucket} key=${key} requestId=${requestId || ''} message=${message}`
+    );
+    return `Error while upload file: ${code}: ${message}`;
+};
 
 // Used function in default data create demo saas
 exports.deleteBucketInWasabi = (companyId) => {
@@ -109,7 +129,7 @@ exports.updateLocalWasabiFiles = (companyId, path, file) => {
             .then(() => {
                 resolve(updatedFilePath);
             }).catch((error)=>{
-                reject(`Error while upload file: ${error}`)
+                reject(formatS3UploadError(error, { bucket: bucketName, key: fileName, op: 'PutObject' }))
             })
         } catch (error) {
             reject(`File upload error: ${error}`)
@@ -232,7 +252,7 @@ exports.uploadThumbnailFileFromBase64 = (base64,path,name,width,height,companyId
                 .then(() => {
                     resolve(fileName)
                 }).catch((error)=>{
-                    reject(`Error while upload file: ${error}`)
+                    reject(formatS3UploadError(error, { bucket: bucketName, key: fileName, op: 'PutObject(thumbnail)' }))
                 })
             } catch (error) {
                 reject(`File upload error: ${error}`)
@@ -326,7 +346,7 @@ exports.uploadMainFileForbase64Thumbnail = (companyId, path, base64String, repla
                     });
                 }
             }).catch((error)=>{
-                reject(`Error while upload file: ${error}`)
+                reject(formatS3UploadError(error, { bucket: bucketName, key: fileName, op: 'PutObject(base64)' }))
                 fs.unlink(file, (err) => {
                     if (err) {
                         logger.error(`Error deleting file: ${err}`);
@@ -666,7 +686,7 @@ exports.uploadThumbnailFile = (file,x,y,path,companyId,isUserProfile = false) =>
                             }
                         });
                     }).catch((error)=>{
-                        reject(`Error while upload file: ${error}`)
+                        reject(formatS3UploadError(error, { bucket: bucketName, key: fileName, op: 'PutObject(thumbnail-file)' }))
                         fs.unlink(outputFile, (err) => {
                             if (err) {
                                 logger.error(`Error deleting file: ${err}`);
@@ -775,7 +795,7 @@ exports.uploadFileWasabiPromise = (companyId, path, file, replaceFile, fileObjec
                             logger.error("Promise.allSettled error:", error);
                         });
                     }).catch((error)=>{
-                        reject(`Error while upload file: ${error}`)
+                        reject(formatS3UploadError(error, { bucket: bucketName, key: fileName, op: 'PutObject(file+thumbnail)' }))
                         fs.unlink(file, (err) => {
                             if (err) {
                                 logger.error(`Error deleting file: ${err}`);
@@ -817,7 +837,7 @@ exports.uploadFileWasabiPromise = (companyId, path, file, replaceFile, fileObjec
                                 }
                             });
                     }).catch((error)=>{
-                        reject(`Error while upload file: ${error}`)
+                        reject(formatS3UploadError(error, { bucket: bucketName, key: fileName, op: 'PutObject(file)' }))
                         fs.unlink(file, (err) => {
                             if (err) {
                                 logger.error(`Error deleting file: ${err}`);

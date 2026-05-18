@@ -2,6 +2,8 @@ const express = require("express");
 const fs = require("fs");
 var cors = require('cors');
 const path = require('path');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 
 // Global error handlers — catch crashes and log before Render kills the process
 process.on('uncaughtException', (err) => {
@@ -23,9 +25,46 @@ const { makeDefaultBrandSettings } = require("./Modules/Admin/common/controller.
 const { corsOriginDelegate } = require('./utils/cors.js');
 
 const app = express();
+// Trust the loopback proxy by default so X-Forwarded-For is honored when
+// nginx (or any same-host reverse proxy) sits in front of the Node
+// process. Without this, express-rate-limit logs
+// ERR_ERL_UNEXPECTED_X_FORWARDED_FOR and may key all clients by the
+// proxy IP. Override via TRUST_PROXY env (e.g. "1" for one upstream, or
+// "true" for any). Safe in dev because requests from outside loopback
+// fall back to req.connection.remoteAddress.
+app.set('trust proxy', process.env.TRUST_PROXY || 'loopback');
+
 // CORS — BUG-002 / #56. Replace wildcard with an env-driven allow-list.
 // See utils/cors.js for the exact rules and supported env vars.
 app.use(cors({ origin: corsOriginDelegate }));
+
+// Security headers. CSP is intentionally disabled — the Vue frontend uses
+// inline scripts/styles in production. crossOriginEmbedderPolicy is off so
+// existing third-party embeds keep working. Everything else (HSTS,
+// X-Content-Type-Options, X-Frame-Options, Referrer-Policy, etc.) is on
+// with helmet defaults.
+app.use(helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
+
+// Global rate limiting. Generous default (600 req/min per IP ≈ 10 req/sec)
+// to leave headroom for SPA polling and bulk operations. Per-account
+// brute-force protection on auth endpoints lives in
+// `Modules/Auth/helper.js#manageResetAttempt` (5 attempts / 15-min
+// window / 30-min lockout), so no separate auth-specific middleware
+// limit is needed here.
+const GLOBAL_RATE_LIMIT = Number(process.env.GLOBAL_RATE_LIMIT_PER_MIN || 600);
+
+app.use(rateLimit({
+    windowMs: 60 * 1000,
+    max: GLOBAL_RATE_LIMIT,
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Skip Socket.io polling — it uses its own transport throttling.
+    skip: (req) => req.path.startsWith('/socket.io/'),
+}));
 // BUG-037 / #91 — body limits.
 // Previously every endpoint accepted 50MB JSON/url-encoded/raw bodies,
 // so any unauthenticated POST could spend the request loop buffering
