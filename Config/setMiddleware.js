@@ -14,6 +14,10 @@ const verifyJWTTokenWithCRoute = [
     "/api/v2/timetracker/end",
     "/api/v2/timetracker/capture",
     "/api/v2/timetracker/timelog",
+    // Screenshot Retention (owner-only inside the controller; auth-required
+    // at the middleware layer to populate req.uid / req.aud).
+    "/api/v1/screenshot-retention",
+    "/api/v1/screenshot-retention/preview",
     "/api/v1/addmilestone",
     "/api/v1/updatemilestone",
     "/api/v1/deletemilestone",

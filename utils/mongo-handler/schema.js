@@ -565,6 +565,20 @@ const schema = {
             type: Map,
             required: false
         },
+        // Per-company opt-in retention policy for time-tracker screenshots.
+        // Map shape:
+        //   enabled: Boolean
+        //   maxAgeMonths: Number (3 | 6 | 12 | 24)
+        //   enabledAt: Date
+        //   enabledBy: String (userId)
+        //   lastRunAt: Date
+        //   lastRunStats: { deletedCount, failedCount, durationMs, cutoffIso }
+        //   firstRunCompletedAt: Date (used to lift the first-run safety cap)
+        //   runningSince: Date (advisory lock — set when a run starts, cleared on finish)
+        screenshotRetention: {
+            type: Map,
+            required: false
+        },
         availableUser: {
             type: Number,
         },
