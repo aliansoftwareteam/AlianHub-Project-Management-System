@@ -1,10 +1,16 @@
 /**
  * Screenshot Retention — HTTP layer.
  *
- * All endpoints read the caller's companyId from the `companyid` request
- * header (set by the existing JWT middleware) and the caller's userId from
- * the request body / query — matching the convention used by other
- * settings endpoints in this codebase.
+ * Identity sources:
+ *   - companyId: the `companyid` request header, validated against the
+ *     token's `aud` claim by Config/jwt.js#verifyJWTTokenWithCV2.
+ *   - userId: `req.uid`, set by Config/jwt.js#checkToken (line 137) from
+ *     the verified token's `uid` claim. NEVER trust `req.body.userId` for
+ *     authorisation — a non-owner could pass the owner's userId in the
+ *     body and bypass the role check below.
+ *
+ * The routes are listed in Config/setMiddleware.js#verifyJWTTokenWithCRoute
+ * so the JWT middleware fires before any handler here runs.
  *
  * Mutation endpoints (preview, update) require the caller to be a company
  * owner (`roleType === 1` in the per-tenant `company_users` collection).
@@ -23,10 +29,10 @@ const ROLE_TYPE_COMPANY_OWNER = 1;
 
 function getCallerContext(req) {
     const companyId = req.headers && (req.headers.companyid || req.headers.companyId);
-    const userId =
-        (req.body && req.body.userId) ||
-        (req.query && req.query.userId) ||
-        (req.params && req.params.userId);
+    // `req.uid` is set by Config/jwt.js#checkToken from the verified token.
+    // This is the only trustworthy userId source — anything pulled from
+    // req.body / req.query / req.params can be forged by the caller.
+    const userId = req && req.uid;
     return { companyId, userId };
 }
 
@@ -100,7 +106,7 @@ exports.previewDeletion = async (req, res) => {
     try {
         const { companyId, userId } = getCallerContext(req);
         if (!companyId) return sendErr(res, 400, 'companyId header is required');
-        if (!userId) return sendErr(res, 400, 'userId is required');
+        if (!userId) return sendErr(res, 401, 'authentication required');
 
         const ownerOk = await isCompanyOwner(companyId, userId);
         if (!ownerOk) return sendErr(res, 403, 'Only the company owner can preview screenshot retention');
@@ -139,7 +145,7 @@ exports.updateSettings = async (req, res) => {
     try {
         const { companyId, userId } = getCallerContext(req);
         if (!companyId) return sendErr(res, 400, 'companyId header is required');
-        if (!userId) return sendErr(res, 400, 'userId is required');
+        if (!userId) return sendErr(res, 401, 'authentication required');
 
         const ownerOk = await isCompanyOwner(companyId, userId);
         if (!ownerOk) return sendErr(res, 403, 'Only the company owner can change screenshot retention');

@@ -65,32 +65,26 @@ const COMPANY_CONCURRENCY = 5;                  // how many tenants to process i
 const TENANT_BATCH_SIZE = 100;                  // TimeSheet docs per page
 
 // ----- S3 client (lazy) --------------------------------------------------
-// We reuse Modules/storage/wasabi/controller's S3 client at call time so
-// any future credential rotation in awsRef propagates here without
-// re-requiring this module. require() is cached, so this still resolves
-// once per process.
+// Modules/storage/wasabi/controller.js declares its S3Client with `let`
+// (not `exports.`) so we can't reuse the singleton; we build our own from
+// `awsRef` and memoise it for the life of the process. Credentials baked
+// into the client at construction — if `awsRef` gets refreshed at runtime
+// for some reason, restart the process to pick up the new values.
 let _s3 = null;
 function getS3Client() {
     if (_s3) return _s3;
     // eslint-disable-next-line global-require
-    const wasabiCtrl = require('../storage/wasabi/controller');
-    _s3 = wasabiCtrl.s3Client || wasabiCtrl.default && wasabiCtrl.default.s3Client;
-    if (!_s3) {
-        // Fallback: build our own from awsRef. This keeps the cron alive
-        // even if controller.js stops exporting s3Client in the future.
-        // eslint-disable-next-line global-require
-        const { S3Client } = require('@aws-sdk/client-s3');
-        // eslint-disable-next-line global-require
-        const awsRef = require('../../Config/aws.js');
-        _s3 = new S3Client({
-            region: awsRef.region,
-            endpoint: awsRef.wasabiEndPoint,
-            credentials: {
-                accessKeyId: awsRef.wasabiAccessKey,
-                secretAccessKey: awsRef.wasabiSecretAccessKey
-            }
-        });
-    }
+    const { S3Client } = require('@aws-sdk/client-s3');
+    // eslint-disable-next-line global-require
+    const awsRef = require('../../Config/aws.js');
+    _s3 = new S3Client({
+        region: awsRef.region,
+        endpoint: awsRef.wasabiEndPoint,
+        credentials: {
+            accessKeyId: awsRef.wasabiAccessKey,
+            secretAccessKey: awsRef.wasabiSecretAccessKey
+        }
+    });
     return _s3;
 }
 
@@ -196,16 +190,32 @@ async function updateCompanyPolicy(companyId, patch, opts = {}) {
  */
 async function countOldTrackshots(companyId, cutoff) {
     const cutoffMs = cutoff.getTime();
+    // Legacy trackshots store `screenShotTime` as a STRING (multipart form
+    // submissions don't preserve numeric types). Coerce per-element with
+    // $convert so the comparison works regardless of how the field was
+    // originally stored. `onError: null` causes unparsable values to skip
+    // rather than fail the whole pipeline.
+    const coerced = {
+        $convert: { input: '$$t.screenShotTime', to: 'long', onError: null, onNull: null }
+    };
     const pipeline = [
-        // Limit to docs that have at least one old trackshot.
-        { $match: { 'trackShots.screenShotTime': { $lt: cutoffMs } } },
+        // Loose pre-filter: docs that have any trackshot at all. The strict
+        // age check happens in $project so legacy string timestamps are
+        // included (the $match on `{$lt: cutoffMs}` against a string would
+        // silently exclude them).
+        { $match: { 'trackShots.0': { $exists: true } } },
         { $project: {
             count: {
                 $size: {
                     $filter: {
                         input: { $ifNull: ['$trackShots', []] },
                         as: 't',
-                        cond: { $lt: ['$$t.screenShotTime', cutoffMs] }
+                        cond: {
+                            $and: [
+                                { $ne: [coerced, null] },
+                                { $lt: [coerced, cutoffMs] }
+                            ]
+                        }
                     }
                 }
             }
@@ -240,7 +250,10 @@ async function deleteTrackshotObjects(companyId, trackshot) {
     const s3 = getS3Client();
     const mainKey = extractKey(trackshot && trackshot.image);
     if (!mainKey) {
-        return { mainDeleted: true, thumbsDeleted: 0, thumbsFailed: 0, errors: ['no-key'] };
+        // Record had no usable image key. Caller pre-filters these out of
+        // the loop so this is defensive; flag with `skipped` so the caller
+        // doesn't count it as a real deletion.
+        return { mainDeleted: false, skipped: true, thumbsDeleted: 0, thumbsFailed: 0, errors: ['no-key'] };
     }
     const thumbKeys = derivThumbnailKeys(mainKey);
 
@@ -289,11 +302,15 @@ function extractKey(imageField) {
         // Path style: /<bucket>/<key>. Virtual-host style: /<key>.
         // We don't know the bucket name without the company context here,
         // so just return everything after the first slash that follows the
-        // host — covers both styles well enough for our cleanup.
-        const parts = url.pathname.split('/').filter(Boolean);
+        // host. Use decoded segments — URL.pathname returns percent-encoded
+        // values and Wasabi keys are stored decoded.
+        const parts = url.pathname.split('/').filter(Boolean).map((p) => {
+            try { return decodeURIComponent(p); } catch (_) { return p; }
+        });
         if (parts.length <= 1) return parts.join('/');
-        // Drop the first segment if it looks like a bucket id (24 hex chars).
-        if (/^[a-f0-9]{20,}$/i.test(parts[0])) parts.shift();
+        // Drop the first segment if it looks like a MongoDB ObjectId
+        // (exactly 24 hex chars — the company-id bucket convention).
+        if (/^[a-f0-9]{24}$/i.test(parts[0])) parts.shift();
         return parts.join('/');
     } catch (e) {
         return trimmed;
@@ -302,15 +319,23 @@ function extractKey(imageField) {
 
 /**
  * Materialise the thumbnail keys for a given main key, mirroring the
- * pattern from Modules/storage/wasabi/controller.js:210:
+ * pattern from Modules/storage/wasabi/controller.js:210
  *   `${name.split('.')[0]}-${width}x${height}.${ext}`
+ *
+ * IMPORTANT: the upload-time call at wasabi/controller.js:298 passes
+ * `(thu.height, thu.width)` into the function whose params are
+ * `(width, height)` — so the dimensions are EFFECTIVELY SWAPPED in the
+ * stored filename. With `thumbnail.json` declaring `{width:78,height:140}`,
+ * the actual stored file is `xxx-140x78.png`, not `xxx-78x140.png`. We
+ * reproduce that exact convention here so the deletes find the files.
+ * (Pre-existing bug in the upload path — out of scope to fix in this PR.)
  */
 function derivThumbnailKeys(mainKey) {
     const lastDot = mainKey.lastIndexOf('.');
     if (lastDot <= 0) return [];
     const base = mainKey.slice(0, lastDot);
     const ext = mainKey.slice(lastDot + 1);
-    return TRACKSHOT_THUMBNAIL_SIZES.map(({ width, height }) => `${base}-${width}x${height}.${ext}`);
+    return TRACKSHOT_THUMBNAIL_SIZES.map(({ width, height }) => `${base}-${height}x${width}.${ext}`);
 }
 
 // ----- Cleanup workflow (per company) -----------------------------------
@@ -328,7 +353,9 @@ async function runRetentionForCompany(company) {
 
     // Advisory lock — refuse to run if a previous run is still in flight
     // and started recently. A run that started >STALE_LOCK_THRESHOLD ago is
-    // assumed crashed and gets reclaimed.
+    // assumed crashed and gets reclaimed. NOTE: best-effort only — two
+    // concurrent processes (e.g. clustered deploy) could both read "no
+    // lock" simultaneously; cluster-aware leader election is out of scope.
     if (policy.runningSince) {
         const lockAge = Date.now() - new Date(policy.runningSince).getTime();
         if (lockAge < STALE_LOCK_THRESHOLD_MS) {
@@ -345,51 +372,83 @@ async function runRetentionForCompany(company) {
 
     let deletedCount = 0;
     let failedCount = 0;
+    let skippedCount = 0;       // empty-key trackshots — not counted as deleted
     let scannedDocs = 0;
+    let runError = null;
+    let hitCap = false;
+    let exhausted = true;       // becomes false if the loop bails for any reason other than empty-result
     const failedKeys = [];
 
     try {
-        // Acquire lock.
-        await updateCompanyPolicy(companyId, {}, { /* no-op patch */ });
+        // Acquire lock. Single $set — no read-modify-write so it's at
+        // least atomic at the document level.
         await stampMasterField(companyId, { 'screenshotRetention.runningSince': new Date() });
 
-        // Loop through tenant TimeSheets in pages. Each page only loads docs
-        // that have at least one old trackshot.
-        let pagedSkip = 0;
+        // Cursor-based scan: sort by _id ASC and resume via _id > lastSeen.
+        // This is immune to $pull shrinking the match set mid-run (the
+        // earlier `skip`-based loop missed docs when the page they would
+        // have landed on got compacted).
+        //
+        // The DB query is intentionally loose (`'trackShots.0': $exists`)
+        // because legacy data stores `screenShotTime` as STRINGS (multipart
+        // form submissions); MongoDB's numeric `$lt` against a string field
+        // would silently exclude them. The strict age filter happens in
+        // memory below with `Number(t.screenShotTime)` coercion.
+        let lastSeenId = null;
         // eslint-disable-next-line no-constant-condition
         while (true) {
             if (deletedCount >= cap) {
+                hitCap = true;
+                exhausted = false;
                 logger.info(`${LOG_PREFIX} companyId=${companyId} hit first-run cap=${cap}; deferring rest to next run`);
                 break;
             }
+            const matchClause = { 'trackShots.0': { $exists: true } };
+            if (lastSeenId) matchClause._id = { $gt: lastSeenId };
             const query = {
                 type: SCHEMA_TYPE.TIMESHEET,
                 data: [
-                    { 'trackShots.screenShotTime': { $lt: cutoffMs } },
+                    matchClause,
                     { _id: 1, trackShots: 1 },
-                    { skip: pagedSkip, limit: TENANT_BATCH_SIZE, sort: { _id: 1 } }
+                    { limit: TENANT_BATCH_SIZE, sort: { _id: 1 } }
                 ]
             };
             // eslint-disable-next-line no-await-in-loop
             const docs = await MongoDbCrudOpration(companyId, query, 'find');
             if (!Array.isArray(docs) || docs.length === 0) break;
             scannedDocs += docs.length;
+            lastSeenId = docs[docs.length - 1]._id;
 
-            // Process docs sequentially within a page so we don't fan out
-            // unbounded Wasabi requests; concurrency at the company level
-            // (COMPANY_CONCURRENCY) gives us enough parallelism overall.
             for (const doc of docs) {
-                if (deletedCount >= cap) break;
-                const oldShots = (doc.trackShots || []).filter(
-                    (t) => t && typeof t.screenShotTime === 'number' && t.screenShotTime < cutoffMs
-                );
+                if (deletedCount >= cap) {
+                    hitCap = true;
+                    exhausted = false;
+                    break;
+                }
+                // Strict in-memory filter: coerce screenShotTime via Number()
+                // so legacy string timestamps participate, and pre-filter
+                // empty-image records so they don't show up as "deleted" in
+                // the stats.
+                const oldShots = (doc.trackShots || []).filter((t) => {
+                    if (!t || !t.image) return false;
+                    const sst = Number(t.screenShotTime);
+                    return Number.isFinite(sst) && sst < cutoffMs;
+                });
                 if (!oldShots.length) continue;
 
                 const keysToPull = [];
                 for (const shot of oldShots) {
-                    if (deletedCount >= cap) break;
+                    if (deletedCount >= cap) {
+                        hitCap = true;
+                        exhausted = false;
+                        break;
+                    }
                     // eslint-disable-next-line no-await-in-loop
                     const res = await deleteTrackshotObjects(companyId, shot);
+                    if (res.skipped) {
+                        skippedCount += 1;
+                        continue;
+                    }
                     if (res.mainDeleted) {
                         keysToPull.push(shot.image);
                         deletedCount += 1;
@@ -414,32 +473,37 @@ async function runRetentionForCompany(company) {
                     }, 'updateOne');
                 }
             }
-            // Next page. We sort by _id and don't rely on the unchanged-doc
-            // assumption, so use skip rather than a resumption cursor — the
-            // $pull above can move docs out of the match set, which is
-            // tolerable; we'll just see fewer hits on the next page.
-            pagedSkip += docs.length;
         }
     } catch (err) {
-        logger.error(`${LOG_PREFIX} runRetentionForCompany failed companyId=${companyId} ${err && err.message}`);
+        runError = err && err.message ? err.message : String(err);
+        exhausted = false;
+        logger.error(`${LOG_PREFIX} runRetentionForCompany failed companyId=${companyId} ${runError}`);
     }
 
     const durationMs = Date.now() - startedAt;
     const stats = {
         deletedCount,
         failedCount,
+        skippedCount,
         scannedDocs,
         durationMs,
-        cutoffIso: cutoff.toISOString()
+        cutoffIso: cutoff.toISOString(),
+        hitCap,
+        error: runError
     };
 
-    // Persist stats + clear lock + stamp first-run completion when applicable.
+    // Persist stats + clear lock + stamp first-run completion ONLY if we
+    // actually finished a real cleanup pass. Conditions:
+    //   - the scan exhausted the cursor (didn't bail on cap or error), AND
+    //   - we actually processed records (deletedCount > 0).
+    // For new companies with no eligible data yet we leave the marker
+    // unset so the safety cap remains in effect if legacy data appears.
     const finalPatch = {
         'screenshotRetention.lastRunAt': new Date(),
         'screenshotRetention.lastRunStats': stats,
         'screenshotRetention.runningSince': null
     };
-    if (!policy.firstRunCompletedAt && deletedCount < cap) {
+    if (!policy.firstRunCompletedAt && exhausted && deletedCount > 0) {
         finalPatch['screenshotRetention.firstRunCompletedAt'] = new Date();
     }
     try {
@@ -448,7 +512,7 @@ async function runRetentionForCompany(company) {
         logger.error(`${LOG_PREFIX} could not persist run stats companyId=${companyId} ${err && err.message}`);
     }
 
-    logger.info(`${LOG_PREFIX} companyId=${companyId} deleted=${deletedCount} failed=${failedCount} scannedDocs=${scannedDocs} durationMs=${durationMs}`);
+    logger.info(`${LOG_PREFIX} companyId=${companyId} deleted=${deletedCount} failed=${failedCount} skipped=${skippedCount} scannedDocs=${scannedDocs} durationMs=${durationMs}${runError ? ` error=${runError}` : ''}`);
     return stats;
 }
 

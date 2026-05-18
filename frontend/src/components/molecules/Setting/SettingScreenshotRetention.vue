@@ -61,7 +61,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, inject } from 'vue';
+import { ref, computed, watch, inject } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import { useToast } from 'vue-toast-notification';
@@ -195,12 +195,25 @@ function formatRelative(dateLike) {
     return t('ScreenshotRetention.months_ago', { n: months });
 }
 
-onMounted(() => {
-    // Skip the API call entirely for non-owners — they wouldn't see the
-    // card anyway, and the server's GET endpoint doesn't return anything
-    // sensitive but there's no point pinging it.
-    if (isOwner.value) loadPolicy();
-});
+// Watch isOwner rather than firing once on mount: the Vuex store may
+// hydrate `companyUserDetail` asynchronously after this component mounts
+// (soft route change before the owner record is fetched), in which case
+// a one-shot onMounted would never load the policy and the card would
+// show its hard-coded defaults forever. `immediate: true` covers the
+// case where the store IS already hydrated at mount time. The
+// `policyLoaded` flag prevents re-fetching if isOwner flips back and
+// forth.
+let policyLoaded = false;
+watch(
+    isOwner,
+    (val) => {
+        if (val && !policyLoaded) {
+            policyLoaded = true;
+            loadPolicy();
+        }
+    },
+    { immediate: true }
+);
 </script>
 
 <style scoped>
