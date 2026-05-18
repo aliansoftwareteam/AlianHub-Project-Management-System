@@ -47,11 +47,15 @@
     "start": "node server.js",
     "nodemon": "nodemon index.js",
     "check-version": "node check-version.js",
-    "basic-install": "node installation.js && npm run start"
+    "basic-install": "node installation.js && npm run start",
+    "setup": "node scripts/dev.js",
+    "dev": "node scripts/dev.js --skip-install",
+    "setup:reset": "node scripts/dev.js --force"
   },
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "jest": "^30.4.2"
+    "jest": "^30.4.2",
+    "nodemon": "^3.1.0"
   }
 }

@@ -41,6 +41,63 @@ Built for enterprises, startups, and growing teams — without vendor lock-in.
 
 ---
 
+## Quick Start (One Command)
+
+```bash
+git clone https://github.com/aliansoftwareteam/AlianHub-Project-Management-System.git
+cd AlianHub-Project-Management-System
+npm run setup
+```
+
+That's it. **No technical knowledge required.** `npm run setup` will:
+
+1. Install all dependencies (root, frontend, wizard) in parallel
+2. Generate a `.env` file with secure random secrets
+3. Build the installation wizard UI
+4. Start the backend and frontend dev server
+5. **Auto-complete the installation wizard** — connects to MongoDB, sets up storage, skips optional services (Firebase / AI / SMTP), initializes the database, and creates an admin account
+6. Open `http://localhost:8080` in your browser
+
+When it's done, you'll see this in your terminal:
+
+```
+──────────────────────────────────────────────────────────
+  ✓  AlianHub is ready!
+──────────────────────────────────────────────────────────
+
+  URL:       http://localhost:8080
+  Email:     admin@admin.local
+  Password:  admin123
+
+  API:       http://localhost:4000
+  Stop:      Ctrl+C in this terminal
+──────────────────────────────────────────────────────────
+```
+
+**Prerequisite:** MongoDB running locally on `mongodb://localhost:27017`. If you don't have it: `docker run -d -p 27017:27017 mongo:7` or download from [mongodb.com](https://www.mongodb.com/try/download/community).
+
+### Available commands
+
+| Command | What it does |
+|---------|--------------|
+| `npm run setup` | Full setup — install, configure, start, auto-complete wizard, open browser |
+| `npm run dev` | Fast restart — skips install, just starts the services |
+| `npm run setup:reset` | Wipe `node_modules` and reinstall everything |
+| `npm run setup -- --manual` | Skip auto-setup — open the interactive wizard instead |
+| `npm run setup -- --no-open` | Start without auto-opening a browser |
+
+### Custom admin credentials
+
+```bash
+SETUP_ADMIN_EMAIL=you@example.com SETUP_ADMIN_PASSWORD=secret npm run setup
+```
+
+Other env-var overrides: `SETUP_ADMIN_FIRST`, `SETUP_ADMIN_LAST`, `SETUP_COMPANY`, `SETUP_PHONE`, `SETUP_COUNTRY`, `SETUP_CITY`, `SETUP_STATE`.
+
+> **Manual setup still works.** Everything above is an additive convenience layer. All existing scripts (`npm start`, `npm run nodemon`, `npm run basic-install`, etc.) and the original interactive wizard are unchanged. If `npm run setup` ever fails it falls back automatically to the wizard UI so you can finish manually.
+
+---
+
 ## What is AlianHub?
 
 **AlianHub** is a full-stack, open-source project management system designed for teams that require flexibility, transparency, and ownership over their workflows.
