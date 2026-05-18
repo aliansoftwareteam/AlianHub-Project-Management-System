@@ -17,10 +17,14 @@ const { makeUniqueId } = require('../../utils/commonFunctions.js');
 // BUG-036 / #90 — path-traversal-safe resolver for the firebase service-account file.
 const { resolveServiceFile } = require('../../utils/safeServiceFile.js');
 
+// Evaluated at module-load time: fall back to the documented default when APIURL
+// isn't set yet (fresh clone, partially-edited .env, or this file getting required
+// before dotenv has run). Preserves the original "strip trailing slash" behaviour.
+const __defaultApiUrl = process.env.APIURL || 'http://localhost:4000/';
 exports.envVar = {
     "JWT_SECRET": require('crypto').randomBytes(16).toString('hex'),
     "PRECOMPANYKEY": require('crypto').randomBytes(4).toString('hex'),
-    "WEBURL": `${process.env.APIURL.substring(0, process.env.APIURL.length - 1)}`, // Static discussion
+    "WEBURL": __defaultApiUrl.substring(0, __defaultApiUrl.length - 1),
 }
 
 exports.tmpInstallSteps = [{
@@ -693,6 +697,26 @@ exports.checkinstallstep = (req, res) => {
         }
 
         if (bodyData.step === 4) {
+            // Allow Firebase to be skipped (push notifications are optional for self-hosted dev).
+            // Matches the existing isDoItLater pattern used for the AI step.
+            if (bodyData.isDoItLater) {
+                exports.installSteps[3].status = "done";
+                exports.envVar.APIKEY = "";
+                exports.envVar.AUTODOMAIN = "";
+                exports.envVar.PROJECTID = "";
+                exports.envVar.STORAGEBUCKET = "";
+                exports.envVar.MESSAGINGSENDERID = "";
+                exports.envVar.APPID = "";
+                exports.envVar.MEASUREMENTID = "";
+                serviceFun.writeFile(installStepsFilePath, JSON.stringify({installSteps: exports.installSteps, envVar: exports.envVar}, null, 4), () => {
+                    setTimeout(() => { emitListener(bodyData?.eventId, {step: 1}); }, 1000);
+                    setTimeout(() => {
+                        emitListener(bodyData?.eventId, {step: "STOP"});
+                        res.json({ status: true, statusText: "Firebase skipped", step: 4 });
+                    }, 2000);
+                });
+                return;
+            }
             exports.installSteps[3].status = "inprogress";
             serviceFun.writeFile(installStepsFilePath, JSON.stringify({installSteps: exports.installSteps, envVar: exports.envVar}, null, 4), () => {
                 exports.checkFirebaseConnection(req, (firebaseRes) => {
@@ -760,6 +784,19 @@ exports.checkinstallstep = (req, res) => {
         }
 
         if (bodyData.step === 6) {
+            // Allow SMTP to be skipped (email is optional for first-run dev — operator can
+            // configure it later from the admin UI). Matches the AI/Firebase skip pattern.
+            if (bodyData.isDoItLater) {
+                exports.installSteps[5].status = "done";
+                serviceFun.writeFile(installStepsFilePath, JSON.stringify({installSteps: exports.installSteps, envVar: exports.envVar}, null, 4), () => {
+                    setTimeout(() => { emitListener(bodyData?.eventId, {step: 1}); }, 1000);
+                    setTimeout(() => {
+                        emitListener(bodyData?.eventId, {step: "STOP"});
+                        res.json({ status: true, statusText: "SMTP skipped", step: 6 });
+                    }, 2000);
+                });
+                return;
+            }
             exports.installSteps[5].status = "inprogress";
             serviceFun.writeFile(installStepsFilePath, JSON.stringify({installSteps: exports.installSteps, envVar: exports.envVar}, null, 4), () => {
                 if (bodyData.key === 1) {
