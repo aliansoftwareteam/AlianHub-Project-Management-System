@@ -1,4 +1,3 @@
-// const AWS = require('aws-sdk');
 const { SCHEMA_TYPE } = require("../../Config/schemaType.js");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries.js");
 const iCtr = require('../ImportSettings/controller.js');

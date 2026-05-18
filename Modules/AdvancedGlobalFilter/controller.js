@@ -3,6 +3,7 @@ const logger = require("../../Config/loggerConfig");
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const { replaceObjectKey } = require("../Auth/helper");
+const { escapeRegex } = require("../../utils/escapeRegex");
 
 /**
  * Helper functions
@@ -238,7 +239,7 @@ exports.searchTasks = async (req, res) => {
                     { ...additionalFilter },
                     { ProjectID: { $in: convertedProjectIds } },
                     { deletedStatusKey: { $in: [undefined, 0] } },
-                    ...(searchStr ? [{ TaskName: { $regex: searchStr, $options: "i" } }] : []),
+                    ...(searchStr ? [{ TaskName: { $regex: escapeRegex(searchStr), $options: "i" } }] : []),
                 ],
             },
         }
@@ -373,7 +374,7 @@ exports.searchProjects = async (req, res) => {
                     { statusType: { $ne: "close" } },
                     { deletedStatusKey: { $in: [undefined, 0] } },
                     ...(searchStr
-                        ? [{ ProjectName: { $regex: searchStr, $options: "i" } }]
+                        ? [{ ProjectName: { $regex: escapeRegex(searchStr), $options: "i" } }]
                         : []),
                     {
                         $or: [publicQuery, privateQuery]

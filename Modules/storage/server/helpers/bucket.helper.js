@@ -410,29 +410,46 @@ exports.getBucketSizeStorage = () => {
     })
 }
 
-// FILE 
+// FILE
 const multer = require('multer');
 const jwt = require('jsonwebtoken');
 const sharp = require('sharp');
 const { updateCompanyFun, getCompanyDataFun } = require('../../../Company/controller/updateCompany');
+const { DEFAULT_LIMITS, safeFileFilter, safeRelativePath } = require('../../../../utils/uploadConfig');
 
 const storage = multer.diskStorage({
     destination: function (req, _, cb) {
         const { path: filepath, companyId: bucketId } = req.body;
+        const safePath = safeRelativePath(filepath);
+        const safeBucket = safeRelativePath(bucketId);
+        if (!safePath || !safeBucket) {
+            return cb(new Error('Invalid upload path'));
+        }
 
-        const dir = path.join(__dirname, '../../../../storage', bucketId ,filepath.split('/').slice(0, -1).join('/'));
+        const dir = path.join(__dirname, '../../../../storage', safeBucket, safePath.split('/').slice(0, -1).join('/'));
 
         fs.mkdirSync(dir, { recursive: true });
 
         cb(null, dir);
     },
     filename: function (req, _, cb) {
-        let fileNameFromPath = req.body.path.split('/').pop();
+        const safePath = safeRelativePath(req.body.path);
+        if (!safePath) {
+            return cb(new Error('Invalid upload path'));
+        }
+        const fileNameFromPath = path.basename(safePath);
+        if (!fileNameFromPath || fileNameFromPath === '..') {
+            return cb(new Error('Invalid filename'));
+        }
         cb(null, fileNameFromPath);
     }
 });
 exports.storageRef = storage;
-exports.upload = multer({  storage });
+exports.upload = multer({
+    storage,
+    limits: DEFAULT_LIMITS,
+    fileFilter: safeFileFilter,
+});
 
 exports.validatePath = async(req, res, next) => {
     const { path: filepath, companyId: bucketId } = req.body;

@@ -196,6 +196,13 @@ exports.generateTokenV2 = async (req, res) => {
                 res.status(400).json(gData);
                 return;
             }
+            // TODO(P1-SEC-09): set httpOnly: true once the frontend stops
+            // reading these cookies directly. Currently App.vue,
+            // socketHelper.js, CreateCompany.vue, services/index.js, etc.
+            // call Cookies.get('accessToken' | 'refreshToken'), so flipping
+            // httpOnly here breaks socket auth and the refresh flow until
+            // the frontend stores tokens in memory/localStorage (or the
+            // backend switches to reading req.cookies via cookie-parser).
             const setCookie = {
                 maxAge: serviceCtr.convertToSeconds(process.env.JWT_EXP)*1000,
                 httpOnly: false,
@@ -672,6 +679,9 @@ exports.loginAuth = (req, res, next) => {
                             next();
                             return;
                         }
+                        // TODO(P1-SEC-09): see matching comment near login.
+                        // Set httpOnly: true once the frontend no longer
+                        // reads these cookies with js-cookie.
                         const setCookie = {
                             maxAge: serviceCtr.convertToSeconds(process.env.JWT_EXP)*1000,
                             httpOnly: false,

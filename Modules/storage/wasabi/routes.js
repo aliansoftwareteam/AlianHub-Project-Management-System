@@ -1,9 +1,14 @@
 const { handleProfileGetForUser, handleTaskTypeImageGet } = require(`../../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
 const ctrl = require('./controller');
 const multer = require("multer");
+const { DEFAULT_LIMITS, safeFileFilter } = require('../../../utils/uploadConfig');
 
 
-const upload = multer({ dest: "wasabiUploads/" });
+const upload = multer({
+    dest: "wasabiUploads/",
+    limits: DEFAULT_LIMITS,
+    fileFilter: safeFileFilter,
+});
 exports.init = (app) => {
 
     /**

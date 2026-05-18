@@ -2,6 +2,7 @@ const mongoCm = require('../../utils/mongo-handler/mongoQueries');
 const logger = require("../../Config/loggerConfig");
 const { dbCollections } = require('../../Config/collections');
 const socketEmitter = require('../../event/socketEventEmitter');
+const { escapeRegex } = require('../../utils/escapeRegex');
 
 // Key 1 is Project Comments
 // Key 2 is update sprint count and task count
@@ -754,7 +755,7 @@ exports.unsetAllCounts = (companyId, projectId = "", sprintId = "", options = {s
                                 as: "field",
                                 cond: {
                                     $and: [
-                                        { $regexMatch: { input: "$$field.k", regex: searchKey } },
+                                        { $regexMatch: { input: "$$field.k", regex: escapeRegex(searchKey) } },
                                         { $gte: ["$$field.v", 0] }
                                     ]
                                 }

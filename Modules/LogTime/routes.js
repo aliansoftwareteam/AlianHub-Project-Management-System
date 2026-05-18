@@ -1,8 +1,13 @@
 const { handleMulterStorage } = require(`../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
 const ctrlV2 = require('./controllerV2');
 const multer = require("multer");
+const { DEFAULT_LIMITS, safeFileFilter } = require('../../utils/uploadConfig');
 
-const upload = multer(handleMulterStorage());
+const upload = multer({
+    ...handleMulterStorage(),
+    limits: DEFAULT_LIMITS,
+    fileFilter: safeFileFilter,
+});
 
 exports.init = (app) => {
     // V2 VERSION START

@@ -3,6 +3,7 @@ const { dbCollections } = require("../../Config/collections");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const { default: mongoose } = require("mongoose");
 const { pushChat,addChat, getChat, deleteChat, removeChat} = require("./helper");
+const { escapeRegex } = require("../../utils/escapeRegex");
 const config = require('../../Config/config');
 const logger = require("../../Config/loggerConfig");
 const { SCHEMA_TYPE } = require("../../Config/schemaType")
@@ -336,7 +337,7 @@ exports.updateAiModel = (req,res) => {
                 res.send({status : false,statusText: err})
                 return;
             }
-            const regex = new RegExp(`^(${key}=).*`, 'm');
+            const regex = new RegExp(`^(${escapeRegex(key)}=).*`, 'm');
             const replacement = `${key}="${req.body.value}"`;
 
             let updatedData;
