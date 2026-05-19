@@ -70,7 +70,7 @@ jobs:
             cd /node/ALIAN/staging/
 
             echo "📥 Pull latest code"
-            git reset --hard staging
+            git reset --hard
             git fetch origin staging
 
             echo "📦 Backend setup"
