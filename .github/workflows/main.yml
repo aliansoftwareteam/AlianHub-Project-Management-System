@@ -75,12 +75,12 @@ jobs:
 
             echo "📦 Backend setup"
             npm install
-            pm2 restart 19
+            pm2 restart 18
 
             echo "🎨 Frontend build"
             cd frontend
             npm install
             # npm run build
-            pm2 restart 19
+            pm2 restart 18
 
             echo "✅ Deployment completed"
