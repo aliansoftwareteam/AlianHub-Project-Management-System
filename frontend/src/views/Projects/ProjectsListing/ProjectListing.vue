@@ -18,6 +18,7 @@
         @update:filterFavorites="$emit('update:filterFavorites', $event)"
         @changeAvatar="$emit('changeAvatar', $event)"
         @createProject="$emit('createProject', $event)"
+        @createAiProject="$emit('createAiProject', $event)"
         @loadMoreProjects="loadMoreProjects"
         @projectDataClick="projectDataClick()"
         @close="visible = false"
@@ -46,6 +47,7 @@
                 @update:filterFavorites="$emit('update:filterFavorites', $event)"
                 @changeAvatar="$emit('changeAvatar', $event)"
                 @createProject="$emit('createProject', $event)"
+        @createAiProject="$emit('createAiProject', $event)"
                 @projectDataClick="projectDataClick()"
                 @loadMoreProjects="loadMoreProjects"
                 @close="visible = false"
@@ -92,7 +94,7 @@ const ProjectfilterObject = ref( {
 }); 
 
 // EMITS
-const emit = defineEmits(["update:projectData", "update:sprints", "change", "close", "update:showArchivedProjects", "update:filterFavorites", 'changeAvatar', 'createProject','isSpinner','sprintsFoldersData', 'update:sprintLoading']);
+const emit = defineEmits(["update:projectData", "update:sprints", "change", "close", "update:showArchivedProjects", "update:filterFavorites", 'changeAvatar', 'createProject', 'createAiProject','isSpinner','sprintsFoldersData', 'update:sprintLoading']);
 
 // PROPS
 const props = defineProps({

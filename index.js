@@ -189,6 +189,7 @@ function initializeControllers() {
     require('./Modules/EmailNotification/init').init(app);
     require(`./Modules/storage/${currentDirectory}/init`).init(app);
     require('./Modules/AI/init').init(app);
+    require('./Modules/AIProjectGenerator/init').init(app);
     require('./Modules/Users/init').init(app);
     require('./Modules/Project/init').init(app);
     require('./Modules/Teams/init').init(app);
