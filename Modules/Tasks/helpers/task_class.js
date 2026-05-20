@@ -294,7 +294,7 @@ class Task {
                             changeData: editTaskObj
                         })
                         .catch((error) => {
-                            console.log(`ERROR in notification: ${error.message}`);
+                            logger.error(`ERROR in notification: ${error.message}`);
                         });
                     }
                     let historyObj = {
@@ -305,11 +305,11 @@ class Task {
                     HandleHistory('task',projectData.CompanyId, projectData._id,taskData._id,historyObj, userData).then(async () => {});
                 })
                 .catch((error) => {
-                    console.log(`ERROR in task Name update : ${error.message}`);
+                    logger.error(`ERROR in task Name update : ${error.message}`);
                     reject(error)
                 })
             } catch (error) {
-                console.log(`ERROR in task Name update : ${error.message}`);
+                logger.error(`ERROR in task Name update : ${error.message}`);
                 reject(error)
             }
         })

@@ -1,6 +1,7 @@
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration,validateObjectId } = require("../../../utils/mongo-handler/mongoQueries");
 const { mongoose } = require("mongoose");
+const logger = require("../../../Config/loggerConfig");
 
 
 exports.getDefaultSprintData = (uid, query, companyId, projectId, roleType) => {
@@ -177,8 +178,7 @@ exports.getSprintFolder = async (req,res) => {
                         exports.getDefaultSprintData(uid,req.query,companyId,projectId, roleType).then((ele)=>{
                             res.status(200).json(ele);
                         }).catch((error)=>{
-                            console.log(error);
-                            
+                            logger.error(`${error}`);
                             res.status(400).json({error: error});
                         })
                     } else if (req.query.collection === 'folders') {

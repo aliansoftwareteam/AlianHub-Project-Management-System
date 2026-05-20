@@ -14,6 +14,7 @@ const pjson = require('../../package.json');
 const { requestHandler } = require('../../Config/config.js');
 const aiModals = require('../../utils/aiModals.json');
 const { makeUniqueId } = require('../../utils/commonFunctions.js');
+const logger = require('../../Config/loggerConfig.js');
 // BUG-036 / #90 — path-traversal-safe resolver for the firebase service-account file.
 const { resolveServiceFile } = require('../../utils/safeServiceFile.js');
 
@@ -440,7 +441,7 @@ exports.checkTokenConnection = (req, cb) => {
  */
 exports.generateBuildFrontend = (cb) => {
     try {
-        console.log("Start Build");
+        logger.info("Start Build");
         const vueProjectDirectory = __dirname + '/../../frontend';
         const writePublicFilePath = __dirname + '/../../frontend/public/firebase-messaging-sw.js';
         const buildCommand = 'npm run build';
@@ -546,14 +547,14 @@ self.addEventListener('push', event => {
 
         fs.writeFile(filePathEnv, data, (err, data) => {
             if (err) {
-                console.log("Error Generate FrontEnd ENV", err);
+                logger.error(`Error Generate FrontEnd ENV: ${err}`);
                 cb({
                     status: false,
                     error: `Error Generate FrontEnd ENV: ${err}`
                 });
                 return;
             }
-            console.log("End Generate FrontEnd ENV");
+            logger.info("End Generate FrontEnd ENV");
             // Write Public Firebase message
             fs.writeFile(writePublicFilePath, bdCode, (err) => {
                 if (err) {
@@ -571,17 +572,17 @@ self.addEventListener('push', event => {
                         })
                         return;
                     }
-                    console.log(`Vue build generated: ${buildStdout}`);
+                    logger.info(`Vue build generated: ${buildStdout}`);
                     if (fs.existsSync(removeDist)) {
-                        fs.rmdir(removeDist, {recursive: true, force: true}, (error) => { 
-                            if (error) { 
-                                console.log(error); 
+                        fs.rmdir(removeDist, {recursive: true, force: true}, (error) => {
+                            if (error) {
+                                logger.error(`${error}`);
                                 cb({
                                     status: false,
                                     error: `Error Remove Dist Folder: ${error}`
                                 })
-                            } else { 
-                                console.log("Non Recursive: Directories Deleted!"); 
+                            } else {
+                                logger.info("Non Recursive: Directories Deleted!");
                                 cb({
                                     status: true,
                                     buildStdout: buildStdout,
@@ -909,7 +910,7 @@ exports.checkinstallstep = (req, res) => {
                 const finalEnvData = {...envData, ...exports.envVar};
                 fs.writeFile(filePath, convertToEnv(finalEnvData), (err, data) => {
                     if (err) {
-                        console.log("Error Generate FrontEnd ENV", err);
+                        logger.error(`Error Generate FrontEnd ENV: ${err}`);
                         exports.installSteps[6].status = "error";
                         serviceFun.writeFile(installStepsFilePath, JSON.stringify({installSteps: exports.installSteps, envVar: exports.envVar}, null, 4), () => {
                             emitListener(bodyData?.eventId, {step: "STOP", error: err || "Something went wrong; please contact the administrator"});
@@ -920,7 +921,7 @@ exports.checkinstallstep = (req, res) => {
                         });
                         return;
                     }
-                    console.log("End Generate FrontEnd ENV");
+                    logger.info("End Generate FrontEnd ENV");
                     setTimeout(() => {
                         const { startInitialization } = require('./initalizations.js');
                         startInitialization().then(() => {
@@ -972,7 +973,7 @@ exports.checkinstallstep = (req, res) => {
             });
         }
     } catch (error) {
-        console.log("error.message", error.message || error);
+        logger.error(`error.message: ${error.message || error}`);
         exports.installSteps[bodyData.step-1].status = "error";
         serviceFun.writeFile(installStepsFilePath, JSON.stringify({installSteps: exports.installSteps, envVar: exports.envVar}, null, 4), () => {
             res.json({
@@ -996,7 +997,7 @@ exports.getAiModels = (req, res) => {
             data: aiModals
         });
     } catch (error) {
-        console.log("error.message", error.message || error);
+        logger.error(`error.message: ${error.message || error}`);
         res.json({
             status: false,
             error: error?.message || error

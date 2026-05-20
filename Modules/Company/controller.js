@@ -708,7 +708,7 @@ exports.deleteCompany = (req, res) => {
         mongoose.connect(process.env.MONGODB_URL+"/"+req.body.companyId);
         const connection = mongoose.connection;
         connection.once('open', () => {
-            console.log("MongoDB database connection established successfully "+ req.body.companyId);
+            logger.info(`MongoDB database connection established successfully ${req.body.companyId}`);
         });
         mongoose.connection.dropDatabase().then(() => {
             try {

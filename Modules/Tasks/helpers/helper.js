@@ -283,7 +283,7 @@ exports.createCustomFields = ({tasks, userData, projectData}) => {
                         resolve({tasks: tasks, customFields: customFieldsArr});
                     })
                     .catch((error) => {
-                        console.log("error here:", error);
+                        logger.error(`error here: ${error}`);
                         reject(error)
                     });
             } catch (error) {

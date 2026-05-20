@@ -235,7 +235,7 @@ exports.resetAiRequestCount = async() => {
             ]
         }
         MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL,obj,"updateMany").then(() => {
-            console.log("COMPLETE COMP");
+            logger.info("COMPLETE COMP");
         }).catch((error)=> {
             logger.error(`${error} error in updatemany company count`);
         })

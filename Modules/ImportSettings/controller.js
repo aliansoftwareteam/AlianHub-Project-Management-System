@@ -17,10 +17,10 @@ async function batchUpdate(arr) {
 
             let results = []
             const loopFun = () => {
-                console.log("TOTAL: ", count, "/", arr.length, "==", ((count * 100) / arr.length).toFixed(2));
+                logger.info(`TOTAL: ${count} / ${arr.length} == ${((count * 100) / arr.length).toFixed(2)}`);
                 if(count >= arr.length) {
                     resolve(results)
-                    console.log("END");
+                    logger.info("END");
                     return;
                 } else {
                     try {
@@ -34,7 +34,7 @@ async function batchUpdate(arr) {
 
                             if(data) {
                                 promises.push(importData[data.name].apply(null, data.params))
-                                console.log("DATA FOR: ", data.name);
+                                logger.info(`DATA FOR: ${data.name}`);
                             }
                         }
 
@@ -52,7 +52,7 @@ async function batchUpdate(arr) {
                                 }, 200);
                             })
                             .catch((error) => {
-                                console.log(`UPDATE failed batch: ${batch} > ${error.message}`);
+                                logger.error(`UPDATE failed batch: ${batch} > ${error.message}`);
                                 reject(new Error(`Batch update failed: ${error.message}`));
                             });
 

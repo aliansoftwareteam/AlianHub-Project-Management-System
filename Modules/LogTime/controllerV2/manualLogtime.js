@@ -321,7 +321,7 @@ exports.manualLogTime = async (req, res) => {
                     })
                 }).catch((error) => {
                     logger.error(`TimeSheet===========>Error ${error.message}`);
-                    console.log("error=========>",error)
+                    logger.error(`error: ${error}`);
                     res.send({
                         status: false,
                         statusText: `Error4 1: ${error}`
