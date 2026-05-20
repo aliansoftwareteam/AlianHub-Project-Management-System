@@ -1,59 +1,147 @@
 name: CI / Deploy
+
 on:
   push:
     branches:
       - staging
+
   pull_request:
+    branches:
+      - staging
     types:
       - opened
       - synchronize
       - reopened
-      - closed
-    branches:
-      - staging
+
   workflow_dispatch:
+
+concurrency:
+  group: staging-deploy
+  cancel-in-progress: true
 
 jobs:
   validate:
-    # Run on every push and on every PR event (including closed-merged).
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
+      # ---------------------------------
+      # Checkout
+      # ---------------------------------
+
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      # ---------------------------------
+      # Node Setup
+      # ---------------------------------
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 22
+          cache: npm
+
+      # ---------------------------------
+      # Backend Validation
+      # ---------------------------------
 
       - name: Install backend dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci
 
       - name: Run backend tests
         run: npm test
 
-      # Audit is advisory until the firebase-admin transitive-dep CVEs are
-      # resolved (P3-DEP-37). Findings still appear in the workflow log.
-      - name: Backend security audit (advisory)
+      - name: Backend security audit
         run: npm audit --omit=dev --audit-level=high
         continue-on-error: true
 
+      # ---------------------------------
+      # Frontend Build
+      # ---------------------------------
+
       - name: Install frontend dependencies
         working-directory: frontend
-        run: npm install --no-audit --no-fund
+        run: npm ci
 
       - name: Build frontend
         working-directory: frontend
         run: npm run build
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+          # ── Firebase (required) ───────────────────────────────────────
+          # These get inlined into the bundle by Vue CLI at build time.
+          # Missing values silently become `undefined` in the shipped JS,
+          # which is why we map them explicitly here instead of relying
+          # on a `.env` file (which is gitignored and not present on the
+          # CI runner). Set each one in GitHub → Settings → Secrets and
+          # variables → Actions → Repository secrets.
+          VUE_APP_ENVIRONMENT:       ${{ secrets.VUE_APP_ENVIRONMENT }}
+          VUE_APP_APIKEY:            ${{ secrets.VUE_APP_APIKEY }}
+          VUE_APP_AUTHDOMAIN:        ${{ secrets.VUE_APP_AUTHDOMAIN }}
+          VUE_APP_PROJECTID:         ${{ secrets.VUE_APP_PROJECTID }}
+          VUE_APP_STORAGEBUCKET:     ${{ secrets.VUE_APP_STORAGEBUCKET }}
+          VUE_APP_MESSAGINGSENDERID: ${{ secrets.VUE_APP_MESSAGINGSENDERID }}
+          VUE_APP_APPID:             ${{ secrets.VUE_APP_APPID }}
+          VUE_APP_MEASUREMENTID:     ${{ secrets.VUE_APP_MEASUREMENTID }}
+          # ── App configuration ────────────────────────────────────────
+          VUE_APP_STORAGE_TYPE:      ${{ secrets.VUE_APP_STORAGE_TYPE }}
+          VUE_APP_AFFILIATEON:       ${{ secrets.VUE_APP_AFFILIATEON }}
+
+      # ---------------------------------
+      # Create Frontend Artifact
+      # ---------------------------------
+
+      - name: Archive frontend build
+        run: |
+          tar -czf frontend-dist.tar.gz -C frontend dist
+
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend-dist.tar.gz
+          retention-days: 1
 
   deploy:
     needs: validate
-    if: github.event_name == 'push' || github.event.pull_request.merged == true
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
+
     steps:
-      - name: Deploy via SSH
+      # ---------------------------------
+      # Checkout
+      # ---------------------------------
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ---------------------------------
+      # Download Frontend Artifact
+      # ---------------------------------
+
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+
+      # ---------------------------------
+      # Upload Artifact to VPS
+      # ---------------------------------
+
+      - name: Upload frontend archive to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DO_HOST }}
+          username: ${{ secrets.DO_USER }}
+          key: ${{ secrets.DO_SSH_KEY }}
+          source: frontend-dist.tar.gz
+          target: /tmp
+
+      # ---------------------------------
+      # Deploy Application
+      # ---------------------------------
+
+      - name: Deploy application
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DO_HOST }}
@@ -61,26 +149,84 @@ jobs:
           key: ${{ secrets.DO_SSH_KEY }}
           script: |
             set -e
+
             echo "🔧 Loading NVM..."
+
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
             nvm use 22
 
             echo "🚀 Starting deployment..."
+
             cd /node/ALIAN/staging/
 
-            echo "📥 Pull latest code"
-            git reset --hard
+            # ---------------------------------
+            # Update Backend Source
+            # ---------------------------------
+
+            echo "📥 Updating backend source"
+
             git fetch origin staging
+            git reset --hard origin/staging
 
-            echo "📦 Backend setup"
-            npm install
+            # ---------------------------------
+            # Install Backend Dependencies
+            # ---------------------------------
+
+            echo "📦 Installing backend dependencies"
+
+            npm ci --omit=dev
+
+            # ---------------------------------
+            # Frontend Backup + Deploy
+            # ---------------------------------
+
+            echo "🎨 Deploying frontend build"
+
+            BACKUP_DIR="frontend/dist-backups"
+            CURRENT_DIST="frontend/dist"
+
+            mkdir -p $BACKUP_DIR
+
+            # Backup existing dist
+            if [ -d "$CURRENT_DIST" ]; then
+              TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
+
+              echo "📦 Creating frontend backup: $TIMESTAMP"
+
+              mv $CURRENT_DIST "$BACKUP_DIR/dist-$TIMESTAMP"
+            fi
+
+            # Create fresh dist directory
+            mkdir -p frontend/dist
+
+            # Extract uploaded artifact
+            tar -xzf /tmp/frontend-dist.tar.gz -C frontend
+
+            # ---------------------------------
+            # Cleanup Old Backups
+            # Keep only latest 5
+            # ---------------------------------
+
+            echo "🧹 Cleaning old backups"
+
+            cd $BACKUP_DIR
+
+            ls -dt dist-* 2>/dev/null | tail -n +6 | xargs -r rm -rf
+
+            cd - > /dev/null
+
+            # ---------------------------------
+            # Restart Application
+            # ---------------------------------
+
+            echo "♻️ Restarting PM2"
+
             pm2 restart 18
 
-            echo "🎨 Frontend build"
-            cd frontend
-            npm install
-            # npm run build
-            pm2 restart 18
+            echo "📊 PM2 Status"
+
+            pm2 status
 
             echo "✅ Deployment completed"
