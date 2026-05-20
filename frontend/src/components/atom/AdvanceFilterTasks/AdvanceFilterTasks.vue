@@ -40,7 +40,7 @@
                     <div class="d-flex align-items-center">
                         <span class="advancefilter__body--marginright" v-if="props.taskObj?.isParentTask === false"><img :src="subTaskImage" /> </span>
                         <span class="advancefilter__body--marginright"><img :src="favourite(props.taskObj?.favouriteTasks) && favourite(props.taskObj?.favouriteTasks)?.length ? filledStar : blankStar" /></span>
-                        <span class="advancefilter__body--taskname black text-ellipse d-block advancefilter__body--width" v-html="highlightSearchTerm(props.taskObj?.TaskName)"></span>
+                        <span class="advancefilter__body--taskname black text-ellipse d-block advancefilter__body--width" v-html="sanitizeInline(highlightSearchTerm(props.taskObj?.TaskName))"></span>
                     </div>
                 </div>
             </div>
@@ -81,6 +81,7 @@
     import { useI18n } from "vue-i18n";
     const { t } = useI18n();
     import { useCustomComposable } from '../../../composable';
+    import { sanitizeInline } from '@/utils/sanitizeHtml';
     const { generateTaskURL } = filterFun();
     const $toast = useToast();
     const {sanitizeInput} = useCustomComposable();

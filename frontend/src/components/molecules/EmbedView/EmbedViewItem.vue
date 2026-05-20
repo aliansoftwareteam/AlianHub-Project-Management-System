@@ -11,7 +11,7 @@
     <div class="embed__view-item" v-else>
         <SpinnerComp :is-spinner="!isVisible" v-if="!isVisible"/>
         <div class="embed__viewshow-visible"  v-show="isVisible">
-        <div class="vhtml" v-if="Data?.type == 'Anything_html'"  v-html='URL'></div>
+        <div class="vhtml" v-if="Data?.type == 'Anything_html'"  v-html='sanitizedEmbed'></div>
             <iframe id="frame" v-show="Data?.type != 'Anything_html'" :src=" Data?.type != 'Anything_html' ? URL : '' " height="100%" width="100%" class="border-0"></iframe>
         </div>
     </div>
@@ -22,6 +22,7 @@ import { useRoute } from 'vue-router';
 import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue'
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import {useStore} from 'vuex'
+import { sanitizeHtml } from '@/utils/sanitizeHtml';
 
 
 const route  = useRoute()
@@ -36,6 +37,10 @@ const {getters}  = useStore()
 
 const URL = ref('')
 const Data = ref('')
+const sanitizedEmbed = computed(() => sanitizeHtml(URL.value, {
+    allowedTags: ["iframe", "div", "span", "a", "img", "p", "br", "b", "i", "u", "em", "strong"],
+    allowedAttr: ["src", "href", "target", "rel", "alt", "title", "class", "style", "id", "width", "height", "frameborder", "allow", "allowfullscreen", "sandbox", "loading", "referrerpolicy"]
+}))
 const projectData = inject('selectedProject')
 const isVisible = ref(false)
 const currentCompany = computed(() => getters["settings/selectedCompany"]);

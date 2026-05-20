@@ -2,7 +2,7 @@
     <div class="d-flex align-items-center">
         <UserProfile class="log-use-profile" :data="data.userData" :show-dot="false" :width="'30px'" :thumbnail="'30x30'" />
         <div class="ml-015 wrapperNameImage">
-            <span v-html="convert(data.Message)"></span>
+            <span v-html="sanitizeHtml(convert(data.Message))"></span>
             <span>&nbsp;{{getDateAndTime(data.createdAt == undefined ? new Date().getTime(): new Date(data?.createdAt).getTime())}}</span>
         </div>
     </div>
@@ -10,6 +10,7 @@
 <script setup>
 import UserProfile from "@/components/atom/UserProfile/UserProfile.vue";
 import { defineComponent,defineProps, inject, ref } from "vue";
+import { sanitizeHtml } from "@/utils/sanitizeHtml";
 import { useProjects } from '@/composable/projects';
 import { useGetterFunctions } from "@/composable";
 import moment from "moment";

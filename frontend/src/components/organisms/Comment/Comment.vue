@@ -33,7 +33,7 @@
                         <span v-if="!message.isDeleted && message.sent && new Date(message.createdAt)?.getTime() !== new Date(message.updatedAt)?.getTime()" class="font-size-10">({{$t('Comments.edited')}})</span>
                         <div :id="message._id" class="border-radius-10-px p-10px message_id-sent" :class="{'bg-white': !message.sent, 'bg-light-blue': message.sent}" :style="`${message.type !== 'text' || message.type !== 'link' ? 'width: auto;' : ''}`">
                             <template v-if="message.isDeleted">
-                                <pre class="red font-italic" v-html="message.userId === userId ? $t('Comments.You_deleted_this_message') : $t('Comments.This_message_is_deleted')"/>
+                                <pre class="red font-italic" v-html="sanitizeInline(message.userId === userId ? $t('Comments.You_deleted_this_message') : $t('Comments.This_message_is_deleted'))"/>
                             </template>
                             <template v-else>
                                 <Spinner
@@ -100,12 +100,12 @@
                                                 <pre
                                                     class="text-ellipsis text-nowrap white__space-nowrap"
                                                     :title="['link', 'text'].includes(message.reply_type) ? checkLink(changeText(message?.reply_message || ''), true) : message?.reply_mediaOriginalName"
-                                                    v-html="['link', 'text'].includes(message.reply_type) ? checkLink(changeText(message?.reply_message || ''), true) : message?.reply_mediaOriginalName"
+                                                    v-html="sanitizeInline(['link', 'text'].includes(message.reply_type) ? checkLink(changeText(message?.reply_message || ''), true) : message?.reply_mediaOriginalName)"
                                                 />
                                             </div>
                                             <pre
                                                 :class="{'para-overflow': message.overflow && !showMore}"
-                                                v-html="message.type === 'link' ? checkLink(changeText(message.message), true) : changeText(message.message)"
+                                                v-html="sanitizeInline(message.type === 'link' ? checkLink(changeText(message.message), true) : changeText(message.message))"
                                             />
                                             <div v-if="message.overflow" class="text-center cursor-pointer border-top mt-10px pt-5px text-center" @click="showMore = !showMore">
                                                 <span>{{$t('Permissions.Read')}} {{showMore ? $t('Comments.less') : $t('Comments.more')}}</span>
@@ -115,7 +115,7 @@
                                     <template v-else>
                                         <pre
                                             :class="{'para-overflow': message.overflow && !showMore}"
-                                            v-html="message.type === 'link' ? checkLink(changeText(message.message), true) : changeText(message.message)"
+                                            v-html="sanitizeInline(message.type === 'link' ? checkLink(changeText(message.message), true) : changeText(message.message))"
                                         />
                                         <div v-if="message.overflow" class="text-center cursor-pointer border-top mt-10px pt-5px text-center" @click="showMore = !showMore">
                                             <span>{{$t('Permissions.Read')}} {{showMore ? $t('Comments.less') : $t('Comments.more')}}</span>
@@ -188,6 +188,7 @@ const { handleStorageImageRequest } = storageHelper();
 const {getDateType} = useProjects();
 
 // UTILS
+import { sanitizeInline } from "@/utils/sanitizeHtml";
 const {changeText, checkLink} = useCustomComposable();
 const {convertDateFormat} = useConvertDate();
 const {getUser} = useGetterFunctions();

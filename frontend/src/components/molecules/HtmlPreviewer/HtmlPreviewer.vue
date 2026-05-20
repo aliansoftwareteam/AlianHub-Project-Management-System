@@ -12,17 +12,18 @@
         </label>
       </div>
 
-      <div v-if="viewMode === 'html'" v-html="fileContent" class="html-previewer style-scroll"></div>
+      <div v-if="viewMode === 'html'" v-html="sanitizedFileContent" class="html-previewer style-scroll"></div>
 
       <textarea v-else v-model="fileContent" readonly ref="textRef" class="code-previewer style-scroll"></textarea>
     </div>
 </template>
 
 <script setup>
-import { onMounted, ref, defineProps, defineEmits, watch, nextTick } from 'vue';
+import { onMounted, ref, computed, defineProps, defineEmits, watch, nextTick } from 'vue';
 import playIconGray from '@/assets/images/svg/PriorityIcon/playiconGray.svg';
 import CodeIcon from '@/assets/images/png/codeIcon.png';
 import { apiRequest } from '@/services';
+import { sanitizeHtml } from '@/utils/sanitizeHtml';
 
   const props = defineProps({
     url: {
@@ -36,6 +37,8 @@ import { apiRequest } from '@/services';
   const fileContent = ref('');
   const viewMode = ref('html');
   const textRef = ref();
+
+  const sanitizedFileContent = computed(() => sanitizeHtml(fileContent.value));
 
 
   const previewContainer = ref(null);

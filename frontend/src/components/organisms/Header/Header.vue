@@ -259,7 +259,7 @@
 
                                 <div class="d-flex ml-1 flex-column comment__notification-message">
                                     <strong>{{getUser(item['userId']).Employee_Name}}</strong>
-                                    <div v-html="!showNotification ? item.message : `<p>${changeText(item.comment_message)}</p>`"></div>
+                                    <div v-html="sanitizeHtml(!showNotification ? item.message : `<p>${changeText(item.comment_message)}</p>`)"></div>
 
                                     <span class="">{{ getDateAndTime(new Date(item?.createdAt).getTime()) }}</span>
                                 </div>
@@ -328,6 +328,7 @@ import {useHelper} from "./helper"
 import { useMainChat } from "@/views/Chat/helper";
 import { useStore } from "vuex";
 import { useCustomComposable, useGetterFunctions } from "@/composable/index.js";
+import { sanitizeHtml } from "@/utils/sanitizeHtml";
 
 // COMPONENTS
 import NavLinks from "@/components/organisms/NavLinks/NavLinks.vue";

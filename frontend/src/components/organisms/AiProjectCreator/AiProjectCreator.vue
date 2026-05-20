@@ -261,6 +261,7 @@
                         <h4 class="aipg-exec-title">{{ step === 'done' ? 'All done!' : 'Building your project…' }}</h4>
                     </div>
                     <div class="aipg-progress-list">
+                        <!-- v-html safe: stepIcon() returns only hardcoded literals (✓, ·, or a static spinner span). No user input is interpolated. -->
                         <div class="aipg-progress-row" :class="rowClass('project')">
                             <span class="aipg-progress-icon"><span v-html="stepIcon('project')" /></span>
                             <span class="aipg-progress-label">Project</span>

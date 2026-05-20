@@ -59,7 +59,7 @@
                         <span class="black d-block advancefilter__body--width">
                             <pre
                                 class="advancefilter__body--taskname m-0 text-ellipse text-ellipse-responsive"
-                                v-html="hightlight(props.commentObj.message)"
+                                v-html="sanitizeInline(hightlight(props.commentObj.message))"
                             />
                         </span>
                     </div>
@@ -67,7 +67,7 @@
                         <span class="black d-block advancefilter__body--width">
                             <pre
                                 class="advancefilter__body--taskname m-0 text-ellipse text-ellipse-responsive"
-                                v-html="hightlight(props.commentObj.message)"
+                                v-html="sanitizeInline(hightlight(props.commentObj.message))"
                             />
                         </span>
                     </div>
@@ -75,7 +75,7 @@
                         <span class="black d-block advancefilter__body--width">
                             <pre
                                 class="advancefilter__body--taskname m-0 text-ellipse text-ellipse-responsive"
-                                v-html="hightlight(props.commentObj.mediaName)"
+                                v-html="sanitizeInline(hightlight(props.commentObj.mediaName))"
                             />
                         </span>
                     </div>
@@ -118,6 +118,7 @@
     import ImageIcon from "@/components/atom/ImageIcon/ImageIcon.vue"
     import { useProjects } from '@/composable/projects';
     import { useI18n } from "vue-i18n";
+    import { sanitizeInline } from '@/utils/sanitizeHtml';
     const { t } = useI18n();
     const {getDateAndTime} = useProjects();
     const route = useRoute();

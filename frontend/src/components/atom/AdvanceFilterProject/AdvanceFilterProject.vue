@@ -53,7 +53,7 @@
                     </div> -->
                     <div class="d-flex align-items-center">
                         <span class="advancefilter__body--marginright"><img :src="favourite ? filledStar : blankStar" /></span>
-                        <span class="advancefilter__body--taskname m-0 text-ellipse black d-block advancefilter__body--width" v-html="highlightSearchTerm(props.projectObj.ProjectName)"></span>
+                        <span class="advancefilter__body--taskname m-0 text-ellipse black d-block advancefilter__body--width" v-html="sanitizeInline(highlightSearchTerm(props.projectObj.ProjectName))"></span>
                     </div>
                 </div>
             </div>
@@ -77,6 +77,7 @@
     import { useI18n } from "vue-i18n";
     const { t } = useI18n();
     import { useCustomComposable } from '../../../composable';
+    import { sanitizeInline } from '@/utils/sanitizeHtml';
 
     //inject
     const companyId = inject("$companyId");

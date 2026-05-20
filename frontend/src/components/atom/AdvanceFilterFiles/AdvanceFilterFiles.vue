@@ -36,7 +36,7 @@
                                         </span>
                                     </div>
                                     <div>
-                                        <span class="advancefilter__body--taskname black text-ellipse d-block advancefilter__body--width" v-html="highlightSearchTerm(attachment.filename)"></span>
+                                        <span class="advancefilter__body--taskname black text-ellipse d-block advancefilter__body--width" v-html="sanitizeInline(highlightSearchTerm(attachment.filename))"></span>
                                     </div>
                                 </div>
                             </div>
@@ -84,7 +84,7 @@
                                 </span>
                             </div>
                             <div>
-                                <span class="advancefilter__body--taskname black text-ellipse d-block advancefilter__body--width" v-html="highlightSearchTerm(attachment.filename)"></span>
+                                <span class="advancefilter__body--taskname black text-ellipse d-block advancefilter__body--width" v-html="sanitizeInline(highlightSearchTerm(attachment.filename))"></span>
                             </div>
                         </div>
                     </div>
@@ -144,7 +144,7 @@
                                 </div>
                             </div>
                             <div>
-                                <span class="advancefilter__body--taskname black text-ellipse d-block advancefilter__body--width" v-html="highlightSearchTerm(attachment?.mediaOriginalName)"></span>
+                                <span class="advancefilter__body--taskname black text-ellipse d-block advancefilter__body--width" v-html="sanitizeInline(highlightSearchTerm(attachment?.mediaOriginalName))"></span>
                             </div>
                         </div>
                     </div>
@@ -189,6 +189,7 @@
     import TaskDetail from '@/views/TaskDetail/TaskDetail.vue'
     import { useRoute, useRouter } from 'vue-router';
     import { useI18n } from "vue-i18n";
+    import { sanitizeInline } from '@/utils/sanitizeHtml';
     const { t } = useI18n();
     const route = useRoute();
     const router = useRouter();

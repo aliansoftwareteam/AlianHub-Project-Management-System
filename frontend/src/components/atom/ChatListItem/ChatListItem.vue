@@ -40,7 +40,7 @@
                         <span v-if="item?.message === 'general.message_deleted'">
                             {{ $t('general.message_deleted') }}
                         </span>
-                        <span v-else v-html="changeText(item?.message || '', '', '')"></span>
+                        <span v-else v-html="sanitizeInline(changeText(item?.message || '', '', ''))"></span>
                     </div>
                 </div>
                 <img v-if="item?.private" :src="privateIcon" alt="privateIcon" class="private__icon">
@@ -96,6 +96,7 @@ import ChatListItem from "@/components/atom/ChatListItem/ChatListItem.vue"
 import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
 
 // UTILS
+import { sanitizeInline } from "@/utils/sanitizeHtml";
 const {getUser} = useGetterFunctions()
 const {getters} = useStore();
 const {changeText} = useCustomComposable();

@@ -47,7 +47,7 @@
                         :thumbnail="'30x30'"
                     />
                     <strong class="text-nowrap cursor-default mr-5px">{{getUser(reply.userId).Employee_Name}}: </strong>
-                    <span v-if="reply.type === 'text' || reply.type === 'link'" class="text-ellipsis cursor-default" :title="checkLink(changeText(reply.message), true)" v-html="checkLink(changeText(reply.message), true)"></span>
+                    <span v-if="reply.type === 'text' || reply.type === 'link'" class="text-ellipsis cursor-default" :title="checkLink(changeText(reply.message), true)" v-html="sanitizeInline(checkLink(changeText(reply.message), true))"></span>
                     <span v-else class="text-ellipsis cursor-default" :title="reply.mediaName">{{reply.mediaName}}</span>
                 </div>
                 <div class="d-flex align-items-center">
@@ -85,6 +85,7 @@ import {defineProps, defineEmits, computed, onMounted, watch, ref, nextTick, inj
 import UserProfile from "@/components/atom/UserProfile/UserProfile.vue"
 
 // UTILS
+import { sanitizeInline } from "@/utils/sanitizeHtml";
 const {getUser} = useGetterFunctions();
 const {changeText, checkLink} = useCustomComposable();
 

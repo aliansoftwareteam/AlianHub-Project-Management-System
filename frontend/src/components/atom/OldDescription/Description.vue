@@ -12,7 +12,7 @@
                     class="description__Edit-wrapper d-block"
                 >
                     <div v-if="description">
-                        <span class="ql-editor" v-if="description!== ''" v-html="description"></span>
+                        <span class="ql-editor" v-if="description!== ''" v-html="sanitizeHtml(description)"></span>
                     </div>
                     <span v-else class="task-detail-subdesc">Add a Description...</span>
                 </div>
@@ -57,6 +57,7 @@
 import { defineComponent, defineEmits, defineProps, ref , inject} from "vue";
 
 import { VueEditor } from "vue3-editor";
+import { sanitizeHtml } from "@/utils/sanitizeHtml";
 
 defineComponent({
     name: "DescriptionComponent"
