@@ -146,7 +146,16 @@ const verifyJWTTokenWithCRoute = [
     '/api/v1/getcompany-reffercode',
     '/api/v1/promotional-credit/:id',
     '/api/v1/timesheet',
-    '/api/v1/report/time-forcasting'
+    '/api/v1/report/time-forcasting',
+    // AI Project Generator
+    // The /execute/events/:jobId SSE endpoint is intentionally NOT listed
+    // — EventSource can't send auth headers, and the jobId is a random
+    // 24-char hex (≥96 bits) so it's safe as a bearer-style capability.
+    // Matches the existing pattern for /api/v1/generatePrompt/events/:id.
+    '/api/v1/ai/project/upload-brief',
+    '/api/v1/ai/project/plan',
+    '/api/v1/ai/project/clarify',
+    '/api/v1/ai/project/execute',
 ];
 const verifyJWTToken = [
     "/api/v2/company/delete",
