@@ -35,6 +35,12 @@ module.exports.SEND_FCM = "/api/v1/send-fcm";
 module.exports.UPDATA_TASK_INDEX = "/api/v1/taskIndex";
 module.exports.ONLOAD_UPDATE_TASK_INDEX = "/api/v1/updateTaskIndexOnload";
 module.exports.CREATE_PROJECT = "/api/v1/createProject";
+// AI Project Generator (Modules/AIProjectGenerator)
+module.exports.AI_PROJECT_UPLOAD_BRIEF = "/api/v1/ai/project/upload-brief";
+module.exports.AI_PROJECT_PLAN = "/api/v1/ai/project/plan";
+module.exports.AI_PROJECT_CLARIFY = "/api/v1/ai/project/clarify";
+module.exports.AI_PROJECT_EXECUTE = "/api/v1/ai/project/execute";
+module.exports.AI_PROJECT_EVENTS = "/api/v1/ai-progress";
 module.exports.WASABI_UPLOAD_FILE = "/api/v1/wasabi/uploadFile";
 module.exports.WASABI_UPLOAD64_FILE = "/api/v1/wasabi/uploadFile_64";
 module.exports.WASABI_RETRIVE_USER_PROFILE = "/api/v1/wasabi/retriveUserProfile";

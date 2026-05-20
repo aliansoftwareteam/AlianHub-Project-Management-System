@@ -14,6 +14,7 @@
                 @update:filterFavorites="filterFavorites = $event"
                 @update:searchData="projectSearchText = $event"
                 @createProject="openSidebar()"
+                @createAiProject="openAiCreator()"
                 :loadingProjects="loadingProjects"
                 @changeAvatar="showColorAvatar = true, assignAvatarData($event)"
                 v-model:sprintLoading="sprintLoading"
@@ -734,6 +735,7 @@
                         <h2>{{$t('ProjectSlider.you_dont')}}</h2>
                         <div v-if="checkPermission('project.project_list',projectData.isGlobalPermission) === true && checkPermission('project.project_create',projectData.isGlobalPermission) === true && !isFilterHasData">
                             <button class="outline-primary ml-1 font-size-16 p0x-13px" @click="openSidebar()">+ {{$t('ProjectSlider.new_project')}}</button>
+                            <button v-if="currentCompany?.planFeature?.aiPermission" class="btn btn-primary ml-1 font-size-16 p0x-13px" @click="openAiCreator()">✨ Create with AI</button>
                         </div>
                     </template>
                     <template v-else>
@@ -773,6 +775,7 @@
             :showSpinner="showSpinner"
         />
         <CreateProjectSidebar v-if="isActiveCreateSidebar" :isAdvanceFilterApplied='isAdvanceFilterApplied' :isActiveCreateSidebar="isActiveCreateSidebar" @click:closeSidebar="closeSidebar" @closeSidebar="closeSidebar"/>
+        <AiProjectCreator v-if="isActiveAiCreator" :visible="isActiveAiCreator" @close="isActiveAiCreator = false" @created="onAiProjectCreated"/>
         <ProjectPermission v-if="permissionSidebar" @isClose="(val) => {permissionSidebar = !val}" :projectData="projectData"></ProjectPermission>
         <ConfirmModal
             className="projecttourend_driver_modal"
@@ -827,6 +830,7 @@ import { EditProjectName } from '@/utils/NotificationTemplate';
 // COMPONENTS
 import ProjectWatcher from "@/components/organisms/ProjectWatcher/ProjectWatcher.vue"
 import CreateProjectSidebar from '@/components/organisms/CreateProject/CreateProjectSidebar.vue'
+import AiProjectCreator from '@/components/organisms/AiProjectCreator/AiProjectCreator.vue'
 import ProjectProfileForm from '@/components/templates/CreateProject/ProjectProfileForm.vue';
 import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
 import SpinnerComp from "@/components/atom/SpinnerComp/SpinnerComp.vue";
@@ -1136,6 +1140,26 @@ const copy = require("@/assets/images/svg/copy-link.svg")
     }
     function closeSidebar(value){
         isActiveCreateSidebar.value = value;
+    }
+    const isActiveAiCreator = ref(false);
+    const currentCompany = computed(() => getters['settings/selectedCompany']);
+    const openAiCreator = () => {
+        isActiveAiCreator.value = true;
+    }
+    function onAiProjectCreated({ projectId }) {
+        // The project-list socket pipeline doesn't fan out an 'insert' event
+        // for new projects, so we re-fetch the project list ourselves so the
+        // new project shows up immediately without a page reload.
+        try {
+            dispatch('projectData/setProjects', { roleType: 'currentUser' });
+        } catch (_e) { /* ignore */ }
+        if (projectId) {
+            try {
+                const cid = (currentCompany.value && currentCompany.value._id) || route.params.cid;
+                router.push({ name: 'Project', params: { cid, id: projectId } });
+            } catch (_e) { /* ignore */ }
+        }
+        isActiveAiCreator.value = false;
     }
 
     const assigneeInProgress = ref({});
