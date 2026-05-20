@@ -1,6 +1,7 @@
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { importRestrictedExtensions, importCustomFields, importTours } = require("../../utils/data");
 const { uploadPublicAssets } = require('../storage/wasabi/controller');
+const logger = require('../../Config/loggerConfig.js');
 
 exports.startInitialization = () => {
     return new Promise((resolve, reject) => {
@@ -27,7 +28,7 @@ exports.startInitialization = () => {
 
             Promise.allSettled(promises)
             .then((result) => {
-                console.log("result: ", result);
+                logger.info(`initialization result: ${JSON.stringify(result.map(r => r.status))}`);
                 resolve();
             })
             .catch((error) => {

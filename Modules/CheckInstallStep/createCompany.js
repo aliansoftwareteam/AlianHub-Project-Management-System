@@ -466,7 +466,7 @@ exports.createCompanyFromAPIFunction = (userId,obj) => {
             exports.createCompany(object).then(()=>{
                 resolve();
             }).catch((error)=>{
-                console.log(error);
+                logger.error(`${error}`);
             })
         } catch (error) {
             reject(error);

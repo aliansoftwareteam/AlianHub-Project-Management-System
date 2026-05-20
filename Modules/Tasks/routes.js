@@ -4,6 +4,7 @@ const tabSyncTaskCtrl = require('./controller/getTabSyncTasks');
 const advanceFilter = require('./helpers/manageGlobalFilter');
 const getTaskCtrl = require('./helpers/getTasksData');
 const { handleEvents } = require('../Company/eventController');
+const logger = require('../../Config/loggerConfig');
 
 exports.init = (app) => {
     app.post('/api/tasks', (req, res) => {
@@ -13,11 +14,11 @@ exports.init = (app) => {
                 res.send({status: true, statusText: 'Task created successfully.'});
             })
             .catch((error) => {
-                console.log('ERROR: ', error.message);
+                logger.error(`ERROR: ${error.message}`);
                 res.send({status: false, statusText: error.message});
             });
         } catch (error) {
-            console.log('ERROR: ', error.message);
+            logger.error(`ERROR: ${error.message}`);
             res.send({status: false, statusText: error.message});
         }
     });
@@ -28,8 +29,7 @@ exports.init = (app) => {
             res.send({status: true, statusText: 'Task updated successfully.',data:response});
         })
         .catch((error) => {
-            console.log('ERROR: ', error);
-            console.error("ERRORsssss: ", error.message);
+            logger.error(`ERROR: ${error}`);
             res.send({status: false, statusText: error.message});
         });
     });
@@ -45,11 +45,11 @@ exports.init = (app) => {
                 }
             })
             .catch((error) => {
-                console.log('ERROR: ', error.message);
+                logger.error(`ERROR: ${error.message}`);
                 res.send({status: false, statusText: error.message});
             });
         } catch (error) {
-            console.log('ERROR: ', error.message);
+            logger.error(`ERROR: ${error.message}`);
             res.send({status: false, statusText: error.message});
         }
     });
@@ -60,8 +60,7 @@ exports.init = (app) => {
             res.send({status: true, statusText: 'Task updated successfully.',data:response});
         })
         .catch((error) => {
-            console.log('ERROR: ', error);
-            console.error("ERRORsssss: ", error.message);
+            logger.error(`ERROR: ${error}`);
             res.send({status: false, statusText: error.message});
         });
     });

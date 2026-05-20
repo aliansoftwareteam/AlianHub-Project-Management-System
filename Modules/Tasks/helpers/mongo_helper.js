@@ -608,7 +608,7 @@ exports.convertToListSubTask = (companyId, projectData, subTask, sprintObj, oldS
                     logger.error(`error in update task count : ${error}`)
                 });
             }).catch((error) => {
-                console.log(error,"ERROR")
+                logger.error(`ERROR: ${error}`);
             });
         } catch (error) {
             reject(error);

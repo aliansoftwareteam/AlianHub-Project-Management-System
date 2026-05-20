@@ -743,7 +743,7 @@ exports.removeProjectCount = (companyId,isPrivateSpace) => {
         }
         updateCompanyFun(SCHEMA_TYPE.GOLBAL,decObj,"findOneAndUpdate",companyId,true);
     } catch (error) {
-        console.log(error,"ERROR:");
+        logger.error(`ERROR: ${error}`);
     }
 }
 
