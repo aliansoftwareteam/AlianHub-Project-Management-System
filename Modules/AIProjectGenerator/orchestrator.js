@@ -337,7 +337,7 @@ function buildProjectDoc({ plan, context, companyId, uid, userData, projectIdHin
         ProjectName: proj.ProjectName,
         ProjectCode: String(proj.ProjectCode || '').toUpperCase(),
         ProjectCurrency: { code: 'USD', symbol: '$' },
-        ProjectType: proj.ProjectType || 'General',
+        ProjectType: 'Fix',
         ProjectRequiredComponent: projectRequired,
         ProjectRequiredDefaultComponent: defaultRequired,
         LeadUserId: Array.isArray(proj.LeadUserId) ? proj.LeadUserId : [],

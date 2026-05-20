@@ -26,7 +26,6 @@ Hard rules:
         "projectIcon": { "emoji": string, "backgroundColor": "#RRGGBB" },
         "DueDate": "YYYY-MM-DD" | null,
         "isPrivateSpace": boolean,              // default false
-        "ProjectType": string,                  // e.g. "Software", "Marketing", "Operations"
         "projectStatusData": [{"name": string, "textColor": "#RRGGBB", "type": string}], // 2-6 lifecycle states for the PROJECT as a whole
         "taskStatusData":   [{"name": string, "textColor": "#RRGGBB", "type": string}], // 3-8 workflow states a TASK moves through
         "taskTypeCounts":   [{"name": string, "key": number}],                          // 2-6 entries: "Task","Bug","Story","Epic","Subtask"

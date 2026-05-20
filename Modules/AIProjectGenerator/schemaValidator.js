@@ -65,7 +65,7 @@ const ProjectSchema = z.object({
     }).default({ emoji: '🚀', backgroundColor: '#6473E8' }),
     DueDate: DateLike.optional(),
     isPrivateSpace: z.boolean().default(false),
-    ProjectType: z.string().min(1).max(60).optional().default('General'),
+    ProjectType: z.string().min(1).max(60).optional().default('Fix'),
     projectStatusData: z.array(StatusEntrySchema).min(2).max(8),
     taskStatusData: z.array(StatusEntrySchema).min(2).max(8),
     taskTypeCounts: z.array(TaskTypeSchema).min(1).max(8),
