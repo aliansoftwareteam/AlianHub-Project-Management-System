@@ -412,7 +412,7 @@ const formData = ref({
     }
 });
 
-const message = ref({
+const createEmptyMessage = () => ({
     reply:{},
     replyMessageId:"",
     message:"",
@@ -420,6 +420,10 @@ const message = ref({
     mediaName: undefined,
     mediaSize: undefined,
 });
+
+const COMMENT_DRAFT_PREFIX = "alianhub:comment-draft";
+
+const message = ref(createEmptyMessage());
 const mediaFiles = ref([]);
 const messages = ref([]);
 const showScrollBotton = ref(false);
@@ -540,7 +544,7 @@ watch([() => props.sprintId, () => props.taskId], ([newSprint, newTask], [oldSpr
     }
 })
 async function initialize() {
-    resetMessage()
+    restoreMessageDraft();
     page.value = 1;
     resetUnread.value = false;
     // unreadMessages.value = 0;
@@ -689,6 +693,11 @@ watch([loadingChat, clientWidth], ([loading]) => {
 watch(() => props.userIds, () => {
     setUsers();
 })
+
+watch(message, () => {
+    persistMessageDraft();
+}, {deep: true})
+
 function setUsers() {
     let tmp = [];
     if(props.mainChat) {
@@ -793,15 +802,88 @@ function scrollBottom(){
     }, 300)
 }
 
-function resetMessage() {
-    message.value = {
-        reply:{},
-        replyMessageId:"",
-        message:"",
-        mediaURL: undefined,
-        mediaName: undefined,
-        mediaSize: undefined,
+function getCommentDraftKey() {
+    const projectId = projectData.value?._id;
+    if(!companyId.value || !projectId) return "";
+
+    const scope = props.mainChat ? "main-chat" : "comments";
+    const sprintId = props.sprintId || "project";
+    const taskId = props.mainChat && props.newChat && newMainChat.value
+        ? newMainChat.value
+        : (props.taskId || "project");
+
+    return [COMMENT_DRAFT_PREFIX, companyId.value, projectId, scope, sprintId, taskId].join(":");
+}
+
+function getDraftPayload() {
+    const draft = message.value || {};
+    return {
+        ...draft,
+        reply: draft.reply || {},
+        replyMessageId: draft.replyMessageId || "",
+        message: draft.message || "",
+        mediaURL: draft.mediaURL,
+        mediaName: draft.mediaName,
+        mediaSize: draft.mediaSize,
+    };
+}
+
+function hasDraftPayload(draft = getDraftPayload()) {
+    return Boolean(
+        draft._id ||
+        draft.message?.trim()?.length ||
+        (draft.reply && Object.keys(draft.reply).length)
+    );
+}
+
+function persistMessageDraft() {
+    const key = getCommentDraftKey();
+    if(!key) return;
+
+    try {
+        const draft = getDraftPayload();
+        if(hasDraftPayload(draft)) {
+            sessionStorage.setItem(key, JSON.stringify(draft));
+        } else {
+            sessionStorage.removeItem(key);
+        }
+    } catch (error) {
+        console.error("ERROR in persistMessageDraft hook: ", error);
     }
+}
+
+function restoreMessageDraft() {
+    const key = getCommentDraftKey();
+    if(!key) {
+        message.value = createEmptyMessage();
+        return;
+    }
+
+    try {
+        const rawDraft = sessionStorage.getItem(key);
+        message.value = rawDraft
+            ? {...createEmptyMessage(), ...JSON.parse(rawDraft)}
+            : createEmptyMessage();
+    } catch (error) {
+        console.error("ERROR in restoreMessageDraft hook: ", error);
+        message.value = createEmptyMessage();
+    }
+}
+
+function clearMessageDraft(key = getCommentDraftKey()) {
+    if(!key) return;
+
+    try {
+        sessionStorage.removeItem(key);
+    } catch (error) {
+        console.error("ERROR in clearMessageDraft hook: ", error);
+    }
+}
+
+function resetMessage() {
+    const draftKey = getCommentDraftKey();
+    message.value = createEmptyMessage();
+    clearMessageDraft(draftKey);
 }
 
 function pinMessage(message) {
@@ -1186,6 +1268,68 @@ function getMessages() {
     handleSocketData();
 }
 
+function getMessageId(data = {}) {
+    return data?._id ? String(data._id) : (data?.id ? String(data.id) : "");
+}
+
+function findMessageIndexById(data = {}) {
+    const messageId = getMessageId(data);
+    if(!messageId) return -1;
+
+    return messages.value.findIndex((message) => {
+        return getMessageId(message) === messageId || (message._id && String(message._id) === messageId);
+    });
+}
+
+function decorateIncomingMessage(docData) {
+    const obj = {...docData, sent: docData.userId === userId.value};
+    const messageText = obj.message || "";
+    obj.overflow = (obj.type === 'text' || obj.type === 'link')
+        ? messageText.length > 465
+        : messageText.length > 100;
+    return obj;
+}
+
+function shouldShowDateDivider(obj) {
+    return messages.value.length > 1
+        && obj.createdAt !== undefined
+        && new Date(obj.createdAt).setHours(0,0,0,0) !== new Date(messages.value[messages.value.length-1].createdAt).setHours(0,0,0,0);
+}
+
+function upsertIncomingComment(docData, {replaceSending = false, incrementTotal = false} = {}) {
+    if(!docData) return false;
+
+    const obj = decorateIncomingMessage(docData);
+    const existingIndex = findMessageIndexById(obj);
+    if(existingIndex > -1) {
+        messages.value[existingIndex] = {...messages.value[existingIndex], ...obj};
+        return false;
+    }
+
+    if(replaceSending) {
+        let type = "";
+        let name = "";
+        if(docData.mediaURL && docData.mediaURL.length) {
+            type = docData.type;
+            name = docData.mediaName;
+        }
+        const sendingIndex = messages.value.findIndex((x) => (x.isSending && x.type === type && x.mediaName === name));
+        if(sendingIndex > -1){
+            messages.value[sendingIndex] = obj;
+            return false;
+        }
+    }
+
+    if(shouldShowDateDivider(obj)) {
+        obj.showDifference = true;
+    }
+    messages.value.push(obj);
+    if(incrementTotal) {
+        totalMessages.value += 1;
+    }
+    return true;
+}
+
 function handleSocketData() {
     if(!snapshotListener.value) {
         snapshotListener.value = true;
@@ -1199,38 +1343,13 @@ function handleSocketData() {
 
     socket.value.on("commentInsert",(data)=> {
         let docData = data.fullDocument;
-        let type = "";
-        let name = "";
-        if(docData.mediaURL && docData.mediaURL.length) {
-            type = docData.type;
-            name = docData.mediaName;
-        }
-        let ind = messages.value.findIndex((x) => (x.isSending && x.type === type && x.mediaName === name));
-        if(ind > -1){
-            messages.value[ind] = {...docData, sent: docData.userId === userId.value};
-        } else {
-            totalMessages.value += 1;
-            let obj = {...docData, sent: docData.userId === userId.value};
-            if(messages.value.length > 1 && obj.createdAt !== undefined && new Date(obj.createdAt).setHours(0,0,0,0) !== new Date(messages.value[messages.value.length-1].createdAt).setHours(0,0,0,0)) {
-                obj.showDifference= true;
-            }
-            messages.value.push(obj);
-        }
+        upsertIncomingComment(docData, {replaceSending: true, incrementTotal: true});
     })
 
 
     socket.value.on("commentUpdate",(data)=> {
         let docData = data.fullDocument;
-        let index = messages.value.findIndex((x) => x._id === docData._id);
-        if(index > -1) {
-            messages.value[index] = {...docData, sent: docData.userId === userId.value};
-        } else {
-            let obj = {...docData, sent: docData.userId === userId.value};
-            if(messages.value.length > 1 && obj.createdAt !== undefined && new Date(obj.createdAt).setHours(0,0,0,0) !== new Date(messages.value[messages.value.length-1].createdAt).setHours(0,0,0,0)) {
-                obj.showDifference= true;
-            }
-            messages.value.push(obj);
-        }
+        upsertIncomingComment(docData);
     })
 
 

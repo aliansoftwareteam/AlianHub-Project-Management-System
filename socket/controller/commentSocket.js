@@ -5,12 +5,18 @@ exports.commentSocketHandler = ({socket, namespace}) => {
     socket.on('joinCommentRoom',(data)=>{
         const roomName = data.roomName;
         joinRoom(socket,roomName);
-        socketRef.rooms.push({roomName, socketId: data.socketId,namespace,socket});
+        const existingIndex = socketRef.rooms.findIndex((x) => x.roomName === roomName && x.socketId === data.socketId);
+        if (existingIndex === -1) {
+            socketRef.rooms.push({roomName, socketId: data.socketId,namespace,socket});
+        } else {
+            socketRef.rooms[existingIndex] = {roomName, socketId: data.socketId,namespace,socket};
+        }
     });
     socket.on('leaveCommentRoom',(roomName)=>{
-        let index = socketRef.rooms.findIndex((x)=> x.roomName === roomName);        
-        if (index !== -1) {
-            socketRef.rooms.splice(index, 1);
+        for (let index = socketRef.rooms.length - 1; index >= 0; index--) {
+            if (socketRef.rooms[index].roomName === roomName) {
+                socketRef.rooms.splice(index, 1);
+            }
         }
         leaveRoom(socket,roomName);
     })
@@ -40,7 +46,7 @@ function setEventName(type) {
 const handleCommentChange = (changeData, includeUpdatedFields = false) => {
     if (changeData.module === 'comments') {
         const comentIdentifier = `comments_${JSON.parse(JSON.stringify(changeData.data)).projectId}_${JSON.parse(JSON.stringify(changeData.data)).sprintId}_${JSON.parse(JSON.stringify(changeData.data)).taskId}`;
-        const relatedRooms = socketRef.rooms.filter(x => x.roomName.includes(comentIdentifier));
+        const relatedRooms = uniqueRooms(socketRef.rooms.filter(x => x.roomName.includes(comentIdentifier)));
         
         relatedRooms.forEach(data => {
             const eventName = setEventName(changeData.type);
@@ -69,7 +75,7 @@ const handleCommentChange = (changeData, includeUpdatedFields = false) => {
 
     if (changeData.module === 'comments_project') {
         const comentProjectIdentifier = `comments_project_${JSON.parse(JSON.stringify(changeData.data)).projectId}`;
-        const relatedRooms = socketRef.rooms.filter(x => x.roomName.includes(comentProjectIdentifier));
+        const relatedRooms = uniqueRooms(socketRef.rooms.filter(x => x.roomName.includes(comentProjectIdentifier)));
         
         relatedRooms.forEach(data => {
             const eventName = setEventName(changeData.type);
@@ -96,6 +102,16 @@ const handleCommentChange = (changeData, includeUpdatedFields = false) => {
         });
     }
 };
+
+function uniqueRooms(rooms) {
+    const seen = new Set();
+    return rooms.filter((room) => {
+        const key = `${room.roomName}**${room.socketId}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
 
 socketEmitter.on('update', changeData => handleCommentChange(changeData, true));
 socketEmitter.on('insert', changeData => handleCommentChange(changeData, false));
