@@ -35,3 +35,8 @@ span.task__type-img{
     height:14px !important;
     width:14px !important;
 }
+/* Prefer soft word wrap over hard character-break in table cells */
+.view-item .word-break-all {
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
