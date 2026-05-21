@@ -6,10 +6,14 @@ import * as env from '@/config/env';
  *
  * Endpoints (see Modules/AIProjectGenerator):
  *   POST /api/v1/ai/project/upload-brief   — multipart form, returns briefId
- *   POST /api/v1/ai/project/plan           — generates plan OR returns follow-up questions
- *   POST /api/v1/ai/project/clarify        — answers follow-ups, then plan
+ *   POST /api/v1/ai/project/plan           — generates a plan in one shot
  *   POST /api/v1/ai/project/execute        — kicks off orchestrator, returns jobId
- *   GET  /api/v1/ai/project/execute/events/:jobId  — SSE progress stream
+ *   GET  /api/v1/ai-progress/:jobId        — SSE progress stream
+ *
+ * The /clarify endpoint and its multi-turn flow were removed because the
+ * conversation cache expired between proxy 504 retries, surfacing
+ * "Conversation not found or expired" to the user. The plan call is now
+ * always a single round-trip and is freely retryable from the UI.
  */
 export function useAiProjectGenerator() {
 
@@ -20,21 +24,11 @@ export function useAiProjectGenerator() {
         return res.data;
     }
 
-    async function generatePlan({ description, hints, briefId, conversationId, isPrivateSpace }) {
+    async function generatePlan({ description, hints, briefId, isPrivateSpace }) {
         const res = await apiRequest('post', env.AI_PROJECT_PLAN, {
             description,
             hints: hints || {},
             briefId: briefId || null,
-            conversationId: conversationId || null,
-            isPrivateSpace: !!isPrivateSpace,
-        });
-        return res.data;
-    }
-
-    async function clarify({ conversationId, answers, isPrivateSpace }) {
-        const res = await apiRequest('post', env.AI_PROJECT_CLARIFY, {
-            conversationId,
-            answers,
             isPrivateSpace: !!isPrivateSpace,
         });
         return res.data;
@@ -89,7 +83,6 @@ export function useAiProjectGenerator() {
     return {
         uploadBrief,
         generatePlan,
-        clarify,
         execute,
         subscribeToProgress,
     };

@@ -16,8 +16,12 @@ exports.init = (app) => {
      * @swagger
      * /api/v1/ai/project/plan:
      *   post:
-     *     summary: Generate a project plan (or follow-up questions) from a description
+     *     summary: Generate a complete project plan from a description (one-shot)
      *     tags: [AI Project Generator]
+     *     description: |
+     *       Always returns a full plan in a single round-trip. The previous
+     *       multi-turn clarification flow was removed because the conversation
+     *       cache expired between proxy 504 retries on staging.
      */
     app.post('/api/v1/ai/project/plan', ctrl.plan);
 
@@ -25,8 +29,12 @@ exports.init = (app) => {
      * @swagger
      * /api/v1/ai/project/clarify:
      *   post:
-     *     summary: Answer follow-up questions and continue plan generation
+     *     summary: (Removed) — returns 410 Gone; clients should retry /plan
      *     tags: [AI Project Generator]
+     *     description: |
+     *       Retained as a transient stub so frontend caches that still POST to
+     *       the old URL during a deploy roll-out get a clear "endpoint
+     *       removed, retry /plan" response instead of a 404.
      */
     app.post('/api/v1/ai/project/clarify', ctrl.clarify);
 
