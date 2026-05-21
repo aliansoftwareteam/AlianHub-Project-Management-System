@@ -12,8 +12,9 @@ import * as env from '@/config/env';
  *
  * The /clarify endpoint and its multi-turn flow were removed because the
  * conversation cache expired between proxy 504 retries, surfacing
- * "Conversation not found or expired" to the user. The plan call is now
- * always a single round-trip and is freely retryable from the UI.
+ * "Conversation not found or expired" to the user. The plan call now returns
+ * immediately and streams the generated plan through SSE, so proxy timeouts
+ * do not interrupt long LLM responses.
  */
 export function useAiProjectGenerator() {
 
@@ -31,7 +32,38 @@ export function useAiProjectGenerator() {
             briefId: briefId || null,
             isPrivateSpace: !!isPrivateSpace,
         });
-        return res.data;
+        if (res.data && res.data.plan) {
+            return res.data;
+        }
+        if (!res.data || !res.data.status || !res.data.jobId) {
+            return res.data;
+        }
+        return waitForPlan(res.data.jobId);
+    }
+
+    function waitForPlan(jobId) {
+        return new Promise((resolve, reject) => {
+            let unsubscribe = null;
+            unsubscribe = subscribeToProgress(jobId, (payload) => {
+                if (!payload) return;
+                if (payload.data) payload = payload.data;
+
+                if (payload.event === 'complete' && (payload.phase === 'plan' || payload.plan)) {
+                    if (unsubscribe) unsubscribe();
+                    resolve({
+                        status: true,
+                        needsClarification: false,
+                        planId: payload.planId,
+                        plan: payload.plan,
+                        tokensUsed: payload.tokensUsed,
+                        model: payload.model,
+                    });
+                } else if (payload.event === 'error') {
+                    if (unsubscribe) unsubscribe();
+                    reject(new Error(payload.error || 'Plan generation failed. Please try again.'));
+                }
+            });
+        });
     }
 
     async function execute({ plan, edits, userName, isPrivateSpace }) {
