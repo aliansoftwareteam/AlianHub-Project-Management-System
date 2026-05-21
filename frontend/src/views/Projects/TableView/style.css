@@ -5,6 +5,68 @@
     margin: 20px 0px;
 }
 
+/* Multi-select cell width — keep it narrow so it doesn't crowd the row. */
+.table-row-select-cell,
+.table-row-select-header {
+    width: 28px;
+    min-width: 28px;
+    text-align: center;
+    padding: 0 4px;
+}
+/* Row checkbox: hidden by default, shown on row hover or when selected.
+   Matches the List/Kanban behavior so the experience is consistent. */
+.table-row-multi-select {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    margin: 0;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+tr:hover .table-row-multi-select,
+.table-row-multi-select--active {
+    opacity: 1;
+}
+.table-row-multi-select input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    accent-color: #8591F9;
+    margin: 0;
+}
+@media (hover: none) {
+    .table-row-multi-select { opacity: 1; }
+}
+
+/* Group-level tri-state checkbox in table view group headers. */
+.table-group-multi-select {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    margin-right: 6px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    cursor: pointer;
+    vertical-align: middle;
+}
+.task__groups:hover .table-group-multi-select,
+.table-group-multi-select--active {
+    opacity: 1;
+}
+.table-group-multi-select input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    accent-color: #8591F9;
+    margin: 0;
+}
+@media (hover: none) {
+    .table-group-multi-select { opacity: 1; }
+}
+
 .list_view-table-wrapper {
     width: 100%;
     overflow-y: auto;

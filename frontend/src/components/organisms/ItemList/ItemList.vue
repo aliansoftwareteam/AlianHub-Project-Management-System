@@ -4,6 +4,22 @@
             <div class="new-row item_head">
                 <div class="new-col1" :style="`${clientWidth > sideScrollWidth ? 'border:0px' : ''};`">
                     <div class="common-section head" @click="() => {emit('toggle', item); $forceUpdate();}">
+                        <!-- Group tri-state checkbox: none / some (indeterminate) / all. Visible on header hover or when this group has selection. -->
+                        <label
+                            v-if="canGroupSelect && groupTaskIds.length"
+                            class="group-multi-select"
+                            :class="{ 'group-multi-select--active': groupCheckboxState !== 'none' }"
+                            @click.stop
+                        >
+                            <input
+                                type="checkbox"
+                                :checked="groupCheckboxState === 'all'"
+                                :indeterminate.prop="groupCheckboxState === 'some'"
+                                @click.stop
+                                @change="handleGroupCheckboxChange($event)"
+                                :aria-label="$t ? ($t('Common.select_all_tasks') || 'Select all tasks in group') : 'Select all tasks in group'"
+                            />
+                        </label>
                         <template v-if="groupType === 1">
                             <img src="@/assets/images/svg/triangleBlack.svg" alt="traingle" :style="`margin-right: 5px; transform: rotateZ(${item.isExpanded ? 90 : 0}deg)`">
                             <div class="cursor-default position-re d-flex align-items-center ml-8px assignee__wrapper" v-if="item.value?.length">
@@ -296,6 +312,7 @@ import { computed, ref, watch, defineProps, unref, onMounted, inject, defineEmit
 import { useStore } from 'vuex';
 import draggable from 'vuedraggable';
 import { useCustomComposable } from '@/composable';
+import { useTaskSelection } from '@/composable/useTaskSelection.js';
 import { taskListHelper, useUpdateTasks } from '@/views/Projects/helper';
 import taskClass from "@/utils/TaskOperations";
 
@@ -603,6 +620,32 @@ watch(() => unref(tasksGetter), (newVal) => {
 })
 
 const createTask = ref(false);
+
+// Multi-select group header: tri-state checkbox that selects/deselects all
+// visible tasks (incl. expanded subtasks) for this status/assignee/etc group.
+const selection = useTaskSelection();
+const canGroupSelect = computed(() => checkPermission('task.task_status', projectData.value?.isGlobalPermission) === true
+    && !showArchived.value);
+const groupTaskIds = computed(() => {
+    const source = searchedTask ? filteredTasksGetter.value : items.value;
+    if (!Array.isArray(source)) return [];
+    const ids = [];
+    for (const t of source) {
+        if (!t?._id) continue;
+        if (showArchived.value ? true : !t.deletedStatusKey) ids.push(String(t._id));
+        if (t.isExpanded && Array.isArray(t.subtaskArray)) {
+            for (const s of t.subtaskArray) {
+                if (s?._id && (showArchived.value ? true : !s.deletedStatusKey)) ids.push(String(s._id));
+            }
+        }
+    }
+    return ids;
+});
+const groupCheckboxState = computed(() => selection.groupState(groupTaskIds.value));
+const handleGroupCheckboxChange = (evt) => {
+    if (evt) evt.stopPropagation();
+    selection.toggleGroup(groupTaskIds.value);
+};
 
 let subObserver = {};
 function toggleTask(task,e) {

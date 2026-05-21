@@ -65,6 +65,37 @@ exports.init = (app) => {
         });
     });
 
+    // Bulk multi-task operations. Single endpoint, dynamic action dispatch —
+    // matches the PATCH /api/v2/tasks convention.
+    // Body: { action: 'bulkUpdateStatus' | 'bulkDelete' | ..., taskIds: [..], ...payload }
+    // CompanyId comes from the verified header set by the auth middleware;
+    // it overrides anything the client put in the body to prevent spoofing.
+    app.post('/api/v2/tasks/bulk', (req, res) => {
+        try {
+            const action = req.body && req.body.action;
+            if (!action || typeof action !== 'string' || !action.startsWith('bulk')) {
+                return res.send({ status: false, statusText: 'Invalid bulk action' });
+            }
+            if (typeof taskMongo[action] !== 'function') {
+                return res.send({ status: false, statusText: `Unknown bulk action: ${action}` });
+            }
+            const headerCompanyId = req.headers['companyid'] || '';
+            const payload = { ...req.body, companyId: headerCompanyId };
+
+            taskMongo[action](payload)
+            .then((response) => {
+                res.send({ status: true, statusText: 'Bulk operation completed', data: response });
+            })
+            .catch((error) => {
+                logger.error(`ERROR bulk ${action}: ${error.message}`);
+                res.send({ status: false, statusText: error.message });
+            });
+        } catch (error) {
+            logger.error(`ERROR bulk dispatch: ${error.message}`);
+            res.send({ status: false, statusText: error.message });
+        }
+    });
+
     app.patch('/api/v1/importTasks', (req, res) => {
         taskMongo.createMultipleTasks(req.body)
         .then((response) => {

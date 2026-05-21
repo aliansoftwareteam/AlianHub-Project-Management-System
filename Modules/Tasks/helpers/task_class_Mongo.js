@@ -10,6 +10,7 @@ const updateMetaMixin = require('./taskMongo/updateMeta');
 const structuralMixin = require('./taskMongo/structural');
 const mergeDuplicateMixin = require('./taskMongo/mergeDuplicate');
 const internalsMixin = require('./taskMongo/internals');
+const bulkMixin = require('./taskMongo/bulk');
 
 class Task {}
 
@@ -22,6 +23,7 @@ Object.assign(
     structuralMixin,
     mergeDuplicateMixin,
     internalsMixin,
+    bulkMixin,
 );
 
 exports.taskMongo = new Task();

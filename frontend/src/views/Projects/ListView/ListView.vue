@@ -76,6 +76,7 @@ import Skelaton from "@/components/atom/Skelaton/Skelaton.vue"
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import isEqual from 'lodash/isEqual';
 import { taskListHelper } from '@/views/Projects/helper.js';
+import { useTaskSelection } from '@/composable/useTaskSelection.js';
 
 const triangleBlack = require('@/assets/images/svg/triangleBlack.svg');
 
@@ -131,6 +132,12 @@ const initialDate = ref(0);
 const isLoading = ref(false);
 
 const currentCompany = computed(() => getters["settings/selectedCompany"])
+
+const { setActiveView, setActiveProject } = useTaskSelection();
+setActiveView('list');
+watch(() => project.value?._id, (newId) => {
+    if (newId) setActiveProject(String(newId));
+}, { immediate: true });
 
 const timer = ref(null);
 function debouncer(timeout = 1000) {

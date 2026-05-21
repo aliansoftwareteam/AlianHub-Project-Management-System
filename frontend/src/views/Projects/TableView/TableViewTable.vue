@@ -1,5 +1,21 @@
 <template>
     <div v-if="(searchedTask ? filteredTask : tasksGetter)?.length"  class="task__groups">
+        <!-- Group-level tri-state select-all checkbox. Visible on header hover OR when this group has selection. -->
+        <label
+            v-if="canGroupSelect && groupTaskIds.length"
+            class="table-group-multi-select"
+            :class="{ 'table-group-multi-select--active': groupCheckboxState !== 'none' }"
+            @click.stop
+        >
+            <input
+                type="checkbox"
+                :checked="groupCheckboxState === 'all'"
+                :indeterminate.prop="groupCheckboxState === 'some'"
+                @click.stop
+                @change="handleGroupCheckboxChange($event)"
+                aria-label="Select all tasks in group"
+            />
+        </label>
         <div class="view-status" v-if="data?.searchKey == 'statusKey'  " :style="[{'background-color':data?.bgColor , 'color':data?.textColor}]">
             {{data?.name}}
         </div>
@@ -65,6 +81,7 @@ import * as env from '@/config/env';
 // UTILS
 import { useCustomComposable} from "@/composable";
 import { taskListHelper } from '@/views/Projects/helper.js';
+import { useTaskSelection } from '@/composable/useTaskSelection.js';
 
 // PACKAGES
 import {useStore} from 'vuex'
@@ -107,6 +124,31 @@ const project = inject("selectedProject")
 const companyId = inject("$companyId")
 const userId = inject('$userId')
 const permit = checkPermission("task.show_tasks",project?.value?.isGlobalPermission);
+
+const selection = useTaskSelection();
+const { setActiveView, setActiveProject } = selection;
+setActiveView('table');
+watch(() => project.value?._id, (newId) => {
+    if (newId) setActiveProject(String(newId));
+}, { immediate: true });
+
+const showArchivedInj = inject('showArchived', null);
+const canGroupSelect = computed(() => checkPermission('task.task_status', project.value?.isGlobalPermission) === true
+    && !(showArchivedInj?.value));
+const groupTaskIds = computed(() => {
+    const source = searchedTask ? filteredTask.value : tasksGetter.value;
+    if (!Array.isArray(source)) return [];
+    const ids = [];
+    for (const t of source) {
+        if (t?._id && (showArchivedInj?.value ? true : !t.deletedStatusKey)) ids.push(String(t._id));
+    }
+    return ids;
+});
+const groupCheckboxState = computed(() => selection.groupState(groupTaskIds.value));
+const handleGroupCheckboxChange = (evt) => {
+    if (evt) evt.stopPropagation();
+    selection.toggleGroup(groupTaskIds.value);
+};
 
 watch(()=> props.globalSortKey, () => {
     if (observerRef.value) {

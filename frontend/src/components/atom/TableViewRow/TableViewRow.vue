@@ -1,7 +1,22 @@
 <template>
-    <td class="view-item"> 
+    <td class="view-item table-row-select-cell" @click.stop>
+        <label
+            v-if="canRowSelect"
+            class="table-row-multi-select"
+            :class="{ 'table-row-multi-select--active': isRowSelected }"
+        >
+            <input
+                type="checkbox"
+                :checked="isRowSelected"
+                @click.stop
+                @change="handleRowCheckboxChange($event)"
+                aria-label="Select task"
+            />
+        </label>
+    </td>
+    <td class="view-item">
         <div>
-            {{index}} 
+            {{index}}
         </div>
     </td>
     <td class="view-item"> 
@@ -116,6 +131,7 @@ import ProjectTaskType from "@/components/atom/TaskTypeSelection/TaskTypeSelecti
 import taskClass from "@/utils/TaskOperations";
 import { useToast } from "vue-toast-notification"
 import {useGetterFunctions , useCustomComposable , useMoment , useConvertDate} from '@/composable'
+import { useTaskSelection } from '@/composable/useTaskSelection.js';
 import { useStore } from 'vuex'
 import TaskStatus from '@/components/atom/TaskStatus/TaskStatus.vue'
 import { useRouter, useRoute } from "vue-router"
@@ -155,6 +171,19 @@ const showArchiveVar = inject("showArchived");
 const task = ref(props.data)
 const { getters,commit } = useStore()
 const projectData  = inject('selectedProject')
+
+// Multi-select cell — leading column. Checkbox visible on row hover OR
+// when this row is selected (consistent with List & Kanban). The cell
+// itself always exists so columns stay aligned with the header.
+const rowSelection = useTaskSelection();
+const canRowSelect = computed(() => checkPermission('task.task_status', projectData?.value?.isGlobalPermission) === true
+    && !showArchiveVar?.value);
+const isRowSelected = computed(() => rowSelection.isSelected(props.data?._id));
+const handleRowCheckboxChange = (evt) => {
+    if (!props.data?._id) return;
+    if (evt) evt.stopPropagation();
+    rowSelection.toggle(props.data._id, evt);
+};
 const statusSearch = ref("");
 const $toast = useToast()
 const userId = inject('$userId');
