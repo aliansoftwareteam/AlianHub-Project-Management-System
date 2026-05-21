@@ -427,6 +427,8 @@
     <div v-else class="d-flex align-items-center justify-content-center w-100 h-100">
         <img :src="accessDenied" alt="accessDenied">
     </div>
+    <!-- Multi-select bulk action bar — renders only when tasks are selected -->
+    <BulkActionBar />
 </template>
 
 <script setup>
@@ -442,6 +444,7 @@ import { projectComponentsIcons } from '@/composable/commonFunction';
 
 // COMPONENTS
 import ConfirmationSidebar from '@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue';
+import BulkActionBar from '@/components/molecules/BulkActionBar/BulkActionBar.vue';
 import WasabiImage from '@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue';
 import ProjectListing from './ProjectsListing/ProjectListing.vue';
 import ViewsDropdown from '@/components/molecules/ProjectViews/ViewsDropdown.vue';

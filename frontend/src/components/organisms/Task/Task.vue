@@ -4,6 +4,21 @@
             <!-- LEFT SECTION -->
             <div class="new-col1" :style="{ border: (clientWidth > sideScrollWidth ? '0px' : '')}">
                 <div class="common-section task ignore-drag" :style="`${task.isParentTask === false ? 'padding-left: 12px;' : ''}`">
+                    <!-- Multi-select checkbox: visible on row hover OR when this row is selected. Permission-gated. -->
+                    <label
+                        v-if="canMultiSelect"
+                        class="task-multi-select"
+                        :class="{ 'task-multi-select--active': isTaskSelected }"
+                        @click.stop
+                    >
+                        <input
+                            type="checkbox"
+                            :checked="isTaskSelected"
+                            @click.stop
+                            @change="handleSelectChange($event)"
+                            :aria-label="$t ? $t('Common.select_task') || 'Select task' : 'Select task'"
+                        />
+                    </label>
                     <img :src="dragIcon" alt="dragIcon" v-if="!showArchiveVar" class="draggable_icon cursor-all-scroll">
                     <div class="parent__tasksubarray-wrapper position-ab">
                         <template v-if="(task.subTasks && task.isParentTask) || (searchedTask && task?.subtaskArray?.length)">
@@ -279,11 +294,26 @@ import { useTaskActions } from './composables/useTaskActions';
 import { useTaskMutations } from './composables/useTaskMutations';
 
 import { useConvertDate, useCustomComposable } from '@/composable';
+import { useTaskSelection } from '@/composable/useTaskSelection.js';
 import { useStore } from 'vuex';
 import { customField } from '../../../plugins/customFieldView/helper.js';
 
 const { isCustomFields } = customField();
 const dropVisible = ref(false);
+
+// Multi-select state. Checkbox renders on hover OR when THIS row is
+// selected — never blocks existing single-task interactions. We let the
+// browser handle the toggle (no preventDefault) and sync the store via
+// the change event; this keeps the native :checked binding in sync.
+const selection = useTaskSelection();
+const canMultiSelect = computed(() => checkPermission('task.task_status', projectData.value?.isGlobalPermission) === true
+    && !showArchiveVar.value);
+const isTaskSelected = computed(() => selection.isSelected(props.data?._id));
+const handleSelectChange = (evt) => {
+    if (!props.data?._id) return;
+    if (evt) evt.stopPropagation();
+    selection.toggle(props.data._id, evt);
+};
 const clientWidth = inject('$clientWidth');
 const projectRef = inject('selectedProject');
 const userId = inject('$userId');

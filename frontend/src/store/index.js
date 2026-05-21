@@ -6,6 +6,7 @@ import users from './Users'
 import mainChat from './MainChats'
 import brandSettingTab from './brandSettings'
 import ToursData from './Tours';
+import taskSelection from './TaskSelection';
 
 const socketInstanceWatcher = (store) => {
     let previousSocketInstance = store.state.settings.socketInstance;
@@ -36,7 +37,8 @@ export default createStore({
         users,
         mainChat,
         brandSettingTab,
-        ToursData
+        ToursData,
+        taskSelection
     },
     plugins: [socketInstanceWatcher]
 })

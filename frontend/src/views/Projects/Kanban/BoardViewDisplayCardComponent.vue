@@ -1,5 +1,22 @@
 <template>
-    <div>
+    <div class="kanban-card-wrapper">
+        <!-- Multi-select checkbox: top-left of card. Visible on card hover OR when this card is selected. -->
+        <label
+            v-if="canCardMultiSelect"
+            class="kanban-card-multi-select"
+            :class="{ 'kanban-card-multi-select--active': isCardSelected }"
+            @click.stop
+            @mousedown.stop
+        >
+            <input
+                type="checkbox"
+                :checked="isCardSelected"
+                @click.stop
+                @mousedown.stop
+                @change="handleCardCheckboxChange($event)"
+                aria-label="Select task"
+            />
+        </label>
         <div @click.stop.prevent="!showArchiveVar ? toggleTaskDetail(element) : ''">
             <div>
                 <div class="d-flex justify-content-between">
@@ -220,6 +237,7 @@
     import BoardViewTaskCreate from "@/views/Projects/Kanban/BoardViewTaskCreate.vue"
     import Assignee from "@/components/molecules/Assignee/Assignee.vue"
     import {useConvertDate,useCustomComposable,useGetterFunctions } from "@/composable";
+    import { useTaskSelection } from "@/composable/useTaskSelection.js";
     import CreateTagPopup from "@/components/molecules/TagList/CreateTagPopup.vue";
     import DropDown from '@/components/molecules/DropDown/DropDown.vue'
     import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue'
@@ -253,6 +271,19 @@
     const tagChipArray = ref([])
     const element = ref(props.data)
     const {updateTaskByGroup} = useUpdateTasks();
+
+    // Multi-select on Kanban cards: checkbox renders on card hover OR when
+    // THIS card is selected. Permission-gated. Click/mousedown propagation
+    // stopped so it doesn't open the task detail or start a drag.
+    const cardSelection = useTaskSelection();
+    const canCardMultiSelect = computed(() => checkPermission('task.task_status', projectData.value?.isGlobalPermission) === true
+        && !showArchiveVar.value);
+    const isCardSelected = computed(() => cardSelection.isSelected(props.data?._id));
+    const handleCardCheckboxChange = (evt) => {
+        if (!props.data?._id) return;
+        if (evt) evt.stopPropagation();
+        cardSelection.toggle(props.data._id, evt);
+    };
     const chipCount = ref(4)
     const showSidebar = ref(false);
     const archive = ref(false);

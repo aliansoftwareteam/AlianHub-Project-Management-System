@@ -58,6 +58,7 @@ module.exports.GENERATETOKEN_V2 = '/api/v2/generateToken';
 module.exports.UPDATE_UNREADREAD_COMMENTS_COUNT = '/api/v1/updateunreadcommentscount';
 module.exports.UNSET_COMMENTS_COUNT = '/api/v1/unsetCommentCounts';
 module.exports.V2_TASKS = '/api/v2/tasks';
+module.exports.V2_TASKS_BULK = '/api/v2/tasks/bulk';
 module.exports.V1_TASKS_IMPORT = '/api/v1/importTasks';
 module.exports.API_URI = window.location.origin;
 module.exports.DOMAIN_URI = window.location.origin;

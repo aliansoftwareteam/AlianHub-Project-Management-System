@@ -61,6 +61,7 @@ import { useUpdateTasks } from "../helper";
 import * as env from '@/config/env';
 import { apiRequest } from "../../../services";
 import { useCustomComposable } from "@/composable";
+import { useTaskSelection } from "@/composable/useTaskSelection.js";
 
 //Props
 const props = defineProps({
@@ -92,12 +93,23 @@ const { dispatch, commit } = useStore()
 const { updateTaskByGroup } = useUpdateTasks()
 const { checkPermission } = useCustomComposable();
 
+const selection = useTaskSelection();
+const { setActiveView, setActiveProject } = selection;
+setActiveView('kanban');
+watch(() => projectData.value?._id, (newId) => {
+    if (newId) setActiveProject(String(newId));
+}, { immediate: true });
+
 // Computed properties
 const isDisabled = computed(() => {
     const shouldDisableOnWidth = clientWidth.value <= 768;
     const shouldDisableOnPermission = (checkPermission('task.task_list', projectData.value?.isGlobalPermission) !== true || checkPermission('task.task_status', projectData.value?.isGlobalPermission) !== true);
     const shouldDisableOnArchive = (showArchiveVar.value !== false);
-    const finalDisabled = shouldDisableOnWidth || shouldDisableOnPermission || shouldDisableOnArchive;
+    // Disable drag when multi-select is active (>=2 selected). Multi-move
+    // happens via the BulkActionBar's "Move" action — keeps the drag
+    // behavior unambiguous for the user.
+    const shouldDisableOnMultiSelect = selection.count.value >= 2;
+    const finalDisabled = shouldDisableOnWidth || shouldDisableOnPermission || shouldDisableOnArchive || shouldDisableOnMultiSelect;
     return finalDisabled;
 });
 
