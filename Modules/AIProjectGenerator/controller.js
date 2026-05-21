@@ -16,9 +16,7 @@ const orchestrator = require('./orchestrator');
 const { normalizePlanColors, forceDefaultStatusToDoName } = orchestrator;
 
 const PLAN_TTL_SECONDS = 15 * 60;        // 15 min
-const CONVO_TTL_SECONDS = 30 * 60;       // 30 min
 const BRIEF_TTL_SECONDS = 30 * 60;       // 30 min
-const MAX_CLARIFY_ROUNDS = 3;
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 
 function token() {
@@ -214,45 +212,25 @@ exports.plan = async (req, res) => {
             if (stash && stash.companyId === companyId) briefText = stash.text;
         }
 
-        let conversation = [];
-        let conversationId = (req.body && req.body.conversationId) || null;
-        if (conversationId) {
-            const stash = myCache.get(cacheKey('convo', uid, conversationId));
-            if (stash && stash.companyId === companyId) conversation = stash.conversation || [];
-        } else {
-            conversationId = token();
-        }
-        const clarifyRound = conversation.length;
-        if (clarifyRound > MAX_CLARIFY_ROUNDS) return sendError(res, 400, 'Max clarification rounds reached');
-
         const members = await loadActiveMembers(companyId);
 
+        // One-shot plan call. The /clarify endpoint and conversation cache
+        // were removed (staging-app intermittently 504s on the proxy and the
+        // cached conversation expired between retries, producing
+        // "Conversation not found or expired" errors). The system prompt
+        // forces needsClarification=false so the model commits to a plan
+        // from whatever description the user gave — vague inputs get
+        // reasonable defaults rather than a follow-up question.
         const { result, tokens, model } = await callLlmForPlan({
-            description, hints, briefText, members, conversation, clarifyRound,
+            description, hints, briefText, members,
+            conversation: [],
+            clarifyRound: 3, // force "final round" rules: must return a plan
         });
 
-        if (result.needsClarification) {
-            myCache.set(cacheKey('convo', uid, conversationId), {
-                companyId,
-                description,
-                hints,
-                briefText,
-                conversation,
-                pendingQuestions: result.questions || [],
-                lastUpdated: Date.now(),
-            }, CONVO_TTL_SECONDS);
-            return res.send({
-                status: true,
-                needsClarification: true,
-                conversationId,
-                questions: result.questions || [],
-                tokensUsed: tokens,
-                model,
-            });
-        }
-
-        // Full plan path.
         let { plan } = result;
+        if (!plan) {
+            return sendError(res, 502, 'The AI did not return a plan. Please try again.');
+        }
         try {
             const allowed = new Set(members.map((m) => String(m.id)));
             const sanitized = sanitizeMemberIds(plan, allowed);
@@ -281,8 +259,6 @@ exports.plan = async (req, res) => {
             plan,
             createdAt: Date.now(),
         }, PLAN_TTL_SECONDS);
-        // Drop the conversation cache — plan is committed.
-        myCache.del(cacheKey('convo', uid, conversationId));
 
         return res.send({
             status: true,
@@ -295,102 +271,17 @@ exports.plan = async (req, res) => {
     } catch (error) {
         logger.error(`AIPG plan error: ${error && error.message ? error.message : error}`);
         const code = error.code === 'LLM_INVALID_OUTPUT' ? 502 : 500;
-        return sendError(res, code, error && error.message ? error.message : 'Plan generation failed');
+        return sendError(res, code, error && error.message ? error.message : 'Plan generation failed. Please try again.');
     }
 };
 
+// /clarify was removed when we collapsed the wizard to one-shot. The route
+// is no longer registered (see routes.js). This stub stays in case any
+// frontend cache still POSTs to the old URL during a deploy roll-out — it
+// returns a clear "endpoint removed, just retry /plan" response instead of
+// 404'ing.
 exports.clarify = async (req, res) => {
-    if (!isAnyProviderConfigured()) {
-        return sendError(res, 503, 'AI provider is not configured');
-    }
-    try {
-        const uid = req.uid;
-        if (!uid) return sendError(res, 401, 'Unauthorized');
-        const companyId = resolveCompanyId(req);
-        if (!companyId) return sendError(res, 403, 'Company access denied');
-
-        const conversationId = req.body && req.body.conversationId;
-        if (!conversationId) return sendError(res, 400, 'conversationId required');
-
-        const stash = myCache.get(cacheKey('convo', uid, conversationId));
-        if (!stash || stash.companyId !== companyId) return sendError(res, 404, 'Conversation not found or expired');
-
-        const answers = Array.isArray(req.body.answers) ? req.body.answers.map((a) => String(a || '').trim()) : [];
-        if (!answers.length) return sendError(res, 400, 'answers required (array of strings)');
-
-        const pendingQuestions = stash.pendingQuestions || [];
-        const newTurns = answers.slice(0, pendingQuestions.length).map((answer, i) => ({
-            question: pendingQuestions[i] || `Question ${i + 1}`,
-            answer,
-        }));
-        const conversation = (stash.conversation || []).concat(newTurns);
-
-        if (conversation.length > MAX_CLARIFY_ROUNDS) {
-            return sendError(res, 400, 'Max clarification rounds reached');
-        }
-
-        // Re-run plan generation with updated conversation. clarifyRound is the
-        // round we're answering, not the next pending round.
-        const members = await loadActiveMembers(companyId);
-        const { result, tokens, model } = await callLlmForPlan({
-            description: stash.description,
-            hints: stash.hints,
-            briefText: stash.briefText,
-            members,
-            conversation,
-            clarifyRound: conversation.length,
-        });
-
-        if (result.needsClarification && conversation.length < MAX_CLARIFY_ROUNDS) {
-            myCache.set(cacheKey('convo', uid, conversationId), {
-                ...stash,
-                conversation,
-                pendingQuestions: result.questions || [],
-                lastUpdated: Date.now(),
-            }, CONVO_TTL_SECONDS);
-            return res.send({
-                status: true,
-                needsClarification: true,
-                conversationId,
-                questions: result.questions || [],
-                tokensUsed: tokens,
-                model,
-            });
-        }
-
-        // Final plan.
-        let { plan } = result;
-        if (!plan) return sendError(res, 502, 'LLM did not return a plan after clarification');
-        const allowed = new Set(members.map((m) => String(m.id)));
-        const sanitized = sanitizeMemberIds(plan, allowed);
-        plan = sanitized.plan;
-        if (plan && plan.project && typeof req.body.isPrivateSpace === 'boolean') {
-            plan.project.isPrivateSpace = req.body.isPrivateSpace;
-        }
-        const reCheck = PlanSchema.safeParse(plan);
-        if (!reCheck.success) {
-            const issues = reCheck.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n');
-            return sendError(res, 502, `Plan failed final validation: ${issues}`);
-        }
-        plan = reCheck.data;
-
-        const planId = token();
-        myCache.set(cacheKey('plan', uid, planId), { companyId, plan, createdAt: Date.now() }, PLAN_TTL_SECONDS);
-        myCache.del(cacheKey('convo', uid, conversationId));
-
-        return res.send({
-            status: true,
-            needsClarification: false,
-            planId,
-            plan,
-            tokensUsed: tokens,
-            model,
-        });
-    } catch (error) {
-        logger.error(`AIPG clarify error: ${error && error.message ? error.message : error}`);
-        const code = error.code === 'LLM_INVALID_OUTPUT' ? 502 : 500;
-        return sendError(res, code, error && error.message ? error.message : 'Clarification failed');
-    }
+    return sendError(res, 410, 'Clarification flow was removed. Submit the same description to /plan again.');
 };
 
 exports.execute = async (req, res) => {

@@ -90,22 +90,6 @@
                     </div>
 
                     <div class="aipg-card">
-                        <label class="aipg-field-label">
-                            Target task count
-                            <strong class="aipg-target-count">{{ hints.targetTaskCount }}</strong>
-                        </label>
-                        <p class="aipg-helper">A floor — the AI will generate at least this many tasks, more if the project needs it.</p>
-                        <input
-                            type="range"
-                            min="10"
-                            max="80"
-                            step="5"
-                            v-model.number="hints.targetTaskCount"
-                            :disabled="loading"
-                            class="aipg-range"/>
-                    </div>
-
-                    <div class="aipg-card">
                         <label class="aipg-field-label">Attach a brief <span class="aipg-muted">— optional</span></label>
                         <p class="aipg-helper">PDF, DOCX, TXT, or MD — up to 10 MB.</p>
                         <label class="aipg-file-drop" :class="{ 'is-disabled': loading || briefUploading }">
@@ -127,40 +111,20 @@
                         </label>
                     </div>
 
-                    <!-- Clarification questions inline -->
-                    <div v-if="pendingQuestions.length" class="aipg-card aipg-card-accent">
-                        <h5 class="aipg-section-title">Quick questions to sharpen the plan</h5>
-                        <div v-for="(q, idx) in pendingQuestions" :key="idx" class="aipg-q-row">
-                            <label class="aipg-field-label-sm">{{ q }}</label>
-                            <textarea
-                                v-model="clarifyAnswers[idx]"
-                                rows="3"
-                                class="aipg-textarea aipg-textarea-sm"
-                                placeholder="Your answer…"
-                                :disabled="loading"></textarea>
-                        </div>
-                    </div>
-
                     <transition name="aipg-fade">
-                        <div v-if="error" class="aipg-alert aipg-alert-danger">{{ error }}</div>
+                        <div v-if="error" class="aipg-alert aipg-alert-danger">
+                            <div>{{ error }}</div>
+                            <p class="aipg-alert-hint">Click <strong>Generate plan</strong> again — the AI will retry from your description.</p>
+                        </div>
                     </transition>
 
                     <div class="aipg-actions">
                         <button
-                            v-if="!pendingQuestions.length"
                             class="aipg-btn aipg-btn-primary"
                             :disabled="!canGenerate || loading || briefUploading"
                             @click="onGeneratePlan">
                             <span v-if="loading" class="aipg-spinner aipg-spinner-sm" aria-hidden="true"></span>
-                            {{ loading ? 'Generating plan…' : 'Generate plan' }}
-                        </button>
-                        <button
-                            v-else
-                            class="aipg-btn aipg-btn-primary"
-                            :disabled="!canSubmitAnswers || loading"
-                            @click="onSubmitClarification">
-                            <span v-if="loading" class="aipg-spinner aipg-spinner-sm" aria-hidden="true"></span>
-                            {{ loading ? 'Working…' : 'Continue' }}
+                            {{ loading ? 'Generating plan…' : (error ? 'Try again' : 'Generate plan') }}
                         </button>
                     </div>
                 </section>
@@ -335,9 +299,11 @@ export default defineComponent({
         const rolledBack = ref(false);
 
         const description = ref('');
-        const hints = reactive({
-            targetTaskCount: 25,
-        });
+        // No-frills hints. The clarification round-trip + target-task-count
+        // slider were removed in favour of a one-shot plan call — fewer
+        // moving parts, no cached conversation state to expire, retryable
+        // without "Conversation not found" errors when the proxy 504s.
+        const hints = reactive({});
         // Mirrors the manual flow's workspace step: 'public' → private=false.
         // We force this onto the plan server-side so the user's choice always
         // wins over whatever the LLM picked.
@@ -345,10 +311,6 @@ export default defineComponent({
         const briefFile = ref(null);
         const briefId = ref(null);
         const briefStats = reactive({ tokenEstimate: 0, charCount: 0, truncated: false });
-
-        const conversationId = ref(null);
-        const pendingQuestions = ref([]);
-        const clarifyAnswers = ref([]);
 
         const plan = ref(null);
         const planId = ref(null);
@@ -377,7 +339,6 @@ export default defineComponent({
         const placeholderText = 'e.g. "A 3-month SaaS launch for a 5-person team building an invoicing tool with Stripe billing. Kanban workflow. GitHub + Slack integrations. MVP in 6 weeks; full launch in 12."';
 
         const canGenerate = computed(() => description.value.trim().length >= 20);
-        const canSubmitAnswers = computed(() => pendingQuestions.value.length > 0 && clarifyAnswers.value.filter((a) => (a || '').trim().length).length === pendingQuestions.value.length);
 
         const totals = computed(() => {
             if (!plan.value) return { folders: 0, sprints: 0, tasks: 0 };
@@ -467,10 +428,7 @@ export default defineComponent({
         }
 
         function cleanHints() {
-            const out = {};
-            if (hints.targetTaskCount) out.targetTaskCount = Number(hints.targetTaskCount);
-            out.isPrivateSpace = !!isPrivateSpace.value;
-            return out;
+            return { isPrivateSpace: !!isPrivateSpace.value };
         }
 
         async function onGeneratePlan() {
@@ -478,56 +436,26 @@ export default defineComponent({
             loading.value = true;
             error.value = '';
             try {
+                // One-shot plan call. No conversation state, no clarification
+                // round-trip. If the proxy 504s mid-call or anything else
+                // fails, the user just clicks "Try again" and we re-run from
+                // the same description — there's no expirable cache to lose.
                 const result = await api.generatePlan({
                     description: description.value.trim(),
                     hints: cleanHints(),
                     briefId: briefId.value,
-                    conversationId: conversationId.value,
                     isPrivateSpace: isPrivateSpace.value,
                 });
                 if (!result || !result.status) {
-                    error.value = (result && result.statusText) || 'Plan generation failed';
+                    error.value = (result && result.statusText) || 'Plan generation failed. Please try again.';
                     return;
                 }
-                if (result.needsClarification) {
-                    conversationId.value = result.conversationId;
-                    pendingQuestions.value = result.questions || [];
-                    clarifyAnswers.value = pendingQuestions.value.map(() => '');
+                if (!result.plan) {
+                    error.value = 'The AI did not return a plan. Please try again.';
                     return;
                 }
                 plan.value = result.plan;
                 planId.value = result.planId;
-                step.value = 'preview';
-            } catch (e) {
-                error.value = friendlyErr(e);
-            } finally {
-                loading.value = false;
-            }
-        }
-
-        async function onSubmitClarification() {
-            if (!canSubmitAnswers.value) return;
-            loading.value = true;
-            error.value = '';
-            try {
-                const result = await api.clarify({
-                    conversationId: conversationId.value,
-                    answers: clarifyAnswers.value,
-                    isPrivateSpace: isPrivateSpace.value,
-                });
-                if (!result || !result.status) {
-                    error.value = (result && result.statusText) || 'Clarify failed';
-                    return;
-                }
-                if (result.needsClarification) {
-                    pendingQuestions.value = result.questions || [];
-                    clarifyAnswers.value = pendingQuestions.value.map(() => '');
-                    return;
-                }
-                plan.value = result.plan;
-                planId.value = result.planId;
-                pendingQuestions.value = [];
-                clarifyAnswers.value = [];
                 step.value = 'preview';
             } catch (e) {
                 error.value = friendlyErr(e);
@@ -651,9 +579,6 @@ export default defineComponent({
             briefStats.tokenEstimate = 0;
             briefStats.truncated = false;
             briefStats.charCount = 0;
-            conversationId.value = null;
-            pendingQuestions.value = [];
-            clarifyAnswers.value = [];
             plan.value = null;
             planId.value = null;
             jobId.value = null;
@@ -690,14 +615,13 @@ export default defineComponent({
             closeIcon,
             clientWidth, step, loading, briefUploading, error, rolledBack,
             description, hints, isPrivateSpace, briefFile, briefId, briefStats,
-            conversationId, pendingQuestions, clarifyAnswers,
             plan, planId, editableProjectName,
             jobId, progress, createdProjectId,
             placeholderText,
-            canGenerate, canSubmitAnswers, totals,
+            canGenerate, totals,
             countFolderTasks, isStepDone, stepClass, stepDoneDot, rowClass, stepIcon, stepStatusLabel,
             onFileChosen, clearBrief,
-            onGeneratePlan, onSubmitClarification,
+            onGeneratePlan,
             onApprovePlan, onOpenProject, onRetry, onClose,
         };
     },
@@ -1330,6 +1254,7 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
     line-height: 1.45;
 }
 .aipg-alert-danger { background: #fee2e2; color: #b91c1c; }
+.aipg-alert-hint { margin: 6px 0 0; font-size: 12px; opacity: 0.85; }
 
 .aipg-actions {
     display: flex;

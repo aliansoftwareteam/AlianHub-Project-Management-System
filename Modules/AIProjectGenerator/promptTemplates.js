@@ -88,7 +88,6 @@ Plan-shape rules:
 Task count rules (CRITICAL — the user expects a fully-fleshed project, not a stub):
 - Each sprint MUST contain 4-8 concrete tasks. NEVER stop at 1-3 tasks per sprint — that is treated as a failed plan.
 - Plan-level total: generate every task that's genuinely needed to ship the project end-to-end. There is no upper "budget" you should ration. Hard ceiling: 100 tasks.
-- If the user supplies hints.targetTaskCount, treat it as a FLOOR you should meet or exceed. Going more than 15% below the target is a violation. Going above is fine if the work warrants it.
 - Cover the full lifecycle for each phase: setup tasks, the main build tasks, edge-cases / error states, testing, docs, deployment / handoff. A "Backend" folder with only "Set up API" and "Create routes" is incomplete — add auth, validation, error handling, tests, logging, rate-limiting, deployment, etc.
 
 Color rules:
@@ -96,19 +95,20 @@ Color rules:
 - The server derives bgColor from textColor automatically — only emit textColor and you can omit bgColor entirely.
 
 Clarification rule:
-- If the description is too vague to produce a meaningful plan (under ~20 chars of substantive intent, or missing the basics like what the project is), ask 1-3 SHORT clarifying questions and set needsClarification=true. Otherwise produce the plan.
-- Maximum of 3 clarification rounds — after the third, you MUST return a plan.
+- DO NOT ask clarifying questions. ALWAYS set needsClarification=false and return a full plan. If the description is vague, fill in reasonable defaults and proceed — the user explicitly opted in to a one-shot plan with no follow-up.
 `;
 
-function buildSystemPrompt({ clarifyRound = 0 } = {}) {
-    let header = `You are AlianHub's AI Project Bootstrapper. Given a project description (plus optional hints, an uploaded brief, and the user's prior answers), produce a complete project plan (project metadata + folders + sprints + 10-50 actionable tasks).`;
-    if (clarifyRound >= 3) {
-        header += `\n\nThis is the FINAL round. You MUST set needsClarification=false and return a full plan even if some details are still unclear — make reasonable defaults and note assumptions inside task descriptions.`;
-    }
+function buildSystemPrompt(/* { clarifyRound = 0 } = {} */) {
+    // The wizard always runs in one-shot mode now — there is no clarification
+    // round-trip. Tell the model unambiguously: commit to a plan with sensible
+    // defaults rather than ever asking a follow-up question.
+    const header = `You are AlianHub's AI Project Bootstrapper. Given a project description (plus optional hints and an uploaded brief), produce a complete project plan (project metadata + folders + sprints + actionable tasks) in a SINGLE response.
+
+This is a ONE-SHOT call. You MUST set needsClarification=false and return a full plan, even if some details are unclear. Invent reasonable defaults silently and note any assumptions inside task descriptions. Never ask the user a question.`;
     return `${header}\n\n${SHARED_RULES}`;
 }
 
-function buildUserMessage({ description, hints, briefText, members, conversation, clarifyRound }) {
+function buildUserMessage({ description, hints, briefText, members /* conversation, clarifyRound */ }) {
     const sections = [];
     sections.push(`Project description:\n${(description || '').trim() || '(none)'}`);
     if (hints && Object.keys(hints).length) {
@@ -125,12 +125,7 @@ function buildUserMessage({ description, hints, briefText, members, conversation
         }));
         sections.push(`Available members (id+name+role) — you may use these ids in AssigneeUserId / LeadUserId, otherwise leave empty arrays:\n${JSON.stringify(slim, null, 2)}`);
     }
-    if (Array.isArray(conversation) && conversation.length) {
-        const lines = conversation.map((t, i) => `Q${i + 1}: ${t.question}\nA${i + 1}: ${t.answer}`);
-        sections.push(`Prior clarification:\n${lines.join('\n\n')}`);
-    }
-    sections.push(`Clarification round: ${clarifyRound}/3`);
-    sections.push(`Reminder: emit ONE JSON object only. needsClarification must be true (with questions) OR false (with plan).`);
+    sections.push(`Reminder: emit ONE JSON object only. needsClarification MUST be false. Include the full "plan" object.`);
     return sections.join('\n\n');
 }
 
