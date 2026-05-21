@@ -16,12 +16,12 @@ exports.init = (app) => {
      * @swagger
      * /api/v1/ai/project/plan:
      *   post:
-     *     summary: Generate a complete project plan from a description (one-shot)
+     *     summary: Start async project-plan generation from a description
      *     tags: [AI Project Generator]
      *     description: |
-     *       Always returns a full plan in a single round-trip. The previous
-     *       multi-turn clarification flow was removed because the conversation
-     *       cache expired between proxy 504 retries on staging.
+     *       Returns a jobId immediately. The generated plan is delivered on
+     *       /api/v1/ai-progress/{jobId}, avoiding proxy 504s while the LLM is
+     *       still producing the full plan.
      */
     app.post('/api/v1/ai/project/plan', ctrl.plan);
 

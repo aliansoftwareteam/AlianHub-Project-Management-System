@@ -125,6 +125,77 @@ async function callLlmForPlan({ description, hints, briefText, members, conversa
     return { result: validated.value, tokens: usedTokens, model: (provider && provider.name) || 'unknown' };
 }
 
+async function generatePlanForJob({ jobId, uid, companyId, description, hints, briefText, isPrivateSpace }) {
+    const emit = (payload) => sseEmitter.emit(jobId, payload);
+
+    try {
+        emit({ event: 'progress', phase: 'plan', step: 'context', status: 'started' });
+        const members = await loadActiveMembers(companyId);
+        emit({ event: 'progress', phase: 'plan', step: 'context', status: 'done' });
+
+        // Generate the full plan in the background; the HTTP request already
+        // returned a job id, so slow LLM responses no longer trip the proxy.
+        emit({ event: 'progress', phase: 'plan', step: 'ai', status: 'started' });
+        const { result, tokens, model } = await callLlmForPlan({
+            description, hints, briefText, members,
+            conversation: [],
+            clarifyRound: 3, // force "final round" rules: must return a plan
+        });
+
+        let { plan } = result;
+        if (!plan) {
+            throw new Error('The AI did not return a plan. Please try again.');
+        }
+        try {
+            const allowed = new Set(members.map((m) => String(m.id)));
+            const sanitized = sanitizeMemberIds(plan, allowed);
+            plan = sanitized.plan;
+        } catch (_e) { /* leave as-is */ }
+
+        // The user's explicit public/private choice always wins over whatever
+        // the LLM picked.
+        if (plan && plan.project && typeof isPrivateSpace === 'boolean') {
+            plan.project.isPrivateSpace = isPrivateSpace;
+        }
+
+        // Re-validate after sanitization, then normalize status colors so the
+        // preview chips look identical to the saved project (same "bg = text + 35"
+        // convention the orchestrator applies at save time).
+        const reCheck = PlanSchema.safeParse(plan);
+        if (!reCheck.success) {
+            const issues = reCheck.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n');
+            throw new Error(`Plan failed final validation: ${issues}`);
+        }
+        plan = forceDefaultStatusToDoName(normalizePlanColors(reCheck.data));
+
+        const planId = token();
+        myCache.set(cacheKey('plan', uid, planId), {
+            companyId,
+            plan,
+            createdAt: Date.now(),
+        }, PLAN_TTL_SECONDS);
+
+        emit({
+            event: 'complete',
+            phase: 'plan',
+            status: true,
+            needsClarification: false,
+            planId,
+            plan,
+            tokensUsed: tokens,
+            model,
+        });
+    } catch (error) {
+        logger.error(`AIPG plan job error: ${error && error.message ? error.message : error}`);
+        emit({
+            event: 'error',
+            phase: 'plan',
+            error: error && error.message ? error.message : 'Plan generation failed. Please try again.',
+            code: error && error.code ? error.code : undefined,
+        });
+    }
+}
+
 // Wraps multer.single so multer's MulterError ('LIMIT_FILE_SIZE',
 // 'LIMIT_UNEXPECTED_FILE', filter rejections, etc.) becomes a clean
 // {status:false, statusText} response the frontend already knows how to
@@ -212,62 +283,33 @@ exports.plan = async (req, res) => {
             if (stash && stash.companyId === companyId) briefText = stash.text;
         }
 
-        const members = await loadActiveMembers(companyId);
+        const jobId = token();
 
-        // One-shot plan call. The /clarify endpoint and conversation cache
-        // were removed (staging-app intermittently 504s on the proxy and the
-        // cached conversation expired between retries, producing
-        // "Conversation not found or expired" errors). The system prompt
-        // forces needsClarification=false so the model commits to a plan
-        // from whatever description the user gave — vague inputs get
-        // reasonable defaults rather than a follow-up question.
-        const { result, tokens, model } = await callLlmForPlan({
-            description, hints, briefText, members,
-            conversation: [],
-            clarifyRound: 3, // force "final round" rules: must return a plan
-        });
+        // Reply immediately so reverse proxies do not 504 while the LLM is
+        // thinking. The client subscribes to /api/v1/ai-progress/:jobId for
+        // the final plan payload, using the same bearer-style random job id
+        // pattern as the execute flow.
+        res.send({ status: true, jobId, queued: true });
 
-        let { plan } = result;
-        if (!plan) {
-            return sendError(res, 502, 'The AI did not return a plan. Please try again.');
-        }
-        try {
-            const allowed = new Set(members.map((m) => String(m.id)));
-            const sanitized = sanitizeMemberIds(plan, allowed);
-            plan = sanitized.plan;
-        } catch (_e) { /* leave as-is */ }
-
-        // Honour the user's explicit public/private choice from step 1 — it
-        // always wins over whatever the LLM picked.
-        if (plan && plan.project && typeof req.body.isPrivateSpace === 'boolean') {
-            plan.project.isPrivateSpace = req.body.isPrivateSpace;
-        }
-
-        // Re-validate after sanitization, then normalize status colors so the
-        // preview chips look identical to the saved project (same "bg = text + 35"
-        // convention the orchestrator applies at save time).
-        const reCheck = PlanSchema.safeParse(plan);
-        if (!reCheck.success) {
-            const issues = reCheck.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n');
-            return sendError(res, 502, `Plan failed final validation: ${issues}`);
-        }
-        plan = forceDefaultStatusToDoName(normalizePlanColors(reCheck.data));
-
-        const planId = token();
-        myCache.set(cacheKey('plan', uid, planId), {
-            companyId,
-            plan,
-            createdAt: Date.now(),
-        }, PLAN_TTL_SECONDS);
-
-        return res.send({
-            status: true,
-            needsClarification: false,
-            planId,
-            plan,
-            tokensUsed: tokens,
-            model,
-        });
+        setTimeout(() => {
+            generatePlanForJob({
+                jobId,
+                uid,
+                companyId,
+                description,
+                hints,
+                briefText,
+                isPrivateSpace: !!(req.body && req.body.isPrivateSpace),
+            }).catch((error) => {
+                logger.error(`AIPG plan job outer error: ${error && error.message ? error.message : error}`);
+                sseEmitter.emit(jobId, {
+                    event: 'error',
+                    phase: 'plan',
+                    error: error && error.message ? error.message : 'Plan generation failed. Please try again.',
+                });
+            });
+        }, 200);
+        return;
     } catch (error) {
         logger.error(`AIPG plan error: ${error && error.message ? error.message : error}`);
         const code = error.code === 'LLM_INVALID_OUTPUT' ? 502 : 500;

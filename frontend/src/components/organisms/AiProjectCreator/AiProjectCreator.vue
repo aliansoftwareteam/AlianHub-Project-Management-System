@@ -436,10 +436,8 @@ export default defineComponent({
             loading.value = true;
             error.value = '';
             try {
-                // One-shot plan call. No conversation state, no clarification
-                // round-trip. If the proxy 504s mid-call or anything else
-                // fails, the user just clicks "Try again" and we re-run from
-                // the same description — there's no expirable cache to lose.
+                // Async plan job: the composable waits on SSE and resolves
+                // with the final plan without holding the POST request open.
                 const result = await api.generatePlan({
                     description: description.value.trim(),
                     hints: cleanHints(),
