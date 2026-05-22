@@ -132,12 +132,14 @@ Touches only backend, no frontend coordination needed.
 
 **Verification:** `npm test` → 20/20 pass. All touched files `node --check` clean. Namespaced emitter routing verified with a smoke harness.
 
-### Phase 2 — Core Refactor (3–5 days)
+### Phase 2 — Core Refactor (3–5 days) — ✅ COMPLETE (2026-05-22)
 Rework the room index. Backend-only.
-- [ ] Fix #1 — `Map`-based room index
-- [ ] Fix #5 — use `socket.rooms` not `adapter.rooms.keys()`
-- [ ] Fix #7 — shared `upsertRoom` helper
-- [ ] Fix #9 — cache `getTotalSprintCount`
+- [x] Fix #1 — `Map`-based room index (`socket/helper.js` now owns the `byPrefix` / `bySocket` indexes; `exports.rooms` array removed from `socket/socketinit.js`)
+- [x] Fix #5 — `data.socket.rooms.has(data.roomName)` liveness guard replaces `Array.from(adapter.rooms.keys()).filter(...)` in all 5 controllers
+- [x] Fix #7 — `upsertRoom(entry)` is idempotent on `roomName`; replaced hand-rolled findIndex / push-or-replace dedup across all controllers
+- [x] Fix #9 — `getTotalSprintCount` results cached in `node-cache` (`sprintPlanCheck:<companyId>:<sprintId>`, 30s TTL)
+
+**Verification:** `npm test` → 28/28 pass (20 existing + 8 new `tests/socket-room-index.test.js`). End-to-end smoke harness at `.claude/tests/smoke-phase2.js` confirms namespaced emitter still routes through the new index and `removeBySocket` purges entries on disconnect. All touched files `node --check` clean.
 
 ### Phase 3 — Payload + Debounce (2–3 days)
 Requires small frontend coordination for Fix #8.
