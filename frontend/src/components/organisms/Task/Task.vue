@@ -164,8 +164,8 @@
                             :num-of-users="2"
                             imageWidth="30px"
                             :addUser="!showArchiveVar"
-                            @selected="changeAssignee(checkApps('MultipleAssignees',projectData) ? 'add' : 'replace', $event, assigneeInProgress)"
-                            @removed="changeAssignee('remove', $event, assigneeInProgress)"
+                            @selected="changeAssignee(checkApps('MultipleAssignees',projectData) ? 'add' : 'replace', $event)"
+                            @removed="changeAssignee('remove', $event)"
                             :isDisplayTeam="true"
                             :multiSelect="checkApps('MultipleAssignees')"
                         />
@@ -176,8 +176,8 @@
                             :num-of-users="2"
                             imageWidth="30px"
                             :addUser="!showArchiveVar"
-                            @selected="changeAssignee(checkApps('MultipleAssignees',projectData) ? 'add' : 'replace', $event, assigneeInProgress)"
-                            @removed="changeAssignee('remove', $event, assigneeInProgress)"
+                            @selected="changeAssignee(checkApps('MultipleAssignees',projectData) ? 'add' : 'replace', $event)"
+                            @removed="changeAssignee('remove', $event)"
                             :isDisplayTeam="true"
                             :multiSelect="checkApps('MultipleAssignees')"
                         />
@@ -384,7 +384,6 @@ const toggleTaskDetail = inject('toggleTaskDetail');
 const statusSearch = ref('');
 const taskName = ref(props.data.TaskName);
 const editTaskName = ref(false);
-const assigneeInProgress = ref({});
 
 const dueDate = computed(() => props.data.DueDate);
 

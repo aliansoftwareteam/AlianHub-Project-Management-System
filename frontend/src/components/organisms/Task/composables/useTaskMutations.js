@@ -1,4 +1,4 @@
-import { inject } from 'vue';
+import { inject, ref } from 'vue';
 import { useStore } from 'vuex';
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from 'vue-i18n';
@@ -15,6 +15,8 @@ export function useTaskMutations({ projectData, task, props }) {
 
     const userId = inject('$userId');
     const companyId = inject('$companyId');
+
+    const assigneeInProgress = ref({});
 
     const companyOwner = () => getters['settings/companyOwnerDetail'];
 
@@ -97,7 +99,7 @@ export function useTaskMutations({ projectData, task, props }) {
         updateTaskByGroup(props.data, status, 4);
     }
 
-    function changeAssignee(type, value, assigneeInProgress) {
+    function changeAssignee(type, value) {
         if (!value?.id) return;
         if (assigneeInProgress.value[value?.id] && assigneeInProgress.value[value?.id] === type) return;
         assigneeInProgress.value[value?.id] = type;
