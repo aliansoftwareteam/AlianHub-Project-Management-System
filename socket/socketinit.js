@@ -8,10 +8,15 @@ const { instrument } = require('@socket.io/admin-ui');
 const jwt = require('jsonwebtoken');
 const logger = require('../Config/loggerConfig');
 const { corsOriginDelegate } = require('../utils/cors.js');
+const { removeRoom, removeBySocket } = require('./helper');
 exports.changeStreams = [];
 const EventEmitter = require('events');
 exports.emitter = new EventEmitter();
-exports.rooms = [];
+// SOCKET-PERFORMANCE-PLAN #1 (Phase 2): the linear `exports.rooms = []`
+// global array has been replaced by the Map-based index in socket/helper.js.
+// Every controller now goes through upsertRoom / removeRoom / findRoomsByPrefix.
+// The index is accessed via the helper module — there's no global array to
+// scan anymore.
 
 /**
  * Build the @socket.io/admin-ui config from env (BUG-004 / #58 fix).
@@ -82,45 +87,29 @@ exports.initSocket = (server) => {
         socket.customData = {userRole};
         const namespace = socket.nsp;
 
-        // SOCKET-PERFORMANCE-PLAN #4: auto-purge socketRef.rooms entries on
-        // socket disconnect. The pre-existing `disconnectNameSpace` event
-        // requires the client to call it explicitly — that doesn't fire when
-        // the browser closes, the network drops, or the mobile app is killed.
-        // Without this, every dead socket's room entries stay in the global
-        // array forever, growing it until every event scan becomes slow.
-        // Listening to Socket.io's native `disconnect` makes cleanup
-        // unconditional.
+        // SOCKET-PERFORMANCE-PLAN #4 (Phase 1) + #1 (Phase 2): auto-purge
+        // every entry for this socket from the room index when the socket
+        // disconnects. `removeBySocket` uses the bySocket reverse index
+        // (Set<roomName>) so cleanup is O(rooms-per-socket), not O(n) over
+        // the whole index.
         socket.on('disconnect', () => {
-            for (let i = exports.rooms.length - 1; i >= 0; i--) {
-                if (exports.rooms[i].socket === socket) {
-                    exports.rooms.splice(i, 1);
-                }
-            }
+            removeBySocket(socket);
         });
 
+        // SOCKET-PERFORMANCE-PLAN #1 (Phase 2): explicit client-driven
+        // namespace disconnect. Behaviourally identical to the original
+        // recursive `countFunction` — for every room in this adapter whose
+        // name encodes the target socket id, remove the index entry. Then
+        // forcibly close the target socket. The recursion in the previous
+        // version was synchronous busy-work; a plain forEach over
+        // `adapter.rooms` is equivalent and easier to follow.
         socket.on('disconnectNameSpace', (id) => {
-            let roomsArray = [];
             socket.adapter.rooms.forEach((_, roomName) => {
-                roomsArray.push(roomName);
-            })
-            let count = 0
-            let countFunction = (roomName) => {
-                if (count >= roomsArray.length) {
-                    namespace.sockets.get(id)?.disconnect(true);
-                    return;
-                } else {
-                    let index = exports.rooms.findIndex((x)=> (x.roomName === roomName && x.roomName.includes(id)));
-                    if (index !== -1){
-                        exports.rooms.splice(index, 1);
-                        count++;
-                        countFunction(roomsArray[count]);
-                    } else {
-                        count++;
-                        countFunction(roomsArray[count]);
-                    }
+                if (roomName.includes(id)) {
+                    removeRoom(roomName);
                 }
-            }
-            countFunction(roomsArray[count]);
+            });
+            namespace.sockets.get(id)?.disconnect(true);
         });
 
         socket.on('getRoomList', (socketId, callback) => {

@@ -12,6 +12,10 @@ const { handleTaskAttachmentsDuplicateFunctionality } = require(`../../../common
 const { getCachedCompanyData } = require('../../../utils/planHelper');
 const serviceFun = require("../../serviceFunction");
 const socketEmitter = require('../../../event/socketEventEmitter');
+// SOCKET-PERFORMANCE-PLAN #9 (Phase 2): cache the plan-permission check
+// behind getTotalSprintCount in node-cache.
+const { myCache } = require('../../../Config/config');
+const SPRINT_PLAN_CHECK_TTL_SECONDS = 30;
 const { updateCommentCollection, addCommentCollection } = require('../../Comments/controller');
 // BUG-033 / #87 — self-healing reconciliation for sprint task counts.
 const { reconcileSprintTaskCount, scheduleReconciliation } = require('./reconcileTaskCount');
@@ -1072,18 +1076,39 @@ exports.getTaskCount = async(companyId, sprintId) => {
     }
 }
 
-exports.getTotalSprintCount = async (companyId,sprintId) => {
-    return new Promise(async(resolve,reject) => {
+// SOCKET-PERFORMANCE-PLAN #9 (Phase 2): every task create awaited this
+// function, and the inner `getTaskCount` fires an aggregate pipeline
+// against the tasks collection. Under task-heavy load (bulk imports, AI
+// project plan generation) it serialized every write behind a sequential
+// DB round-trip and inflated the time the connection pool spent saturated.
+//
+// Cache the boolean result for SPRINT_PLAN_CHECK_TTL_SECONDS keyed by
+// `companyId:sprintId`. Trade-offs:
+//   - up to TTL seconds of over-allocation after a sprint hits its task
+//     ceiling (next attempt within the window still sees the cached
+//     `true`). Plan limits are soft caps — the tolerance is acceptable.
+//   - up to TTL seconds of denial after a plan upgrade flips a previously
+//     blocked sprint. Same window, opposite direction. Documented so we
+//     can shorten TTL later if a customer complaint surfaces it.
+exports.getTotalSprintCount = async (companyId, sprintId) => {
+    const cacheKey = `sprintPlanCheck:${companyId}:${sprintId}`;
+    const cached = myCache.get(cacheKey);
+    if (cached !== undefined) return cached;
+
+    return new Promise(async (resolve, reject) => {
         try {
-            Promise.allSettled([exports.getTaskCount(companyId, sprintId),getCachedCompanyData(companyId)]).then(async(results) => {
+            Promise.allSettled([exports.getTaskCount(companyId, sprintId), getCachedCompanyData(companyId)]).then(async (results) => {
                 const resolvedPromises = results.filter((result) => result.status === 'fulfilled');
                 if (resolvedPromises.length === 2) {
                     const [sprintCountResult, cachedCompanyResult] = resolvedPromises.map((result) => result.value);
 
                     const hasPermission = await exports.checkPlanPermission(cachedCompanyResult.data, sprintCountResult.count);
 
+                    myCache.set(cacheKey, hasPermission, SPRINT_PLAN_CHECK_TTL_SECONDS);
                     resolve(hasPermission);
-                }else{
+                } else {
+                    // Don't cache transient failures — we want the next call
+                    // to re-try fresh once Mongo / company-data come back.
                     resolve(false);
                 }
             })
