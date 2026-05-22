@@ -37,5 +37,9 @@ exports.userNotificationCountHandler = ({socket, namespace}) => {
     });
 }
 
-socketEmitter.on('update', changeData => handleUserNotificationChange(changeData, true));
-socketEmitter.on('insert', changeData => handleUserNotificationChange(changeData, false));
+// SOCKET-PERFORMANCE-PLAN #2: scoped to the `userIdNotification` module
+// only. Previously this fired for every task/comment/companies update too,
+// even though the early `module` check exited within a few lines — the
+// scan over socketRef.rooms still ran on the wrong path.
+socketEmitter.on('userIdNotification:update', changeData => handleUserNotificationChange(changeData, true));
+socketEmitter.on('userIdNotification:insert', changeData => handleUserNotificationChange(changeData, false));

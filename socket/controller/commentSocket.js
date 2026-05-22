@@ -45,7 +45,11 @@ function setEventName(type) {
 }
 const handleCommentChange = (changeData, includeUpdatedFields = false) => {
     if (changeData.module === 'comments') {
-        const comentIdentifier = `comments_${JSON.parse(JSON.stringify(changeData.data)).projectId}_${JSON.parse(JSON.stringify(changeData.data)).sprintId}_${JSON.parse(JSON.stringify(changeData.data)).taskId}`;
+        // SOCKET-PERFORMANCE-PLAN #3: dropped three back-to-back deep clones of
+        // the full comment document; field access on the doc directly works
+        // for both plain objects and Mongoose documents.
+        const { projectId, sprintId, taskId } = changeData.data;
+        const comentIdentifier = `comments_${projectId}_${sprintId}_${taskId}`;
         const relatedRooms = uniqueRooms(socketRef.rooms.filter(x => x.roomName.includes(comentIdentifier)));
         
         relatedRooms.forEach(data => {
@@ -74,7 +78,8 @@ const handleCommentChange = (changeData, includeUpdatedFields = false) => {
     }
 
     if (changeData.module === 'comments_project') {
-        const comentProjectIdentifier = `comments_project_${JSON.parse(JSON.stringify(changeData.data)).projectId}`;
+        // SOCKET-PERFORMANCE-PLAN #3: same dedup-via-clone removal as above.
+        const comentProjectIdentifier = `comments_project_${changeData.data.projectId}`;
         const relatedRooms = uniqueRooms(socketRef.rooms.filter(x => x.roomName.includes(comentProjectIdentifier)));
         
         relatedRooms.forEach(data => {
@@ -113,5 +118,11 @@ function uniqueRooms(rooms) {
     });
 }
 
-socketEmitter.on('update', changeData => handleCommentChange(changeData, true));
-socketEmitter.on('insert', changeData => handleCommentChange(changeData, false));
+// SOCKET-PERFORMANCE-PLAN #2: comments are published under two modules —
+// `comments` (task-level comments) and `comments_project` (project-level
+// comments). Subscribe to both namespaces so the handler still receives
+// every relevant event while ignoring task/companies/notification fan-out.
+socketEmitter.on('comments:update', changeData => handleCommentChange(changeData, true));
+socketEmitter.on('comments:insert', changeData => handleCommentChange(changeData, false));
+socketEmitter.on('comments_project:update', changeData => handleCommentChange(changeData, true));
+socketEmitter.on('comments_project:insert', changeData => handleCommentChange(changeData, false));

@@ -73,5 +73,8 @@ exports.chatSocketHandler = ({socket, namespace}) => {
     })
 }
 
-socketEmitter.on('update', changeData => handleTaskChange(changeData, true));
-socketEmitter.on('insert', changeData => handleTaskChange(changeData, false));
+// SOCKET-PERFORMANCE-PLAN #2: chat events live on the `task` module too —
+// the chat handler only forwards events where `mainChat === true`, so it
+// shares the same namespace as the task handler.
+socketEmitter.on('task:update', changeData => handleTaskChange(changeData, true));
+socketEmitter.on('task:insert', changeData => handleTaskChange(changeData, false));

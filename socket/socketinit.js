@@ -81,6 +81,23 @@ exports.initSocket = (server) => {
         const {userRole} = socket.handshake.query;
         socket.customData = {userRole};
         const namespace = socket.nsp;
+
+        // SOCKET-PERFORMANCE-PLAN #4: auto-purge socketRef.rooms entries on
+        // socket disconnect. The pre-existing `disconnectNameSpace` event
+        // requires the client to call it explicitly — that doesn't fire when
+        // the browser closes, the network drops, or the mobile app is killed.
+        // Without this, every dead socket's room entries stay in the global
+        // array forever, growing it until every event scan becomes slow.
+        // Listening to Socket.io's native `disconnect` makes cleanup
+        // unconditional.
+        socket.on('disconnect', () => {
+            for (let i = exports.rooms.length - 1; i >= 0; i--) {
+                if (exports.rooms[i].socket === socket) {
+                    exports.rooms.splice(i, 1);
+                }
+            }
+        });
+
         socket.on('disconnectNameSpace', (id) => {
             let roomsArray = [];
             socket.adapter.rooms.forEach((_, roomName) => {
