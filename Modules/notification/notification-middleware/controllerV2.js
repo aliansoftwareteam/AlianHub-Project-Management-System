@@ -212,19 +212,18 @@ exports.fetchCompanies = () => {
 }
 
 exports.fetchNotsifications = () => {
-  socketEmitter.on('insert',(value)=>{
-    if (value.module === 'globalNotification') {
-      getCompanyDataFun([value.data.companyId],false).then((companyData) => {
-        let planfeatures = JSON.parse(JSON.stringify(companyData[0]?.planFeature || {}));
-        if (value.type === 'insert') {
-          const insert = value.data;
-          this.manageTypeNotification(insert,planfeatures)
-        } else if (value.type === 'update') {
-          const update = value.data;
-          this.manageTypeNotification(update,planfeatures)
-        }
-      })
-    }
+  // SOCKET-PERFORMANCE-PLAN #2: subscribe to the module-scoped event so
+  // this listener only wakes up for `globalNotification` inserts, not for
+  // every task/comment/companies/userId mutation across the system.
+  socketEmitter.on('globalNotification:insert', (value) => {
+    getCompanyDataFun([value.data.companyId], false).then((companyData) => {
+      let planfeatures = JSON.parse(JSON.stringify(companyData[0]?.planFeature || {}));
+      if (value.type === 'insert') {
+        this.manageTypeNotification(value.data, planfeatures)
+      } else if (value.type === 'update') {
+        this.manageTypeNotification(value.data, planfeatures)
+      }
+    })
   });
 }
 exports.manageTypeNotification=(notificationData,planFeature)=>{

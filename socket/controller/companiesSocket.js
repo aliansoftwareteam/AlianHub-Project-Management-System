@@ -40,7 +40,9 @@ function setEventName(type) {
 const handleCompaniesChange = (changeData, includeUpdatedFields = false) => {
     if (changeData.module === 'companies') {
         try {
-            const companiesIdentifier = `selected_companies_${JSON.parse(JSON.stringify(changeData.data.data))._id}`;
+            // SOCKET-PERFORMANCE-PLAN #3: dropped deep clone — template
+            // literal already calls toString() on the ObjectId.
+            const companiesIdentifier = `selected_companies_${changeData.data.data._id}`;
             const relatedRooms = socketRef.rooms.filter(x => x.roomName.includes(companiesIdentifier));
             
             relatedRooms.forEach(data => {
@@ -69,5 +71,6 @@ const handleCompaniesChange = (changeData, includeUpdatedFields = false) => {
     }
 };
 
-socketEmitter.on('update', changeData => handleCompaniesChange(changeData, true));
-socketEmitter.on('insert', changeData => handleCompaniesChange(changeData, false));
+// SOCKET-PERFORMANCE-PLAN #2: scoped to the `companies` module only.
+socketEmitter.on('companies:update', changeData => handleCompaniesChange(changeData, true));
+socketEmitter.on('companies:insert', changeData => handleCompaniesChange(changeData, false));

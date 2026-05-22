@@ -27,7 +27,12 @@ function setEventName(type) {
 const handleTaskChange = (changeData, includeUpdatedFields = false) => {
     if (changeData.module === 'task') {
         const sprintIdentifier = `project_sprint_${changeData.data.ProjectID}_${changeData.data.sprintId}`;
-        const taskDetail = `taskDetail_${JSON.parse(JSON.stringify(changeData.data))._id}`;
+        // SOCKET-PERFORMANCE-PLAN #3: dropped JSON.parse(JSON.stringify(...))
+        // around `_id` access. The deep clone was used solely to coerce the
+        // Mongoose ObjectId to a string for template literal interpolation —
+        // template literals already call .toString() on objects, so the clone
+        // was a pure allocation/GC cost on every event.
+        const taskDetail = `taskDetail_${changeData.data._id}`;
         const subTaskDetail = `taskDetail_${changeData.data.ParentTaskId}`;
         const relatedRooms = socketRef.rooms.filter(x => x.roomName.includes(sprintIdentifier) || x.roomName.includes(taskDetail) || x.roomName.includes(subTaskDetail));
         
@@ -75,10 +80,14 @@ const handleTaskChange = (changeData, includeUpdatedFields = false) => {
                     ...(includeUpdatedFields && { updatedFields: changeData.updatedFields })
                 };
     
+                // SOCKET-PERFORMANCE-PLAN #3: cache the stringified _id once
+                // per change instead of deep-cloning the entire task document
+                // inside the forEach loop.
+                const changedTaskId = String(changeData.data._id);
                 matchingRooms.forEach(room => {
                     if (room.includes('taskDetail_')) {
                         let taskId = room.split('**')[0].split('_')[1];
-                        if (JSON.parse(JSON.stringify(changeData.data))._id == taskId) {
+                        if (changedTaskId == taskId) {
                             data.namespace.to(room).emit(`taskDetail_${eventName}`, emitData);
                         } else {
                             data.namespace.to(room).emit(`taskDetail_${eventName}`, {...emitData, isSubTaskUpdate: true});
@@ -119,5 +128,9 @@ exports.taskSocketHandler = ({socket, namespace}) => {
     })
 }
 
-socketEmitter.on('update', changeData => handleTaskChange(changeData, true));
-socketEmitter.on('insert', changeData => handleTaskChange(changeData, false));
+// SOCKET-PERFORMANCE-PLAN #2: subscribe to module-scoped events only. The
+// emitter publishes `task:update` / `task:insert` for any payload tagged
+// with `module: 'task'`, so this handler stops firing for comment/company/
+// notification mutations.
+socketEmitter.on('task:update', changeData => handleTaskChange(changeData, true));
+socketEmitter.on('task:insert', changeData => handleTaskChange(changeData, false));
