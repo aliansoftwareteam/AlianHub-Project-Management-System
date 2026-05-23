@@ -59,6 +59,18 @@
                     </div>
 
                     <div class="aipg-card">
+                        <label class="aipg-field-label">Additional requirements <span class="aipg-muted">— optional</span></label>
+                        <p class="aipg-helper">Anything the AI should keep in mind: team size, tech stack, deadlines, constraints, things to skip.</p>
+                        <textarea
+                            v-model="additionalRequirements"
+                            class="aipg-textarea aipg-textarea-sm"
+                            rows="3"
+                            maxlength="2000"
+                            :placeholder="'e.g. Team of 3. Must integrate with Slack. Skip QA — internal tool.'"
+                            :disabled="loading"></textarea>
+                    </div>
+
+                    <div class="aipg-card">
                         <label class="aipg-field-label">Workspace</label>
                         <p class="aipg-helper">Choose who can see this project once it's created.</p>
                         <div class="aipg-privacy-row">
@@ -145,60 +157,44 @@
                                 :disabled="loading"/>
                             <code class="aipg-code-pill">{{ plan.project.ProjectCode }}</code>
                             <span class="aipg-ml-auto aipg-helper">
-                                {{ totals.folders }} folders · {{ totals.sprints }} sprints · {{ totals.tasks }} tasks
+                                {{ totals.sprints }} sprints · {{ totals.tasks }} tasks
                             </span>
                         </div>
                         <p class="aipg-plan-description">{{ plan.project.description }}</p>
-                        <div class="aipg-chip-row" v-if="plan.project.apps.length">
-                            <span class="aipg-chip aipg-chip-app" v-for="a in plan.project.apps" :key="'app-'+a.key">{{ a.name }}</span>
-                        </div>
                     </div>
 
                     <div class="aipg-folder-list">
                         <details
-                            v-for="(folder, fi) in plan.folders"
-                            :key="'f-'+fi"
+                            v-for="(sprint, si) in plan.sprints"
+                            :key="'s-'+si"
                             class="aipg-folder"
-                            :open="fi === 0">
+                            :open="si === 0">
                             <summary class="aipg-folder-summary">
                                 <span class="aipg-chevron" aria-hidden="true">›</span>
                                 <input
-                                    v-model="folder.folderName"
+                                    v-model="sprint.sprintName"
                                     class="aipg-input-plain aipg-folder-name"
                                     maxlength="80"
                                     :disabled="loading"
                                     @click.stop/>
-                                <span class="aipg-pill aipg-ml-auto">{{ countFolderTasks(folder) }} tasks</span>
+                                <span class="aipg-pill aipg-ml-auto">{{ sprint.tasks.length }} tasks</span>
                             </summary>
-                            <div
-                                v-for="(sprint, si) in folder.sprints"
-                                :key="'s-'+fi+'-'+si"
-                                class="aipg-sprint">
-                                <div class="aipg-sprint-head">
+                            <ul class="aipg-task-list">
+                                <li v-for="(task, ti) in sprint.tasks" :key="'t-'+si+'-'+ti" class="aipg-task">
                                     <input
-                                        v-model="sprint.sprintName"
-                                        class="aipg-input-plain aipg-sprint-name"
-                                        maxlength="80"
+                                        v-model="task.TaskName"
+                                        class="aipg-input-plain aipg-task-name"
+                                        maxlength="200"
                                         :disabled="loading"/>
-                                    <span class="aipg-pill aipg-pill-sm aipg-ml-auto">{{ sprint.tasks.length }}</span>
-                                </div>
-                                <ul class="aipg-task-list">
-                                    <li v-for="(task, ti) in sprint.tasks" :key="'t-'+fi+'-'+si+'-'+ti" class="aipg-task">
-                                        <input
-                                            v-model="task.TaskName"
-                                            class="aipg-input-plain aipg-task-name"
-                                            maxlength="200"
-                                            :disabled="loading"/>
-                                        <details class="aipg-task-desc">
-                                            <summary class="aipg-task-desc-trigger">
-                                                <span class="aipg-chevron aipg-chevron-sm" aria-hidden="true">›</span>
-                                                Description
-                                            </summary>
-                                            <pre class="aipg-task-desc-body">{{ task.description }}</pre>
-                                        </details>
-                                    </li>
-                                </ul>
-                            </div>
+                                    <details class="aipg-task-desc">
+                                        <summary class="aipg-task-desc-trigger">
+                                            <span class="aipg-chevron aipg-chevron-sm" aria-hidden="true">›</span>
+                                            Description
+                                        </summary>
+                                        <pre class="aipg-task-desc-body">{{ renderTaskDescription(task) }}</pre>
+                                    </details>
+                                </li>
+                            </ul>
                         </details>
                     </div>
 
@@ -229,11 +225,6 @@
                             <span class="aipg-progress-icon"><span v-html="stepIcon('project')" /></span>
                             <span class="aipg-progress-label">Project</span>
                             <span class="aipg-progress-status">{{ stepStatusLabel('project') }}</span>
-                        </div>
-                        <div class="aipg-progress-row" :class="rowClass('folder')">
-                            <span class="aipg-progress-icon"><span v-html="stepIcon('folder')" /></span>
-                            <span class="aipg-progress-label">Folders</span>
-                            <span class="aipg-progress-status">{{ progress.foldersDone }} / {{ progress.totalFolders || '…' }}</span>
                         </div>
                         <div class="aipg-progress-row" :class="rowClass('sprint')">
                             <span class="aipg-progress-icon"><span v-html="stepIcon('sprint')" /></span>
@@ -299,11 +290,9 @@ export default defineComponent({
         const rolledBack = ref(false);
 
         const description = ref('');
-        // No-frills hints. The clarification round-trip + target-task-count
-        // slider were removed in favour of a one-shot plan call — fewer
-        // moving parts, no cached conversation state to expire, retryable
-        // without "Conversation not found" errors when the proxy 504s.
-        const hints = reactive({});
+        // Free-form "Additional requirements" textarea on Step 1 — piped
+        // verbatim into the prompt. Capped at 2000 chars server-side.
+        const additionalRequirements = ref('');
         // Mirrors the manual flow's workspace step: 'public' → private=false.
         // We force this onto the plan server-side so the user's choice always
         // wins over whatever the LLM picked.
@@ -323,9 +312,6 @@ export default defineComponent({
         const unsubscribeProgress = ref(null);
         const progress = reactive({
             project: 'pending',
-            foldersDone: 0,
-            totalFolders: 0,
-            folderState: 'pending',
             sprintsDone: 0,
             totalSprints: 0,
             sprintState: 'pending',
@@ -341,17 +327,35 @@ export default defineComponent({
         const canGenerate = computed(() => description.value.trim().length >= 20);
 
         const totals = computed(() => {
-            if (!plan.value) return { folders: 0, sprints: 0, tasks: 0 };
-            let s = 0; let t = 0;
-            for (const f of plan.value.folders) {
-                s += f.sprints.length;
-                for (const sp of f.sprints) t += sp.tasks.length;
-            }
-            return { folders: plan.value.folders.length, sprints: s, tasks: t };
+            if (!plan.value || !Array.isArray(plan.value.sprints)) return { sprints: 0, tasks: 0 };
+            let t = 0;
+            for (const sp of plan.value.sprints) t += (sp.tasks || []).length;
+            return { sprints: plan.value.sprints.length, tasks: t };
         });
 
-        function countFolderTasks(folder) {
-            return folder.sprints.reduce((acc, s) => acc + s.tasks.length, 0);
+        // Render Editor.js blocks as readable plain text for the preview
+        // `<pre>`. Matches the orchestrator's blocksToText helper so the
+        // preview shows the same text that lands in `rawDescription` on
+        // save. Block types we know: paragraph, header, list.
+        function renderTaskDescription(task) {
+            const blocks = (task && Array.isArray(task.descriptionBlocks)) ? task.descriptionBlocks : [];
+            const out = [];
+            for (const b of blocks) {
+                if (!b || !b.data) continue;
+                if (b.type === 'paragraph' && typeof b.data.text === 'string') {
+                    out.push(b.data.text);
+                } else if (b.type === 'header' && typeof b.data.text === 'string') {
+                    out.push('');
+                    out.push(b.data.text);
+                } else if (b.type === 'list' && Array.isArray(b.data.items)) {
+                    const bullet = b.data.style === 'ordered' ? null : '• ';
+                    b.data.items.forEach((item, idx) => {
+                        const prefix = bullet === null ? `${idx + 1}. ` : bullet;
+                        out.push(`${prefix}${item}`);
+                    });
+                }
+            }
+            return out.join('\n').trim();
         }
 
         function isStepDone(name) {
@@ -427,10 +431,6 @@ export default defineComponent({
             if (el) el.value = '';
         }
 
-        function cleanHints() {
-            return { isPrivateSpace: !!isPrivateSpace.value };
-        }
-
         async function onGeneratePlan() {
             if (!canGenerate.value) return;
             loading.value = true;
@@ -440,7 +440,7 @@ export default defineComponent({
                 // with the final plan without holding the POST request open.
                 const result = await api.generatePlan({
                     description: description.value.trim(),
-                    hints: cleanHints(),
+                    additionalRequirements: additionalRequirements.value.trim(),
                     briefId: briefId.value,
                     isPrivateSpace: isPrivateSpace.value,
                 });
@@ -469,12 +469,9 @@ export default defineComponent({
                     ProjectName: p.project.ProjectName,
                     description: p.project.description,
                 },
-                folders: p.folders.map((f) => ({
-                    folderName: f.folderName,
-                    sprints: f.sprints.map((s) => ({
-                        sprintName: s.sprintName,
-                        tasks: s.tasks.map((t) => ({ TaskName: t.TaskName })),
-                    })),
+                sprints: (p.sprints || []).map((s) => ({
+                    sprintName: s.sprintName,
+                    tasks: (s.tasks || []).map((t) => ({ TaskName: t.TaskName })),
                 })),
             };
         }
@@ -496,7 +493,6 @@ export default defineComponent({
                 }
                 jobId.value = result.jobId;
                 step.value = 'executing';
-                progress.totalFolders = totals.value.folders;
                 progress.totalSprints = totals.value.sprints;
                 progress.totalTasks = totals.value.tasks;
                 subscribe();
@@ -514,31 +510,25 @@ export default defineComponent({
                 if (payload.data) payload = payload.data;
                 if (payload.event === 'progress') {
                     progress.lastEvent = `${payload.step}: ${payload.status}${payload.name ? ' · ' + payload.name : ''}`;
-                    if (payload.step === 'project') progress.project = payload.status === 'done' ? 'done' : 'active';
-                    if (payload.step === 'folder') {
-                        progress.folderState = 'active';
-                        if (payload.status === 'done') progress.foldersDone += 1;
-                    }
-                    if (payload.step === 'sprint') {
-                        progress.sprintState = 'active';
-                        if (payload.status === 'done') progress.sprintsDone += 1;
-                    }
-                    if (payload.step === 'tasks') {
-                        progress.tasksState = 'active';
+                    if (payload.step === 'project') {
+                        progress.project = payload.status === 'done' ? 'done' : 'active';
+                    } else if (payload.step === 'sprint') {
+                        progress.sprintState = payload.status === 'done' ? 'done' : 'active';
+                        if (payload.status === 'progress') progress.sprintsDone += 1;
+                        if (payload.status === 'done' && typeof payload.completed === 'number') {
+                            progress.sprintsDone = payload.completed;
+                        }
+                        if (typeof payload.total === 'number') progress.totalSprints = payload.total;
+                    } else if (payload.step === 'tasks') {
+                        progress.sprintState = 'done';
+                        progress.tasksState = payload.status === 'done' ? 'done' : 'active';
                         if (typeof payload.completed === 'number') progress.tasksDone = payload.completed;
                         if (typeof payload.total === 'number') progress.totalTasks = payload.total;
                     }
-                    if (payload.step === 'sprint') progress.folderState = 'done';
-                    if (payload.step === 'tasks') {
-                        progress.folderState = 'done';
-                        progress.sprintState = 'done';
-                    }
                 } else if (payload.event === 'complete') {
                     progress.project = 'done';
-                    progress.folderState = 'done';
                     progress.sprintState = 'done';
                     progress.tasksState = 'done';
-                    progress.foldersDone = (payload.totals && payload.totals.folders) || progress.foldersDone;
                     progress.sprintsDone = (payload.totals && payload.totals.sprints) || progress.sprintsDone;
                     progress.tasksDone = (payload.totals && payload.totals.tasks) || progress.tasksDone;
                     createdProjectId.value = payload.projectId;
@@ -572,6 +562,7 @@ export default defineComponent({
             step.value = 'input';
             error.value = '';
             description.value = '';
+            additionalRequirements.value = '';
             briefId.value = null;
             briefFile.value = null;
             briefStats.tokenEstimate = 0;
@@ -582,13 +573,10 @@ export default defineComponent({
             jobId.value = null;
             createdProjectId.value = null;
             progress.project = 'pending';
-            progress.folderState = 'pending';
             progress.sprintState = 'pending';
             progress.tasksState = 'pending';
-            progress.foldersDone = 0;
             progress.sprintsDone = 0;
             progress.tasksDone = 0;
-            progress.totalFolders = 0;
             progress.totalSprints = 0;
             progress.totalTasks = 0;
             progress.lastEvent = '';
@@ -612,12 +600,12 @@ export default defineComponent({
         return {
             closeIcon,
             clientWidth, step, loading, briefUploading, error, rolledBack,
-            description, hints, isPrivateSpace, briefFile, briefId, briefStats,
+            description, additionalRequirements, isPrivateSpace, briefFile, briefId, briefStats,
             plan, planId, editableProjectName,
             jobId, progress, createdProjectId,
             placeholderText,
             canGenerate, totals,
-            countFolderTasks, isStepDone, stepClass, stepDoneDot, rowClass, stepIcon, stepStatusLabel,
+            renderTaskDescription, isStepDone, stepClass, stepDoneDot, rowClass, stepIcon, stepStatusLabel,
             onFileChosen, clearBrief,
             onGeneratePlan,
             onApprovePlan, onOpenProject, onRetry, onClose,

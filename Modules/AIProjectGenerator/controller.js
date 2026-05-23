@@ -9,11 +9,11 @@ const multer = require('multer');
 
 const { getProvider, isAnyProviderConfigured } = require('./llmProvider');
 const { PlanSchema, ClarifyResponseSchema, sanitizeMemberIds, tryParseJson } = require('./schemaValidator');
-const { buildSystemPrompt, buildUserMessage, buildRepairPrompt } = require('./promptTemplates');
+const { buildSystemPrompt, buildUserMessage, buildRepairPrompt } = require('./promptBuilder');
 const { briefUpload, extractFromFile, safeUnlink, MAX_BRIEF_BYTES } = require('./briefExtractor');
 const sseEmitter = require('./sseEmitter');
 const orchestrator = require('./orchestrator');
-const { normalizePlanColors, forceDefaultStatusToDoName } = orchestrator;
+const { normalizePlanColors } = orchestrator;
 
 const PLAN_TTL_SECONDS = 15 * 60;        // 15 min
 const BRIEF_TTL_SECONDS = 30 * 60;       // 30 min
@@ -70,11 +70,15 @@ async function loadActiveMembers(companyId) {
     }
 }
 
-async function callLlmForPlan({ description, hints, briefText, members, conversation, clarifyRound }) {
+async function callLlmForPlan({ description, additionalRequirements, briefText, members }) {
     const provider = getProvider();
-    const systemPrompt = buildSystemPrompt({ clarifyRound });
-    const userMessage = buildUserMessage({ description, hints, briefText, members, conversation, clarifyRound });
-    const maxTokens = Number(process.env.LLM_MAX_TOKENS_PLAN) || 8000;
+    const systemPrompt = buildSystemPrompt();
+    const userMessage = buildUserMessage({ description, additionalRequirements, briefText, members });
+    // 32000 default: large plans (30+ tasks) with 5-block descriptions
+    // routinely run 15-25K output tokens. Claude Sonnet 4.5 supports 64K
+    // output and gpt-5 supports 128K, so 32K is well within bounds for
+    // either provider while still bounding cost.
+    const maxTokens = Number(process.env.LLM_MAX_TOKENS_PLAN) || 32000;
 
     const firstAttempt = await provider.chat({
         systemPrompt,
@@ -83,6 +87,19 @@ async function callLlmForPlan({ description, hints, briefText, members, conversa
         maxTokens,
         temperature: 0.4,
     });
+
+    // Truncation short-circuit: if the model hit max_tokens, the JSON is
+    // physically incomplete and a repair pass with the same budget will
+    // hit the same wall. Surface a clear "raise the budget" error
+    // immediately instead of burning a second LLM call.
+    if (firstAttempt.truncated) {
+        const err = new Error(
+            'The AI ran out of output token budget mid-plan. Raise LLM_MAX_TOKENS_PLAN '
+            + `(currently ${maxTokens}) in your .env to give it more room, or describe a smaller project.`,
+        );
+        err.code = 'LLM_TRUNCATED';
+        throw err;
+    }
 
     const tryValidate = (raw) => {
         const parsed = tryParseJson(raw);
@@ -113,6 +130,15 @@ async function callLlmForPlan({ description, hints, briefText, members, conversa
             temperature: 0.2,
         });
         usedTokens += repairAttempt.totalTokens || 0;
+        // Same truncation guard on the repair pass.
+        if (repairAttempt.truncated) {
+            const err = new Error(
+                'The AI ran out of output token budget on the repair attempt. Raise '
+                + `LLM_MAX_TOKENS_PLAN (currently ${maxTokens}) in your .env, or describe a smaller project.`,
+            );
+            err.code = 'LLM_TRUNCATED';
+            throw err;
+        }
         validated = tryValidate(repairAttempt.content);
         if (!validated.ok) {
             const err = new Error(`LLM output failed validation after repair: ${validated.error}`);
@@ -125,7 +151,7 @@ async function callLlmForPlan({ description, hints, briefText, members, conversa
     return { result: validated.value, tokens: usedTokens, model: (provider && provider.name) || 'unknown' };
 }
 
-async function generatePlanForJob({ jobId, uid, companyId, description, hints, briefText, isPrivateSpace }) {
+async function generatePlanForJob({ jobId, uid, companyId, description, additionalRequirements, briefText, isPrivateSpace }) {
     const emit = (payload) => sseEmitter.emit(jobId, payload);
 
     try {
@@ -137,9 +163,7 @@ async function generatePlanForJob({ jobId, uid, companyId, description, hints, b
         // returned a job id, so slow LLM responses no longer trip the proxy.
         emit({ event: 'progress', phase: 'plan', step: 'ai', status: 'started' });
         const { result, tokens, model } = await callLlmForPlan({
-            description, hints, briefText, members,
-            conversation: [],
-            clarifyRound: 3, // force "final round" rules: must return a plan
+            description, additionalRequirements, briefText, members,
         });
 
         let { plan } = result;
@@ -160,13 +184,15 @@ async function generatePlanForJob({ jobId, uid, companyId, description, hints, b
 
         // Re-validate after sanitization, then normalize status colors so the
         // preview chips look identical to the saved project (same "bg = text + 35"
-        // convention the orchestrator applies at save time).
+        // convention the orchestrator applies at save time). We deliberately
+        // do NOT rename the first status to "To Do" — Phase A respects the
+        // domain-specific name the model picked.
         const reCheck = PlanSchema.safeParse(plan);
         if (!reCheck.success) {
             const issues = reCheck.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n');
             throw new Error(`Plan failed final validation: ${issues}`);
         }
-        plan = forceDefaultStatusToDoName(normalizePlanColors(reCheck.data));
+        plan = normalizePlanColors(reCheck.data);
 
         const planId = token();
         myCache.set(cacheKey('plan', uid, planId), {
@@ -276,7 +302,10 @@ exports.plan = async (req, res) => {
         const description = String((req.body && req.body.description) || '').trim();
         if (description.length < 20) return sendError(res, 400, 'Description must be at least 20 characters');
 
-        const hints = (req.body && req.body.hints) || {};
+        // "Additional requirements" textarea from Step 1 of the wizard — the
+        // single biggest "match my requirements" lever. Capped at 2000 chars
+        // so a runaway paste can't dominate the prompt.
+        const additionalRequirements = String((req.body && req.body.additionalRequirements) || '').trim().slice(0, 2000);
         let briefText = '';
         if (req.body && req.body.briefId) {
             const stash = myCache.get(cacheKey('brief', uid, req.body.briefId));
@@ -297,7 +326,7 @@ exports.plan = async (req, res) => {
                 uid,
                 companyId,
                 description,
-                hints,
+                additionalRequirements,
                 briefText,
                 isPrivateSpace: !!(req.body && req.body.isPrivateSpace),
             }).catch((error) => {
@@ -359,7 +388,7 @@ exports.execute = async (req, res) => {
             const issues = reCheck.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n');
             return sendError(res, 400, `Plan failed validation: ${issues}`);
         }
-        plan = forceDefaultStatusToDoName(normalizePlanColors(reCheck.data));
+        plan = normalizePlanColors(reCheck.data);
 
         // Re-sanitize assignee ids against the current company membership in
         // case roster changed since /plan was called.
@@ -372,7 +401,7 @@ exports.execute = async (req, res) => {
 
         const userData = {
             id: String(uid),
-            Employee_Name: (req.body && req.body.userName) || 'AlainHub AI ',
+            Employee_Name: (req.body && req.body.userName) || 'AlianHub AI',
             companyOwnerId: companyId,
         };
 
@@ -402,23 +431,16 @@ function applyEdits(plan, edits) {
         if (typeof edits.project.ProjectCode === 'string') next.project.ProjectCode = edits.project.ProjectCode.toUpperCase().slice(0, 6);
         if (typeof edits.project.description === 'string') next.project.description = edits.project.description.slice(0, 2000);
     }
-    if (Array.isArray(edits.folders)) {
-        for (let i = 0; i < edits.folders.length && i < next.folders.length; i++) {
-            const ef = edits.folders[i];
-            if (!ef) continue;
-            if (typeof ef.folderName === 'string') next.folders[i].folderName = ef.folderName.slice(0, 80);
-            if (Array.isArray(ef.sprints)) {
-                for (let j = 0; j < ef.sprints.length && j < next.folders[i].sprints.length; j++) {
-                    const es = ef.sprints[j];
-                    if (!es) continue;
-                    if (typeof es.sprintName === 'string') next.folders[i].sprints[j].sprintName = es.sprintName.slice(0, 80);
-                    if (Array.isArray(es.tasks)) {
-                        for (let k = 0; k < es.tasks.length && k < next.folders[i].sprints[j].tasks.length; k++) {
-                            const et = es.tasks[k];
-                            if (!et) continue;
-                            if (typeof et.TaskName === 'string') next.folders[i].sprints[j].tasks[k].TaskName = et.TaskName.slice(0, 200);
-                        }
-                    }
+    if (Array.isArray(edits.sprints) && Array.isArray(next.sprints)) {
+        for (let i = 0; i < edits.sprints.length && i < next.sprints.length; i++) {
+            const es = edits.sprints[i];
+            if (!es) continue;
+            if (typeof es.sprintName === 'string') next.sprints[i].sprintName = es.sprintName.slice(0, 80);
+            if (Array.isArray(es.tasks)) {
+                for (let k = 0; k < es.tasks.length && k < next.sprints[i].tasks.length; k++) {
+                    const et = es.tasks[k];
+                    if (!et) continue;
+                    if (typeof et.TaskName === 'string') next.sprints[i].tasks[k].TaskName = et.TaskName.slice(0, 200);
                 }
             }
         }
