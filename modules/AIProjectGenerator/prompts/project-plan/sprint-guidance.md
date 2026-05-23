@@ -42,3 +42,15 @@ needs them.
 
 Avoid filler. Don't pad with vague "set up tooling" tasks just to round
 out a count. Every task should earn its place.
+
+## Tasks per sprint
+
+A sprint with 2 tasks usually means the tasks are too broad — check
+whether each task is actually one deliverable or several bundled together.
+A sprint with 10-12 tasks is normal for a busy sprint. There is no upper
+limit if the work genuinely belongs together.
+
+If you find yourself writing a sprint with only 1-3 tasks and the sprint
+name implies a large area of work (e.g. "Chrome Extension Core",
+"Authentication", "Design"), that is a signal to go back and split the
+tasks within that sprint — not to add a second sprint.

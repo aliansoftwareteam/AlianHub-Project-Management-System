@@ -112,8 +112,7 @@
                             </span>
                             <span v-else-if="briefId" class="aipg-file-drop-inner aipg-file-drop-ok">
                                 <span class="aipg-tick" aria-hidden="true">✓</span>
-                                Brief loaded · ~{{ briefStats.tokenEstimate }} tokens
-                                <span v-if="briefStats.truncated" class="aipg-muted">(truncated)</span>
+                                {{ briefFile?.name }}
                                 <button class="aipg-btn-link" type="button" :disabled="loading" @click.prevent="clearBrief">Remove</button>
                             </span>
                             <span v-else class="aipg-file-drop-inner aipg-muted">
@@ -1095,7 +1094,8 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
 .aipg-folder-name {
     font-size: 14px;
     font-weight: 600;
-    flex: 0 1 auto;
+    flex: 1 1 0;
+    min-width: 0;
 }
 .aipg-pill {
     background: #f1f5f9;

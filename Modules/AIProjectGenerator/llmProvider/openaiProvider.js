@@ -71,14 +71,21 @@ const openaiProvider = {
             body.response_format = { type: 'json_object' };
         }
 
+        // Allow timeout overrides via env so operators can tune without a
+        // code change. Reasoning / gpt-5 models need generous headroom because
+        // they burn hidden reasoning tokens before producing visible output,
+        // and a richer system prompt (more rules, more example tasks) directly
+        // increases generation time. Default: 10 min for reasoning, 4 min for
+        // classic chat models.
+        const defaultTimeout = reasoning ? 600000 : 240000;
+        const timeoutMs = Number(process.env.OPENAI_TIMEOUT_MS) || defaultTimeout;
+
         const response = await axios.post(OPENAI_CHAT_URL, body, {
             headers: {
                 Authorization: `Bearer ${config.AI_API_KEY}`,
                 'Content-Type': 'application/json',
             },
-            // Reasoning models can take noticeably longer because they generate
-            // hidden reasoning tokens. Bump the axios timeout for them.
-            timeout: reasoning ? 240000 : 120000,
+            timeout: timeoutMs,
         });
 
         const choice = response.data && response.data.choices && response.data.choices[0];

@@ -194,27 +194,103 @@ two weeks."
         "sprintName": "Backend Foundation",
         "tasks": [
           {
-            "TaskName": "Wire JWT auth for /login and /logout",
+            "TaskName": "Build POST /auth/signup endpoint",
             "TaskTypeKey": 1,
             "status": "Backlog",
             "priority": "High",
             "AssigneeUserId": [],
             "descriptionBlocks": [
-              { "type": "paragraph", "data": { "text": "Every other endpoint requires an authenticated user, so this is the first task that unblocks the rest of the backend work." } },
+              { "type": "paragraph", "data": { "text": "Stand up the account-creation endpoint that lets a new user register. This unblocks every subsequent endpoint that requires a logged-in user." } },
               { "type": "header", "data": { "text": "What to do", "level": 4 } },
               { "type": "list", "data": { "style": "ordered", "items": [
-                "Add POST /api/login: bcrypt-compare submitted password against users.passwordHash; on match, sign a 24h JWT with JWT_SECRET and return { token, user }.",
-                "Add POST /api/logout: client clears the token; server-side just returns 204 (stateless JWT).",
-                "Add middleware verifyToken() that decodes the Bearer JWT and attaches req.user; mount on all /api/* routes except /login.",
-                "Rate-limit /login to 5 attempts per IP per minute using express-rate-limit."
+                "Add route POST /auth/signup in routes/auth.js.",
+                "Validate body: { email (valid format), password (≥8 chars, ≥1 letter + ≥1 number), name (2-60 chars) }. Return 400 with field errors on failure.",
+                "Check the User collection for an existing email (case-insensitive). Return 409 if found.",
+                "bcrypt-hash the password at cost factor 12 and save the User document.",
+                "Sign a 24h JWT with payload { userId, email } using JWT_SECRET.",
+                "Respond 201 with { token, user: { id, email, name } }. Never include passwordHash in any response."
               ] } },
               { "type": "header", "data": { "text": "Acceptance criteria", "level": 4 } },
               { "type": "list", "data": { "style": "unordered", "items": [
-                "POST /api/login with valid credentials returns 200 + { token, user }; invalid returns 401.",
-                "Any /api/* call without a valid Bearer token returns 401.",
-                "Passwords never appear in logs or error responses.",
-                "6th login attempt from same IP inside a minute returns 429."
+                "Valid payload returns 201 with token and user fields.",
+                "Duplicate email returns 409.",
+                "Invalid email or weak password returns 400 with the offending field named.",
+                "Stored User document contains passwordHash, not the raw password.",
+                "Decoded token yields the correct userId."
               ] } }
+            ]
+          },
+          {
+            "TaskName": "Build POST /auth/login endpoint",
+            "TaskTypeKey": 1,
+            "status": "Backlog",
+            "priority": "High",
+            "AssigneeUserId": [],
+            "descriptionBlocks": [
+              { "type": "paragraph", "data": { "text": "Return a JWT for an existing user so the frontend can authenticate subsequent requests." } },
+              { "type": "header", "data": { "text": "What to do", "level": 4 } },
+              { "type": "list", "data": { "style": "ordered", "items": [
+                "Add route POST /auth/login in routes/auth.js.",
+                "Validate body: { email, password }. Return 400 if either is missing.",
+                "Look up the User by email (case-insensitive). Return 401 if not found.",
+                "bcrypt.compare the submitted password against users.passwordHash. Return 401 on mismatch.",
+                "Sign a 24h JWT and return 200 with { token, user: { id, email, name } }.",
+                "Apply express-rate-limit: max 5 attempts per IP per minute; return 429 on breach."
+              ] } },
+              { "type": "header", "data": { "text": "Acceptance criteria", "level": 4 } },
+              { "type": "list", "data": { "style": "unordered", "items": [
+                "Valid credentials return 200 + { token, user }.",
+                "Wrong password or unknown email returns 401.",
+                "6th attempt from the same IP within a minute returns 429.",
+                "Passwords never appear in logs or error responses."
+              ] } },
+              { "type": "paragraph", "data": { "text": "Depends on: Build POST /auth/signup endpoint" } }
+            ]
+          },
+          {
+            "TaskName": "Build POST /auth/logout endpoint",
+            "TaskTypeKey": 1,
+            "status": "Backlog",
+            "priority": "Medium",
+            "AssigneeUserId": [],
+            "descriptionBlocks": [
+              { "type": "paragraph", "data": { "text": "Provide a logout endpoint so the client has a clean contract for ending a session. Stateless JWT — the server returns 204 and the client discards the token." } },
+              { "type": "header", "data": { "text": "What to do", "level": 4 } },
+              { "type": "list", "data": { "style": "ordered", "items": [
+                "Add route POST /auth/logout in routes/auth.js.",
+                "Apply the verifyToken middleware so only authenticated requests reach this route.",
+                "Return 204 No Content. No body needed — client is responsible for clearing the stored token."
+              ] } },
+              { "type": "header", "data": { "text": "Acceptance criteria", "level": 4 } },
+              { "type": "list", "data": { "style": "unordered", "items": [
+                "Authenticated POST /auth/logout returns 204.",
+                "Unauthenticated request returns 401."
+              ] } },
+              { "type": "paragraph", "data": { "text": "Depends on: Build POST /auth/login endpoint" } }
+            ]
+          },
+          {
+            "TaskName": "Build GET /users/me endpoint",
+            "TaskTypeKey": 1,
+            "status": "Backlog",
+            "priority": "Medium",
+            "AssigneeUserId": [],
+            "descriptionBlocks": [
+              { "type": "paragraph", "data": { "text": "Return the authenticated user's profile so the frontend can display the current user without re-parsing the JWT." } },
+              { "type": "header", "data": { "text": "What to do", "level": 4 } },
+              { "type": "list", "data": { "style": "ordered", "items": [
+                "Add route GET /users/me in routes/users.js.",
+                "Apply the verifyToken middleware.",
+                "Look up the User document by req.user.userId. Return 404 if somehow missing.",
+                "Return 200 with { id, email, name, createdAt }. Exclude passwordHash."
+              ] } },
+              { "type": "header", "data": { "text": "Acceptance criteria", "level": 4 } },
+              { "type": "list", "data": { "style": "unordered", "items": [
+                "Authenticated request returns 200 with id, email, name, createdAt.",
+                "passwordHash is never present in the response.",
+                "Unauthenticated request returns 401."
+              ] } },
+              { "type": "paragraph", "data": { "text": "Depends on: Build POST /auth/login endpoint" } }
             ]
           }
         ]
@@ -227,9 +303,11 @@ two weeks."
 Notice in both examples:
 
 - Status names and task types match the domain (podcast uses "Booked / Recorded / Editing"; software uses "Backlog / Code Review / QA").
-- Task names are specific verbs ("Wire JWT", "Submit show"), not categories.
+- Task names are specific verbs ("Build POST /auth/signup", "Submit show"), not categories.
+- **Each API endpoint is its own task — signup, login, logout, and GET /users/me are four separate tasks, not one.** Never combine two endpoints or two screens in one task name.
 - Every description has all four parts in the same block order.
-- Steps name actual files, endpoints, or deliverables.
+- The context paragraph explains WHY the task exists — it does not list skills or technologies.
+- Steps name actual files, endpoints, payloads, status codes, frame sizes, and libraries.
 - Acceptance criteria are checkable, not aspirational.
 - Priorities vary — not everything is Medium.
 - `AssigneeUserId` is always `[]` because no specific members were named.

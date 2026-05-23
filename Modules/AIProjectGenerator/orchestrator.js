@@ -338,14 +338,43 @@ function pickAppKeys(apps) {
 // ─── Description block helpers ─────────────────────────────────────────
 
 /**
+ * Normalize a list block's items into the shape `@editorjs/nested-list`
+ * expects: an array of `{ content, items: [] }` objects, NOT plain strings.
+ * The LLM emits items as `["step 1", "step 2"]` (the natural shape and what
+ * the prompt examples show) but the frontend editor reads `item.content`,
+ * so plain strings render as the literal text "undefined". Convert here so
+ * the prompts stay readable and the saved doc still renders correctly.
+ */
+function normalizeListItems(items) {
+    if (!Array.isArray(items)) return [];
+    return items.map((it) => {
+        if (typeof it === 'string') return { content: it, items: [] };
+        if (it && typeof it === 'object') {
+            const content = typeof it.content === 'string'
+                ? it.content
+                : (typeof it.text === 'string' ? it.text : '');
+            const nested = Array.isArray(it.items) ? normalizeListItems(it.items) : [];
+            return { content, items: nested };
+        }
+        return { content: String(it == null ? '' : it), items: [] };
+    });
+}
+
+/**
  * Wrap the LLM's `descriptionBlocks` array into the `descriptionBlock`
  * shape Editor.js expects on the saved task doc.
  */
 function wrapDescriptionBlock(blocks) {
+    const normalized = Array.isArray(blocks) ? blocks.map((b) => {
+        if (b && b.type === 'list' && b.data) {
+            return { ...b, data: { ...b.data, items: normalizeListItems(b.data.items) } };
+        }
+        return b;
+    }) : [];
     return {
         time: Date.now(),
         version: EDITORJS_VERSION,
-        blocks: Array.isArray(blocks) ? blocks : [],
+        blocks: normalized,
     };
 }
 
@@ -367,6 +396,7 @@ function blocksToText(blocks) {
         } else if (b.type === 'list' && Array.isArray(b.data.items)) {
             for (const item of b.data.items) {
                 if (typeof item === 'string') lines.push(item);
+                else if (item && typeof item === 'object' && typeof item.content === 'string') lines.push(item.content);
             }
         }
     }
@@ -697,7 +727,15 @@ async function rollback({ companyId, tracker }) {
                 type: SCHEMA_TYPE.PROJECTS,
                 data: [{ _id: new mongoose.Types.ObjectId(tracker.project) }, { $set: { deletedStatusKey: 1 } }],
             }, 'updateOne').catch(() => {});
-            await removeProjectCount(companyId, tracker.isPrivateSpace).catch(() => {});
+        }
+        // Always roll back the project count if checkProjectPlan incremented
+        // it — independent of whether the project doc was actually saved.
+        // Previously this was tied to `tracker.project`, so a hang anywhere
+        // between checkProjectPlan and saveProject would leak +1 on the
+        // company's projectCount each retry, eventually tripping the plan
+        // limit even though no project was created.
+        if (tracker.countIncremented) {
+            try { removeProjectCount(companyId, tracker.isPrivateSpace); } catch (_e) {}
         }
     } catch (e) {
         logger.error(`AI project rollback error: ${e && e.message ? e.message : e}`);
@@ -729,6 +767,17 @@ async function fireProjectCreateNotification({ companyId, projectDoc, userData }
 
 // ─── Orchestrator entry ────────────────────────────────────────────────
 
+// Race a promise against a timeout so a hung MongoDB call doesn't freeze
+// the execute UI forever. 45 seconds is well beyond normal DB latency.
+function withTimeout(promise, ms, label) {
+    return Promise.race([
+        promise,
+        new Promise((_, reject) =>
+            setTimeout(() => reject(new Error(`Step timed out after ${ms}ms: ${label}`)), ms)
+        ),
+    ]);
+}
+
 async function executePlan({ plan, companyId, uid, userData, jobId }) {
     const tracker = {
         project: null,
@@ -742,10 +791,12 @@ async function executePlan({ plan, companyId, uid, userData, jobId }) {
     try {
         // 1. Plan-limit gate — matches the manual createProject flow.
         emit({ event: 'progress', step: 'project', status: 'started' });
+        logger.info(`[AIPG][${jobId}] step 1: checkProjectPlan start (company=${companyId})`);
         try {
-            await checkProjectPlan({
-                body: { CompanyId: companyId, isPrivateSpace: tracker.isPrivateSpace },
-            });
+            await withTimeout(
+                checkProjectPlan({ body: { CompanyId: companyId, isPrivateSpace: tracker.isPrivateSpace } }),
+                45000, 'checkProjectPlan'
+            );
             tracker.countIncremented = true;
         } catch (err) {
             // checkProjectPlan increments the count BEFORE checking limits,
@@ -753,29 +804,41 @@ async function executePlan({ plan, companyId, uid, userData, jobId }) {
             // detect the count-not-rolled case via err.countRollBack !== false.
             const rolledByCheck = err && err.countRollBack === false;
             if (!rolledByCheck) {
-                await removeProjectCount(companyId, tracker.isPrivateSpace).catch(() => {});
+                // removeProjectCount is fire-and-forget (no Promise returned).
+                try { removeProjectCount(companyId, tracker.isPrivateSpace); } catch (_e) {}
             }
             const reason = (err && err.statusText) || 'Project limit reached for this plan. Please upgrade or remove an existing project.';
             const e = new Error(reason);
             e.code = 'PLAN_LIMIT';
             throw e;
         }
+        logger.info(`[AIPG][${jobId}] step 1: checkProjectPlan done`);
 
         // 2. Load company context.
-        const context = await loadCompanyContext(companyId);
+        logger.info(`[AIPG][${jobId}] step 2: loadCompanyContext start`);
+        const context = await withTimeout(loadCompanyContext(companyId), 45000, 'loadCompanyContext');
+        logger.info(`[AIPG][${jobId}] step 2: loadCompanyContext done`);
 
         // 3. Server-side ProjectCode generation with collision retry.
-        const projectCode = await generateUniqueProjectCode(companyId, plan.project.ProjectName);
+        logger.info(`[AIPG][${jobId}] step 3: generateUniqueProjectCode start`);
+        const projectCode = await withTimeout(
+            generateUniqueProjectCode(companyId, plan.project.ProjectName),
+            45000, 'generateUniqueProjectCode'
+        );
+        logger.info(`[AIPG][${jobId}] step 3: generateUniqueProjectCode done (code=${projectCode})`);
 
         // 4. Build project doc.
         const { projectDoc, statusUpdates } = buildProjectDoc({ plan, context, companyId, uid, projectCode });
         tracker.projectName = projectDoc.ProjectName;
+        logger.info(`[AIPG][${jobId}] step 4: buildProjectDoc done`);
 
         // 5. Save project.
-        const savedProject = await saveProject(companyId, projectDoc);
+        logger.info(`[AIPG][${jobId}] step 5: saveProject start`);
+        const savedProject = await withTimeout(saveProject(companyId, projectDoc), 45000, 'saveProject');
         tracker.project = projectDoc._id.toString();
         try { socketEmitter.emit('insert', { type: 'insert', data: savedProject || projectDoc, module: 'projects' }); } catch (_e) { /* ignore */ }
         emit({ event: 'progress', step: 'project', status: 'done', projectId: tracker.project });
+        logger.info(`[AIPG][${jobId}] step 5: saveProject done (projectId=${tracker.project})`);
 
         // 6. $push new statuses/types into company SETTINGS (best-effort).
         await pushNewStatusesToSettings({ companyId, statusUpdates });
@@ -847,7 +910,7 @@ async function executePlan({ plan, companyId, uid, userData, jobId }) {
 
         return { ok: true, projectId: tracker.project, totals: { sprints: tracker.sprints.length, tasks: tracker.tasks.length } };
     } catch (error) {
-        logger.error(`AI project orchestrator error: ${error && error.message ? error.message : error}`);
+        logger.error(`[AIPG][${jobId}] orchestrator catch: ${error && error.message ? error.message : error}${error && error.stack ? '\n' + error.stack : ''}`);
         await rollback({ companyId, tracker });
         emit({ event: 'error', error: error && error.message ? error.message : String(error), rolledBack: true, code: error && error.code });
         return { ok: false, error: error && error.message ? error.message : String(error) };
