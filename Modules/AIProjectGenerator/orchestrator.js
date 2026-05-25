@@ -46,7 +46,38 @@ const { addSprintFun } = require('../Sprints/controller');
 const { HandleHistory } = require('../Tasks/helpers/helper');
 const { HandleBothNotification } = require('../Tasks/helpers/handleNotification');
 const { checkProjectPlan, removeProjectCount } = require('../createProject/controller');
+const { estimateAndPersist: estimateTaskTimeWithAI } = require('../EstimatedTime/aiTaskEstimator');
 const sseEmitter = require('./sseEmitter');
+
+// Concurrency cap for fire-and-forget AI estimates after bulk task insert —
+// keeps us well under the LLM provider's per-key rate limits when a single
+// project generates dozens of tasks at once.
+const ESTIMATE_CONCURRENCY = 3;
+
+function fireTaskEstimatesInBackground(companyId, docs) {
+    if (!Array.isArray(docs) || docs.length === 0) return;
+    let cursor = 0;
+    const runOne = async () => {
+        while (cursor < docs.length) {
+            const idx = cursor;
+            cursor += 1;
+            const d = docs[idx];
+            try {
+                await estimateTaskTimeWithAI({
+                    companyId,
+                    taskId: String(d._id),
+                    task: d,
+                });
+            } catch (e) {
+                logger.error(`AI task estimate error (orchestrator): ${e && e.message ? e.message : e}`);
+            }
+        }
+    };
+    const workers = Math.min(ESTIMATE_CONCURRENCY, docs.length);
+    for (let i = 0; i < workers; i += 1) {
+        runOne();
+    }
+}
 
 // Hardcoded list of view columns that manual createProject also injects
 // regardless of wizard input (see Modules/createProject/controller.js:440-487).
@@ -701,6 +732,12 @@ async function createTasksForSprint({ companyId, projectDoc, sprintDoc, tasks, s
     for (const d of docs) {
         try { socketEmitter.emit('insert', { type: 'insert', data: d, module: 'task' }); } catch (_e) { /* ignore */ }
     }
+
+    // Estimates run in the background so the orchestrator's progress stream
+    // is not blocked by the per-task LLM calls. Each estimate persists its
+    // own `totalEstimatedTime` update and emits a follow-up socket event.
+    fireTaskEstimatesInBackground(companyId, docs);
+
     return docs;
 }
 
