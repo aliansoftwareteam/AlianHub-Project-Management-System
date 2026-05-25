@@ -1,15 +1,4 @@
-const { checkConnectionExists, createConnection, updateConnectionRecord, connections, evictLeastRecentlyUsed, getMaxTenantConnections } = require("./helper");
-
-// Issue #162 — enforce the per-tenant connection cap by evicting the
-// least-recently-used connection (outside a small grace window) before
-// opening a new one. If every entry is inside the grace window we accept
-// a transient overshoot rather than risk aborting an in-flight query.
-const enforceConnectionCap = () => {
-    const cap = getMaxTenantConnections();
-    while (connections.length >= cap) {
-        if (!evictLeastRecentlyUsed()) break;
-    }
-};
+const { checkConnectionExists, createConnection, updateConnectionRecord, connections } = require("./helper");
 
 const requestedDbs = []
 function removeFromArray(db) {
@@ -36,7 +25,6 @@ exports.handleConnection = async (companyId) => {
                     if(reCheck >= 60) {
                         // console.log("INTERVAL >> CONNECTION CREATE");
                         clearInterval(interval);
-                        enforceConnectionCap();
                         createConnection(db)
                         .then((conData) => {
                             // console.log("REQUESTED DB FOUND", db);
@@ -76,7 +64,6 @@ exports.handleConnection = async (companyId) => {
                         resolve({ status: true, database: locals });
                     } else {
                         requestedDbs.push(db);
-                        enforceConnectionCap();
                         createConnection(db)
                             .then((conData) => {
                                 // console.log("REQUESTED DB FOUND", db);
@@ -94,7 +81,6 @@ exports.handleConnection = async (companyId) => {
                     }
                 } else {
                     requestedDbs.push(db);
-                    enforceConnectionCap();
                     createConnection(db)
                         .then((conData) => {
                             removeFromArray(db)
