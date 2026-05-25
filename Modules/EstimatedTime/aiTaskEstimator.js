@@ -79,12 +79,60 @@ function extractDescription(task) {
     return lines.join('\n').trim();
 }
 
+/**
+ * Lightweight whitespace normalization for the description before it
+ * hits the LLM. We don't deduplicate text here — that's the model's
+ * job per the prompt's Phase 1 — but we strip whitespace noise so the
+ * model spends its reasoning budget on real content:
+ *
+ *   - Trim trailing whitespace on every line (so two lines that differ
+ *     only by trailing spaces look identical to the model).
+ *   - Collapse 3+ consecutive blank lines into a single blank line.
+ *   - Collapse 3+ repeats of the same non-empty line (e.g. accidental
+ *     copy/paste) into a single occurrence.
+ *
+ * This is conservative: it removes accidental duplication, not
+ * intentional repetition with different wording.
+ */
+function normalizeDescriptionForPrompt(text) {
+    if (typeof text !== 'string' || !text) return '';
+    // Strip trailing whitespace per line and normalize newlines.
+    let lines = text.replace(/\r\n/g, '\n').split('\n').map((l) => l.replace(/\s+$/, ''));
+    // Collapse 3+ blank lines into one.
+    const collapsed = [];
+    let blankRun = 0;
+    for (const line of lines) {
+        if (line === '') {
+            blankRun += 1;
+            if (blankRun <= 1) collapsed.push('');
+        } else {
+            blankRun = 0;
+            collapsed.push(line);
+        }
+    }
+    // Collapse 3+ identical consecutive non-empty lines into one.
+    const out = [];
+    let lastNonEmpty = null;
+    let lastRun = 0;
+    for (const line of collapsed) {
+        if (line !== '' && line === lastNonEmpty) {
+            lastRun += 1;
+            if (lastRun <= 1) out.push(line);
+        } else {
+            lastNonEmpty = line === '' ? lastNonEmpty : line;
+            lastRun = line === '' ? lastRun : 1;
+            out.push(line);
+        }
+    }
+    return out.join('\n').trim();
+}
+
 function buildUserMessage(task) {
     const title = (task && task.TaskName) ? String(task.TaskName) : '(no title)';
     const priority = (task && task.Task_Priority) ? String(task.Task_Priority) : 'MEDIUM';
     const taskType = (task && task.TaskType) ? String(task.TaskType) : 'task';
     const isParent = !task || task.isParentTask !== false;
-    let description = extractDescription(task);
+    let description = normalizeDescriptionForPrompt(extractDescription(task));
     if (description.length > DESCRIPTION_CHAR_CAP) {
         description = `${description.slice(0, DESCRIPTION_CHAR_CAP)}…`;
     }
@@ -96,6 +144,8 @@ function buildUserMessage(task) {
         '',
         'Description:',
         description || '(no description provided — estimate from the title only)',
+        '',
+        'Follow the four-phase pipeline in the system prompt. Deduplicate before estimating; do not double-count overlapping requirements.',
     ].join('\n');
 }
 
@@ -149,8 +199,14 @@ async function callProvider(task) {
         systemPrompt: SYSTEM_PROMPT,
         messages: [{ role: 'user', content: userMessage }],
         jsonMode: true,
-        temperature: 0.2,
-        maxTokens: 256,
+        // Low temperature pulls the model toward deterministic, calibrated
+        // numbers — accuracy depends on the model NOT being creative here.
+        temperature: 0.15,
+        // 1024 leaves room for the work_items[] array (Phase 2 chain-of-
+        // thought) without truncating the JSON. A truncated response
+        // means parseMinutes returns null and we skip the estimate, so
+        // this directly affects success rate.
+        maxTokens: 1024,
     });
     const result = await Promise.race([
         chatPromise,
@@ -194,9 +250,12 @@ async function persistEstimate(companyId, taskId, minutes) {
  * @param {string} params.companyId
  * @param {string} params.taskId
  * @param {object} params.task        Task-shaped object (TaskName, description, etc.)
+ * @param {boolean} [params.force]    When true, bypass the "estimate already set"
+ *                                    guard. Used by the manual sidebar button
+ *                                    which is an explicit recalculation request.
  * @returns {Promise<{status: boolean, minutes?: number, reason?: string}>}
  */
-async function estimateAndPersist({ companyId, taskId, task } = {}) {
+async function estimateAndPersist({ companyId, taskId, task, force = false } = {}) {
     try {
         if (!companyId || !taskId || !task) {
             return { status: false, reason: 'missing required input' };
@@ -206,8 +265,11 @@ async function estimateAndPersist({ companyId, taskId, task } = {}) {
             || !providerFactory.isAnyProviderConfigured()) {
             return { status: false, reason: 'no LLM provider configured' };
         }
-        // Don't overwrite an explicit value the caller already set.
-        if (typeof task.totalEstimatedTime === 'number' && task.totalEstimatedTime > 0) {
+        // Don't overwrite an explicit value the caller already set — unless
+        // the caller is explicitly recalculating (manual sidebar button).
+        if (!force
+            && typeof task.totalEstimatedTime === 'number'
+            && task.totalEstimatedTime > 0) {
             return { status: false, reason: 'estimate already set' };
         }
         const minutes = await callProvider(task);
@@ -230,6 +292,7 @@ module.exports = {
         parseMinutes,
         buildUserMessage,
         extractDescription,
+        normalizeDescriptionForPrompt,
         MIN_MINUTES,
         MAX_MINUTES,
     },
