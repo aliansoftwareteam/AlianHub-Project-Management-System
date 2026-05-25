@@ -4,7 +4,7 @@
  * The prompt is split into modular `.md` partials under ./prompts/ so each
  * piece can be edited independently without touching JavaScript. Partials
  * are read ONCE at module load and cached in memory — `require()` already
- * caches this file, so this gives us zero file I/O per request.
+ * caches this file, so this gives us zero file I/O per request. 
  *
  * Layout:
  *   prompts/shared/      — role, output format, member rule, color rule, brief handling
