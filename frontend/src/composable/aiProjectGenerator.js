@@ -25,10 +25,10 @@ export function useAiProjectGenerator() {
         return res.data;
     }
 
-    async function generatePlan({ description, hints, briefId, isPrivateSpace }) {
+    async function generatePlan({ description, additionalRequirements, briefId, isPrivateSpace }) {
         const res = await apiRequest('post', env.AI_PROJECT_PLAN, {
             description,
-            hints: hints || {},
+            additionalRequirements: additionalRequirements || '',
             briefId: briefId || null,
             isPrivateSpace: !!isPrivateSpace,
         });
