@@ -22,7 +22,7 @@ const PROMPTS_DIR = path.join(__dirname, 'prompts');
 
 // Strip BOM + normalize line endings so files authored on different OSes
 // produce identical prompts (and so the byte-counts in tokenization are
-// deterministic).
+// deterministic). 
 function readPartial(...segments) {
     const fullPath = path.join(PROMPTS_DIR, ...segments);
     const raw = fs.readFileSync(fullPath, 'utf8');
