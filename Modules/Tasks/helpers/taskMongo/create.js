@@ -20,6 +20,7 @@ const { emitListener } = require("../../../Company/eventController.js");
 const { createCustomFields } = require("../helper.js");
 const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
+const { estimateAndPersist: estimateTaskTimeWithAI } = require('../../../EstimatedTime/aiTaskEstimator.js');
 module.exports = {
     create({data, user, projectData ,indexObj, setNotif}) {
         return new Promise((resolve,reject) => {
@@ -95,7 +96,20 @@ module.exports = {
                         })
     
                         if(data?.mainChat) return;
-    
+
+                        // Fire-and-forget: ask the LLM for an end-to-end
+                        // completion-time estimate (in minutes, assuming an AI
+                        // coding agent does the work) and persist it to
+                        // `totalEstimatedTime`. No-op when no LLM provider is
+                        // configured, so the existing flow is unaffected.
+                        estimateTaskTimeWithAI({
+                            companyId: projectData.CompanyId,
+                            taskId: taskResult.id,
+                            task: data,
+                        }).catch((error) => {
+                            logger.error(`AI task estimate error: ${error && error.message ? error.message : error}`);
+                        });
+
                         let taskObj = {
                             'ProjectName' : projectData.ProjectName,
                             'newTaskname' : data.TaskName
