@@ -154,11 +154,38 @@
              <div class="d-flex task-detail-right-side-label" v-if="checkApps('TimeEstimates') && checkPermission('task.task_estimated_hours',project?.isGlobalPermission) !== null">
                 <h4>{{$t('UserTimesheet.estimated')}}</h4>
                 <Skelaton v-if="isMainSpinner" style="height: 24px;" class="w-100px border-radius-7-px"/>
-                <EstimatedTimeInput
-                    v-if="Object.keys(task || {}).length && !isMainSpinner"
-                    :task="task"
-                    @update:totalEstimatedTime="(val) => updateTotalEstimatedTime(val)"
-                />
+                <div v-if="Object.keys(task || {}).length && !isMainSpinner" class="d-flex align-items-center estimated-with-ai">
+                    <EstimatedTimeInput
+                        :task="task"
+                        @update:totalEstimatedTime="(val) => updateTotalEstimatedTime(val)"
+                    />
+                    <!--
+                      Icon-only AI estimator trigger. Tooltip via the native
+                      title attribute matches the project's existing tooltip
+                      convention (see BulkActionBar.vue / CheckList.vue).
+                      Disabled + spinner state while a request is in flight.
+
+                      Permission gate: `=== true` (read-write) only. The outer
+                      row's `!== null` gate already covers visibility for the
+                      read-only case; this inner gate hides the AI trigger
+                      from users who can see the estimate but not edit it —
+                      matching the convention used by Priority / Start Date /
+                      Due Date rows in this same component.
+                    -->
+                    <button
+                        v-if="checkPermission('task.task_estimated_hours', project?.isGlobalPermission) === true"
+                        type="button"
+                        class="ai-estimate-btn"
+                        :class="{ 'is-loading': isAiEstimateLoading }"
+                        :disabled="isAiEstimateLoading"
+                        :title="isAiEstimateLoading ? 'Generating estimate…' : 'Generate estimate using AI'"
+                        :aria-label="isAiEstimateLoading ? 'Generating estimate' : 'Generate estimate using AI'"
+                        @click.stop="generateAiEstimate"
+                    >
+                        <span v-if="isAiEstimateLoading" class="ai-estimate-spinner" aria-hidden="true"></span>
+                        <img v-else :src="aiEstimateIcon" alt="" class="ai-estimate-icon" />
+                    </button>
+                </div>
             </div>
             <div class="d-flex task-detail-right-side-label" v-if="checkApps('TimeEstimates') && checkPermission('task.task_estimated_hours',project?.isGlobalPermission) !== null">
                 <h4>{{$t('UserTimesheet.task_planning')}}</h4>
@@ -200,6 +227,13 @@ import { taskDueDateAdd, taskDueDateChange } from '@/utils/NotificationTemplate'
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from "vue-i18n";
 import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
+import { apiRequest } from '@/services';
+import * as env from '@/config/env';
+
+// Icon for the "Generate estimate using AI" sidebar button. Same asset
+// the SubTasks / Checklist / Sprints components use for their AI actions
+// so the visual language stays consistent.
+const aiEstimateIcon = require("@/assets/images/svg/ai_image.svg");
 const { t } = useI18n();
 
 const {convertDateFormat} = useConvertDate();
@@ -253,6 +287,9 @@ const props = defineProps({
 const taskLeaderData = ref(getUser(props.task?.Task_Leader));
 const assigneeInProgress = ref({});
 const isSpinner = ref(false);
+// In-flight flag for the manual AI-estimate request — drives both the
+// button's spinner state and the click-debounce.
+const isAiEstimateLoading = ref(false);
 watch(() => props.task,(val) => {
     taskLeaderData.value = getUser(val?.Task_Leader);
 });
@@ -660,6 +697,40 @@ const displayTime = (time) => {
   const hours = Math.floor(totalMinutes / 60)
   const minutes = totalMinutes % 60
   return `${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m`
+}
+
+// Manual AI-estimate trigger. Posts to the EstimatedTime route which
+// loads the canonical task doc server-side, runs the LLM estimator with
+// force=true (so it overwrites any existing value), persists to
+// `totalEstimatedTime`, and emits a Socket.io `task` update — so other
+// connected clients see the new value without a refresh. We don't need
+// to patch local state here because the socket update flows back through
+// the same channel that drives `props.task`.
+const generateAiEstimate = async () => {
+    if (isAiEstimateLoading.value) return;
+    const taskId = props.task && props.task._id;
+    if (!taskId) {
+        $toast.error('Task is not available', { position: 'top-right' });
+        return;
+    }
+    isAiEstimateLoading.value = true;
+    try {
+        const response = await apiRequest('post', `${env.ESTIMATED_TIME}/ai/${taskId}`, {});
+        if (response && response.data && response.data.status) {
+            $toast.success('Estimate generated', { position: 'top-right' });
+        } else {
+            const msg = (response && response.data && response.data.statusText)
+                || 'Could not generate estimate';
+            $toast.error(msg, { position: 'top-right' });
+        }
+    } catch (err) {
+        const msg = (err && err.response && err.response.data && err.response.data.statusText)
+            || (err && err.message)
+            || 'Could not generate estimate';
+        $toast.error(msg, { position: 'top-right' });
+    } finally {
+        isAiEstimateLoading.value = false;
+    }
 }
 </script>
 <style scoped src='./style.css'>

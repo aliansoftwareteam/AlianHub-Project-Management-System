@@ -4,6 +4,7 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const { replaceObjectKey } = require("../Auth/helper");
 const socketEmitter = require("../../event/socketEventEmitter");
+const { estimateAndPersist: estimateTaskTimeWithAI } = require("./aiTaskEstimator");
 
 exports.getEstimatedTime = async(req,res) => {
     try {
@@ -62,6 +63,75 @@ exports.updateEstimatedTime = async(req,res) => {
         res.status(500).json({ message: "An error occurred while updating the estimated time.", error: error.message });
     }
 }
+
+// Manual AI estimate trigger — invoked from the task detail sidebar's
+// "Generate estimate using AI" icon button. Unlike the post-create
+// auto-estimate (which silently no-ops if a value already exists), this
+// endpoint always recalculates because the user explicitly asked for it.
+// The estimator helper does the LLM call, clamping, persistence, and
+// Socket.io emit, so this controller just orchestrates and returns.
+exports.generateAiEstimate = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'];
+        const taskId = req.params.tid;
+
+        if (!companyId) {
+            return res.status(400).json({ status: false, statusText: 'companyId header required' });
+        }
+        if (!taskId || !mongoose.Types.ObjectId.isValid(taskId)) {
+            return res.status(400).json({ status: false, statusText: 'valid taskId required' });
+        }
+
+        // Fetch the task with just the fields the estimator needs so the
+        // payload to the LLM is built from the canonical DB state — not
+        // from whatever stale shape the client happened to send.
+        const taskObj = {
+            type: SCHEMA_TYPE.TASKS,
+            data: [
+                { _id: new mongoose.Types.ObjectId(taskId) },
+                {
+                    TaskName: 1,
+                    Task_Priority: 1,
+                    TaskType: 1,
+                    isParentTask: 1,
+                    rawDescription: 1,
+                    descriptionBlock: 1,
+                    totalEstimatedTime: 1,
+                },
+            ],
+        };
+        const taskDoc = await MongoDbCrudOpration(companyId, taskObj, 'findOne');
+        if (!taskDoc || !taskDoc._id) {
+            return res.status(404).json({ status: false, statusText: 'task not found' });
+        }
+
+        const result = await estimateTaskTimeWithAI({
+            companyId,
+            taskId,
+            task: taskDoc,
+            force: true,
+        });
+
+        if (!result.status) {
+            return res.status(400).json({
+                status: false,
+                statusText: result.reason || 'estimate not generated',
+            });
+        }
+        return res.status(200).json({
+            status: true,
+            statusText: 'Estimate generated successfully',
+            data: { totalEstimatedTime: result.minutes },
+        });
+    } catch (error) {
+        loggerConfig.error(`generateAiEstimate error: ${error && error.message ? error.message : error}`);
+        return res.status(500).json({
+            status: false,
+            statusText: 'An error occurred while generating the AI estimate.',
+            error: error && error.message ? error.message : String(error),
+        });
+    }
+};
 
 exports.getEstimateByAggregate = async (req,res) => {
     try {
