@@ -826,7 +826,26 @@ async function executePlan({ plan, companyId, uid, userData, jobId }) {
     const emit = (payload) => sseEmitter.emit(jobId, payload);
 
     try {
-        // 1. Plan-limit gate — matches the manual createProject flow.
+        // 1. Plan-limit gate — INTENTIONALLY BYPASSED.
+        //
+        // We still call `checkProjectPlan` because internally it $inc's the
+        // company's `projectCount.{projectCount,publicCount,privateCount}`
+        // counters BEFORE checking the limit ceiling. Keeping that call
+        // means AI-created projects stay accurately counted in the
+        // companies doc — matching how the manual createProject flow
+        // tracks them. We just swallow the rejection that comes back
+        // when the ceiling is tripped, so creation proceeds anyway.
+        //
+        // checkProjectPlan rejects in two distinct cases:
+        //   (a) `countRollBack === false` — the $inc itself failed (e.g.
+        //       Mongo write error). Count was NOT mutated, so we leave
+        //       tracker.countIncremented = false. Nothing for the
+        //       downstream rollback path to undo.
+        //   (b) Otherwise — the $inc succeeded and only the ceiling
+        //       check failed. Count WAS mutated, so we mark
+        //       countIncremented = true and the existing rollback() in
+        //       the outer catch will correctly decrement on later
+        //       failure, exactly like the limit-not-tripped path.
         emit({ event: 'progress', step: 'project', status: 'started' });
         logger.info(`[AIPG][${jobId}] step 1: checkProjectPlan start (company=${companyId})`);
         try {
@@ -836,20 +855,16 @@ async function executePlan({ plan, companyId, uid, userData, jobId }) {
             );
             tracker.countIncremented = true;
         } catch (err) {
-            // checkProjectPlan increments the count BEFORE checking limits,
-            // so if it rejects we still need to roll the count back. We
-            // detect the count-not-rolled case via err.countRollBack !== false.
-            const rolledByCheck = err && err.countRollBack === false;
-            if (!rolledByCheck) {
-                // removeProjectCount is fire-and-forget (no Promise returned).
-                try { removeProjectCount(companyId, tracker.isPrivateSpace); } catch (_e) {}
+            const incrementFailed = err && err.countRollBack === false;
+            if (!incrementFailed) {
+                tracker.countIncremented = true;
             }
-            const reason = (err && err.statusText) || 'Project limit reached for this plan. Please upgrade or remove an existing project.';
-            const e = new Error(reason);
-            e.code = 'PLAN_LIMIT';
-            throw e;
+            const reason = (err && err.statusText)
+                || (err && err.message)
+                || 'unknown';
+            logger.warn(`[AIPG][${jobId}] checkProjectPlan rejected — bypassed (reason: ${reason}, incrementApplied: ${!incrementFailed})`);
         }
-        logger.info(`[AIPG][${jobId}] step 1: checkProjectPlan done`);
+        logger.info(`[AIPG][${jobId}] step 1: checkProjectPlan done (limit gate bypassed)`);
 
         // 2. Load company context.
         logger.info(`[AIPG][${jobId}] step 2: loadCompanyContext start`);

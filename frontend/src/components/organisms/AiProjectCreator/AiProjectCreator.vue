@@ -129,7 +129,22 @@
                         </div>
                     </transition>
 
-                    <div class="aipg-actions">
+                    <div v-if="hasGeneratedPlan" class="aipg-actions aipg-actions-split">
+                        <button
+                            class="aipg-btn aipg-btn-ghost"
+                            :disabled="!canGenerate || loading || briefUploading"
+                            @click="onGeneratePlan">
+                            <span v-if="loading" class="aipg-spinner aipg-spinner-sm" aria-hidden="true"></span>
+                            {{ loading ? 'Generating plan…' : 'Re-Generate Plan' }}
+                        </button>
+                        <button
+                            class="aipg-btn aipg-btn-primary"
+                            :disabled="loading || briefUploading"
+                            @click="onNextWithExistingPlan">
+                            Next →
+                        </button>
+                    </div>
+                    <div v-else class="aipg-actions">
                         <button
                             class="aipg-btn aipg-btn-primary"
                             :disabled="!canGenerate || loading || briefUploading"
@@ -324,6 +339,25 @@ export default defineComponent({
         const placeholderText = 'e.g. "A 3-month SaaS launch for a 5-person team building an invoicing tool with Stripe billing. Kanban workflow. GitHub + Slack integrations. MVP in 6 weeks; full launch in 12."';
 
         const canGenerate = computed(() => description.value.trim().length >= 20);
+
+        // True once a plan has been produced and is still held in memory.
+        // Drives the dual-button layout on Step 1 (Next + Re-Generate)
+        // when the user comes back from the preview/review screen.
+        // We check `sprints` length too so a stale `{}` or partial object
+        // from a failed run never trips this flag.
+        const hasGeneratedPlan = computed(() => {
+            const p = plan.value;
+            return !!(p && p.project && Array.isArray(p.sprints) && p.sprints.length > 0);
+        });
+
+        // Navigate to the review step using the in-memory plan as-is —
+        // no LLM call, no token spend. Used by the "Next" button on
+        // Step 1 when the user returned from the preview screen.
+        function onNextWithExistingPlan() {
+            if (!hasGeneratedPlan.value) return;
+            error.value = '';
+            step.value = 'preview';
+        }
 
         const totals = computed(() => {
             if (!plan.value || !Array.isArray(plan.value.sprints)) return { sprints: 0, tasks: 0 };
@@ -603,10 +637,10 @@ export default defineComponent({
             plan, planId, editableProjectName,
             jobId, progress, createdProjectId,
             placeholderText,
-            canGenerate, totals,
+            canGenerate, hasGeneratedPlan, totals,
             renderTaskDescription, isStepDone, stepClass, stepDoneDot, rowClass, stepIcon, stepStatusLabel,
             onFileChosen, clearBrief,
-            onGeneratePlan,
+            onGeneratePlan, onNextWithExistingPlan,
             onApprovePlan, onOpenProject, onRetry, onClose,
         };
     },
