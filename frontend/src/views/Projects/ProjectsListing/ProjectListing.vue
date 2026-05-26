@@ -627,7 +627,12 @@ function handleSearchUpdateProject (searchValues) {
     folderSearch.value = searchValues.folderSearch;
     sprintSearch.value = searchValues.sprintSearch;
 }
-defineExpose({toggleSidebar})
+// `mutateCurrentProjectDetails` is exposed so the AI Project Creator's
+// post-create handler in Projects.vue can replay the exact same flow a
+// user clicking a project in the sidebar triggers — commit-to-Vuex,
+// route push with the right tab query, and `update:projectData` emit
+// so the parent's watchers load sprints / tasks.
+defineExpose({toggleSidebar, mutateCurrentProjectDetails})
 </script>
 
 <style>

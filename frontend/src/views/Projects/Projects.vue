@@ -722,16 +722,49 @@ function closeSidebar(value) {
 const openAiCreator = () => {
     isActiveAiCreator.value = true;
 };
-function onAiProjectCreated({ projectId }) {
-    try {
-        dispatch('projectData/setProjects', { roleType: 'currentUser' });
-    } catch (_e) { /* ignore */ }
-    if (projectId) {
-        try {
-            const cid = (currentCompany.value && currentCompany.value._id) || route.params.cid;
-            router.push({ name: 'Project', params: { cid, id: projectId } });
-        } catch (_e) { /* ignore */ }
+async function onAiProjectCreated({ projectId }) {
+    if (!projectId) {
+        isActiveAiCreator.value = false;
+        return;
     }
+    try {
+        // Refresh the projects list so the newly AI-created project is in
+        // the Vuex store. We `await` here because the next step needs to
+        // find it; without the await we'd race the store update and almost
+        // always miss the new project.
+        await dispatch('projectData/setProjects', { roleType: 'currentUser' });
+
+        const projectsData = (getters['projectData/projects'] && getters['projectData/projects'].data) || [];
+        const newProject = projectsData.find((p) => String(p._id) === String(projectId));
+
+        // Re-use the sidebar's selection flow. `mutateCurrentProjectDetails`
+        // does ALL the work clicking a project in the left sidebar does:
+        //   - expands the project in the sidebar
+        //   - computes the correct `?tab=` query from the project's
+        //     ProjectRequiredComponent (falls back to 'ProjectListView')
+        //   - pushes the route with full params + query
+        //   - commits the project to Vuex (`projectData/mutateCurrentProjectDetails`)
+        //   - emits `update:projectData` up to this component, whose existing
+        //     watcher then loads sprints + tasks
+        //
+        // Plain `router.push` alone skips the Vuex commit and the
+        // update:projectData emit, so the main panel renders before the
+        // active-project state is set and the user sees "No Data Found"
+        // until they manually click the project in the sidebar.
+        if (newProject && projectList.value && typeof projectList.value.mutateCurrentProjectDetails === 'function') {
+            projectList.value.mutateCurrentProjectDetails(newProject, true, true);
+        } else {
+            // Defensive fallback: at minimum get the user to the right URL
+            // with the tab query even if we couldn't reach the sidebar
+            // component (e.g. it failed to mount).
+            const cid = (currentCompany.value && currentCompany.value._id) || route.params.cid;
+            router.push({
+                name: 'Project',
+                params: { cid, id: projectId },
+                query: { tab: 'ProjectListView' },
+            });
+        }
+    } catch (_e) { /* ignore */ }
     isActiveAiCreator.value = false;
 }
 
