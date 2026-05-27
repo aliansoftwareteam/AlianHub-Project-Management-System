@@ -1807,5 +1807,139 @@
         "backgroundColor": "#0091ff",
         "updatedAt": "2025-03-13T05:45:04.000Z",
         "createdAt": "2025-03-13T05:45:04.000Z"
+    },
+    {
+        "_id": "67ed1a001ca0ddd22163f5f0",
+        "name": "employee_workload_report_title",
+        "description": "employee_workload_report_description",
+        "permission": [],
+        "fields": [
+            {
+                "label": "card_name",
+                "groupBy": "display",
+                "type": "text",
+                "name": "fieldName",
+                "value": "Employee Workload & Activity Report",
+                "placeHolder": "card_name",
+                "options": [],
+                "rules": "required | min:3 | max:100",
+                "info": "",
+                "hidden": false,
+                "disabled": false
+            },
+            {
+                "label": "location",
+                "groupBy": "data",
+                "type": "dropdown",
+                "name": "projectId",
+                "value": [],
+                "placeHolder": "select",
+                "options": [],
+                "rules": "",
+                "info": "",
+                "hidden": false,
+                "disabled": false
+            },
+            {
+                "label": "show_assignees",
+                "groupBy": "data",
+                "type": "dropdown",
+                "name": "AssigneeUserId",
+                "value": [],
+                "placeHolder": "select",
+                "options": [],
+                "rules": "",
+                "info": "",
+                "hidden": false,
+                "disabled": false
+            },
+            {
+                "label": "status",
+                "groupBy": "data",
+                "type": "dropdown",
+                "name": "statusArray",
+                "value": [],
+                "placeHolder": "select",
+                "options": [],
+                "rules": "",
+                "info": "",
+                "hidden": false,
+                "disabled": false
+            },
+            {
+                "label": "timerange",
+                "groupBy": "data",
+                "type": "dropdown",
+                "name": "timerange",
+                "value": 3,
+                "placeHolder": "select",
+                "options": [
+                    {
+                        "id": 1,
+                        "name": "today"
+                    },
+                    {
+                        "id": 2,
+                        "name": "yesterday"
+                    },
+                    {
+                        "id": 3,
+                        "name": "this_week"
+                    },
+                    {
+                        "id": 4,
+                        "name": "last_week"
+                    },
+                    {
+                        "id": 5,
+                        "name": "this_month"
+                    },
+                    {
+                        "id": 6,
+                        "name": "last_month"
+                    },
+                    {
+                        "id": 7,
+                        "name": "last_30_days"
+                    }
+                ],
+                "rules": "",
+                "info": "",
+                "hidden": false,
+                "disabled": false
+            },
+            {
+                "label": "include_subtasks",
+                "groupBy": "data",
+                "type": "radio",
+                "name": "isParentTask",
+                "value": true,
+                "placeHolder": "",
+                "options": [],
+                "rules": "",
+                "info": "",
+                "hidden": false,
+                "disabled": false
+            },
+            {
+                "label": "hide_empty_users",
+                "groupBy": "data",
+                "type": "radio",
+                "name": "hideEmptyEmployees",
+                "value": false,
+                "placeHolder": "",
+                "options": [],
+                "rules": "",
+                "info": "",
+                "hidden": false,
+                "disabled": false
+            }
+        ],
+        "key": "EmployeeWorkloadReportCard",
+        "image": "EmployeeWorkloadReport",
+        "cardType": "workload",
+        "backgroundColor": "#6473E8",
+        "updatedAt": "2026-05-26T00:00:00.000Z",
+        "createdAt": "2026-05-26T00:00:00.000Z"
     }
 ]

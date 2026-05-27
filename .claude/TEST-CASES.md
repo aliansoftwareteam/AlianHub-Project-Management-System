@@ -877,6 +877,312 @@ Please include:
 
 ---
 
-**Document version:** 1.2
-**Covers PRs:** #188, #189, #190 + multi-select + Created By editable
-**Last updated:** 2026-05-25
+**Document version:** 1.3
+**Covers PRs:** #188, #189, #190 + multi-select + Created By editable + Employee Workload Report widget
+**Last updated:** 2026-05-26
+
+---
+
+# 2026-05-26 — Employee Workload & Activity Report widget
+
+New dashboard card under "Add Card" → Workload group. Pulls a
+filter-driven report of who's doing what right now. Uses two AI
+features: per-task Learning/Actual classification (cached on the
+task) and a 2-4 sentence plain-English summary banner.
+
+## Section K — Add and remove the card
+
+### K1. Card appears in the "Add Card" picker
+
+**Setup**
+- Log in as an Admin user.
+- Open the dashboard.
+
+**Steps**
+1. Click "Add Card" in the dashboard top-right.
+2. Scroll the picker until you see the new card titled
+   "Employee Workload & Activity Report".
+3. Hover the card — confirm description text appears.
+4. Click it.
+
+### K2. Card mounts with default config (zero setup)
+
+**Steps**
+1. After K1, the card should appear on the dashboard.
+2. Within ~5 seconds the table should populate with employees.
+3. The AI summary banner should appear at the top (if an AI key is
+   configured on the server).
+4. The two charts at the bottom should render.
+
+### K3. Remove the card
+
+**Steps**
+1. Click the X (close) icon in the top-right of the card.
+
+---
+
+## Section L — Filter and config (gear icon)
+
+### L1. Open the edit panel
+
+**Steps**
+1. Click the gear (settings) icon in the card header.
+2. The edit panel slides in from the right.
+
+### L2. Change the date range
+
+**Steps**
+1. In the edit panel, set Date Range to "Last 7 Days".
+2. Click Save.
+3. Observe the card refreshing and showing the new range.
+
+### L3. Filter to specific employees
+
+**Steps**
+1. Open the edit panel.
+2. Pick 2 employees from the Employees dropdown.
+3. Click Save.
+
+### L4. Filter to specific projects
+
+**Steps**
+1. Open the edit panel.
+2. Pick 1 project from the Projects dropdown.
+3. Click Save.
+
+### L5. Filter by task type
+
+**Steps**
+1. Open the edit panel.
+2. Select task type "learning".
+3. Click Save.
+
+### L6. Change activity thresholds
+
+**Steps**
+1. Open the edit panel.
+2. Set Active Within Minutes to 60 (1 hour).
+3. Set Idle After Minutes to 240 (4 hours).
+4. Set Overload Capacity Per Day to 300 (5 hours).
+5. Click Save.
+
+### L7. Hide the AI summary banner
+
+**Steps**
+1. Open the edit panel.
+2. Toggle off "Show AI Summary".
+3. Click Save.
+
+### L8. Hide the workload chart
+
+**Steps**
+1. Open the edit panel.
+2. Toggle off "Show Workload Chart".
+3. Click Save.
+
+### L9. Hide the task-type chart
+
+**Steps**
+1. Open the edit panel.
+2. Toggle off "Show Task Type Chart".
+3. Click Save.
+
+### L10. Change refresh interval
+
+**Steps**
+1. Open the edit panel.
+2. Set refresh interval to 30 seconds.
+3. Click Save and wait 30 seconds.
+
+### L11. Disable auto-refresh
+
+**Steps**
+1. Open the edit panel.
+2. Set refresh interval to 0.
+3. Click Save.
+
+---
+
+## Section M — Table interactions
+
+### M1. Expand an employee row
+
+**Steps**
+1. Click the chevron (›) in the leftmost column of any employee row.
+2. The row expands to show their tasks.
+3. Click again to collapse.
+
+### M2. Sort by tracked hours
+
+**Steps**
+1. Click the "Tracked" column header.
+2. Click it again to reverse direction.
+
+### M3. Sort by overdue count
+
+**Steps**
+1. Click the "Overdue" column header.
+2. Employees with overdue tasks should rise to the top.
+
+### M4. Sort by activity status
+
+**Steps**
+1. Click the "Activity" column header.
+2. Confirm Active/Idle/Overloaded employees group together.
+
+---
+
+## Section N — Visual flags
+
+### N1. Activity badges show correct colors
+
+**Steps**
+1. Look at the Activity column.
+2. Confirm green badge = Active, gray badge = Idle, red badge = Overloaded.
+
+### N2. Overdue tasks are visually flagged
+
+**Steps**
+1. Expand an employee with overdue tasks (N > 0 in Overdue column).
+2. Inside, each overdue task has a red "Xd overdue" tag.
+
+### N3. Missing estimates show as em-dash
+
+**Steps**
+1. Find an employee or task with no estimate set.
+2. Confirm the Estimated column / task estimate shows "—" (italic gray).
+
+### N4. Overload highlights estimated hours red
+
+**Steps**
+1. Find an employee marked "Overloaded".
+2. Confirm their Estimated column value is shown in red.
+
+### N5. Online indicator on avatar
+
+**Steps**
+1. Have a coworker log into the app.
+2. Check that their avatar in the card shows a green dot.
+
+---
+
+## Section O — AI features
+
+### O1. AI summary banner appears
+
+**Setup**
+- AI keys configured on the server (`ANTHROPIC_API_KEY +
+  ANTHROPIC_MODEL` or `AI_API_KEY + AI_MODEL`).
+
+**Steps**
+1. Open the card.
+2. Look at the top banner.
+
+### O2. AI summary hidden when no AI key
+
+**Setup**
+- Server has no AI keys configured.
+
+**Steps**
+1. Open the card.
+2. Look for the summary banner.
+
+### O3. Learning / Actual pills on tasks
+
+**Setup**
+- AI keys configured.
+- Some tasks have been created with descriptions distinct enough to
+  be classified (one obviously a tutorial, one obviously a customer
+  feature).
+
+**Steps**
+1. Expand any employee row in the card.
+2. Look at the task pills on the right of each task.
+
+### O4. Unknown pills when no AI key
+
+**Setup**
+- No AI keys configured. Tasks have no manual `aiTaskCategoryManual`.
+
+**Steps**
+1. Expand any employee row.
+2. All task pills should show "Unknown".
+
+### O5. AI summary cache works
+
+**Setup**
+- AI keys configured.
+
+**Steps**
+1. Open the card and wait for the summary.
+2. Close the card and re-add it within 5 minutes.
+3. The summary should appear instantly (cached).
+
+---
+
+## Section P — Role-based visibility
+
+### P1. Admin sees all employees
+
+**Setup**
+- Log in as a Company Owner / Admin.
+
+**Steps**
+1. Open the card with no employee filter applied.
+
+### P2. Manager sees their team only
+
+**Setup**
+- Log in as a user with `roleType: 2` (Manager / Project Lead).
+
+**Steps**
+1. Open the card with no employee filter applied.
+
+### P3. Regular employee sees themselves only
+
+**Setup**
+- Log in as a user with `roleType: 3` or higher.
+
+**Steps**
+1. Open the card with no employee filter applied.
+
+### P4. Cross-role API attempt blocked
+
+**Setup**
+- Get an auth token for a regular employee.
+
+**Steps**
+1. Manually `POST /api/v1/dashboard/employee-workload` with a body
+   asking for a different employee's ID.
+2. Observe the response.
+
+---
+
+## Section Q — Layout / interaction parity with other cards
+
+### Q1. Drag the card to a different position
+
+**Steps**
+1. Click and hold the card header.
+2. Drag it to a new position in the grid.
+3. Release.
+
+### Q2. Resize the card
+
+**Steps**
+1. Hover the bottom-right corner.
+2. Drag to resize.
+
+### Q3. Card persists across sessions
+
+**Steps**
+1. Add the card, configure it.
+2. Log out and log back in.
+
+### Q4. Auto-refresh pauses when tab is hidden
+
+**Steps**
+1. Set refresh interval to 10 seconds in the gear panel.
+2. Switch to a different browser tab for 30+ seconds.
+3. Switch back.
+

@@ -81,7 +81,7 @@
                     />
                 </template>
             </div>
-            <div v-if="cardType !== 'time_tracking' && componentId !== 'QueueListComp'">
+            <div v-if="cardType !== 'time_tracking' && componentId !== 'QueueListComp' && componentId !== 'EmployeeWorkloadReportCard'">
                 <div class="custom-field card-advanced-filter">
                     <h3 class="group_by_card">{{$t('Filters.filter')}}</h3>
                     <template v-for="(field, index) in fieldArray.filter(e => e.groupBy === 'filter')" :key="index">
@@ -123,15 +123,25 @@ const { getters } = store;
 const {makeUniqueId,checkPermission} = useCustomComposable()
 const userId = inject("$userId");
 const teams = computed(() => {
-    const teamsArr = getters["settings/teams"];
-    return teamsArr.map((x) => {
-        return {
-            ...x,
-            "_id": "tId_"+x._id,
-            "Employee_Name": x.name,
-            "Employee_profileImageURL": ""
-        }
-    })
+    // Members (roleType !== 1 and !== 2) cannot select teams in the
+    // EmployeeWorkloadReportCard — the backend would only return their
+    // own data anyway, so showing the full team list is misleading.
+    if (props.componentId === 'EmployeeWorkloadReportCard') {
+        const roleType = getters["settings/companyUserDetail"]?.roleType;
+        if (roleType !== 1 && roleType !== 2) return [];
+    }
+    const teamsArr = getters["settings/teams"] || [];
+    return teamsArr
+        // Skip teams that have no members — selecting them does nothing.
+        .filter((x) => Array.isArray(x.assigneeUsersArray) && x.assigneeUsersArray.length)
+        .map((x) => {
+            return {
+                ...x,
+                "_id": "tId_"+x._id,
+                "Employee_Name": x.name,
+                "Employee_profileImageURL": ""
+            }
+        })
 });
 
 const taskStatusArray = computed(() => JSON.parse(JSON.stringify(getters["settings/AllTaskStatus"]?.settings || [])));
@@ -183,6 +193,20 @@ const usersArray = computed(() => {
     const allUsers = JSON.parse(JSON.stringify(getters["users/users"]))
     const currentUserOnly = allUsers.filter(user => user._id === userId.value);
 
+    // EmployeeWorkloadReportCard: show only users the viewer is
+    // allowed to see — mirrors the backend role-based visibility.
+    //   roleType 1 (Admin)   → all users
+    //   roleType 2 (Manager) → all users (backend will further restrict)
+    //   else   (Member)      → only themselves
+    if (props.componentId === 'EmployeeWorkloadReportCard') {
+        const roleType = getters["settings/companyUserDetail"]?.roleType;
+        if (roleType !== 1 && roleType !== 2) {
+            selectedUser.value = [userId.value]; // eslint-disable-line
+            return currentUserOnly;
+        }
+        return allUsers;
+    }
+
     const makeFilterCond = (key) => {
         const permission = checkPermission(key);
         if (permission === 2 || permission === true) return allUsers;
@@ -209,6 +233,17 @@ const formRef = ref(null);
 const errorProject = ref('');
 const submitted = ref(false);
 const fieldArray = ref(JSON.parse(JSON.stringify(props.fieldsArray)));
+
+// EmployeeWorkloadReportCard — hide fields that are irrelevant for
+// members (roleType !== 1 and !== 2): "Hide empty users" makes no
+// sense when the viewer can only see themselves.
+if (props.componentId === 'EmployeeWorkloadReportCard') {
+    const roleType = getters["settings/companyUserDetail"]?.roleType;
+    if (roleType !== 1 && roleType !== 2) {
+        const f = fieldArray.value.find((x) => x.name === 'hideEmptyEmployees');
+        if (f) f.hidden = true;
+    }
+}
 
 const { checkErrors, checkAllFields } = useValidation();
 

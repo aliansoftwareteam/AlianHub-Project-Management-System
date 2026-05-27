@@ -1,0 +1,447 @@
+/* ─────────────────────────────────────────────────────────────
+   EmployeeWorkloadReportCard — styling matches existing
+   dashboard cards (white background, Roboto, soft borders,
+   #6473E8 brand accent).
+   ───────────────────────────────────────────────────────────── */
+
+.ewr-card-wrapper {
+    width: 100%;
+    height: 100%;
+    /* Flex column so the chips row is pinned at the top and the
+       table wrapper owns all remaining height + scrolling. */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    font-family: 'Roboto', sans-serif;
+    color: #1F212A;
+    cursor: default;
+}
+
+.ewr-loading {
+    padding: 8px 4px;
+    flex-shrink: 0;
+}
+.ewr-row-skeleton {
+    border-radius: 6px;
+}
+
+/* Filter chip row — fixed at the top; never scrolls away */
+.ewr-chips-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+}
+.ewr-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 9px;
+    background: #F1F3F9;
+    border-radius: 12px;
+    font-size: 11px;
+    color: #4A5061;
+    line-height: 1.4;
+    text-transform: capitalize;
+}
+.ewr-chip-spacer {
+    flex: 1;
+}
+
+/* Search box */
+.ewr-search-box {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #fff;
+    border: 1.5px solid #E2E6FA;
+    border-radius: 20px;
+    padding: 5px 12px;
+    box-shadow: 0 1px 3px rgba(100, 115, 232, 0.06);
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+.ewr-search-box:focus-within {
+    border-color: #6473E8;
+    box-shadow: 0 0 0 3px rgba(100, 115, 232, 0.12);
+    background: #fff;
+}
+.ewr-search-icon {
+    width: 13px;
+    height: 13px;
+    color: #94A3B8;
+    flex-shrink: 0;
+    transition: color 0.18s ease;
+}
+.ewr-search-box:focus-within .ewr-search-icon {
+    color: #6473E8;
+}
+.ewr-search-input {
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 12px;
+    color: #1F212A;
+    font-family: 'Roboto', sans-serif;
+    width: 175px;
+    padding: 0;
+    line-height: 1.5;
+    letter-spacing: 0.01em;
+}
+.ewr-search-input::placeholder {
+    color: #B0B8CC;
+    font-weight: 400;
+}
+.ewr-search-clear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    font-size: 9px;
+    color: #fff;
+    background: #C4CAD6;
+    cursor: pointer;
+    flex-shrink: 0;
+    border-radius: 50%;
+    transition: background 0.15s ease;
+    line-height: 1;
+}
+.ewr-search-clear:hover {
+    background: #6473E8;
+}
+.ewr-chip-loading {
+    background: #FEF6E7;
+    color: #B45309;
+}
+
+/* Colour legend for the Logged Hours column */
+.ewr-legend {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 11px;
+    color: #6B7280;
+    white-space: nowrap;
+}
+.ewr-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+.ewr-legend-dot {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.ewr-legend-dot-estimate {
+    background: #EF4444;
+}
+.ewr-legend-dot-planned {
+    background: #F59E0B;
+}
+.ewr-mini-spinner {
+    display: inline-block;
+    box-sizing: border-box;
+    width: 10px;
+    height: 10px;
+    border: 2px solid #E2E6FA;
+    border-top-color: #6473E8;
+    border-radius: 50%;
+    margin-right: 4px;
+    animation: ewr-spin 0.7s linear infinite;
+}
+@keyframes ewr-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Empty state */
+.ewr-empty {
+    padding: 24px 12px;
+    text-align: center;
+    color: #6B7280;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+/* Table — fixed layout with explicit column widths so data lines up
+   under each header cleanly. The Employee column is flexible
+   (auto), the numeric columns are fixed-width so values stay
+   under their headers regardless of card size. */
+.ewr-table-wrapper {
+    flex: 1;               /* grows to fill remaining card height    */
+    overflow-y: auto;      /* this is now the sole scroll container  */
+    overflow-x: hidden;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+}
+.ewr-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 13px;
+}
+.ewr-table thead {
+    background: #FAFBFC;
+}
+.ewr-table th {
+    text-align: left;
+    padding: 9px 10px;
+    font-weight: 600;
+    color: #4A5061;
+    border-bottom: 1px solid #E5E7EB;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    box-sizing: border-box;
+    /* Sticky header — sticks to the top of .ewr-table-wrapper scroll */
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #FAFBFC;
+}
+.ewr-table th:hover {
+    background: #F1F3F9;
+}
+
+/* Column widths */
+.ewr-th-expand { width: 36px; cursor: default !important; }
+.ewr-th-expand:hover { background: transparent !important; }
+.ewr-th-name { width: auto; }
+.ewr-th-project { width: 20%; cursor: default !important; }
+.ewr-th-project:hover { background: transparent !important; }
+.ewr-th-num {
+    width: 130px;
+    text-align: right !important;
+    padding-right: 22px;   /* gap between adjacent hour columns */
+}
+.ewr-td-num {
+    padding-right: 22px;   /* keep values aligned under the wider header */
+}
+
+/* Extra right-edge breathing room so the last column's numbers
+   aren't crammed against the table border. */
+.ewr-table th:last-child,
+.ewr-table td:last-child {
+    padding-right: 28px;
+}
+
+.ewr-row td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #F1F3F9;
+    vertical-align: middle;
+    box-sizing: border-box;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ewr-row:last-child td {
+    border-bottom: 0;
+}
+.ewr-row-expanded td {
+    border-bottom-color: transparent;
+}
+
+.ewr-td-expand {
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+    width: 36px;
+}
+.ewr-chevron {
+    display: inline-block;
+    font-size: 14px;
+    color: #94A3B8;
+    transition: transform 0.15s ease;
+}
+.ewr-chevron-open {
+    transform: rotate(90deg);
+    color: #6473E8;
+}
+
+/* Employee cell — flex INSIDE the td, not on the td itself */
+.ewr-td-name {
+    overflow: hidden;
+}
+.ewr-name-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+.ewr-avatar-placeholder {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #E2E6FA;
+    color: #6473E8;
+    font-size: 11px;
+    font-weight: 600;
+}
+.ewr-name-text {
+    color: #1F212A;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    flex: 1;
+}
+
+.ewr-td-num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: #1F212A;
+    width: 130px;
+}
+.ewr-td-project {
+    width: 20%;
+    color: #4A5061;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ewr-muted {
+    color: #94A3B8;
+}
+
+/* Only rows with tasks are clickable/expandable */
+.ewr-row-clickable {
+    cursor: pointer;
+}
+.ewr-row-clickable:hover td {
+    background: #FAFBFC;
+}
+/* De-emphasise employees with no activity in the current filter */
+.ewr-row-empty td {
+    color: #B0B6C0;
+}
+.ewr-row-empty .ewr-name-text {
+    color: #8A909C;
+    font-weight: 400;
+}
+
+/* Highlights */
+.ewr-missing {
+    color: #94A3B8;
+    font-style: italic;
+}
+/* Over-budget on the Logged column — lighter, cleaner pairing */
+.ewr-over-estimate {
+    color: #EF4444;   /* clean red — logged exceeded the task estimate */
+    font-weight: 600;
+}
+.ewr-over-planned {
+    color: #F59E0B;   /* warm amber — logged exceeded the employee's own plan */
+    font-weight: 600;
+}
+
+/* Expanded task rows — real table rows aligned to the same columns.
+   Generous vertical padding gives clear space between each task. */
+.ewr-task-tr td {
+    padding: 11px 10px;
+    background: #FAFBFC;
+    border-bottom: 1px solid #F1F3F9;
+    font-size: 12px;
+    vertical-align: middle;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+/* A little extra room at the very top and bottom of the group */
+.ewr-task-first td {
+    padding-top: 14px;
+}
+.ewr-task-last td {
+    padding-bottom: 14px;
+}
+
+/* Over-estimate task row — tinted red + left accent so over-budget
+   tasks are obvious at a glance. Declared AFTER .ewr-task-tr td so
+   the background wins (same specificity). */
+.ewr-task-over td {
+    background: #FEF2F2;
+}
+.ewr-task-over td:first-child {
+    box-shadow: inset 3px 0 0 #EF4444;
+}
+.ewr-td-task-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ewr-subtask-icon {
+    display: inline-block;
+    width: 10px;
+    height: 11px;
+    vertical-align: middle;
+    margin-right: 6px;
+    flex-shrink: 0;
+    opacity: 0.75;
+}
+.ewr-task-key {
+    display: inline-block;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 10px;
+    color: #6473E8;
+    background: #EEF0FE;
+    padding: 1px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+    margin-right: 8px;
+}
+.ewr-task-name {
+    color: #1F212A;
+}
+.ewr-task-name-link {
+    cursor: pointer;
+}
+.ewr-task-name-link:hover {
+    color: #6473E8;
+    text-decoration: underline;
+}
+.ewr-no-tasks {
+    color: #6B7280;
+    font-style: italic;
+}
+.ewr-task-more {
+    color: #94A3B8;
+    font-size: 11px;
+    font-style: italic;
+}
+
+/* Totals footer row — sticky at the bottom of the scroll container */
+.ewr-total-row td {
+    padding: 10px;
+    border-top: 2px solid #E5E7EB;
+    background: #FAFBFC;
+    font-weight: 600;
+    color: #1F212A;
+    font-variant-numeric: tabular-nums;
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+}
+.ewr-total-label {
+    color: #4A5061;
+}
+
+/* Responsive — narrow numeric columns at small width */
+@media (max-width: 991px) {
+    .ewr-th-num, .ewr-td-num { width: 108px; padding-right: 16px; }
+    .ewr-table th:last-child, .ewr-table td:last-child { padding-right: 20px; }
+    .ewr-th-project, .ewr-td-project { width: 16%; }
+}
+@media (max-width: 767px) {
+    .ewr-table th, .ewr-table td {
+        padding: 6px 8px;
+        font-size: 12px;
+    }
+    .ewr-th-num, .ewr-td-num { width: 84px; padding-right: 12px; }
+    .ewr-table th:last-child, .ewr-table td:last-child { padding-right: 14px; }
+}
