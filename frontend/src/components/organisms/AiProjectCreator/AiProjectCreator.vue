@@ -2,10 +2,10 @@
     <Sidebar
         v-if="visible"
         :visible="visible"
-        :close-on-back-drop="step !== 'executing'"
+        :close-on-back-drop="!isBusy"
         :width="clientWidth <= 768 ? '100%' : '780px'"
         :top="clientWidth <= 767 ? '0px' : '46px'"
-        @update:visible="onClose">
+        @update:visible="onSidebarVisibleChange">
         <template #head-left>
             <span class="aipg-head-title">
                 <span class="aipg-spark" aria-hidden="true">✨</span>
@@ -18,8 +18,8 @@
                 :src="closeIcon"
                 alt="Close"
                 class="aipg-close-icon"
-                :class="{ 'aipg-close-icon-disabled': loading || briefUploading }"
-                @click="(loading || briefUploading) ? null : onClose()"/>
+                :class="{ 'aipg-close-icon-disabled': isBusy }"
+                @click="isBusy ? null : onClose()"/>
         </template>
         <template #body>
             <div class="aipg-wrapper">
@@ -346,6 +346,17 @@ export default defineComponent({
         // The answers/skips the user submitted from the Clarify step,
         // sent verbatim into /plan as the `clarifications` array.
         const clarifications = ref(null);
+
+        // True when ANY in-flight operation owns the modal — brief upload,
+        // clarify LLM call, plan LLM call, or the orchestrator's execute
+        // job. The backdrop-close + X-icon both gate on this so a stray
+        // outside click cannot abort an in-flight LLM/orchestrator run.
+        const isBusy = computed(() =>
+            step.value === 'executing'
+            || loading.value
+            || clarifyLoading.value
+            || briefUploading.value,
+        );
 
         const description = ref('');
         // Mirrors the manual flow's workspace step: 'public' → private=false.
@@ -756,6 +767,16 @@ export default defineComponent({
             rolledBack.value = false;
         }
 
+        // Defensive guard for the Sidebar's `update:visible` event. The
+        // backdrop already honors `:close-on-back-drop="!isBusy"`, but
+        // Sidebar may also emit close from ESC key or programmatic paths
+        // — refuse all of them while a run is in flight.
+        function onSidebarVisibleChange(nextVisible) {
+            if (nextVisible) return;     // open events are parent-driven; ignore
+            if (isBusy.value) return;    // mid-run: refuse to close
+            onClose();
+        }
+
         function onClose() {
             if (step.value === 'executing') return;
             if (unsubscribeProgress.value) {
@@ -812,12 +833,12 @@ export default defineComponent({
             plan, planId, editableProjectName,
             jobId, progress, createdProjectId,
             placeholderText,
-            canGenerate, hasGeneratedPlan, hasGeneratedQuestions, totals,
+            canGenerate, hasGeneratedPlan, hasGeneratedQuestions, totals, isBusy,
             renderTaskDescription, isStepDone, stepClass, stepDoneDot, rowClass, stepIcon, stepStatusLabel,
             onFileChosen, clearBrief,
             onGeneratePlan, onNextWithExistingPlan,
             onRegenerateQuestions, onNextWithExistingQuestions,
-            onApprovePlan, onOpenProject, onRetry, onClose,
+            onApprovePlan, onOpenProject, onRetry, onClose, onSidebarVisibleChange,
             // Clarify step
             clarifyLoading, clarifyQuestions, clarifyUnderstanding, clarifyError,
             onClarifySubmit, onClarifyBack, onClarifyRetry, onClarifySkipAll,
