@@ -240,6 +240,137 @@ const ClarifyResponseSchema = z.object({
     plan: PlanSchema,
 });
 
+// ─── Clarifying questions schema ───────────────────────────────────────
+//
+// Validates the JSON output of the clarify LLM call (before plan
+// generation). The shape is intentionally permissive — `recommended` can
+// be a string, array, or boolean depending on `type` — so each question
+// is refined post-hoc with `superRefine` to enforce per-type rules.
+
+// Categories are the eight mandatory ones the clarify call MUST cover for
+// every brief. Display order in the UI follows this declaration order
+// (Platform first, Compliance last). Values are stable snake_case ids;
+// the frontend maps them to emoji-prefixed display labels.
+const QuestionCategoryEnum = z.enum([
+    'platform',        // 🖥️  Where users access the product
+    'features',        // ✨ What is in v1 / out of scope
+    'tech_stack',      // 🛠️  Frameworks, languages, databases, hosting
+    'integrations',    // 💳 Payments, auth, CRM, analytics, 3rd-party APIs
+    'audience',        // 👥 Who uses it, scale, public vs. internal
+    'timeline',        // 📅 Launch window, phased rollout
+    'budget',          // 💰 Spend tier for APIs, infra, tooling
+    'compliance',      // 🌍 Regulatory, regional, accessibility, data residency
+]);
+
+const QuestionTypeEnum = z.enum([
+    'segmented',
+    'radio_cards',
+    'toggle_chips',
+    'toggle',
+    'preset_chips',
+    'text',
+    'select_card',
+]);
+
+const QuestionOptionSchema = z.object({
+    value: z.string().min(1).max(60),
+    label: z.string().min(1).max(80),
+    description: z.string().max(200).optional(),
+});
+
+const ClarifyQuestionSchema = z.object({
+    id: z.string().regex(/^[a-z][a-z0-9-]{0,40}$/, 'id must be kebab-case, 1–41 chars'),
+    category: QuestionCategoryEnum,
+    question: z.string().min(5).max(240),
+    rationale: z.string().max(280).optional().default(''),
+    required: z.boolean().default(false),
+    type: QuestionTypeEnum,
+    options: z.array(QuestionOptionSchema).max(8).optional(),
+    // `recommended` is type-dependent: string for single-choice, string[]
+    // for multi, boolean for toggle, absent for text. We accept the union
+    // and validate the per-type shape in superRefine.
+    recommended: z.union([z.string(), z.array(z.string()), z.boolean()]).optional(),
+    hint: z.string().max(280).optional().default(''),
+}).superRefine((q, ctx) => {
+    const issue = (msg, path) => ctx.addIssue({ code: z.ZodIssueCode.custom, message: msg, path: path || [] });
+
+    const needsOptions = ['segmented', 'radio_cards', 'select_card', 'toggle_chips', 'preset_chips'].includes(q.type);
+    if (needsOptions) {
+        if (!Array.isArray(q.options) || q.options.length < 2) {
+            issue(`type "${q.type}" requires at least 2 options`, ['options']);
+            return;
+        }
+        // Option values must be unique within the question.
+        const seen = new Set();
+        for (const opt of q.options) {
+            if (seen.has(opt.value)) issue(`duplicate option value "${opt.value}"`, ['options']);
+            seen.add(opt.value);
+        }
+    }
+
+    if (q.type === 'toggle' && q.options) {
+        issue('type "toggle" must not include options', ['options']);
+    }
+    if (q.type === 'text' && q.options) {
+        issue('type "text" must not include options', ['options']);
+    }
+
+    // recommended shape per type
+    if (q.recommended != null) {
+        const validValues = needsOptions ? new Set(q.options.map((o) => o.value)) : null;
+        if (q.type === 'toggle_chips') {
+            if (!Array.isArray(q.recommended)) {
+                issue('recommended must be an array for type "toggle_chips"', ['recommended']);
+            } else {
+                for (const v of q.recommended) {
+                    if (!validValues || !validValues.has(v)) {
+                        issue(`recommended value "${v}" is not in options`, ['recommended']);
+                    }
+                }
+            }
+        } else if (q.type === 'toggle') {
+            if (typeof q.recommended !== 'boolean') {
+                issue('recommended must be a boolean for type "toggle"', ['recommended']);
+            }
+        } else if (q.type === 'text') {
+            // No structured recommendation for free text.
+            if (typeof q.recommended !== 'string') {
+                issue('recommended for type "text" must be a string suggestion or omitted', ['recommended']);
+            }
+        } else {
+            // segmented / radio_cards / select_card / preset_chips
+            if (typeof q.recommended !== 'string') {
+                issue(`recommended must be a string for type "${q.type}"`, ['recommended']);
+            } else if (validValues && !validValues.has(q.recommended)) {
+                issue(`recommended value "${q.recommended}" is not in options`, ['recommended']);
+            }
+        }
+    }
+});
+
+const ClarifyQuestionsSchema = z.object({
+    understanding: z.string().max(400).optional().default(''),
+    // 14-question cap: enough room for a full tech-stack breakdown (one
+    // question per layer — frontend, backend, db, storage, deployment,
+    // ci/cd) plus the scope/audience/timeline/quality/budget questions a
+    // CTO would also ask. Most briefs return 5–8 questions; the cap is
+    // only for tech-heavy briefs that genuinely need the breakdown.
+    questions: z.array(ClarifyQuestionSchema).max(14),
+}).superRefine((doc, ctx) => {
+    // Question ids must be globally unique within the questions array.
+    const seen = new Set();
+    doc.questions.forEach((q, i) => {
+        if (seen.has(q.id)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: `duplicate question id "${q.id}"`,
+                path: ['questions', i, 'id'],
+            });
+        }
+        seen.add(q.id);
+    });
+});
+
 /**
  * Strip ids that aren't in the allowed member list. Returns a cleaned plan
  * plus a list of removed ids for logging.
@@ -297,6 +428,7 @@ function tryParseJson(raw) {
 module.exports = {
     PlanSchema,
     ClarifyResponseSchema,
+    ClarifyQuestionsSchema,
     sanitizeMemberIds,
     tryParseJson,
 };
