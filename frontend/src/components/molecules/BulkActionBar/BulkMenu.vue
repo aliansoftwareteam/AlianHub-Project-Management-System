@@ -1,6 +1,7 @@
 <template>
     <div class="bulk-menu">
         <button
+            ref="btnRef"
             class="bulk-action-bar__btn"
             :class="{ 'bulk-action-bar__btn--active': open, 'bulk-action-bar__btn--disabled': disabled }"
             :disabled="disabled"
@@ -9,21 +10,26 @@
         >
             <span>{{ label }}</span>
         </button>
-        <div
-            v-if="open"
-            class="bulk-menu__panel"
-            :style="{ width }"
-            @click.stop
-        >
-            <slot />
-        </div>
+        <!-- Teleport the panel to <body> so it is not clipped by the bar's
+             `overflow-x: auto` in compact (mobile) mode. Position is computed
+             against the button's bounding rect on open. -->
+        <Teleport to="body">
+            <div
+                v-if="open"
+                class="bulk-menu__panel"
+                :style="panelStyle"
+                @click.stop
+            >
+                <slot />
+            </div>
+        </Teleport>
     </div>
 </template>
 
 <script setup>
-import { defineProps, defineEmits } from 'vue';
+import { defineProps, defineEmits, ref, watch, nextTick, onBeforeUnmount } from 'vue';
 
-defineProps({
+const props = defineProps({
     label: { type: String, required: true },
     open: { type: Boolean, default: false },
     disabled: { type: Boolean, default: false },
@@ -32,6 +38,45 @@ defineProps({
 
 const emit = defineEmits(['toggle']);
 function onToggle() { emit('toggle'); }
+
+const btnRef = ref(null);
+const panelStyle = ref({});
+
+// Place the panel above the button (matches the prior desktop layout —
+// 16px gap), then clamp horizontally so the panel never slides off-screen
+// when the button is near the right edge in compact mode.
+function updatePosition() {
+    if (!btnRef.value) return;
+    const rect = btnRef.value.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const widthPx = parseInt(props.width, 10) || 220;
+    let left = rect.left;
+    if (left + widthPx > vw - 8) left = Math.max(8, vw - widthPx - 8);
+    if (left < 8) left = 8;
+    panelStyle.value = {
+        width: props.width,
+        left: `${left}px`,
+        bottom: `${vh - rect.top + 16}px`,
+    };
+}
+
+watch(() => props.open, async (isOpen) => {
+    if (isOpen) {
+        await nextTick();
+        updatePosition();
+        window.addEventListener('scroll', updatePosition, true);
+        window.addEventListener('resize', updatePosition);
+    } else {
+        window.removeEventListener('scroll', updatePosition, true);
+        window.removeEventListener('resize', updatePosition);
+    }
+});
+
+onBeforeUnmount(() => {
+    window.removeEventListener('scroll', updatePosition, true);
+    window.removeEventListener('resize', updatePosition);
+});
 </script>
 
 <style scoped>
@@ -64,9 +109,7 @@ function onToggle() { emit('toggle'); }
 }
 
 .bulk-menu__panel {
-    position: absolute;
-    bottom: calc(100% + 16px);
-    left: 0;
+    position: fixed;
     background: #fff;
     color: #2b2b35;
     border: 1px solid rgba(15, 17, 26, 0.06);

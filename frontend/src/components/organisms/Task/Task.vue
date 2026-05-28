@@ -2,23 +2,25 @@
     <div>
         <div class="new-row list-group-item" id="singletaskdisply">
             <!-- LEFT SECTION -->
-            <div class="new-col1" :style="{ border: (clientWidth > sideScrollWidth ? '0px' : '')}">
-                <div class="common-section task ignore-drag" :style="`${task.isParentTask === false ? 'padding-left: 12px;' : ''}`">
-                    <!-- Multi-select checkbox: visible on row hover OR when this row is selected. Permission-gated. -->
-                    <label
-                        v-if="canMultiSelect"
-                        class="task-multi-select"
-                        :class="{ 'task-multi-select--active': isTaskSelected }"
+            <div class="new-col1" :class="{ 'new-col1--has-multi-select': canMultiSelect }" :style="{ border: (clientWidth > sideScrollWidth ? '0px' : '')}">
+                <!-- Multi-select checkbox: its own column at the very left of the row,
+                     in front of the drag handle / expand arrow so checkboxes align in a
+                     single vertical column regardless of whether the row has an arrow. -->
+                <label
+                    v-if="canMultiSelect"
+                    class="task-multi-select"
+                    :class="{ 'task-multi-select--active': isTaskSelected }"
+                    @click.stop
+                >
+                    <input
+                        type="checkbox"
+                        :checked="isTaskSelected"
                         @click.stop
-                    >
-                        <input
-                            type="checkbox"
-                            :checked="isTaskSelected"
-                            @click.stop
-                            @change="handleSelectChange($event)"
-                            :aria-label="$t ? $t('Common.select_task') || 'Select task' : 'Select task'"
-                        />
-                    </label>
+                        @change="handleSelectChange($event)"
+                        :aria-label="$t ? $t('Common.select_task') || 'Select task' : 'Select task'"
+                    />
+                </label>
+                <div class="common-section task ignore-drag" :style="`${task.isParentTask === false ? 'padding-left: 12px;' : ''}`">
                     <img :src="dragIcon" alt="dragIcon" v-if="!showArchiveVar" class="draggable_icon cursor-all-scroll">
                     <div class="parent__tasksubarray-wrapper position-ab">
                         <template v-if="(task.subTasks && task.isParentTask) || (searchedTask && task?.subtaskArray?.length)">
