@@ -53,6 +53,75 @@ export function useTaskSelection() {
         store.commit('taskSelection/setAnchor', id);
     };
 
+    // Locate a task in the projectData store and return it together with
+    // its parent task (if it is a subtask). Used by the cascade logic to
+    // walk parent ↔ subtask relationships without each caller having to
+    // re-traverse the store.
+    const findTaskWithParent = (taskId) => {
+        const tasksState = store.state.projectData?.tasks || {};
+        const targetId = String(taskId);
+        for (const pid of Object.keys(tasksState)) {
+            const project = tasksState[pid];
+            const sprintIds = Array.isArray(project?.sprints) ? project.sprints : [];
+            for (const sid of sprintIds) {
+                const sprintData = project[sid];
+                if (!sprintData?.tasks) continue;
+                for (const t of sprintData.tasks) {
+                    if (String(t?._id) === targetId) return { task: t, parent: null };
+                    if (Array.isArray(t?.subtaskArray)) {
+                        const sub = t.subtaskArray.find((s) => String(s?._id) === targetId);
+                        if (sub) return { task: sub, parent: t };
+                    }
+                }
+            }
+        }
+        return null;
+    };
+
+    // Toggle a task and keep the parent ↔ subtask selection consistent:
+    //   • Parent toggled  → mirror new state onto every subtask.
+    //   • Subtask toggled → if every sibling is now selected, select the
+    //                       parent too; otherwise deselect the parent.
+    // Falls back to a plain toggle for tasks that have no relations
+    // (top-level tasks with no subtaskArray).
+    const toggleAndCascade = (task, evt) => {
+        if (!task?._id) return;
+        const id = String(task._id);
+        toggle(id, evt);
+        const isNowSelected = selectedTaskIds.value.includes(id);
+
+        // Down-cascade: parent → its loaded subtasks.
+        if (task.isParentTask && Array.isArray(task.subtaskArray) && task.subtaskArray.length) {
+            const subIds = task.subtaskArray.map((s) => String(s?._id)).filter(Boolean);
+            if (subIds.length) {
+                if (isNowSelected) {
+                    store.commit('taskSelection/selectMany', subIds);
+                } else {
+                    store.commit('taskSelection/deselectMany', subIds);
+                }
+            }
+            return;
+        }
+
+        // Up-cascade: subtask → its parent. After this subtask was toggled,
+        // re-derive the parent's expected state from its siblings.
+        if (task.isParentTask === false) {
+            const parent = findTaskWithParent(id)?.parent;
+            if (!parent?._id || !Array.isArray(parent.subtaskArray)) return;
+            const siblingIds = parent.subtaskArray.map((s) => String(s?._id)).filter(Boolean);
+            if (!siblingIds.length) return;
+            const selectedSet = new Set(selectedTaskIds.value);
+            const allSiblingsSelected = siblingIds.every((sid) => selectedSet.has(sid));
+            const parentId = String(parent._id);
+            const parentSelected = selectedSet.has(parentId);
+            if (allSiblingsSelected && !parentSelected) {
+                store.commit('taskSelection/selectMany', [parentId]);
+            } else if (!allSiblingsSelected && parentSelected) {
+                store.commit('taskSelection/deselectMany', [parentId]);
+            }
+        }
+    };
+
     // Group header tri-state: select all visible ids when none/some are
     // selected, deselect them all when every visible id is already selected.
     const toggleGroup = (groupTaskIds) => {
@@ -91,6 +160,7 @@ export function useTaskSelection() {
         activeView,
         isSelected,
         toggle,
+        toggleAndCascade,
         toggleGroup,
         groupState,
         clear,

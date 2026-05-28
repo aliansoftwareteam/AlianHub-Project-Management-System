@@ -282,7 +282,8 @@
     const handleCardCheckboxChange = (evt) => {
         if (!props.data?._id) return;
         if (evt) evt.stopPropagation();
-        cardSelection.toggle(props.data._id, evt);
+        // Parent ↔ subtask cascade (mirrors list/table view behavior).
+        cardSelection.toggleAndCascade(props.data, evt);
     };
     const chipCount = ref(4)
     const showSidebar = ref(false);

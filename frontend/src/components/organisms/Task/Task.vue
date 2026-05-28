@@ -314,7 +314,10 @@ const isTaskSelected = computed(() => selection.isSelected(props.data?._id));
 const handleSelectChange = (evt) => {
     if (!props.data?._id) return;
     if (evt) evt.stopPropagation();
-    selection.toggle(props.data._id, evt);
+    // Parent ↔ subtask cascade: checking a parent selects all its subtasks,
+    // and checking the last unchecked subtask auto-selects the parent.
+    // Composable handles both directions.
+    selection.toggleAndCascade(props.data, evt);
 };
 const clientWidth = inject('$clientWidth');
 const projectRef = inject('selectedProject');
