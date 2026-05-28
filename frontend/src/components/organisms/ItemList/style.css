@@ -4,7 +4,7 @@
     display: contents;
 }
 
-/* Group-header multi-select checkbox: tri-state (none/some/all). */
+/* Group-header multi-select checkbox: tri-state (none/some/all) — always visible. */
 .group-multi-select {
     display: inline-flex;
     align-items: center;
@@ -12,13 +12,7 @@
     width: 18px;
     height: 18px;
     margin-right: 6px;
-    opacity: 0;
-    transition: opacity 0.15s ease;
     cursor: pointer;
-}
-.item_head:hover .group-multi-select,
-.group-multi-select--active {
-    opacity: 1;
 }
 .group-multi-select input[type="checkbox"] {
     width: 14px;
@@ -26,9 +20,6 @@
     cursor: pointer;
     accent-color: #8591F9;
     margin: 0;
-}
-@media (hover: none) {
-    .group-multi-select { opacity: 1; }
 }
 .list_view {
     overflow-x: auto;

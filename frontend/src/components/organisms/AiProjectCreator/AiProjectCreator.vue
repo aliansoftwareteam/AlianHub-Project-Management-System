@@ -30,13 +30,18 @@
                         <span class="aipg-step-label">Describe</span>
                     </li>
                     <li class="aipg-step-line" :class="{ 'done': isStepDone('input') }"></li>
+                    <li class="aipg-step" :class="stepClass('clarify')">
+                        <span class="aipg-step-dot">{{ stepDoneDot('clarify', '2') }}</span>
+                        <span class="aipg-step-label">Clarify</span>
+                    </li>
+                    <li class="aipg-step-line" :class="{ 'done': isStepDone('clarify') }"></li>
                     <li class="aipg-step" :class="stepClass('preview')">
-                        <span class="aipg-step-dot">{{ stepDoneDot('preview', '2') }}</span>
+                        <span class="aipg-step-dot">{{ stepDoneDot('preview', '3') }}</span>
                         <span class="aipg-step-label">Review plan</span>
                     </li>
                     <li class="aipg-step-line" :class="{ 'done': isStepDone('preview') }"></li>
                     <li class="aipg-step" :class="stepClass('executing', 'done')">
-                        <span class="aipg-step-dot">{{ step === 'done' ? '✓' : '3' }}</span>
+                        <span class="aipg-step-dot">{{ step === 'done' ? '✓' : '4' }}</span>
                         <span class="aipg-step-label">Create</span>
                     </li>
                 </ol>
@@ -56,18 +61,6 @@
                                 {{ description.length }} / 20 minimum characters
                             </span>
                         </div>
-                    </div>
-
-                    <div class="aipg-card">
-                        <label class="aipg-field-label">Additional requirements <span class="aipg-muted">— optional</span></label>
-                        <p class="aipg-helper">Anything the AI should keep in mind: team size, tech stack, deadlines, constraints, things to skip.</p>
-                        <textarea
-                            v-model="additionalRequirements"
-                            class="aipg-textarea aipg-textarea-sm"
-                            rows="3"
-                            maxlength="2000"
-                            :placeholder="'e.g. Team of 3. Must integrate with Slack. Skip QA — internal tool.'"
-                            :disabled="loading"></textarea>
                     </div>
 
                     <div class="aipg-card">
@@ -132,30 +125,67 @@
                     <div v-if="hasGeneratedPlan" class="aipg-actions aipg-actions-split">
                         <button
                             class="aipg-btn aipg-btn-ghost"
-                            :disabled="!canGenerate || loading || briefUploading"
+                            :disabled="!canGenerate || loading || briefUploading || clarifyLoading"
                             @click="onGeneratePlan">
-                            <span v-if="loading" class="aipg-spinner aipg-spinner-sm" aria-hidden="true"></span>
-                            {{ loading ? 'Generating plan…' : 'Re-Generate Plan' }}
+                            <span v-if="loading || clarifyLoading" class="aipg-spinner aipg-spinner-sm" aria-hidden="true"></span>
+                            {{ (loading || clarifyLoading) ? 'Generating plan…' : 'Re-Generate Plan' }}
                         </button>
                         <button
                             class="aipg-btn aipg-btn-primary"
-                            :disabled="loading || briefUploading"
+                            :disabled="loading || briefUploading || clarifyLoading"
                             @click="onNextWithExistingPlan">
+                            Next →
+                        </button>
+                    </div>
+                    <div v-else-if="hasGeneratedQuestions" class="aipg-actions aipg-actions-split">
+                        <!--
+                            User came back to Step 1 after generating questions
+                            but before generating a plan. Offer a cheap "Next →"
+                            that reuses the cached questions (zero LLM cost),
+                            plus a "Re-Generate Questions" escape if they want a
+                            fresh set after editing the brief.
+                        -->
+                        <button
+                            class="aipg-btn aipg-btn-ghost"
+                            :disabled="!canGenerate || loading || briefUploading || clarifyLoading"
+                            @click="onRegenerateQuestions">
+                            <span v-if="clarifyLoading || loading" class="aipg-spinner aipg-spinner-sm" aria-hidden="true"></span>
+                            {{ (clarifyLoading || loading) ? 'Generating…' : 'Re-Generate Questions' }}
+                        </button>
+                        <button
+                            class="aipg-btn aipg-btn-primary"
+                            :disabled="loading || briefUploading || clarifyLoading"
+                            @click="onNextWithExistingQuestions">
                             Next →
                         </button>
                     </div>
                     <div v-else class="aipg-actions">
                         <button
                             class="aipg-btn aipg-btn-primary"
-                            :disabled="!canGenerate || loading || briefUploading"
+                            :disabled="!canGenerate || loading || briefUploading || clarifyLoading"
                             @click="onGeneratePlan">
-                            <span v-if="loading" class="aipg-spinner aipg-spinner-sm" aria-hidden="true"></span>
-                            {{ loading ? 'Generating plan…' : (error ? 'Try again' : 'Generate plan') }}
+                            <span v-if="loading || clarifyLoading" class="aipg-spinner aipg-spinner-sm" aria-hidden="true"></span>
+                            {{ (loading || clarifyLoading) ? 'Generating…' : (error ? 'Try again' : 'Generate plan') }}
                         </button>
                     </div>
                 </section>
 
-                <!-- STEP 2: PREVIEW -->
+                <!-- STEP 2: CLARIFY -->
+                <section v-else-if="step === 'clarify'" class="aipg-section">
+                    <ClarifyStep
+                        :loading="clarifyLoading"
+                        :generating="loading"
+                        :understanding="clarifyUnderstanding"
+                        :questions="clarifyQuestions"
+                        :error-message="clarifyError"
+                        @submit="onClarifySubmit"
+                        @back="onClarifyBack"
+                        @retry="onClarifyRetry"
+                        @skip-all="onClarifySkipAll"
+                    />
+                </section>
+
+                <!-- STEP 3: PREVIEW -->
                 <section v-else-if="step === 'preview'" class="aipg-section">
                     <div class="aipg-plan-header">
                         <div class="aipg-plan-head-row">
@@ -283,11 +313,12 @@
 <script>
 import { ref, reactive, computed, onBeforeUnmount, inject, defineComponent } from 'vue';
 import Sidebar from '@/components/molecules/Sidebar/Sidebar.vue';
+import ClarifyStep from './clarify/ClarifyStep.vue';
 import { useAiProjectGenerator } from '@/composable/aiProjectGenerator';
 
 export default defineComponent({
     name: 'AiProjectCreator',
-    components: { Sidebar },
+    components: { Sidebar, ClarifyStep },
     props: {
         visible: { type: Boolean, default: false },
     },
@@ -297,16 +328,26 @@ export default defineComponent({
         const api = useAiProjectGenerator();
         const closeIcon = require('@/assets/images/svg/CloseSidebar.svg');
 
-        const step = ref('input'); // input | preview | executing | done | error
+        const step = ref('input'); // input | clarify | preview | executing | done | error
         const loading = ref(false);
         const briefUploading = ref(false);
         const error = ref('');
         const rolledBack = ref(false);
 
+        // ── Clarify step state ───────────────────────────────────────────
+        // The Clarify step is OPTIONAL. If the brief is already detailed
+        // enough the LLM returns zero questions and we skip it. If the
+        // /clarify call fails we also skip it — the user can still finish
+        // the flow with the existing plan generation.
+        const clarifyLoading = ref(false);   // true while we're fetching questions
+        const clarifyQuestions = ref([]);    // [{id, category, question, type, options, recommended, ...}]
+        const clarifyUnderstanding = ref('');// short "here's what I heard" line from the LLM
+        const clarifyError = ref('');        // error message inside the clarify step (recoverable)
+        // The answers/skips the user submitted from the Clarify step,
+        // sent verbatim into /plan as the `clarifications` array.
+        const clarifications = ref(null);
+
         const description = ref('');
-        // Free-form "Additional requirements" textarea on Step 1 — piped
-        // verbatim into the prompt. Capped at 2000 chars server-side.
-        const additionalRequirements = ref('');
         // Mirrors the manual flow's workspace step: 'public' → private=false.
         // We force this onto the plan server-side so the user's choice always
         // wins over whatever the LLM picked.
@@ -359,6 +400,40 @@ export default defineComponent({
             step.value = 'preview';
         }
 
+        // True once a clarify-question batch has been produced and is still
+        // held in memory. Drives the dual-button layout on Step 1 when the
+        // user came back from the Clarify step without yet generating a plan
+        // — they can jump straight back to Clarify (no LLM call) or pay for
+        // a fresh question set.
+        const hasGeneratedQuestions = computed(() => {
+            return Array.isArray(clarifyQuestions.value) && clarifyQuestions.value.length > 0;
+        });
+
+        // "Next →" path when questions exist but no plan yet — zero token cost,
+        // just hop back into the Clarify step with the cached questions and
+        // whatever answers the user had already entered.
+        function onNextWithExistingQuestions() {
+            if (!hasGeneratedQuestions.value) return;
+            error.value = '';
+            clarifyError.value = '';
+            step.value = 'clarify';
+        }
+
+        // "Re-Generate Questions" path — costs one clarify LLM call but no
+        // plan call. Wipes the cached questions and re-runs the clarify
+        // entry point, which transitions to the Clarify step and shows the
+        // skeleton placeholders while we wait. If the LLM decides the brief
+        // needs no clarifications (unusual after an edit), the existing
+        // fall-through in onGeneratePlan still skips straight to plan.
+        function onRegenerateQuestions() {
+            clarifications.value = null;
+            // Clear so the Clarify step shows its skeleton state, not the
+            // stale questions, while the new fetch is in flight.
+            clarifyQuestions.value = [];
+            clarifyUnderstanding.value = '';
+            return onGeneratePlan();
+        }
+
         const totals = computed(() => {
             if (!plan.value || !Array.isArray(plan.value.sprints)) return { sprints: 0, tasks: 0 };
             let t = 0;
@@ -392,7 +467,10 @@ export default defineComponent({
         }
 
         function isStepDone(name) {
-            const order = ['input', 'preview', 'executing', 'done'];
+            // Order includes the new 'clarify' step between input and preview.
+            // Steps not in this list (e.g. 'error') treat the step as not done,
+            // matching the existing behavior.
+            const order = ['input', 'clarify', 'preview', 'executing', 'done'];
             return order.indexOf(name) < order.indexOf(step.value);
         }
 
@@ -464,25 +542,69 @@ export default defineComponent({
             if (el) el.value = '';
         }
 
+        // Entry point from Step 1's "Generate plan" button. Tries to fetch
+        // clarifying questions first; if any are returned the user is sent
+        // into the Clarify step. If the LLM returns zero questions, or if
+        // the clarify call fails for any reason, we skip Q&A and run plan
+        // generation directly — the wizard MUST stay functional even if
+        // the Q&A feature is broken.
         async function onGeneratePlan() {
             if (!canGenerate.value) return;
+            error.value = '';
+            clarifyError.value = '';
+            clarifications.value = null;
+            clarifyLoading.value = true;
+            // Move into the Clarify step immediately so the user sees the
+            // skeleton placeholders while we wait for the LLM. If we end
+            // up skipping Q&A we transition out again before they see the
+            // questions render.
+            step.value = 'clarify';
+            try {
+                const res = await api.generateClarifyingQuestions({
+                    description: description.value.trim(),
+                    briefId: briefId.value,
+                });
+                if (res && res.status && Array.isArray(res.questions) && res.questions.length) {
+                    clarifyQuestions.value = res.questions;
+                    clarifyUnderstanding.value = res.understanding || '';
+                    clarifyLoading.value = false;
+                    return; // user now answers questions; submit will call runPlanGeneration
+                }
+                // Either status:false, no questions, or malformed — just
+                // skip Q&A and run plan generation with whatever brief we have.
+                clarifyLoading.value = false;
+                await runPlanGeneration(null);
+            } catch (e) {
+                // Clarify failed — graceful fallback to plan generation.
+                clarifyLoading.value = false;
+                await runPlanGeneration(null);
+                // Note: any error during the fallback plan generation is
+                // surfaced by runPlanGeneration itself via error.value, so
+                // we don't need to re-raise here.
+            }
+        }
+
+        // The actual plan-generation call. Separated from onGeneratePlan so
+        // both the post-clarify submit and the "skip clarify" fallback can
+        // share it without duplicating the SSE-wait + error handling.
+        async function runPlanGeneration(clarificationsPayload) {
             loading.value = true;
             error.value = '';
             try {
-                // Async plan job: the composable waits on SSE and resolves
-                // with the final plan without holding the POST request open.
                 const result = await api.generatePlan({
                     description: description.value.trim(),
-                    additionalRequirements: additionalRequirements.value.trim(),
                     briefId: briefId.value,
                     isPrivateSpace: isPrivateSpace.value,
+                    clarifications: clarificationsPayload,
                 });
                 if (!result || !result.status) {
                     error.value = (result && result.statusText) || 'Plan generation failed. Please try again.';
+                    step.value = 'input'; // back to Step 1 so user can retry
                     return;
                 }
                 if (!result.plan) {
                     error.value = 'The AI did not return a plan. Please try again.';
+                    step.value = 'input';
                     return;
                 }
                 plan.value = result.plan;
@@ -490,9 +612,57 @@ export default defineComponent({
                 step.value = 'preview';
             } catch (e) {
                 error.value = friendlyErr(e);
+                step.value = 'input';
             } finally {
                 loading.value = false;
             }
+        }
+
+        // ── Clarify step handlers ────────────────────────────────────────
+        // Submitted from the ClarifyStep component with the full
+        // clarifications array (one entry per question, including skipped).
+        async function onClarifySubmit(clarificationsPayload) {
+            clarifications.value = clarificationsPayload;
+            await runPlanGeneration(clarificationsPayload);
+        }
+
+        // User clicked "← Back" on the Clarify step — return to Step 1 but
+        // KEEP the generated questions + answers in memory. Step 1 then
+        // shows the dual-button layout ("Re-Generate Questions" / "Next →")
+        // so the user can hop back into the Clarify step without paying
+        // for another LLM call. We only clear `clarifyError` since that's
+        // tied to a transient panel state, not to the questions themselves.
+        function onClarifyBack() {
+            step.value = 'input';
+            clarifyError.value = '';
+        }
+
+        // Retry button inside the Clarify step's error panel.
+        async function onClarifyRetry() {
+            clarifyError.value = '';
+            clarifyLoading.value = true;
+            try {
+                const res = await api.generateClarifyingQuestions({
+                    description: description.value.trim(),
+                    briefId: briefId.value,
+                });
+                if (res && res.status && Array.isArray(res.questions) && res.questions.length) {
+                    clarifyQuestions.value = res.questions;
+                    clarifyUnderstanding.value = res.understanding || '';
+                } else {
+                    // Still empty — just skip and generate.
+                    await runPlanGeneration(null);
+                }
+            } catch (e) {
+                clarifyError.value = friendlyErr(e);
+            } finally {
+                clarifyLoading.value = false;
+            }
+        }
+
+        // "Skip and generate plan" button inside the Clarify error panel.
+        async function onClarifySkipAll() {
+            await runPlanGeneration(null);
         }
 
         function buildEdits() {
@@ -595,7 +765,6 @@ export default defineComponent({
             step.value = 'input';
             error.value = '';
             description.value = '';
-            additionalRequirements.value = '';
             briefId.value = null;
             briefFile.value = null;
             briefStats.tokenEstimate = 0;
@@ -616,6 +785,12 @@ export default defineComponent({
             rolledBack.value = false;
             briefUploading.value = false;
             isPrivateSpace.value = false;
+            // Reset clarify state too so re-opening the modal is a clean slate.
+            clarifyLoading.value = false;
+            clarifyQuestions.value = [];
+            clarifyUnderstanding.value = '';
+            clarifyError.value = '';
+            clarifications.value = null;
             emit('close');
         }
 
@@ -633,15 +808,19 @@ export default defineComponent({
         return {
             closeIcon,
             clientWidth, step, loading, briefUploading, error, rolledBack,
-            description, additionalRequirements, isPrivateSpace, briefFile, briefId, briefStats,
+            description, isPrivateSpace, briefFile, briefId, briefStats,
             plan, planId, editableProjectName,
             jobId, progress, createdProjectId,
             placeholderText,
-            canGenerate, hasGeneratedPlan, totals,
+            canGenerate, hasGeneratedPlan, hasGeneratedQuestions, totals,
             renderTaskDescription, isStepDone, stepClass, stepDoneDot, rowClass, stepIcon, stepStatusLabel,
             onFileChosen, clearBrief,
             onGeneratePlan, onNextWithExistingPlan,
+            onRegenerateQuestions, onNextWithExistingQuestions,
             onApprovePlan, onOpenProject, onRetry, onClose,
+            // Clarify step
+            clarifyLoading, clarifyQuestions, clarifyUnderstanding, clarifyError,
+            onClarifySubmit, onClarifyBack, onClarifyRetry, onClarifySkipAll,
         };
     },
 });
@@ -660,8 +839,8 @@ export default defineComponent({
     --aipg-text: #0f172a;
     --aipg-text-muted: #64748b;
     --aipg-text-helper: #94a3b8;
-    --aipg-primary: #4f46e5;
-    --aipg-primary-hover: #4338ca;
+    --aipg-primary: #2F3990;
+    --aipg-primary-hover: #252D75;
     --aipg-primary-soft: #eef2ff;
     --aipg-success: #15803d;
     --aipg-success-soft: #dcfce7;
@@ -742,12 +921,12 @@ export default defineComponent({
     border-radius: 2px;
     transition: background 0.2s ease;
 }
-.aipg-step-line.done { background: #4f46e5; }
-.aipg-step-active { color: #4f46e5; }
+.aipg-step-line.done { background: #2F3990; }
+.aipg-step-active { color: #2F3990; }
 .aipg-step-active .aipg-step-dot {
     background: #eef2ff;
-    color: #4f46e5;
-    border-color: #4f46e5;
+    color: #2F3990;
+    border-color: #2F3990;
 }
 .aipg-step-done { color: #15803d; }
 .aipg-step-done .aipg-step-dot {
@@ -820,7 +999,7 @@ export default defineComponent({
 }
 .aipg-textarea:focus {
     outline: none;
-    border-color: #4f46e5;
+    border-color: #2F3990;
     box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.12);
 }
 .aipg-textarea:disabled {
@@ -842,7 +1021,7 @@ export default defineComponent({
 }
 .aipg-input:focus {
     outline: none;
-    border-color: #4f46e5;
+    border-color: #2F3990;
     box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
 }
 .aipg-input:disabled {
@@ -877,7 +1056,7 @@ export default defineComponent({
     background: #fafbff;
 }
 .aipg-privacy-option-active {
-    border-color: #4f46e5;
+    border-color: #2F3990;
     background: #eef2ff;
     box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08);
 }
@@ -898,13 +1077,13 @@ export default defineComponent({
 .aipg-privacy-text { display: inline-flex; flex-direction: column; gap: 2px; min-width: 0; }
 .aipg-privacy-text strong { font-size: 14px; color: #0f172a; }
 .aipg-privacy-sub { font-size: 12px; color: #64748b; }
-.aipg-privacy-option-active .aipg-privacy-sub { color: #4338ca; }
+.aipg-privacy-option-active .aipg-privacy-sub { color: #252D75; }
 .aipg-target-count {
     display: inline-block;
     margin-left: 8px;
     padding: 2px 10px;
     background: #eef2ff;
-    color: #4f46e5;
+    color: #2F3990;
     border-radius: 999px;
     font-size: 13px;
     font-weight: 700;
@@ -926,7 +1105,7 @@ export default defineComponent({
 .aipg-input-plain:focus {
     outline: none;
     background: #ffffff;
-    border-color: #4f46e5;
+    border-color: #2F3990;
     box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
 }
 .aipg-input-plain:disabled { cursor: not-allowed; opacity: 0.7; }
@@ -980,7 +1159,7 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
     text-align: center;
 }
 .aipg-file-drop:hover:not(.is-disabled) {
-    border-color: #4f46e5;
+    border-color: #2F3990;
     background: #eef2ff;
 }
 .aipg-file-drop.is-disabled { cursor: not-allowed; opacity: 0.7; }
@@ -1019,13 +1198,13 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
 .aipg-btn-link {
     background: none;
     border: none;
-    color: #4f46e5;
+    color: #2F3990;
     cursor: pointer;
     padding: 0 4px;
     font: inherit;
     text-decoration: underline;
 }
-.aipg-btn-link:hover:not(:disabled) { color: #4338ca; }
+.aipg-btn-link:hover:not(:disabled) { color: #252D75; }
 .aipg-btn-link:disabled { color: #cbd5e1; cursor: not-allowed; text-decoration: none; }
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -1035,7 +1214,7 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
     margin: 0 0 12px;
     font-size: 14px;
     font-weight: 600;
-    color: #4f46e5;
+    color: #2F3990;
 }
 .aipg-q-row + .aipg-q-row { margin-top: 12px; }
 
@@ -1100,7 +1279,7 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
     font-size: 12px;
     font-weight: 500;
 }
-.aipg-chip-app { background: #eef2ff; color: #4338ca; }
+.aipg-chip-app { background: #eef2ff; color: #252D75; }
 
 /* ─────────────────────────────────────────────────────────────────────
    Folder / sprint / task tree
@@ -1251,9 +1430,9 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
 }
 .aipg-progress-row-active .aipg-progress-icon {
     background: #c7d2fe;
-    color: #4338ca;
+    color: #252D75;
 }
-.aipg-progress-row-active .aipg-progress-status { color: #4f46e5; }
+.aipg-progress-row-active .aipg-progress-status { color: #2F3990; }
 .aipg-progress-row-done {
     background: #f0fdf4;
     border-color: #bbf7d0;
@@ -1310,13 +1489,13 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
 .aipg-btn:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .aipg-btn-primary {
-    background: #4f46e5;
+    background: #2F3990;
     color: #ffffff;
-    border-color: #4f46e5;
+    border-color: #2F3990;
 }
 .aipg-btn-primary:hover:not(:disabled) {
-    background: #4338ca;
-    border-color: #4338ca;
+    background: #252D75;
+    border-color: #252D75;
 }
 
 .aipg-btn-ghost {
@@ -1337,7 +1516,7 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
     width: 18px;
     height: 18px;
     border: 2px solid rgba(79, 70, 229, 0.2);
-    border-top-color: #4f46e5;
+    border-top-color: #2F3990;
     border-radius: 999px;
     animation: aipg-spin 0.7s linear infinite;
     vertical-align: middle;

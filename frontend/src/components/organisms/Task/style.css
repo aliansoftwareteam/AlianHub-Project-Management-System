@@ -5,22 +5,24 @@
   /* position: relative; */
 }
 
-/* Multi-select checkbox shown on row hover (matches ClickUp pattern).
-   Stays visible once any task is selected, so user can deselect easily. */
+/* Multi-select checkbox — own column at the far-left of the row, sitting in
+   front of the drag handle and expand/collapse arrow. Absolute so it doesn't
+   push the rest of the row content right. */
+.new-col1--has-multi-select {
+  position: relative;
+}
 .task-multi-select {
+  position: absolute;
+  top: 50%;
+  left: 8px;
+  transform: translateY(-50%);
+  z-index: 4;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 18px;
   height: 18px;
-  margin-right: 4px;
-  opacity: 0;
-  transition: opacity 0.15s ease;
   cursor: pointer;
-}
-.list-group-item:hover .task-multi-select,
-.task-multi-select--active {
-  opacity: 1;
 }
 .task-multi-select input[type="checkbox"] {
   width: 14px;
@@ -29,10 +31,19 @@
   accent-color: #8591F9;
   margin: 0;
 }
-@media (hover: none) {
-  /* Touch devices: always show so it's tappable. */
-  .task-multi-select { opacity: 1; }
-}
+/* When the checkbox column is present, push the absolute-positioned drag
+   handle and expand arrow to the right so the visual order becomes:
+   checkbox → drag → arrow → row content. The extra padding on
+   .common-section.task pushes the flex flow content (status/type icons,
+   task name) past the arrow so they no longer overlap. Subtask rows keep
+   their inline padding-left override and have no arrow, so they are
+   unaffected. */
+.new-col1--has-multi-select .draggable_icon { left: 32px; }
+.new-col1--has-multi-select .parent__tasksubarray-wrapper { left: 52px; }
+.new-col1--has-multi-select .common-section.task { padding-left: 50px; }
+/* Keep the subtask connector (├─/└─ pointer image) aligned under the
+   parent task's expand arrow so the tree visual remains coherent. */
+.new-col1--has-multi-select .parent__task-lastchild { margin-left: 25px; }
 
 .task-options-image {
   border: 1px solid #97989a;

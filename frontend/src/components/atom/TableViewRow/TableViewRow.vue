@@ -182,7 +182,8 @@ const isRowSelected = computed(() => rowSelection.isSelected(props.data?._id));
 const handleRowCheckboxChange = (evt) => {
     if (!props.data?._id) return;
     if (evt) evt.stopPropagation();
-    rowSelection.toggle(props.data._id, evt);
+    // Parent ↔ subtask cascade (mirrors list/kanban view behavior).
+    rowSelection.toggleAndCascade(props.data, evt);
 };
 const statusSearch = ref("");
 const $toast = useToast()

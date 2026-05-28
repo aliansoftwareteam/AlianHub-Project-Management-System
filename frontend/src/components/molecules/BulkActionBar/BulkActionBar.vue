@@ -94,10 +94,13 @@
                         @click="onAssigneeRowClick(user)"
                     >
                         <span class="bulk-menu__user-info">
-                            <img v-if="user.image" :src="user.image" class="bulk-menu__avatar" :alt="user.label" />
-                            <span v-else class="bulk-menu__avatar bulk-menu__avatar--placeholder">
-                                {{ (user.label || '?').charAt(0).toUpperCase() }}
-                            </span>
+                            <UserProfile
+                                class="bulk-menu__avatar-wrap"
+                                :data="{ title: user.label, image: user.image, type: 'user' }"
+                                :showDot="false"
+                                width="26px"
+                                thumbnail="30x30"
+                            />
                             <span class="bulk-menu__row-label">{{ user.label }}</span>
                             <span v-if="assigneeState(user.id) === 'some'" class="bulk-menu__partial-pill">partial</span>
                         </span>
@@ -254,6 +257,7 @@ import { useToast } from 'vue-toast-notification';
 
 import ConfirmationSidebar from '@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue';
 import DueDateCompo from '@/components/molecules/DueDateCompo/DueDateCompo.vue';
+import UserProfile from '@/components/atom/UserProfile/UserProfile.vue';
 import BulkMenu from './BulkMenu.vue';
 
 import { useTaskSelection } from '@/composable/useTaskSelection.js';
@@ -303,6 +307,7 @@ const TELEPORT_POPUP_SELECTORS = [
     '#my-sidebar',         // Sidebar teleport target
     '#my-dropdown',        // DropDown teleport target
     '.drop-down-menu',
+    '.bulk-menu__panel',   // BulkMenu's own panel teleported to <body>
 ];
 function isInsideTeleportPopup(target) {
     if (!target || !target.closest) return false;
@@ -944,21 +949,12 @@ function onTagAct(operation, tag) {
     flex: 1;
     min-width: 0;
 }
-.bulk-menu__avatar {
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    object-fit: cover;
+.bulk-menu__avatar-wrap {
     flex-shrink: 0;
 }
-.bulk-menu__avatar--placeholder {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: #e6e8ff;
-    color: #4054ec;
-    font-size: 11px;
-    font-weight: 600;
+.bulk-menu__avatar-wrap :deep(.profile-image) {
+    border-radius: 50%;
+    object-fit: cover;
 }
 
 /* Selected row's remove (×) icon. Renders only when row is in some/all. */
