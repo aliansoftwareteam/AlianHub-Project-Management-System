@@ -13,6 +13,7 @@ const { buildSystemPrompt, buildUserMessage, buildRepairPrompt } = require('./pr
 const { briefUpload, extractFromFile, safeUnlink, MAX_BRIEF_BYTES } = require('./briefExtractor');
 const sseEmitter = require('./sseEmitter');
 const orchestrator = require('./orchestrator');
+const clarifier = require('./clarifier');
 const { normalizePlanColors } = orchestrator;
 
 const PLAN_TTL_SECONDS = 15 * 60;        // 15 min
@@ -70,10 +71,10 @@ async function loadActiveMembers(companyId) {
     }
 }
 
-async function callLlmForPlan({ description, additionalRequirements, briefText, members }) {
+async function callLlmForPlan({ description, additionalRequirements, briefText, members, clarifications }) {
     const provider = getProvider();
     const systemPrompt = buildSystemPrompt();
-    const userMessage = buildUserMessage({ description, additionalRequirements, briefText, members });
+    const userMessage = buildUserMessage({ description, additionalRequirements, briefText, members, clarifications });
     // 32000 default: large plans (30+ tasks) with 5-block descriptions
     // routinely run 15-25K output tokens. Claude Sonnet 4.5 supports 64K
     // output and gpt-5 supports 128K, so 32K is well within bounds for
@@ -151,7 +152,7 @@ async function callLlmForPlan({ description, additionalRequirements, briefText, 
     return { result: validated.value, tokens: usedTokens, model: (provider && provider.name) || 'unknown' };
 }
 
-async function generatePlanForJob({ jobId, uid, companyId, description, additionalRequirements, briefText, isPrivateSpace }) {
+async function generatePlanForJob({ jobId, uid, companyId, description, additionalRequirements, briefText, isPrivateSpace, clarifications }) {
     const emit = (payload) => sseEmitter.emit(jobId, payload);
 
     try {
@@ -163,7 +164,7 @@ async function generatePlanForJob({ jobId, uid, companyId, description, addition
         // returned a job id, so slow LLM responses no longer trip the proxy.
         emit({ event: 'progress', phase: 'plan', step: 'ai', status: 'started' });
         const { result, tokens, model } = await callLlmForPlan({
-            description, additionalRequirements, briefText, members,
+            description, additionalRequirements, briefText, members, clarifications,
         });
 
         let { plan } = result;
@@ -312,6 +313,13 @@ exports.plan = async (req, res) => {
             if (stash && stash.companyId === companyId) briefText = stash.text;
         }
 
+        // Optional clarifications from the new Clarify step. The frontend
+        // sends an array of { id, question, category, type, answer, skipped }
+        // objects — one entry per question that was asked. We sanitize
+        // here so the prompt builder gets a clean shape regardless of
+        // what the client posted.
+        const clarifications = sanitizeClarifications(req.body && req.body.clarifications);
+
         const jobId = token();
 
         // Reply immediately so reverse proxies do not 504 while the LLM is
@@ -329,6 +337,7 @@ exports.plan = async (req, res) => {
                 additionalRequirements,
                 briefText,
                 isPrivateSpace: !!(req.body && req.body.isPrivateSpace),
+                clarifications,
             }).catch((error) => {
                 logger.error(`AIPG plan job outer error: ${error && error.message ? error.message : error}`);
                 sseEmitter.emit(jobId, {
@@ -346,14 +355,80 @@ exports.plan = async (req, res) => {
     }
 };
 
-// /clarify was removed when we collapsed the wizard to one-shot. The route
-// is no longer registered (see routes.js). This stub stays in case any
-// frontend cache still POSTs to the old URL during a deploy roll-out — it
-// returns a clear "endpoint removed, just retry /plan" response instead of
-// 404'ing.
+// /clarify generates a small set of clarifying questions tailored to the
+// brief. The frontend renders them as a Q&A step BEFORE plan generation;
+// the user's answers are then posted back with /plan so the model has
+// authoritative context for the plan. Synchronous (small token budget,
+// no SSE) — the request returns the questions JSON inline.
 exports.clarify = async (req, res) => {
-    return sendError(res, 410, 'Clarification flow was removed. Submit the same description to /plan again.');
+    if (!isAnyProviderConfigured()) {
+        return sendError(res, 503, 'AI provider is not configured');
+    }
+    try {
+        const uid = req.uid;
+        if (!uid) return sendError(res, 401, 'Unauthorized');
+        const companyId = resolveCompanyId(req);
+        if (!companyId) return sendError(res, 403, 'Company access denied');
+
+        const description = String((req.body && req.body.description) || '').trim();
+        if (description.length < 20) return sendError(res, 400, 'Description must be at least 20 characters');
+
+        const additionalRequirements = String((req.body && req.body.additionalRequirements) || '').trim().slice(0, 2000);
+        let briefText = '';
+        if (req.body && req.body.briefId) {
+            const stash = myCache.get(cacheKey('brief', uid, req.body.briefId));
+            if (stash && stash.companyId === companyId) briefText = stash.text;
+        }
+
+        const { understanding, questions, tokens, model } = await clarifier.generateClarifyingQuestions({
+            description,
+            additionalRequirements,
+            briefText,
+        });
+
+        return res.send({
+            status: true,
+            understanding,
+            questions,
+            tokensUsed: tokens,
+            model,
+        });
+    } catch (error) {
+        logger.error(`AIPG clarify error: ${error && error.message ? error.message : error}`);
+        // Non-fatal: a clarify failure should NOT block the user. The
+        // frontend treats a non-OK response as "skip Q&A, go straight to
+        // plan" — same fallback used when the brief is already complete.
+        const code = error.code === 'LLM_INVALID_OUTPUT' ? 502 : 500;
+        return sendError(res, code, error && error.message ? error.message : 'Could not generate clarifying questions. You can continue without them.');
+    }
 };
+
+/**
+ * Defensive sanitization of the `clarifications` payload coming from the
+ * client. Drops anything not shaped like a {id, question, …} entry and
+ * caps the array length so a malicious or buggy client can't bloat the
+ * prompt. Returns null if the input is missing/empty/invalid so callers
+ * can treat "no clarifications" uniformly.
+ */
+function sanitizeClarifications(raw) {
+    if (!Array.isArray(raw) || !raw.length) return null;
+    const out = [];
+    for (const entry of raw.slice(0, 12)) {
+        if (!entry || typeof entry !== 'object') continue;
+        const id = typeof entry.id === 'string' ? entry.id.slice(0, 60) : '';
+        const question = typeof entry.question === 'string' ? entry.question.slice(0, 280) : '';
+        if (!id || !question) continue;
+        out.push({
+            id,
+            question,
+            category: typeof entry.category === 'string' ? entry.category.slice(0, 40) : 'misc',
+            type: typeof entry.type === 'string' ? entry.type.slice(0, 40) : 'text',
+            answer: entry.answer === undefined ? null : entry.answer,
+            skipped: !!entry.skipped,
+        });
+    }
+    return out.length ? out : null;
+}
 
 exports.execute = async (req, res) => {
     try {

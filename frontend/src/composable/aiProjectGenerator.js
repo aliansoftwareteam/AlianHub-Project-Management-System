@@ -6,15 +6,19 @@ import * as env from '@/config/env';
  *
  * Endpoints (see Modules/AIProjectGenerator):
  *   POST /api/v1/ai/project/upload-brief   — multipart form, returns briefId
- *   POST /api/v1/ai/project/plan           — generates a plan in one shot
+ *   POST /api/v1/ai/project/clarify        — returns clarifying questions (sync)
+ *   POST /api/v1/ai/project/plan           — generates a plan (async via SSE)
  *   POST /api/v1/ai/project/execute        — kicks off orchestrator, returns jobId
  *   GET  /api/v1/ai-progress/:jobId        — SSE progress stream
  *
- * The /clarify endpoint and its multi-turn flow were removed because the
- * conversation cache expired between proxy 504 retries, surfacing
- * "Conversation not found or expired" to the user. The plan call now returns
- * immediately and streams the generated plan through SSE, so proxy timeouts
- * do not interrupt long LLM responses.
+ * Wizard flow:
+ *   Describe → (Clarify Q&A) → Review plan → Create
+ *
+ * The Clarify step is *optional*: if the LLM returns zero questions, or if
+ * the call fails for any reason, the wizard skips straight to plan
+ * generation without breaking. The plan endpoint accepts an optional
+ * `clarifications` array — the user's answers — so the model has
+ * authoritative context for the plan.
  */
 export function useAiProjectGenerator() {
 
@@ -25,12 +29,31 @@ export function useAiProjectGenerator() {
         return res.data;
     }
 
-    async function generatePlan({ description, additionalRequirements, briefId, isPrivateSpace }) {
+    /**
+     * Ask the backend to generate clarifying questions for the current brief.
+     * Synchronous endpoint — returns the questions inline.
+     *
+     * Resolves to `{ status, understanding, questions }`. Caller treats
+     * `questions: []` as "skip Q&A". Caller can also wrap this in try/catch
+     * and on failure jump straight to generatePlan() without clarifications;
+     * the backend tolerates that.
+     */
+    async function generateClarifyingQuestions({ description, additionalRequirements, briefId }) {
+        const res = await apiRequest('post', env.AI_PROJECT_CLARIFY, {
+            description,
+            additionalRequirements: additionalRequirements || '',
+            briefId: briefId || null,
+        });
+        return res.data || { status: false, questions: [] };
+    }
+
+    async function generatePlan({ description, additionalRequirements, briefId, isPrivateSpace, clarifications }) {
         const res = await apiRequest('post', env.AI_PROJECT_PLAN, {
             description,
             additionalRequirements: additionalRequirements || '',
             briefId: briefId || null,
             isPrivateSpace: !!isPrivateSpace,
+            clarifications: Array.isArray(clarifications) && clarifications.length ? clarifications : null,
         });
         if (res.data && res.data.plan) {
             return res.data;
@@ -114,6 +137,7 @@ export function useAiProjectGenerator() {
 
     return {
         uploadBrief,
+        generateClarifyingQuestions,
         generatePlan,
         execute,
         subscribeToProgress,

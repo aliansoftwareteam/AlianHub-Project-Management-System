@@ -29,12 +29,16 @@ exports.init = (app) => {
      * @swagger
      * /api/v1/ai/project/clarify:
      *   post:
-     *     summary: (Removed) — returns 410 Gone; clients should retry /plan
+     *     summary: Generate clarifying questions for the wizard's Clarify step
      *     tags: [AI Project Generator]
      *     description: |
-     *       Retained as a transient stub so frontend caches that still POST to
-     *       the old URL during a deploy roll-out get a clear "endpoint
-     *       removed, retry /plan" response instead of a 404.
+     *       Reads the brief (description + additional requirements + uploaded
+     *       brief text) and returns a small structured list of clarifying
+     *       questions the user is asked BEFORE plan generation. The answers
+     *       come back on /plan as a `clarifications` field. Synchronous —
+     *       the request returns the questions inline (no SSE, no jobId).
+     *       Returning `{ status: true, questions: [] }` is valid: it tells
+     *       the frontend the brief is already complete enough to skip Q&A.
      */
     app.post('/api/v1/ai/project/clarify', ctrl.clarify);
 
