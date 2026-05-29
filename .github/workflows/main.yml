@@ -1,17 +1,13 @@
 name: CI / Deploy
 
 on:
+  # Run only when something lands on staging (a PR merge counts as a push,
+  # so validate + deploy still cover every code change going live).
+  # Open / updated PRs no longer trigger this workflow, which keeps CI
+  # minutes off in-progress branches.
   push:
     branches:
       - staging
-
-  pull_request:
-    branches:
-      - staging
-    types:
-      - opened
-      - synchronize
-      - reopened
 
   workflow_dispatch:
 
