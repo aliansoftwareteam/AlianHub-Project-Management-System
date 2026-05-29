@@ -288,6 +288,22 @@ function mergeStatusList({ planList, settings, shapeFn }) {
     return { merged, newEntries, finalTotal: total };
 }
 
+// ─── Use company settings as-is for status lists ─────────────────────
+//
+// Unlike `mergeStatusList` which honors LLM-coined names and adds new
+// entries to the company's settings, this helper ALWAYS uses the existing
+// company settings unchanged. The LLM cannot invent new status names —
+// the user's own kanban setup (Settings → Task / Project Status) is
+// authoritative. This prevents AI projects from polluting the company's
+// status catalog with one-off labels like "Backlog", "QA", "Review" the
+// model coined, and guarantees every AI project's kanban looks identical
+// to a manually-created project's kanban.
+function useCompanyStatusList({ settings, shapeFn }) {
+    const settingsList = Array.isArray(settings.settings) ? settings.settings : [];
+    const merged = settingsList.map((s, idx) => shapeFn(s, idx));
+    return { merged, newEntries: [], finalTotal: Number(settings.totalStatus) || settingsList.length };
+}
+
 function shapeProjectStatus(entry, idx) {
     const textColor = pickTextColor(entry, idx);
     return {
@@ -442,13 +458,17 @@ function buildProjectDoc({ plan, context, companyId, uid, projectIdHint, project
         : new mongoose.Types.ObjectId();
 
     const proj = plan.project;
-    const projectStatusMerge = mergeStatusList({
-        planList: proj.projectStatusData,
+    // Project + task statuses are ALWAYS taken from the company's existing
+    // settings — never merged with whatever the LLM emitted. This keeps
+    // the app's "dynamic statuses" promise intact: the user's own kanban
+    // setup is the single source of truth, and AI projects look identical
+    // to manually-created ones. Task TYPES still merge (the model may
+    // legitimately need a new type the company hasn't catalogued yet).
+    const projectStatusMerge = useCompanyStatusList({
         settings: context.projectStatusSettings,
         shapeFn: shapeProjectStatus,
     });
-    const taskStatusMerge = mergeStatusList({
-        planList: proj.taskStatusData,
+    const taskStatusMerge = useCompanyStatusList({
         settings: context.taskStatusSettings,
         shapeFn: shapeTaskStatus,
     });
