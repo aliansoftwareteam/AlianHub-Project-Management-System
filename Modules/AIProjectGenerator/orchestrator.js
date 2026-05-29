@@ -607,11 +607,18 @@ function buildTaskDoc({ task, projectDoc, sprintDoc, statusByName, taskTypeByKey
     const id = new mongoose.Types.ObjectId();
     const taskType = taskTypeByKey.get(String(task.TaskTypeKey || '')) || projectDoc.taskTypeCounts[0];
 
-    // Status lookup is case-insensitive name match. Schema validates the
-    // name exists, but defensively fall back to default_active if not.
-    const wantedStatus = statusByName.get(String(task.status || '').toLowerCase());
-    const fallbackStatus = projectDoc.taskStatusData.find((s) => s.type === 'default_active') || projectDoc.taskStatusData[0];
-    const statusDetails = wantedStatus || fallbackStatus;
+    // AI-created tasks always start in the FIRST task status column — the
+    // company's "starting" state (typically "To Do" or "Backlog"). We
+    // deliberately ignore whatever status the LLM picked, because new tasks
+    // should never begin life as "In Progress" / "In Review" / "Done", and
+    // the first column is what the user sees first on the kanban board.
+    // Schema validates `taskStatusData` is non-empty, but we defensively
+    // fall back through default_active just in case.
+    const statusDetails = projectDoc.taskStatusData[0]
+        || projectDoc.taskStatusData.find((s) => s.type === 'default_active');
+    // statusByName is intentionally unused for AI flow — keep the param for
+    // signature compatibility with manual-creation callers.
+    void statusByName;
 
     const taskLeader = (task.AssigneeUserId && task.AssigneeUserId[0])
         || (Array.isArray(projectDoc.LeadUserId) && projectDoc.LeadUserId[0])
