@@ -38,6 +38,30 @@ function sendError(res, status, message) {
     return res.status(status).send({ status: false, statusText: message });
 }
 
+/**
+ * Maps LLM provider error codes to appropriate HTTP status codes so the
+ * client receives a meaningful status rather than a generic 500.
+ *
+ * LLM_RATE_LIMITED  → 429  (client should back off and retry)
+ * LLM_AUTH_FAILED   → 503  (server config issue, not a client mistake)
+ * LLM_UNAVAILABLE   → 503  (upstream temporarily down)
+ * LLM_TIMEOUT       → 504  (gateway timeout)
+ * LLM_BAD_REQUEST   → 400  (bad model config / invalid params)
+ * LLM_INVALID_OUTPUT→ 502  (model returned unparseable output)
+ * anything else     → 500
+ */
+function llmErrorToHttpStatus(error) {
+    const map = {
+        LLM_RATE_LIMITED: 429,
+        LLM_AUTH_FAILED: 503,
+        LLM_UNAVAILABLE: 503,
+        LLM_TIMEOUT: 504,
+        LLM_BAD_REQUEST: 400,
+        LLM_INVALID_OUTPUT: 502,
+    };
+    return (error && error.code && map[error.code]) || 500;
+}
+
 function resolveCompanyId(req) {
     // Prefer the JWT-verified header (set by verifyJWTTokenWithCV2 upstream)
     // but accept body.companyId/CompanyId for flexibility. We always
@@ -350,8 +374,8 @@ exports.plan = async (req, res) => {
         return;
     } catch (error) {
         logger.error(`AIPG plan error: ${error && error.message ? error.message : error}`);
-        const code = error.code === 'LLM_INVALID_OUTPUT' ? 502 : 500;
-        return sendError(res, code, error && error.message ? error.message : 'Plan generation failed. Please try again.');
+        const httpCode = llmErrorToHttpStatus(error);
+        return sendError(res, httpCode, error && error.message ? error.message : 'Plan generation failed. Please try again.');
     }
 };
 
@@ -398,8 +422,8 @@ exports.clarify = async (req, res) => {
         // Non-fatal: a clarify failure should NOT block the user. The
         // frontend treats a non-OK response as "skip Q&A, go straight to
         // plan" — same fallback used when the brief is already complete.
-        const code = error.code === 'LLM_INVALID_OUTPUT' ? 502 : 500;
-        return sendError(res, code, error && error.message ? error.message : 'Could not generate clarifying questions. You can continue without them.');
+        const httpCode = llmErrorToHttpStatus(error);
+        return sendError(res, httpCode, error && error.message ? error.message : 'Could not generate clarifying questions. You can continue without them.');
     }
 };
 
