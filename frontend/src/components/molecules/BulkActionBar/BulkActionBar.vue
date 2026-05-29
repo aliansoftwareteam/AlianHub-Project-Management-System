@@ -345,15 +345,16 @@ const availablePriorities = computed(() => {
     return Array.isArray(data) ? data : [];
 });
 // Build a clean { id, label, image } list of users available to assign.
-// Prefer project members (AssigneeUserId on projectData). Fall back to
-// active company users for projects without a restricted member list.
-// Backend re-validates permission per task in any case.
+// Private-space projects restrict to the project's member list; public
+// projects allow any active company user — matches the per-task assignee
+// picker in TaskDetailRightSide. Backend re-validates permission per task.
 const assigneeUserList = computed(() => {
+    const isPrivateSpace = !!projectData?.value?.isPrivateSpace;
     const projectIds = Array.isArray(projectData?.value?.AssigneeUserId)
         ? projectData.value.AssigneeUserId
         : [];
     const companyUsers = getters['settings/companyUsers'] || [];
-    const sourceIds = projectIds.length
+    const sourceIds = isPrivateSpace
         ? projectIds
         : companyUsers.filter((u) => u && u.isDelete === false).map((u) => u.userId);
 
