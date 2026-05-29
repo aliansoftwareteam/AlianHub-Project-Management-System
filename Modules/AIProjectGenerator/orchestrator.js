@@ -307,7 +307,7 @@ const STANDARD_TASK_STATUSES = [
     { name: 'In Progress', textColor: '#6473e8', type: 'active' },
     { name: 'In Review',   textColor: '#9759c0', type: 'active' },
     { name: 'Backlog',     textColor: '#ec4141', type: 'active' },
-    { name: 'Done',        textColor: '#24c110', type: 'close' },
+    { name: 'Completed',   textColor: '#24c110', type: 'close' },
 ];
 
 const STANDARD_PROJECT_STATUSES = [
