@@ -288,21 +288,34 @@ function mergeStatusList({ planList, settings, shapeFn }) {
     return { merged, newEntries, finalTotal: total };
 }
 
-// ─── Use company settings as-is for status lists ─────────────────────
+// ─── Standard status sets for AI projects ──────────────────────────
 //
-// Unlike `mergeStatusList` which honors LLM-coined names and adds new
-// entries to the company's settings, this helper ALWAYS uses the existing
-// company settings unchanged. The LLM cannot invent new status names —
-// the user's own kanban setup (Settings → Task / Project Status) is
-// authoritative. This prevents AI projects from polluting the company's
-// status catalog with one-off labels like "Backlog", "QA", "Review" the
-// model coined, and guarantees every AI project's kanban looks identical
-// to a manually-created project's kanban.
-function useCompanyStatusList({ settings, shapeFn }) {
-    const settingsList = Array.isArray(settings.settings) ? settings.settings : [];
-    const merged = settingsList.map((s, idx) => shapeFn(s, idx));
-    return { merged, newEntries: [], finalTotal: Number(settings.totalStatus) || settingsList.length };
-}
+// The LLM is no longer allowed to invent its own status names — AI
+// projects always use this curated standard set, which mirrors what
+// the manual "Implementation Plan" project template ships. These names
+// are looked up in the company's settings via mergeStatusList: if a name
+// already exists in the company catalog, its key + colors are reused;
+// only genuinely-new names get added to settings (which is rare — most
+// companies already have these in their catalog).
+//
+// This is the right balance:
+//   - AI projects look like manual ones (same 5-6 columns)
+//   - Company settings catalog is not polluted with LLM-coined garbage
+//   - User's existing customisations of these status colors are honored
+const STANDARD_TASK_STATUSES = [
+    { name: 'To Do',       textColor: '#ff9600', type: 'default_active' },
+    { name: 'In Progress', textColor: '#6473e8', type: 'active' },
+    { name: 'In Review',   textColor: '#9759c0', type: 'active' },
+    { name: 'Backlog',     textColor: '#ec4141', type: 'active' },
+    { name: 'Done',        textColor: '#24c110', type: 'close' },
+];
+
+const STANDARD_PROJECT_STATUSES = [
+    { name: 'Planning',  textColor: '#6473e8', type: 'default_active' },
+    { name: 'Active',    textColor: '#24c110', type: 'active' },
+    { name: 'On Hold',   textColor: '#ff9600', type: 'active' },
+    { name: 'Completed', textColor: '#6BC950', type: 'close' },
+];
 
 function shapeProjectStatus(entry, idx) {
     const textColor = pickTextColor(entry, idx);
@@ -458,17 +471,19 @@ function buildProjectDoc({ plan, context, companyId, uid, projectIdHint, project
         : new mongoose.Types.ObjectId();
 
     const proj = plan.project;
-    // Project + task statuses are ALWAYS taken from the company's existing
-    // settings — never merged with whatever the LLM emitted. This keeps
-    // the app's "dynamic statuses" promise intact: the user's own kanban
-    // setup is the single source of truth, and AI projects look identical
-    // to manually-created ones. Task TYPES still merge (the model may
-    // legitimately need a new type the company hasn't catalogued yet).
-    const projectStatusMerge = useCompanyStatusList({
+    // Project + task statuses always use the STANDARD curated set —
+    // not the LLM's emitted list (which would invent garbage names like
+    // "QA", "Review", "Ready for Production"), nor the full company
+    // catalog (which may contain test/garbage statuses accumulated over
+    // time). mergeStatusList still reuses existing entries from the
+    // company catalog when names match (so user customisations stick).
+    const projectStatusMerge = mergeStatusList({
+        planList: STANDARD_PROJECT_STATUSES,
         settings: context.projectStatusSettings,
         shapeFn: shapeProjectStatus,
     });
-    const taskStatusMerge = useCompanyStatusList({
+    const taskStatusMerge = mergeStatusList({
+        planList: STANDARD_TASK_STATUSES,
         settings: context.taskStatusSettings,
         shapeFn: shapeTaskStatus,
     });
