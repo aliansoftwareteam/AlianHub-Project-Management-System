@@ -78,16 +78,46 @@ const anthropicProvider = {
             const stream = client.messages.stream(params);
             response = await stream.finalMessage();
         } catch (err) {
-            // Surface Anthropic API errors with a useful message instead of
-            // letting the SDK's default string bubble up. The controller
-            // logs the message and emits it to the SSE error event.
+            const httpStatus = err && err.status;
             const detail = err && err.error && err.error.error && err.error.error.message;
-            const message = detail
-                || (err && err.message)
-                || 'Anthropic request failed';
+
+            // Map known HTTP status codes to friendly messages with error codes
+            // so the controller can respond with the right HTTP status.
+            if (httpStatus === 429) {
+                // Anthropic returns 429 for both rate limits AND credit balance
+                // issues. Sniff the detail message to decide which one. Credit
+                // issues need a different fix (add balance) than rate limits.
+                const isCreditIssue = typeof detail === 'string'
+                    && /credit|quota|billing|balance/i.test(detail);
+                if (isCreditIssue) {
+                    const e = new Error(
+                        'Your Anthropic account is out of credits. Please add balance to your Anthropic '
+                        + 'account (https://console.anthropic.com/settings/billing) and try again.',
+                    );
+                    e.code = 'LLM_QUOTA_EXCEEDED';
+                    throw e;
+                }
+                const e = new Error('The AI service is rate-limited (too many requests). Please wait about a minute and try again.');
+                e.code = 'LLM_RATE_LIMITED';
+                throw e;
+            }
+            if (httpStatus === 401 || httpStatus === 403) {
+                const e = new Error('Invalid or unauthorized Anthropic API key. Check your ANTHROPIC_API_KEY configuration.');
+                e.code = 'LLM_AUTH_FAILED';
+                throw e;
+            }
+            if (httpStatus === 503 || httpStatus === 502) {
+                const e = new Error('The AI service is temporarily unavailable. Please try again in a moment.');
+                e.code = 'LLM_UNAVAILABLE';
+                throw e;
+            }
+
+            // Generic fallback — surface Anthropic's own error message.
+            const message = detail || (err && err.message) || 'Anthropic request failed';
             const wrapped = new Error(`Anthropic: ${message}`);
             wrapped.cause = err;
-            wrapped.status = err && err.status;
+            wrapped.code = 'LLM_ERROR';
+            wrapped.status = httpStatus;
             // Opus has a smaller default max_tokens budget than Sonnet; flag
             // the most common config mistake so operators don't chase ghosts.
             if (isClaudeOpus(process.env.ANTHROPIC_MODEL) && maxTokens > 4096) {

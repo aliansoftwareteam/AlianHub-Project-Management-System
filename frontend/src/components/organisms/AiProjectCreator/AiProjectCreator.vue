@@ -122,13 +122,30 @@
                         </div>
                     </transition>
 
+                    <!-- AI working status — visible while any LLM call is in flight -->
+                    <transition name="aipg-fade">
+                        <div v-if="clarifyLoading || loading" class="aipg-status-panel" role="status" aria-live="polite">
+                            <span class="aipg-spinner aipg-status-spinner" aria-hidden="true"></span>
+                            <div class="aipg-status-panel-text">
+                                <p class="aipg-status-panel-title">
+                                    {{ clarifyLoading ? 'Analyzing your brief…' : 'Generating project plan…' }}
+                                </p>
+                                <p class="aipg-status-panel-sub">
+                                    {{ clarifyLoading
+                                        ? 'The AI is reading your requirements. This takes a moment.'
+                                        : 'Building your sprints and tasks — usually 15–30 seconds. Please wait.' }}
+                                </p>
+                            </div>
+                        </div>
+                    </transition>
+
                     <div v-if="hasGeneratedPlan" class="aipg-actions aipg-actions-split">
                         <button
                             class="aipg-btn aipg-btn-ghost"
                             :disabled="!canGenerate || loading || briefUploading || clarifyLoading"
                             @click="onGeneratePlan">
                             <span v-if="loading || clarifyLoading" class="aipg-spinner aipg-spinner-sm" aria-hidden="true"></span>
-                            {{ (loading || clarifyLoading) ? 'Generating plan…' : 'Re-Generate Plan' }}
+                            {{ clarifyLoading ? 'Analyzing brief…' : (loading ? 'Generating plan…' : 'Re-Generate Plan') }}
                         </button>
                         <button
                             class="aipg-btn aipg-btn-primary"
@@ -150,7 +167,7 @@
                             :disabled="!canGenerate || loading || briefUploading || clarifyLoading"
                             @click="onRegenerateQuestions">
                             <span v-if="clarifyLoading || loading" class="aipg-spinner aipg-spinner-sm" aria-hidden="true"></span>
-                            {{ (clarifyLoading || loading) ? 'Generating…' : 'Re-Generate Questions' }}
+                            {{ clarifyLoading ? 'Analyzing brief…' : (loading ? 'Generating plan…' : 'Re-Generate Questions') }}
                         </button>
                         <button
                             class="aipg-btn aipg-btn-primary"
@@ -165,13 +182,26 @@
                             :disabled="!canGenerate || loading || briefUploading || clarifyLoading"
                             @click="onGeneratePlan">
                             <span v-if="loading || clarifyLoading" class="aipg-spinner aipg-spinner-sm" aria-hidden="true"></span>
-                            {{ (loading || clarifyLoading) ? 'Generating…' : (error ? 'Try again' : 'Generate plan') }}
+                            {{ clarifyLoading ? 'Analyzing brief…' : (loading ? 'Generating plan…' : (error ? 'Try again' : 'Generate plan')) }}
                         </button>
                     </div>
                 </section>
 
                 <!-- STEP 2: CLARIFY -->
                 <section v-else-if="step === 'clarify'" class="aipg-section">
+                    <!-- Plan-generation status — shows while LLM builds the plan
+                         after the user submits their answers. ClarifyStep dims
+                         itself (opacity + pointer-events) but this panel makes
+                         the wait state unmissable. -->
+                    <transition name="aipg-fade">
+                        <div v-if="loading" class="aipg-status-panel" role="status" aria-live="polite">
+                            <span class="aipg-spinner aipg-status-spinner" aria-hidden="true"></span>
+                            <div class="aipg-status-panel-text">
+                                <p class="aipg-status-panel-title">Generating project plan…</p>
+                                <p class="aipg-status-panel-sub">Building your sprints and tasks — usually 15–30 seconds. Please wait.</p>
+                            </div>
+                        </div>
+                    </transition>
                     <ClarifyStep
                         :loading="clarifyLoading"
                         :generating="loading"
@@ -564,34 +594,39 @@ export default defineComponent({
             error.value = '';
             clarifyError.value = '';
             clarifications.value = null;
+            // Stay on Step 1 during the clarify call — the "Generate plan"
+            // button shows "Analyzing brief…" via the clarifyLoading flag.
+            // We transition to the Clarify wizard ONLY if the LLM returns
+            // questions; if it returns `[]` (or fails) we go straight to
+            // plan generation without ever showing the wizard skeleton.
             clarifyLoading.value = true;
-            // Move into the Clarify step immediately so the user sees the
-            // skeleton placeholders while we wait for the LLM. If we end
-            // up skipping Q&A we transition out again before they see the
-            // questions render.
-            step.value = 'clarify';
             try {
                 const res = await api.generateClarifyingQuestions({
                     description: description.value.trim(),
                     briefId: briefId.value,
                 });
                 if (res && res.status && Array.isArray(res.questions) && res.questions.length) {
+                    // Questions came back — NOW move into the Clarify step.
                     clarifyQuestions.value = res.questions;
                     clarifyUnderstanding.value = res.understanding || '';
                     clarifyLoading.value = false;
-                    return; // user now answers questions; submit will call runPlanGeneration
+                    step.value = 'clarify';
+                    return; // user now answers; submit will call runPlanGeneration
                 }
-                // Either status:false, no questions, or malformed — just
-                // skip Q&A and run plan generation with whatever brief we have.
+                // Empty array, status:false, or malformed — skip Q&A and
+                // go straight to plan generation. User never sees the
+                // wizard. clarifyLoading stays true → loading flips to
+                // `loading` inside runPlanGeneration, so the button text
+                // smoothly transitions from "Analyzing brief…" to
+                // "Generating plan…" without a state gap.
                 clarifyLoading.value = false;
                 await runPlanGeneration(null);
             } catch (e) {
                 // Clarify failed — graceful fallback to plan generation.
+                // User stays on Step 1; runPlanGeneration handles its own
+                // error surfacing via error.value.
                 clarifyLoading.value = false;
                 await runPlanGeneration(null);
-                // Note: any error during the fallback plan generation is
-                // surfaced by runPlanGeneration itself via error.value, so
-                // we don't need to re-raise here.
             }
         }
 
@@ -1527,6 +1562,45 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
 .aipg-btn-ghost:hover:not(:disabled) {
     background: #f8fafc;
     border-color: #cbd5e1;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   AI working status panel
+   ───────────────────────────────────────────────────────────────────── */
+.aipg-status-panel {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    background: #eef2ff;
+    border: 1px solid #c7d2fe;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(47, 57, 144, 0.07);
+}
+.aipg-status-spinner {
+    flex-shrink: 0;
+    width: 22px !important;
+    height: 22px !important;
+    border: 2.5px solid rgba(47, 57, 144, 0.18) !important;
+    border-top-color: #2F3990 !important;
+}
+.aipg-status-panel-text {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+.aipg-status-panel-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #2F3990;
+}
+.aipg-status-panel-sub {
+    margin: 0;
+    font-size: 12px;
+    color: #4338ca;
+    opacity: 0.8;
 }
 
 /* ─────────────────────────────────────────────────────────────────────
