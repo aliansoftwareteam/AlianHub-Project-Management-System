@@ -66,14 +66,6 @@
 
 ---
 
-## Plan Feature Gate
-
-| ID     | Title                                                     | Precondition                                  | Steps                                                                              | Expected Result                                                          | Actual Result | Status |
-|--------|-----------------------------------------------------------|-----------------------------------------------|------------------------------------------------------------------------------------|--------------------------------------------------------------------------|---------------|--------|
-| TM_026 | Upgrade Plan screen shown when team feature not in plan   | Company plan does not include team feature    | 1. Open Settings → Teams                                                           | "Upgrade your plan to unlock team" screen shown; team list not visible   |               | ⏳     |
-
----
-
 ## Permission-based Access
 
 | ID     | Title                                                           | Precondition                                               | Steps                                                                | Expected Result                                                          | Actual Result | Status |
@@ -85,4 +77,4 @@
 
 ---
 
-**Total:** 30 test cases · **All status:** ⏳ Pending
+**Total:** 29 test cases · **All status:** ⏳ Pending

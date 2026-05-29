@@ -39,16 +39,6 @@
 
 ---
 
-## Bulk Import (CSV)
-
-| ID      | Title                                                  | Precondition                               | Steps                                                                               | Expected Result                                                         | Actual Result | Status |
-|---------|--------------------------------------------------------|--------------------------------------------|-------------------------------------------------------------------------------------|-------------------------------------------------------------------------|---------------|--------|
-| MBR_013 | Import members from a CSV file                         | Valid CSV with name and email columns      | 1. Click "Import Members"  2. Upload a valid CSV  3. Confirm                       | Members imported; progress shown; new members appear in the list        |               | ⏳     |
-| MBR_014 | Import progress shown in real-time                     | Bulk import running                        | 1. Start a CSV import with 10+ members                                             | Progress indicator updates as each member is processed                  |               | ⏳     |
-| MBR_015 | Duplicate emails in CSV are skipped                    | CSV contains an email already in the system | 1. Upload a CSV that includes an existing member's email                           | Duplicate skipped; rest of members imported; summary shown              |               | ⏳     |
-
----
-
 ## Role Management
 
 | ID      | Title                                                  | Precondition                               | Steps                                                                               | Expected Result                                                         | Actual Result | Status |
@@ -111,4 +101,4 @@
 
 ---
 
-**Total:** 35 test cases · **All status:** ⏳ Pending
+**Total:** 32 test cases · **All status:** ⏳ Pending
