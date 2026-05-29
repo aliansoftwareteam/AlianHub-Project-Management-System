@@ -84,7 +84,20 @@ const anthropicProvider = {
             // Map known HTTP status codes to friendly messages with error codes
             // so the controller can respond with the right HTTP status.
             if (httpStatus === 429) {
-                const e = new Error('The AI service is rate-limited. Please wait a moment and try again.');
+                // Anthropic returns 429 for both rate limits AND credit balance
+                // issues. Sniff the detail message to decide which one. Credit
+                // issues need a different fix (add balance) than rate limits.
+                const isCreditIssue = typeof detail === 'string'
+                    && /credit|quota|billing|balance/i.test(detail);
+                if (isCreditIssue) {
+                    const e = new Error(
+                        'Your Anthropic account is out of credits. Please add balance to your Anthropic '
+                        + 'account (https://console.anthropic.com/settings/billing) and try again.',
+                    );
+                    e.code = 'LLM_QUOTA_EXCEEDED';
+                    throw e;
+                }
+                const e = new Error('The AI service is rate-limited (too many requests). Please wait about a minute and try again.');
                 e.code = 'LLM_RATE_LIMITED';
                 throw e;
             }

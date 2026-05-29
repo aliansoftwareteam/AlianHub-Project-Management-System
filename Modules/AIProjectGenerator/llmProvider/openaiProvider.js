@@ -91,13 +91,29 @@ const openaiProvider = {
             });
         } catch (axiosErr) {
             const status = axiosErr.response && axiosErr.response.status;
-            const apiMsg = axiosErr.response
-                && axiosErr.response.data
-                && axiosErr.response.data.error
-                && axiosErr.response.data.error.message;
+            const errBody = axiosErr.response && axiosErr.response.data && axiosErr.response.data.error;
+            const apiMsg = errBody && errBody.message;
+            // OpenAI uses 429 for BOTH rate limits and insufficient billing
+            // quota. The two need different user messages — one resolves
+            // in 60s, the other requires the account owner to add credits.
+            // Differentiate via `error.type` / `error.code`.
+            const apiType = errBody && errBody.type;
+            const apiCode = errBody && errBody.code;
 
             if (status === 429) {
-                const err = new Error('The AI service is rate-limited. Please wait a moment and try again.');
+                const isQuotaIssue = apiType === 'insufficient_quota'
+                    || apiCode === 'insufficient_quota'
+                    || (typeof apiMsg === 'string' && /quota|billing|credit/i.test(apiMsg));
+                if (isQuotaIssue) {
+                    const err = new Error(
+                        'Your OpenAI account is out of credits. Please add balance to your OpenAI wallet '
+                        + '(https://platform.openai.com/account/billing) and try again.',
+                    );
+                    err.code = 'LLM_QUOTA_EXCEEDED';
+                    throw err;
+                }
+                // Genuine rate limit — resolves within ~60 seconds.
+                const err = new Error('The AI service is rate-limited (too many requests). Please wait about a minute and try again.');
                 err.code = 'LLM_RATE_LIMITED';
                 throw err;
             }

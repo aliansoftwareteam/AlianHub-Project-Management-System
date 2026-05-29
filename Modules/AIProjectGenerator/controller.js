@@ -42,17 +42,19 @@ function sendError(res, status, message) {
  * Maps LLM provider error codes to appropriate HTTP status codes so the
  * client receives a meaningful status rather than a generic 500.
  *
- * LLM_RATE_LIMITED  → 429  (client should back off and retry)
- * LLM_AUTH_FAILED   → 503  (server config issue, not a client mistake)
- * LLM_UNAVAILABLE   → 503  (upstream temporarily down)
- * LLM_TIMEOUT       → 504  (gateway timeout)
- * LLM_BAD_REQUEST   → 400  (bad model config / invalid params)
- * LLM_INVALID_OUTPUT→ 502  (model returned unparseable output)
- * anything else     → 500
+ * LLM_RATE_LIMITED   → 429  (client should back off and retry — resolves in ~60s)
+ * LLM_QUOTA_EXCEEDED → 402  (account out of credits — owner must add balance)
+ * LLM_AUTH_FAILED    → 503  (server config issue, not a client mistake)
+ * LLM_UNAVAILABLE    → 503  (upstream temporarily down)
+ * LLM_TIMEOUT        → 504  (gateway timeout)
+ * LLM_BAD_REQUEST    → 400  (bad model config / invalid params)
+ * LLM_INVALID_OUTPUT → 502  (model returned unparseable output)
+ * anything else      → 500
  */
 function llmErrorToHttpStatus(error) {
     const map = {
         LLM_RATE_LIMITED: 429,
+        LLM_QUOTA_EXCEEDED: 402,
         LLM_AUTH_FAILED: 503,
         LLM_UNAVAILABLE: 503,
         LLM_TIMEOUT: 504,
