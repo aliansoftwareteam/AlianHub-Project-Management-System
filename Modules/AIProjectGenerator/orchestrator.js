@@ -288,6 +288,35 @@ function mergeStatusList({ planList, settings, shapeFn }) {
     return { merged, newEntries, finalTotal: total };
 }
 
+// ─── Standard status sets for AI projects ──────────────────────────
+//
+// The LLM is no longer allowed to invent its own status names — AI
+// projects always use this curated standard set, which mirrors what
+// the manual "Implementation Plan" project template ships. These names
+// are looked up in the company's settings via mergeStatusList: if a name
+// already exists in the company catalog, its key + colors are reused;
+// only genuinely-new names get added to settings (which is rare — most
+// companies already have these in their catalog).
+//
+// This is the right balance:
+//   - AI projects look like manual ones (same 5-6 columns)
+//   - Company settings catalog is not polluted with LLM-coined garbage
+//   - User's existing customisations of these status colors are honored
+const STANDARD_TASK_STATUSES = [
+    { name: 'To Do',       textColor: '#ff9600', type: 'default_active' },
+    { name: 'In Progress', textColor: '#6473e8', type: 'active' },
+    { name: 'In Review',   textColor: '#9759c0', type: 'active' },
+    { name: 'Backlog',     textColor: '#ec4141', type: 'active' },
+    { name: 'Completed',   textColor: '#24c110', type: 'close' },
+];
+
+const STANDARD_PROJECT_STATUSES = [
+    { name: 'Planning',  textColor: '#6473e8', type: 'default_active' },
+    { name: 'Active',    textColor: '#24c110', type: 'active' },
+    { name: 'On Hold',   textColor: '#ff9600', type: 'active' },
+    { name: 'Completed', textColor: '#6BC950', type: 'close' },
+];
+
 function shapeProjectStatus(entry, idx) {
     const textColor = pickTextColor(entry, idx);
     return {
@@ -442,13 +471,19 @@ function buildProjectDoc({ plan, context, companyId, uid, projectIdHint, project
         : new mongoose.Types.ObjectId();
 
     const proj = plan.project;
+    // Project + task statuses always use the STANDARD curated set —
+    // not the LLM's emitted list (which would invent garbage names like
+    // "QA", "Review", "Ready for Production"), nor the full company
+    // catalog (which may contain test/garbage statuses accumulated over
+    // time). mergeStatusList still reuses existing entries from the
+    // company catalog when names match (so user customisations stick).
     const projectStatusMerge = mergeStatusList({
-        planList: proj.projectStatusData,
+        planList: STANDARD_PROJECT_STATUSES,
         settings: context.projectStatusSettings,
         shapeFn: shapeProjectStatus,
     });
     const taskStatusMerge = mergeStatusList({
-        planList: proj.taskStatusData,
+        planList: STANDARD_TASK_STATUSES,
         settings: context.taskStatusSettings,
         shapeFn: shapeTaskStatus,
     });
@@ -607,11 +642,18 @@ function buildTaskDoc({ task, projectDoc, sprintDoc, statusByName, taskTypeByKey
     const id = new mongoose.Types.ObjectId();
     const taskType = taskTypeByKey.get(String(task.TaskTypeKey || '')) || projectDoc.taskTypeCounts[0];
 
-    // Status lookup is case-insensitive name match. Schema validates the
-    // name exists, but defensively fall back to default_active if not.
-    const wantedStatus = statusByName.get(String(task.status || '').toLowerCase());
-    const fallbackStatus = projectDoc.taskStatusData.find((s) => s.type === 'default_active') || projectDoc.taskStatusData[0];
-    const statusDetails = wantedStatus || fallbackStatus;
+    // AI-created tasks always start in the FIRST task status column — the
+    // company's "starting" state (typically "To Do" or "Backlog"). We
+    // deliberately ignore whatever status the LLM picked, because new tasks
+    // should never begin life as "In Progress" / "In Review" / "Done", and
+    // the first column is what the user sees first on the kanban board.
+    // Schema validates `taskStatusData` is non-empty, but we defensively
+    // fall back through default_active just in case.
+    const statusDetails = projectDoc.taskStatusData[0]
+        || projectDoc.taskStatusData.find((s) => s.type === 'default_active');
+    // statusByName is intentionally unused for AI flow — keep the param for
+    // signature compatibility with manual-creation callers.
+    void statusByName;
 
     const taskLeader = (task.AssigneeUserId && task.AssigneeUserId[0])
         || (Array.isArray(projectDoc.LeadUserId) && projectDoc.LeadUserId[0])
