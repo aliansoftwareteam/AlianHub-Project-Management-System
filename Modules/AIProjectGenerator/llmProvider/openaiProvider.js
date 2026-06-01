@@ -80,13 +80,73 @@ const openaiProvider = {
         const defaultTimeout = reasoning ? 600000 : 240000;
         const timeoutMs = Number(process.env.OPENAI_TIMEOUT_MS) || defaultTimeout;
 
-        const response = await axios.post(OPENAI_CHAT_URL, body, {
-            headers: {
-                Authorization: `Bearer ${config.AI_API_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            timeout: timeoutMs,
-        });
+        let response;
+        try {
+            response = await axios.post(OPENAI_CHAT_URL, body, {
+                headers: {
+                    Authorization: `Bearer ${config.AI_API_KEY}`,
+                    'Content-Type': 'application/json',
+                },
+                timeout: timeoutMs,
+            });
+        } catch (axiosErr) {
+            const status = axiosErr.response && axiosErr.response.status;
+            const errBody = axiosErr.response && axiosErr.response.data && axiosErr.response.data.error;
+            const apiMsg = errBody && errBody.message;
+            // OpenAI uses 429 for BOTH rate limits and insufficient billing
+            // quota. The two need different user messages — one resolves
+            // in 60s, the other requires the account owner to add credits.
+            // Differentiate via `error.type` / `error.code`.
+            const apiType = errBody && errBody.type;
+            const apiCode = errBody && errBody.code;
+
+            if (status === 429) {
+                const isQuotaIssue = apiType === 'insufficient_quota'
+                    || apiCode === 'insufficient_quota'
+                    || (typeof apiMsg === 'string' && /quota|billing|credit/i.test(apiMsg));
+                if (isQuotaIssue) {
+                    const err = new Error(
+                        'Your OpenAI account is out of credits. Please add balance to your OpenAI wallet '
+                        + '(https://platform.openai.com/account/billing) and try again.',
+                    );
+                    err.code = 'LLM_QUOTA_EXCEEDED';
+                    throw err;
+                }
+                // Genuine rate limit — resolves within ~60 seconds.
+                const err = new Error('The AI service is rate-limited (too many requests). Please wait about a minute and try again.');
+                err.code = 'LLM_RATE_LIMITED';
+                throw err;
+            }
+            if (status === 401) {
+                const err = new Error('Invalid AI API key. Please check your AI_API_KEY configuration.');
+                err.code = 'LLM_AUTH_FAILED';
+                throw err;
+            }
+            if (status === 403) {
+                const err = new Error('AI API access denied. Check your API key permissions.');
+                err.code = 'LLM_AUTH_FAILED';
+                throw err;
+            }
+            if (status === 400) {
+                const err = new Error(apiMsg || 'Invalid request to AI API. Check your model configuration.');
+                err.code = 'LLM_BAD_REQUEST';
+                throw err;
+            }
+            if (status === 503 || status === 502) {
+                const err = new Error('The AI service is temporarily unavailable. Please try again in a moment.');
+                err.code = 'LLM_UNAVAILABLE';
+                throw err;
+            }
+            if (axiosErr.code === 'ECONNABORTED' || axiosErr.code === 'ETIMEDOUT') {
+                const err = new Error('The AI request timed out. Please try again.');
+                err.code = 'LLM_TIMEOUT';
+                throw err;
+            }
+            // Unknown network/API error — pass through with the original message
+            const fallback = new Error(apiMsg || axiosErr.message || 'OpenAI request failed');
+            fallback.code = 'LLM_ERROR';
+            throw fallback;
+        }
 
         const choice = response.data && response.data.choices && response.data.choices[0];
         const usage = response.data && response.data.usage;

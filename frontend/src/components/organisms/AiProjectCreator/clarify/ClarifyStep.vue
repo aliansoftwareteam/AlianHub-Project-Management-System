@@ -1,132 +1,170 @@
 <template>
     <!--
-        Once `generating` flips to true (the user clicked "Generate plan"
-        and we're waiting on the LLM), the whole step becomes
-        non-interactive — pointer-events: none on the root prevents any
-        further answer edits, skips, or back-clicks until the plan call
-        resolves. The visual cue is a slight dim so the user understands
-        the screen is intentionally locked.
+        Wizard-style Clarify step. One question per page with a step
+        indicator, option rows with keyboard shortcuts, an "Other" free-
+        text escape, Skip / Next at the bottom. Modelled on the AskUserQuestion
+        popup pattern. Self-contained — no QuestionCard, no input atoms.
     -->
     <div
-        class="clarify-step"
-        :class="{ 'clarify-step--locked': generating }"
+        class="cw"
+        :class="{ 'cw--locked': generating }"
         :aria-busy="generating || null"
+        @keydown="onKeydown"
     >
-        <!-- AI's "here's what I heard" banner -->
-        <div v-if="understanding" class="clarify-step__understanding">
-            <span class="clarify-step__understanding-icon">✦</span>
-            <span class="clarify-step__understanding-text">{{ understanding }}</span>
-        </div>
-
-        <div v-if="!loading" class="clarify-step__meta">
-            <span class="clarify-step__count">
-                {{ questions.length }} {{ questions.length === 1 ? 'question' : 'questions' }} ·
-                {{ estimatedMinutes }}
-            </span>
-        </div>
-
-        <!-- Skeleton placeholders while the LLM is generating questions -->
-        <template v-if="loading">
-            <div
-                v-for="n in 5"
-                :key="`sk-${n}`"
-                class="clarify-step__skeleton"
-                aria-hidden="true"
-            >
-                <div class="clarify-step__skeleton-line clarify-step__skeleton-line--short"></div>
-                <div class="clarify-step__skeleton-line"></div>
-                <div class="clarify-step__skeleton-pills">
-                    <span></span><span></span><span></span>
-                </div>
-            </div>
-        </template>
-
-        <!-- Error state -->
-        <div v-else-if="errorMessage" class="clarify-step__error">
-            <p class="clarify-step__error-title">Couldn't draft clarifying questions</p>
-            <p class="clarify-step__error-msg">{{ errorMessage }}</p>
-            <div class="clarify-step__error-actions">
-                <button type="button" class="clarify-step__btn clarify-step__btn--ghost" @click="$emit('retry')">Try again</button>
-                <button type="button" class="clarify-step__btn" @click="$emit('skip-all')">Skip and generate plan</button>
+        <!-- Loading skeleton -->
+        <div v-if="loading" class="cw__skeleton" aria-hidden="true">
+            <div class="cw__skeleton-line cw__skeleton-line--short"></div>
+            <div class="cw__skeleton-line"></div>
+            <div class="cw__skeleton-rows">
+                <div class="cw__skeleton-row" v-for="n in 4" :key="n"></div>
             </div>
         </div>
 
-        <!-- Question list (grouped by category if many; flat otherwise) -->
-        <template v-else>
-            <template v-if="groupedView">
-                <div
-                    v-for="group in groups"
-                    :key="group.category"
-                    class="clarify-step__group"
+        <!-- Error -->
+        <div v-else-if="errorMessage" class="cw__error">
+            <p class="cw__error-title">Couldn't draft clarifying questions</p>
+            <p class="cw__error-msg">{{ errorMessage }}</p>
+            <div class="cw__error-actions">
+                <button type="button" class="cw__btn cw__btn--ghost" @click="$emit('retry')">Try again</button>
+                <button type="button" class="cw__btn cw__btn--primary" @click="$emit('skip-all')">Skip and generate plan</button>
+            </div>
+        </div>
+
+        <!-- Wizard card -->
+        <div v-else-if="currentQuestion" class="cw__card">
+            <header class="cw__head">
+                <span class="cw__step">{{ currentIndex + 1 }}/{{ questions.length }}</span>
+                <h3 class="cw__question">
+                    {{ currentQuestion.question }}<span v-if="currentQuestion.required" class="cw__req" aria-label="Required">*</span>
+                </h3>
+                <button
+                    type="button"
+                    class="cw__close"
+                    :disabled="generating"
+                    aria-label="Close"
+                    @click="$emit('back')"
+                >×</button>
+            </header>
+
+            <p v-if="currentQuestion.hint" class="cw__hint">{{ currentQuestion.hint }}</p>
+
+            <!-- Free text (type === 'text') -->
+            <div v-if="isFreeText" class="cw__options">
+                <textarea
+                    v-model="textDraft"
+                    class="cw__textarea"
+                    :placeholder="textPlaceholder"
+                    rows="4"
+                    maxlength="500"
+                    @input="onTextDraftInput"
+                />
+            </div>
+
+            <!-- Option rows for everything else -->
+            <div v-else class="cw__options">
+                <button
+                    v-for="(opt, i) in renderableOptions"
+                    :key="String(opt.value)"
+                    type="button"
+                    class="cw__option"
+                    :class="{ 'cw__option--selected': isSelected(opt.value) }"
+                    @click="onOptionClick(opt.value)"
                 >
-                    <div class="clarify-step__group-header">
-                        <span class="clarify-step__group-title">{{ group.label }}</span>
-                        <span class="clarify-step__group-meta">
-                            {{ group.answered }} of {{ group.total }} answered
+                    <span class="cw__option-body">
+                        <span class="cw__option-label">
+                            <span class="cw__option-text">{{ opt.label }}</span>
+                            <span v-if="isRecommended(opt.value)" class="cw__rec">Recommended</span>
                         </span>
-                    </div>
-                    <div class="clarify-step__group-questions">
-                        <QuestionCard
-                            v-for="q in group.questions"
-                            :key="q.id"
-                            :question="q"
-                            :answer="answers[q.id]"
-                            :skipped="!!skipped[q.id]"
-                            @update:answer="setAnswer(q.id, $event)"
-                            @skip="toggleSkip(q.id)"
-                        />
-                    </div>
-                </div>
-            </template>
-            <template v-else>
-                <div class="clarify-step__questions">
-                    <QuestionCard
-                        v-for="q in questions"
-                        :key="q.id"
-                        :question="q"
-                        :answer="answers[q.id]"
-                        :skipped="!!skipped[q.id]"
-                        @update:answer="setAnswer(q.id, $event)"
-                        @skip="toggleSkip(q.id)"
-                    />
-                </div>
-            </template>
-        </template>
+                        <span v-if="opt.description" class="cw__option-desc">{{ opt.description }}</span>
+                    </span>
+                    <kbd v-if="i < 9" class="cw__kbd">{{ i + 1 }}</kbd>
+                </button>
 
-        <!-- Sticky bottom action bar -->
-        <div v-if="!loading && !errorMessage" class="clarify-step__actions">
-            <button
-                type="button"
-                class="clarify-step__btn clarify-step__btn--ghost"
-                @click="$emit('back')"
-            >
-                ← Back
-            </button>
-            <button
-                type="button"
-                class="clarify-step__btn clarify-step__btn--ghost"
-                :disabled="generating"
-                @click="onLetAIDecide"
-            >
-                Let AI decide everything
-            </button>
-            <button
-                type="button"
-                class="clarify-step__btn clarify-step__btn--primary"
-                :disabled="!canSubmit || generating"
-                @click="onSubmit"
-            >
-                <span v-if="generating">Generating plan…</span>
-                <span v-else-if="hasMissingRequired">Answer required questions</span>
-                <span v-else>Generate plan ({{ counterText }})</span>
-            </button>
+                <!-- Inline text field that appears under the rows when the
+                     user selected "Custom" (preset_chips) — same pattern as
+                     "Other" but baked into the question's own options. -->
+                <input
+                    v-if="showCustomInput"
+                    v-model="customDraft"
+                    type="text"
+                    class="cw__inline-input"
+                    :placeholder="customPlaceholder"
+                    maxlength="200"
+                    @input="onCustomDraftInput"
+                />
+
+                <!-- "Other" escape — appears as the last row for single-select
+                     types (segmented / radio_cards / select_card). User can
+                     type a free-text answer that overrides the structured pick. -->
+                <div
+                    v-if="allowOther"
+                    class="cw__option cw__option--other"
+                    :class="{ 'cw__option--selected': isOtherSelected }"
+                >
+                    <span class="cw__option-body">
+                        <span class="cw__option-label">
+                            <span class="cw__option-text">Other</span>
+                        </span>
+                        <input
+                            v-model="otherDraft"
+                            type="text"
+                            class="cw__other-input"
+                            placeholder="Type your own answer here"
+                            maxlength="200"
+                            @focus="selectOther"
+                            @input="onOtherDraftInput"
+                        />
+                    </span>
+                    <kbd class="cw__kbd">{{ renderableOptions.length + 1 }}</kbd>
+                </div>
+            </div>
+
+            <!-- Footer: Back on far-left, Let-AI-decide + Skip + Next on right -->
+            <footer class="cw__foot">
+                <!-- ← Back: previous question when on Q2+, back to Step 1 when on Q1 -->
+                <button
+                    type="button"
+                    class="cw__btn cw__btn--ghost"
+                    :disabled="generating"
+                    @click="onBack"
+                >
+                    <span class="cw__back-arrow">←</span>
+                    {{ currentIndex > 0 ? 'Previous' : 'Back' }}
+                </button>
+                <span class="cw__spacer"></span>
+                <button
+                    type="button"
+                    class="cw__btn cw__btn--link"
+                    :disabled="generating"
+                    @click="onLetAIDecideAll"
+                >
+                    Let AI decide
+                </button>
+                <button
+                    type="button"
+                    class="cw__btn cw__btn--ghost"
+                    :disabled="generating"
+                    @click="onSkip"
+                >
+                    Skip
+                </button>
+                <button
+                    type="button"
+                    class="cw__btn cw__btn--primary"
+                    :disabled="!canAdvance || generating"
+                    @click="onNext"
+                >
+                    <span v-if="generating">Generating plan…</span>
+                    <span v-else>{{ isLastQuestion ? 'Generate plan' : 'Next' }}</span>
+                    <kbd v-if="!generating" class="cw__kbd cw__kbd--inline">Enter</kbd>
+                </button>
+            </footer>
         </div>
     </div>
 </template>
 
 <script setup>
-import { defineProps, defineEmits, computed, reactive, watch } from 'vue';
-import QuestionCard from './QuestionCard.vue';
+import { defineProps, defineEmits, computed, reactive, ref, watch } from 'vue';
 
 const props = defineProps({
     loading: { type: Boolean, default: false },
@@ -138,127 +176,245 @@ const props = defineProps({
 
 const emit = defineEmits(['submit', 'back', 'retry', 'skip-all']);
 
-// Local answer + skipped state, keyed by question.id. Reset whenever the
-// upstream questions array changes (e.g. user edited Step 1 description).
+// ── Wizard state ────────────────────────────────────────────────────
+// `answers` and `skipped` are keyed by question.id and persist across
+// navigation between wizard pages. `currentIndex` drives which page is
+// shown. `*Draft` refs hold the in-progress text for the inline inputs.
+const currentIndex = ref(0);
 const answers = reactive({});
 const skipped = reactive({});
+const otherDraft = ref('');
+const customDraft = ref('');
+const textDraft = ref('');
 
+// Reset everything when a fresh question set arrives.
 watch(
     () => props.questions,
     (qs) => {
-        // Clear old keys
+        currentIndex.value = 0;
         for (const k of Object.keys(answers)) delete answers[k];
         for (const k of Object.keys(skipped)) delete skipped[k];
-        // Pre-fill recommended answers as defaults (the consultative move:
-        // the AI already has an opinion, user can keep / change / skip).
+        // Pre-fill recommended answers so the user can hit Enter to accept.
         for (const q of qs || []) {
             if (q && q.id && q.recommended != null && q.type !== 'text') {
-                answers[q.id] = cloneRecommended(q);
+                answers[q.id] = cloneRecommended(q.recommended);
             }
         }
+        loadDraftsForCurrent(qs && qs[0]);
     },
     { immediate: true, deep: false },
 );
 
-function cloneRecommended(q) {
-    const r = q.recommended;
+// Whenever the wizard page changes, hydrate the local drafts from the
+// stored answer for THAT question (so navigating back and forth keeps
+// the "Other" or "Custom" text the user already typed).
+watch(currentIndex, (i) => {
+    loadDraftsForCurrent(props.questions[i]);
+});
+
+function loadDraftsForCurrent(q) {
+    otherDraft.value = '';
+    customDraft.value = '';
+    textDraft.value = '';
+    if (!q) return;
+    const a = answers[q.id];
+    if (q.type === 'text') {
+        textDraft.value = typeof a === 'string' ? a : '';
+    } else if (typeof a === 'object' && a !== null) {
+        if (a.value === 'custom' && a.customText) customDraft.value = a.customText;
+        if (a.value === '__other__' && a.customText) otherDraft.value = a.customText;
+    }
+}
+
+function cloneRecommended(r) {
     if (Array.isArray(r)) return [...r];
     return r;
 }
 
-function setAnswer(id, value) {
-    answers[id] = value;
-    // Touching a value clears the skipped flag for that question.
-    if (skipped[id]) delete skipped[id];
-}
+// ── Current question accessors ──────────────────────────────────────
+const currentQuestion = computed(() => props.questions[currentIndex.value] || null);
+const currentAnswer = computed(() => (currentQuestion.value ? answers[currentQuestion.value.id] : undefined));
+const isLastQuestion = computed(() => currentIndex.value >= props.questions.length - 1);
+const isFreeText = computed(() => currentQuestion.value?.type === 'text');
+const isMultiSelect = computed(() => currentQuestion.value?.type === 'toggle_chips');
+const isPresetChips = computed(() => currentQuestion.value?.type === 'preset_chips');
+const allowOther = computed(() => ['segmented', 'radio_cards', 'select_card'].includes(currentQuestion.value?.type));
 
-function toggleSkip(id) {
-    if (skipped[id]) {
-        delete skipped[id];
-    } else {
-        skipped[id] = true;
-        // Wipe any partial answer so we send a clean "skipped" upstream.
-        delete answers[id];
+// Render `toggle` as two synthetic Yes/No rows so the same row template
+// works across every type. For everything else we use the question's
+// own options array.
+const renderableOptions = computed(() => {
+    const q = currentQuestion.value;
+    if (!q) return [];
+    if (q.type === 'toggle') {
+        return [
+            { value: true, label: 'Yes' },
+            { value: false, label: 'No' },
+        ];
     }
-}
-
-// ── grouping ─────────────────────────────────────────────────────────
-// Plain-text group labels for the 8 core categories. Groups render in
-// the spec sequence regardless of LLM order (see GROUP_ORDER below).
-const GROUP_LABELS = {
-    platform:     'Platform',
-    features:     'Core Features',
-    tech_stack:   'Tech Stack',
-    integrations: 'Integrations',
-    audience:     'Audience & Scale',
-    timeline:     'Timeline',
-    budget:       'Budget',
-    compliance:   'Compliance & Region',
-};
-const GROUP_ORDER = [
-    'platform', 'features', 'tech_stack', 'integrations',
-    'audience', 'timeline', 'budget', 'compliance',
-];
-
-const groupedView = computed(() => (props.questions || []).length > 6);
-
-const groups = computed(() => {
-    const map = new Map();
-    for (const q of props.questions || []) {
-        const cat = q.category || 'other';
-        if (!map.has(cat)) map.set(cat, []);
-        map.get(cat).push(q);
-    }
-    // Render groups in spec order (Platform first, Compliance last).
-    // Any unknown categories fall back to alphabetical at the end.
-    const knownInOrder = GROUP_ORDER.filter((c) => map.has(c));
-    const unknown = [...map.keys()].filter((c) => !GROUP_ORDER.includes(c)).sort();
-    const out = [];
-    for (const cat of [...knownInOrder, ...unknown]) {
-        const qs = map.get(cat);
-        const answeredCount = qs.filter((q) => isAnswered(q)).length;
-        out.push({
-            category: cat,
-            label: GROUP_LABELS[cat] || 'Other',
-            questions: qs,
-            total: qs.length,
-            answered: answeredCount,
-        });
-    }
-    return out;
+    return Array.isArray(q.options) ? q.options : [];
 });
 
+const showCustomInput = computed(() => {
+    if (!isPresetChips.value) return false;
+    const a = currentAnswer.value;
+    const sel = typeof a === 'object' && a !== null ? a.value : a;
+    return sel === 'custom';
+});
+
+const customPlaceholder = computed(() => 'Type your answer here');
+const textPlaceholder = computed(() => {
+    const r = currentQuestion.value?.recommended;
+    return typeof r === 'string' && r.length ? r : 'Type your answer here…';
+});
+
+const isOtherSelected = computed(() => {
+    if (!allowOther.value) return false;
+    const a = currentAnswer.value;
+    return typeof a === 'object' && a !== null && a.value === '__other__';
+});
+
+// ── Selection helpers ──────────────────────────────────────────────
+function isSelected(value) {
+    const a = currentAnswer.value;
+    if (a == null) return false;
+    if (isMultiSelect.value) {
+        return Array.isArray(a) && a.map(String).includes(String(value));
+    }
+    if (typeof a === 'object' && a !== null) {
+        if (a.value === '__other__') return false; // structured rows not selected when Other is active
+        return String(a.value) === String(value);
+    }
+    return String(a) === String(value);
+}
+
+function isRecommended(value) {
+    const r = currentQuestion.value?.recommended;
+    if (r == null) return false;
+    if (Array.isArray(r)) return r.map(String).includes(String(value));
+    return String(r) === String(value);
+}
+
+// ── Click / input handlers ─────────────────────────────────────────
+function onOptionClick(value) {
+    const q = currentQuestion.value;
+    if (!q) return;
+    if (skipped[q.id]) delete skipped[q.id];
+
+    if (isMultiSelect.value) {
+        const cur = Array.isArray(answers[q.id]) ? [...answers[q.id]] : [];
+        const v = String(value);
+        const idx = cur.map(String).indexOf(v);
+        if (idx === -1) cur.push(value);
+        else cur.splice(idx, 1);
+        answers[q.id] = cur;
+        return;
+    }
+
+    // preset_chips with "custom" → keep the object shape, preserve any
+    // existing customText so a click-back doesn't wipe what the user typed.
+    if (isPresetChips.value && value === 'custom') {
+        answers[q.id] = { value: 'custom', customText: customDraft.value || '' };
+        return;
+    }
+
+    // Single-select normal pick — clear Other state if it was set.
+    answers[q.id] = value;
+    otherDraft.value = '';
+}
+
+function selectOther() {
+    const q = currentQuestion.value;
+    if (!q || !allowOther.value) return;
+    if (skipped[q.id]) delete skipped[q.id];
+    answers[q.id] = { value: '__other__', customText: otherDraft.value };
+}
+
+function onOtherDraftInput() {
+    const q = currentQuestion.value;
+    if (!q) return;
+    if (skipped[q.id]) delete skipped[q.id];
+    answers[q.id] = { value: '__other__', customText: otherDraft.value };
+}
+
+function onCustomDraftInput() {
+    const q = currentQuestion.value;
+    if (!q) return;
+    answers[q.id] = { value: 'custom', customText: customDraft.value };
+}
+
+function onTextDraftInput() {
+    const q = currentQuestion.value;
+    if (!q) return;
+    if (skipped[q.id]) delete skipped[q.id];
+    answers[q.id] = textDraft.value;
+}
+
+// ── Validation ─────────────────────────────────────────────────────
 function isAnswered(q) {
     if (skipped[q.id]) return false;
     const a = answers[q.id];
     if (a == null) return false;
     if (Array.isArray(a)) return a.length > 0;
     if (typeof a === 'string') return a.trim().length > 0;
-    if (typeof a === 'object') return !!a.value;
+    if (typeof a === 'object') {
+        // Object shape — only counted as answered if customText present
+        // (e.g. Other / Custom) or if value is a non-empty string.
+        if (a.value === 'custom' || a.value === '__other__') {
+            return typeof a.customText === 'string' && a.customText.trim().length > 0;
+        }
+        return a.value != null;
+    }
+    if (typeof a === 'boolean') return true;
     return true;
 }
 
-// ── derived state ────────────────────────────────────────────────────
-const answeredCount = computed(() => (props.questions || []).filter((q) => isAnswered(q)).length);
-
-const hasMissingRequired = computed(() => {
-    return (props.questions || []).some((q) => q.required && !isAnswered(q) && !skipped[q.id]);
+const canAdvance = computed(() => {
+    const q = currentQuestion.value;
+    if (!q) return false;
+    if (skipped[q.id]) return true; // skipped means user chose to move on
+    if (!q.required) return true;   // optional → can always advance
+    return isAnswered(q);
 });
 
-const canSubmit = computed(() => !hasMissingRequired.value);
+// ── Navigation ─────────────────────────────────────────────────────
+function onBack() {
+    if (props.generating) return;
+    if (currentIndex.value > 0) {
+        // Navigate to the previous question within the wizard.
+        currentIndex.value -= 1;
+    } else {
+        // Already on Q1 — go back to Step 1 (Describe).
+        emit('back');
+    }
+}
 
-const counterText = computed(() => `${answeredCount.value}/${(props.questions || []).length}`);
+function onNext() {
+    if (!canAdvance.value || props.generating) return;
+    if (isLastQuestion.value) {
+        emit('submit', buildClarifications());
+        return;
+    }
+    currentIndex.value += 1;
+}
 
-const estimatedMinutes = computed(() => {
-    const n = (props.questions || []).length;
-    if (n === 0) return '';
-    if (n <= 3) return '~30 seconds';
-    if (n <= 6) return '~1 minute';
-    if (n <= 9) return '~2 minutes';
-    return '~3 minutes';
-});
+function onSkip() {
+    const q = currentQuestion.value;
+    if (!q || props.generating) return;
+    skipped[q.id] = true;
+    delete answers[q.id];
+    if (isLastQuestion.value) {
+        emit('submit', buildClarifications());
+    } else {
+        currentIndex.value += 1;
+    }
+}
 
-// ── emit shape ───────────────────────────────────────────────────────
+function onLetAIDecideAll() {
+    if (props.generating) return;
+    emit('submit', buildClarifications({ skipAll: true }));
+}
+
 // Build the clarifications array the backend expects:
 //   [{ id, question, category, type, answer, skipped }]
 function buildClarifications({ skipAll = false } = {}) {
@@ -275,172 +431,276 @@ function buildClarifications({ skipAll = false } = {}) {
     });
 }
 
-function onSubmit() {
-    if (!canSubmit.value) return;
-    emit('submit', buildClarifications());
-}
+// ── Keyboard ───────────────────────────────────────────────────────
+function onKeydown(evt) {
+    if (props.generating || props.loading || props.errorMessage) return;
+    const tag = (evt.target && evt.target.tagName) || '';
+    const inTextarea = tag === 'TEXTAREA';
 
-function onLetAIDecide() {
-    emit('submit', buildClarifications({ skipAll: true }));
+    // Enter advances (except inside a textarea, where Enter inserts a newline).
+    if (evt.key === 'Enter' && !inTextarea) {
+        evt.preventDefault();
+        onNext();
+        return;
+    }
+
+    // ArrowLeft goes back (previous question or Step 1 if on Q1).
+    if (evt.key === 'ArrowLeft' && tag !== 'INPUT' && !inTextarea) {
+        evt.preventDefault();
+        onBack();
+        return;
+    }
+
+    // Number keys 1–9 pick the corresponding option. Skip when typing in
+    // an input field so the digit goes into the field instead.
+    if (tag === 'INPUT' || inTextarea) return;
+    if (/^[1-9]$/.test(evt.key)) {
+        const idx = parseInt(evt.key, 10) - 1;
+        const opts = renderableOptions.value;
+        if (idx < opts.length) {
+            evt.preventDefault();
+            onOptionClick(opts[idx].value);
+        } else if (idx === opts.length && allowOther.value) {
+            // The "Other" row is the row after the structured options.
+            evt.preventDefault();
+            selectOther();
+        }
+    }
 }
 </script>
 
 <style scoped>
-.clarify-step {
+.cw {
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    padding-bottom: 80px; /* leave room for sticky action bar */
+    gap: 14px;
 }
-/* Active during plan generation — blocks every interactive element under
-   the step (inputs, skip links, Back, Let-AI-decide, even the primary
-   button itself) so the user cannot mutate state mid-flight. Slight dim
-   communicates the locked state visually. The CTA spinner remains
-   visible because it lives on a button whose `disabled` attribute is
-   also set — both signals reinforce the same affordance. */
-.clarify-step--locked {
+.cw--locked {
     pointer-events: none;
     opacity: 0.65;
     user-select: none;
 }
 
-.clarify-step__understanding {
-    display: flex;
-    gap: 10px;
-    background: #eef0ff;
-    border: 1px solid #c7cdfa;
-    border-radius: 10px;
-    padding: 12px 14px;
-    font-size: 13px;
-    color: #2b2b35;
-    line-height: 1.5;
-}
-.clarify-step__understanding-icon {
-    color: #2F3990;
-    flex-shrink: 0;
-    font-size: 14px;
-    line-height: 1.5;
-}
-.clarify-step__understanding-text {
-    flex: 1;
-}
-
-.clarify-step__meta {
-    font-size: 12px;
-    color: #6b7280;
-}
-
-.clarify-step__group {
+/* ── Card surface ──────────────────────────────────────────────── */
+.cw__card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    padding: 18px 18px 14px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 14px;
 }
-.clarify-step__group-header {
+
+/* ── Header ────────────────────────────────────────────────────── */
+.cw__head {
     display: flex;
-    align-items: baseline;
-    gap: 10px;
-    padding: 0 4px;
-}
-.clarify-step__group-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: #2b2b35;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-.clarify-step__group-meta {
-    font-size: 11px;
-    color: #9aa0a6;
-    margin-left: auto;
-}
-.clarify-step__group-questions,
-.clarify-step__questions {
-    display: flex;
-    flex-direction: column;
+    align-items: center;
     gap: 12px;
 }
-
-/* Skeleton */
-.clarify-step__skeleton {
-    background: #fff;
-    border: 1px solid #f0f1f3;
-    border-radius: 12px;
-    padding: 16px 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-.clarify-step__skeleton-line {
-    height: 12px;
-    background: linear-gradient(90deg, #f0f1f3 0%, #e5e7eb 50%, #f0f1f3 100%);
-    background-size: 200% 100%;
-    animation: shimmer 1.4s infinite;
-    border-radius: 4px;
-}
-.clarify-step__skeleton-line--short {
-    width: 30%;
-    height: 10px;
-}
-.clarify-step__skeleton-pills {
-    display: flex;
-    gap: 8px;
-    margin-top: 4px;
-}
-.clarify-step__skeleton-pills span {
-    width: 70px;
-    height: 28px;
-    border-radius: 999px;
-    background: linear-gradient(90deg, #f0f1f3 0%, #e5e7eb 50%, #f0f1f3 100%);
-    background-size: 200% 100%;
-    animation: shimmer 1.4s infinite;
-}
-@keyframes shimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-}
-
-/* Error */
-.clarify-step__error {
-    background: #fff5f5;
-    border: 1px solid #fecaca;
-    border-radius: 10px;
-    padding: 14px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-.clarify-step__error-title {
-    margin: 0;
-    font-size: 13px;
+.cw__step {
+    flex-shrink: 0;
+    font-size: 11px;
     font-weight: 600;
-    color: #c5343a;
+    color: #2F3990;
+    background: #eef0ff;
+    padding: 3px 8px;
+    border-radius: 999px;
+    letter-spacing: 0.2px;
 }
-.clarify-step__error-msg {
+.cw__question {
+    margin: 0;
+    flex: 1;
+    font-size: 15px;
+    font-weight: 600;
+    color: #2b2b35;
+    line-height: 1.4;
+    min-width: 0;
+}
+.cw__req {
+    color: #b07000;
+    font-weight: 700;
+    margin-left: 2px;
+}
+.cw__close {
+    appearance: none;
+    background: transparent;
+    border: none;
+    color: #9aa0a6;
+    font-size: 20px;
+    line-height: 1;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+.cw__close:hover:not(:disabled) {
+    background: #f4f5f7;
+    color: #2b2b35;
+}
+.cw__close:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* ── Hint line ─────────────────────────────────────────────────── */
+.cw__hint {
     margin: 0;
     font-size: 12px;
-    color: #4b5563;
+    color: #6b7280;
     line-height: 1.5;
 }
-.clarify-step__error-actions {
+
+/* ── Options list ──────────────────────────────────────────────── */
+.cw__options {
     display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.cw__option {
+    appearance: none;
+    background: #f8f9fb;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    padding: 12px 14px;
+    text-align: left;
+    cursor: pointer;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+    font: inherit;
+    color: inherit;
+}
+.cw__option:hover:not(.cw__option--selected) {
+    background: #f1f3f7;
+}
+.cw__option--selected {
+    background: #eef0ff;
+    border-color: #c7cdfa;
+}
+.cw__option--other {
+    cursor: default;
+    align-items: center;
+}
+.cw__option-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+.cw__option-label {
+    display: inline-flex;
+    align-items: center;
     gap: 8px;
-    margin-top: 4px;
+    flex-wrap: wrap;
+    font-size: 14px;
+    font-weight: 500;
+    color: #2b2b35;
+}
+.cw__option-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.cw__rec {
+    font-size: 10px;
+    font-weight: 600;
+    color: #2F3990;
+    background: #e6e8ff;
+    padding: 2px 6px;
+    border-radius: 4px;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+.cw__option-desc {
+    font-size: 12px;
+    color: #6b7280;
+    line-height: 1.45;
+}
+.cw__kbd {
+    flex-shrink: 0;
+    margin-left: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    font-size: 11px;
+    font-family: inherit;
+    color: #6b7280;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
 }
 
-/* Action bar */
-.clarify-step__actions {
-    position: sticky;
-    bottom: 0;
-    margin: 0 -18px -18px;
-    padding: 12px 18px;
+/* "Other" / "Custom" inline inputs */
+.cw__inline-input,
+.cw__other-input {
+    appearance: none;
+    border: 1px solid #e5e7eb;
     background: #fff;
-    border-top: 1px solid #f0f1f3;
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    flex-wrap: wrap;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 13px;
+    color: #2b2b35;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    width: 100%;
 }
-.clarify-step__btn {
+.cw__inline-input:focus,
+.cw__other-input:focus {
+    border-color: #2F3990;
+    box-shadow: 0 0 0 3px rgba(47, 57, 144, 0.18);
+}
+.cw__inline-input::placeholder,
+.cw__other-input::placeholder {
+    color: #9aa0a6;
+}
+
+/* Free-text textarea */
+.cw__textarea {
+    width: 100%;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+    color: #2b2b35;
+    background: #fff;
+    outline: none;
+    resize: vertical;
+    min-height: 90px;
+    max-height: 240px;
+    font-family: inherit;
+    line-height: 1.5;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.cw__textarea:focus {
+    border-color: #2F3990;
+    box-shadow: 0 0 0 3px rgba(47, 57, 144, 0.18);
+}
+.cw__textarea::placeholder {
+    color: #9aa0a6;
+}
+
+/* ── Footer ────────────────────────────────────────────────────── */
+.cw__foot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-top: 4px;
+    border-top: 1px solid #f0f1f3;
+    margin-top: 4px;
+    padding-top: 12px;
+}
+.cw__spacer {
+    flex: 1;
+}
+.cw__btn {
     appearance: none;
     border: 1px solid transparent;
     border-radius: 8px;
@@ -450,28 +710,122 @@ function onLetAIDecide() {
     cursor: pointer;
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
     white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
-.clarify-step__btn--ghost {
+.cw__btn--ghost {
     background: transparent;
     border-color: #e5e7eb;
     color: #4b5563;
 }
-.clarify-step__btn--ghost:hover:not(:disabled) {
+.cw__btn--ghost:hover:not(:disabled) {
     background: #f4f5f7;
     border-color: #d1d5db;
 }
-.clarify-step__btn--primary {
+.cw__btn--link {
+    background: transparent;
+    border-color: transparent;
+    color: #6b7280;
+    padding: 6px 8px;
+}
+.cw__btn--link:hover:not(:disabled) {
+    color: #2F3990;
+    background: transparent;
+}
+.cw__btn--primary {
     background: #2F3990;
     color: #fff;
     border-color: #2F3990;
-    margin-left: auto;
 }
-.clarify-step__btn--primary:hover:not(:disabled) {
+.cw__btn--primary:hover:not(:disabled) {
     background: #252D75;
     border-color: #252D75;
 }
-.clarify-step__btn:disabled {
+.cw__btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+.cw__back-arrow {
+    font-size: 14px;
+    line-height: 1;
+}
+.cw__kbd--inline {
+    color: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.25);
+}
+.cw__btn--ghost .cw__kbd--inline,
+.cw__btn--link .cw__kbd--inline {
+    color: #6b7280;
+    background: #fff;
+    border-color: #e5e7eb;
+}
+
+/* ── Skeleton (loading questions) ─────────────────────────────── */
+.cw__skeleton {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.cw__skeleton-line {
+    height: 12px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #f0f1f3 0%, #e5e7eb 50%, #f0f1f3 100%);
+    background-size: 200% 100%;
+    animation: cw-shimmer 1.4s infinite;
+}
+.cw__skeleton-line--short {
+    width: 30%;
+    height: 10px;
+}
+.cw__skeleton-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 6px;
+}
+.cw__skeleton-row {
+    height: 44px;
+    border-radius: 10px;
+    background: linear-gradient(90deg, #f4f5f7 0%, #eaecf0 50%, #f4f5f7 100%);
+    background-size: 200% 100%;
+    animation: cw-shimmer 1.4s infinite;
+}
+@keyframes cw-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* ── Error state ──────────────────────────────────────────────── */
+.cw__error {
+    background: #fff5f5;
+    border: 1px solid #fecaca;
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.cw__error-title {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #c5343a;
+}
+.cw__error-msg {
+    margin: 0;
+    font-size: 12px;
+    color: #4b5563;
+    line-height: 1.5;
+}
+.cw__error-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
 }
 </style>
