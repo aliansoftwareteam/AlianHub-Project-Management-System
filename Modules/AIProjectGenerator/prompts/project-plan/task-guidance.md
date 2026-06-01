@@ -258,13 +258,32 @@ blocks or change their order.
 
 ## Priority
 
-Each task has a `priority` of `Low`, `Medium`, `High`, or `Urgent`.
-Choose deliberately — don't default everything to `Medium`.
+Each task has a `priority` of exactly one of these three values:
+`Low`, `Medium`, or `High`. No other values are valid.
 
-- **Urgent** — blockers, security/critical bugs, things that must happen first
-- **High** — work that's on the critical path for the sprint's goal
-- **Medium** — normal work
-- **Low** — polish, optional extras, nice-to-haves
+Assign priority based on the task's actual importance to the project,
+not its position in the plan or how interesting it sounds.
 
-In a typical project, most tasks are Medium, with a handful of High and
-Low. Urgent is rare. If everything is Urgent, nothing is.
+- **High** — the task is on the critical path: the sprint cannot be
+  considered done without it, or other tasks are blocked until it
+  finishes. Examples: the authentication system, core data models,
+  the primary API endpoint for a key feature, scaffolding a new
+  codebase. Reserve High for tasks that genuinely gate everything
+  else. **Most tasks are NOT High.**
+
+- **Medium** — normal, necessary work. The feature ships without this
+  task being done first, but the sprint is incomplete without it
+  eventually. This is the correct priority for the majority of tasks
+  in any real project: standard screens, supporting endpoints, UI
+  components, integration wiring, QA tasks.
+
+- **Low** — polish, optional extras, copy tweaks, nice-to-have
+  improvements, tasks that could be deferred to the next sprint
+  without blocking delivery.
+
+**Required distribution check before emitting:** in a typical sprint
+of 6–10 tasks, expect roughly 1–2 High, 4–6 Medium, and 1–2 Low.
+If you have assigned High to more than one-third of your tasks, you
+are over-classifying — go back and downgrade tasks that do not
+literally block other tasks to Medium. A plan where every task is
+High is a plan with no priorities at all.

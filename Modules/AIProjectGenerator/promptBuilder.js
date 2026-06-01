@@ -55,6 +55,7 @@ const PROJECT_PLAN_SYSTEM = composeSystem([
     ['project-plan', 'system.md'],
     ['project-plan', 'workflow-guidance.md'],
     ['project-plan', 'sprint-guidance.md'],
+    ['project-plan', 'special-sprints-guidance.md'],
     ['project-plan', 'task-guidance.md'],
     'member-rule.md',
     'color-rule.md',

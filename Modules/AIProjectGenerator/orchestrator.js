@@ -628,8 +628,12 @@ async function createSprint({ companyId, projectId, projectName, sprintName, use
 
 // ─── Task doc builder ──────────────────────────────────────────────────
 
+// Priority values are the three company defaults that ship with every
+// AlianHub installation. URGENT is intentionally excluded — it is not
+// a default priority and assigning it here would create tasks the
+// company's priority filter cannot match until they add a custom entry.
 const PRIORITY_NORMALIZE = {
-    low: 'LOW', medium: 'MEDIUM', high: 'HIGH', urgent: 'URGENT',
+    low: 'LOW', medium: 'MEDIUM', high: 'HIGH',
 };
 
 function normalizePriority(raw) {
