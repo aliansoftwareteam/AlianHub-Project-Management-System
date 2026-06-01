@@ -33,7 +33,7 @@
             "TaskName": string,                           // 4-200 chars, imperative
             "TaskTypeKey": number,                        // must match a taskTypeCounts[].key
             "status": string,                             // must match a taskStatusData[].name
-            "priority": "Low" | "Medium" | "High" | "Urgent",
+            "priority": "Low" | "Medium" | "High",
             "AssigneeUserId": string[],                   // member ids only; default []
             "descriptionBlocks": [
               { "type": "paragraph", "data": { "text": string } },

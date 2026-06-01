@@ -58,6 +58,27 @@ where the client can review and change them.
   Present each option with a one-line benefit so a non-technical user can
   choose confidently. Only ask this if the brief mentions AI-powered features.
 
+- **Design / UX platform** (only when the project involves wireframes,
+  screen designs, or UI prototyping): which tool the team will use to
+  design screens and prototypes. Do NOT assume Figma — many teams use
+  other tools. Ask this once regardless of how many screens the project
+  has. Include a "Let AI decide" fallback.
+  Recommended options:
+  - Figma — browser-based, real-time collaboration, component libraries,
+    supports MCP server integration with AI assistants (recommended for most teams)
+  - Adobe XD — tight Adobe Creative Cloud integration; good for teams
+    already on Illustrator or Photoshop
+  - Penpot — open-source, self-hostable, SVG-based; best for teams that
+    need data-residency or prefer open tools
+  - Framer — code-based design-to-production tool; great when the
+    frontend developer and designer are the same person
+  - Sketch — macOS-native; strong plugin ecosystem; popular with iOS-first teams
+  - Balsamiq — low-fidelity wireframes only; ideal for early-stage
+    concept validation before high-fidelity design
+  - Miro — collaborative whiteboard; good for flow diagrams and early
+    information architecture before moving to a dedicated design tool
+  - Let AI decide — defaults to Figma for most projects
+
 ---
 
 ## Rule 2 — Calibrate question count to OPEN PRODUCT decisions
@@ -97,6 +118,7 @@ closed — they default silently regardless.
 | **Monetization** | Revenue model clear, or internal tool (revenue N/A) | Consumer or B2B product with no revenue model |
 | **Tech stack** | A specific stack named — framework AND backend AND database (e.g. "React + Node.js + PostgreSQL") | Only delivery format named (e.g. "Chrome extension", "mobile app") — frontend framework / backend / database still open |
 | **AI model** | AI model or provider named, OR project has no AI features | Project involves AI features but no model or provider is specified |
+| **Design platform** | Design tool named (Figma, Adobe XD, Penpot, etc.), OR project has no UI/UX work | Project involves screen design / wireframes / prototyping but no design tool is specified |
 
 **Open dimension = one question candidate.** Bundle correlated ones (e.g.,
 timeline + team size). Skip any dimension the brief already closes.
