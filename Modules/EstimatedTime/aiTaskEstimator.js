@@ -29,6 +29,22 @@ try {
     providerFactory = null;
 }
 
+// Task activity-log + minute-formatting helpers, loaded defensively (same
+// pattern as providerFactory above) so a missing/renamed module can never
+// break the estimator — the activity-log entry just silently no-ops.
+// HandleHistory writes the same HISTORY doc the manual estimate edit does,
+// so the AI estimate shows up in a task's Activity tab identically.
+let taskHistoryHelper = null;
+try {
+    taskHistoryHelper = require('../Tasks/helpers/helper');
+} catch (_e) {
+    taskHistoryHelper = null;
+}
+
+// Default actor for AI-generated estimates when no explicit user is passed.
+// Matches the AIProjectGenerator flow's author name (see controller.js).
+const AI_ACTOR_NAME = 'AlianHub AI';
+
 // Bounds chosen so a malformed LLM response can't write nonsense.
 // 5 minutes — smallest meaningful "AI does the task end-to-end" unit.
 // 7 days  — anything larger should be broken into subtasks.
@@ -231,7 +247,8 @@ async function callProvider(task) {
     return parseMinutes(result.content);
 }
 
-async function persistEstimate(companyId, taskId, minutes) {
+async function persistEstimate(companyId, taskId, minutes, opts = {}) {
+    const { userData, previousMinutes } = opts;
     const updateQuery = {
         type: SCHEMA_TYPE.TASKS,
         data: [
@@ -250,8 +267,55 @@ async function persistEstimate(companyId, taskId, minutes) {
                 module: 'task',
             });
         } catch (_e) { /* socket emit best-effort */ }
+
+        // Activity-log entry — mirrors the manual estimate-edit history
+        // (key "task_total_estimate") so the AI estimate shows in the task's
+        // Activity tab. Best-effort: never throws, never blocks the estimate.
+        logEstimateHistory({ companyId, result, taskId, minutes, userData, previousMinutes });
     }
     return result;
+}
+
+/**
+ * Write a task activity-log row for an AI-generated estimate. Resolved from
+ * the canonical updated task doc (so ProjectId / sprintId are always right)
+ * and the shared HandleHistory helper used everywhere else. Best-effort:
+ * any failure is logged and swallowed so it can't affect the estimate flow.
+ */
+function logEstimateHistory({ companyId, result, taskId, minutes, userData, previousMinutes }) {
+    try {
+        if (!taskHistoryHelper
+            || typeof taskHistoryHelper.HandleHistory !== 'function'
+            || typeof taskHistoryHelper.convertToDisplayFormat !== 'function') {
+            return;
+        }
+        const projectId = result.ProjectID ? String(result.ProjectID) : null;
+        if (!projectId) return;
+
+        const actorName = (userData && userData.Employee_Name) || AI_ACTOR_NAME;
+        const actorId = (userData && userData.id) ? String(userData.id) : '';
+        // HISTORY.UserId is a required String — Mongoose rejects an empty
+        // value, so a blank actor id would make the save fail validation and
+        // get silently swallowed by the .catch below (no activity-log row).
+        // Skip rather than attempt a doomed write; callers that want the log
+        // pass a real user (orchestrator -> creator, manual trigger -> clicker).
+        if (!actorId) return;
+        const toText = taskHistoryHelper.convertToDisplayFormat(minutes);
+        const hasPrev = typeof previousMinutes === 'number' && previousMinutes > 0;
+        const message = hasPrev
+            ? `<b>${actorName}</b> has updated total estimated time from <b>${taskHistoryHelper.convertToDisplayFormat(previousMinutes)}</b> to <b>${toText}</b> using AI.`
+            : `<b>${actorName}</b> has set the total estimated time to <b>${toText}</b> using AI.`;
+
+        taskHistoryHelper.HandleHistory('task', companyId, projectId, taskId, {
+            key: 'task_total_estimate',
+            message,
+            sprintId: (result.sprintArray && result.sprintArray.id) || result.sprintId || '',
+        }, { id: actorId, Employee_Name: actorName }).catch((e) => {
+            logger.error(`AI estimate history error for task ${taskId}: ${e && e.message ? e.message : e}`);
+        });
+    } catch (e) {
+        logger.error(`AI estimate history build error for task ${taskId}: ${e && e.message ? e.message : e}`);
+    }
 }
 
 /**
@@ -265,9 +329,12 @@ async function persistEstimate(companyId, taskId, minutes) {
  * @param {boolean} [params.force]    When true, bypass the "estimate already set"
  *                                    guard. Used by the manual sidebar button
  *                                    which is an explicit recalculation request.
+ * @param {object} [params.userData]  Optional actor for the activity-log entry
+ *                                    ({ id, Employee_Name }). Defaults to the
+ *                                    "AlianHub AI" actor when omitted.
  * @returns {Promise<{status: boolean, minutes?: number, reason?: string}>}
  */
-async function estimateAndPersist({ companyId, taskId, task, force = false } = {}) {
+async function estimateAndPersist({ companyId, taskId, task, force = false, userData } = {}) {
     try {
         if (!companyId || !taskId || !task) {
             return { status: false, reason: 'missing required input' };
@@ -284,11 +351,17 @@ async function estimateAndPersist({ companyId, taskId, task, force = false } = {
             && task.totalEstimatedTime > 0) {
             return { status: false, reason: 'estimate already set' };
         }
+        // Capture the prior value BEFORE the update so the activity log can
+        // render a "from X to Y" message on a re-estimate (and "set to Y" on
+        // a first estimate, where there is no prior value).
+        const previousMinutes = (typeof task.totalEstimatedTime === 'number')
+            ? task.totalEstimatedTime
+            : null;
         const minutes = await callProvider(task);
         if (minutes == null) {
             return { status: false, reason: 'no estimate returned' };
         }
-        await persistEstimate(companyId, taskId, minutes);
+        await persistEstimate(companyId, taskId, minutes, { userData, previousMinutes });
         return { status: true, minutes };
     } catch (error) {
         logger.error(`AI task estimator failed for task ${taskId}: ${error && error.message ? error.message : error}`);
