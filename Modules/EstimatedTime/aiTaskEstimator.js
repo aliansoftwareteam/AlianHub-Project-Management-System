@@ -34,7 +34,12 @@ try {
 // 7 days  — anything larger should be broken into subtasks.
 const MIN_MINUTES = 5;
 const MAX_MINUTES = 60 * 24 * 7;
-const REQUEST_TIMEOUT_MS = 60_000;
+// Thinking models (DeepSeek deepseek-reasoner / deepseek-v4-pro, OpenAI
+// o-series) reason before answering and are noticeably slower per call,
+// so allow generous headroom. The estimator runs fire-and-forget in the
+// background, so a longer ceiling costs nothing in UX and only raises the
+// success rate for slow models.
+const REQUEST_TIMEOUT_MS = 120_000;
 const DESCRIPTION_CHAR_CAP = 4000;
 
 // Load the system prompt from the shared AIProjectGenerator prompts dir so
@@ -202,11 +207,18 @@ async function callProvider(task) {
         // Low temperature pulls the model toward deterministic, calibrated
         // numbers — accuracy depends on the model NOT being creative here.
         temperature: 0.15,
-        // 1024 leaves room for the work_items[] array (Phase 2 chain-of-
-        // thought) without truncating the JSON. A truncated response
-        // means parseMinutes returns null and we skip the estimate, so
-        // this directly affects success rate.
-        maxTokens: 1024,
+        // The visible JSON answer (work_items[] + minutes + reasoning) is
+        // tiny — ~300-500 tokens — so 1024 was fine for non-thinking models
+        // (GPT-4.1, Claude, deepseek-chat). But THINKING models
+        // (deepseek-reasoner, deepseek-v4-pro, OpenAI o-series) spend their
+        // output budget on hidden chain-of-thought BEFORE the visible JSON.
+        // At 1024 the reasoning consumed the entire budget and the model
+        // emitted an EMPTY answer (finish_reason="length") → parseMinutes
+        // returned null → no estimate was ever saved. 8192 gives the
+        // reasoning ample room while the model still self-terminates
+        // (finish_reason="stop") at ~1000-1300 tokens, so non-thinking
+        // models pay nothing for the larger ceiling.
+        maxTokens: 8192,
     });
     const result = await Promise.race([
         chatPromise,
