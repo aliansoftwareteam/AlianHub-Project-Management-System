@@ -492,17 +492,27 @@ exports.execute = async (req, res) => {
         plan = normalizePlanColors(reCheck.data);
 
         // Re-sanitize assignee ids against the current company membership in
-        // case roster changed since /plan was called.
+        // case roster changed since /plan was called. While the roster is
+        // loaded, resolve the current user's display name from `uid` so every
+        // AI-generated activity-log entry (project / task / estimate) is
+        // attributed to the real person who triggered the run — matching the
+        // manual flow — instead of a generic label.
+        let currentUserName = '';
         try {
             const members = await loadActiveMembers(companyId);
             const allowed = new Set(members.map((m) => String(m.id)));
+            const me = members.find((m) => String(m.id) === String(uid));
+            if (me && me.name) currentUserName = me.name;
             const sanitized = sanitizeMemberIds(plan, allowed);
             plan = sanitized.plan;
         } catch (_e) { /* leave as-is */ }
 
         const userData = {
             id: String(uid),
-            Employee_Name: (req.body && req.body.userName) || 'AlianHub AI',
+            // Prefer the server-resolved roster name (authoritative current
+            // user); fall back to a client-supplied name, then a generic label
+            // only if the user genuinely can't be resolved.
+            Employee_Name: currentUserName || (req.body && req.body.userName) || 'AlianHub AI',
             companyOwnerId: companyId,
         };
 

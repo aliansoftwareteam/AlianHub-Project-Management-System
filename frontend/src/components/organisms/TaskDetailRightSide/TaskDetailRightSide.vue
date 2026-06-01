@@ -715,7 +715,14 @@ const generateAiEstimate = async () => {
     }
     isAiEstimateLoading.value = true;
     try {
-        const response = await apiRequest('post', `${env.ESTIMATED_TIME}/ai/${taskId}`, {});
+        // Send the logged-in user so the estimator can attribute the
+        // "updated estimated time" activity-log entry to whoever clicked
+        // (and so the required HISTORY.UserId is never blank).
+        const userData = getUserData();
+        const response = await apiRequest('post', `${env.ESTIMATED_TIME}/ai/${taskId}`, {
+            userName: userData.Employee_Name,
+            userId: userData.id,
+        });
         if (response && response.data && response.data.status) {
             $toast.success('Estimate generated', { position: 'top-right' });
         } else {
