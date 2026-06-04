@@ -36,6 +36,12 @@
                         <img :src="aiIcon" class="mr-3px" />
                         <span @click.stop="suggestTask()" class="ai-color font-size-14 font-weight-500 ai-border-bottom" :class="[{'pointer-event-none' : isSpinner}]">{{$t("AI.suggest_tasks")}}</span>
                     </div>
+                    <div class="d-flex align-items-center ml-10px cursor-pointer" v-if="canShowProposalReview &&
+                        checkPermission('task.task_list',project?.isGlobalPermission) === true &&
+                        checkPermission('task.task_create',project?.isGlobalPermission) === true">
+                        <img :src="aiIcon" class="mr-3px" />
+                        <span @click.stop="toggleReview()" class="ai-color font-size-14 font-weight-500 ai-border-bottom" :class="[{'red': isReviewing}]">{{ isReviewing ? ('⏹ ' + $t('AI.stop_review') + ' (' + (reviewProgress || $t('AI.starting')) + ')') : $t('AI.review_proposals') }}</span>
+                    </div>
                 </div>
             </div>
             <div v-if="!showArchiveVar" class="d-flex align-items-center sharewith__status-toggle" :style="[{paddingTop : clientWidth <=512 ? '15px' : '' }]">
@@ -231,7 +237,7 @@
 
 <script setup>
 // PACKAGES
-import { computed, defineComponent, defineEmits, defineProps, inject, onMounted, ref, watch} from 'vue';
+import { computed, defineComponent, defineEmits, defineProps, inject, onMounted, onUnmounted, ref, watch} from 'vue';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { useToast } from 'vue-toast-notification';
 
@@ -265,6 +271,17 @@ const { checkPermission, debouncerWithPromise, checkApps} = useCustomComposable(
 const showArchiveVar = inject("showArchived");
 const companyId = inject("$companyId");
 const userId = inject("$userId");
+
+// ── TEMPORARY: project-scoped Proposal Review trigger ────────────────────────
+// The "Review Proposals" button is gated to specific project id(s) below while
+// the permanent per-project gating is finalized (apps key / status-based).
+// To enable on another project, add its _id to this array. REMOVE this block
+// and switch the button's v-if back to a real gate once that lands.
+const PROPOSAL_REVIEW_PROJECT_IDS = ['6571e7195470e64b12032951'];
+const canShowProposalReview = computed(
+    () => PROPOSAL_REVIEW_PROJECT_IDS.includes(String(project?.value?._id || ''))
+);
+// ─────────────────────────────────────────────────────────────────────────────
 const modalStartDate = ref(null);
 const modalEndDate = ref(null);
 const initialDate = ref(0);
@@ -338,6 +355,10 @@ const watcherUsers = ref([]);
 const timer = ref(null);
 const taskListAi = ref([]);
 const isSpinner = ref(false);
+const isReviewing = ref(false);
+const reviewId = ref(null);
+const reviewProgress = ref('');
+const reviewSource = ref(null);
 const isCreateSpinner = ref(false);
 const isError = ref(false);
 const showImportModal = ref(false);
@@ -560,6 +581,8 @@ function updateSprintAPICALL(updateData = null,historyObj) {
 onMounted(() => {
     handleWatcherList();
 })
+// Close any open proposal-review SSE stream if this sprint unmounts mid-run.
+onUnmounted(() => { finishReview(); })
 function handleWatcherList() {
     watcherUsers.value = [];
     let allUsers = JSON.parse(JSON.stringify(project.value?.isPrivateSpace ? !props.sprint?.private ? (project.value?.AssigneeUserId || []) : (props.sprint?.AssigneeUserId || []) : companyUsers.value));
@@ -683,6 +706,105 @@ function suggestTask () {
                 console.error(error,"ERROR IN GENERAE PROMPTS:");
             })
         })
+    }
+}
+
+
+// AI proposal review for THIS sprint's "In Review - TL" cards.
+// Start/stop TOGGLE: clicking while idle starts a background job; clicking
+// while it runs STOPS it (emergency stop). The backend runs the job
+// asynchronously and streams progress over SSE (same channel mechanism as the
+// AI project creator). Stop is graceful: the server-side loop checks the
+// cancel flag between cards, so it halts before touching the next card.
+// NOTE: needs the backend endpoints (env.PROPOSAL_REVIEW / _STOP / _EVENTS) —
+// until those exist, Start surfaces a friendly error instead of doing anything.
+function toggleReview () {
+    if (isReviewing.value) { stopReview(); return; }
+    startReview();
+}
+
+function startReview () {
+    const sprintId = props.sprint?.id || props.sprint?._id;
+    if (!sprintId || !project.value?._id) {
+        $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
+        return;
+    }
+    isReviewing.value = true;
+    reviewProgress.value = '';
+    // No "started" toast — the button itself shows the running/loading state
+    // ("⏹ Stop (Starting… / x/y)"). Only ONE toast is shown, at the end.
+    apiRequest('post', env.PROPOSAL_REVIEW, {
+        companyId: companyId.value,
+        projectId: project.value._id,
+        sprintId,
+        userData: getUserData(),
+    }).then((res) => {
+        const d = res && res.data;
+        if (!d || !d.status || !d.reviewId) {
+            finishReview();
+            $toast.error((d && d.statusText) || t('Toast.something_went_wrong'), { position: 'top-right' });
+            return;
+        }
+        reviewId.value = d.reviewId;
+        const url = `${env.API_URI}${env.PROPOSAL_REVIEW_EVENTS}/${encodeURIComponent(d.reviewId)}`;
+        reviewSource.value = new EventSource(url);
+        reviewSource.value.onmessage = (evt) => {
+            if (!evt || !evt.data) return;
+            let payload; try { payload = JSON.parse(evt.data); } catch (_e) { return; }
+            if (payload.event === 'progress') {
+                reviewProgress.value = `${payload.processed || 0}/${payload.total || 0}`;
+            } else if (payload.event === 'complete') {
+                const s = payload.summary || {};
+                if ((s.total || 0) === 0) {
+                    // No "In Review - TL" cards in this sprint — tell the user clearly.
+                    $toast.success(t('AI.no_tasks_to_review'), { position: 'top-right' });
+                } else {
+                    // ONE final toast. When cards were skipped, spell out WHY
+                    // (per reason) so a skip-only run isn't mistaken for "nothing
+                    // happened". Only reasons with a count > 0 are shown.
+                    const r = s.skipReasons || {};
+                    const reasonText = Object.keys(r)
+                        .filter((k) => r[k] > 0)
+                        .map((k) => `${r[k]} ${t('AI.skip_' + k)}`)
+                        .join(' · ');
+                    let msg = `${t('AI.review_proposals')}: ✅ ${s.approved || 0} · ❌ ${s.backlog || 0} · ⏭️ ${s.skipped || 0} / ${s.total || 0}`;
+                    if (s.stopped) msg += ` — ${t('AI.stopped')}`;
+                    if (reasonText) msg += `  ·  ${t('AI.skipped')}: ${reasonText}`;
+                    $toast.success(msg, { position: 'top-right' });
+                }
+                finishReview();
+            } else if (payload.event === 'error') {
+                $toast.error(payload.error || t('Toast.something_went_wrong'), { position: 'top-right' });
+                finishReview();
+            }
+        };
+        reviewSource.value.onerror = () => { finishReview(); };
+    }).catch((err) => {
+        finishReview();
+        const msg = (err && err.response && err.response.data && err.response.data.statusText)
+            || (err && err.message) || t('Toast.something_went_wrong');
+        $toast.error(msg, { position: 'top-right' });
+    });
+}
+
+// Emergency stop — tell the server to cancel the running job. The server emits
+// a final "complete (stopped)" SSE event which closes the stream; we also clear
+// local state optimistically so the button flips back to Start immediately.
+function stopReview () {
+    if (reviewId.value) {
+        $toast.success(t('AI.stopping_review'), { position: 'top-right' });
+        apiRequest('post', env.PROPOSAL_REVIEW_STOP, { reviewId: reviewId.value }).catch(() => {});
+    }
+    finishReview();
+}
+
+function finishReview () {
+    isReviewing.value = false;
+    reviewProgress.value = '';
+    reviewId.value = null;
+    if (reviewSource.value) {
+        try { reviewSource.value.close(); } catch (_e) { /* ignore */ }
+        reviewSource.value = null;
     }
 }
 

@@ -192,7 +192,16 @@ function initializeControllers() {
     require('./Modules/trackerUserPermission/init').init(app);
     require('./Modules/SaasAdmin/init').init(app);
     require('./Modules/ScreenshotRetention/init').init(app);
-    if(process.env.NODE_ENV === "production") {
+    // Crons normally only load in production so dev runs don't fire destructive
+    // jobs (storage cleanup, screenshot retention, AI counter resets) on
+    // developer machines. The proposal-review auto-scheduler is opt-in via
+    // PROPOSAL_REVIEW_AUTO_ENABLED, so let dev operators turn it on locally
+    // for testing without flipping NODE_ENV — the other crons inside cron.js
+    // still only run at their scheduled times (mostly midnight UTC), so the
+    // collateral risk of also loading them in dev is small and easy to undo
+    // by setting PROPOSAL_REVIEW_AUTO_ENABLED=false.
+    if (process.env.NODE_ENV === "production"
+        || String(process.env.PROPOSAL_REVIEW_AUTO_ENABLED || '').toLowerCase() === "true") {
         require('./cron.js')
     }
     require('./Modules/Admin/admin.js').init(app);
@@ -201,6 +210,7 @@ function initializeControllers() {
     require(`./Modules/storage/${currentDirectory}/init`).init(app);
     require('./Modules/AI/init').init(app);
     require('./Modules/AIProjectGenerator/init').init(app);
+    require('./Modules/ProposalReview/init').init(app);
     require('./Modules/Users/init').init(app);
     require('./Modules/Project/init').init(app);
     require('./Modules/Teams/init').init(app);

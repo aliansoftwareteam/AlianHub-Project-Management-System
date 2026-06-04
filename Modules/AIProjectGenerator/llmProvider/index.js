@@ -1,11 +1,13 @@
 const openaiProvider = require('./openaiProvider');
 const anthropicProvider = require('./anthropicProvider');
 const deepseekProvider = require('./deepseekProvider');
+const managedAgentProvider = require('./managedAgentProvider');
 
 const SUPPORTED = {
     openai: openaiProvider,
     anthropic: anthropicProvider,
     deepseek: deepseekProvider,
+    'managed-agent': managedAgentProvider,
 };
 
 /**
@@ -23,11 +25,15 @@ function getProvider() {
     if (openaiProvider.isConfigured) return openaiProvider;
     if (anthropicProvider.isConfigured) return anthropicProvider;
     if (deepseekProvider.isConfigured) return deepseekProvider;
-    throw new Error('No LLM provider is configured. Set AI_API_KEY+AI_MODEL, ANTHROPIC_API_KEY+ANTHROPIC_MODEL, or DEEPSEEK_API_KEY+DEEPSEEK_MODEL, and optionally LLM_PROVIDER.');
+    if (managedAgentProvider.isConfigured) return managedAgentProvider;
+    throw new Error('No LLM provider is configured. Set AI_API_KEY+AI_MODEL, ANTHROPIC_API_KEY+ANTHROPIC_MODEL, DEEPSEEK_API_KEY+DEEPSEEK_MODEL, or ANTHROPIC_API_KEY+ANTHROPIC_AGENT_ID+ANTHROPIC_ENVIRONMENT_ID (managed-agent), and optionally LLM_PROVIDER.');
 }
 
 function isAnyProviderConfigured() {
-    return openaiProvider.isConfigured || anthropicProvider.isConfigured || deepseekProvider.isConfigured;
+    return openaiProvider.isConfigured
+        || anthropicProvider.isConfigured
+        || deepseekProvider.isConfigured
+        || managedAgentProvider.isConfigured;
 }
 
 module.exports = {
