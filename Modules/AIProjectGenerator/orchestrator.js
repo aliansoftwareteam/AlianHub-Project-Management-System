@@ -54,7 +54,7 @@ const sseEmitter = require('./sseEmitter');
 // project generates dozens of tasks at once.
 const ESTIMATE_CONCURRENCY = 3;
 
-function fireTaskEstimatesInBackground(companyId, docs) {
+function fireTaskEstimatesInBackground(companyId, docs, userData) {
     if (!Array.isArray(docs) || docs.length === 0) return;
     let cursor = 0;
     const runOne = async () => {
@@ -67,6 +67,9 @@ function fireTaskEstimatesInBackground(companyId, docs) {
                     companyId,
                     taskId: String(d._id),
                     task: d,
+                    // Pass the run's actor so the estimate's activity-log entry
+                    // is attributed consistently (defaults to "AlianHub AI").
+                    userData,
                 });
             } catch (e) {
                 logger.error(`AI task estimate error (orchestrator): ${e && e.message ? e.message : e}`);
@@ -628,8 +631,12 @@ async function createSprint({ companyId, projectId, projectName, sprintName, use
 
 // ─── Task doc builder ──────────────────────────────────────────────────
 
+// Priority values are the three company defaults that ship with every
+// AlianHub installation. URGENT is intentionally excluded — it is not
+// a default priority and assigning it here would create tasks the
+// company's priority filter cannot match until they add a custom entry.
 const PRIORITY_NORMALIZE = {
-    low: 'LOW', medium: 'MEDIUM', high: 'HIGH', urgent: 'URGENT',
+    low: 'LOW', medium: 'MEDIUM', high: 'HIGH',
 };
 
 function normalizePriority(raw) {
@@ -731,7 +738,7 @@ async function reserveTaskKeyRange({ companyId, projectId, count, taskTypeIncrem
     return { newLastTaskId: lastTaskId, startKey: lastTaskId - count + 1 };
 }
 
-async function createTasksForSprint({ companyId, projectDoc, sprintDoc, tasks, statusByName, taskTypeByKey, creatorUid }) {
+async function createTasksForSprint({ companyId, projectDoc, sprintDoc, tasks, statusByName, taskTypeByKey, creatorUid, userData }) {
     if (!tasks || tasks.length === 0) return [];
 
     const docs = tasks.map((t) => buildTaskDoc({
@@ -775,10 +782,32 @@ async function createTasksForSprint({ companyId, projectDoc, sprintDoc, tasks, s
         try { socketEmitter.emit('insert', { type: 'insert', data: d, module: 'task' }); } catch (_e) { /* ignore */ }
     }
 
+    // Activity-log entry per created task — mirrors the manual task-create
+    // history (key "Task_Created") so each AI-generated task shows a
+    // "created" row in its Activity tab, just like the project does. We log
+    // ONLY task-level history (not project-level) so the project's Activity
+    // feed keeps its single "created project with N sprints and M tasks"
+    // summary instead of being flooded with one row per task. Best-effort:
+    // failures are logged and never block task creation.
+    const historyActor = userData || { id: String(creatorUid || ''), Employee_Name: 'AlianHub AI' };
+    for (const d of docs) {
+        const taskTypeLabel = String(d.TaskType || 'task').replace(/_/g, '-');
+        const historyObj = {
+            message: `<b>${historyActor.Employee_Name || 'AlianHub AI'}</b> has created new <b>${d.TaskName}</b> ${taskTypeLabel}.`,
+            key: 'Task_Created',
+            sprintId: String(sprintDoc._id),
+        };
+        HandleHistory('task', companyId, String(projectDoc._id), String(d._id), historyObj, historyActor)
+            .catch((e) => {
+                logger.error(`AI task-create history error: ${e && e.message ? e.message : e}`);
+            });
+    }
+
     // Estimates run in the background so the orchestrator's progress stream
     // is not blocked by the per-task LLM calls. Each estimate persists its
-    // own `totalEstimatedTime` update and emits a follow-up socket event.
-    fireTaskEstimatesInBackground(companyId, docs);
+    // own `totalEstimatedTime` update, emits a follow-up socket event, and
+    // logs its own estimate activity-log entry.
+    fireTaskEstimatesInBackground(companyId, docs, userData);
 
     return docs;
 }
@@ -971,6 +1000,7 @@ async function executePlan({ plan, companyId, uid, userData, jobId }) {
                 statusByName: taskStatusByName,
                 taskTypeByKey,
                 creatorUid: uid,
+                userData,
             });
             for (const t of created) tracker.tasks.push(t._id.toString());
             completed += created.length;
@@ -1047,4 +1077,5 @@ module.exports = {
     blocksToText,
     wrapDescriptionBlock,
     normalizePriority,
+    createTasksForSprint,
 };

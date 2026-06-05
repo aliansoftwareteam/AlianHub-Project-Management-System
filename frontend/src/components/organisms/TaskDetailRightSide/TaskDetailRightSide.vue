@@ -164,16 +164,10 @@
                       title attribute matches the project's existing tooltip
                       convention (see BulkActionBar.vue / CheckList.vue).
                       Disabled + spinner state while a request is in flight.
-
-                      Permission gate: `=== true` (read-write) only. The outer
-                      row's `!== null` gate already covers visibility for the
-                      read-only case; this inner gate hides the AI trigger
-                      from users who can see the estimate but not edit it —
-                      matching the convention used by Priority / Start Date /
-                      Due Date rows in this same component.
+                      Shown whenever the Estimated row is visible — the per-user
+                      edit-permission gate (`=== true`) was removed on request.
                     -->
                     <button
-                        v-if="checkPermission('task.task_estimated_hours', project?.isGlobalPermission) === true"
                         type="button"
                         class="ai-estimate-btn"
                         :class="{ 'is-loading': isAiEstimateLoading }"
@@ -715,7 +709,14 @@ const generateAiEstimate = async () => {
     }
     isAiEstimateLoading.value = true;
     try {
-        const response = await apiRequest('post', `${env.ESTIMATED_TIME}/ai/${taskId}`, {});
+        // Send the logged-in user so the estimator can attribute the
+        // "updated estimated time" activity-log entry to whoever clicked
+        // (and so the required HISTORY.UserId is never blank).
+        const userData = getUserData();
+        const response = await apiRequest('post', `${env.ESTIMATED_TIME}/ai/${taskId}`, {
+            userName: userData.Employee_Name,
+            userId: userData.id,
+        });
         if (response && response.data && response.data.status) {
             $toast.success('Estimate generated', { position: 'top-right' });
         } else {

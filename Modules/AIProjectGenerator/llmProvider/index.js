@@ -1,9 +1,11 @@
 const openaiProvider = require('./openaiProvider');
 const anthropicProvider = require('./anthropicProvider');
+const deepseekProvider = require('./deepseekProvider');
 
 const SUPPORTED = {
     openai: openaiProvider,
     anthropic: anthropicProvider,
+    deepseek: deepseekProvider,
 };
 
 /**
@@ -20,11 +22,12 @@ function getProvider() {
     // Fallback: pick whichever is configured, preferring openai for back-compat.
     if (openaiProvider.isConfigured) return openaiProvider;
     if (anthropicProvider.isConfigured) return anthropicProvider;
-    throw new Error('No LLM provider is configured. Set AI_API_KEY+AI_MODEL or ANTHROPIC_API_KEY+ANTHROPIC_MODEL, and optionally LLM_PROVIDER.');
+    if (deepseekProvider.isConfigured) return deepseekProvider;
+    throw new Error('No LLM provider is configured. Set AI_API_KEY+AI_MODEL, ANTHROPIC_API_KEY+ANTHROPIC_MODEL, or DEEPSEEK_API_KEY+DEEPSEEK_MODEL, and optionally LLM_PROVIDER.');
 }
 
 function isAnyProviderConfigured() {
-    return openaiProvider.isConfigured || anthropicProvider.isConfigured;
+    return openaiProvider.isConfigured || anthropicProvider.isConfigured || deepseekProvider.isConfigured;
 }
 
 module.exports = {

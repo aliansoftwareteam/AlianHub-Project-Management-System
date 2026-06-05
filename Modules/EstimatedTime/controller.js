@@ -105,11 +105,22 @@ exports.generateAiEstimate = async (req, res) => {
             return res.status(404).json({ status: false, statusText: 'task not found' });
         }
 
+        // Actor for the activity-log entry the estimator writes. The client
+        // sends the logged-in user so the "updated estimated time" history row
+        // is attributed to whoever clicked the AI trigger (and so HISTORY.UserId
+        // — a required String — is never blank). Falls back to undefined when
+        // absent, in which case the estimator skips the log rather than failing.
+        const { userName, userId } = req.body || {};
+        const userData = userId
+            ? { id: String(userId), Employee_Name: userName || 'AlianHub AI' }
+            : undefined;
+
         const result = await estimateTaskTimeWithAI({
             companyId,
             taskId,
             task: taskDoc,
             force: true,
+            userData,
         });
 
         if (!result.status) {
