@@ -49,6 +49,20 @@
     flex: 1;
 }
 
+/* User count badge — sits at the left of the controls row, under the title */
+.ewr-count-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 11px;
+    background: #EEF0FE;
+    color: #6473E8;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
 /* Time Period inline dropdown — pill styled to match the search box */
 .ewr-period-box {
     display: inline-flex;

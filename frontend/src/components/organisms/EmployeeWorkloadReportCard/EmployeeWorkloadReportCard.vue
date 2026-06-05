@@ -8,6 +8,11 @@
         <template v-else>
             <!-- Filter chips -->
             <div class="ewr-chips-row">
+                <!-- User count badge — sits under the card title; reflects the
+                     number of employees currently shown (after search filter). -->
+                <span class="ewr-count-badge" :title="`${sortedEmployees.length} ${sortedEmployees.length === 1 ? 'user' : 'users'}`">
+                    {{ sortedEmployees.length }} {{ sortedEmployees.length === 1 ? 'user' : 'users' }}
+                </span>
                 <span v-if="cardObject.taskType && cardObject.taskType !== 'all'" class="ewr-chip" :title="$t('dashboardCard.task_type')">
                     <span class="ewr-chip-label">{{ cardObject.taskType }}</span>
                 </span>
