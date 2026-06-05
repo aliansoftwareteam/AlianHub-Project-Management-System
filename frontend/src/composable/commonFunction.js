@@ -221,6 +221,11 @@ export const projectAppsIcons = (key) => {
             key: "AI",
             beforeIcon: require("@/assets/images/svg/project_apps_inactive_icons/apps_ai_inactive.svg"),
             afterIcon: require("@/assets/images/svg/project_apps_active_icons/apps_ai_active.svg")
+        },
+        {
+            key: "proposalReview",
+            beforeIcon: require("@/assets/images/svg/project_apps_inactive_icons/apps_proposal_review_inactive.svg"),
+            afterIcon: require("@/assets/images/svg/project_apps_active_icons/apps_proposal_review_active.svg")
         }
     ];
 

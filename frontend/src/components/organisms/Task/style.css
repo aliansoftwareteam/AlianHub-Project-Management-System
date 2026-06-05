@@ -117,3 +117,20 @@ div.task-options div:last-child div {
     position: absolute;
   }
 }
+/* Proposal Review — small inline SVG spinner shown next to TaskName while the agent is reviewing.
+   Two concentric circles in the SVG: a low-contrast gray ring (always visible) and a blue arc
+   (rotated by CSS). The SVG guarantees a clean round shape at any size — the previous pure-CSS
+   border approach rendered as a barely-visible C-shape on white because the gray was too faint. */
+.proposal-review-spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    margin-right: 6px;
+    vertical-align: middle;
+    flex-shrink: 0;
+    transform-origin: 50% 50%;
+    animation: proposalReviewSpin 0.8s linear infinite;
+}
+@keyframes proposalReviewSpin {
+    to { transform: rotate(360deg); }
+}

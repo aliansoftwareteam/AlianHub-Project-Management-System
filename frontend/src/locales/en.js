@@ -621,6 +621,7 @@ export default {
         CustomFields: "Custom Fields",
         TimeTracking: "Time Tracking",
         AI: "AI",
+        proposalReview: "Proposal Review",
     },
     Tags: {
         no_tags_found: "No Tags Found",

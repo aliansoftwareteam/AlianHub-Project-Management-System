@@ -278,6 +278,10 @@ async function processUrl(message) {
     if (message.type !== "video" || message.type !== "audio" || message.type !== "image") {
         let properUrl = message.downloadURL || message.mediaURL;
 
+        // Text/link comments carry no media URL; skip cleanly instead of
+        // throwing `Cannot read properties of undefined (reading 'includes')`.
+        if (!properUrl) return;
+
         if (!properUrl.includes("http")) {
 
             try {

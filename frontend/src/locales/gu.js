@@ -592,7 +592,8 @@ export default {
         "MultipleAssignees": "એકથી વધુ સોંપનાર",
         "CustomFields": "કસ્ટમ ફીલ્ડ્સ",
         "TimeTracking": "સમય ટ્રેકિંગ",
-        "AI": "એઆઈ"
+        "AI": "એઆઈ",
+        "proposalReview": "પ્રસ્તાવ સમીક્ષા"
     },
     "Tags": {
         "no_tags_found": "કોઈ ટૅગ્સ મળ્યા નથી",

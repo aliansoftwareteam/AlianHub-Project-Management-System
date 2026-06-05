@@ -550,6 +550,29 @@ export function useGetterFunctions() {
      * @returns user object
      */
     function getUser(id,type = null) {
+        // Static AlianHub AI sBot user — defined server-side in
+        // utils/commonFunctions.js → ALIANHUB_BOT_USER. The bot has no real
+        // entry in the `users` collection, so without this short-circuit it
+        // would render as "Ghost User" on every automated comment / activity
+        // entry. The id below MUST match ALIANHUB_BOT_USER.id on the backend.
+        if (id === '000000000000000000000b07') {
+            return {
+                id,
+                _id: id,
+                cuid: "",
+                Employee_Name: "AlianHub AI Bot",
+                Employee_profileImage: defaultUserAvatar,
+                Employee_profileImageURL: defaultUserAvatar,
+                isOnline: false,
+                timeFormat: "",
+                companyOwnerId: "",
+                Time_Zone: "",
+                assigneeCompany: [],
+                Employee_Email: "bot@alianhub.local",
+                ghostUser: false,
+                isVesionUpdate: false,
+            };
+        }
         const obj = ref({
             id: id,
             _id: id,
