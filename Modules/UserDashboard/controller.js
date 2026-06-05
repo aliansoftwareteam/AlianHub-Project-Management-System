@@ -217,6 +217,9 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
                 : Array.isArray(payload.statusKey) ? payload.statusKey : [],
             taskType: payload.taskType || "all",
             includeSubtasks: payload.isParentTask === undefined ? true : !!payload.isParentTask,
+            // "Current" mode — restrict the report to employees with a
+            // running tracker right now (who is working on what live).
+            currentOnly: payload.currentOnly === true,
             activeWithinMinutes: Number(payload.activeWithinMinutes) || null,
             idleAfterMinutes: Number(payload.idleAfterMinutes) || null,
             overloadCapacityMinutesPerDay: Number(payload.overloadCapacityMinutesPerDay) || null,
@@ -330,6 +333,46 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
             });
         }
 
+        // 2b. Currently-active trackers (per user, per task). Independent of
+        // the date filter — a tracker started yesterday and still running is
+        // an "active" tracker now. Used purely to flag tasks with a
+        // "Running" badge in the UI; doesn't affect minute tallies.
+        //
+        // How the tracker actually works (Modules/LogTime/controllerV2):
+        //   - START sets `startTimeTracker` to the current Unix-seconds ts.
+        //   - Each screenshot CAPTURE while running REFRESHES both
+        //     `startTimeTracker` and `LogEndTime` to "now" and bumps
+        //     `LogTimeDuration` to the elapsed minutes (so duration is NOT
+        //     zero once a tracker has run for a bit — the earlier
+        //     `LogTimeDuration: 0` check was wrong).
+        //   - STOP `$unset`s `startTimeTracker`.
+        //
+        // A bare `{ $exists: true }` is too loose: abandoned/crashed
+        // sessions and legacy rows keep a stale `startTimeTracker`, which
+        // is why every task lit up. Because a LIVE tracker refreshes
+        // `startTimeTracker` to "now" on every capture, a genuinely running
+        // entry always has a RECENT value. We therefore mirror the app's
+        // own "is running" rule (frontend ViewTimelogDetail.vue): the
+        // tracker counts as running only if `startTimeTracker` is within
+        // the last 10 minutes.
+        const RUNNING_WINDOW_SEC = 10 * 60; // matches frontend's 10-min rule
+        const nowSec = Math.floor(Date.now() / 1000);
+        const activeTrackerPairs = new Set();
+        {
+            const activeFilter = {
+                Loggeduser: { $in: employeeIdStrs },
+                startTimeTracker: { $gte: nowSec - RUNNING_WINDOW_SEC },
+            };
+            const activeLogs = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.TIMESHEET,
+                data: [activeFilter, { Loggeduser: 1, TicketID: 1 }],
+            }, "find").catch(() => []);
+            (activeLogs || []).forEach((ts) => {
+                if (!ts.Loggeduser || !ts.TicketID) return;
+                activeTrackerPairs.add(`${ts.Loggeduser}|${ts.TicketID}`);
+            });
+        }
+
         // 3. Union of tasks that were either planned or logged in range.
         const unionTaskIds = new Set();
         const userTaskPairs = new Set(); // `${uid}|${tid}` the employee touched in range
@@ -341,6 +384,15 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
             userTaskPairs.add(k);
             unionTaskIds.add(k.split("|")[1]);
         });
+        // In "Current" mode also fold in the active-tracker pairs so a
+        // tracker that started before the (today) range — e.g. running
+        // across midnight — still surfaces its task.
+        if (cfg.currentOnly) {
+            activeTrackerPairs.forEach((k) => {
+                userTaskPairs.add(k);
+                unionTaskIds.add(k.split("|")[1]);
+            });
+        }
 
         // 4. Fetch those tasks and apply the task-level filters
         //    (project / status / subtask / taskType). Tasks that don't
@@ -397,11 +449,14 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
         }
 
         // 6. Group the in-range (user, task) pairs by employee, keeping
-        //    only pairs whose task survived the filters.
+        //    only pairs whose task survived the filters. In "Current" mode
+        //    also drop any pair that isn't an active tracker right now, so
+        //    the report shows only who is working live and on what.
         const pairsByUser = {}; // uid → Set of tid
         userTaskPairs.forEach((key) => {
             const [uid, tid] = key.split("|");
             if (!taskMap[tid]) return; // task filtered out
+            if (cfg.currentOnly && !activeTrackerPairs.has(key)) return; // not live
             if (!pairsByUser[uid]) pairsByUser[uid] = new Set();
             pairsByUser[uid].add(tid);
         });
@@ -454,6 +509,9 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
                     aiTaskCategory: category,
                     overdue: !!isOverdue,
                     isSubTask: t.isParentTask === false,
+                    // Currently-running tracker flag — drives the "Running"
+                    // badge in the UI.
+                    isTracking: activeTrackerPairs.has(`${uidStr}|${tid}`),
                 };
             };
 

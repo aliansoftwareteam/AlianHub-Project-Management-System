@@ -1867,48 +1867,6 @@
                 "disabled": false
             },
             {
-                "label": "timerange",
-                "groupBy": "data",
-                "type": "dropdown",
-                "name": "timerange",
-                "value": 3,
-                "placeHolder": "select",
-                "options": [
-                    {
-                        "id": 1,
-                        "name": "today"
-                    },
-                    {
-                        "id": 2,
-                        "name": "yesterday"
-                    },
-                    {
-                        "id": 3,
-                        "name": "this_week"
-                    },
-                    {
-                        "id": 4,
-                        "name": "last_week"
-                    },
-                    {
-                        "id": 5,
-                        "name": "this_month"
-                    },
-                    {
-                        "id": 6,
-                        "name": "last_month"
-                    },
-                    {
-                        "id": 7,
-                        "name": "last_30_days"
-                    }
-                ],
-                "rules": "",
-                "info": "",
-                "hidden": false,
-                "disabled": false
-            },
-            {
                 "label": "include_subtasks",
                 "groupBy": "data",
                 "type": "radio",
@@ -1922,11 +1880,37 @@
                 "disabled": false
             },
             {
-                "label": "hide_empty_users",
-                "groupBy": "data",
+                "label": "show_logged_hours",
+                "groupBy": "display",
                 "type": "radio",
-                "name": "hideEmptyEmployees",
-                "value": false,
+                "name": "showLoggedHours",
+                "value": true,
+                "placeHolder": "",
+                "options": [],
+                "rules": "",
+                "info": "",
+                "hidden": false,
+                "disabled": false
+            },
+            {
+                "label": "show_planned_hours",
+                "groupBy": "display",
+                "type": "radio",
+                "name": "showPlannedHours",
+                "value": true,
+                "placeHolder": "",
+                "options": [],
+                "rules": "",
+                "info": "",
+                "hidden": false,
+                "disabled": false
+            },
+            {
+                "label": "show_estimate_hours",
+                "groupBy": "display",
+                "type": "radio",
+                "name": "showEstimateHours",
+                "value": true,
                 "placeHolder": "",
                 "options": [],
                 "rules": "",

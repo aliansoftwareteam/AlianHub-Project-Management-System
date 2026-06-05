@@ -8,12 +8,6 @@
         <template v-else>
             <!-- Filter chips -->
             <div class="ewr-chips-row">
-                <span class="ewr-chip" :title="$t('dashboardCard.date_range')">
-                    <span class="ewr-chip-label">{{ chipLabel('date') }}</span>
-                </span>
-                <span class="ewr-chip" :title="$t('dashboardCard.employees')">
-                    <span class="ewr-chip-label">{{ chipLabel('employees') }}</span>
-                </span>
                 <span v-if="cardObject.taskType && cardObject.taskType !== 'all'" class="ewr-chip" :title="$t('dashboardCard.task_type')">
                     <span class="ewr-chip-label">{{ cardObject.taskType }}</span>
                 </span>
@@ -22,6 +16,23 @@
                 <span v-if="isLoading" class="ewr-chip ewr-chip-loading">
                     <span class="ewr-mini-spinner" aria-hidden="true"></span>
                     Refreshing…
+                </span>
+                <!-- Time Period filter — moved out of the edit-card config so it's
+                     a quick, always-visible control. Drives the same
+                     resolveDateRange() → fetch path the config field used. -->
+                <span class="ewr-period-box" title="Time period">
+                    <svg class="ewr-period-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <rect x="3.5" y="5" width="17" height="15" rx="2" stroke="currentColor" stroke-width="1.7"/>
+                        <line x1="3.5" y1="9.5" x2="20.5" y2="9.5" stroke="currentColor" stroke-width="1.7"/>
+                        <line x1="8" y1="3" x2="8" y2="6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                        <line x1="16" y1="3" x2="16" y2="6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                    </svg>
+                    <select v-model.number="timerange" class="ewr-period-select" @change="onTimerangeChange">
+                        <option v-for="opt in TIMERANGE_OPTIONS" :key="opt.id" :value="opt.id">{{ opt.label }}</option>
+                    </select>
+                    <svg class="ewr-period-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                        <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
                 </span>
                 <span class="ewr-search-box">
                     <svg class="ewr-search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -42,8 +53,10 @@
                         @click="searchQuery = ''"
                     >&#x2715;</span>
                 </span>
-                <!-- Colour legend for the Logged Hours column -->
-                <span class="ewr-legend" title="Logged Hours colour meaning">
+                <!-- Colour legend for the Logged Hours column. The red/amber
+                     highlights only ever render on the Logged column, so the
+                     legend is hidden whenever that column is toggled off. -->
+                <span v-if="showLoggedCol" class="ewr-legend" title="Logged Hours colour meaning">
                     <span class="ewr-legend-item">
                         <span class="ewr-legend-dot ewr-legend-dot-estimate"></span>
                         Over estimate
@@ -55,10 +68,10 @@
                 </span>
             </div>
 
-            <!-- Empty state — also covers the case where "Hide empty
-                 users" filtered everyone out. -->
+            <!-- Empty state — also covers the case where empty users
+                 are filtered out, and the "Current" (no live trackers) case. -->
             <div v-if="!sortedEmployees.length" class="ewr-empty">
-                <p class="ewr-empty-text">{{ searchQuery ? `No employees match "${searchQuery}".` : 'No employees match this filter.' }}</p>
+                <p class="ewr-empty-text">{{ emptyStateText }}</p>
             </div>
 
             <template v-else>
@@ -72,13 +85,13 @@
                                     Employee {{ sortIndicator('name') }}
                                 </th>
                                 <th class="ewr-th-project">Project</th>
-                                <th class="ewr-th-num" @click="setSort('loggedMinutes')">
+                                <th v-if="showLoggedCol" class="ewr-th-num" @click="setSort('loggedMinutes')">
                                     Logged Hours {{ sortIndicator('loggedMinutes') }}
                                 </th>
-                                <th class="ewr-th-num" @click="setSort('plannedMinutes')">
+                                <th v-if="showPlannedCol" class="ewr-th-num" @click="setSort('plannedMinutes')">
                                     Planned Hours {{ sortIndicator('plannedMinutes') }}
                                 </th>
-                                <th class="ewr-th-num" @click="setSort('commonEstimateMinutes')">
+                                <th v-if="showEstimateCol" class="ewr-th-num" @click="setSort('commonEstimateMinutes')">
                                     Estimate Hours {{ sortIndicator('commonEstimateMinutes') }}
                                 </th>
                             </tr>
@@ -113,16 +126,17 @@
                                     </td>
                                     <td class="ewr-td-project ewr-muted">{{ projectCountLabel(row.projectCount) }}</td>
                                     <td
+                                        v-if="showLoggedCol"
                                         class="ewr-td-num"
                                         :class="loggedHighlightClass(row.loggedMinutes, row.plannedMinutes, row.commonEstimateMinutes)"
                                         :title="loggedHighlightTitle(row.loggedMinutes, row.plannedMinutes, row.commonEstimateMinutes)">
                                         {{ formatMinutes(row.loggedMinutes) }}
                                     </td>
-                                    <td class="ewr-td-num">
+                                    <td v-if="showPlannedCol" class="ewr-td-num">
                                         <span v-if="row.plannedMinutes">{{ formatMinutes(row.plannedMinutes) }}</span>
                                         <span v-else class="ewr-missing" title="No planned hours">—</span>
                                     </td>
-                                    <td class="ewr-td-num">
+                                    <td v-if="showEstimateCol" class="ewr-td-num">
                                         <span v-if="row.commonEstimateMinutes">{{ formatMinutes(row.commonEstimateMinutes) }}</span>
                                         <span v-else class="ewr-missing" title="No estimate set">—</span>
                                     </td>
@@ -132,7 +146,7 @@
                                 <template v-if="expanded[row._id]">
                                     <tr v-if="!row.tasks.length" class="ewr-task-tr ewr-task-first ewr-task-last">
                                         <td></td>
-                                        <td colspan="5" class="ewr-no-tasks">No tasks for this employee in current filter.</td>
+                                        <td :colspan="emptyTaskColspan" class="ewr-no-tasks">No tasks for this employee in current filter.</td>
                                     </tr>
                                     <tr
                                         v-for="(t, tIndex) in row.tasks"
@@ -147,6 +161,8 @@
                                         <td></td>
                                         <td class="ewr-td-task-name">
                                             <img v-if="t.isSubTask" :src="subTaskIcon" class="ewr-subtask-icon" title="Sub task" alt="sub task" />
+                                            <!-- Green "Running" badge appears next to tasks with an active tracker. -->
+                                            <span v-if="t.isTracking" class="ewr-running-badge" title="Tracker is currently running">Running</span>
                                             <span
                                                 class="ewr-task-name ewr-task-name-link"
                                                 :title="t.TaskName"
@@ -154,15 +170,16 @@
                                         </td>
                                         <td class="ewr-td-project" :title="t.ProjectName">{{ t.ProjectName || '—' }}</td>
                                         <td
+                                            v-if="showLoggedCol"
                                             class="ewr-td-num"
                                             :class="loggedHighlightClass(t.loggedMinutes, t.plannedMinutes, t.commonEstimateMinutes)"
                                             :title="loggedHighlightTitle(t.loggedMinutes, t.plannedMinutes, t.commonEstimateMinutes)">
                                             {{ t.loggedMinutes ? formatMinutes(t.loggedMinutes) : '—' }}
                                         </td>
-                                        <td class="ewr-td-num">
+                                        <td v-if="showPlannedCol" class="ewr-td-num">
                                             {{ t.plannedMinutes ? formatMinutes(t.plannedMinutes) : '—' }}
                                         </td>
-                                        <td class="ewr-td-num">
+                                        <td v-if="showEstimateCol" class="ewr-td-num">
                                             {{ t.commonEstimateMinutes ? formatMinutes(t.commonEstimateMinutes) : '—' }}
                                         </td>
                                     </tr>
@@ -170,14 +187,14 @@
                                 </template>
                             </template>
                         </tbody>
-                        <tfoot>
+                        <tfoot v-if="showTotalRow">
                             <tr class="ewr-total-row">
                                 <td></td>
                                 <td class="ewr-total-label">Total</td>
                                 <td></td>
-                                <td class="ewr-td-num">{{ formatMinutes(totals.logged) }}</td>
-                                <td class="ewr-td-num">{{ formatMinutes(totals.planned) }}</td>
-                                <td class="ewr-td-num">{{ formatMinutes(totals.estimate) }}</td>
+                                <td v-if="showLoggedCol" class="ewr-td-num">{{ formatMinutes(totals.logged) }}</td>
+                                <td v-if="showPlannedCol" class="ewr-td-num">{{ formatMinutes(totals.planned) }}</td>
+                                <td v-if="showEstimateCol" class="ewr-td-num">{{ formatMinutes(totals.estimate) }}</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -201,7 +218,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, inject, nextTick, provide } from 'vue';
+import { ref, reactive, computed, onMounted, watch, inject, nextTick, provide } from 'vue';
 import { useStore } from 'vuex';
 import { apiRequest } from '@/services';
 import { teamIdToUserId } from '@/composable/commonFunction';
@@ -218,6 +235,9 @@ const props = defineProps({
     taskStatusArray: { type: Object, default: () => ({}) },
     componentId: { type: String, default: '' },
     filterData: { type: [Array, Object], default: () => [] },
+    // Bumped by the dashboard chrome's refresh icon. Any change triggers
+    // a re-fetch — replaces the previous 5-minute auto-refresh.
+    refreshTrigger: { type: Number, default: 0 },
 });
 
 const userId = inject('$userId');
@@ -273,7 +293,26 @@ const sortKey = ref('name');
 const sortDir = ref('asc');
 // Search — client-side, filters by employee name.
 const searchQuery = ref('');
-let refreshTimer = null;
+
+// Column visibility toggles (driven by edit-card modal). Default to
+// true when the config value is missing so older saved cards still
+// show every column.
+const showLoggedCol = computed(() => cardObject.value.showLoggedHours !== false);
+const showPlannedCol = computed(() => cardObject.value.showPlannedHours !== false);
+const showEstimateCol = computed(() => cardObject.value.showEstimateHours !== false);
+// The Total footer only totals the hour columns — hide it entirely when
+// every hour column is toggled off (nothing left to total).
+const showTotalRow = computed(() => showLoggedCol.value || showPlannedCol.value || showEstimateCol.value);
+// Colspan for the "No tasks for this employee" row — needs to cover
+// every visible column except the leading empty <td>. Fixed columns
+// (employee + project) = 2, plus whichever hour columns are visible.
+const emptyTaskColspan = computed(() => {
+    let n = 2; // employee + project
+    if (showLoggedCol.value) n += 1;
+    if (showPlannedCol.value) n += 1;
+    if (showEstimateCol.value) n += 1;
+    return n;
+});
 
 // ─── Helpers ─────────────────────────────────────────────────────
 function formatMinutes(min) {
@@ -315,21 +354,36 @@ function loggedHighlightTitle(logged, planned, estimate) {
     }
     return '';
 }
-const TIMERANGE_LABELS = {
-    1: 'Today', 2: 'Yesterday', 3: 'This week', 4: 'Last week',
-    5: 'This month', 6: 'Last month', 7: 'Last 30 days',
-};
-function chipLabel(kind) {
-    if (kind === 'date') {
-        return TIMERANGE_LABELS[Number(cardObject.value.timerange)] || 'This week';
-    }
-    if (kind === 'employees') {
-        const ids = cardObject.value.AssigneeUserId || [];
-        if (!ids.length) return 'All visible';
-        return `${ids.length} selected`;
-    }
-    return '';
+// Time-period options for the inline dropdown. The `id` matches the
+// numeric ids `resolveDateRange()` switches on (1=today … 7=last_30_days),
+// so the existing date-range → fetch logic is reused unchanged.
+const TIMERANGE_OPTIONS = [
+    // "Current" is a live view: only employees with a running tracker
+    // right now. It pivots on today's range for hour context, but the
+    // backend further restricts the rows to active-tracker pairs.
+    { id: 8, label: 'Current' },
+    { id: 1, label: 'Today' },
+    { id: 2, label: 'Yesterday' },
+    { id: 3, label: 'This Week' },
+    { id: 4, label: 'Last Week' },
+    { id: 5, label: 'This Month' },
+    { id: 6, label: 'Last Month' },
+    { id: 7, label: 'Last 30 Days' },
+];
+// Id of the special "Current" (live trackers) option.
+const CURRENT_TIMERANGE_ID = 8;
+// Source of truth for the inline Time Period control. Initialised from
+// the saved card config (backward compatible with cards that still have
+// a persisted `timerange`), defaulting to "Current" (live trackers).
+const timerange = ref(Number(props.cardData?.timerange) || CURRENT_TIMERANGE_ID);
+function onTimerangeChange() {
+    fetchReport();
 }
+const emptyStateText = computed(() => {
+    if (searchQuery.value) return `No employees match "${searchQuery.value}".`;
+    if (timerange.value === CURRENT_TIMERANGE_ID) return 'No one is currently working on a task.';
+    return 'No employees match this filter.';
+});
 
 // ─── Sorting ─────────────────────────────────────────────────────
 function setSort(key) {
@@ -345,12 +399,10 @@ function sortIndicator(key) {
     return sortDir.value === 'asc' ? '↑' : '↓';
 }
 const sortedEmployees = computed(() => {
-    let list = [...report.employees];
-    // "Hide empty users" toggle — drop employees with no tasks in the
-    // current filter when enabled.
-    if (cardObject.value.hideEmptyEmployees) {
-        list = list.filter((r) => r.assignedTaskCount > 0);
-    }
+    // Always drop employees with no tasks in the current filter — the
+    // widget exists to surface real workload, so noise from idle users
+    // is never useful. (Was a config toggle; now hardcoded behaviour.)
+    let list = report.employees.filter((r) => r.assignedTaskCount > 0);
     // Search — client-side name filter.
     const q = searchQuery.value.trim().toLowerCase();
     if (q) {
@@ -388,6 +440,7 @@ function resolveDateRange(value) {
     const id = Number(value);
 
     switch (id) {
+        case 8: // current (live trackers) — share today's range for context
         case 1: { // today
             start.setHours(0, 0, 0, 0);
             return { dateFrom: start.toISOString(), dateTo: end.toISOString() };
@@ -441,12 +494,12 @@ function toggleExpand(id) {
 
 // ─── Fetch ─────────────────────────────────────────────────────
 async function fetchReport() {
-    if (document.hidden) return; // Page Visibility API — skip when tab hidden
     isLoading.value = true;
     try {
         // Field names match the catalog (TotalUrgentTasksComp convention):
         // AssigneeUserId, projectId, statusArray, timerange, isParentTask.
-        const { dateFrom, dateTo } = resolveDateRange(cardObject.value.timerange);
+        // `timerange` now comes from the inline dropdown (was config).
+        const { dateFrom, dateTo } = resolveDateRange(timerange.value);
         // "Show Assignees" can include teams (stored as "tId_<teamId>").
         // Expand any team selections into their member user ids before
         // sending — otherwise the backend can't match them to users.
@@ -458,6 +511,9 @@ async function fetchReport() {
             isParentTask: cardObject.value.isParentTask !== false,
             dateFrom,
             dateTo,
+            // "Current" mode → backend restricts rows to employees with a
+            // running tracker right now (who's working on what live).
+            currentOnly: timerange.value === CURRENT_TIMERANGE_ID,
             callerUserId: userId && userId.value ? String(userId.value) : '',
             callerRoleType: props.companyUserDetail?.roleType || 3,
         };
@@ -474,41 +530,27 @@ async function fetchReport() {
     }
 }
 
-// ─── Auto-refresh with Page Visibility pause ───────────────────
-const AUTO_REFRESH_SECONDS = 300; // 5 minutes
-function startAutoRefresh() {
-    stopAutoRefresh();
-    refreshTimer = setInterval(() => {
-        if (!document.hidden) fetchReport();
-    }, AUTO_REFRESH_SECONDS * 1000);
-}
-function stopAutoRefresh() {
-    if (refreshTimer) {
-        clearInterval(refreshTimer);
-        refreshTimer = null;
-    }
-}
-function handleVisibilityChange() {
-    if (!document.hidden) fetchReport();
-}
-
 // ─── Lifecycle + reactive config ───────────────────────────────
+// Auto-refresh removed — refresh is now driven manually by the chrome's
+// refresh icon (parent bumps `refreshTrigger`, the watch below re-fetches).
 onMounted(() => {
     fetchReport();
-    startAutoRefresh();
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-});
-onBeforeUnmount(() => {
-    stopAutoRefresh();
-    document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
 
 watch(() => props.cardData, (newVal) => {
     if (!newVal) return;
     cardObject.value = JSON.parse(JSON.stringify(newVal));
+    // Keep the inline Time Period in sync if a saved value is present;
+    // otherwise leave the user's current inline selection untouched.
+    if (newVal.timerange) timerange.value = Number(newVal.timerange);
     fetchReport();
-    startAutoRefresh();
 }, { deep: true });
+
+// Refresh icon in the chrome bumps the trigger → re-fetch.
+watch(() => props.refreshTrigger, (val, prev) => {
+    if (val === prev) return;
+    fetchReport();
+});
 </script>
 
 <style scoped src="./style.css"></style>

@@ -3,6 +3,21 @@
     <div class="cardHeader">
       <span class="font-size-18 font-weight-bold text-ellipsis w-85" :title="title">{{ title }}</span>  
       <span class="cursor-pointer dashboard-container-setting-controller">
+        <!-- Refresh icon — only renders when the parent passes showRefresh.
+             Sits BEFORE the settings (edit) icon per design spec. -->
+        <svg
+          v-if="showRefresh"
+          class="mr-10px dashboard-refresh-icon"
+          width="14" height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          title="Refresh"
+          @click.stop="$emit('refresh-card', id)"
+        >
+          <path d="M21 12a9 9 0 1 1-3-6.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M21 3v6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
         <img :src="editIcon" style="height:14px;width:14px;" class="mr-10px" @click="$emit('edit-card', id)"/>
         <img :src="closeIcon" @click="$emit('delete-card', id)"/><!-- Emit event -->
       </span>
@@ -29,7 +44,13 @@ defineProps({
   componentId : {
     type: String,
     default: ''
-  }
+  },
+  // When true, renders a refresh icon in the card chrome (before the
+  // settings icon). The parent listens to @refresh-card to act on it.
+  showRefresh: {
+    type: Boolean,
+    default: false,
+  },
 });
 const containerRef = ref(null)
 const containerWidth = ref(0)
@@ -50,7 +71,7 @@ onUnmounted(() => {
   }
 })
 provide("$containerWidth", containerWidth);
-defineEmits(['delete-card','edit-card']); // Define delete-card event
+defineEmits(['delete-card','edit-card','refresh-card']); // Define delete-card event
 </script>
 
 
@@ -82,5 +103,18 @@ h2 {
 }
 .dashboard-container-setting-controller {
   min-width: 38px;
+  display: inline-flex;
+  align-items: center;
+}
+.dashboard-refresh-icon {
+  color: #5a6478;
+  cursor: pointer;
+  transition: color 0.15s ease, transform 0.3s ease;
+  display: inline-block;
+  vertical-align: middle;
+}
+.dashboard-refresh-icon:hover {
+  color: #2F3990;
+  transform: rotate(90deg);
 }
 </style>

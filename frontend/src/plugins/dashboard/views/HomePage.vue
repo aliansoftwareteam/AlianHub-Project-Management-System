@@ -32,7 +32,13 @@
                         @resize="resize"
                         :class="{'grid_layout_hover': hoverIndex === index, [item.i]: true}"
                     >
-                        <DashBoardCard :title="item?.cardData?.fieldName" :id="item.i" @delete-card="handleRemoveCard(item.i)" @edit-card="handleEditCardSettings(item.componentId,item.cardData,item.i,item.filterData)">
+                        <DashBoardCard
+                            :title="item?.cardData?.fieldName"
+                            :id="item.i"
+                            :showRefresh="item.componentId === 'EmployeeWorkloadReportCard'"
+                            @delete-card="handleRemoveCard(item.i)"
+                            @edit-card="handleEditCardSettings(item.componentId,item.cardData,item.i,item.filterData)"
+                            @refresh-card="handleRefreshCard(item.i)">
                             <component
                                 :is="getComponent(item.componentId)"
                                 :cardUID="item.i"
@@ -41,6 +47,7 @@
                                 :taskStatusArray="taskStatusArray"
                                 :cardData="item.cardData ?? {}"
                                 :componentId="item.componentId"
+                                :refreshTrigger="refreshKeys[item.i] || 0"
                                 v-bind="bindUpdates(item.componentId) ? { onHandleUpdateFromCard:(e)=>handleUpdateFromCard(e) } : {}"
                                 :filterData="item.filterData ?? {}"
                             />
@@ -50,7 +57,13 @@
             </div>
             <div v-else>
                 <div v-for="(item,index) in layout" :key="index" class="mb-1 mr-1 ml-1" :class="{'mt-1':index === 0}">
-                    <DashBoardCard :title="item?.cardData?.fieldName" :id="item.i" @delete-card="handleRemoveCard(item.i)" @edit-card="handleEditCardSettings(item.componentId,item.cardData,item.i,item.filterData)">
+                    <DashBoardCard
+                        :title="item?.cardData?.fieldName"
+                        :id="item.i"
+                        :showRefresh="item.componentId === 'EmployeeWorkloadReportCard'"
+                        @delete-card="handleRemoveCard(item.i)"
+                        @edit-card="handleEditCardSettings(item.componentId,item.cardData,item.i,item.filterData)"
+                        @refresh-card="handleRefreshCard(item.i)">
                         <component
                             :is="getComponent(item.componentId)"
                             :cardUID="item.i"
@@ -59,6 +72,7 @@
                             :taskStatusArray="taskStatusArray"
                             :cardData="item.cardData ?? {}"
                             :componentId="item.componentId"
+                            :refreshTrigger="refreshKeys[item.i] || 0"
                             v-bind="bindUpdates(item.componentId) ? { onHandleUpdateFromCard:(e)=>handleUpdateFromCard(e) } : {}"
                             :filterData="item.filterData ?? {}"
                         />
@@ -131,7 +145,7 @@
     </div>
 </template>
 <script setup>
-    import {  ref, onMounted, inject, computed, watch,defineExpose, nextTick,provide } from 'vue';
+    import {  ref, reactive, onMounted, inject, computed, watch,defineExpose, nextTick,provide } from 'vue';
     import { GridLayout, GridItem } from 'grid-layout-plus';
     import useCustomFieldImage from '@/composable/customFieldIcon.js';
     import AdvanceSearchModal from '@/components/atom/Modal/Modal.vue';
@@ -197,6 +211,14 @@
     const isMoving = ref(false);
     const hoverIndex = ref(null);
     const editCardId = ref(null);
+    // Per-card refresh counter. The chrome's refresh icon increments the
+    // counter for that card; the resolved component watches its bound
+    // `refreshTrigger` prop and re-fetches on every change. Keyed by
+    // `item.i` (the card uid).
+    const refreshKeys = reactive({});
+    const handleRefreshCard = (id) => {
+        refreshKeys[id] = (refreshKeys[id] || 0) + 1;
+    };
     const cardComponent = ref([]);
     const filterCardComponent = ref([]);
     const currentLayout = ref({});

@@ -232,18 +232,13 @@ const formObj = ref({});
 const formRef = ref(null);
 const errorProject = ref('');
 const submitted = ref(false);
-const fieldArray = ref(JSON.parse(JSON.stringify(props.fieldsArray)));
-
-// EmployeeWorkloadReportCard — hide fields that are irrelevant for
-// members (roleType !== 1 and !== 2): "Hide empty users" makes no
-// sense when the viewer can only see themselves.
-if (props.componentId === 'EmployeeWorkloadReportCard') {
-    const roleType = getters["settings/companyUserDetail"]?.roleType;
-    if (roleType !== 1 && roleType !== 2) {
-        const f = fieldArray.value.find((x) => x.name === 'hideEmptyEmployees');
-        if (f) f.hidden = true;
-    }
-}
+// Drop the deprecated `hideEmptyEmployees` field from any card whose
+// saved config still carries it (added to the dashboard before the
+// field was removed). Empty users are always hidden now — no toggle.
+const fieldArray = ref(
+    JSON.parse(JSON.stringify(props.fieldsArray))
+        .filter((f) => f && f.name !== 'hideEmptyEmployees')
+);
 
 const { checkErrors, checkAllFields } = useValidation();
 
