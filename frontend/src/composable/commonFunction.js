@@ -634,11 +634,12 @@ export const getCardsComponentsSize = (key) => {
                 "maxH": 18
             };
         case 'EmployeeWorkloadReportCard':
-            // Tall and wide by default — this card has a summary
-            // banner, an employee table, and two side-by-side charts,
-            // so it needs more vertical room than a single chart card.
+            // Defaults tall (the employee table wants vertical room), but the
+            // table is responsive and its columns can be toggled off, so keep
+            // the minimum width small like the other cards — let the user
+            // shrink it down instead of locking it to half the page.
             return {
-                "minW": 6,
+                "minW": 3,
                 "maxW": 12,
                 "minH": 10,
                 "maxH": 22
