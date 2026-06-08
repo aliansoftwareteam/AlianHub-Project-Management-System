@@ -1,0 +1,84 @@
+name: Lint PR title & commits
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: commitlint-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────
+  # PR TITLE — must follow Conventional Commits, since we use squash
+  # merging on main and the PR title becomes the squash-commit message.
+  # ────────────────────────────────────────────────────────────────────
+  lint-pr-title:
+    name: PR title (Conventional Commits)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR title
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Keep in sync with commitlint.config.js → type-enum
+          types: |
+            build
+            chore
+            ci
+            docs
+            feat
+            fix
+            perf
+            refactor
+            revert
+            style
+            test
+          requireScope: false
+          # Subject must start with a lowercase letter
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: |
+            The subject in PR title "{title}" should start with a lowercase
+            letter. For example, use "feat: add login page" — not
+            "feat: Add login page".
+          # Don't fail if the PR is still in draft / WIP
+          ignoreLabels: |
+            wip
+            do not merge
+
+  # ────────────────────────────────────────────────────────────────────
+  # COMMITS — every commit in the PR must pass commitlint.
+  # ────────────────────────────────────────────────────────────────────
+  lint-commits:
+    name: Commit messages (commitlint)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (with full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install commitlint dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint every commit in the PR
+        run: |
+          npx commitlint \
+            --from "${{ github.event.pull_request.base.sha }}" \
+            --to   "${{ github.event.pull_request.head.sha }}" \
+            --verbose
