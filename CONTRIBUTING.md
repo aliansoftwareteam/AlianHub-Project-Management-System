@@ -19,21 +19,26 @@ Please read this guide carefully before submitting issues or pull requests.
 - Be open to feedback and discussion
 
 ### 3. Submitting Pull Requests
-- Fork the repository
-- Create a feature branch from the latest `main`
+- Fork the repository (external contributors) or branch directly (maintainers)
+- Create a topic branch from the latest `staging` — **not** `main`
 - Keep changes focused and minimal
-- Use the appropriate PR template:
-  - `new_feature.md`
-  - `bug_fix.md`
-  - `refactor.md`
+- Open the PR against `staging` (not `main`)
+
+> 📘 See [BRANCHING.md](BRANCHING.md) for the full branching strategy, including hotfix and release workflows.
 
 
 ## Branch Naming Convention
 
-Examples:
-- `feature/user-notifications`
-- `bugfix/login-validation`
+Use the format `<type>/<short-kebab-case-description>`:
+
+- `feat/user-notifications`
+- `fix/login-validation`
 - `refactor/api-layer`
+- `chore/upgrade-deps`
+- `docs/api-reference`
+- `hotfix/payment-gateway-timeout` *(branched from `main`, not `staging`)*
+
+Full list of accepted types and examples: [BRANCHING.md § Topic branches](BRANCHING.md#topic-branches).
 
 
 ## Testing Requirements

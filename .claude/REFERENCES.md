@@ -17,6 +17,7 @@
 | Resource | Path | Purpose |
 |----------|------|---------|
 | **Contributing Guide** | [CONTRIBUTING.md](../../CONTRIBUTING.md) | How to contribute |
+| **Branching Strategy** | [BRANCHING.md](../../BRANCHING.md) | Branch model, PR/hotfix/release workflows |
 | **Security Policy** | [SECURITY.md](../../SECURITY.md) | Report security vulnerabilities |
 | **Code of Conduct** | [CODE_OF_CONDUCT.md](../../CODE_OF_CONDUCT.md) | Community standards |
 | **License** | [LICENSE](../../LICENSE) | MIT open-source license |
