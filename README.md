@@ -32,7 +32,7 @@ Built for enterprises, startups, and growing teams — without vendor lock-in.
 
 <div align="center">
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.0-4baaaa.svg)](CODE_OF_CONDUCT.md)
 
 </div>
@@ -204,5 +204,12 @@ AlianHub Project-Management-System is a community-driven project, and your contr
 
 ## License
 
-Licensed under the **MIT License**.  
-See the [LICENSE](LICENSE) file for details.
+Licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+
+See the [LICENSE](LICENSE) file for the full license text and [COPYRIGHT](COPYRIGHT) for the copyright notice.
+
+> **What AGPL-3.0 means for you:**
+> - ✅ You can use, modify, self-host, and distribute AlianHub freely.
+> - ✅ You can run a private modified version internally without publishing changes.
+> - ⚠️ If you run a **modified** version as a **public network service** (SaaS), you must publish your modifications under the same license.
+> - 📩 Need a different license for commercial / closed-source use? Contact us at [support@aliansoftware.net](mailto:support@aliansoftware.net).

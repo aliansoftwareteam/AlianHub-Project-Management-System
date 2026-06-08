@@ -10,7 +10,7 @@ Quick reference for development. For detailed guides, see **See Also** section a
 - **Highly customizable:** Custom fields, templates, workflows
 - **Multi-tenant:** Single instance serves multiple companies
 - **Real-time collaboration:** Socket.io LiveSync for instant updates
-- **Open-source:** MIT licensed, community-driven
+- **Open-source:** AGPL-3.0 licensed, community-driven
 
 **Target Users:** Enterprises, startups, and teams requiring control, customization, and compliance with data residency requirements.
 
@@ -259,7 +259,7 @@ See [.claude/SECURITY-PATTERNS.md](.claude/SECURITY-PATTERNS.md) for detailed pr
 - **Authentication:** JWT + OAuth (GitHub, Google)
 - **Real-time:** Socket.io with fallbacks
 - **Storage:** Wasabi S3 or local filesystem
-- **License:** MIT (open-source)
+- **License:** AGPL-3.0 (open-source, copyleft)
 
 ---
 
