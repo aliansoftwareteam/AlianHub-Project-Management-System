@@ -1,17 +1,10 @@
 name: CI / Deploy
 
 on:
+  # Run only when changes land on `staging` — i.e. when a PR is merged.
   push:
     branches:
       - staging
-
-  pull_request:
-    branches:
-      - staging
-    types:
-      - opened
-      - synchronize
-      - reopened
 
   workflow_dispatch:
 
@@ -168,15 +161,62 @@ jobs:
             echo "📥 Updating backend source"
 
             git fetch origin staging
+
+            # ---------------------------------
+            # Decide whether backend dependencies need reinstalling
+            # ---------------------------------
+            # Run `npm ci` only when one of these is true; otherwise skip it
+            # and avoid the RAM spike:
+            #   1. node_modules is missing      (first deploy / wiped)
+            #   2. package-lock.json changed    (dependencies changed)
+            #   3. Node major changed since the last install (e.g. 22 <-> 20.x)
+            #      — native addons like bcrypt/sharp are built per Node ABI, so
+            #      a version switch must rebuild them or the app crashes on boot.
+            #
+            # The lockfile check runs BEFORE `git reset --hard`, while HEAD
+            # still points at the currently-deployed commit.
+
+            NODE_MAJOR="$(node -v | cut -d. -f1 | tr -d 'v')"   # e.g. 22 or 20
+            NODE_MARKER="node_modules/.node-major"
+            BUILT_MAJOR="$(cat "$NODE_MARKER" 2>/dev/null || echo '')"
+
+            NEED_INSTALL=0
+            INSTALL_REASON=""
+
+            if [ ! -d node_modules ]; then
+              NEED_INSTALL=1
+              INSTALL_REASON="node_modules missing (first deploy)"
+            elif ! git diff --quiet HEAD origin/staging -- package-lock.json; then
+              NEED_INSTALL=1
+              INSTALL_REASON="dependencies changed"
+            elif [ "$BUILT_MAJOR" != "$NODE_MAJOR" ]; then
+              NEED_INSTALL=1
+              INSTALL_REASON="Node version changed (built on ${BUILT_MAJOR:-unknown}, now $NODE_MAJOR)"
+            fi
+
             git reset --hard origin/staging
 
             # ---------------------------------
-            # Install Backend Dependencies
+            # Install Backend Dependencies (only when needed)
             # ---------------------------------
 
-            echo "📦 Installing backend dependencies"
+            if [ "$NEED_INSTALL" = "1" ]; then
+              echo "📦 Installing backend dependencies — reason: $INSTALL_REASON"
 
-            npm ci --omit=dev
+              # Cap native-module build parallelism to keep peak RAM low:
+              # JOBS=1 makes node-gyp/make compile addons (e.g. bcrypt) one
+              # job at a time instead of one per CPU core. It only bites when a
+              # module has no prebuilt binary and falls back to a source build.
+              # --no-audit / --no-fund drop the post-install network audit and
+              # funding scan (the security audit already runs in the CI job).
+              JOBS=1 npm ci --omit=dev --no-audit --no-fund
+
+              # Record the Node major these modules were built against, so the
+              # next deploy can detect a version switch and rebuild them.
+              echo "$NODE_MAJOR" > "$NODE_MARKER"
+            else
+              echo "📦 No dependency or Node-version change — skipping npm ci"
+            fi
 
             # ---------------------------------
             # Frontend Backup + Deploy
