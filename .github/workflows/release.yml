@@ -1,0 +1,51 @@
+name: Release
+
+# ─────────────────────────────────────────────────────────────────────
+# Automated release process for AlianHub.
+#
+# This workflow runs on every push to `main`. It uses release-please to:
+#   1. Scan new Conventional Commits since the last release
+#   2. Open (or update) a Release PR that bumps the version in
+#      package.json and appends the new CHANGELOG.md section
+#   3. When the Release PR is merged, automatically:
+#      - Create the git tag (e.g. v14.1.0)
+#      - Create the matching GitHub Release with changelog as the body
+#
+# Workflow → maintainer relationship:
+#   • You merge feature PRs to staging (everyday work)
+#   • Periodically you promote staging → main (a single PR from staging)
+#   • This workflow auto-opens a Release PR on main with the version bump
+#   • You review and merge the Release PR → tag + GitHub Release appear
+#
+# See: BRANCHING.md § Release workflow
+# Tool: https://github.com/googleapis/release-please
+# ─────────────────────────────────────────────────────────────────────
+
+on:
+  push:
+    branches:
+      - main
+
+  # Manual fallback — run release-please on demand without a push
+  workflow_dispatch:
+
+permissions:
+  contents: write       # create tags, releases, branches, commits
+  pull-requests: write  # open and update the Release PR
+  issues: write         # comment on closed issues referenced by the release
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Cut release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run release-please
+        uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          token: ${{ secrets.GITHUB_TOKEN }}
