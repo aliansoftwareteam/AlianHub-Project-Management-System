@@ -2,6 +2,8 @@
 	"name": "alian-hub-v3",
 	"version": "8.36.0",
 	"private": true,
+	"license": "AGPL-3.0-or-later",
+	"author": "Alian Software <https://alianhub.com>",
 	"scripts": {
 		"serve": "vue-cli-service serve",
 		"build": "vue-cli-service build",
