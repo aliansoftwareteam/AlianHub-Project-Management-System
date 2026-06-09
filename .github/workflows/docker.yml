@@ -26,21 +26,16 @@ name: Docker
 # ─────────────────────────────────────────────────────────────────────
 
 on:
+  # Build + publish image when a release tag is cut by release-please
   release:
     types: [published]
+
+  # Build + publish image on every commit to main (after a PR merges)
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'Dockerfile'
-      - '.dockerignore'
-      - 'docker-compose.yml'
-      - '.github/workflows/docker.yml'
-      - 'package.json'
-      - 'frontend/package.json'
+
+  # Manual trigger from the Actions UI
   workflow_dispatch:
 
 permissions:
