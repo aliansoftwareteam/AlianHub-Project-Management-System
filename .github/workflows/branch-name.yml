@@ -1,0 +1,73 @@
+name: Validate branch name
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - edited
+      - synchronize
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: branch-name-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Branch name matches convention
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch name follows <type>/<kebab-description>
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+
+          echo "Validating branch name: $BRANCH"
+
+          # Standard topic branches: <type>/<kebab-case-description>
+          # Types kept in sync with BRANCHING.md § Topic branches.
+          STANDARD='^(feat|fix|hotfix|refactor|chore|docs|perf|test|ci|build|style)\/[a-z0-9]+(-[a-z0-9.]+)*$'
+
+          # Release branches: release/vMAJOR.MINOR.PATCH[-prerelease]
+          RELEASE='^release\/v[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.-]+)?$'
+
+          # Hotfix-backport branches: hotfix-backport/<kebab-description>
+          BACKPORT='^hotfix-backport\/[a-z0-9]+(-[a-z0-9.]+)*$'
+
+          # Dependabot / Renovate auto-update branches are exempt
+          BOT='^(dependabot|renovate)\/.+$'
+
+          if [[ "$BRANCH" =~ $STANDARD ]] || \
+             [[ "$BRANCH" =~ $RELEASE ]]  || \
+             [[ "$BRANCH" =~ $BACKPORT ]] || \
+             [[ "$BRANCH" =~ $BOT ]]; then
+            echo "✅ Branch name '$BRANCH' is valid."
+            exit 0
+          fi
+
+          echo "❌ Branch name '$BRANCH' does not follow the convention."
+          echo ""
+          echo "Expected: <type>/<short-kebab-case-description>"
+          echo ""
+          echo "Allowed types:"
+          echo "  feat, fix, hotfix, refactor, chore, docs,"
+          echo "  perf, test, ci, build, style"
+          echo ""
+          echo "Special-case patterns:"
+          echo "  release/vMAJOR.MINOR.PATCH        (release branches)"
+          echo "  hotfix-backport/<description>     (backporting hotfixes to staging)"
+          echo "  dependabot/...  renovate/...      (bot-generated, auto-exempt)"
+          echo ""
+          echo "Examples:"
+          echo "  feat/employee-workload-report"
+          echo "  fix/login-validation-error"
+          echo "  chore/upgrade-deps"
+          echo "  release/v14.0.27"
+          echo ""
+          echo "See BRANCHING.md (§ Topic branches) for the full convention."
+          exit 1

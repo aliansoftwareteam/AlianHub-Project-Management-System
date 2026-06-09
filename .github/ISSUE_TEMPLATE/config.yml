@@ -1,0 +1,19 @@
+# Disable the "Open a blank issue" link so every report starts from a template.
+blank_issues_enabled: false
+
+contact_links:
+  - name: 📖 Documentation & User Guide
+    url: https://help.alianhub.com
+    about: Most usage questions are answered in the docs. Please check here first.
+
+  - name: 💬 Live Demo
+    url: https://demo.alianhub.com
+    about: Try AlianHub in your browser before opening an issue.
+
+  - name: 🛟 GitHub Discussions
+    url: https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/discussions
+    about: For questions, ideas, or general discussion — not bug reports.
+
+  - name: 🔒 Report a security vulnerability (privately)
+    url: https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/security/advisories/new
+    about: Please do NOT open a public issue for security problems. Use a private advisory instead.
