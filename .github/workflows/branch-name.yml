@@ -42,10 +42,17 @@ jobs:
           # Dependabot / Renovate auto-update branches are exempt
           BOT='^(dependabot|renovate)\/.+$'
 
-          if [[ "$BRANCH" =~ $STANDARD ]] || \
-             [[ "$BRANCH" =~ $RELEASE ]]  || \
-             [[ "$BRANCH" =~ $BACKPORT ]] || \
-             [[ "$BRANCH" =~ $BOT ]]; then
+          # Long-running branches (used as source of promotion PRs:
+          # staging -> main, or hotfix flows branching from main).
+          # Per BRANCHING.md these are the only branches with no type
+          # prefix that are allowed.
+          LONG_RUNNING='^(staging|main)$'
+
+          if [[ "$BRANCH" =~ $STANDARD ]]     || \
+             [[ "$BRANCH" =~ $RELEASE ]]      || \
+             [[ "$BRANCH" =~ $BACKPORT ]]     || \
+             [[ "$BRANCH" =~ $BOT ]]          || \
+             [[ "$BRANCH" =~ $LONG_RUNNING ]]; then
             echo "✅ Branch name '$BRANCH' is valid."
             exit 0
           fi
@@ -61,6 +68,7 @@ jobs:
           echo "Special-case patterns:"
           echo "  release/vMAJOR.MINOR.PATCH        (release branches)"
           echo "  hotfix-backport/<description>     (backporting hotfixes to staging)"
+          echo "  staging  |  main                  (long-running branches — promotion PRs)"
           echo "  dependabot/...  renovate/...      (bot-generated, auto-exempt)"
           echo ""
           echo "Examples:"
