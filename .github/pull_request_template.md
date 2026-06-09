@@ -22,11 +22,12 @@
 
 ## Type of change
 
-<!-- Check all that apply. The first one should match your PR title prefix. -->
+<!-- Check all that apply. The first one should match your PR title prefix.
+     Note: `hotfix` is a branch-type only — for PR title and commit messages on
+     hotfix branches, use `fix` as the type. -->
 
 - [ ] 🚀 `feat` — New feature
-- [ ] 🐛 `fix` — Bug fix
-- [ ] 🔥 `hotfix` — Urgent production fix (targets `main`, not `staging`)
+- [ ] 🐛 `fix` — Bug fix (use this for `hotfix/*` branches too)
 - [ ] ♻️ `refactor` — Code refactor (no behavior change)
 - [ ] 🔧 `chore` — Build / config / deps / housekeeping
 - [ ] 📘 `docs` — Documentation only

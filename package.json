@@ -56,7 +56,7 @@
     "setup": "node scripts/dev.js",
     "dev": "node scripts/dev.js --skip-install",
     "setup:reset": "node scripts/dev.js --force",
-    "lint:commits": "commitlint --from origin/staging --to HEAD --verbose"
+    "lint:commits": "commitlint --from ${BASE_BRANCH:-origin/staging} --to HEAD --verbose"
   },
   "author": "",
   "license": "ISC",
