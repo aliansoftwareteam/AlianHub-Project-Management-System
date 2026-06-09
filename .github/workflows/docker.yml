@@ -34,7 +34,6 @@ on:
   pull_request:
     branches:
       - main
-      - staging
     paths:
       - 'Dockerfile'
       - '.dockerignore'
