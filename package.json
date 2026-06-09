@@ -91,11 +91,14 @@
     "basic-install": "node installation.js && npm run start",
     "setup": "node scripts/dev.js",
     "dev": "node scripts/dev.js --skip-install",
-    "setup:reset": "node scripts/dev.js --force"
+    "setup:reset": "node scripts/dev.js --force",
+    "lint:commits": "commitlint --from ${BASE_BRANCH:-origin/staging} --to HEAD --verbose"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "Alian Software <https://alianhub.com>",
+  "license": "AGPL-3.0-or-later",
   "devDependencies": {
+    "@commitlint/cli": "^19.5.0",
+    "@commitlint/config-conventional": "^19.5.0",
     "jest": "^30.4.2",
     "nodemon": "^3.1.0"
   }

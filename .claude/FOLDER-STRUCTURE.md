@@ -142,7 +142,8 @@ AlianHub-Project-Management-System/
 ├── CLAUDE.md                            # Claude Code project guide
 ├── CONTRIBUTING.md                      # Contribution guidelines
 ├── SECURITY.md                          # Security policy
-└── LICENSE                              # MIT license
+├── LICENSE                              # AGPL-3.0 license
+└── COPYRIGHT                            # Copyright notice
 ```
 
 ## Key Folder Purposes

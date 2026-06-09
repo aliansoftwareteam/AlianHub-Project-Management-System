@@ -18,9 +18,11 @@
 |----------|------|---------|
 | **Contributing Guide** | [CONTRIBUTING.md](../../CONTRIBUTING.md) | How to contribute |
 | **Discoverability Playbook** | [.claude/DISCOVERABILITY.md](DISCOVERABILITY.md) | Internal — submission targets, launch copy, SEO snippets |
+| **Branching Strategy** | [BRANCHING.md](../../BRANCHING.md) | Branch model, PR/hotfix/release workflows |
 | **Security Policy** | [SECURITY.md](../../SECURITY.md) | Report security vulnerabilities |
 | **Code of Conduct** | [CODE_OF_CONDUCT.md](../../CODE_OF_CONDUCT.md) | Community standards |
-| **License** | [LICENSE](../../LICENSE) | MIT open-source license |
+| **License** | [LICENSE](../../LICENSE) | AGPL-3.0 open-source license |
+| **Copyright** | [COPYRIGHT](../../COPYRIGHT) | Copyright notice (Alian Software) |
 
 ## Technology Documentation
 
