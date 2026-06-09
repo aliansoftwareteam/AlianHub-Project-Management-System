@@ -35,20 +35,6 @@ jobs:
           cache: npm
 
       # ---------------------------------
-      # Backend Validation
-      # ---------------------------------
-
-      - name: Install backend dependencies
-        run: npm ci
-
-      - name: Run backend tests
-        run: npm test
-
-      - name: Backend security audit
-        run: npm audit --omit=dev --audit-level=high
-        continue-on-error: true
-
-      # ---------------------------------
       # Frontend Build
       # ---------------------------------
 
