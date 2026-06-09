@@ -41,6 +41,28 @@ Use the format `<type>/<short-kebab-case-description>`:
 Full list of accepted types and examples: [BRANCHING.md § Topic branches](BRANCHING.md#topic-branches).
 
 
+## Commit Message Format
+
+We follow [Conventional Commits](https://www.conventionalcommits.org/) for all commit messages and PR titles. CI enforces this automatically.
+
+**Format:**
+
+```
+<type>(<optional-scope>): <short description>
+```
+
+**Examples:**
+
+- `feat(workload-report): add weekly view`
+- `fix(auth): correct JWT expiry handling`
+- `docs(readme): add Docker quick start`
+- `chore: bump dependencies`
+
+**Accepted types:** `feat`, `fix`, `refactor`, `chore`, `docs`, `perf`, `test`, `ci`, `build`, `style`, `revert`.
+
+See [`commitlint.config.js`](commitlint.config.js) for the full configuration. Run `npm run lint:commits` to check your commits locally before pushing.
+
+
 ## Testing Requirements
 - All new features must include tests where applicable
 - Bug fixes should include regression coverage
