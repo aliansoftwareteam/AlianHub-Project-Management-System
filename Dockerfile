@@ -26,9 +26,14 @@ WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm ci --no-audit --no-fund
 
-# Symlink the brand config so the build can read it
+# Copy the brand config so the build can read it
 COPY brandSettings.json /app/brandSettings.json
 RUN ln -sf /app/brandSettings.json /app/frontend/brandSettings.json
+
+# Copy the root package.json — Header.vue imports {version} from it
+# via a 5-level relative path. Without this, webpack fails with:
+#   "Can't resolve '../../../../../package.json'"
+COPY package.json /app/package.json
 
 # Build the SPA bundle
 COPY frontend/ ./
