@@ -1,8 +1,75 @@
+# ─────────────────────────────────────────────────────────────────────
+# .dockerignore — keep the build context small and don't leak secrets.
+# Matches .gitignore conventions; this file is read by `docker build`.
+# ─────────────────────────────────────────────────────────────────────
+
+# Node
 **/node_modules
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+
+# Build output (the Dockerfile rebuilds this internally)
+**/dist
+**/build
+**/.cache
+
+# Secrets & local env
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+
+# VCS & CI
+.git
+.gitignore
+.gitattributes
+.github
+
+# IDE / editor
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tests & coverage
+tests
+**/__tests__
+**/coverage
+**/.nyc_output
+
+# Logs
+*.log
+logs
+
+# Local storage (mounted as a volume at runtime)
 /storage
-/frontend/node_modules
-/admin/node_modules
+/common-storage/uploads
+
+# Installation artifacts (one-time setup, not needed in image)
+/installation
 /installation-single
 /installation-saas
-/installation
+
+# Documentation / metadata (not used at runtime)
+*.md
+!brandSettings.json
+.claude
+CHANGELOG.md
+
+# Docker files themselves (the Dockerfile is already loaded by Docker)
 Dockerfile
+Dockerfile.*
+.dockerignore
+docker-compose.yml
+docker-compose.*.yml
+
+# Misc
+*.tar.gz
+*.zip

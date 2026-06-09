@@ -3,6 +3,24 @@
     overflow: auto;
     display: contents;
 }
+
+/* Group-header multi-select checkbox: tri-state (none/some/all) — always visible. */
+.group-multi-select {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    margin-right: 6px;
+    cursor: pointer;
+}
+.group-multi-select input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    accent-color: #8591F9;
+    margin: 0;
+}
 .list_view {
     overflow-x: auto;
   }

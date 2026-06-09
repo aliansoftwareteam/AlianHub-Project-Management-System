@@ -1,4 +1,4 @@
-const { resolve } = require('path');
+const path = require('path');
 const {dbCollections} = require('../../Config/collections');
 const logger = require("../../Config/loggerConfig");
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
@@ -6,15 +6,9 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const { updateCommentSprint } = require("../Comments/controller");
 
 const fp = `${__dirname}/`;
-const {writeFile} = require("fs");
 const mongoose = require("mongoose");
 const socketEmitter = require('../../event/socketEventEmitter');
 
-function writeData(fileName, data) {
-    writeFile(`${fp}/${fileName}.json`, JSON.stringify(data, null, 4), (err) => {
-        if(err) throw err;
-    })
-}
 
 exports.changeTaskType = async (req, res) => {
     try {
@@ -60,7 +54,10 @@ exports.changeTaskType = async (req, res) => {
             promisesArr.push(
                 new Promise((resolve1, reject1) => {
                     try {
-                        req.body.taskTypeKey.forEach(async(key) => {
+                        // BUG-017 / #71 fix: body has no `await` (it uses
+                        // .then/.catch on MongoDbCrudOpration), so the
+                        // `async` keyword was misleading. Plain forEach.
+                        req.body.taskTypeKey.forEach((key) => {
                             if(key === task.TaskTypeKey){
                                 let newStatus = req.body.oldTaskType.filter((y) => y.key === key)[0]?.convertType;
                                 if(newStatus){
@@ -157,11 +154,16 @@ exports.changeTaskStatus = async (req, res) => {
                 tasks.push(x)
             })
         })
-        tasks.forEach(async(task) => {
+        // BUG-017 / #71 fix: this outer forEach only pushes synchronously
+        // constructed Promise objects, no `await` — drop the `async`.
+        tasks.forEach((task) => {
             promisesArr.push(
                 new Promise((resolve, reject) => {
                     try {
-                        req.body.taskStatusKey.forEach(async(key) => {
+                        // BUG-017 / #71 fix: same shape as the changeTaskType
+                        // version above — inner body uses .then/.catch, no
+                        // `await`, so `async` is misleading.
+                        req.body.taskStatusKey.forEach((key) => {
                             if(key === task.statusKey){
                                 let newStatus = req.body.oldTaskStatus.filter((y) => y.key === key)[0]?.convertStatus;
                                 if(newStatus){
@@ -239,11 +241,10 @@ async function batchUpdate(updateArray, cid) {
 
             let results = []
             const loopFun = () => {
-                console.log("TOTAL: ", count, "/", updateArray.length, "==", ((count * 100) / updateArray.length).toFixed(2));
+                logger.info(`TOTAL: ${count} / ${updateArray.length} == ${((count * 100) / updateArray.length).toFixed(2)}`);
                 if(count >= updateArray.length) {
-                    writeData(`updateArray`, results)
                     resolve(results)
-                    console.log("END");
+                    logger.info("END");
                     return;
                 } else {
                     try {
@@ -280,7 +281,7 @@ async function batchUpdate(updateArray, cid) {
                         Promise.allSettled(promises)
                         .then((result) => {
                             result.filter((x) => x.status === "rejected").forEach((x) => {
-                                console.log(`UPDATE failed for: ${x}`)
+                                logger.warn(`UPDATE failed for: ${x}`)
                             })
                             results = [...results, ...result]
                             setTimeout(() => {
@@ -288,7 +289,7 @@ async function batchUpdate(updateArray, cid) {
                             }, 200);
                         })
                         .catch((error) => {
-                            console.log(`UPDATE failed batch: ${batch} > ${error.message}`);
+                            logger.error(`UPDATE failed batch: ${batch} > ${error.message}`);
                             next();
                         })
                     } catch (e) {
@@ -308,38 +309,40 @@ exports.migrateSprintsFun = async (req, res) => {
         let projects = await MongoDbCrudOpration(req.body.companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{}] }, "find");
         let mainChat = await MongoDbCrudOpration(req.body.companyId, { type: SCHEMA_TYPE.MAIN_CHATS, data: [{}] }, "find");
         projects = projects.concat(mainChat);
-        console.log(projects.length,"length");
+        logger.info(`projects length: ${projects.length}`);
 
-        let promisesArr = [];
-        let count = 0;
-        let countFunction = (project) => {
-            if (count >= projects.length) {
-                resolve();
-                console.log(`END PROJECT`);
-                return;
-            } else {
-                promisesArr.push(
-                    exports.migrateProject(project,req.body.companyId).then(() => {
-                        count++;
-                        countFunction(projects[count]);
-                    }).catch((error) => {
-                        console.error(error,`error in migrateProject ${project._id}`)
+        // Process projects sequentially and collect all promises
+        const migrateAll = () => new Promise((resolveMigration) => {
+            let count = 0;
+            const countFunction = (project) => {
+                if (count >= projects.length) {
+                    logger.info('END PROJECT');
+                    resolveMigration();
+                    return;
+                }
+                exports.migrateProject(project, req.body.companyId)
+                    .then(() => {
                         count++;
                         countFunction(projects[count]);
                     })
-                )
-            }
-        }
-        countFunction(projects[count]);
-        await Promise.allSettled(promisesArr).then(() => {
+                    .catch((error) => {
+                        console.error(error, `error in migrateProject ${project?._id}`);
+                        count++;
+                        countFunction(projects[count]);
+                    });
+            };
+            countFunction(projects[count]);
+        });
+
+        await migrateAll().then(() => {
             res.send({ status: true, statusText: "done"});
         }).catch((error) => {
-            console.log(`Error in Promise Project ${project._id}: ${error}`);
+            logger.error(`Error in migration Promise: ${error}`);
         });
 
     } catch (error) {
         res.send({ status: false, statusText: error});
-        console.log(`Error in migration : ${error}`);
+        logger.error(`Error in migration : ${error}`);
     }
 };
 
@@ -364,7 +367,7 @@ exports.migrateProject = (project,companyId) => {
             let myArr = [...folders]
             folderPromise.push(batchUpdate(myArr, companyId));
             Promise.allSettled(folderPromise).then((response) => {
-                console.log(`FOLDER UPDATE END ${project._id}`);
+                logger.info(`FOLDER UPDATE END ${project._id}`);
                 let updatedFolders = response[0].value.map((result) => result.value);
                 sprints = sprints.map(sprint => {
                     let sprintObj = {
@@ -390,12 +393,12 @@ exports.migrateProject = (project,companyId) => {
                     Promise.allSettled([exports.updateTaksSprints(JSON.parse(JSON.stringify(project._id)),companyId),exports.updateTaksFolders(JSON.parse(JSON.stringify(project._id)),companyId), updateCommentSprint(JSON.parse(JSON.stringify(project._id)),companyId)]).then(() => {
                         resolve();
                     }).catch((error) => {
-                        console.log("Erro in update sprint and folders task");
+                        logger.error("Error in update sprint and folders task");
                         reject(error);
                     })
                 })
             }).catch((error) => {
-                console.log(`Error in Promise folder and sprint: ${error}`);
+                logger.error(`Error in Promise folder and sprint: ${error}`);
             });
         } catch (error) {
             reject(error);
@@ -424,9 +427,9 @@ exports.updateTaksSprints = (projectId,companyId) => {
                             ]
                         }
                         const promise =  MongoDbCrudOpration(companyId,updateObj,"updateMany").then(() => {
-                            console.log("IF DONE updateTaksSprints");
+                            logger.info("IF DONE updateTaksSprints");
                         }).catch((err) => {
-                            console.log(err,"ERROR IN IF UPDATE MANY");
+                            logger.error(`ERROR IN IF UPDATE MANY: ${err}`);
                         })
                         updatePromises.push(promise);
                     }else{
@@ -438,9 +441,9 @@ exports.updateTaksSprints = (projectId,companyId) => {
                             ]
                         }
                         const promise =  MongoDbCrudOpration(companyId,uObj,"updateMany").then(() => {
-                            console.log("ELSE DONE updateTaksSprints");
+                            logger.info("ELSE DONE updateTaksSprints");
                         }).catch((err) => {
-                            console.log(err,"ERROR IN ELSE UPDATE MANY");
+                            logger.error(`ERROR IN ELSE UPDATE MANY: ${err}`);
                         })
                         updatePromises.push(promise);
                     }
@@ -449,11 +452,11 @@ exports.updateTaksSprints = (projectId,companyId) => {
             Promise.allSettled(updatePromises).then(() => {
                 resolve();
             }).catch((error) => {
-                console.log(error,"ERROR IN ALL SETTLED");
+                logger.error(`ERROR IN ALL SETTLED: ${error}`);
                 reject();
             });
         } catch (error) {
-            console.log(error,"ERROR IN UPDATE SPRINTS:");
+            logger.error(`ERROR IN UPDATE SPRINTS: ${error}`);
             reject();
         }
     })
@@ -480,9 +483,9 @@ exports.updateTaksFolders = (projectId,companyId) => {
                             ]
                         }
                         const promise =  MongoDbCrudOpration(companyId,updateObj,"updateMany").then(() => {
-                            console.log("IF DONE updateTaksFolders");
+                            logger.info("IF DONE updateTaksFolders");
                         }).catch((err) => {
-                            console.log(err,"ERROR IN IF UPDATE MANY");
+                            logger.error(`ERROR IN IF UPDATE MANY: ${err}`);
                         })
                         updatePromises.push(promise);
                     }
@@ -491,12 +494,12 @@ exports.updateTaksFolders = (projectId,companyId) => {
             Promise.allSettled(updatePromises).then(() => {
                 resolve();
             }).catch((error) => {
-                console.log(error,"ERROR IN ALL SETTLED");
+                logger.error(`ERROR IN ALL SETTLED: ${error}`);
                 reject();
             });
         } catch (error) {
             reject();
-            console.log(error,"ERROR IN UPDATE FOLDERS:");
+            logger.error(`ERROR IN UPDATE FOLDERS: ${error}`);
         }
     })
 }

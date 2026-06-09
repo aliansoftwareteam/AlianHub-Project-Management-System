@@ -1,6 +1,7 @@
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration,validateObjectId } = require("../../../utils/mongo-handler/mongoQueries");
 const { mongoose } = require("mongoose");
+const logger = require("../../../Config/loggerConfig");
 
 
 exports.getDefaultSprintData = (uid, query, companyId, projectId, roleType) => {
@@ -135,11 +136,17 @@ exports.getSprintFolder = async (req,res) => {
 
         if (req.query.collection) {
             if (req.query.collection === 'sprints' || req.query.collection === 'folders') {
-                if (req.query.count) {          
+                if (req.query.count) {
                     let data = [
                         {
                             $match: {
-                                projectId: new mongoose.Types.ObjectId(projectId)
+                                projectId: new mongoose.Types.ObjectId(projectId),
+                                // BUG-032 / #86 fix: count was including
+                                // soft-deleted sprints/folders, which made the
+                                // sidebar counters disagree with the actual
+                                // list (the list-rendering branches below use
+                                // `deletedStatusKey: { $nin: [1] }`).
+                                deletedStatusKey: { $nin: [1] }
                             }
                         },
                     ]
@@ -171,8 +178,7 @@ exports.getSprintFolder = async (req,res) => {
                         exports.getDefaultSprintData(uid,req.query,companyId,projectId, roleType).then((ele)=>{
                             res.status(200).json(ele);
                         }).catch((error)=>{
-                            console.log(error);
-                            
+                            logger.error(`${error}`);
                             res.status(400).json({error: error});
                         })
                     } else if (req.query.collection === 'folders') {

@@ -127,3 +127,58 @@
     .task-detail-right-side-label h4{width: 35%;font-size: 16px;font-weight: 400;}
     .taskdetail-label, .task-esitmate-hours{font-size: 16px !important;padding-right: 0 !important;}
 }
+
+/* AI-estimate icon button — sits inline with the EstimatedTimeInput on
+   the right of the "Estimated" row. Sized to match the inline time
+   value's visual height (24px) so the row stays balanced. */
+.estimated-with-ai {
+    gap: 6px;
+}
+.ai-estimate-btn {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.15s ease-in-out;
+}
+.ai-estimate-btn:hover:not(:disabled) {
+    background-color: rgba(100, 115, 232, 0.10);
+}
+.ai-estimate-btn:disabled {
+    cursor: progress;
+    opacity: 0.75;
+}
+.ai-estimate-icon {
+    width: 16px;
+    height: 16px;
+    pointer-events: none;
+}
+/* Inline ring spinner. The `.task-detail-right-side-label span` rule
+   above (lines 25-35) targets every <span> inside the label container
+   and forces height/padding/border-radius/line-height on it — which
+   squashes the spinner into a pill if we don't override it. We bump
+   specificity with the `.ai-estimate-btn` ancestor selector (which
+   wins against the bare-element rule) and explicitly reset every
+   property the parent rule touches. */
+.ai-estimate-btn .ai-estimate-spinner {
+    display: inline-block;
+    box-sizing: border-box;
+    width: 14px;
+    height: 14px;
+    padding: 0;
+    line-height: 0;
+    border: 2px solid #E2E6FA;
+    border-top-color: #6473E8;
+    border-radius: 50%;
+    font-size: 0;
+    animation: ai-estimate-spin 0.7s linear infinite;
+}
+@keyframes ai-estimate-spin {
+    to { transform: rotate(360deg); }
+}

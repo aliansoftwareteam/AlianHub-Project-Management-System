@@ -2,18 +2,93 @@ const express = require("express");
 const fs = require("fs");
 var cors = require('cors');
 const path = require('path');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+
+// Global error handlers — catch crashes and log before Render kills the process
+process.on('uncaughtException', (err) => {
+    console.error('[FATAL] uncaughtException:', err.message);
+    console.error(err.stack);
+    process.exit(1);
+});
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('[FATAL] unhandledRejection at:', promise);
+    console.error('[FATAL] Reason:', reason);
+    process.exit(1);
+});
 const bodyParser = require("body-parser");
 const config =  require('./Config/config.js');
 const awsRef =  require('./Config/aws.js');
 const logger = require("./Config/loggerConfig");
 const packJOSNData = require("./package.json");
 const { makeDefaultBrandSettings } = require("./Modules/Admin/common/controller.js");
+const { corsOriginDelegate } = require('./utils/cors.js');
 
 const app = express();
-app.use(cors({origin: '*'}));
-app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
-app.use(bodyParser.json({limit: '50mb'}));
-app.use(bodyParser.raw({limit: '50mb'}));
+// Trust the loopback proxy by default so X-Forwarded-For is honored when
+// nginx (or any same-host reverse proxy) sits in front of the Node
+// process. Without this, express-rate-limit logs
+// ERR_ERL_UNEXPECTED_X_FORWARDED_FOR and may key all clients by the
+// proxy IP. Override via TRUST_PROXY env (e.g. "1" for one upstream, or
+// "true" for any). Safe in dev because requests from outside loopback
+// fall back to req.connection.remoteAddress.
+// app.set('trust proxy', process.env.TRUST_PROXY || 'loopback');
+
+// CORS — BUG-002 / #56. Replace wildcard with an env-driven allow-list.
+// See utils/cors.js for the exact rules and supported env vars.
+app.use(cors({ origin: corsOriginDelegate }));
+
+// Security headers. CSP is intentionally disabled — the Vue frontend uses
+// inline scripts/styles in production. crossOriginEmbedderPolicy is off so
+// existing third-party embeds keep working. Everything else (HSTS,
+// X-Content-Type-Options, X-Frame-Options, Referrer-Policy, etc.) is on
+// with helmet defaults.
+// app.use(helmet({
+//     contentSecurityPolicy: false,
+//     crossOriginEmbedderPolicy: false,
+//     crossOriginResourcePolicy: { policy: 'cross-origin' },
+// }));
+
+// Global rate limiting. Counts only API traffic — static assets and
+// socket.io are skipped so SPA cold-loads can't trip the limit. Set
+// GLOBAL_RATE_LIMIT_PER_MIN=0 (or "off"/"false") to disable entirely;
+// useful for internal deployments where auth-level brute-force
+// protection (Modules/Auth/helper.js#manageResetAttempt) is enough.
+// const rawGlobalLimit = String(process.env.GLOBAL_RATE_LIMIT_PER_MIN ?? '10000').trim().toLowerCase();
+// const rateLimitDisabled = ['0', 'off', 'false', 'no', 'disabled'].includes(rawGlobalLimit);
+
+// if (!rateLimitDisabled) {
+//     const GLOBAL_RATE_LIMIT = Math.max(1, Number(rawGlobalLimit) || 10000);
+//     const STATIC_ASSET_RX = /\.(js|mjs|css|map|svg|png|jpe?g|gif|ico|webp|avif|woff2?|ttf|otf|eot|html?|mp4|webm|mp3|wav|pdf)$/i;
+
+//     app.use(rateLimit({
+//         windowMs: 60 * 1000,
+//         max: GLOBAL_RATE_LIMIT,
+//         standardHeaders: true,
+//         legacyHeaders: false,
+//         // Don't count anything that isn't a real API call. Socket.io has
+//         // its own throttling; static assets are not a DoS vector here.
+//         skip: (req) => {
+//             if (req.path.startsWith('/socket.io/')) return true;
+//             if (STATIC_ASSET_RX.test(req.path)) return true;
+//             if (req.path === '/' || req.path.startsWith('/assets/') || req.path.startsWith('/static/')) return true;
+//             return false;
+//         },
+//     }));
+// }
+// BUG-037 / #91 — body limits.
+// Previously every endpoint accepted 50MB JSON/url-encoded/raw bodies,
+// so any unauthenticated POST could spend the request loop buffering
+// 50MB before validation even runs. Drop the default to 2MB (well above
+// typical JSON payloads — comments, settings, project data — but blocks
+// the trivial multi-MB DoS). File uploads use `multer` and have their
+// own limits (see Modules/storage/**), so this only constrains
+// body-parser-handled paths. Operators with bulk-import or large-form
+// use cases can raise it via the `BODY_LIMIT` env var.
+const BODY_LIMIT = process.env.BODY_LIMIT || '2mb';
+app.use(bodyParser.urlencoded({ extended: true, limit: BODY_LIMIT }));
+app.use(bodyParser.json({ limit: BODY_LIMIT }));
+app.use(bodyParser.raw({ limit: BODY_LIMIT }));
 
 // Set Maintenance Mode
 if (!config.UNDER_MAINTENANCE || config.UNDER_MAINTENANCE == "false") {
@@ -98,13 +173,13 @@ function initializeControllers() {
         }
     })
     //IMPORT CUSTOM FILES
-    require('./Modules/auth/init').init(app);
+    require('./Modules/Auth/init').init(app);
     require('./Modules/notification1/init').init(app);
-    require('./Modules/import_settings/init').init(app);
-    require('./Modules/tasks/init.js').init(app);
-    require('./Modules/sprints/init.js').init(app);
-    require('./Modules/logTime/init.js').init(app);
-    require('./Modules/milestone/init.js').init(app);
+    require('./Modules/ImportSettings/init').init(app);
+    require('./Modules/Tasks/init.js').init(app);
+    require('./Modules/Sprints/init.js').init(app);
+    require('./Modules/LogTime/init.js').init(app);
+    require('./Modules/Milestone/init.js').init(app);
     require('./Modules/Company/init.js').init(app);
     require('./Modules/trackerDownload/init.js').init(app);
     require('./Modules/notification/notification-middleware/init').init(app);
@@ -115,26 +190,27 @@ function initializeControllers() {
     require('./Modules/notification-count/init').init(app);
     require('./Modules/notification/sendEmail/init').init(app);
     require('./Modules/trackerUserPermission/init').init(app);
-    require('./Modules/checkinstallstep/init').init(app);
     require('./Modules/SaasAdmin/init').init(app);
+    require('./Modules/ScreenshotRetention/init').init(app);
     if(process.env.NODE_ENV === "production") {
         require('./cron.js')
     }
     require('./Modules/Admin/admin.js').init(app);
     require('./Modules/emailTemplate/init').init(app);
-    require('./Modules/email-notification/init').init(app);
+    require('./Modules/EmailNotification/init').init(app);
     require(`./Modules/storage/${currentDirectory}/init`).init(app);
     require('./Modules/AI/init').init(app);
-    require('./Modules/usersModule/init').init(app);
+    require('./Modules/AIProjectGenerator/init').init(app);
+    require('./Modules/Users/init').init(app);
     require('./Modules/Project/init').init(app);
     require('./Modules/Teams/init').init(app);
     require('./Modules/tours/init').init(app);
-    require('./Modules/AdvanceGlobalFilter/init.js').init(app);
+    require('./Modules/AdvancedGlobalFilter/init.js').init(app);
     require('./Modules/settings/settingCurrency/init').init(app);
     require('./Modules/settings/settingNotifications/init').init(app);
     require('./Modules/projectRules/init').init(app);
     require('./Modules/EstimatedTime/init').init(app);
-    require('./Modules/customField/init').init(app);
+    require('./Modules/CustomField/init').init(app);
     require('./Modules/ProjectTemplates/init').init(app);
     require('./Modules/settings/templates/init').init(app);
     require('./Modules/settings/ProjectStatusTemplate/init').init(app);
@@ -160,20 +236,15 @@ function initializeControllers() {
     require('./Modules/MediaFiles/init').init(app);
     require("./Modules/SubscriptionPlan/init").init(app);
     require("./Modules/subscription/init").init(app);
-    require("./Modules/PlaneFeature/init").init(app);
+    require("./Modules/PlanFeature/init").init(app);
     require("./Modules/Invoice/init").init(app);
     require("./Modules/generateMongoId/init").init(app);
     require("./Modules/UserDashboard/init.js").init(app);
-    require("./Modules/affiliate/init").init(app);
-    require("./Modules/oAuth/init.js").init(app);
+    require("./Modules/Affiliate/init").init(app);
+    require("./Modules/OAuth/init.js").init(app);
     require("./Modules/githubOAuth/init.js").init(app);
     require("./Modules/googleOAuth/init.js").init(app);
 }
-
-// FIRES EVENT WHEN THE ENV IS UPDATED
-fs.watchFile(__dirname+'/.env', () => {
-    initializeControllers();
-})
 
 // SET MIDDLEWARE
 // require('./Config/setMiddleware.js').setMiddlewareWithC(app);
@@ -194,7 +265,7 @@ if (!process.env.STORAGE_TYPE) {
     process.env.STORAGE_TYPE = "wasabi";
 }
 
-require('./Modules/checkinstallstep/init').init(app);
+require('./Modules/CheckInstallStep/init').init(app);
 
 // SWAGGER CONFIGURATION
 require('./Modules/swaggerAPI/init').init(app, config.APIURL);

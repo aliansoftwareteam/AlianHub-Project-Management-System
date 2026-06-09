@@ -6,6 +6,7 @@ const loggerConfig = require('../../../../Config/loggerConfig');
 const { default: mongoose } = require("mongoose");
 const { SCHEMA_TYPE } = require('../../../../Config/schemaType');
 const thumbnailArray = require('../../../../thumbnail.json');
+const { guardFile, guardBuffer } = require('../../../../utils/imageGuard.js');
 
 exports.iconsThumbnailGenerator = (fpath,companyId,file,bufferString,fileNameWithRan,thumbnailKey) => {
     return new Promise((resolve, reject) => {
@@ -176,28 +177,38 @@ exports.formatBucketSize = (size, unit) => {
     }
 }
 
-async function copyFile(source, destination) {
-    try {
-        await fs.cp(source, destination,(err, data) => {
+// BUG-017 / #71: this helper used `await fs.cp(source, destination, callback)`,
+// but `fs.cp` is callback-style and returns `undefined` — `await undefined`
+// resolves immediately, so the function returned before the copy was done.
+// That made the surrounding `Promise.allSettled(imageArray.map(...))` fix
+// in `uploadIamgesInStorage` toothless on its own. Promisify the callback
+// here so the awaits up the chain actually wait.
+function copyFile(source, destination) {
+    return new Promise((resolve) => {
+        fs.cp(source, destination, (err) => {
             if (err) {
                 loggerConfig.error('Error copying file:', err);
             } else {
                 loggerConfig.info('File copied successfully');
             }
+            resolve();
         });
-    } catch (error) {
-        loggerConfig.error('Error copying file:', error);
-    }
+    });
 }
 exports.uploadIamgesInStorage = (imageArray,companyId) => {
     return new Promise(async (resolve, reject) => {
         try {
-            imageArray.forEach(async(x)=>{
+            // BUG-017 / #71 fix: the previous `imageArray.forEach(async ...)`
+            // didn't wait for the copyFile awaits, so `resolve()` fired
+            // before any file had finished copying. Use `Promise.allSettled`
+            // so independent copies run in parallel and a single failure
+            // doesn't abort the batch.
+            await Promise.allSettled(imageArray.map(async (x) => {
                 const destPath = path.join(__dirname, '../../../../storage', companyId, x.path);
                 const srcPath = path.join(__dirname, '/../../../../wasabiUploadsLocal', x.filePath);
-                await copyFile(srcPath,destPath)
-            });
-            resolve()
+                await copyFile(srcPath, destPath);
+            }));
+            resolve();
         } catch (error) {
             reject(error);
         }
@@ -399,29 +410,46 @@ exports.getBucketSizeStorage = () => {
     })
 }
 
-// FILE 
+// FILE
 const multer = require('multer');
 const jwt = require('jsonwebtoken');
 const sharp = require('sharp');
 const { updateCompanyFun, getCompanyDataFun } = require('../../../Company/controller/updateCompany');
+const { DEFAULT_LIMITS, safeFileFilter, safeRelativePath } = require('../../../../utils/uploadConfig');
 
 const storage = multer.diskStorage({
     destination: function (req, _, cb) {
         const { path: filepath, companyId: bucketId } = req.body;
+        const safePath = safeRelativePath(filepath);
+        const safeBucket = safeRelativePath(bucketId);
+        if (!safePath || !safeBucket) {
+            return cb(new Error('Invalid upload path'));
+        }
 
-        const dir = path.join(__dirname, '../../../../storage', bucketId ,filepath.split('/').slice(0, -1).join('/'));
+        const dir = path.join(__dirname, '../../../../storage', safeBucket, safePath.split('/').slice(0, -1).join('/'));
 
         fs.mkdirSync(dir, { recursive: true });
 
         cb(null, dir);
     },
     filename: function (req, _, cb) {
-        let fileNameFromPath = req.body.path.split('/').pop();
+        const safePath = safeRelativePath(req.body.path);
+        if (!safePath) {
+            return cb(new Error('Invalid upload path'));
+        }
+        const fileNameFromPath = path.basename(safePath);
+        if (!fileNameFromPath || fileNameFromPath === '..') {
+            return cb(new Error('Invalid filename'));
+        }
         cb(null, fileNameFromPath);
     }
 });
 exports.storageRef = storage;
-exports.upload = multer({  storage });
+exports.upload = multer({
+    storage,
+    limits: DEFAULT_LIMITS,
+    fileFilter: safeFileFilter,
+});
 
 exports.validatePath = async(req, res, next) => {
     const { path: filepath, companyId: bucketId } = req.body;
@@ -497,6 +525,9 @@ exports.uploadStorageThumbnailFile = async (filePath, x, y, companyId, file) => 
     try {
         fs.mkdirSync(outputDir, { recursive: true });
 
+        // BUG-023 / #77 fix: validate size + dimensions before sharp.
+        await guardFile(file.path);
+
         await sharp(file.path)
             .resize(x, y)
             .toFile(outputFile);
@@ -524,8 +555,12 @@ exports.uploadStorageThumbnailFilev2 = async (filePath, x, y, companyId, file,bu
         let sharpInstance;
         if (bufferString) {
             const buffer = Buffer.from(bufferString, 'base64');
+            // BUG-023 / #77 fix: validate size + dimensions before sharp.
+            await guardBuffer(buffer);
             sharpInstance = sharp(buffer);
         } else {
+            // BUG-023 / #77 fix: validate size + dimensions before sharp.
+            await guardFile(file.path);
             sharpInstance = sharp(file.path);
         }
 

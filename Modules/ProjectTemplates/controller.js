@@ -71,7 +71,7 @@ exports.deleteTemplate = async (req, res) => {
         if (response) {
             return res.status(200).json({ status: true });
         } else {
-            return res.status(404).json({ tatus: false });
+            return res.status(404).json({ status: false });
         }
 
     } catch (error) {
@@ -352,7 +352,7 @@ exports.createTemplateWithAI = async (req, res) => {
         return res.status(200).json({ status: true, data: result || {} });
     } catch (error) {
         console.error("Error in createTemplateWithAI hook => ", error)
-        if (error.response.data?.error?.type === 'invalid_request_error') {
+        if (error.response?.data?.error?.type === 'invalid_request_error') {
             return res.status(400).json({
                 message: "AI is not integrated in your system",
                 error: "AI is not integrated in your system"

@@ -1,0 +1,17 @@
+
+=== mainChatCacheKey — shape + parity ===
+  PASS  helper is exported
+  PASS  helper produces `mainChat:<companyId>`
+
+=== updateMainChat invalidates the key the setter wrote ===
+  PASS  seed: cache hit before update
+  PASS  after update: cache entry for companyId is invalidated
+  PASS  companyId-keyed entry is invalidated
+
+=== source — broken JSON.parse(JSON.stringify(...)) pattern is gone ===
+  PASS  no executable JSON.parse(JSON.stringify(result))?._id pattern
+  PASS  source uses the shared mainChatCacheKey helper
+
+========================================
+Tests: 7 | Passed: 7 | Failed: 0
+========================================

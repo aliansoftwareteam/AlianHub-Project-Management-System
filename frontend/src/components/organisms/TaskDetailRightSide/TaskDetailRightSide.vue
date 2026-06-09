@@ -54,23 +54,50 @@
             <div class="d-flex task-detail-right-side-label">
                 <h4>{{$t('Comment.created_by')}}</h4>
                 <Skelaton v-if="!task?.Task_Leader && isMainSpinner" style="height: 30px;" class="w-30px border-radius-50-per"/>
-                <div v-else class="d-flex align-items-center">
-                    <UserProfile
-                        :data="{
-                            image: taskLeaderData.Employee_profileImageURL, 
-                            title: taskLeaderData.Employee_Name
-                        }"
-                        :showDot="false"
-                        width="30px"
-                        :thumbnail="'30x30'"
-                    />
-                    <span 
-                        class="black text-ellipsis task-created-by" 
-                        :class="{'font-size-13 font-weight-400' : clientWidth > 767, 'font-size-16' : clientWidth <=767}"
-                        :title="taskLeaderData?.Employee_Name || 'N/A'">
-                        {{ taskLeaderData?.Employee_Name || 'N/A' }}
-                    </span>
-                </div>
+                <template v-else>
+                    <!-- Editable picker — gated by the same permission as Assignee. -->
+                    <div
+                        v-if="checkPermission('task.task_assignee',project?.isGlobalPermission) === true && checkPermission('task.task_list',project?.isGlobalPermission) == true"
+                        class="d-flex align-items-center"
+                    >
+                        <Assignee
+                            :numOfUsers="1"
+                            :users="task.Task_Leader ? [task.Task_Leader] : []"
+                            :addUser="true"
+                            :options="permittedOptions"
+                            @selected="updateTaskLeader($event)"
+                            imageWidth="30px"
+                            :showAddUser="false"
+                            :zIndexAssigne="props.zIndexAssigne"
+                            :isDisplayTeam="false"
+                            :multiSelect="false"
+                        />
+                        <span
+                            class="black text-ellipsis task-created-by ml-5px"
+                            :class="{'font-size-13 font-weight-400' : clientWidth > 767, 'font-size-16' : clientWidth <=767}"
+                            :title="taskLeaderData?.Employee_Name || 'N/A'">
+                            {{ taskLeaderData?.Employee_Name || 'N/A' }}
+                        </span>
+                    </div>
+                    <!-- Read-only display — original behaviour for users without permission. -->
+                    <div v-else class="d-flex align-items-center">
+                        <UserProfile
+                            :data="{
+                                image: taskLeaderData.Employee_profileImageURL,
+                                title: taskLeaderData.Employee_Name
+                            }"
+                            :showDot="false"
+                            width="30px"
+                            :thumbnail="'30x30'"
+                        />
+                        <span
+                            class="black text-ellipsis task-created-by"
+                            :class="{'font-size-13 font-weight-400' : clientWidth > 767, 'font-size-16' : clientWidth <=767}"
+                            :title="taskLeaderData?.Employee_Name || 'N/A'">
+                            {{ taskLeaderData?.Employee_Name || 'N/A' }}
+                        </span>
+                    </div>
+                </template>
             </div>
             <div class="d-flex task-detail-right-side-label" v-if="checkPermission('task.task_priority',project?.isGlobalPermission) !== null && checkApps('Priority')">
                 <h4>{{$t('Projects.priority')}}</h4>
@@ -127,11 +154,32 @@
              <div class="d-flex task-detail-right-side-label" v-if="checkApps('TimeEstimates') && checkPermission('task.task_estimated_hours',project?.isGlobalPermission) !== null">
                 <h4>{{$t('UserTimesheet.estimated')}}</h4>
                 <Skelaton v-if="isMainSpinner" style="height: 24px;" class="w-100px border-radius-7-px"/>
-                <EstimatedTimeInput
-                    v-if="Object.keys(task || {}).length && !isMainSpinner"
-                    :task="task"
-                    @update:totalEstimatedTime="(val) => updateTotalEstimatedTime(val)"
-                />
+                <div v-if="Object.keys(task || {}).length && !isMainSpinner" class="d-flex align-items-center estimated-with-ai">
+                    <EstimatedTimeInput
+                        :task="task"
+                        @update:totalEstimatedTime="(val) => updateTotalEstimatedTime(val)"
+                    />
+                    <!--
+                      Icon-only AI estimator trigger. Tooltip via the native
+                      title attribute matches the project's existing tooltip
+                      convention (see BulkActionBar.vue / CheckList.vue).
+                      Disabled + spinner state while a request is in flight.
+                      Shown whenever the Estimated row is visible — the per-user
+                      edit-permission gate (`=== true`) was removed on request.
+                    -->
+                    <button
+                        type="button"
+                        class="ai-estimate-btn"
+                        :class="{ 'is-loading': isAiEstimateLoading }"
+                        :disabled="isAiEstimateLoading"
+                        :title="isAiEstimateLoading ? 'Generating estimate…' : 'Generate estimate using AI'"
+                        :aria-label="isAiEstimateLoading ? 'Generating estimate' : 'Generate estimate using AI'"
+                        @click.stop="generateAiEstimate"
+                    >
+                        <span v-if="isAiEstimateLoading" class="ai-estimate-spinner" aria-hidden="true"></span>
+                        <img v-else :src="aiEstimateIcon" alt="" class="ai-estimate-icon" />
+                    </button>
+                </div>
             </div>
             <div class="d-flex task-detail-right-side-label" v-if="checkApps('TimeEstimates') && checkPermission('task.task_estimated_hours',project?.isGlobalPermission) !== null">
                 <h4>{{$t('UserTimesheet.task_planning')}}</h4>
@@ -173,6 +221,13 @@ import { taskDueDateAdd, taskDueDateChange } from '@/utils/NotificationTemplate'
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from "vue-i18n";
 import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
+import { apiRequest } from '@/services';
+import * as env from '@/config/env';
+
+// Icon for the "Generate estimate using AI" sidebar button. Same asset
+// the SubTasks / Checklist / Sprints components use for their AI actions
+// so the visual language stays consistent.
+const aiEstimateIcon = require("@/assets/images/svg/ai_image.svg");
 const { t } = useI18n();
 
 const {convertDateFormat} = useConvertDate();
@@ -226,6 +281,9 @@ const props = defineProps({
 const taskLeaderData = ref(getUser(props.task?.Task_Leader));
 const assigneeInProgress = ref({});
 const isSpinner = ref(false);
+// In-flight flag for the manual AI-estimate request — drives both the
+// button's spinner state and the click-debounce.
+const isAiEstimateLoading = ref(false);
 watch(() => props.task,(val) => {
     taskLeaderData.value = getUser(val?.Task_Leader);
 });
@@ -354,6 +412,44 @@ const updateAssignee = (event, type) =>{
     } catch (error) {
         console.error(error);
         $toast.error(t('Toast.Assignee_not_updated'),{position: 'top-right'});
+    }
+}
+
+const updateTaskLeader = (event) => {
+    try {
+        if (!event || !event.id) return;
+        if (event.id === props.task.Task_Leader) return;
+        const userData = getUserData();
+
+        const updateObject = {
+            Task_Leader: event.id
+        }
+
+        const projectData = {
+            _id: project.value._id,
+            CompanyId: project.value.CompanyId,
+            lastTaskId: project.value.lastTaskId,
+            ProjectName: project.value.ProjectName,
+            ProjectCode: project.value.ProjectCode
+        }
+
+        taskClass.updateTaskLeader({
+            firebaseObj: updateObject,
+            projectData: projectData,
+            taskData: props.task,
+            employeeName: getUser(event.id).Employee_Name,
+            userData
+        })
+        .then(() => {
+            $toast.success(t('Toast.Created_by_updated_successfully'), { position: 'top-right' });
+        })
+        .catch((error) => {
+            console.error("ERROR in updateTaskLeader: ", error);
+            $toast.error(t('Toast.Created_by_not_updated'), { position: 'top-right' });
+        })
+    } catch (error) {
+        console.error(error);
+        $toast.error(t('Toast.Created_by_not_updated'), { position: 'top-right' });
     }
 }
 
@@ -595,6 +691,47 @@ const displayTime = (time) => {
   const hours = Math.floor(totalMinutes / 60)
   const minutes = totalMinutes % 60
   return `${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m`
+}
+
+// Manual AI-estimate trigger. Posts to the EstimatedTime route which
+// loads the canonical task doc server-side, runs the LLM estimator with
+// force=true (so it overwrites any existing value), persists to
+// `totalEstimatedTime`, and emits a Socket.io `task` update — so other
+// connected clients see the new value without a refresh. We don't need
+// to patch local state here because the socket update flows back through
+// the same channel that drives `props.task`.
+const generateAiEstimate = async () => {
+    if (isAiEstimateLoading.value) return;
+    const taskId = props.task && props.task._id;
+    if (!taskId) {
+        $toast.error('Task is not available', { position: 'top-right' });
+        return;
+    }
+    isAiEstimateLoading.value = true;
+    try {
+        // Send the logged-in user so the estimator can attribute the
+        // "updated estimated time" activity-log entry to whoever clicked
+        // (and so the required HISTORY.UserId is never blank).
+        const userData = getUserData();
+        const response = await apiRequest('post', `${env.ESTIMATED_TIME}/ai/${taskId}`, {
+            userName: userData.Employee_Name,
+            userId: userData.id,
+        });
+        if (response && response.data && response.data.status) {
+            $toast.success('Estimate generated', { position: 'top-right' });
+        } else {
+            const msg = (response && response.data && response.data.statusText)
+                || 'Could not generate estimate';
+            $toast.error(msg, { position: 'top-right' });
+        }
+    } catch (err) {
+        const msg = (err && err.response && err.response.data && err.response.data.statusText)
+            || (err && err.message)
+            || 'Could not generate estimate';
+        $toast.error(msg, { position: 'top-right' });
+    } finally {
+        isAiEstimateLoading.value = false;
+    }
 }
 </script>
 <style scoped src='./style.css'>

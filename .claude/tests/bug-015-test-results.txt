@@ -1,0 +1,48 @@
+
+=== updateStatus — DB write happens, then side effects, then resolve ===
+  PASS  updateStatus resolves successfully
+  PASS  updateStatus: DB call happened
+  PASS  updateStatus: history was awaited BEFORE resolve
+  PASS  updateStatus: notification was awaited BEFORE resolve
+
+=== updateStatus — side-effect failure does NOT reject ===
+  PASS  updateStatus still resolves when side effects fail
+
+=== updateStatus — DB failure DOES reject ===
+  PASS  updateStatus rejects when the DB write fails
+  PASS  history NOT called when DB failed
+  PASS  notification NOT called when DB failed
+
+=== updateStatus — isUpdateTask:false fires side effects, no DB ===
+  PASS  resolves with success
+  PASS  no DB call (isUpdateTask=false)
+  PASS  history WAS called
+  PASS  notification WAS called (name !== updatedTaskName)
+
+=== updatePriority — DB then side effects then resolve ===
+  PASS  updatePriority: DB write happened
+  PASS  updatePriority: history awaited before resolve
+  PASS  updatePriority: notification awaited before resolve
+
+=== updatePriority — isUpdateTask:false fires side effects ===
+  PASS  updatePriority(false): resolves successfully
+  PASS  updatePriority(false): no DB call
+  PASS  updatePriority(false): history called
+
+=== updateTaskName — DB then side effects then resolve ===
+  PASS  updateTaskName: DB write happened
+  PASS  updateTaskName: history awaited before resolve
+  PASS  updateTaskName: notification awaited before resolve
+
+=== updateTaskName — DB failure rejects, side effects skipped ===
+  PASS  updateTaskName rejects on DB failure
+  PASS  updateTaskName: history NOT called on DB failure
+
+=== source — outer Promise resolves are inside Promise.allSettled awaits ===
+  PASS  source uses Promise.allSettled
+  PASS  source defines fireSideEffects helpers
+  PASS  source does NOT resolve immediately inside Mongo .then before side effects
+
+========================================
+Tests: 26 | Passed: 26 | Failed: 0
+========================================

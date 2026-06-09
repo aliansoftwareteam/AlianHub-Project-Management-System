@@ -2,6 +2,7 @@ const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { fetchRules } = require("../../settings/securityPermissions/controller");
 const mongoose = require("mongoose")
+const { escapeRegex } = require("../../../utils/escapeRegex");
 
 exports.projectFilter = async (req, res) => {
     try {
@@ -172,7 +173,7 @@ const buildSprintQuery = (req, privateQuery, publicQuery) => [
                                 {
                                     "$regexMatch": {
                                         "input": "$name",
-                                        "regex": req.body.search,
+                                        "regex": escapeRegex(req.body.search),
                                         "options": "i"
                                     }
                                 }
@@ -257,7 +258,7 @@ const buildFolderQuery = (req, privateQuery, publicQuery) => [
                         "$expr": {
                             "$and": [
                                 { "$eq": ["$projectId", "$$currentProjectId"] },
-                                { "$regexMatch": { input: "$name", regex: req.body.search, options: "i" } }
+                                { "$regexMatch": { input: "$name", regex: escapeRegex(req.body.search), options: "i" } }
                             ]
                         }
                     }
@@ -324,7 +325,7 @@ const buildProjectNameQuery = (req, privateQuery, publicQuery) => [
               ]
             },
             {
-              ProjectName: { $regex: req.body.search, $options: "i" }
+              ProjectName: { $regex: escapeRegex(req.body.search), $options: "i" }
             }
           ]
         }
@@ -483,7 +484,7 @@ const buildProjectFilterProjectNameQuery = (req, privateQuery, publicQuery,userI
                       ]
                     },
                     {
-                      ProjectName: { $regex: req.body.search, $options: "i" }
+                      ProjectName: { $regex: escapeRegex(req.body.search), $options: "i" }
                     }
                 ]
             }
@@ -620,7 +621,7 @@ const buildProjectFilterFolderQuery = (req, privateQuery, publicQuery,userId) =>
                             "$expr": {
                                 "$and": [
                                     { "$eq": ["$projectId", "$$currentProjectId"] },
-                                    { "$regexMatch": { input: "$name", regex: req.body.search, options: "i" } }
+                                    { "$regexMatch": { input: "$name", regex: escapeRegex(req.body.search), options: "i" } }
                                 ]
                             }
                         }
@@ -805,7 +806,7 @@ const buildProjectFilterSprintQuery = (req, privateQuery, publicQuery,userId) =>
                                     {
                                         "$regexMatch": {
                                             "input": "$name",
-                                            "regex": req.body.search,
+                                            "regex": escapeRegex(req.body.search),
                                             "options": "i"
                                         }
                                     }

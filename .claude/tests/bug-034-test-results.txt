@@ -1,0 +1,18 @@
+PASS: logger has three transports
+PASS: transport[0] is a DailyRotateFile
+PASS: transport[0] has a maxSize cap
+PASS: transport[0] has a maxFiles retention window
+PASS: transport[1] is a DailyRotateFile
+PASS: transport[1] has a maxSize cap
+PASS: transport[1] has a maxFiles retention window
+PASS: transport[2] is a DailyRotateFile
+PASS: transport[2] has a maxSize cap
+PASS: transport[2] has a maxFiles retention window
+PASS: a transport targets track-*.log
+PASS: a transport targets error-*.log
+PASS: a transport targets combined-*.log
+PASS: warn-level transport present
+PASS: error-level transport present
+PASS: info-level transport present
+
+All BUG-034 assertions passed.

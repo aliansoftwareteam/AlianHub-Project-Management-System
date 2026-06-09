@@ -5,6 +5,7 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries.
 const { dbCollections } = require("../../Config/collections.js");
 const { myCache } = require('../../Config/config');
 const { removeCache } = require("../../utils/commonFunctions");
+const { escapeRegex } = require("../../utils/escapeRegex");
 exports.deleteTracker = async (req, res) => {
     try {
         const { id } = req.params; // Extract _id from URL parameters
@@ -152,7 +153,7 @@ exports.getTracker = async (req, res) => {
                     {
                         $match: {
                             $and: [
-                                { ...(search && { title: { $regex: search, $options: 'i' } }) },
+                                { ...(search && { title: { $regex: escapeRegex(search), $options: 'i' } }) },
                             ],
                         },
                     },

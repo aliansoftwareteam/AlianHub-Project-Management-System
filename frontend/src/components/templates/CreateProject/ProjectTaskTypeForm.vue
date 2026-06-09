@@ -263,7 +263,9 @@ const { t } = useI18n();
                 return !newTaskTypeData.value.some((y) => y.key === x.key);
             });
             if(notMatchedProjects.length > 0){
-                notMatchedProjects.forEach(async(x) => {
+                // BUG-017 / #71 fix: body uses apiRequest().then().catch(),
+                // no `await`, so the `async` keyword was misleading.
+                notMatchedProjects.forEach((x) => {
                     const searchResult = {
                         $match: {
                             $and:[

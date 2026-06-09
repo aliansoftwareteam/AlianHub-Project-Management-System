@@ -402,12 +402,25 @@ function sendNotification(dataUrl) {
   screenshotNotificationWindow.webContents.on('did-finish-load', () => {
     screenshotNotificationWindow.webContents.send('screenshot-path', dataUrl);
     screenshotNotificationWindow.show();
-    ipcMain.on('close_click', () => {
-      screenshotNotificationWindow.close();
-    });
-    setTimeout(() => {
-      screenshotNotificationWindow.close();
+
+    const notificationWindow = screenshotNotificationWindow;
+    const closeHandler = () => {
+      if (!notificationWindow.isDestroyed()) {
+        notificationWindow.close();
+      }
+    };
+    ipcMain.once('close_click', closeHandler);
+
+    const autoCloseTimer = setTimeout(() => {
+      if (!notificationWindow.isDestroyed()) {
+        notificationWindow.close();
+      }
     }, 10000);
+
+    notificationWindow.once('closed', () => {
+      clearTimeout(autoCloseTimer);
+      ipcMain.removeListener('close_click', closeHandler);
+    });
   });
 
 }

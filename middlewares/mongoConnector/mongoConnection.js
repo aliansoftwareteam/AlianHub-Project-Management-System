@@ -81,7 +81,7 @@ exports.handleConnection = async (companyId) => {
                     }
                 } else {
                     requestedDbs.push(db);
-                   createConnection(db)
+                    createConnection(db)
                         .then((conData) => {
                             removeFromArray(db)
                             // console.log("REQUESTED DB FOUND", db);

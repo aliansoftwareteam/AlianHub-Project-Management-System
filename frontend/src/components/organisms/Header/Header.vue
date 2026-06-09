@@ -55,7 +55,7 @@
                 <span v-if="totalMainCounts" class="notification-tick blinking"></span>
             </router-link>
             <div class="position-re" :class="{'mr-2' : clientWidth > 1440, 'mr-1' : clientWidth<=1440}" v-if="rules && Object.keys(rules).length">
-                <img src="@/assets/images/svg/header_notification.svg" class="cursor-pointer" id="notification_driver" @click="getNotifications(!notifications.length), showNotification = 0, notificationVisible = true">
+                <img src="@/assets/images/svg/header_notification.svg" class="cursor-pointer" id="notification_driver" @click="openNotificationsDropdown()">
                 <span :class="{'notification-tick': totalNotification}" class="blinking"></span>
             </div>
             <div class="position-re" :class="{'pr-2' : clientWidth > 1440, 'pr-1' : clientWidth<=1440}" v-if="rules && Object.keys(rules).length">
@@ -195,7 +195,7 @@
                         <router-link  v-if="rules && Object.keys(rules).length && checkPermission('chat') == true" class="p-1 cursor-pointer border-radius-7-px mobile-menu-list" @click="visible = false" :class="{'active-list-mobile' : $route.name.includes('chat')}" :to="{name: 'chats', params: {cid: companyId}}">
                             {{$t('Header.Chat')}}
                         </router-link>
-                        <div  v-if="rules && Object.keys(rules).length" class="p-1 cursor-pointer border-radius-7-px mobile-menu-list" @click="getNotifications(!notifications.length), showNotification = 0, notificationVisible = true, visible = false">
+                        <div  v-if="rules && Object.keys(rules).length" class="p-1 cursor-pointer border-radius-7-px mobile-menu-list" @click="openNotificationsDropdown(true)">
                             {{$t('Header.Notification')}}
                         </div>
                         <div v-if="rules && Object.keys(rules).length" class="p-1 cursor-pointer border-radius-7-px mobile-menu-list" @click="getMentions(!mentions.length), showNotification = 1, notificationVisible = true, visible = false">
@@ -225,7 +225,18 @@
                     {{!showNotification ? $t('Header.Notifications') : $t('Header.mentions')}}
                 </div>
                 <div class="d-flex align-items-center justify-content-between">
-                    <button v-if="!showNotification ? totalNotification > 0 : totalMentions > 0" class="outline-primary mr-10px" @click="markAllRead(!showNotification ? 'notifications' : 'mentions')">{{$t('Header.Mark_all_as_read')}}</button>
+                    <!-- Unread / Archive toggle. Only applies to notifications, not mentions. -->
+                    <button
+                        v-if="!showNotification"
+                        class="outline-primary mr-10px"
+                        @click="switchNotificationFilter(notificationFilter === 'unread' ? 'archived' : 'unread')">
+                        {{ notificationFilter === 'unread' ? $t('Header.View_Archive') : $t('Header.View_Unread') }}
+                    </button>
+                    <!-- Show "Mark all as read" whenever there are unread items visible. Using
+                         `notifications.length` (the list is already filtered to unread on this
+                         view) instead of the server-side `totalNotification` counter, which
+                         can lag behind and falsely hide the button. -->
+                    <button v-if="!showNotification ? (notificationFilter === 'unread' && notifications.length > 0) : totalMentions > 0" class="outline-primary mr-10px" @click="markAllRead(!showNotification ? 'notifications' : 'mentions')">{{$t('Header.Mark_all_as_read')}}</button>
                     <img :src="closeBlueImage" alt="closeButton" class="cursor-pointer" @click="notificationVisible = false"/>
                 </div>
             </template>
@@ -456,6 +467,8 @@ const batchSize = ref(10)
 const notifications = ref([]);
 const noNotifications = ref(false);
 const notificationSkip = ref(0);
+// 'unread' (default, shown when the bell first opens) | 'archived' (View Archive)
+const notificationFilter = ref('unread');
 
 // MENTIONS
 const mentions = ref([]);
@@ -501,7 +514,7 @@ function getNotifications(loadMore = false) {
         }
     }
 
-    const url = `${APP_NOTIFICATION}/notification?userId=${userId.value}&loadMore=${loadMore}&batchSize=${batchSize.value}&notificationSkip=${notificationSkip.value}`;
+    const url = `${APP_NOTIFICATION}/notification?userId=${userId.value}&loadMore=${loadMore}&batchSize=${batchSize.value}&notificationSkip=${notificationSkip.value}&filter=${notificationFilter.value}`;
     apiRequest("get", url).then((response) => {
         if (response.data.status) {
             const data = response.data.data;
@@ -533,6 +546,35 @@ function getNotifications(loadMore = false) {
         isSpinner.value = false;
         console.error(`Error in getNotifications hook => ${error}`);
     });
+}
+
+function switchNotificationFilter(newFilter) {
+    if (newFilter !== 'unread' && newFilter !== 'archived') return;
+    if (notificationFilter.value === newFilter) return;
+    notificationFilter.value = newFilter;
+    // Reset paging state so the new filter starts a fresh fetch.
+    notifications.value = [];
+    notificationSkip.value = 0;
+    batchSize.value = 10;
+    noNotifications.value = false;
+    getNotifications(false);
+}
+
+function openNotificationsDropdown(closeMobileMenu = false) {
+    // Always land in the Unread view when the bell opens — matches the
+    // "initially only unread" UX requirement. The "View Archive" button in
+    // the dropdown head flips this to 'archived'.
+    notificationFilter.value = 'unread';
+    notifications.value = [];
+    notificationSkip.value = 0;
+    batchSize.value = 10;
+    noNotifications.value = false;
+    showNotification.value = 0;
+    notificationVisible.value = true;
+    if (closeMobileMenu) {
+        visible.value = false;
+    }
+    getNotifications(false);
 }
 
 async function getMentions(loadMore = false) {
@@ -601,6 +643,15 @@ async function getMentions(loadMore = false) {
 }
 
 function markRead(data, key, redirect = true) {
+    // Once an item is marked read it stops belonging to the "unread" view.
+    // Drop it from the local list so the dropdown doesn't keep showing it
+    // while the user is filtered to unread.
+    const dropFromUnreadList = () => {
+        if (key === 'notifications' && notificationFilter.value === 'unread') {
+            notifications.value = notifications.value.filter((x) => x._id !== data._id);
+        }
+    };
+
     if(data.notSeen && !data.notSeen.includes(userId.value)) {
         if(redirect) {
             clearFilterSignal.value++;
@@ -610,6 +661,7 @@ function markRead(data, key, redirect = true) {
         } else {
             notifications.value = notifications.value.filter((x) => x._id !== data._id);
         }
+        dropFromUnreadList();
         return;
     }
 
@@ -627,6 +679,7 @@ function markRead(data, key, redirect = true) {
         } else {
             notifications.value = notifications.value.filter((x) => x._id !== data._id);
         }
+        dropFromUnreadList();
 
         if(key === 'notifications' ? totalNotification.value <= 0 : totalMentions.value <= 0) return;
 
@@ -656,6 +709,11 @@ function markAllRead(key) {
 
     if(key === 'notifications') {
         notifications.value.filter((x) => !x.seen).forEach((data) => data.seen = true);
+        // After marking everything read, all items belong to "archived" — so
+        // clear them out of the dropdown if the user is on the Unread view.
+        if (notificationFilter.value === 'unread') {
+            notifications.value = [];
+        }
     } else {
         mentions.value.filter((x) => !x.seen).forEach((data) => data.seen = true);
     }

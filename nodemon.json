@@ -1,0 +1,22 @@
+{
+  "watch": [
+    "Config",
+    "Modules",
+    "common-storage",
+    "event",
+    "middlewares",
+    "socket",
+    "utils",
+    "index.js",
+    "server.js",
+    "cron.js"
+  ],
+  "ext": "js,mjs,cjs",
+  "ignore": [
+    "node_modules",
+    "tests",
+    "**/*.test.js",
+    "**/*.spec.js"
+  ],
+  "delay": 1500
+}

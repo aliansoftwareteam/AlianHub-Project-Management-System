@@ -5,9 +5,52 @@
     margin: 20px 0px;
 }
 
+/* Multi-select cell width — keep it narrow so it doesn't crowd the row. */
+.table-row-select-cell,
+.table-row-select-header {
+    width: 28px;
+    min-width: 28px;
+    text-align: center;
+    padding: 0 4px;
+}
+/* Row checkbox — always visible on every row. */
+.table-row-multi-select {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    margin: 0;
+}
+.table-row-multi-select input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    accent-color: #8591F9;
+    margin: 0;
+}
+
+/* Group-level tri-state checkbox in table view group headers — always visible. */
+.table-group-multi-select {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    margin-right: 6px;
+    cursor: pointer;
+    vertical-align: middle;
+}
+.table-group-multi-select input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    accent-color: #8591F9;
+    margin: 0;
+}
+
 .list_view-table-wrapper {
     width: 100%;
-    overflow-y: auto;
+    overflow: auto;
     height: calc(100% - 134px);
     padding: 0px 20px 15px 20px;
 }
@@ -44,28 +87,69 @@
     margin-left: -10px;
 }
 .header-item{
-    padding: 5px 10px 5px 19px ;
+    padding: 5px 10px 5px 19px;
     color: #0000;
     background-color: #DFE1E6;
     border-right: 1px solid #F0F1F3;
+    white-space: nowrap;
 }
 .table-width {
     overflow: auto;
     max-height: calc(100vh - 510px);
 }
-table.table__view tr th:first-child, table.table__view tr td:first-child{
-    width: 3%;
-    min-width: 42px;
+table.table__view {
+    width: 100%;
+    min-width: 1000px;
 }
-table.table__view tr th:nth-child(2), table.table__view tr td:nth-child(2) { width: 5%; }
-table.table__view tr td:nth-child(3), table.table__view tr th:nth-child(3) { width: 25%; }
-table.table__view tr td:nth-child(4), table.table__view tr th:nth-child(4) { width: 4%; word-break: break-all; }
-table.table__view tr td:nth-child(5), table.table__view tr th:nth-child(5) { width: 8%; }
-table.table__view tr td:nth-child(6), table.table__view tr th:nth-child(6) { width: 7%; word-break: break-all; }
-table.table__view tr td:nth-child(7), table.table__view tr th:nth-child(7) { width: 7%; }
-table.table__view tr td:nth-child(8), table.table__view tr th:nth-child(8) { width: 7%; }
-table.table__view tr td:nth-child(9), table.table__view tr th:nth-child(9) { width: 7%; }
-
+/* checkbox */
+table.table__view tr th:first-child, table.table__view tr td:first-child {
+    width: 40px;
+    min-width: 40px;
+}
+/* # index */
+table.table__view tr th:nth-child(2), table.table__view tr td:nth-child(2) {
+    width: 50px;
+    min-width: 50px;
+}
+/* Type icon — fixed narrow */
+table.table__view tr th:nth-child(3), table.table__view tr td:nth-child(3) {
+    width: 70px;
+    min-width: 70px;
+}
+/* Tasks name — flexible, fills remaining space */
+table.table__view tr th:nth-child(4), table.table__view tr td:nth-child(4) {
+    min-width: 200px;
+}
+/* Chat */
+table.table__view tr th:nth-child(5), table.table__view tr td:nth-child(5) {
+    width: 70px;
+    min-width: 70px;
+}
+/* Status */
+table.table__view tr th:nth-child(6), table.table__view tr td:nth-child(6) {
+    width: 150px;
+    min-width: 130px;
+}
+/* Assignee */
+table.table__view tr th:nth-child(7), table.table__view tr td:nth-child(7) {
+    width: 120px;
+    min-width: 100px;
+}
+/* Due Date */
+table.table__view tr th:nth-child(8), table.table__view tr td:nth-child(8) {
+    width: 130px;
+    min-width: 110px;
+}
+/* Priority */
+table.table__view tr th:nth-child(9), table.table__view tr td:nth-child(9) {
+    width: 110px;
+    min-width: 90px;
+}
+/* Key */
+table.table__view tr th:nth-child(10), table.table__view tr td:nth-child(10) {
+    width: 100px;
+    min-width: 90px;
+}
 
 .table__userstatus-thead {
     position: sticky;
@@ -86,18 +170,13 @@ table.table__view tr td:nth-child(9), table.table__view tr th:nth-child(9) { wid
     position: relative;
 }
 .table_view-status .status-main_name {
-    word-break: break-all;
+    word-break: break-word;
     display: block;
     white-space: inherit;
 }
 .due_date-listing {
-    word-break: break-all;
+    word-break: break-word;
     display: block;
-}
-@media(max-width: 1499px){
-    .table__view {
-        width: 1260px;
-    }
 }
 @media(max-width: 767px){
     .list_view-table-wrapper {

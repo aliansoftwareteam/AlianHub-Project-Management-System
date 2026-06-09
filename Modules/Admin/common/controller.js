@@ -54,7 +54,7 @@ exports.getlogo = (req, res) => {
         });
 
     } catch (error) {
-        console.log("error", error);
+        logger.error(`error: ${error}`);
         res.send("Not Set Logo");
     }
 };

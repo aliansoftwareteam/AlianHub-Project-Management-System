@@ -8,6 +8,31 @@
     height: calc(100vh - 155px);
 }
 
+/* Card-level multi-select checkbox: top-left corner — always visible. */
+.kanban-card-wrapper { position: relative; }
+.kanban-card-multi-select {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    z-index: 5;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.kanban-card-multi-select input[type="checkbox"] {
+    width: 12px;
+    height: 12px;
+    cursor: pointer;
+    accent-color: #8591F9;
+    margin: 0;
+}
+
 .kanban-board .kanban-column {
     flex: 0 0 300px;
     display: flex;

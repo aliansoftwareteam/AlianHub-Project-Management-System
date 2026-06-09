@@ -1,0 +1,17 @@
+
+=== package.json — declared version ===
+  PASS  sharp is listed as a runtime dependency
+  PASS  declared version >= 0.34.0 (CVE-2024-28219 fixed in 0.33.2)
+
+=== installed version on disk ===
+  PASS  sharp is installed
+  PASS  installed version >= 0.34.0
+
+=== runtime smoke — sharp loads and processes a tiny image ===
+  PASS  require("sharp") succeeds
+  PASS  resize().toBuffer() works (no API regression)
+  PASS  metadata() reports the resized dimensions
+
+========================================
+Tests: 7 | Passed: 7 | Failed: 0
+========================================

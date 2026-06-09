@@ -1,0 +1,128 @@
+name: Docker
+
+# ─────────────────────────────────────────────────────────────────────
+# Build the AlianHub Docker image and publish to GitHub Container
+# Registry (ghcr.io).
+#
+# Triggers:
+#   • release.published   — when release-please cuts a tagged release,
+#                            push `vX.Y.Z`, `X.Y.Z`, `X.Y`, `X`, `latest`
+#   • push to main        — push `edge` and `main-<sha>` (rolling main)
+#   • pull_request        — build-only (no push) to verify the image
+#                            still builds on every change
+#   • workflow_dispatch   — manual trigger from the Actions UI
+#
+# Pushing to Docker Hub:
+#   To also push to hub.docker.com, add two repo secrets:
+#     DOCKERHUB_USERNAME
+#     DOCKERHUB_TOKEN
+#   and uncomment the "Login to Docker Hub" and Docker Hub tag lines
+#   in the metadata-action `images:` block below.
+#
+# Multi-arch:
+#   Built for linux/amd64 and linux/arm64.
+#
+# See also: BRANCHING.md § Release workflow
+# ─────────────────────────────────────────────────────────────────────
+
+on:
+  # Build + publish image when a release tag is cut by release-please
+  release:
+    types: [published]
+
+  # Build + publish image on every commit to main (after a PR merges)
+  push:
+    branches:
+      - main
+
+  # Manual trigger from the Actions UI
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write   # required to push to ghcr.io
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY_GHCR: ghcr.io
+  # Short, branded image name — matches the reference in docker-compose.yml.
+  # The default `${{ github.repository }}` would expand to the much longer
+  # `aliansoftwareteam/alianhub-project-management-system` (auto-lowercased
+  # by GHCR), which is awkward to type.
+  IMAGE_NAME: aliansoftwareteam/alianhub
+
+jobs:
+  build-and-push:
+    name: Build & push image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU (multi-arch emulation)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY_GHCR }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Uncomment after adding Docker Hub secrets ───────────────
+      # - name: Log in to Docker Hub
+      #   if: github.event_name != 'pull_request'
+      #   uses: docker/login-action@v3
+      #   with:
+      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
+      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract image metadata (tags + labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          # GHCR is always included; add Docker Hub by uncommenting the
+          # second line below after secrets are configured.
+          images: |
+            ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}
+            # docker.io/alianhub/alianhub
+          tags: |
+            # Semantic-version tags from release-please (e.g. v14.1.0)
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            # `edge` tag for the latest commit on main
+            type=edge,branch=main
+            # `main-<sha>` for traceability on every main commit
+            type=sha,prefix=main-,enable=${{ github.ref == 'refs/heads/main' }}
+            # `latest` only for stable release tags (not pre-releases)
+            type=raw,value=latest,enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
+          labels: |
+            org.opencontainers.image.title=AlianHub
+            org.opencontainers.image.description=Self-hosted, open-source project management system
+            org.opencontainers.image.url=https://alianhub.com
+            org.opencontainers.image.documentation=https://help.alianhub.com
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.licenses=AGPL-3.0-or-later
+            org.opencontainers.image.vendor=Alian Software
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false   # avoid the unsigned-attestation noise on ghcr

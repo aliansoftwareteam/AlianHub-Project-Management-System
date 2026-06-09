@@ -32,11 +32,28 @@ exports.connect = (db) => {
             MONGODB_URL = installation?.envVar?.MONGODB_URL;
         }
         try {
+            const baseMongoUrl = MONGODB_URL.replace(/\/+$/, ''); // strip trailing slashes
+            // Note: do NOT append ?authSource=admin for mongodb+srv — Atlas SRV TXT records handle auth
+            const connStr = baseMongoUrl.startsWith('mongodb+srv')
+                ? `${baseMongoUrl}/${db}`
+                : `${baseMongoUrl}/${db}?authSource=admin`;
+            // Phase 1 perf tuning (SOCKET-PERFORMANCE-PLAN #6, #13):
+            //   - maxPoolSize 3 -> 10 (env-overridable). The previous cap of 3
+            //     queued any 4th concurrent query per tenant; task-heavy flows
+            //     (create, history write, sprint count, notification) easily
+            //     saturate that and stack up behind waitQueueTimeoutMS.
+            //   - minPoolSize 2 keeps warm sockets so the first request after
+            //     idle doesn't pay handshake latency.
+            //   - waitQueueTimeoutMS 30000 -> 5000. A queued query that can't
+            //     get a socket inside 5s is almost always doomed; failing fast
+            //     surfaces the real problem instead of pinning a request
+            //     worker for 30s.
             const connection = await mongoose.createConnection(
-                `${MONGODB_URL}/${db}?authSource=admin`, // CONNECTION STRING
+                connStr, // CONNECTION STRING
                 {
-                    waitQueueTimeoutMS: 30000, // WAIT_QUEUE_TIMEOUT
-                    maxPoolSize: 3, // MAX_POOL_SIZE
+                    waitQueueTimeoutMS: Number(process.env.MONGO_WAIT_QUEUE_TIMEOUT_MS) || 5000,
+                    maxPoolSize: Number(process.env.MONGO_POOL_SIZE) || 10,
+                    minPoolSize: Number(process.env.MONGO_MIN_POOL_SIZE) || 2,
                     connectTimeoutMS: 60000, // CONNECT_TIMEOUT
                     serverSelectionTimeoutMS: 60000 // SERVER_SELECTION_TIMEOUT
                 }

@@ -1,8 +1,84 @@
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const logger = require("./loggerConfig");
 const mongoC = require("../utils/mongo-handler/mongoQueries");
 const { dbCollections } = require("../Config/collections.js");
 const {myCache} = require('./config');
+
+// Mongo ObjectId pattern — used to reject regex/control characters in the
+// `companyid` request header before any token-membership check.
+const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
+
+// Strict membership check against a JWT `aud` claim that may be a comma-joined
+// string (current shape — see `generateJWTToken`) or an array. Replaces the
+// previous `new RegExp(companyId)` audience option, which let header values
+// like `.*` match any audience and cross tenants.
+const isCompanyInAudience = (audClaim, companyId) => {
+    if (!audClaim || !companyId) return false;
+    const list = Array.isArray(audClaim)
+        ? audClaim
+        : String(audClaim).split(',');
+    const target = String(companyId).trim();
+    return list.some((entry) => String(entry).trim() === target);
+};
+
+// BUG-013 / #67 fix: live membership re-check against MongoDB, cached.
+//
+// The JWT audience claim is frozen at login and lasts JWT_EXP (24h default),
+// so a user removed from a company between login and token expiry still has
+// access for up to a day. Re-check the `users.AssignCompany` array on every
+// authenticated request, with a short cache TTL (default 60s) so the cost
+// is one Mongo lookup per user-company pair per minute, not per request.
+//
+// Cache invalidation hook `invalidateMembershipCache(uid, companyId?)` is
+// exported so the membership-change flows (add/remove member) can wipe the
+// cache and apply changes immediately.
+const MEMBERSHIP_CACHE_PREFIX = 'membership:';
+
+const getMembershipCacheTtlSeconds = () => {
+    const raw = Number(process.env.MEMBERSHIP_CACHE_TTL_SECONDS);
+    if (!Number.isFinite(raw) || raw < 0) return 60;
+    return raw;
+};
+
+const verifyCompanyMembership = async (uid, companyId) => {
+    if (!uid || !companyId) return false;
+    if (!OBJECT_ID_PATTERN.test(String(uid)) || !OBJECT_ID_PATTERN.test(String(companyId))) {
+        return false;
+    }
+    const cacheKey = `${MEMBERSHIP_CACHE_PREFIX}${uid}:${companyId}`;
+    const cached = myCache.get(cacheKey);
+    if (cached === true) return true;
+    if (cached === false) return false;
+    try {
+        const obj = {
+            type: dbCollections.USERS,
+            data: [{
+                _id: new mongoose.Types.ObjectId(String(uid)),
+                AssignCompany: String(companyId),
+            }],
+        };
+        const resData = await mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, obj, 'findOne');
+        const isMember = !!(resData && resData._id);
+        myCache.set(cacheKey, isMember, getMembershipCacheTtlSeconds());
+        return isMember;
+    } catch (error) {
+        logger.error(`verifyCompanyMembership error for uid=${uid} companyId=${companyId}: ${error.message || error}`);
+        return false;
+    }
+};
+
+const invalidateMembershipCache = (uid, companyId) => {
+    if (!uid) return;
+    if (companyId) {
+        myCache.del(`${MEMBERSHIP_CACHE_PREFIX}${uid}:${companyId}`);
+        return;
+    }
+    const prefix = `${MEMBERSHIP_CACHE_PREFIX}${uid}:`;
+    myCache.keys()
+        .filter((k) => k.indexOf(prefix) === 0)
+        .forEach((k) => myCache.del(k));
+};
 
 
 const generateToken = (time) => {
@@ -160,7 +236,7 @@ const checkToken = (isValid, req, res, next) => {
  * @param {Object} next
  * @returns 
  */
-const verifyJWTTokenWithC = (req, res, next) => {
+const verifyJWTTokenWithC = async (req, res, next) => {
     try {
         let token = req.headers['x-access-token'] || req.headers['authorization']; // Express headers are auto converted to lowercase
         const companyId = req.headers['companyid'] || "";
@@ -172,16 +248,37 @@ const verifyJWTTokenWithC = (req, res, next) => {
                 isJwtError: true
             });
         }
+        if (!OBJECT_ID_PATTERN.test(companyId)) {
+            return res.status(401).json({
+                status: false,
+                error: 'Invalid company id',
+                statusText: 'Unauthorized',
+                isJwtError: true
+            });
+        }
         if (token) {
             if (token.startsWith('Bearer ')) {
                 // Remove Bearer from string
                 token = token.slice(7, token.length);
             }
-            const generateRegex = new RegExp(companyId, '');
-            const isValid = jwt.verify(token, process.env.JWT_SECRET, {audience: generateRegex});
-            if (isValid) {
+            const isValid = jwt.verify(token, process.env.JWT_SECRET);
+            if (isValid && isCompanyInAudience(isValid.aud, companyId)) {
                 const { uid } = isValid;
-                
+
+                // BUG-013 / #67 fix: re-check membership against the DB
+                // (cached) so a user removed from this company loses access
+                // within the cache TTL instead of at JWT expiry.
+                const isMember = await verifyCompanyMembership(uid, companyId);
+                if (!isMember) {
+                    return res.status(403).json({
+                        status: false,
+                        error: 'You are no longer a member of this company',
+                        statusText: 'Forbidden',
+                        isJwtError: true,
+                        isLogout: true,
+                    });
+                }
+
                 req.uid = uid;
                 next();
             } else {
@@ -212,7 +309,7 @@ const verifyJWTTokenWithC = (req, res, next) => {
     }
 }
 
-const verifyJWTTokenWithCV2 = (req, res, next) => {
+const verifyJWTTokenWithCV2 = async (req, res, next) => {
     let token = req.headers['x-access-token'] || req.headers['authorization']; // Express headers are auto converted to lowercase
     const companyId = req.headers['companyid'] || "";
     if (!companyId) {
@@ -223,14 +320,44 @@ const verifyJWTTokenWithCV2 = (req, res, next) => {
             isJwtError: true
         });
     }
+    if (!OBJECT_ID_PATTERN.test(companyId)) {
+        return res.status(401).json({
+            status: false,
+            error: 'Invalid company id',
+            statusText: 'Unauthorized',
+            isJwtError: true
+        });
+    }
     if (token) {
         try {
             if (token.startsWith('Bearer ')) {
                 // Remove Bearer from string
                 token = token.slice(7, token.length);
             }
-            const generateRegex = new RegExp(companyId, '');
-            const isValid = jwt.verify(token, process.env.JWT_SECRET, {audience: generateRegex});
+            const isValid = jwt.verify(token, process.env.JWT_SECRET);
+            if (!isCompanyInAudience(isValid.aud, companyId)) {
+                res.clearCookie('accessToken');
+                return res.status(401).json({
+                    status: false,
+                    error: 'Unauthorized',
+                    statusText: 'Unauthorized',
+                    isJwtError: true
+                });
+            }
+
+            // BUG-013 / #67 fix: live membership re-check (cached).
+            const isMember = await verifyCompanyMembership(isValid.uid, companyId);
+            if (!isMember) {
+                res.clearCookie('accessToken');
+                return res.status(403).json({
+                    status: false,
+                    error: 'You are no longer a member of this company',
+                    statusText: 'Forbidden',
+                    isJwtError: true,
+                    isLogout: true,
+                });
+            }
+
             checkToken(isValid, req, res, next);
         } catch (error) {
             res.clearCookie('accessToken');
@@ -325,6 +452,57 @@ const verifyJWTTokenV2 = (req, res, next) => {
     }
 }
 
+/**
+ * Defense-in-depth check: when a request carries a companyId (in body,
+ * path params, query, or the `companyid` header), verify it appears in
+ * the JWT audience claim. Routes that legitimately operate without a
+ * company scope pass through unchanged.
+ *
+ * Non-ObjectId candidates (e.g. the global "USER_PROFILES" bucket name
+ * used for user profile pictures) pass through too — they aren't real
+ * company tenants, and the controllers that accept them have their own
+ * authorization for that bucket. Forcing them through this check would
+ * 400-block legitimate uploads.
+ *
+ * Applied after `verifyJWTTokenV2` so `req.aud` is already populated.
+ */
+const requireCompanyAud = (req, res, next) => {
+    try {
+        const candidate =
+            (req.body && (req.body.companyId || req.body.CompanyId)) ||
+            (req.params && req.params.companyId) ||
+            (req.query && req.query.companyId) ||
+            (req.headers && req.headers.companyid) ||
+            null;
+
+        if (!candidate) return next();
+
+        const companyId = String(candidate).trim();
+        // Skip enforcement for non-ObjectId values (special buckets like
+        // USER_PROFILES). Those aren't tenants and have controller-level
+        // checks.
+        if (!OBJECT_ID_PATTERN.test(companyId)) {
+            return next();
+        }
+        if (!isCompanyInAudience(req.aud, companyId)) {
+            return res.status(403).json({
+                status: false,
+                error: 'You do not have access to this company',
+                statusText: 'Forbidden',
+                isJwtError: true,
+            });
+        }
+        return next();
+    } catch (error) {
+        return res.status(401).json({
+            status: false,
+            error: error.message,
+            statusText: 'Unauthorized',
+            isJwtError: true,
+        });
+    }
+};
+
 const verifyToken = (token) => {
         if (token) {
             try {
@@ -379,5 +557,10 @@ module.exports = {
     verifyJWTToken: verifyJWTToken,
     verifyJWTTokenV2: verifyJWTTokenV2,
     verifyToken: verifyToken,
-    removeCacheAndCookie: removeCacheAndCookie
+    removeCacheAndCookie: removeCacheAndCookie,
+    requireCompanyAud: requireCompanyAud,
+    // BUG-013 / #67
+    verifyCompanyMembership: verifyCompanyMembership,
+    invalidateMembershipCache: invalidateMembershipCache,
+    getMembershipCacheTtlSeconds: getMembershipCacheTtlSeconds,
 }

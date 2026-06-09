@@ -12,9 +12,7 @@ Security fixes are applied on a **best-effort basis**, typically to the latest r
 
 All suspected security vulnerabilities **must be reported via GitHub Security Advisories**.
 
-➡️ Submit a report here:
-`https://github.com/aliansoftwareteam
-AlianHub-Project-Management-System/security/advisories/new`
+➡️ Submit a report here: [Report a vulnerability](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/security/advisories/new)
 
 Please include the following information (all are required):
 

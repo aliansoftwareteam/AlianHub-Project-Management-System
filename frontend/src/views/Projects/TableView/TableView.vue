@@ -29,6 +29,8 @@
         <table class="table__view">
             <thead class="w-100 table__userstatus-thead d-table"> 
             <tr class="header">
+                <!-- Spacer header for the multi-select checkbox column added in TableViewRow -->
+                <th class="header-item table-row-select-header" aria-label="Select"></th>
                 <th class="header-item"><span class="dark-gray font-weight-500 font-size-12" >#</span></th>
                 <th class="header-item"><span class="dark-gray font-weight-500 font-size-12" > {{$t('ProjectDetails.type')}} <img class="ml-1 cursor-pointer" @click="sortByColumns(globalSortKey == `TaskTypeKey: ${1}` ? `TaskTypeKey: ${-1}` : `TaskTypeKey: ${1}`)" :style="[{rotate: globalSortKey === `TaskTypeKey: ${1}` ? '0deg' : '180deg'}]" :src="arrow" alt=""></span></th>
                 <th class="header-item"><span class="dark-gray font-weight-500 font-size-12" >{{$t('Projects.tasks')}}<img class="ml-1 cursor-pointer" @click="sortByColumns(globalSortKey == `TaskName: ${1}` ? `TaskName: ${-1}` : `TaskName: ${1}`)" :style="[{rotate: globalSortKey === `TaskName: ${1}` ? '0deg' : '180deg'}]" :src="arrow" alt=""></span></th>

@@ -544,4 +544,4 @@ Alian Software is a technology-driven company focused on building scalable, secu
 
 
 ## License
-This project is MIT licensed.
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**. See the [LICENSE](LICENSE) file for full terms.

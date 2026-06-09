@@ -2,6 +2,7 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
+const { escapeRegex } = require("../../utils/escapeRegex");
 
 exports.getPaginateMediaFiles = async (req, res) => {
     try {
@@ -50,7 +51,7 @@ exports.getPaginateMediaFiles = async (req, res) => {
 
         if (searchValue) {
             matchConditions.push({
-                mediaName: { $regex: searchValue, $options: 'i' },
+                mediaName: { $regex: escapeRegex(searchValue), $options: 'i' },
             });
         }
 
@@ -174,7 +175,7 @@ exports.getMediaFileUsers = async (req, res) => {
 
         if (searchValue) {
             matchConditions.push({
-                mediaOriginalName: { $regex: searchValue, $options: 'i' },
+                mediaOriginalName: { $regex: escapeRegex(searchValue), $options: 'i' },
             });
         }
 

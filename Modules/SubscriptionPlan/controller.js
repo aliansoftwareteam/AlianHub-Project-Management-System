@@ -4,7 +4,7 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const {
   MongoDbCrudOpration,
 } = require("../../utils/mongo-handler/mongoQueries");
-const { replaceObjectKey } = require("../auth/helper");
+const { replaceObjectKey } = require("../Auth/helper");
 // Promise function to retrieve all subscription plans or execute an aggregation query.
 exports.getAllSubscriptionPlansPromise = (queryData) => {
   return new Promise((resolve, reject) => {

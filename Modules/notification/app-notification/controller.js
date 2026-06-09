@@ -97,7 +97,7 @@ exports.getMentionsMessages = async (req, res) => {
  */
 exports.getNotificationMessages = async (req, res) => {
     try {
-        const { userId, loadMore, batchSize = 10, notificationSkip = 0 } = req.query;
+        const { userId, loadMore, batchSize = 10, notificationSkip = 0, filter = 'unread' } = req.query;
 
         const limit = parseInt(batchSize);
         const skip = parseInt(notificationSkip);
@@ -109,22 +109,33 @@ exports.getNotificationMessages = async (req, res) => {
             });
         }
 
-        const query = [
+        // `notSeen` carries the IDs of recipients who have NOT yet read the
+        // notification. So `userId IN notSeen` ⇒ unread for that user, and
+        // `userId NOT IN notSeen` ⇒ already read / archived for that user.
+        // Default to 'unread' to keep the bell focused on actionable items;
+        // the dropdown's "View Archive" toggle passes filter=archived.
+        const normalizedFilter = (filter === 'archived' || filter === 'archive') ? 'archived' : 'unread';
+
+        const baseMatch = [
+            { assigneeUsers: { $in: [userId] } },
+            { key: { $ne: Notification_key.COMMENTS_IM_MENTIONS_IN }},
             {
-                $match: {
-                    $and: [
-                        { assigneeUsers: { $in: [userId] } },
-                        { key: { $ne: Notification_key.COMMENTS_IM_MENTIONS_IN }},
-                        {
-                            $or: [
-                                { notificationType: 'push' },
-                                { notificationType: null }
-                            ]
-                        },
-                        { receiverID: userId }
-                    ]
-                }
+                $or: [
+                    { notificationType: 'push' },
+                    { notificationType: null }
+                ]
             },
+            { receiverID: userId }
+        ];
+
+        if (normalizedFilter === 'archived') {
+            baseMatch.push({ notSeen: { $nin: [userId] } });
+        } else {
+            baseMatch.push({ notSeen: { $in: [userId] } });
+        }
+
+        const query = [
+            { $match: { $and: baseMatch } },
             { $sort: { createdAt: -1, _id: 1 } },
             { $skip: loadMore ? skip : 0 },
             { $limit: limit },

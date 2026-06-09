@@ -1,9 +1,9 @@
 const { SCHEMA_TYPE } = require("../../Config/schemaType.js");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries.js");
-const iCtr = require('../import_settings/controller.js');
-const helperCtr = require('../auth/controller/helper.js');
+const iCtr = require('../ImportSettings/controller.js');
+const helperCtr = require('../Auth/controller/helper.js');
 const logger = require('../../Config/loggerConfig.js');
-const { addAndRemoveUserInMongodbNotificationCount } = require("../auth/controller.js");
+const { addAndRemoveUserInMongodbNotificationCount } = require("../Auth/controller.js");
 const { default: mongoose } = require("mongoose");
 const { emitListener } = require("./eventController.js");
 const serviceCtr = require("../service.js");
@@ -12,8 +12,8 @@ const config =  require('../../Config/config.js');
 const { dbCollections } = require("../../Config/collections.js");
 const defaultSubscriptionDataRef = require("./defaultSubscriptionData.js")
 const { updateCompanyFun } = require("./controller/updateCompany.js");
-const { updateUserFun } = require("../usersModule/controller.js");
-const { storeRefferalCode, checkAndStoreRefferalCode } = require("../affiliate/controller.js");
+const { updateUserFun } = require("../Users/controller.js");
+const { storeRefferalCode, checkAndStoreRefferalCode } = require("../Affiliate/controller.js");
 const { handleCreateCompanyDataStorageFunForUpload, handleCreateCompanyDataStorageFun } = require(`../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
 
 
@@ -708,7 +708,7 @@ exports.deleteCompany = (req, res) => {
         mongoose.connect(process.env.MONGODB_URL+"/"+req.body.companyId);
         const connection = mongoose.connection;
         connection.once('open', () => {
-            console.log("MongoDB database connection established successfully "+ req.body.companyId);
+            logger.info(`MongoDB database connection established successfully ${req.body.companyId}`);
         });
         mongoose.connection.dropDatabase().then(() => {
             try {

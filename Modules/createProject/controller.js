@@ -4,7 +4,7 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose");
 const axios = require('axios');
-const { addSprintFun } = require("../sprints/controller")
+const { addSprintFun } = require("../Sprints/controller")
 const config = require("../../Config/config");
 const { getCachedGlobalTemplateData } = require("../../utils/enterpriseHelper");
 const { removeCache } = require('../../utils/commonFunctions');
@@ -90,6 +90,19 @@ exports.createProjectFun = async(req, res) => {
                     exports.removeProjectCount(req.body.CompanyId,req.body.isPrivateSpace);
                     res.send({status:false, statusText: error});
                 });
+            } else {
+                // BUG-010 / #64 fix: previously this branch was missing, so
+                // when `checkProjectPlan` resolved with `{status: false}`
+                // (e.g. a future refactor moves a failure path from `reject`
+                // to `resolve`) the request would hang until the proxy timed
+                // out. `checkProjectPlan` increments the project count
+                // before validating limits, so we must also roll the count
+                // back here to mirror the .catch branch below.
+                exports.removeProjectCount(req.body.CompanyId, req.body.isPrivateSpace);
+                res.status(400).send({
+                    status: false,
+                    statusText: (data && data.statusText) || 'Project plan check did not pass.',
+                });
             }
         }).catch((error) => {
             if(error?.countRollBack === false && error.countRollBack !== undefined){
@@ -101,7 +114,16 @@ exports.createProjectFun = async(req, res) => {
             }
         })
     } catch (error) {
-        reject(error)
+        // BUG-009 / #63 fix: `createProjectFun` is `async (req, res)`, not a
+        // `new Promise` constructor body — `reject` is not defined in this
+        // scope. Reaching this branch previously threw a ReferenceError that
+        // masked the real error and left the request hanging until the
+        // client / proxy timed out. Respond with the actual error instead.
+        logger.error(`createProjectFun error: ${error && error.message ? error.message : error}`);
+        res.status(400).send({
+            status: false,
+            statusText: error && error.message ? error.message : error,
+        });
     }
 };
 
@@ -588,8 +610,28 @@ exports.createProject = async (req) => {
                         reject({status: false, statusText: err});
                         logger.error(`add create project: ${err}`);
                     });
-                }else{
-                    reject({status: false, statusText: 'error in createProject'});
+                } else {
+                    // BUG-018 / #72 fix: the existing else already rejected
+                    // the outer Promise (so the audit's literal "hangs"
+                    // claim never reproduced — `Promise.allSettled` never
+                    // rejects either, so the outer .then always fires).
+                    // The real bug was that every per-query reason in
+                    // `rejected` was discarded. Surface the actual reasons
+                    // so the caller and the log have something to debug.
+                    const reasons = rejected.map((r, idx) => ({
+                        index: idx,
+                        reason: r && r.reason && r.reason.message
+                            ? r.reason.message
+                            : String(r && r.reason !== undefined ? r.reason : 'unknown'),
+                    }));
+                    logger.error(`createProject prerequisite query failures (${rejected.length}/${results.length}): ${JSON.stringify(reasons)}`);
+                    reject({
+                        status: false,
+                        statusText: 'error in createProject prerequisites',
+                        rejectedCount: rejected.length,
+                        totalCount: results.length,
+                        reasons,
+                    });
                 }
             }).catch((error) => {
                 reject({status: false, statusText: error});
@@ -701,7 +743,7 @@ exports.removeProjectCount = (companyId,isPrivateSpace) => {
         }
         updateCompanyFun(SCHEMA_TYPE.GOLBAL,decObj,"findOneAndUpdate",companyId,true);
     } catch (error) {
-        console.log(error,"ERROR:");
+        logger.error(`ERROR: ${error}`);
     }
 }
 

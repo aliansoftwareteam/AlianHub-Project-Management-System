@@ -1,0 +1,12 @@
+PASS: createSchema.js declares historySchema with { timestamps: true }
+PASS: mongo_helper.js has no live createdAt:utcDateTime.ts assignment
+PASS: mongo_helper.js has no live updatedAt:utcDateTime.ts assignment
+PASS: helper.js has no live createdAt:utcDateTime.ts assignment
+PASS: helper.js has no live updatedAt:utcDateTime.ts assignment
+PASS: history.createdAt still declared as type: Date
+PASS: history.updatedAt still declared as type: Date
+PASS: history.createdAt no longer has required: true
+PASS: history.updatedAt no longer has required: true
+PASS: Mongoose schema with { timestamps: true } stores the option
+
+All BUG-046 assertions passed.

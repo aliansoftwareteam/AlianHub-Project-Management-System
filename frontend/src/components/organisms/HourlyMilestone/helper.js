@@ -191,7 +191,8 @@ export function calendar() {
                                                 let assigneeArray = [];
                                                 allUserData(timeSheet).then((obj)=>{
                                                     if(obj.individualTotals.length > 0){
-                                                        obj.individualTotals.forEach(async (element) => {
+                                                        // BUG-017 / #71 fix: body just does sync array.push.
+                                                        obj.individualTotals.forEach((element) => {
                                                             assigneeArray.push({
                                                                 id:element.user,
                                                                 individualLogTime:element.total

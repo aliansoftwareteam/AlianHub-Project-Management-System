@@ -1,101 +1,76 @@
-const socketRef = require('../socketinit');
-const {joinRoom,leaveRoom} = require('../helper');
+const {
+    joinRoom,
+    leaveRoom,
+    upsertRoom,
+    removeRoom,
+    findRoomsByPrefix,
+} = require('../helper');
 const socketEmitter = require('../../event/socketEventEmitter');
-exports.commentSocketHandler = ({socket, namespace}) => {
-    socket.on('joinCommentRoom',(data)=>{
+
+exports.commentSocketHandler = ({ socket, namespace }) => {
+    socket.on('joinCommentRoom', (data) => {
         const roomName = data.roomName;
-        joinRoom(socket,roomName);
-        socketRef.rooms.push({roomName, socketId: data.socketId,namespace,socket});
+        joinRoom(socket, roomName);
+        // SOCKET-PERFORMANCE-PLAN #7 (Phase 2): upsertRoom replaces the
+        // hand-rolled findIndex / push-or-replace dedup that used to live
+        // inline here. The Map-based index keys on roomName, so re-joining
+        // is naturally idempotent.
+        upsertRoom({ roomName, socketId: data.socketId, namespace, socket });
     });
-    socket.on('leaveCommentRoom',(roomName)=>{
-        let index = socketRef.rooms.findIndex((x)=> x.roomName === roomName);        
-        if (index !== -1) {
-            socketRef.rooms.splice(index, 1);
-        }
-        leaveRoom(socket,roomName);
-    })
-}
-function setEventName(type) {
-    let eventName;
-    switch (type) {
-        case 'insert': { 
-            eventName = 'commentInsert'
-            break;
-        }
-        case 'update': { 
-            eventName = 'commentUpdate'
-            break;
-        }
-        case 'delete': { 
-            eventName = 'commentDelete'
-            break;
-        }
-        case 'replace': { 
-            eventName = 'commentReplace'
-            break;
-        }
-    }
-    return eventName;
-}
-const handleCommentChange = (changeData, includeUpdatedFields = false) => {
-    if (changeData.module === 'comments') {
-        const comentIdentifier = `comments_${JSON.parse(JSON.stringify(changeData.data)).projectId}_${JSON.parse(JSON.stringify(changeData.data)).sprintId}_${JSON.parse(JSON.stringify(changeData.data)).taskId}`;
-        const relatedRooms = socketRef.rooms.filter(x => x.roomName.includes(comentIdentifier));
-        
-        relatedRooms.forEach(data => {
-            const eventName = setEventName(changeData.type);
-            const comment = `${comentIdentifier}**${data.socketId}`;
-            const matchingRooms = [...new Set(
-                Array.from(data.namespace.adapter.rooms.keys())
-                    .filter((roomName) => {
-                        let socId = roomName.split("**");
-                        if (socId.length > 1 && socId[1] === data.socketId) {
-                            return (
-                                (roomName.includes(comment) && data.roomName.includes(comment)) 
-                            )
-                        }
-                    })
-            )];
-            const emitData = {
-                fullDocument: changeData.data,
-                ...(includeUpdatedFields && { updatedFields: changeData.updatedFields })
-            };
-
-            matchingRooms.forEach(room => {
-                data.namespace.to(room).emit(`${eventName}`, emitData);
-            });
-        });
-    }
-
-    if (changeData.module === 'comments_project') {
-        const comentProjectIdentifier = `comments_project_${JSON.parse(JSON.stringify(changeData.data)).projectId}`;
-        const relatedRooms = socketRef.rooms.filter(x => x.roomName.includes(comentProjectIdentifier));
-        
-        relatedRooms.forEach(data => {
-            const eventName = setEventName(changeData.type);
-            const commentProject = `${comentProjectIdentifier}**${data.socketId}`;
-            const matchingRooms = [...new Set(
-                Array.from(data.namespace.adapter.rooms.keys())
-                    .filter((roomName) => {
-                        let socId = roomName.split("**");
-                        if (socId.length > 1 && socId[1] === data.socketId) {
-                            return (
-                                (roomName.includes(commentProject) && data.roomName.includes(commentProject)) 
-                            )
-                        }
-                    })
-            )];
-            const emitData = {
-                fullDocument: changeData.data,
-                ...(includeUpdatedFields && { updatedFields: changeData.updatedFields })
-            };
-
-            matchingRooms.forEach(room => {
-                data.namespace.to(room).emit(`${eventName}`, emitData);
-            });
-        });
-    }
+    socket.on('leaveCommentRoom', (roomName) => {
+        removeRoom(roomName);
+        leaveRoom(socket, roomName);
+    });
 };
 
-socketEmitter.on('update', changeData => handleCommentChange(changeData, true));
-socketEmitter.on('insert', changeData => handleCommentChange(changeData, false));
+function setEventName(type) {
+    switch (type) {
+        case 'insert': return 'commentInsert';
+        case 'update': return 'commentUpdate';
+        case 'delete': return 'commentDelete';
+        case 'replace': return 'commentReplace';
+    }
+}
+
+const handleCommentChange = (changeData, includeUpdatedFields = false) => {
+    // Both modules share the same emit shape; the only difference is the
+    // prefix used to find subscribed rooms.
+    let prefix;
+    if (changeData.module === 'comments') {
+        const { projectId, sprintId, taskId } = changeData.data;
+        prefix = `comments_${projectId}_${sprintId}_${taskId}`;
+    } else if (changeData.module === 'comments_project') {
+        prefix = `comments_project_${changeData.data.projectId}`;
+    } else {
+        return;
+    }
+
+    // SOCKET-PERFORMANCE-PLAN #1 (Phase 2): O(1) prefix lookup replaces the
+    // full-array filter + `uniqueRooms` dedup helper. The Map-based index
+    // is already deduped by construction (key = roomName), so a second-pass
+    // dedup is no longer needed.
+    const relatedRooms = findRoomsByPrefix(prefix);
+    if (!relatedRooms.length) return;
+
+    const eventName = setEventName(changeData.type);
+    const emitData = {
+        fullDocument: changeData.data,
+        ...(includeUpdatedFields && { updatedFields: changeData.updatedFields }),
+    };
+
+    relatedRooms.forEach(data => {
+        // SOCKET-PERFORMANCE-PLAN #5 (Phase 2): see taskSocket.js — small-Set
+        // membership check beats scanning the namespace's full adapter.rooms.
+        if (!data.socket.rooms.has(data.roomName)) return;
+        data.namespace.to(data.roomName).emit(eventName, emitData);
+    });
+};
+
+// SOCKET-PERFORMANCE-PLAN #2: comments are published under two modules —
+// `comments` (task-level comments) and `comments_project` (project-level
+// comments). Subscribe to both namespaces so the handler still receives
+// every relevant event while ignoring task/companies/notification fan-out.
+socketEmitter.on('comments:update', changeData => handleCommentChange(changeData, true));
+socketEmitter.on('comments:insert', changeData => handleCommentChange(changeData, false));
+socketEmitter.on('comments_project:update', changeData => handleCommentChange(changeData, true));
+socketEmitter.on('comments_project:insert', changeData => handleCommentChange(changeData, false));

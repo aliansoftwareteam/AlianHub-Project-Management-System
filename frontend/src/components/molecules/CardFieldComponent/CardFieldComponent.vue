@@ -72,16 +72,28 @@
                         :isCheckBox="field?.label === 'fields' ? true : false"
                     />
 
-                    <ToggleFieldComponent 
+                    <ToggleFieldComponent
                         v-else-if="field?.type === 'radio' && !field?.hidden && (selectedMeasure === 3 || selectedMeasure === null)"
                         :field="field"
                         :formObj="formObj"
                         @update:form-obj="handleFormUpdate"
                         :index="index"
                     />
+
+                    <!-- Recently Added Projects — quick-review list of projects
+                         created in the last ~2 days (same rule as the project
+                         sidebar's green "new" marker). Ticking a row adds it to
+                         the Project selection above. Employee Workload card only;
+                         purely additive — it just toggles selectedProjects. -->
+                    <RecentlyAddedProjects
+                        v-if="componentId === 'EmployeeWorkloadReportCard' && field?.label === 'location' && !field?.hidden && newlyAddedProjects.length"
+                        :projects="newlyAddedProjects"
+                        :selectedIds="selectedProjects"
+                        @toggle="toggleNewProject"
+                    />
                 </template>
             </div>
-            <div v-if="cardType !== 'time_tracking' && componentId !== 'QueueListComp'">
+            <div v-if="cardType !== 'time_tracking' && componentId !== 'QueueListComp' && componentId !== 'EmployeeWorkloadReportCard'">
                 <div class="custom-field card-advanced-filter">
                     <h3 class="group_by_card">{{$t('Filters.filter')}}</h3>
                     <template v-for="(field, index) in fieldArray.filter(e => e.groupBy === 'filter')" :key="index">
@@ -116,6 +128,7 @@ import DropDownListComponent from "@/components/templates/Dashboard/DropDownList
 import ToggleFieldComponent from "@/components/templates/Dashboard/ToggleFieldComponent.vue";
 import TextInputFieldComponent from "@/components/templates/Dashboard/TextInputFieldComponent.vue";
 import HomeTaskFilter from '@/components/molecules/TaskFilter/HomeTaskFilter.vue'
+import RecentlyAddedProjects from '@/components/molecules/RecentlyAddedProjects/RecentlyAddedProjects.vue';
 
 const { t } = useI18n();
 const store = useStore();
@@ -123,15 +136,25 @@ const { getters } = store;
 const {makeUniqueId,checkPermission} = useCustomComposable()
 const userId = inject("$userId");
 const teams = computed(() => {
-    const teamsArr = getters["settings/teams"];
-    return teamsArr.map((x) => {
-        return {
-            ...x,
-            "_id": "tId_"+x._id,
-            "Employee_Name": x.name,
-            "Employee_profileImageURL": ""
-        }
-    })
+    // Members (roleType !== 1 and !== 2) cannot select teams in the
+    // EmployeeWorkloadReportCard — the backend would only return their
+    // own data anyway, so showing the full team list is misleading.
+    if (props.componentId === 'EmployeeWorkloadReportCard') {
+        const roleType = getters["settings/companyUserDetail"]?.roleType;
+        if (roleType !== 1 && roleType !== 2) return [];
+    }
+    const teamsArr = getters["settings/teams"] || [];
+    return teamsArr
+        // Skip teams that have no members — selecting them does nothing.
+        .filter((x) => Array.isArray(x.assigneeUsersArray) && x.assigneeUsersArray.length)
+        .map((x) => {
+            return {
+                ...x,
+                "_id": "tId_"+x._id,
+                "Employee_Name": x.name,
+                "Employee_profileImageURL": ""
+            }
+        })
 });
 
 const taskStatusArray = computed(() => JSON.parse(JSON.stringify(getters["settings/AllTaskStatus"]?.settings || [])));
@@ -183,6 +206,20 @@ const usersArray = computed(() => {
     const allUsers = JSON.parse(JSON.stringify(getters["users/users"]))
     const currentUserOnly = allUsers.filter(user => user._id === userId.value);
 
+    // EmployeeWorkloadReportCard: show only users the viewer is
+    // allowed to see — mirrors the backend role-based visibility.
+    //   roleType 1 (Admin)   → all users
+    //   roleType 2 (Manager) → all users (backend will further restrict)
+    //   else   (Member)      → only themselves
+    if (props.componentId === 'EmployeeWorkloadReportCard') {
+        const roleType = getters["settings/companyUserDetail"]?.roleType;
+        if (roleType !== 1 && roleType !== 2) {
+            selectedUser.value = [userId.value]; // eslint-disable-line
+            return currentUserOnly;
+        }
+        return allUsers;
+    }
+
     const makeFilterCond = (key) => {
         const permission = checkPermission(key);
         if (permission === 2 || permission === true) return allUsers;
@@ -203,12 +240,60 @@ const usersArray = computed(() => {
     }
 });
 
+// ─── Recently Added Projects (Employee Workload card only) ──────────
+// Mirrors the project sidebar's "new_project_add" rule (organisms/Item):
+// a project is "newly added" when its createdAt is past midnight two days
+// ago — the same threshold that paints the green left-border in the
+// project list. We surface those under the Project dropdown so the user
+// can tick recently-created projects straight into the card's selection.
+const resolveCreatedMs = (createdAt) => {
+    if (!createdAt) return NaN;
+    if (typeof createdAt === 'object') {
+        if (createdAt instanceof Date) return createdAt.getTime();
+        const sec = createdAt.seconds ?? createdAt._seconds;
+        if (sec != null) return Number(sec) * 1000;
+        return new Date(createdAt).getTime();
+    }
+    return new Date(createdAt).getTime();
+};
+const isNewlyAddedProject = (project) => {
+    const created = resolveCreatedMs(project?.createdAt);
+    if (Number.isNaN(created)) return false;
+    const now = new Date();
+    const threshold = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2).getTime();
+    return created > threshold;
+};
+const newlyAddedProjects = computed(() => {
+    if (props.componentId !== 'EmployeeWorkloadReportCard') return [];
+    return (props.allProjectsArray || [])
+        .filter(isNewlyAddedProject)
+        // Only surface projects NOT already on this card. Ticking one adds it
+        // to selectedProjects (what Save persists), so it drops out of this
+        // list immediately and won't be suggested again on reopen.
+        .filter((p) => !selectedProjects.value.includes(p._id))
+        .sort((a, b) => resolveCreatedMs(b?.createdAt) - resolveCreatedMs(a?.createdAt));
+});
+// Toggle a project in/out of the SAME selectedProjects array the Project
+// dropdown drives, so Save persists it through the existing path untouched.
+const toggleNewProject = (projectId) => {
+    if (!projectId) return;
+    selectedProjects.value = selectedProjects.value.includes(projectId)
+        ? selectedProjects.value.filter((id) => id !== projectId)
+        : [...selectedProjects.value, projectId];
+};
+
 const error = ref('');
 const formObj = ref({});
 const formRef = ref(null);
 const errorProject = ref('');
 const submitted = ref(false);
-const fieldArray = ref(JSON.parse(JSON.stringify(props.fieldsArray)));
+// Drop the deprecated `hideEmptyEmployees` field from any card whose
+// saved config still carries it (added to the dashboard before the
+// field was removed). Empty users are always hidden now — no toggle.
+const fieldArray = ref(
+    JSON.parse(JSON.stringify(props.fieldsArray))
+        .filter((f) => f && f.name !== 'hideEmptyEmployees')
+);
 
 const { checkErrors, checkAllFields } = useValidation();
 

@@ -3,8 +3,9 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const mongoose = require("mongoose")
 const logger = require("../../Config/loggerConfig");
 const { handleTaskAttachmentsDuplicateFunctionality } = require(`../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
-const { replaceObjectKey } = require("../auth/helper");
+const { replaceObjectKey } = require("../Auth/helper");
 const socketEmitter = require('../../event/socketEventEmitter');
+const { escapeRegex } = require("../../utils/escapeRegex");
 /**
  * This endpoint is used to save data in comments collection
  * @param {*} req 
@@ -125,6 +126,12 @@ exports.getPaginatedMessages = async (req, res) => {
             $match: {
                 $and: [
                     { projectId: new mongoose.Types.ObjectId(projectId) },
+                    // BUG-032 / #86 fix: align soft-delete handling with the other
+                    // comment-listing endpoints (searchMessageFromMainChat /
+                    // searchComments). Without this filter, soft-deleted comments
+                    // (isDeleted === true) reappeared in main-chat pagination.
+                    // `$ne: true` keeps documents whose flag is missing/false.
+                    { isDeleted: { $ne: true } },
                     ...(sprintId ? [{ sprintId: new mongoose.Types.ObjectId(sprintId) }] : []),
                     ...(tabLeaveTime ? [{ updatedAt: { $gte: new Date(Number(tabLeaveTime)) } }] : []),
                     ...(!isDefault && mainChat
@@ -188,12 +195,16 @@ exports.searchMessageFromMainChat = async (req, res) => {
                     ...(searchText && searchText !== ''
                         ? {
                               $or: [
-                                  { mediaName: { $regex: new RegExp(`${searchText}`, "i") } },
-                                  { message: { $regex: new RegExp(`${searchText}`, "i") } }
+                                  { mediaName: { $regex: escapeRegex(searchText), $options: "i" } },
+                                  { message: { $regex: escapeRegex(searchText), $options: "i" } }
                               ]
                           }
                         : {}),
-                    isDeleted: false
+                    // BUG-032 / #86 fix: legacy comments may not have an
+                    // isDeleted field. Using `$ne: true` keeps them in results
+                    // while still excluding soft-deleted ones (consistent with
+                    // searchComments).
+                    isDeleted: { $ne: true }
                 },
                 {},
                 { sort: { createdAt: 1 } },
@@ -253,10 +264,10 @@ exports.searchComments = async (req, res) => {
                         ? [
                             {
                                 $or: [
-                                    { message: { $regex: searchStr, $options: "i" } },
-                                    { mediaURL: { $regex: searchStr, $options: "i" } },
-                                    { mediaName: { $regex: searchStr, $options: "i" } },
-                                    { mediaOriginalName: { $regex: searchStr, $options: "i" } },
+                                    { message: { $regex: escapeRegex(searchStr), $options: "i" } },
+                                    { mediaURL: { $regex: escapeRegex(searchStr), $options: "i" } },
+                                    { mediaName: { $regex: escapeRegex(searchStr), $options: "i" } },
+                                    { mediaOriginalName: { $regex: escapeRegex(searchStr), $options: "i" } },
                                 ],
                             },
                         ]

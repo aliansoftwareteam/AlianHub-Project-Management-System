@@ -1,0 +1,12 @@
+
+=== source — implicit global is gone ===
+  PASS  no bare `setChat = await ...` assignment remains
+  PASS  setChat is now declared with const
+
+=== module loads without leaking globals ===
+  PASS  global.setChat is undefined after require
+  PASS  exports.setChats is a function (handler still wired up)
+
+========================================
+Tests: 4 | Passed: 4 | Failed: 0
+========================================

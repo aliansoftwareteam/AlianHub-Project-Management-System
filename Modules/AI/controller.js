@@ -3,6 +3,7 @@ const { dbCollections } = require("../../Config/collections");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const { default: mongoose } = require("mongoose");
 const { pushChat,addChat, getChat, deleteChat, removeChat} = require("./helper");
+const { escapeRegex } = require("../../utils/escapeRegex");
 const config = require('../../Config/config');
 const logger = require("../../Config/loggerConfig");
 const { SCHEMA_TYPE } = require("../../Config/schemaType")
@@ -234,7 +235,7 @@ exports.resetAiRequestCount = async() => {
             ]
         }
         MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL,obj,"updateMany").then(() => {
-            console.log("COMPLETE COMP");
+            logger.info("COMPLETE COMP");
         }).catch((error)=> {
             logger.error(`${error} error in updatemany company count`);
         })
@@ -336,7 +337,7 @@ exports.updateAiModel = (req,res) => {
                 res.send({status : false,statusText: err})
                 return;
             }
-            const regex = new RegExp(`^(${key}=).*`, 'm');
+            const regex = new RegExp(`^(${escapeRegex(key)}=).*`, 'm');
             const replacement = `${key}="${req.body.value}"`;
 
             let updatedData;
@@ -384,15 +385,24 @@ exports.generateWithStream = (axiosData,header,userId,companyId,uniqueUserId,eve
                 .map((chunk) => chunk.replace(/^data: /, '').trim())
                 .filter((chunk) => chunk !== undefined && chunk !== '' && chunk !== '[DONE]')
                 .map((chunk) => JSON.parse(chunk));
-                chunkObjects.forEach(async(chunk) => {
-                    if (chunk.choices && chunk.choices.length > 0 && chunk.choices[0].delta.content){
-                        delayProvider(chunk.choices[0].delta.content,eventId)
-                    }else if(chunk.usage){
-                        const userUpdate = await exports.limitCountUpdate(userId,companyId,chunk.usage.total_tokens);
-                        emitListener(eventId, {step: "COUNT",value : userUpdate});
+                // BUG-017 / #71 fix: this loop has an `await` inside (the
+                // `limitCountUpdate` call) so the previous `.forEach(async ...)`
+                // was fire-and-forget — `resolve(fullText)` ran before the
+                // quota update settled, so quota failures were invisible.
+                // `for ... of` + `await` guarantees the update is fully
+                // applied before we continue.
+                for (const chunk of chunkObjects) {
+                    if (chunk.choices && chunk.choices.length > 0 && chunk.choices[0].delta.content) {
+                        delayProvider(chunk.choices[0].delta.content, eventId);
+                    } else if (chunk.usage) {
+                        const userUpdate = await exports.limitCountUpdate(userId, companyId, chunk.usage.total_tokens);
+                        emitListener(eventId, { step: "COUNT", value: userUpdate });
                     }
-                });
-                chunkObjects.forEach(async(chunk) => {
+                }
+                // BUG-017 / #71 fix: this loop has no `await` inside — just
+                // string concatenation — so the `async` keyword on the
+                // callback was misleading. Plain `forEach` is correct here.
+                chunkObjects.forEach((chunk) => {
                     if (chunk.choices && chunk.choices.length > 0 && chunk.choices[0].delta.content){
                         fullText += chunk.choices[0].delta.content;
                     }

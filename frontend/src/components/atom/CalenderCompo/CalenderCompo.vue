@@ -255,7 +255,7 @@ const datePicker = ref('');
 const startDateVal = ref('');
 const endDateVal = ref('');
 const dateImage = require('@/assets/images/svg/date_cion.svg');
-const withoutBorderImageIcon = require('@/assets/images/svg/compoment_inactive_icons/comp_calender_inactive.svg');
+const withoutBorderImageIcon = require('@/assets/images/svg/component-inactive-icons/comp_calender_inactive.svg');
 watch(() => props.modelValue, (newval,oldVal) => {
     if (newval != null && newval != '' && newval != oldVal) {
         dateValue.value = newval;
