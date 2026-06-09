@@ -61,6 +61,11 @@
                     </template>
 
                     <div @click="!showArchiveVar ? toggleTaskDetail(task) : ''" class="task_name_wrapper task_Name ml-6px">
+                        <!-- PROPOSAL REVIEW SPINNER — transient UI flag set by Modules/ProposalReview/trigger.js -->
+                        <svg v-if="task.proposalReviewProcessing" class="proposal-review-spinner" :data-title="$t('Apps.proposalReview') + '…'" width="14" height="14" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="12" cy="12" r="9" stroke="#d6d6d6" stroke-width="3" fill="none"/>
+                            <circle cx="12" cy="12" r="9" stroke="#3845B3" stroke-width="3" fill="none" stroke-linecap="round" stroke-dasharray="14 60"/>
+                        </svg>
                         <!-- TASK NAME -->
                         <span v-if="!editTaskName" class="text-ellipsis d-inline-block edit__taskname" :title="task.TaskName">
                             {{ task.TaskName }}
