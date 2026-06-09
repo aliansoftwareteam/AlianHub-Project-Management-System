@@ -71,10 +71,10 @@ COPY Modules/ ./Modules/
 COPY common-storage/ ./common-storage/
 COPY event/ ./event/
 COPY middlewares/ ./middlewares/
-COPY utils/ ./utils/
-COPY locale/ ./locale/
-COPY migrations/ ./migrations/
+COPY public/ ./public/
 COPY scripts/ ./scripts/
+COPY socket/ ./socket/
+COPY utils/ ./utils/
 
 # Persistent storage directory (mounted as a volume in compose)
 RUN mkdir -p /app/common-storage/uploads \
