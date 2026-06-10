@@ -16,6 +16,19 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.2.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.1.0...v14.2.0) (2026-06-10)
+
+
+### 🚀 Features
+
+* **tasks:** add task-to-task relations between work items — blocks, blocked-by, duplicates, duplicated-by and relates-to, with a Linked Tasks section in task detail, live socket sync, activity history on both sides, and a same-project task search ([07392b0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/07392b078b8a0b9fc6171a1fdcfb1b56fbea46a1), [#221](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/221))
+
+
+### ⚙️ CI
+
+* **docker:** build only on push to main + release — skip PR triggers ([#218](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/218))
+* **lint:** allow long-running branches in promotion PRs ([#217](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/217))
+
 ## [14.1.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.0.26...v14.1.0) (2026-06-09)
 
 
