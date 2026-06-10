@@ -217,6 +217,7 @@ function initializeControllers() {
     require('./Modules/ExportJobs/init').init(app);
     require('./Modules/ApiTokens/init').init(app);
     require('./Modules/Pages/init').init(app);
+    require('./Modules/PublicShares/init').init(app);
     require('./Modules/EstimatedTime/init').init(app);
     require('./Modules/CustomField/init').init(app);
     require('./Modules/ProjectTemplates/init').init(app);

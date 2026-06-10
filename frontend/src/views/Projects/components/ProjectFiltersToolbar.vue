@@ -112,6 +112,10 @@
                         <strong :style="{color: (clientWidth <= 767 ? '#535358' : '#000')}" :class="{'font-size-12 font-weight-500' : clientWidth > 767 , 'font-size-14 font-weight-400' : clientWidth <=767}">{{ $t('Projects.pages') }}</strong>
                     </button>
                     <PagesPanel v-model="showPages" :projectData="projectData" />
+                    <button class="text-nowrap btn-white border-groupBy border-radius-6-px cursor-pointer mr-1" @click="showPublicShare = true">
+                        <strong :style="{color: (clientWidth <= 767 ? '#535358' : '#000')}" :class="{'font-size-12 font-weight-500' : clientWidth > 767 , 'font-size-14 font-weight-400' : clientWidth <=767}">{{ $t('Projects.public_link') }}</strong>
+                    </button>
+                    <PublicShareModal v-model="showPublicShare" :projectData="projectData" />
                     <div class="mr-1 border-groupBy border-radius-6-px d-flex align-items-center assignee-filter manage__filter-users">
                         <div
                             @click="$emit('manageFilterUsers', userId)"
@@ -203,11 +207,13 @@ import GlobalSearchModal from '@/components/molecules/GlobalSearch/GlobalSearchM
 import EpicsPanel from '@/components/molecules/Epics/EpicsPanel.vue';
 import ExportTasksDropdown from '@/components/molecules/ExportTasks/ExportTasksDropdown.vue';
 import PagesPanel from '@/components/molecules/Pages/PagesPanel.vue';
+import PublicShareModal from '@/components/molecules/PublicShare/PublicShareModal.vue';
 
 const showBurndown = ref(false);
 const showGlobalSearch = ref(false);
 const showEpics = ref(false);
 const showPages = ref(false);
+const showPublicShare = ref(false);
 import { useCustomComposable } from '@/composable';
 
 const { checkPermission, checkApps } = useCustomComposable();
