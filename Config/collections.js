@@ -59,6 +59,16 @@ const dbCollections = {
     WEBHOOKS: "webhooks",
     WEBHOOK_LOGS: "webhookLogs",
     RECENTVISITS: "recentVisits",
+    API_TOKENS: "apiTokens",
+    API_ACTIVITY_LOGS: "apiActivityLogs",
+    EXPORT_JOBS: "exportJobs",
+    IMPORT_JOBS: "importJobs",
+    EPICS: "epics",
+    PAGES: "pages",
+    PAGE_VERSIONS: "pageVersions",
+    PUBLIC_SHARES: "publicShares",
+    INTAKE_ITEMS: "intakeItems",
+    PUBLIC_SHARE_INDEX: "publicShareIndex",
 }
 
 /** DOCUMENT ID'S NAME WHICH IS USED IN THE "SETTINGS" COLLECTION NAME **/
