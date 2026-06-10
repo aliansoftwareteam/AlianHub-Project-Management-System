@@ -112,6 +112,13 @@ const schema = {
             default: [],
             required: false,
         },
+        // Emoji reactions: [{ emoji, userId, createdAt }], one entry per
+        // user+emoji — written only by Modules/Reactions/controller.js
+        'reactions': {
+            type: Array,
+            default: [],
+            required: false,
+        },
         'checklistArray': {
             type: Array,
             required: false,
@@ -270,6 +277,26 @@ const schema = {
         userId: {
             type: String,
             required: true
+        },
+    },
+    // Per-user recently-visited entities (one doc per user+entity, upserted
+    // on every visit) — written only by Modules/RecentVisits/controller.js
+    recentVisits: {
+        userId: {
+            type: String,
+            required: true,
+        },
+        entityType: {
+            type: String,
+            required: true,
+        },
+        entityId: {
+            type: mongoose.Schema.Types.ObjectId,
+            required: true,
+        },
+        visitedAt: {
+            type: Date,
+            required: true,
         },
     },
     // Outgoing webhook registrations (per-company) — managed by
@@ -1117,6 +1144,12 @@ const schema = {
             type: String,
             required: false
         },
+        // Auto-archive rule: { enabled: Boolean, afterDays: Number } —
+        // applied nightly by Modules/projectSetting/autoArchive.js
+        "autoArchive": {
+            type: Object,
+            required: false
+        },
         AssigneeUserId: {
             type: Array,
             default: [],
@@ -1918,6 +1951,13 @@ const schema = {
         "pinnedMessage": {
             type: Boolean,
             default: false,
+            required: false
+        },
+        // Emoji reactions: [{ emoji, userId, createdAt }], one entry per
+        // user+emoji — written only by Modules/Reactions/controller.js
+        "reactions": {
+            type: Array,
+            default: [],
             required: false
         },
         "mediaOriginalName": {

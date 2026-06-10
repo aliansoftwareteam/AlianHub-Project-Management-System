@@ -57,6 +57,7 @@ const SCHEMA_TYPE = {
     GLOBALSETTING: "globalSetting",
     WEBHOOKS: "webhooks",
     WEBHOOK_LOGS: "webhookLogs",
+    RECENTVISITS: "recentVisits",
 }
 
 module.exports = {

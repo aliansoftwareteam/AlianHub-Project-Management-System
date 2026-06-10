@@ -58,6 +58,7 @@ const dbCollections = {
     GLOBALSETTING: "globalSetting",
     WEBHOOKS: "webhooks",
     WEBHOOK_LOGS: "webhookLogs",
+    RECENTVISITS: "recentVisits",
 }
 
 /** DOCUMENT ID'S NAME WHICH IS USED IN THE "SETTINGS" COLLECTION NAME **/

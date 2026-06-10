@@ -210,6 +210,8 @@ function initializeControllers() {
     require('./Modules/settings/settingNotifications/init').init(app);
     require('./Modules/projectRules/init').init(app);
     require('./Modules/Webhooks/init').init(app);
+    require('./Modules/Reactions/init').init(app);
+    require('./Modules/RecentVisits/init').init(app);
     require('./Modules/EstimatedTime/init').init(app);
     require('./Modules/CustomField/init').init(app);
     require('./Modules/ProjectTemplates/init').init(app);

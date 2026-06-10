@@ -55,7 +55,8 @@ const {
     refferalmapping,
     globalSettingsSchema,
     webhooksSchema,
-    webhookLogsSchema
+    webhookLogsSchema,
+    recentVisitsSchema
 } = require('./createSchema');
 
 
@@ -171,6 +172,8 @@ exports.checkType = (type) => {
             return webhooksSchema
         case SCHEMA_TYPE.WEBHOOK_LOGS:
             return webhookLogsSchema
+        case SCHEMA_TYPE.RECENTVISITS:
+            return recentVisitsSchema
         default:
             return ""
     }
@@ -289,6 +292,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.WEBHOOKS}`
         case SCHEMA_TYPE.WEBHOOK_LOGS:
                 return `${dbCollections.WEBHOOK_LOGS}`
+        case SCHEMA_TYPE.RECENTVISITS:
+                return `${dbCollections.RECENTVISITS}`
         default:
             return ""
     }

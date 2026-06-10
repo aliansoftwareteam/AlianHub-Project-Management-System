@@ -86,6 +86,10 @@ const webhooksSchema = new Schema(schema.webhooks, {strict: true, timestamps: tr
 const webhookLogsSchema = new Schema(schema.webhookLogs, {strict: true, timestamps: true});
 // webhook logs: always read newest-first per webhook; cap retention by query.
 webhookLogsSchema.index({ webhookId: 1, createdAt: -1 });
+const recentVisitsSchema = new Schema(schema.recentVisits, {strict: true, timestamps: true});
+// recents: one doc per user+entity, always read newest-first per user.
+recentVisitsSchema.index({ userId: 1, visitedAt: -1 });
+recentVisitsSchema.index({ userId: 1, entityType: 1, entityId: 1 }, { unique: true });
 
 // BUG-021 / #75 — Indexes for the hottest query paths. Each company has its
 // own MongoDB database, so `companyId` itself is the database name and need
@@ -148,6 +152,7 @@ module.exports = {
     timeSheetSchema,
     webhooksSchema,
     webhookLogsSchema,
+    recentVisitsSchema,
     historySchema,
     userIdSchema, 
     usersSchema,

@@ -125,6 +125,13 @@
                             </template>
                         </div>
                         <span v-if="!message.isDeleted && !message.sent && new Date(message.createdAt).getTime() !== new Date(message.updatedAt).getTime()"  class="font-size-10">({{$t('Comments.edited')}})</span>
+                        <ReactionBar
+                            v-if="!message.isDeleted"
+                            :reactions="localReactions"
+                            compact
+                            class="mt-5px"
+                            @toggle="(emoji) => toggleCommentReaction(emoji)"
+                        />
                     </div>
                 </div>
             </div>
@@ -168,7 +175,7 @@
 
 <script setup>
 // PACKAGES
-import { defineComponent, defineProps, inject, onMounted, ref } from 'vue';
+import { defineComponent, defineProps, inject, onMounted, ref, watch } from 'vue';
 import { useConvertDate, useCustomComposable, useGetterFunctions } from '@/composable';
 
 // COMPONENTS
@@ -181,6 +188,8 @@ import ImageIcon from "@/components/atom/ImageIcon/ImageIcon.vue"
 import UserProfile from "@/components/atom/UserProfile/UserProfile.vue"
 import Spinner from "@/components/atom/SpinnerComp/SpinnerComp.vue"
 import { useProjects } from '@/composable/projects';
+import ReactionBar from '@/components/atom/ReactionBar/ReactionBar.vue';
+import { apiRequest } from '@/services';
 
 import { storageHelper } from "@/composable/commonFunction";
 const { handleStorageImageRequest } = storageHelper();
@@ -241,6 +250,30 @@ const props = defineProps({
 })
 
 const showMore = ref(false);
+
+// Reactions render from a local copy so we never mutate the prop directly;
+// socket-driven prop updates (other users reacting) re-sync it via the watch.
+const localReactions = ref([...(props.message?.reactions || [])]);
+watch(() => props.message?.reactions, (value) => {
+    localReactions.value = [...(value || [])];
+});
+
+function toggleCommentReaction(emoji) {
+    const user = getUser(userId.value);
+    apiRequest('post', '/api/v2/reactions', {
+        targetType: 'comment',
+        targetId: props.message._id,
+        emoji,
+        isProjectComment: props.message.project === true,
+        userData: { id: user.id, Employee_Name: user.Employee_Name },
+    }).then((response) => {
+        if (response.data?.status) {
+            localReactions.value = response.data.data.reactions || [];
+        }
+    }).catch((error) => {
+        console.error('ERROR in toggle comment reaction: ', error);
+    });
+}
 
 // function openFileInWindow(url) {
 //     window.open(url, "_blank")
