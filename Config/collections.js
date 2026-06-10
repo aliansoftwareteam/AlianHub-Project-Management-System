@@ -56,6 +56,7 @@ const dbCollections = {
     REFERCODE: "refferalcodes",
     REFFERALMAPPING: "refferalmapping",
     GLOBALSETTING: "globalSetting",
+    RECENTVISITS: "recentVisits",
 }
 
 /** DOCUMENT ID'S NAME WHICH IS USED IN THE "SETTINGS" COLLECTION NAME **/

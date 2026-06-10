@@ -1,6 +1,7 @@
 import * as env from '@/config/env';
 import { apiRequest } from "../../services";
 import Store from '@/store/index'
+import Swal from 'sweetalert2';
 
 class Task {
     create({ data, user, projectData ,indexObj = {}, groupBy}) {
@@ -135,10 +136,47 @@ class Task {
 
     /* -------------- UPDATE STATUS FUNCTION FOR TASK -----------------*/
 
+    /* Completed-type statuses have type 'close'. When a task that is still
+     * blocked by open tasks gets completed, surface a non-blocking warning —
+     * the change itself proceeds unchanged. Fire-and-forget. */
+    warnIfBlocked({ task, newStatus }) {
+        try {
+            const isCompleting = newStatus?.statusType === 'close' || newStatus?.status?.type === 'close';
+            const hasBlockers = (task?.relations || []).some((rel) => rel.type === 'blocked_by');
+            if (!isCompleting || !hasBlockers) return;
+
+            apiRequest('post', '/api/v2/tasks/relations', { action: 'list', taskId: task._id })
+            .then((response) => {
+                if (!response.data?.status) return;
+                const openBlockers = (response.data.data || []).filter((item) =>
+                    item.type === 'blocked_by' && item.task && item.task.deletedStatusKey !== 1 && item.task.statusType !== 'close'
+                );
+                if (openBlockers.length) {
+                    const keys = openBlockers.map((item) => item.task.TaskKey).join(', ');
+                    Swal.fire({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'warning',
+                        title: `This task is still blocked by ${keys}`,
+                        showConfirmButton: false,
+                        timer: 6000,
+                        timerProgressBar: true,
+                    });
+                }
+            })
+            .catch((error) => {
+                console.error('ERROR in blocked-task warning: ', error);
+            });
+        } catch (error) {
+            console.error('ERROR in blocked-task warning: ', error);
+        }
+    }
+
     updateStatus({ newStatus, prevStatus, projectData, task, userData , isUpdateTask = true}) {
         return new Promise((resolve,reject) => {
             try {
                 const {sprintId,ProjectID} = task;
+                this.warnIfBlocked({ task, newStatus });
                 Store.commit('projectData/mutateUpdateFirebaseTasks', {snap:null, op: "modified", pid:ProjectID, sprintId, data: {...task, ...newStatus},updatedFields:{...newStatus}});
                 apiRequest("patch", env.V2_TASKS, {
                     action: "updateStatus",

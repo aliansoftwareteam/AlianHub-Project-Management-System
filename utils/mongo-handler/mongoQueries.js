@@ -53,7 +53,8 @@ const {
     userDashboard,
     referCodeSchema,
     refferalmapping,
-    globalSettingsSchema
+    globalSettingsSchema,
+    recentVisitsSchema
 } = require('./createSchema');
 
 
@@ -164,7 +165,9 @@ exports.checkType = (type) => {
         case SCHEMA_TYPE.REFFERALMAPPING:
             return refferalmapping
         case SCHEMA_TYPE.GLOBALSETTING:
-            return globalSettingsSchema            
+            return globalSettingsSchema
+        case SCHEMA_TYPE.RECENTVISITS:
+            return recentVisitsSchema
         default:
             return ""
     }
@@ -279,6 +282,8 @@ exports.tableType = (type) => {
             return `${dbCollections.REFFERALMAPPING}`   
         case SCHEMA_TYPE.GLOBALSETTING:
                 return `${dbCollections.GLOBALSETTING}`
+        case SCHEMA_TYPE.RECENTVISITS:
+                return `${dbCollections.RECENTVISITS}`
         default:
             return ""
     }
