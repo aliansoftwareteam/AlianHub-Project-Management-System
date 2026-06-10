@@ -12,12 +12,22 @@ name: Docker
 #                            still builds on every change
 #   • workflow_dispatch   — manual trigger from the Actions UI
 #
-# Pushing to Docker Hub:
-#   To also push to hub.docker.com, add two repo secrets:
-#     DOCKERHUB_USERNAME
-#     DOCKERHUB_TOKEN
-#   and uncomment the "Login to Docker Hub" and Docker Hub tag lines
-#   in the metadata-action `images:` block below.
+# Pushing to Docker Hub (optional, auto-detected):
+#   This workflow always publishes to GHCR. To also publish to
+#   hub.docker.com once the official Docker Hub account exists, add
+#   two repo SECRETS:
+#     DOCKERHUB_USERNAME   (the login username/account)
+#     DOCKERHUB_TOKEN      (a Docker Hub access token)
+#   The workflow auto-detects them on each run — no code changes
+#   needed. If the secrets are absent, the Docker Hub login + push
+#   are skipped cleanly and only GHCR is published.
+#
+#   Image namespace: defaults to `alianhub` → docker.io/alianhub/alianhub.
+#   If the official account/org is named differently, set the repo
+#   VARIABLE `DOCKERHUB_NAMESPACE` to that name (not a secret — it's
+#   not sensitive). Example: a personal login `rasheshmak` pushing to
+#   the `alianhub` org → DOCKERHUB_USERNAME=rasheshmak (secret) and
+#   DOCKERHUB_NAMESPACE=alianhub (variable).
 #
 # Multi-arch:
 #   Built for linux/amd64 and linux/arm64.
@@ -69,6 +79,33 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Detect Docker Hub credentials. This gates BOTH the Docker
+      # Hub login step below AND the docker.io image-name line in
+      # the metadata step further down. The workflow stays valid
+      # whether the secrets are set or not.
+      #
+      # The image namespace defaults to `alianhub` but can be
+      # overridden with the repo VARIABLE `DOCKERHUB_NAMESPACE`
+      # (Settings → Secrets and variables → Actions → Variables).
+      # This matters when the official Docker Hub account/org ends
+      # up named something other than `alianhub` — set the variable
+      # instead of editing this workflow.
+      - name: Detect Docker Hub credentials
+        id: dockerhub
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE }}
+        run: |
+          if [ -n "$DOCKERHUB_USERNAME" ]; then
+            NS="${DOCKERHUB_NAMESPACE:-alianhub}"
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "namespace=$NS" >> "$GITHUB_OUTPUT"
+            echo "✓ Docker Hub credentials detected — will publish to docker.io/$NS/alianhub"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "ℹ Docker Hub credentials not configured — publishing to GHCR only"
+          fi
+
       - name: Log in to GitHub Container Registry
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
@@ -77,23 +114,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # ── Uncomment after adding Docker Hub secrets ───────────────
-      # - name: Log in to Docker Hub
-      #   if: github.event_name != 'pull_request'
-      #   uses: docker/login-action@v3
-      #   with:
-      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
-      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request' && steps.dockerhub.outputs.enabled == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Extract image metadata (tags + labels)
         id: meta
         uses: docker/metadata-action@v5
         with:
-          # GHCR is always included; add Docker Hub by uncommenting the
-          # second line below after secrets are configured.
+          # GHCR is always included. The docker.io target is included
+          # only when Docker Hub secrets are configured — the expression
+          # below resolves to an empty line otherwise, which the action
+          # silently skips.
           images: |
             ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}
-            # docker.io/alianhub/alianhub
+            ${{ steps.dockerhub.outputs.enabled == 'true' && format('docker.io/{0}/alianhub', steps.dockerhub.outputs.namespace) || '' }}
           tags: |
             # Semantic-version tags from release-please (e.g. v14.1.0)
             type=semver,pattern={{version}}
