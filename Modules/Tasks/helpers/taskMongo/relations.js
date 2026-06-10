@@ -4,6 +4,7 @@ const { MongoDbCrudOpration } = require("../../../../utils/mongo-handler/mongoQu
 const { default: mongoose } = require("mongoose");
 const socketEmitter = require('../../../../event/socketEventEmitter');
 const { HandleHistory } = require("../mongo_helper");
+const { HandleBothNotification } = require("../handleNotification");
 const { INVERSE_RELATION, RELATION_LABELS, validateTaskRef, validateRelationPair, validateRelationInput } = require('./relationRules');
 
 // Task-to-task relations (blocks / blocked_by / duplicates / duplicated_by /
@@ -52,6 +53,9 @@ module.exports = {
 
                 this.addRelationHistory({ companyId, task, otherKey: relatedTask.TaskKey, type, userData });
                 this.addRelationHistory({ companyId, task: relatedTask, otherKey: task.TaskKey, type: inverseType, userData });
+
+                this.notifyRelationChange({ companyId, task, userData, message: `<strong>${userData?.Employee_Name || 'Someone'}</strong> linked this task — it now <strong>${RELATION_LABELS[type]}</strong> <strong>${relatedTask.TaskKey}</strong>.` });
+                this.notifyRelationChange({ companyId, task: relatedTask, userData, message: `<strong>${userData?.Employee_Name || 'Someone'}</strong> linked this task — it now <strong>${RELATION_LABELS[inverseType]}</strong> <strong>${task.TaskKey}</strong>.` });
 
                 resolve({
                     status: true,
@@ -106,6 +110,11 @@ module.exports = {
                 this.removeRelationHistory({ companyId, task, otherKey: relatedTask ? relatedTask.TaskKey : 'a deleted task', userData });
                 if (relatedTask) {
                     this.removeRelationHistory({ companyId, task: relatedTask, otherKey: task.TaskKey, userData });
+                }
+
+                this.notifyRelationChange({ companyId, task, userData, message: `<strong>${userData?.Employee_Name || 'Someone'}</strong> removed the link with <strong>${relatedTask ? relatedTask.TaskKey : 'a deleted task'}</strong>.` });
+                if (relatedTask) {
+                    this.notifyRelationChange({ companyId, task: relatedTask, userData, message: `<strong>${userData?.Employee_Name || 'Someone'}</strong> removed the link with <strong>${task.TaskKey}</strong>.` });
                 }
 
                 resolve({
@@ -210,6 +219,33 @@ module.exports = {
         HandleHistory('task', companyId, task.ProjectID, task._id, historyObj, userData)
         .catch((error) => {
             logger.error(`ERROR in task relation history: ${error.message}`);
+        });
+    },
+
+    // In-app + email notification to the task's watchers (recipient filtering —
+    // watcher modes, creator — happens inside HandleBothNotification). A
+    // "No watchers" rejection is the normal empty case, not an error.
+    notifyRelationChange({ companyId, task, userData, message }) {
+        const notificationObject = {
+            message,
+            key: 'task_relation',
+            projectId: task.ProjectID,
+            taskId: task._id,
+            sprintId: task.sprintId,
+        };
+        HandleBothNotification({
+            type: 'tasks',
+            userData,
+            companyId,
+            projectId: task.ProjectID,
+            taskId: task._id,
+            folderId: task.folderObjId || "",
+            sprintId: task.sprintId,
+            object: notificationObject,
+        }).catch((error) => {
+            if (error?.message !== 'No watchers') {
+                logger.error(`ERROR in relation notification: ${error?.message || error}`);
+            }
         });
     },
 

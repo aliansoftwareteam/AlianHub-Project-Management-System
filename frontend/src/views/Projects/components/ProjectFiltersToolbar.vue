@@ -8,7 +8,7 @@
                         type="text"
                         :placeHolder="$t('PlaceHolder.search')"
                         class="form-control"
-                        :style="{width: (clientWidth > 1025 ? '392px' : '90%')}"
+                        :style="{width: (clientWidth > 1025 ? '260px' : '90%')}"
                         :value="taskSearch"
                         @input="$emit('update:taskSearch', $event.target.value)"
                     >
@@ -94,6 +94,11 @@
                             </DropDownOption>
                         </template>
                     </DropDown>
+                    <button class="text-nowrap btn-white border-groupBy border-radius-6-px cursor-pointer mr-1" @click="showBurndown = true">
+                        <strong :style="{color: (clientWidth <= 767 ? '#535358' : '#000')}" :class="{'font-size-12 font-weight-500' : clientWidth > 767 , 'font-size-14 font-weight-400' : clientWidth <=767}">{{ $t('Projects.burndown') }}</strong>
+                    </button>
+                    <BurndownModal v-model="showBurndown" :projectData="projectData" />
+                    <RecentVisitsDropdown class="mr-1" />
                     <div class="mr-1 border-groupBy border-radius-6-px d-flex align-items-center assignee-filter manage__filter-users">
                         <div
                             @click="$emit('manageFilterUsers', userId)"
@@ -179,6 +184,10 @@ import Toggle from '@/components/atom/Toggle/Toggle.vue';
 import Assignee from '@/components/molecules/Assignee/Assignee.vue';
 import TaskFilter from '@/components/molecules/TaskFilter/TaskFilter.vue';
 import MonthlyCalendarMilestone from '@/components/atom/MonthlyCalendarMilestone/MonthlyCalendarMilestone.vue';
+import BurndownModal from '@/components/molecules/Burndown/BurndownModal.vue';
+import RecentVisitsDropdown from '@/components/molecules/RecentVisits/RecentVisitsDropdown.vue';
+
+const showBurndown = ref(false);
 import { useCustomComposable } from '@/composable';
 
 const { checkPermission, checkApps } = useCustomComposable();

@@ -55,6 +55,7 @@ const SCHEMA_TYPE = {
     REFERCODE: "refferalcodes",
     REFFERALMAPPING: "refferalmapping",
     GLOBALSETTING: "globalSetting",
+    RECENTVISITS: "recentVisits",
 }
 
 module.exports = {

@@ -82,6 +82,10 @@ sessionsSchema.index({ createdAt: 1 }, { expireAfterSeconds: Number(process.env.
 const referCodeSchema = new Schema(schema.refferalcodes, {strict: true, timestamps: true});
 const refferalmapping = new Schema(schema.refferalmapping, {strict: true, timestamps: true});
 const globalSettingsSchema = new Schema(schema.globalSettings, {strict: true, timestamps: true});
+const recentVisitsSchema = new Schema(schema.recentVisits, {strict: true, timestamps: true});
+// recents: one doc per user+entity, always read newest-first per user.
+recentVisitsSchema.index({ userId: 1, visitedAt: -1 });
+recentVisitsSchema.index({ userId: 1, entityType: 1, entityId: 1 }, { unique: true });
 
 // BUG-021 / #75 — Indexes for the hottest query paths. Each company has its
 // own MongoDB database, so `companyId` itself is the database name and need
@@ -140,9 +144,10 @@ sessionsSchema.index({ userId: 1 });
 
 // resetAttempt: keyed by IP.
 resetAttemptSchema.index({ ip: 1 });
-module.exports = { 
-    timeSheetSchema, 
-    historySchema, 
+module.exports = {
+    timeSheetSchema,
+    recentVisitsSchema,
+    historySchema,
     userIdSchema, 
     usersSchema,
     adminDetailSchema,

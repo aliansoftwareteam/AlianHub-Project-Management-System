@@ -1,4 +1,5 @@
 const ctrl = require('./controller');
+const autoArchive = require('./autoArchive');
 
 exports.init = (app) => {
      /**
@@ -97,4 +98,9 @@ exports.init = (app) => {
      */
     app.post('/api/v1/projectSetting/taskStatus', ctrl.changeTaskStatus);
     app.post('/api/v1/projectSetting/migrateSprintsFun', ctrl.migrateSprintsFun);
+
+    // Per-project auto-archive rule (completed tasks archive after N days —
+    // applied by the nightly cron in cron.js).
+    app.get('/api/v1/projectSetting/autoArchive/:pid', autoArchive.getAutoArchive);
+    app.post('/api/v1/projectSetting/autoArchive', autoArchive.setAutoArchive);
 }

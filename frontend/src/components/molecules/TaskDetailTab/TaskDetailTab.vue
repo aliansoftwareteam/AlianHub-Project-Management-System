@@ -105,7 +105,7 @@
 import Swal from 'sweetalert2';
 import { useStore } from 'vuex';
 import { useToast } from 'vue-toast-notification';
-import { computed, defineProps, inject, ref, nextTick,onMounted } from 'vue';
+import { computed, defineProps, inject, ref, nextTick,onMounted, watch } from 'vue';
 
 // COMPONENTS
 import { dbCollections } from '@/utils/Collections';
@@ -187,6 +187,21 @@ const isSpinnerAi = ref(false);
 
 // inject
 const userId = inject('$userId');
+
+// Recently-visited tracking — fire-and-forget on every task open.
+function recordRecentVisit() {
+    if (!props.task?._id) return;
+    const user = getUser(userId.value);
+    apiRequest('post', '/api/v2/recent-visits', {
+        entityType: 'task',
+        entityId: props.task._id,
+        userData: { id: user.id },
+    }).catch((error) => {
+        console.error('ERROR in record recent visit: ', error);
+    });
+}
+onMounted(recordRecentVisit);
+watch(() => props.task?._id, recordRecentVisit);
 const companyId = inject('$companyId');
 const clientWidth = inject("$clientWidth");
 const projectData = inject("selectedProject");
