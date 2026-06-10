@@ -53,7 +53,9 @@ const {
     userDashboard,
     referCodeSchema,
     refferalmapping,
-    globalSettingsSchema
+    globalSettingsSchema,
+    webhooksSchema,
+    webhookLogsSchema
 } = require('./createSchema');
 
 
@@ -164,7 +166,11 @@ exports.checkType = (type) => {
         case SCHEMA_TYPE.REFFERALMAPPING:
             return refferalmapping
         case SCHEMA_TYPE.GLOBALSETTING:
-            return globalSettingsSchema            
+            return globalSettingsSchema
+        case SCHEMA_TYPE.WEBHOOKS:
+            return webhooksSchema
+        case SCHEMA_TYPE.WEBHOOK_LOGS:
+            return webhookLogsSchema
         default:
             return ""
     }
@@ -279,6 +285,10 @@ exports.tableType = (type) => {
             return `${dbCollections.REFFERALMAPPING}`   
         case SCHEMA_TYPE.GLOBALSETTING:
                 return `${dbCollections.GLOBALSETTING}`
+        case SCHEMA_TYPE.WEBHOOKS:
+                return `${dbCollections.WEBHOOKS}`
+        case SCHEMA_TYPE.WEBHOOK_LOGS:
+                return `${dbCollections.WEBHOOK_LOGS}`
         default:
             return ""
     }

@@ -55,6 +55,8 @@ const SCHEMA_TYPE = {
     REFERCODE: "refferalcodes",
     REFFERALMAPPING: "refferalmapping",
     GLOBALSETTING: "globalSetting",
+    WEBHOOKS: "webhooks",
+    WEBHOOK_LOGS: "webhookLogs",
 }
 
 module.exports = {

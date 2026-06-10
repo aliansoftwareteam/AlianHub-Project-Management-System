@@ -56,6 +56,8 @@ const dbCollections = {
     REFERCODE: "refferalcodes",
     REFFERALMAPPING: "refferalmapping",
     GLOBALSETTING: "globalSetting",
+    WEBHOOKS: "webhooks",
+    WEBHOOK_LOGS: "webhookLogs",
 }
 
 /** DOCUMENT ID'S NAME WHICH IS USED IN THE "SETTINGS" COLLECTION NAME **/

@@ -272,6 +272,77 @@ const schema = {
             required: true
         },
     },
+    // Outgoing webhook registrations (per-company) — managed by
+    // Modules/Webhooks/controller.js, delivered by dispatcher.js
+    webhooks: {
+        name: {
+            type: String,
+            required: true,
+        },
+        url: {
+            type: String,
+            required: true,
+        },
+        // Subscribed event names, or ['*'] for everything.
+        events: {
+            type: Array,
+            default: [],
+            required: true,
+        },
+        // HMAC secret — generated server-side, returned once on create.
+        secret: {
+            type: String,
+            required: true,
+        },
+        active: {
+            type: Boolean,
+            default: true,
+            required: false,
+        },
+        createdBy: {
+            type: String,
+            required: false,
+        },
+        lastStatus: {
+            type: Number,
+            required: false,
+        },
+        lastDeliveredAt: {
+            type: Date,
+            required: false,
+        },
+    },
+    // Delivery log per webhook attempt — written by the dispatcher only.
+    webhookLogs: {
+        webhookId: {
+            type: mongoose.Schema.Types.ObjectId,
+            required: true,
+        },
+        event: {
+            type: String,
+            required: true,
+        },
+        statusCode: {
+            type: Number,
+            required: false,
+        },
+        success: {
+            type: Boolean,
+            required: true,
+        },
+        durationMs: {
+            type: Number,
+            required: false,
+        },
+        attempt: {
+            type: Number,
+            required: false,
+        },
+        error: {
+            type: String,
+            required: false,
+        },
+    },
     users: {
         "legacyId": {
             type: String,

@@ -82,6 +82,10 @@ sessionsSchema.index({ createdAt: 1 }, { expireAfterSeconds: Number(process.env.
 const referCodeSchema = new Schema(schema.refferalcodes, {strict: true, timestamps: true});
 const refferalmapping = new Schema(schema.refferalmapping, {strict: true, timestamps: true});
 const globalSettingsSchema = new Schema(schema.globalSettings, {strict: true, timestamps: true});
+const webhooksSchema = new Schema(schema.webhooks, {strict: true, timestamps: true});
+const webhookLogsSchema = new Schema(schema.webhookLogs, {strict: true, timestamps: true});
+// webhook logs: always read newest-first per webhook; cap retention by query.
+webhookLogsSchema.index({ webhookId: 1, createdAt: -1 });
 
 // BUG-021 / #75 — Indexes for the hottest query paths. Each company has its
 // own MongoDB database, so `companyId` itself is the database name and need
@@ -140,9 +144,11 @@ sessionsSchema.index({ userId: 1 });
 
 // resetAttempt: keyed by IP.
 resetAttemptSchema.index({ ip: 1 });
-module.exports = { 
-    timeSheetSchema, 
-    historySchema, 
+module.exports = {
+    timeSheetSchema,
+    webhooksSchema,
+    webhookLogsSchema,
+    historySchema,
     userIdSchema, 
     usersSchema,
     adminDetailSchema,
