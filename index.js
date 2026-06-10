@@ -214,6 +214,7 @@ function initializeControllers() {
     require('./Modules/RecentVisits/init').init(app);
     require('./Modules/GlobalSearch/init').init(app);
     require('./Modules/Epics/init').init(app);
+    require('./Modules/ExportJobs/init').init(app);
     require('./Modules/EstimatedTime/init').init(app);
     require('./Modules/CustomField/init').init(app);
     require('./Modules/ProjectTemplates/init').init(app);
