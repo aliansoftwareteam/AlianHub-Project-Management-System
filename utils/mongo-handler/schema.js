@@ -104,6 +104,14 @@ const schema = {
             type: Array,
             required: false,
         },
+        // Task-to-task links: [{ taskId: ObjectId, type: 'blocks'|'blocked_by'|
+        // 'duplicates'|'duplicated_by'|'relates_to', createdBy, createdAt }] —
+        // written only by Modules/Tasks/helpers/taskMongo/relations.js
+        'relations': {
+            type: Array,
+            default: [],
+            required: false,
+        },
         'checklistArray': {
             type: Array,
             required: false,
