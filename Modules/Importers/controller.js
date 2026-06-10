@@ -64,7 +64,7 @@ exports.importFromJira = async (req, res) => {
                 total: tasks.length,
                 processed: 0,
                 created: 0,
-                errors: [],
+                errorList: [],
             },
         }, 'save');
 
@@ -101,7 +101,7 @@ exports.importFromJira = async (req, res) => {
             logger.error(`[importers] jira job ${job._id} failed: ${creationError.message}`);
             await MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.IMPORT_JOBS,
-                data: [{ _id: job._id }, { $set: { status: 'failed', errors: [String(creationError.message || creationError).slice(0, 300)] } }],
+                data: [{ _id: job._id }, { $set: { status: 'failed', errorList: [String(creationError.message || creationError).slice(0, 300)] } }],
             }, 'updateOne').catch(() => {});
             return res.send({ status: false, statusText: `Import failed: ${creationError.message}` });
         }
@@ -121,7 +121,7 @@ exports.listImports = async (req, res) => {
         }
         const jobs = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.IMPORT_JOBS,
-            data: [{ userId }, 'source status total processed created errors createdAt', { sort: { createdAt: -1 }, limit: 20 }],
+            data: [{ userId }, 'source status total processed created errorList createdAt', { sort: { createdAt: -1 }, limit: 20 }],
         }, 'find');
         return res.send({ status: true, statusText: 'Imports fetched.', data: jobs || [] });
     } catch (error) {

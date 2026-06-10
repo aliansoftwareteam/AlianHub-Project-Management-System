@@ -348,7 +348,7 @@ const schema = {
         total: { type: Number, required: false },
         processed: { type: Number, required: false },
         created: { type: Number, required: false },
-        errors: { type: Array, default: [], required: false },
+        errorList: { type: Array, default: [], required: false },
         mapping: { type: Object, required: false },
         fileName: { type: String, required: false },
     },
