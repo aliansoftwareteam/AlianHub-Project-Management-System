@@ -551,7 +551,6 @@ export default {
         page_restored: "Version restored",
         public_link: "Public link",
         create_public_link: "Create public link",
-        copy_link: "Copy",
         link_enabled: "Link enabled",
         allow_intake: "Accept public requests",
         intake_inbox: "Requests",
