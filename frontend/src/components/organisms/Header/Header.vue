@@ -95,7 +95,7 @@
                 </template>
             </DropDown>
             </div>
-            <span class="app-version">
+            <span class="app-version cursor-pointer" :title="$t('Changelog.view_whats_new')" @click="openChangelog()">
                 v{{version}}
             </span>
         </div>
@@ -323,6 +323,7 @@
 <script setup>
 // PACKAGE
 import { computed, defineComponent, defineEmits, inject, onMounted, ref, watch, watchEffect } from "vue";
+import { useRouter } from "vue-router";
 import {version} from "../../../../../package.json";
 import {useHelper} from "./helper"
 import { useMainChat } from "@/views/Chat/helper";
@@ -355,6 +356,14 @@ const {openRoute, menu} = useHelper();
 const {getProjects} = useMainChat();
 const {getDateAndTime} = useProjects();
 const { logOut } = useAuth();
+const router = useRouter();
+
+// OPEN THE WHAT'S NEW (CHANGELOG) PAGE IN A NEW TAB
+const openChangelog = () => {
+    const cid = companyId?.value || localStorage.getItem("selectedCompany") || "";
+    const route = router.resolve({ name: "Changelog", params: { cid } });
+    window.open(`${window.location.origin}${window.location.pathname}${route.href}`, "_blank", "noopener");
+};
 
 // IMAGES
 const closeBlueImage = require("@/assets/images/svg/CloseSidebar.svg");

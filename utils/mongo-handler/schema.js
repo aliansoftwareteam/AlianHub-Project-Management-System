@@ -119,6 +119,11 @@ const schema = {
             default: [],
             required: false,
         },
+        // Optional epic membership — managed by Modules/Epics
+        'epicId': {
+            type: mongoose.Schema.Types.ObjectId,
+            required: false,
+        },
         'checklistArray': {
             type: Array,
             required: false,
@@ -297,6 +302,182 @@ const schema = {
         visitedAt: {
             type: Date,
             required: true,
+        },
+    },
+    // Personal API tokens (hashed at rest; prefix shown for identification)
+    // — managed by Modules/ApiTokens
+    apiTokens: {
+        name: { type: String, required: true },
+        tokenHash: { type: String, required: true },
+        prefix: { type: String, required: true },
+        scopes: { type: Array, default: [], required: false },
+        userId: { type: String, required: true },
+        active: { type: Boolean, default: true, required: false },
+        expiresAt: { type: Date, required: false },
+        lastUsedAt: { type: Date, required: false },
+    },
+    // Per-call audit of token-authenticated API requests
+    apiActivityLogs: {
+        tokenId: { type: mongoose.Schema.Types.ObjectId, required: true },
+        method: { type: String, required: true },
+        path: { type: String, required: true },
+        statusCode: { type: Number, required: false },
+        durationMs: { type: Number, required: false },
+        ip: { type: String, required: false },
+    },
+    // Async export jobs — managed by Modules/ExportJobs
+    exportJobs: {
+        userId: { type: String, required: true },
+        type: { type: String, required: true },
+        format: { type: String, required: true },
+        filters: { type: Object, required: false },
+        status: { type: String, required: true },
+        fileName: { type: String, required: false },
+        filePath: { type: String, required: false },
+        total: { type: Number, required: false },
+        processed: { type: Number, required: false },
+        error: { type: String, required: false },
+    },
+    // Async import jobs (jira first) — managed by Modules/Importers
+    importJobs: {
+        userId: { type: String, required: true },
+        source: { type: String, required: true },
+        projectId: { type: mongoose.Schema.Types.ObjectId, required: true },
+        sprintId: { type: mongoose.Schema.Types.ObjectId, required: false },
+        status: { type: String, required: true },
+        total: { type: Number, required: false },
+        processed: { type: Number, required: false },
+        created: { type: Number, required: false },
+        errorList: { type: Array, default: [], required: false },
+        mapping: { type: Object, required: false },
+        fileName: { type: String, required: false },
+    },
+    // Epics: a grouping layer above tasks with progress roll-up
+    epics: {
+        name: { type: String, required: true },
+        description: { type: String, required: false },
+        ProjectID: { type: mongoose.Schema.Types.ObjectId, required: true },
+        color: { type: String, required: false },
+        status: { type: String, required: false },
+        createdBy: { type: String, required: false },
+        taskCount: { type: Number, default: 0, required: false },
+        completedCount: { type: Number, default: 0, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // Wiki pages (Editor.js blocks; versioned) — managed by Modules/Pages
+    pages: {
+        title: { type: String, required: true },
+        content: { type: Object, required: false },
+        rawText: { type: String, required: false },
+        parentPageId: { type: mongoose.Schema.Types.ObjectId, required: false },
+        ProjectID: { type: mongoose.Schema.Types.ObjectId, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        order: { type: Number, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    pageVersions: {
+        pageId: { type: mongoose.Schema.Types.ObjectId, required: true },
+        title: { type: String, required: false },
+        content: { type: Object, required: false },
+        rawText: { type: String, required: false },
+        savedBy: { type: String, required: false },
+    },
+    // Public share links for sprints/projects (+ optional intake form)
+    publicShares: {
+        entityType: { type: String, required: true },
+        entityId: { type: mongoose.Schema.Types.ObjectId, required: true },
+        token: { type: String, required: true },
+        enabled: { type: Boolean, default: true, required: false },
+        allowIntake: { type: Boolean, default: false, required: false },
+        createdBy: { type: String, required: false },
+    },
+    // Submissions arriving through a public intake form
+    intakeItems: {
+        publicShareId: { type: mongoose.Schema.Types.ObjectId, required: true },
+        name: { type: String, required: false },
+        email: { type: String, required: false },
+        title: { type: String, required: true },
+        description: { type: String, required: false },
+        status: { type: String, required: true },
+        taskId: { type: mongoose.Schema.Types.ObjectId, required: false },
+    },
+    // GLOBAL-DB lookup: public share token -> tenant (no auth context on
+    // public requests, so the token must resolve the company first)
+    publicShareIndex: {
+        token: { type: String, required: true },
+        companyId: { type: String, required: true },
+        shareId: { type: mongoose.Schema.Types.ObjectId, required: true },
+    },
+    // Outgoing webhook registrations (per-company) — managed by
+    // Modules/Webhooks/controller.js, delivered by dispatcher.js
+    webhooks: {
+        name: {
+            type: String,
+            required: true,
+        },
+        url: {
+            type: String,
+            required: true,
+        },
+        // Subscribed event names, or ['*'] for everything.
+        events: {
+            type: Array,
+            default: [],
+            required: true,
+        },
+        // HMAC secret — generated server-side, returned once on create.
+        secret: {
+            type: String,
+            required: true,
+        },
+        active: {
+            type: Boolean,
+            default: true,
+            required: false,
+        },
+        createdBy: {
+            type: String,
+            required: false,
+        },
+        lastStatus: {
+            type: Number,
+            required: false,
+        },
+        lastDeliveredAt: {
+            type: Date,
+            required: false,
+        },
+    },
+    // Delivery log per webhook attempt — written by the dispatcher only.
+    webhookLogs: {
+        webhookId: {
+            type: mongoose.Schema.Types.ObjectId,
+            required: true,
+        },
+        event: {
+            type: String,
+            required: true,
+        },
+        statusCode: {
+            type: Number,
+            required: false,
+        },
+        success: {
+            type: Boolean,
+            required: true,
+        },
+        durationMs: {
+            type: Number,
+            required: false,
+        },
+        attempt: {
+            type: Number,
+            required: false,
+        },
+        error: {
+            type: String,
+            required: false,
         },
     },
     users: {

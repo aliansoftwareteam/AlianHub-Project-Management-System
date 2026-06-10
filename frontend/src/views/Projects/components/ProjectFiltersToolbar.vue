@@ -99,6 +99,31 @@
                     </button>
                     <BurndownModal v-model="showBurndown" :projectData="projectData" />
                     <RecentVisitsDropdown class="mr-1" />
+                    <button class="text-nowrap btn-white border-groupBy border-radius-6-px cursor-pointer mr-1" :title="$t('Projects.global_search')" @click="showGlobalSearch = true">
+                        <strong :style="{color: (clientWidth <= 767 ? '#535358' : '#000')}" :class="{'font-size-12 font-weight-500' : clientWidth > 767 , 'font-size-14 font-weight-400' : clientWidth <=767}">{{ $t('Projects.global_search') }}</strong>
+                    </button>
+                    <GlobalSearchModal v-model="showGlobalSearch" />
+                    <button class="text-nowrap btn-white border-groupBy border-radius-6-px cursor-pointer mr-1" @click="showEpics = true">
+                        <strong :style="{color: (clientWidth <= 767 ? '#535358' : '#000')}" :class="{'font-size-12 font-weight-500' : clientWidth > 767 , 'font-size-14 font-weight-400' : clientWidth <=767}">{{ $t('Projects.epics') }}</strong>
+                    </button>
+                    <EpicsPanel v-model="showEpics" :projectData="projectData" />
+                    <ExportTasksDropdown class="mr-1" :projectData="projectData" />
+                    <button class="text-nowrap btn-white border-groupBy border-radius-6-px cursor-pointer mr-1" @click="showPages = true">
+                        <strong :style="{color: (clientWidth <= 767 ? '#535358' : '#000')}" :class="{'font-size-12 font-weight-500' : clientWidth > 767 , 'font-size-14 font-weight-400' : clientWidth <=767}">{{ $t('Projects.pages') }}</strong>
+                    </button>
+                    <PagesPanel v-model="showPages" :projectData="projectData" />
+                    <button class="text-nowrap btn-white border-groupBy border-radius-6-px cursor-pointer mr-1" @click="showPublicShare = true">
+                        <strong :style="{color: (clientWidth <= 767 ? '#535358' : '#000')}" :class="{'font-size-12 font-weight-500' : clientWidth > 767 , 'font-size-14 font-weight-400' : clientWidth <=767}">{{ $t('Projects.public_link') }}</strong>
+                    </button>
+                    <PublicShareModal v-model="showPublicShare" :projectData="projectData" />
+                    <button class="text-nowrap btn-white border-groupBy border-radius-6-px cursor-pointer mr-1" @click="showImportJira = true">
+                        <strong :style="{color: (clientWidth <= 767 ? '#535358' : '#000')}" :class="{'font-size-12 font-weight-500' : clientWidth > 767 , 'font-size-14 font-weight-400' : clientWidth <=767}">{{ $t('Projects.import_jira') }}</strong>
+                    </button>
+                    <ImportJiraModal v-model="showImportJira" :projectData="projectData" />
+                    <button class="text-nowrap btn-white border-groupBy border-radius-6-px cursor-pointer mr-1" @click="showAutoArchive = true">
+                        <strong :style="{color: (clientWidth <= 767 ? '#535358' : '#000')}" :class="{'font-size-12 font-weight-500' : clientWidth > 767 , 'font-size-14 font-weight-400' : clientWidth <=767}">{{ $t('Projects.auto_archive') }}</strong>
+                    </button>
+                    <AutoArchiveModal v-model="showAutoArchive" :projectData="projectData" />
                     <div class="mr-1 border-groupBy border-radius-6-px d-flex align-items-center assignee-filter manage__filter-users">
                         <div
                             @click="$emit('manageFilterUsers', userId)"
@@ -186,8 +211,21 @@ import TaskFilter from '@/components/molecules/TaskFilter/TaskFilter.vue';
 import MonthlyCalendarMilestone from '@/components/atom/MonthlyCalendarMilestone/MonthlyCalendarMilestone.vue';
 import BurndownModal from '@/components/molecules/Burndown/BurndownModal.vue';
 import RecentVisitsDropdown from '@/components/molecules/RecentVisits/RecentVisitsDropdown.vue';
+import GlobalSearchModal from '@/components/molecules/GlobalSearch/GlobalSearchModal.vue';
+import EpicsPanel from '@/components/molecules/Epics/EpicsPanel.vue';
+import ExportTasksDropdown from '@/components/molecules/ExportTasks/ExportTasksDropdown.vue';
+import PagesPanel from '@/components/molecules/Pages/PagesPanel.vue';
+import PublicShareModal from '@/components/molecules/PublicShare/PublicShareModal.vue';
+import ImportJiraModal from '@/components/molecules/ImportJira/ImportJiraModal.vue';
+import AutoArchiveModal from '@/components/molecules/AutoArchive/AutoArchiveModal.vue';
 
 const showBurndown = ref(false);
+const showGlobalSearch = ref(false);
+const showEpics = ref(false);
+const showPages = ref(false);
+const showPublicShare = ref(false);
+const showImportJira = ref(false);
+const showAutoArchive = ref(false);
 import { useCustomComposable } from '@/composable';
 
 const { checkPermission, checkApps } = useCustomComposable();

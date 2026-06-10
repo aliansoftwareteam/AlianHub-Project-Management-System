@@ -82,10 +82,40 @@ sessionsSchema.index({ createdAt: 1 }, { expireAfterSeconds: Number(process.env.
 const referCodeSchema = new Schema(schema.refferalcodes, {strict: true, timestamps: true});
 const refferalmapping = new Schema(schema.refferalmapping, {strict: true, timestamps: true});
 const globalSettingsSchema = new Schema(schema.globalSettings, {strict: true, timestamps: true});
+const webhooksSchema = new Schema(schema.webhooks, {strict: true, timestamps: true});
+const webhookLogsSchema = new Schema(schema.webhookLogs, {strict: true, timestamps: true});
+// webhook logs: always read newest-first per webhook; cap retention by query.
+webhookLogsSchema.index({ webhookId: 1, createdAt: -1 });
 const recentVisitsSchema = new Schema(schema.recentVisits, {strict: true, timestamps: true});
 // recents: one doc per user+entity, always read newest-first per user.
 recentVisitsSchema.index({ userId: 1, visitedAt: -1 });
 recentVisitsSchema.index({ userId: 1, entityType: 1, entityId: 1 }, { unique: true });
+const apiTokensSchema = new Schema(schema.apiTokens, {strict: true, timestamps: true});
+apiTokensSchema.index({ tokenHash: 1 });
+apiTokensSchema.index({ userId: 1 });
+const apiActivityLogsSchema = new Schema(schema.apiActivityLogs, {strict: true, timestamps: true});
+apiActivityLogsSchema.index({ tokenId: 1, createdAt: -1 });
+const exportJobsSchema = new Schema(schema.exportJobs, {strict: true, timestamps: true});
+exportJobsSchema.index({ userId: 1, createdAt: -1 });
+const importJobsSchema = new Schema(schema.importJobs, {strict: true, timestamps: true});
+importJobsSchema.index({ userId: 1, createdAt: -1 });
+const epicsSchema = new Schema(schema.epics, {strict: true, timestamps: true});
+epicsSchema.index({ ProjectID: 1, deletedStatusKey: 1 });
+const pagesSchema = new Schema(schema.pages, {strict: true, timestamps: true});
+pagesSchema.index({ parentPageId: 1, deletedStatusKey: 1 });
+pagesSchema.index({ ProjectID: 1, deletedStatusKey: 1 });
+const pageVersionsSchema = new Schema(schema.pageVersions, {strict: true, timestamps: true});
+pageVersionsSchema.index({ pageId: 1, createdAt: -1 });
+const publicSharesSchema = new Schema(schema.publicShares, {strict: true, timestamps: true});
+publicSharesSchema.index({ token: 1 }, { unique: true });
+const intakeItemsSchema = new Schema(schema.intakeItems, {strict: true, timestamps: true});
+intakeItemsSchema.index({ publicShareId: 1, status: 1 });
+const publicShareIndexSchema = new Schema(schema.publicShareIndex, {strict: true, timestamps: true});
+publicShareIndexSchema.index({ token: 1 }, { unique: true });
+// Global search: one combined text index per collection.
+taskSchema.index({ TaskName: 'text', rawDescription: 'text' });
+projectsSchema.index({ ProjectName: 'text' });
+commentSchema.index({ message: 'text' });
 
 // BUG-021 / #75 — Indexes for the hottest query paths. Each company has its
 // own MongoDB database, so `companyId` itself is the database name and need
@@ -146,7 +176,19 @@ sessionsSchema.index({ userId: 1 });
 resetAttemptSchema.index({ ip: 1 });
 module.exports = {
     timeSheetSchema,
+    webhooksSchema,
+    webhookLogsSchema,
     recentVisitsSchema,
+    apiTokensSchema,
+    apiActivityLogsSchema,
+    exportJobsSchema,
+    importJobsSchema,
+    epicsSchema,
+    pagesSchema,
+    pageVersionsSchema,
+    publicSharesSchema,
+    intakeItemsSchema,
+    publicShareIndexSchema,
     historySchema,
     userIdSchema, 
     usersSchema,

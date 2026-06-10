@@ -38,6 +38,17 @@ const routes = [
 
 	// REPORTS ROUTE
 	...reports,
+
+	// CHANGELOG / WHAT'S NEW ROUTE
+	{
+		path: '/:cid/whats-new',
+		name: 'Changelog',
+		meta: {
+			title: "What's New",
+			requiresAuth: true
+		},
+		component: () => import(/* webpackChunkName: "changelog" */ '@/views/Changelog/Changelog.vue')
+	},
 	{
 		path: "/:catchAll(.*)",
 		name: "404",

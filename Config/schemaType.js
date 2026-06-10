@@ -55,7 +55,19 @@ const SCHEMA_TYPE = {
     REFERCODE: "refferalcodes",
     REFFERALMAPPING: "refferalmapping",
     GLOBALSETTING: "globalSetting",
+    WEBHOOKS: "webhooks",
+    WEBHOOK_LOGS: "webhookLogs",
     RECENTVISITS: "recentVisits",
+    API_TOKENS: "apiTokens",
+    API_ACTIVITY_LOGS: "apiActivityLogs",
+    EXPORT_JOBS: "exportJobs",
+    IMPORT_JOBS: "importJobs",
+    EPICS: "epics",
+    PAGES: "pages",
+    PAGE_VERSIONS: "pageVersions",
+    PUBLIC_SHARES: "publicShares",
+    INTAKE_ITEMS: "intakeItems",
+    PUBLIC_SHARE_INDEX: "publicShareIndex",
 }
 
 module.exports = {

@@ -40,6 +40,10 @@
                 :task="task"
                 class="mt-1"
             />
+            <EpicPicker
+                :task="task"
+                class="mt-1"
+            />
             <div class="position-re">
                 <div v-if="checkPermission('task.task_custom_field',projectData?.isGlobalPermission) !== null && checkApps('CustomFields')">
                     <div :class="[{'pointer-event-none opacity-5 blur-3-px':!currentCompany?.planFeature?.customFields}]">
@@ -114,6 +118,7 @@ import Attachments from '@/components/atom/Attachments/Attachments.vue'
 import CheckListComponent from '@/components/molecules/CheckList/CheckList.vue'
 import SubTasks from '@/components/organisms/SubTasks/SubTasks.vue'
 import LinkedTasks from '@/components/organisms/LinkedTasks/LinkedTasks.vue'
+import EpicPicker from '@/components/molecules/Epics/EpicPicker.vue'
 import CreateTagPopup from "@/components/molecules/TagList/CreateTagPopup.vue";
 import TagChip from '@/components/atom/TagChip/TagChip.vue'
 import PromptSidebar from "@/components/molecules/PromptSidebar/PromptSidebar.vue";

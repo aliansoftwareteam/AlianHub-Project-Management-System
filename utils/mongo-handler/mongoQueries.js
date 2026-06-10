@@ -54,7 +54,19 @@ const {
     referCodeSchema,
     refferalmapping,
     globalSettingsSchema,
-    recentVisitsSchema
+    webhooksSchema,
+    webhookLogsSchema,
+    recentVisitsSchema,
+    apiTokensSchema,
+    apiActivityLogsSchema,
+    exportJobsSchema,
+    importJobsSchema,
+    epicsSchema,
+    pagesSchema,
+    pageVersionsSchema,
+    publicSharesSchema,
+    intakeItemsSchema,
+    publicShareIndexSchema
 } = require('./createSchema');
 
 
@@ -166,8 +178,32 @@ exports.checkType = (type) => {
             return refferalmapping
         case SCHEMA_TYPE.GLOBALSETTING:
             return globalSettingsSchema
+        case SCHEMA_TYPE.WEBHOOKS:
+            return webhooksSchema
+        case SCHEMA_TYPE.WEBHOOK_LOGS:
+            return webhookLogsSchema
         case SCHEMA_TYPE.RECENTVISITS:
             return recentVisitsSchema
+        case SCHEMA_TYPE.API_TOKENS:
+            return apiTokensSchema
+        case SCHEMA_TYPE.API_ACTIVITY_LOGS:
+            return apiActivityLogsSchema
+        case SCHEMA_TYPE.EXPORT_JOBS:
+            return exportJobsSchema
+        case SCHEMA_TYPE.IMPORT_JOBS:
+            return importJobsSchema
+        case SCHEMA_TYPE.EPICS:
+            return epicsSchema
+        case SCHEMA_TYPE.PAGES:
+            return pagesSchema
+        case SCHEMA_TYPE.PAGE_VERSIONS:
+            return pageVersionsSchema
+        case SCHEMA_TYPE.PUBLIC_SHARES:
+            return publicSharesSchema
+        case SCHEMA_TYPE.INTAKE_ITEMS:
+            return intakeItemsSchema
+        case SCHEMA_TYPE.PUBLIC_SHARE_INDEX:
+            return publicShareIndexSchema
         default:
             return ""
     }
@@ -282,8 +318,32 @@ exports.tableType = (type) => {
             return `${dbCollections.REFFERALMAPPING}`   
         case SCHEMA_TYPE.GLOBALSETTING:
                 return `${dbCollections.GLOBALSETTING}`
+        case SCHEMA_TYPE.WEBHOOKS:
+                return `${dbCollections.WEBHOOKS}`
+        case SCHEMA_TYPE.WEBHOOK_LOGS:
+                return `${dbCollections.WEBHOOK_LOGS}`
         case SCHEMA_TYPE.RECENTVISITS:
                 return `${dbCollections.RECENTVISITS}`
+        case SCHEMA_TYPE.API_TOKENS:
+                return `${dbCollections.API_TOKENS}`
+        case SCHEMA_TYPE.API_ACTIVITY_LOGS:
+                return `${dbCollections.API_ACTIVITY_LOGS}`
+        case SCHEMA_TYPE.EXPORT_JOBS:
+                return `${dbCollections.EXPORT_JOBS}`
+        case SCHEMA_TYPE.IMPORT_JOBS:
+                return `${dbCollections.IMPORT_JOBS}`
+        case SCHEMA_TYPE.EPICS:
+                return `${dbCollections.EPICS}`
+        case SCHEMA_TYPE.PAGES:
+                return `${dbCollections.PAGES}`
+        case SCHEMA_TYPE.PAGE_VERSIONS:
+                return `${dbCollections.PAGE_VERSIONS}`
+        case SCHEMA_TYPE.PUBLIC_SHARES:
+                return `${dbCollections.PUBLIC_SHARES}`
+        case SCHEMA_TYPE.INTAKE_ITEMS:
+                return `${dbCollections.INTAKE_ITEMS}`
+        case SCHEMA_TYPE.PUBLIC_SHARE_INDEX:
+                return `${dbCollections.PUBLIC_SHARE_INDEX}`
         default:
             return ""
     }

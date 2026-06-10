@@ -96,6 +96,9 @@ img.profile-image.header-profile-image {
   font-size: 13px;
   line-height: 19px;
 }
+.app-version:hover{
+  text-decoration: underline;
+}
 .mobile-profileimg-namewrapper {
   flex-direction: column;
 }
