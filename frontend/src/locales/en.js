@@ -2599,4 +2599,17 @@ export default {
         show_data_labels: "Show Data Labels",
         report_type: "Report Type",
     },
+    Changelog: {
+        whats_new: "What's New",
+        subtitle: "Every release and update, straight from the changelog.",
+        view_whats_new: "See what's new in this version",
+        current_version: "You're on",
+        latest: "Latest",
+        installed: "Installed",
+        compare_changes: "Compare changes",
+        view_on_github: "View on GitHub",
+        no_releases: "No release notes available yet.",
+        load_failed: "Couldn't load the changelog.",
+        retry: "Retry",
+    },
 };

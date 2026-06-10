@@ -200,3 +200,4 @@ module.exports.API_TIME_FORCASTING_REPORT ='/api/v1/report/time-forcasting';
 module.exports.CUSTOME_MODALS = '/api/v1/customeModals'
 module.exports.API_OAUTH_GITHUB = '/api/v1/github';
 module.exports.API_OAUTH_GOOGLE = '/api/v1/google';
+module.exports.GET_CHANGELOG = '/api/v2/changelog';
