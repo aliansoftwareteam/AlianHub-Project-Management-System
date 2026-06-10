@@ -103,6 +103,10 @@
                         <strong :style="{color: (clientWidth <= 767 ? '#535358' : '#000')}" :class="{'font-size-12 font-weight-500' : clientWidth > 767 , 'font-size-14 font-weight-400' : clientWidth <=767}">{{ $t('Projects.global_search') }}</strong>
                     </button>
                     <GlobalSearchModal v-model="showGlobalSearch" />
+                    <button class="text-nowrap btn-white border-groupBy border-radius-6-px cursor-pointer mr-1" @click="showEpics = true">
+                        <strong :style="{color: (clientWidth <= 767 ? '#535358' : '#000')}" :class="{'font-size-12 font-weight-500' : clientWidth > 767 , 'font-size-14 font-weight-400' : clientWidth <=767}">{{ $t('Projects.epics') }}</strong>
+                    </button>
+                    <EpicsPanel v-model="showEpics" :projectData="projectData" />
                     <div class="mr-1 border-groupBy border-radius-6-px d-flex align-items-center assignee-filter manage__filter-users">
                         <div
                             @click="$emit('manageFilterUsers', userId)"
@@ -191,9 +195,11 @@ import MonthlyCalendarMilestone from '@/components/atom/MonthlyCalendarMilestone
 import BurndownModal from '@/components/molecules/Burndown/BurndownModal.vue';
 import RecentVisitsDropdown from '@/components/molecules/RecentVisits/RecentVisitsDropdown.vue';
 import GlobalSearchModal from '@/components/molecules/GlobalSearch/GlobalSearchModal.vue';
+import EpicsPanel from '@/components/molecules/Epics/EpicsPanel.vue';
 
 const showBurndown = ref(false);
 const showGlobalSearch = ref(false);
+const showEpics = ref(false);
 import { useCustomComposable } from '@/composable';
 
 const { checkPermission, checkApps } = useCustomComposable();
