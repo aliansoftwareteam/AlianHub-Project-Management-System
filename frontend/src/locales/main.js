@@ -9,6 +9,9 @@ import ru from "./ru";
 import hi from "./hi";
 import gu from "./gu";
 import fr from "./fr";
+import ja from "./ja";
+import ko from "./ko";
+import ptBr from "./ptBr";
 
 export const i18n = createI18n({
     legacy: false,
@@ -25,6 +28,9 @@ export const i18n = createI18n({
         ru,
         hi,
         gu,
-        fr
+        fr,
+        ja,
+        ko,
+        ptBr
     },
 });
