@@ -3,7 +3,6 @@ const path = require("path");
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose");
-const XLSX = require("xlsx");
 const logger = require("../../Config/loggerConfig");
 const { validateExportInput, buildFileName, taskToRow, rowsToCsv } = require('./helpers/exportRules');
 
@@ -48,6 +47,10 @@ async function processJob(companyId, jobId) {
         if (job.format === 'csv') {
             await fs.promises.writeFile(filePath, '﻿' + rowsToCsv(rows), 'utf8');
         } else {
+            // Lazy require: a missing optional lib must fail THIS job with a
+            // clear error, never the whole process at boot (staging 502 root
+            // cause on 2026-06-10 — xlsx was a frontend-only dependency).
+            const XLSX = require('xlsx');
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), 'Tasks');
             XLSX.writeFile(workbook, filePath);
