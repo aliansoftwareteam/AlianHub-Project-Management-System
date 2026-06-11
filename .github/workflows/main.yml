@@ -65,6 +65,20 @@ jobs:
           # ── App configuration ────────────────────────────────────────
           VUE_APP_STORAGE_TYPE:      ${{ secrets.VUE_APP_STORAGE_TYPE }}
           VUE_APP_AFFILIATEON:       ${{ secrets.VUE_APP_AFFILIATEON }}
+          # ── OAuth / social login ─────────────────────────────────────
+          # Client ids + enable flags are inlined into the bundle here, so
+          # they must come from GitHub secrets — the server-side frontend/.env
+          # is NOT used (the bundle is built on this runner, not the VPS).
+          # Set these in GitHub → Settings → Secrets and variables → Actions.
+          # Base URLs are constant for github.com / gitlab.com SaaS.
+          VUE_APP_IS_GOOGLE_LOGIN:       ${{ secrets.VUE_APP_IS_GOOGLE_LOGIN }}
+          VUE_APP_GOOGLE_CLIENT_ID:      ${{ secrets.VUE_APP_GOOGLE_CLIENT_ID }}
+          VUE_APP_IS_GITHUB_LOGIN:       ${{ secrets.VUE_APP_IS_GITHUB_LOGIN }}
+          VUE_APP_GITHUB_CLIENT_ID:      ${{ secrets.VUE_APP_GITHUB_CLIENT_ID }}
+          VUE_APP_GITHUB_BASE_OAUTH_URL: "https://github.com/login/oauth"
+          VUE_APP_IS_GITLAB_LOGIN:       ${{ secrets.VUE_APP_IS_GITLAB_LOGIN }}
+          VUE_APP_GITLAB_CLIENT_ID:      ${{ secrets.VUE_APP_GITLAB_CLIENT_ID }}
+          VUE_APP_GITLAB_BASE_OAUTH_URL: "https://gitlab.com/oauth"
 
       # ---------------------------------
       # Create Frontend Artifact
