@@ -83,7 +83,10 @@ jobs:
 
   deploy:
     needs: validate
-    if: github.event_name == 'push'
+    # Deploy on a push to staging (PR merge) or a manual re-run from the
+    # Actions tab (workflow_dispatch) — the latter lets us rebuild + redeploy
+    # after a server-side env change without an empty commit.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     steps:
