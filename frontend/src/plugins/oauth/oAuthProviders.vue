@@ -6,6 +6,9 @@
         <div v-if="isAuthWithGithub && isAuthWithGithub === 'true'">
             <oAuthWithGithub :mode="mode" :companyID="companyID" :companyUserDocID="companyUserDocID"/>
         </div>
+        <div v-if="isAuthWithGitlab && isAuthWithGitlab === 'true'">
+            <oAuthWithGitlab :mode="mode" :companyID="companyID" :companyUserDocID="companyUserDocID"/>
+        </div>
     </div>
 </template>
 
@@ -29,6 +32,7 @@ defineProps({
 
 const isAuthWithGoogle = ref(process.env.VUE_APP_IS_GOOGLE_LOGIN || null);
 const isAuthWithGithub = ref(process.env.VUE_APP_IS_GITHUB_LOGIN || null);
+const isAuthWithGitlab = ref(process.env.VUE_APP_IS_GITLAB_LOGIN || null);
 </script>
 
 <style>

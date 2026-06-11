@@ -2585,6 +2585,10 @@ const schema = {
             type: String,
             required: false
         },
+        gitlabId: {
+            type: String,
+            required: false
+        },
     },
     resetAttempt: {
         ip: {

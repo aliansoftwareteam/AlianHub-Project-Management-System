@@ -401,3 +401,108 @@ exports.githubSignup = async (req, res) => {
         });
     }
 };
+
+/**
+ * Sign up with gitlab
+ * @param {*} req
+ * @param {*} res
+ * @returns
+ */
+exports.gitlabSignup = async (req, res) => {
+    try {
+        const { firstName, lastName, email, gitlabId, assignCompany, companyUserDocID } = req.body;
+
+        // Validate Required Fields
+        if (!firstName || !lastName || !email || !gitlabId) {
+            return res.status(400).json({
+                status: false,
+                message: "First name, last name, email, and GitLab ID are required",
+            });
+        }
+
+        // Check if user already exists
+        const findObj = {
+            type: dbCollections.USER_AUTH,
+            data: [{ email }],
+        };
+
+        const existingUser = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, findObj, "findOne");
+
+        if (existingUser) {
+            // If already signed up via GitLab or Local, just return existing user
+            return res.status(409).json({
+                status: false,
+                message: "Email already exists"
+            });
+        }
+
+        // Create Auth Document (GitLab Only)
+        const authDoc = {
+            email,
+            gitlabId,
+            isBlocked: false,
+        };
+
+        const authObj = { type: dbCollections.USER_AUTH, data: authDoc };
+        const authRes = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, authObj, "save");
+
+        // Update user status in company users
+        if (assignCompany) {
+            const query = {
+                type: SCHEMA_TYPE.COMPANY_USERS,
+                data: [
+                    {
+                        _id: new mongoose.Types.ObjectId(companyUserDocID)
+                    },
+                    {
+                        $set: {
+                            status: 2,
+                            userId: authRes._id
+                        }
+                    }
+                ]
+            }
+            await mongoRef.MongoDbCrudOpration(assignCompany, query, 'findOneAndUpdate');
+
+            // Import notification settings
+            await importUserNotifications(assignCompany, authRes._id).catch((error) => {
+                logger.error(`Import notification setting error in gitlabSignup hook: ${error}`);
+            });
+
+            // Add notification count object
+            await addAndRemoveUserInMongodbNotificationCount(assignCompany, authRes._id, "add").catch((error) => {
+                logger.error(`Add user in mongodb notification count error in gitlabSignup hook: ${error}`);
+            });
+        }
+
+        // Create User Document
+        const userDoc = {
+            _id: authRes._id,
+            AssignCompany: assignCompany ? [assignCompany] : [],
+            Employee_FName: firstName,
+            Employee_LName: lastName,
+            Employee_Email: email,
+            Employee_Name: `${firstName} ${lastName}`,
+            Time_Format: "12",
+            isDeleted: false,
+            isActive: true,
+            isOnline: false,
+            isEmailVerified: true, // GitLab email is already verified
+        };
+
+        const userObj = { type: dbCollections.USERS, data: userDoc };
+        const userRes = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, userObj, "save");
+
+        return res.status(200).json({
+            status: true,
+            message: "Gitlab signup successful",
+            data: userRes,
+        });
+    } catch (error) {
+        logger.error(`Gitlab Signup API Error: ${error.message}`);
+        return res.status(500).json({
+            status: false,
+            message: error.message || "Internal Server Error",
+        });
+    }
+};

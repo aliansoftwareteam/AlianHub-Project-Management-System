@@ -1,7 +1,7 @@
 <template>
-    <button @click="loginWithGitHub" class="border-0 border-radius-6-px cursor-pointer p-15px" :disabled="isLoading" title="Github">
+    <button @click="loginWithGitLab" class="border-0 border-radius-6-px cursor-pointer p-15px" :disabled="isLoading" title="GitLab">
         <div v-if="isLoading" class="oauth-spinner"></div>
-        <img v-else :src="GithubIcon" alt="github-icon"/>
+        <img v-else :src="GitlabIcon" alt="gitlab-icon"/>
     </button>
 </template>
 
@@ -13,7 +13,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from "vue-i18n";
 
 // Image
-import GithubIcon from "@/assets/images/svg/github_icon.svg";
+import GitlabIcon from "@/assets/images/svg/gitlab_icon.svg";
 
 // Utilities
 import { apiRequestWithoutSecure, apiRequestWithoutCompnay, getAuth } from "@/services";
@@ -48,41 +48,43 @@ onMounted(async () => {
     // Only handle the redirect if THIS provider started it. GitHub and GitLab
     // both come back with ?code=, so without this guard both components would
     // grab the same code and one would strip it from the URL before the other.
-    if (!localStorage.getItem("githubAuthMode")) return;
+    if (!localStorage.getItem("gitlabAuthMode")) return;
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     if (!code) return;
 
-    try {        
-        const res = await apiRequestWithoutSecure("post", `${env.API_OAUTH_GITHUB}/access-token`, JSON.stringify({ code }));
+    try {
+        const redirectUri = window.location.origin;
+        const res = await apiRequestWithoutSecure("post", `${env.API_OAUTH_GITLAB}/access-token`, JSON.stringify({ code, redirectUri }));
         if (!res.data.accessToken) return;
 
         const currentUrl = new URL(window.location.href);
         currentUrl.searchParams.delete("code");
         window.history.replaceState({}, document.title, currentUrl.toString());
 
-        await fetchGitHubUser(res.data.accessToken);
+        await fetchGitLabUser(res.data.accessToken);
     } catch (err) {
         console.error(err);
     }
 });
 
-// Trigger GitHub OAuth
-function loginWithGitHub() {
-    localStorage.setItem("githubAuthMode", props.mode);
-    const clientId = process.env.VUE_APP_GITHUB_CLIENT_ID;
-    const scope = "read:user user:email";
-    const redirectUri = window.location.origin; 
-    const githubAuthUrl = `${process.env.VUE_APP_GITHUB_BASE_OAUTH_URL}/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}`;
-    window.location.href = githubAuthUrl;
+// Trigger GitLab OAuth (GitLab requires response_type=code in the authorize URL).
+function loginWithGitLab() {
+    localStorage.setItem("gitlabAuthMode", props.mode);
+    const clientId = process.env.VUE_APP_GITLAB_CLIENT_ID;
+    const scope = "read_user";
+    const redirectUri = window.location.origin;
+    const base = process.env.VUE_APP_GITLAB_BASE_OAUTH_URL || 'https://gitlab.com/oauth';
+    const gitlabAuthUrl = `${base}/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}`;
+    window.location.href = gitlabAuthUrl;
 }
 
 
 const updateUserStatus = (uid) => {
     return new Promise((resolve, reject) => {
         const updateObject = {
-            'isOnline': true, 
-            'lastActive': new Date() 
+            'isOnline': true,
+            'lastActive': new Date()
         }
         apiRequestWithoutCompnay("put", env.USER_UPATE, {userId: uid, updateObject: updateObject }).then(() => {
             resolve(true)
@@ -106,14 +108,13 @@ const login = async (userInfo) => {
     try {
         const object = {
             email: userInfo.email,
-            githubId: userInfo.githubId,
-            // Forward the GitHub access token so the backend can re-verify the
-            // identity against GitHub's /user API instead of trusting the
-            // client-supplied id/email. Without this, login is rejected in the
-            // default (strict) server mode.
+            gitlabId: userInfo.gitlabId,
+            // Forward the GitLab access token so the backend can re-verify the
+            // identity against GitLab's /user API instead of trusting the
+            // client-supplied id/email. Required in the default (strict) mode.
             accessToken: userInfo.accessToken,
             isLoginType: "frontend",
-            authProvider: "github"
+            authProvider: "gitlab"
         }
 
         // Call login API
@@ -199,7 +200,7 @@ const login = async (userInfo) => {
         } else {
             $toast.error(t("Toast.something_went_wrong"), { position: 'top-right' });
         }
-        
+
         Cookies.remove('refreshToken');
         Cookies.remove('accessToken');
         localStorage.removeItem("updateToken");
@@ -208,7 +209,7 @@ const login = async (userInfo) => {
         localStorage.removeItem("remember");
     } finally {
         isLoading.value = false;
-        localStorage.removeItem("githubAuthMode");
+        localStorage.removeItem("gitlabAuthMode");
         localStorage.removeItem("companyID");
         localStorage.removeItem("companyUserDocID");
     }
@@ -222,12 +223,12 @@ const signup = async (userInfo) => {
             firstName: userInfo.firstName,
             lastName: userInfo.lastName,
             email: userInfo.email,
-            githubId: userInfo.githubId,
+            gitlabId: userInfo.gitlabId,
             assignCompany: companyId,
             companyUserDocID: companyUserDocID
         };
 
-        const signupRes = await apiRequestWithoutSecure("post", env.API_SIGNUP_WITH_GITHUB, payload);
+        const signupRes = await apiRequestWithoutSecure("post", env.API_SIGNUP_WITH_GITLAB, payload);
 
         if (!signupRes?.data?.status) {
             throw new Error(signupRes?.data?.message || "Signup failed");
@@ -237,61 +238,44 @@ const signup = async (userInfo) => {
         $toast.success('User register successfully', { position: 'top-right' });
         setTimeout(() => login(userInfo), 1000);
     } catch (error) {
-        console.error("Google signup error:", error);
+        console.error("Gitlab signup error:", error);
         const msg = error?.response?.data?.message || t("Toast.something_went_wrong");
         $toast.error(msg, { position: "top-right" });
     } finally {
         isLoading.value = false;
-        localStorage.removeItem("githubAuthMode");
+        localStorage.removeItem("gitlabAuthMode");
         localStorage.removeItem("companyID");
         localStorage.removeItem("companyUserDocID");
     }
 };
 
-// Fetch user details and login
-async function fetchGitHubUser(token) {
+// Fetch user details and login. GitLab's /user returns the primary email
+// directly when the token carries the read_user scope, so no extra call.
+async function fetchGitLabUser(token) {
     try {
         isLoading.value = true;
 
-        // Fetch basic profile
-        const resUser = await fetch("https://api.github.com/user", {
-            headers: { Authorization: `token ${token}` },
+        const resUser = await fetch("https://gitlab.com/api/v4/user", {
+            headers: { Authorization: `Bearer ${token}` },
         });
 
         const userData = await resUser.json();
         if (!resUser.ok) return;
 
-        // Fetch emails
-        const resEmails = await fetch("https://api.github.com/user/emails", {
-            headers: { Authorization: `token ${token}` },
-        });
-
-        const emails = await resEmails.json();
-        if (resEmails.ok && Array.isArray(emails)) {
-            // Find primary verified email
-            const primaryEmailObj = emails.find(e => e.primary && e.verified);
-            if (primaryEmailObj) {
-                userData.email = primaryEmailObj.email;
-            } else if (emails.length > 0) {
-                // fallback to first email
-                userData.email = emails[0].email;
-            }
-        }
-        
-        const fullName = userData.name || ""; // might be null
+        const fullName = userData.name || userData.username || ""; // name may be null
         const [firstName, ...lastParts] = fullName.split(" ");
         const lastName = lastParts.join(" "); // Handles middle names
 
         const userInfo = {
             email: userData.email,
-            githubId: userData.id,
+            gitlabId: userData.id,
             firstName,
             lastName,
             accessToken: token,
         }
 
         // Call API's
-        const mode = localStorage.getItem("githubAuthMode");
+        const mode = localStorage.getItem("gitlabAuthMode");
         if(!mode) return;
 
         if (mode === 'login') {
@@ -300,7 +284,7 @@ async function fetchGitHubUser(token) {
             signup(userInfo);
         }
     } catch (err) {
-        console.error("Error fetching GitHub user or emails:", err);
+        console.error("Error fetching GitLab user:", err);
         isLoading.value = false;
     }
 }
