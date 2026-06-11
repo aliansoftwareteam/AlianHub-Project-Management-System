@@ -113,6 +113,7 @@ module.exports.DELETE_SESSION = '/api/v2/session/delete';
 module.exports.UPDATE_SESSION = '/api/v2/session/update';
 module.exports.API_SIGNUP_WITH_GOOGLE = '/api/v2/google-signup';
 module.exports.API_SIGNUP_WITH_GITHUB = '/api/v2/github-signup';
+module.exports.API_SIGNUP_WITH_GITLAB = '/api/v2/gitlab-signup';
 
 //Storage Routes
 //BUCKETS ROUTES
@@ -200,4 +201,5 @@ module.exports.API_TIME_FORCASTING_REPORT ='/api/v1/report/time-forcasting';
 module.exports.CUSTOME_MODALS = '/api/v1/customeModals'
 module.exports.API_OAUTH_GITHUB = '/api/v1/github';
 module.exports.API_OAUTH_GOOGLE = '/api/v1/google';
+module.exports.API_OAUTH_GITLAB = '/api/v1/gitlab';
 module.exports.GET_CHANGELOG = '/api/v2/changelog';

@@ -352,4 +352,5 @@ exports.init = (app) => {
 
     app.post("/api/v2/google-signup", createUserCtrl.googleSignup);
     app.post("/api/v2/github-signup", createUserCtrl.githubSignup);
+    app.post("/api/v2/gitlab-signup", createUserCtrl.gitlabSignup);
 }

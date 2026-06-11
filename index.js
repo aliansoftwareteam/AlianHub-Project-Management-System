@@ -254,6 +254,7 @@ function initializeControllers() {
     require("./Modules/OAuth/init.js").init(app);
     require("./Modules/githubOAuth/init.js").init(app);
     require("./Modules/googleOAuth/init.js").init(app);
+    require("./Modules/gitlabOAuth/init.js").init(app);
     require("./Modules/Changelog/init.js").init(app);
 }
 

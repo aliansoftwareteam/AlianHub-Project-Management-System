@@ -833,5 +833,6 @@ export const escapeCSVValue = (value) => {
 export const isAuthDeviderShow = () => {
     const isAuthWithGoogle = process.env.VUE_APP_IS_GOOGLE_LOGIN || null;
     const isAuthWithGithub = process.env.VUE_APP_IS_GITHUB_LOGIN || null;
-    return (isAuthWithGoogle && isAuthWithGoogle === 'true') || (isAuthWithGithub && isAuthWithGithub === 'true')
+    const isAuthWithGitlab = process.env.VUE_APP_IS_GITLAB_LOGIN || null;
+    return (isAuthWithGoogle && isAuthWithGoogle === 'true') || (isAuthWithGithub && isAuthWithGithub === 'true') || (isAuthWithGitlab && isAuthWithGitlab === 'true')
 }
