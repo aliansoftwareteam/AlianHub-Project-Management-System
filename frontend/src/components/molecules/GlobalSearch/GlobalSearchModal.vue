@@ -131,9 +131,19 @@ function openTask(task) {
     router.push(path).catch((error) => console.error('ERROR opening search task: ', error));
 }
 
+// Project routes always include a sprint segment (see router/projects), so the
+// API returns each project's first active sprint. Projects without one fall
+// back to the sprint-less /p route, keeping the list view as landing tab.
 function openProject(project) {
     close();
-    router.push(`/${companyId.value}/project/${project._id}`).catch((error) => console.error('ERROR opening search project: ', error));
+    const base = `/${companyId.value}/project/${project._id}`;
+    let path = `${base}/p?tab=ProjectListView`;
+    if (project.sprintId) {
+        path = project.folderId
+            ? `${base}/fs/${project.folderId}/${project.sprintId}?tab=ProjectListView`
+            : `${base}/s/${project.sprintId}?tab=ProjectListView`;
+    }
+    router.push(path).catch((error) => console.error('ERROR opening search project: ', error));
 }
 </script>
 

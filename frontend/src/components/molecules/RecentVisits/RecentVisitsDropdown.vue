@@ -1,10 +1,10 @@
 <template>
-    <span class="position-re">
-        <button class="text-nowrap btn-white border-groupBy border-radius-6-px cursor-pointer" @click.stop="toggleOpen">
-            <strong :style="{color: (clientWidth <= 767 ? '#535358' : '#000')}" :class="{'font-size-12 font-weight-500' : clientWidth > 767 , 'font-size-14 font-weight-400' : clientWidth <=767}">{{ $t('Projects.recent_tasks') }}</strong>
-        </button>
-        <span v-if="isOpen" class="recent-visits__overlay" @click.stop="isOpen = false"></span>
-        <div v-if="isOpen" class="recent-visits__panel">
+    <div v-if="modelValue" class="recent-visits__overlay" @click.self="$emit('update:modelValue', false)">
+        <div class="recent-visits__card">
+            <div class="d-flex align-items-center justify-content-between recent-visits__head">
+                <span class="font-size-16 font-weight-700">{{ $t('Projects.recent_tasks') }}</span>
+                <span class="cursor-pointer font-size-16 recent-visits__close" @click="$emit('update:modelValue', false)">&#10005;</span>
+            </div>
             <div v-if="isLoading" class="gray81 font-size-12 recent-visits__empty">{{ $t('Projects.searching') }}</div>
             <div v-else-if="!items.length" class="gray81 font-size-12 recent-visits__empty">{{ $t('Projects.no_recent_tasks') }}</div>
             <div
@@ -19,12 +19,12 @@
                 <span v-if="item.task.status && item.task.status.text" class="font-size-11 recent-visits__status">{{ item.task.status.text }}</span>
             </div>
         </div>
-    </span>
+    </div>
 </template>
 
 <script setup>
 // PACKAGES
-import { inject, ref } from "vue";
+import { defineProps, inject, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
 // UTILS
@@ -33,18 +33,22 @@ import { apiRequest } from '@/services';
 const router = useRouter();
 const userId = inject('$userId');
 const companyId = inject('$companyId');
-const clientWidth = inject('$clientWidth');
 
-const isOpen = ref(false);
+const props = defineProps({
+    modelValue: {
+        type: Boolean,
+        default: false
+    }
+});
+
+const emit = defineEmits(['update:modelValue']);
+
 const isLoading = ref(false);
 const items = ref([]);
 
-function toggleOpen() {
-    isOpen.value = !isOpen.value;
-    if (isOpen.value) {
-        fetchRecent();
-    }
-}
+watch(() => props.modelValue, (open) => {
+    if (open) fetchRecent();
+});
 
 function fetchRecent() {
     isLoading.value = true;
@@ -63,7 +67,7 @@ function fetchRecent() {
 // Task routes (router/projects): with folder → /:cid/project/:id/fs/:folderId/:sprintId/:taskId,
 // without → /:cid/project/:id/s/:sprintId/:taskId
 function openTask(task) {
-    isOpen.value = false;
+    emit('update:modelValue', false);
     const base = `/${companyId.value}/project/${task.ProjectID}`;
     const path = task.folderObjId
         ? `${base}/fs/${task.folderObjId}/${task.sprintId}/${task._id}`
@@ -78,24 +82,27 @@ function openTask(task) {
 .recent-visits__overlay {
     position: fixed;
     inset: 0;
-    z-index: 19;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
-.recent-visits__panel {
-    position: absolute;
-    top: 36px;
-    right: 0;
-    z-index: 20;
-    width: 300px;
-    max-height: 320px;
-    overflow-y: auto;
+.recent-visits__card {
     background: #fff;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-    padding: 4px 0;
+    border-radius: 10px;
+    width: min(440px, 92vw);
+    max-height: 64vh;
+    overflow-y: auto;
+    padding: 14px 16px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
 }
+.recent-visits__head { margin-bottom: 8px; }
+.recent-visits__close { color: #9a9a9a; }
+.recent-visits__close:hover { color: #e84a4a; }
 .recent-visits__row {
-    padding: 7px 12px;
+    padding: 7px 8px;
+    border-radius: 6px;
     min-width: 0;
 }
 .recent-visits__row:hover {
