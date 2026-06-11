@@ -39,7 +39,7 @@
                             <span v-if="release.version === currentVersion" class="changelog-chip changelog-chip--installed">{{ $t('Changelog.installed') }}</span>
                             <span v-if="release.label" class="changelog-release-label">{{ release.label }}</span>
                             <span class="changelog-release-spacer"></span>
-                            <span v-if="release.date" class="changelog-release-date">{{ formatDate(release.date) }}</span>
+                            <span v-if="release.date || release.publishedAt" class="changelog-release-date">{{ formatDate(release) }}</span>
                             <a v-if="release.compareUrl" :href="release.compareUrl" target="_blank" rel="noopener noreferrer" class="changelog-compare-link">{{ $t('Changelog.compare_changes') }}</a>
                         </div>
 
@@ -103,9 +103,18 @@ function fetchChangelog() {
     });
 }
 
-function formatDate(isoDate) {
-    const date = new Date(`${isoDate}T00:00:00`);
-    if (isNaN(date.getTime())) return isoDate;
+function formatDate(release) {
+    // publishedAt is the GitHub release timestamp; CHANGELOG.md only has a date.
+    if (release.publishedAt) {
+        const dateTime = new Date(release.publishedAt);
+        if (!isNaN(dateTime.getTime())) {
+            const datePart = dateTime.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+            const timePart = dateTime.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true });
+            return `${datePart}, ${timePart}`;
+        }
+    }
+    const date = new Date(`${release.date}T00:00:00`);
+    if (isNaN(date.getTime())) return release.date;
     return date.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
 }
 
