@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const axios = require("axios");
 const logger = require("../../Config/loggerConfig");
 const { version: appVersion } = require("../../package.json");
 
@@ -110,6 +111,43 @@ const deriveRepoUrl = (releases) => {
     return withUrl ? withUrl.compareUrl.split("/compare/")[0] : "";
 };
 
+// CHANGELOG.md only records a date, so the exact publish moment comes from
+// the GitHub Releases API. Cached per changelog revision (a new release
+// rewrites the file, so each release costs one fetch); a failed fetch backs
+// off for ten minutes and the page degrades to date-only display.
+const GITHUB_RETRY_MS = 10 * 60 * 1000;
+let githubTimes = { key: null, byVersion: null, retryAtMs: 0 };
+
+const fetchReleaseTimes = async (repoUrl, cacheKey) => {
+    if (githubTimes.byVersion && githubTimes.key === cacheKey) return githubTimes.byVersion;
+    if (Date.now() < githubTimes.retryAtMs) return githubTimes.byVersion || {};
+    const repoMatch = String(repoUrl || "").match(/github\.com\/([^/]+)\/([^/]+)/);
+    if (!repoMatch) return {};
+    try {
+        const response = await axios.get(`https://api.github.com/repos/${repoMatch[1]}/${repoMatch[2]}/releases`, {
+            params: { per_page: 100 },
+            timeout: 8000,
+            headers: {
+                Accept: "application/vnd.github+json",
+                "User-Agent": "AlianHub-Changelog",
+                ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}),
+            },
+        });
+        const byVersion = {};
+        (Array.isArray(response.data) ? response.data : []).forEach((release) => {
+            if (release.tag_name && release.published_at) {
+                byVersion[String(release.tag_name).replace(/^v/, "")] = release.published_at;
+            }
+        });
+        githubTimes = { key: cacheKey, byVersion, retryAtMs: 0 };
+        return byVersion;
+    } catch (fetchError) {
+        logger.error(`Changelog release times fetch failed: ${fetchError.message}`);
+        githubTimes = { ...githubTimes, retryAtMs: Date.now() + GITHUB_RETRY_MS };
+        return githubTimes.byVersion || {};
+    }
+};
+
 /**
  * GET /api/v2/changelog
  * Returns every release documented in CHANGELOG.md (newest first, as
@@ -138,7 +176,13 @@ exports.getChangelog = async (req, res) => {
             };
         }
 
-        return res.send({ status: true, statusText: "Changelog fetched.", data: cache.payload });
+        const releaseTimes = await fetchReleaseTimes(cache.payload.repoUrl, stats.mtimeMs);
+        const releases = cache.payload.releases.map((release) => ({
+            ...release,
+            publishedAt: releaseTimes[release.version] || "",
+        }));
+
+        return res.send({ status: true, statusText: "Changelog fetched.", data: { ...cache.payload, releases } });
     } catch (error) {
         logger.error(`ERROR in get changelog: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
