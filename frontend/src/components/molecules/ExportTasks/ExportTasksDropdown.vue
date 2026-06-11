@@ -1,14 +1,17 @@
 <template>
-    <span class="position-re">
-        <button class="text-nowrap btn-white border-groupBy border-radius-6-px cursor-pointer" @click.stop="isOpen = !isOpen">
-            <strong :style="{color: (clientWidth <= 767 ? '#535358' : '#000')}" :class="{'font-size-12 font-weight-500' : clientWidth > 767 , 'font-size-14 font-weight-400' : clientWidth <=767}">{{ $t('Projects.export_tasks') }}</strong>
-        </button>
-        <span v-if="isOpen" class="export-tasks__overlay" @click.stop="isOpen = false"></span>
-        <div v-if="isOpen" class="export-tasks__panel">
-            <div class="cursor-pointer export-tasks__row font-size-13" @click="startExport('csv')">CSV</div>
-            <div class="cursor-pointer export-tasks__row font-size-13" @click="startExport('xlsx')">XLSX</div>
+    <div v-if="modelValue" class="export-tasks__overlay" @click.self="$emit('update:modelValue', false)">
+        <div class="export-tasks__card">
+            <div class="d-flex align-items-center justify-content-between export-tasks__head">
+                <span class="font-size-16 font-weight-700">{{ $t('Projects.export_tasks') }}</span>
+                <span class="cursor-pointer font-size-16 export-tasks__close" @click="$emit('update:modelValue', false)">&#10005;</span>
+            </div>
+            <div class="font-size-12 gray81 export-tasks__hint">{{ $t('Projects.export_hint') }}</div>
+            <div class="d-flex">
+                <button class="btn-primary font-size-13 mr-10px" :disabled="isBusy" @click="startExport('csv')">CSV</button>
+                <button class="btn-primary font-size-13" :disabled="isBusy" @click="startExport('xlsx')">XLSX</button>
+            </div>
         </div>
-    </span>
+    </div>
 </template>
 
 <script setup>
@@ -25,21 +28,27 @@ const { t } = useI18n();
 const $toast = useToast();
 const { getUser } = useGetterFunctions();
 const userId = inject('$userId');
-const clientWidth = inject('$clientWidth');
 
 const props = defineProps({
     projectData: {
         type: Object,
         required: true
+    },
+    modelValue: {
+        type: Boolean,
+        default: false
     }
 });
 
-const isOpen = ref(false);
+const emit = defineEmits(['update:modelValue']);
+
+const isBusy = ref(false);
 const POLL_INTERVAL_MS = 2000;
 const MAX_POLLS = 30;
 
 function startExport(format) {
-    isOpen.value = false;
+    if (isBusy.value) return;
+    isBusy.value = true;
     const user = getUser(userId.value);
     apiRequest('post', '/api/v2/exports', {
         format,
@@ -49,11 +58,13 @@ function startExport(format) {
     }).then((response) => {
         if (response.data?.status) {
             $toast.info(t('Projects.export_preparing'), { position: 'top-right' });
+            emit('update:modelValue', false);
             pollUntilDone(response.data.data._id, 0);
         } else {
             $toast.error(response.data?.statusText || t('Toast.something_went_wrong'), { position: 'top-right' });
         }
-    }).catch((error) => console.error('ERROR in start export: ', error));
+    }).catch((error) => console.error('ERROR in start export: ', error))
+    .finally(() => { isBusy.value = false; });
 }
 
 function pollUntilDone(jobId, attempt) {
@@ -95,19 +106,24 @@ function downloadJob(job) {
 </script>
 
 <style scoped>
-.export-tasks__overlay { position: fixed; inset: 0; z-index: 19; }
-.export-tasks__panel {
-    position: absolute;
-    top: 36px;
-    right: 0;
-    z-index: 20;
-    min-width: 120px;
-    background: #fff;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-    padding: 4px 0;
+.export-tasks__overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
-.export-tasks__row { padding: 7px 14px; }
-.export-tasks__row:hover { background: #f7f9fc; }
+.export-tasks__card {
+    background: #fff;
+    border-radius: 10px;
+    width: min(360px, 92vw);
+    padding: 16px 20px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+}
+.export-tasks__head { margin-bottom: 8px; }
+.export-tasks__close { color: #9a9a9a; }
+.export-tasks__close:hover { color: #e84a4a; }
+.export-tasks__hint { margin-bottom: 14px; }
 </style>

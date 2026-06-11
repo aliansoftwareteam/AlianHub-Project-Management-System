@@ -94,35 +94,53 @@
                             </DropDownOption>
                         </template>
                     </DropDown>
-                    <button class="text-nowrap btn-white border-groupBy border-radius-6-px cursor-pointer mr-1" @click="showBurndown = true">
-                        <strong :style="{color: (clientWidth <= 767 ? '#535358' : '#000')}" :class="{'font-size-12 font-weight-500' : clientWidth > 767 , 'font-size-14 font-weight-400' : clientWidth <=767}">{{ $t('Projects.burndown') }}</strong>
-                    </button>
-                    <BurndownModal v-model="showBurndown" :projectData="projectData" />
-                    <RecentVisitsDropdown class="mr-1" />
-                    <button class="text-nowrap btn-white border-groupBy border-radius-6-px cursor-pointer mr-1" :title="$t('Projects.global_search')" @click="showGlobalSearch = true">
-                        <strong :style="{color: (clientWidth <= 767 ? '#535358' : '#000')}" :class="{'font-size-12 font-weight-500' : clientWidth > 767 , 'font-size-14 font-weight-400' : clientWidth <=767}">{{ $t('Projects.global_search') }}</strong>
-                    </button>
+                    <!-- All newer features live behind one "…" menu (matches
+                         the task context-menu pattern) instead of nine
+                         separate toolbar buttons. -->
+                    <DropDown id="more_features" class="mr-1" :zIndex="10">
+                        <template #button>
+                            <button class="text-nowrap btn-white border-groupBy border-radius-6-px cursor-pointer" ref="more_features_trigger" :title="$t('Projects.more_features')">
+                                <img :src="horizontalDots" alt="more" class="vertical-middle">
+                            </button>
+                        </template>
+                        <template #options>
+                            <DropDownOption @click="$refs.more_features_trigger.click(); showGlobalSearch = true">
+                                <div><span class="dropdown-label">{{ $t('Projects.global_search') }}</span></div>
+                            </DropDownOption>
+                            <DropDownOption @click="$refs.more_features_trigger.click(); showRecent = true">
+                                <div><span class="dropdown-label">{{ $t('Projects.recent_tasks') }}</span></div>
+                            </DropDownOption>
+                            <DropDownOption @click="$refs.more_features_trigger.click(); showBurndown = true">
+                                <div><span class="dropdown-label">{{ $t('Projects.burndown') }}</span></div>
+                            </DropDownOption>
+                            <DropDownOption @click="$refs.more_features_trigger.click(); showEpics = true">
+                                <div><span class="dropdown-label">{{ $t('Projects.epics') }}</span></div>
+                            </DropDownOption>
+                            <DropDownOption @click="$refs.more_features_trigger.click(); showPages = true">
+                                <div><span class="dropdown-label">{{ $t('Projects.pages') }}</span></div>
+                            </DropDownOption>
+                            <DropDownOption @click="$refs.more_features_trigger.click(); showExport = true">
+                                <div><span class="dropdown-label">{{ $t('Projects.export_tasks') }}</span></div>
+                            </DropDownOption>
+                            <DropDownOption @click="$refs.more_features_trigger.click(); showPublicShare = true">
+                                <div><span class="dropdown-label">{{ $t('Projects.public_link') }}</span></div>
+                            </DropDownOption>
+                            <DropDownOption @click="$refs.more_features_trigger.click(); showImportJira = true">
+                                <div><span class="dropdown-label">{{ $t('Projects.import_jira') }}</span></div>
+                            </DropDownOption>
+                            <DropDownOption @click="$refs.more_features_trigger.click(); showAutoArchive = true">
+                                <div><span class="dropdown-label">{{ $t('Projects.auto_archive') }}</span></div>
+                            </DropDownOption>
+                        </template>
+                    </DropDown>
                     <GlobalSearchModal v-model="showGlobalSearch" />
-                    <button class="text-nowrap btn-white border-groupBy border-radius-6-px cursor-pointer mr-1" @click="showEpics = true">
-                        <strong :style="{color: (clientWidth <= 767 ? '#535358' : '#000')}" :class="{'font-size-12 font-weight-500' : clientWidth > 767 , 'font-size-14 font-weight-400' : clientWidth <=767}">{{ $t('Projects.epics') }}</strong>
-                    </button>
+                    <RecentVisitsDropdown v-model="showRecent" />
+                    <BurndownModal v-model="showBurndown" :projectData="projectData" />
                     <EpicsPanel v-model="showEpics" :projectData="projectData" />
-                    <ExportTasksDropdown class="mr-1" :projectData="projectData" />
-                    <button class="text-nowrap btn-white border-groupBy border-radius-6-px cursor-pointer mr-1" @click="showPages = true">
-                        <strong :style="{color: (clientWidth <= 767 ? '#535358' : '#000')}" :class="{'font-size-12 font-weight-500' : clientWidth > 767 , 'font-size-14 font-weight-400' : clientWidth <=767}">{{ $t('Projects.pages') }}</strong>
-                    </button>
                     <PagesPanel v-model="showPages" :projectData="projectData" />
-                    <button class="text-nowrap btn-white border-groupBy border-radius-6-px cursor-pointer mr-1" @click="showPublicShare = true">
-                        <strong :style="{color: (clientWidth <= 767 ? '#535358' : '#000')}" :class="{'font-size-12 font-weight-500' : clientWidth > 767 , 'font-size-14 font-weight-400' : clientWidth <=767}">{{ $t('Projects.public_link') }}</strong>
-                    </button>
+                    <ExportTasksDropdown v-model="showExport" :projectData="projectData" />
                     <PublicShareModal v-model="showPublicShare" :projectData="projectData" />
-                    <button class="text-nowrap btn-white border-groupBy border-radius-6-px cursor-pointer mr-1" @click="showImportJira = true">
-                        <strong :style="{color: (clientWidth <= 767 ? '#535358' : '#000')}" :class="{'font-size-12 font-weight-500' : clientWidth > 767 , 'font-size-14 font-weight-400' : clientWidth <=767}">{{ $t('Projects.import_jira') }}</strong>
-                    </button>
                     <ImportJiraModal v-model="showImportJira" :projectData="projectData" />
-                    <button class="text-nowrap btn-white border-groupBy border-radius-6-px cursor-pointer mr-1" @click="showAutoArchive = true">
-                        <strong :style="{color: (clientWidth <= 767 ? '#535358' : '#000')}" :class="{'font-size-12 font-weight-500' : clientWidth > 767 , 'font-size-14 font-weight-400' : clientWidth <=767}">{{ $t('Projects.auto_archive') }}</strong>
-                    </button>
                     <AutoArchiveModal v-model="showAutoArchive" :projectData="projectData" />
                     <div class="mr-1 border-groupBy border-radius-6-px d-flex align-items-center assignee-filter manage__filter-users">
                         <div
@@ -226,6 +244,8 @@ const showPages = ref(false);
 const showPublicShare = ref(false);
 const showImportJira = ref(false);
 const showAutoArchive = ref(false);
+const showRecent = ref(false);
+const showExport = ref(false);
 import { useCustomComposable } from '@/composable';
 
 const { checkPermission, checkApps } = useCustomComposable();

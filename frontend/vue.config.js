@@ -11,6 +11,12 @@ module.exports = defineConfig({
         target: 'http://localhost:4000',
         changeOrigin: true
       },
+      // Server-rendered public share pages (GET /share/:token and its intake
+      // form POST) live on the backend, same as /api.
+      '^/share': {
+        target: 'http://localhost:4000',
+        changeOrigin: true
+      },
       'socket.io': {
         target: 'http://localhost:4000',
         changeOrigin: true

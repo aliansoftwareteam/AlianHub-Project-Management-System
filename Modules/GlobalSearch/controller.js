@@ -48,12 +48,44 @@ exports.globalSearch = async (req, res) => {
             }, 'find'),
         ]);
 
+        // Client project routes always carry a sprint segment, so attach each
+        // project's first active sprint (the sprint the sidebar lands on).
+        let projectResults = projects || [];
+        if (projectResults.length) {
+            const sprints = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.SPRINTS,
+                data: [
+                    {
+                        projectId: { $in: projectResults.map((project) => project._id) },
+                        deletedStatusKey: 0,
+                        private: { $ne: true },
+                    },
+                    'projectId folderId',
+                    { sort: { _id: 1 } },
+                ],
+            }, 'find');
+            const firstSprintByProject = {};
+            (sprints || []).forEach((sprint) => {
+                const key = String(sprint.projectId);
+                if (!firstSprintByProject[key]) firstSprintByProject[key] = sprint;
+            });
+            projectResults = projectResults.map((project) => {
+                const sprint = firstSprintByProject[String(project._id)];
+                return {
+                    _id: project._id,
+                    ProjectName: project.ProjectName,
+                    sprintId: sprint ? sprint._id : null,
+                    folderId: sprint && sprint.folderId ? sprint.folderId : null,
+                };
+            });
+        }
+
         return res.send({
             status: true,
             statusText: 'Search complete.',
             data: {
                 tasks: tasks || [],
-                projects: projects || [],
+                projects: projectResults,
                 comments: (comments || []).map((comment) => ({
                     _id: comment._id,
                     message: truncate(comment.message),
