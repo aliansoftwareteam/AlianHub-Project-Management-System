@@ -64,10 +64,15 @@ exports.getProjectList = async (req, res) => {
             ...(isNonAdmin && privatePermission === 1 && { AssigneeUserId: assigneeUserIdCondition })
         };
 
+        // Public projects are visible to ALL company members by design — no
+        // assignment required. (Previously filtered non-admins without the
+        // `public_projects` permission down to assigned-only; that gate is
+        // removed so "public" means visible to everyone.) Private projects
+        // remain gated by privateQuery above. Applies to web app + MCP (same
+        // endpoint).
         const publicQuery = {
             isPrivateSpace: false,
             deletedStatusKey: { $nin: [1] },
-            ...(isNonAdmin && !showAllProjects && { AssigneeUserId: assigneeUserIdCondition })
         };
 
         const projectQuery = [

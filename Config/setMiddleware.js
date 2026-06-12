@@ -156,6 +156,11 @@ const verifyJWTTokenWithCRoute = [
     '/api/v1/ai/project/plan',
     '/api/v1/ai/project/clarify',
     '/api/v1/ai/project/execute',
+    // Personal API tokens (Modules/ApiTokens). app.use prefix-matching
+    // covers /:id, /:id/logs and /me too. Routes were previously
+    // unauthenticated (trusted body userData) — now JWT-protected; the
+    // PAT branch in jwt.js blocks PATs from token management except /me.
+    '/api/v2/api-tokens',
 ];
 const verifyJWTToken = [
     "/api/v2/company/delete",

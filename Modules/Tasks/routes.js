@@ -5,6 +5,7 @@ const advanceFilter = require('./helpers/manageGlobalFilter');
 const getTaskCtrl = require('./helpers/getTasksData');
 const { handleEvents } = require('../Company/eventController');
 const logger = require('../../Config/loggerConfig');
+const { requireTaskActionPermission, requirePermission } = require('../../Config/permissionGuard');
 
 exports.init = (app) => {
     app.post('/api/tasks', (req, res) => {
@@ -34,7 +35,7 @@ exports.init = (app) => {
         });
     });
 
-    app.post('/api/v2/tasks', (req, res) => {
+    app.post('/api/v2/tasks', requirePermission('task.task_create'), (req, res) => {
         try {
             taskMongo.create(req.body)
             .then((resData) => {
@@ -54,7 +55,7 @@ exports.init = (app) => {
         }
     });
 
-    app.patch('/api/v2/tasks', (req, res) => {
+    app.patch('/api/v2/tasks', requireTaskActionPermission(), (req, res) => {
         taskMongo[req.body.action](req.body)
         .then((response) => {
             res.send({status: true, statusText: 'Task updated successfully.',data:response});

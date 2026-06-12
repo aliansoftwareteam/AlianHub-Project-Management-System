@@ -1,4 +1,5 @@
 const ctrl = require('./controller');
+const { requirePermission } = require('../../Config/permissionGuard');
 
 exports.init = (app) => {
     /**
@@ -56,6 +57,6 @@ exports.init = (app) => {
     /**
      * create Project API
     */
-    app.post('/api/v1/createproject', ctrl.createProjectFun);
+    app.post('/api/v1/createproject', requirePermission('project.project_create'), ctrl.createProjectFun);
     app.post('/api/v1/getGlobalTemplate', ctrl.getGlobalTemplate);
 }

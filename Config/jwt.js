@@ -4,6 +4,10 @@ const logger = require("./loggerConfig");
 const mongoC = require("../utils/mongo-handler/mongoQueries");
 const { dbCollections } = require("../Config/collections.js");
 const {myCache} = require('./config');
+// Personal API token (PAT) support — pure helpers only (node crypto), no
+// circular dependency risk. The controller is lazy-required inside
+// verifyApiTokenRequest below.
+const { looksLikeToken, hasScope } = require('../Modules/ApiTokens/helpers/apiTokenRules');
 
 // Mongo ObjectId pattern — used to reject regex/control characters in the
 // `companyid` request header before any token-membership check.
@@ -78,6 +82,92 @@ const invalidateMembershipCache = (uid, companyId) => {
     myCache.keys()
         .filter((k) => k.indexOf(prefix) === 0)
         .forEach((k) => myCache.del(k));
+};
+
+
+// ── Personal API token (PAT) branch ─────────────────────────────────────
+// Modules/ApiTokens issues `ahp_…` tokens (sha256-hashed at rest). API
+// clients (MCP server, scripts) send them as `Authorization: Bearer ahp_…`
+// plus the usual `companyid` header. JWTs keep the exact same code path as
+// before — the PAT branch only triggers on the `ahp_` prefix, which can
+// never be a valid JWT, so the web app flow is untouched.
+
+const PAT_READONLY_METHODS = ['GET', 'HEAD', 'OPTIONS'];
+// PATs must not manage tokens (no token-mints-token escalation). The
+// whoami endpoint is the one exception.
+const PAT_BLOCKED_PATH_PREFIX = '/api/v2/api-tokens';
+const PAT_ALLOWED_EXCEPTIONS = ['/api/v2/api-tokens/me'];
+
+const verifyApiTokenRequest = async (req, res, next, companyId, rawToken) => {
+    try {
+        // Lazy require keeps Config/jwt.js independent of module load order.
+        const { verifyToken: verifyApiToken, logTokenActivity } = require('../Modules/ApiTokens/controller');
+
+        const path = String(req.originalUrl || req.path || '').split('?')[0];
+        if (path.startsWith(PAT_BLOCKED_PATH_PREFIX) && !PAT_ALLOWED_EXCEPTIONS.includes(path)) {
+            return res.status(403).json({
+                status: false,
+                error: 'API tokens cannot manage API tokens. Use the web app session instead.',
+                statusText: 'Forbidden',
+            });
+        }
+
+        const tokenDoc = await verifyApiToken(companyId, rawToken);
+        if (!tokenDoc) {
+            return res.status(401).json({
+                status: false,
+                error: 'Invalid, expired or revoked API token',
+                statusText: 'Unauthorized',
+                isJwtError: true,
+            });
+        }
+
+        // Same live membership re-check the JWT path performs (BUG-013 / #67).
+        const isMember = await verifyCompanyMembership(String(tokenDoc.userId), companyId);
+        if (!isMember) {
+            return res.status(403).json({
+                status: false,
+                error: 'You are no longer a member of this company',
+                statusText: 'Forbidden',
+            });
+        }
+
+        const requiredScope = PAT_READONLY_METHODS.includes(req.method) ? 'read' : 'write';
+        if (!hasScope(tokenDoc, requiredScope)) {
+            return res.status(403).json({
+                status: false,
+                error: `Token lacks the '${requiredScope}' scope.`,
+                statusText: 'Forbidden',
+            });
+        }
+
+        // Same request identity contract the JWT verifiers establish.
+        req.uid = String(tokenDoc.userId);
+        req.aud = companyId;
+        req.apiToken = tokenDoc;
+
+        // Audit trail — same fire-and-forget logging the public-v1 namespace uses.
+        const started = Date.now();
+        res.on('finish', () => {
+            logTokenActivity(companyId, tokenDoc._id, {
+                method: req.method,
+                path,
+                statusCode: res.statusCode,
+                durationMs: Date.now() - started,
+                ip: req.ip || '',
+            });
+        });
+
+        return next();
+    } catch (error) {
+        logger.error(`PAT auth error: ${error.message || error}`);
+        return res.status(401).json({
+            status: false,
+            error: 'Unauthorized',
+            statusText: 'Unauthorized',
+            isJwtError: true,
+        });
+    }
 };
 
 
@@ -334,6 +424,11 @@ const verifyJWTTokenWithCV2 = async (req, res, next) => {
                 // Remove Bearer from string
                 token = token.slice(7, token.length);
             }
+            // PAT branch: `ahp_…` tokens take the API-token path; JWTs
+            // continue through the unchanged session flow below.
+            if (looksLikeToken(token)) {
+                return verifyApiTokenRequest(req, res, next, companyId, token);
+            }
             const isValid = jwt.verify(token, process.env.JWT_SECRET);
             if (!isCompanyInAudience(isValid.aud, companyId)) {
                 res.clearCookie('accessToken');
@@ -428,6 +523,20 @@ const verifyJWTTokenV2 = (req, res, next) => {
         if (token.startsWith('Bearer ')) {
             // Remove Bearer from string
             token = token.slice(7, token.length);
+        }
+
+        // PAT branch: these routes don't otherwise require a companyid
+        // header, but PATs are stored per-company, so one is required here.
+        if (looksLikeToken(token)) {
+            const companyId = String(req.headers['companyid'] || '');
+            if (!OBJECT_ID_PATTERN.test(companyId)) {
+                return res.status(401).json({
+                    status: false,
+                    error: 'A valid companyid header is required for API token authentication',
+                    statusText: 'Unauthorized',
+                });
+            }
+            return verifyApiTokenRequest(req, res, next, companyId, token);
         }
 
         try {
