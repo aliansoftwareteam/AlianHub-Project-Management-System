@@ -5,6 +5,12 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const { replaceObjectKey } = require("../Auth/helper");
 const socketEmitter = require("../../event/socketEventEmitter");
 const { estimateAndPersist: estimateTaskTimeWithAI } = require("./aiTaskEstimator");
+// BUG fix (found via MCP integration 2026-06-12): updateEstimatedTime called
+// `exports.updateRemainingTime`, which was never defined in this module —
+// every Task Planning save threw "not a function" AFTER persisting the row,
+// returning a 500 for a write that had actually succeeded. The real helper
+// lives in the LogTime module.
+const { updateRemainingTime } = require("../LogTime/controllerV2/helpers");
 
 exports.getEstimatedTime = async(req,res) => {
     try {
@@ -56,7 +62,10 @@ exports.updateEstimatedTime = async(req,res) => {
             return res.status(400).json({ message: "Estimated time not updated" });
         }
         if (estimatedTime.TaskId) {
-            exports.updateRemainingTime(req.headers['companyid'],estimatedTime.TaskId);
+            // Fire-and-forget: a remaining-time recalc failure must not fail
+            // the (already persisted) planning row.
+            Promise.resolve(updateRemainingTime(req.headers['companyid'], estimatedTime.TaskId))
+                .catch((error) => loggerConfig.error(`updateRemainingTime after planning save failed: ${error.message || error}`));
         }
         return res.status(200).json(estimatedTime);
     } catch (error) {

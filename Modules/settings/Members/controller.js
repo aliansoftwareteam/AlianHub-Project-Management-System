@@ -219,6 +219,22 @@ exports.updateMember = async (req, res) => {
             });
         }
 
+        // Defense in depth (route is already owner/admin-gated): granting
+        // owner/admin (roleType 1/2) is OWNER-only — prevents an admin from
+        // promoting anyone (incl. self) to owner. Members never reach here.
+        if (data && data.roleType !== undefined) {
+            const { getRoleType, ROLE_OWNER, ROLE_ADMIN } = require('../../../Config/permissionGuard');
+            const callerRole = await getRoleType(req.headers['companyid'] || '', req.uid);
+            const targetRole = Number(data.roleType);
+            if ((targetRole === ROLE_OWNER || targetRole === ROLE_ADMIN) && callerRole !== ROLE_OWNER) {
+                return res.status(403).json({
+                    status: false,
+                    statusText: 'Only the owner can grant owner or admin roles.',
+                    error: 'Forbidden',
+                });
+            }
+        }
+
         const params = {
             type: SCHEMA_TYPE.COMPANY_USERS,
             data: [
