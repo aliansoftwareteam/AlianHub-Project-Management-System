@@ -2655,4 +2655,18 @@ export default {
         load_failed: "Couldn't load the changelog.",
         retry: "Retry",
     },
+    Stickies: {
+        title: "Sticky Notes",
+        add: "Add note",
+        loading: "Loading your notes…",
+        empty: "No notes yet. Click \"Add note\" to jot something down.",
+        placeholder: "Write a quick note…",
+        title_placeholder: "Title",
+        delete: "Delete note",
+        options: "Options",
+        expand: "Expand",
+        pin: "Pin",
+        unpin: "Unpin",
+        drag_hint: "Drag to reorder",
+    },
 };

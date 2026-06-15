@@ -90,6 +90,9 @@ const recentVisitsSchema = new Schema(schema.recentVisits, {strict: true, timest
 // recents: one doc per user+entity, always read newest-first per user.
 recentVisitsSchema.index({ userId: 1, visitedAt: -1 });
 recentVisitsSchema.index({ userId: 1, entityType: 1, entityId: 1 }, { unique: true });
+const stickiesSchema = new Schema(schema.stickies, {strict: true, timestamps: true});
+// stickies: per-user board, read in pin-then-order sequence for that user.
+stickiesSchema.index({ userId: 1, isPinned: -1, sortIndex: 1 });
 const apiTokensSchema = new Schema(schema.apiTokens, {strict: true, timestamps: true});
 apiTokensSchema.index({ tokenHash: 1 });
 apiTokensSchema.index({ userId: 1 });
@@ -179,6 +182,7 @@ module.exports = {
     webhooksSchema,
     webhookLogsSchema,
     recentVisitsSchema,
+    stickiesSchema,
     apiTokensSchema,
     apiActivityLogsSchema,
     exportJobsSchema,
