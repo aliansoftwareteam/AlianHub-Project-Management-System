@@ -470,6 +470,14 @@ const schema = {
             default: true,
             required: false,
         },
+        // Outbound payload shape: 'json' (raw, default), 'slack' (Block Kit),
+        // or 'discord' (embed) — lets a hook target a Slack/Discord incoming
+        // webhook directly without a transform service.
+        format: {
+            type: String,
+            default: "json",
+            required: false,
+        },
         createdBy: {
             type: String,
             required: false,

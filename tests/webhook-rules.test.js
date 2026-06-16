@@ -9,6 +9,7 @@
 const {
     EVENT_TYPES,
     WILDCARD,
+    WEBHOOK_FORMATS,
     isValidUrl,
     validateWebhookInput,
     subscribesTo,
@@ -16,7 +17,58 @@ const {
     trimTaskForDelivery,
     signPayload,
     generateSecret,
+    normalizeFormat,
+    formatForTarget,
 } = require('../Modules/Webhooks/helpers/webhookRules');
+
+describe('webhook format presets', () => {
+    const body = {
+        event: 'task.updated',
+        companyId: 'c1',
+        data: { TaskKey: 'AHE-1', TaskName: 'Fix login', status: { text: 'In Progress' }, Task_Priority: 'HIGH', DueDate: '2026-07-01' },
+    };
+
+    test('normalizeFormat falls back to json for unknown/empty', () => {
+        expect(normalizeFormat('slack')).toBe('slack');
+        expect(normalizeFormat('discord')).toBe('discord');
+        expect(normalizeFormat('teams')).toBe('json');
+        expect(normalizeFormat(undefined)).toBe('json');
+    });
+
+    test('json format returns the raw envelope unchanged', () => {
+        expect(formatForTarget('json', body)).toBe(body);
+        expect(formatForTarget(undefined, body)).toBe(body);
+    });
+
+    test('slack format produces text + blocks with the task details', () => {
+        const out = formatForTarget('slack', body);
+        expect(out.text).toContain('AHE-1');
+        expect(Array.isArray(out.blocks)).toBe(true);
+        const rendered = JSON.stringify(out);
+        expect(rendered).toContain('Task updated');
+        expect(rendered).toContain('In Progress');
+        expect(rendered).toContain('HIGH');
+    });
+
+    test('discord format produces an embed with status/priority/due fields', () => {
+        const out = formatForTarget('discord', body);
+        expect(Array.isArray(out.embeds)).toBe(true);
+        expect(out.embeds[0].title).toContain('Fix login');
+        const names = out.embeds[0].fields.map((f) => f.name);
+        expect(names).toEqual(expect.arrayContaining(['Status', 'Priority', 'Due']));
+    });
+
+    test('validateWebhookInput rejects an unknown format but accepts a valid one', () => {
+        const base = { name: 'h', url: 'https://x.test', events: ['*'] };
+        expect(validateWebhookInput({ ...base, format: 'teams' }).valid).toBe(false);
+        expect(validateWebhookInput({ ...base, format: 'slack' }).valid).toBe(true);
+        expect(validateWebhookInput(base).valid).toBe(true); // format optional
+    });
+
+    test('WEBHOOK_FORMATS lists the three supported shapes', () => {
+        expect(WEBHOOK_FORMATS).toEqual(['json', 'slack', 'discord']);
+    });
+});
 
 describe('🪝 WEBHOOKS - Rules', () => {
 

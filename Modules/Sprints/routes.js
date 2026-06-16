@@ -1,5 +1,6 @@
 const ctrl = require('./controller');
 const burndown = require('./burndown');
+const { requirePermission } = require('../../Config/permissionGuard');
 
 // Whitelist of functions allowed to be called via PATCH /sprint/:id
 const ALLOWED_SPRINT_TYPES = ['editSprintName', 'updateSprint'];
@@ -11,7 +12,7 @@ exports.init = (app) => {
     // Read-only burndown series for a sprint (count + estimate based).
     app.post('/api/v2/sprints/burndown', burndown.getSprintBurndown);
 
-    app.post('/api/v1/sprint', ctrl.addSprint);
+    app.post('/api/v1/sprint', requirePermission('project.project_sprint_create'), ctrl.addSprint);
     app.patch('/api/v1/sprint/:id', (req, res) => {
         if(!req?.body?.type) {
             res.send({status: false, statusText: "type not found"});

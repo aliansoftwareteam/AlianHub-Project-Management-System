@@ -1,8 +1,19 @@
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
+const { dbCollections } = require("../../Config/collections");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
+const { myCache } = require("../../Config/config");
 const { generateToken, hashToken, tokenPrefixOf, looksLikeToken, validateCreateInput, isExpired } = require('./helpers/apiTokenRules');
+
+// Resolve the acting user. These routes now sit behind the JWT middleware
+// (Config/setMiddleware.js) which populates req.uid; the body userData
+// fallback keeps older clients working until the frontend catches up.
+const actingUserId = (req) => {
+    if (req.uid) return String(req.uid);
+    const userData = req.body && req.body.userData;
+    return userData && (userData.id || userData._id) ? String(userData.id || userData._id) : '';
+};
 
 // Personal API tokens. The raw token is shown exactly once at creation;
 // only its sha256 hash is stored. The prefix (first 12 chars) stays
@@ -24,8 +35,8 @@ const maskToken = (doc) => ({
 exports.createToken = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
-        const { name, scopes, expiresInDays, userData } = req.body || {};
-        const userId = userData && (userData.id || userData._id) ? String(userData.id || userData._id) : '';
+        const { name, scopes, expiresInDays } = req.body || {};
+        const userId = actingUserId(req);
         if (!companyId || !userId) {
             return res.send({ status: false, statusText: 'companyId and userId are required.' });
         }
@@ -60,12 +71,15 @@ exports.createToken = async (req, res) => {
 exports.listTokens = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
-        if (!companyId) {
-            return res.send({ status: false, statusText: 'companyId is required.' });
+        const userId = actingUserId(req);
+        if (!companyId || !userId) {
+            return res.send({ status: false, statusText: 'companyId and userId are required.' });
         }
+        // Own tokens only — a user must not see (or learn prefixes of)
+        // other users' tokens.
         const tokens = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.API_TOKENS,
-            data: [{}, null, { sort: { createdAt: -1 } }],
+            data: [{ userId }, null, { sort: { createdAt: -1 } }],
         }, 'find');
         return res.send({ status: true, statusText: 'Tokens fetched.', data: (tokens || []).map(maskToken) });
     } catch (error) {
@@ -78,8 +92,9 @@ exports.listTokens = async (req, res) => {
 exports.updateToken = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
+        const userId = actingUserId(req);
         const { id } = req.params;
-        if (!companyId || !/^[0-9a-fA-F]{24}$/.test(String(id))) {
+        if (!companyId || !userId || !/^[0-9a-fA-F]{24}$/.test(String(id))) {
             return res.send({ status: false, statusText: 'companyId and a valid token id are required.' });
         }
         const { name, active } = req.body || {};
@@ -94,7 +109,7 @@ exports.updateToken = async (req, res) => {
         }
         const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.API_TOKENS,
-            data: [{ _id: new mongoose.Types.ObjectId(id) }, { $set: update }, { returnDocument: 'after' }],
+            data: [{ _id: new mongoose.Types.ObjectId(id), userId }, { $set: update }, { returnDocument: 'after' }],
         }, 'findOneAndUpdate');
         if (!updated) {
             return res.send({ status: false, statusText: 'Token not found.' });
@@ -110,11 +125,20 @@ exports.updateToken = async (req, res) => {
 exports.deleteToken = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
+        const userId = actingUserId(req);
         const { id } = req.params;
-        if (!companyId || !/^[0-9a-fA-F]{24}$/.test(String(id))) {
+        if (!companyId || !userId || !/^[0-9a-fA-F]{24}$/.test(String(id))) {
             return res.send({ status: false, statusText: 'companyId and a valid token id are required.' });
         }
         const tokenObjId = new mongoose.Types.ObjectId(id);
+        // Ownership check before deletion — only the owner may revoke.
+        const owned = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.API_TOKENS,
+            data: [{ _id: tokenObjId, userId }],
+        }, 'findOne');
+        if (!owned) {
+            return res.send({ status: false, statusText: 'Token not found.' });
+        }
         await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.API_TOKENS, data: [{ _id: tokenObjId }] }, 'deleteOne');
         await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.API_ACTIVITY_LOGS, data: [{ tokenId: tokenObjId }] }, 'deleteMany').catch(() => {});
         return res.send({ status: true, statusText: 'Token deleted.' });
@@ -128,9 +152,18 @@ exports.deleteToken = async (req, res) => {
 exports.listTokenLogs = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
+        const userId = actingUserId(req);
         const { id } = req.params;
-        if (!companyId || !/^[0-9a-fA-F]{24}$/.test(String(id))) {
+        if (!companyId || !userId || !/^[0-9a-fA-F]{24}$/.test(String(id))) {
             return res.send({ status: false, statusText: 'companyId and a valid token id are required.' });
+        }
+        // Only the token's owner may read its activity log.
+        const owned = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.API_TOKENS,
+            data: [{ _id: new mongoose.Types.ObjectId(id), userId }],
+        }, 'findOne');
+        if (!owned) {
+            return res.send({ status: false, statusText: 'Token not found.' });
         }
         const logs = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.API_ACTIVITY_LOGS,
@@ -153,14 +186,73 @@ exports.verifyToken = async (companyId, rawToken) => {
             data: [{ tokenHash: hashToken(rawToken), active: true }],
         }, 'findOne');
         if (!doc || isExpired(doc)) return null;
-        MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.API_TOKENS,
-            data: [{ _id: doc._id }, { $set: { lastUsedAt: new Date() } }],
-        }, 'updateOne').catch(() => {});
+        // Throttled lastUsedAt bump: at most one write per token per minute,
+        // so high-frequency API clients don't turn every request into a
+        // Mongo write. (Cache miss after restart just means one extra write.)
+        const throttleKey = `patLastUsed:${companyId}:${doc._id}`;
+        if (!myCache.get(throttleKey)) {
+            myCache.set(throttleKey, true, 60);
+            MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.API_TOKENS,
+                data: [{ _id: doc._id }, { $set: { lastUsedAt: new Date() } }],
+            }, 'updateOne').catch(() => {});
+        }
         return doc;
     } catch (error) {
         logger.error(`ERROR in verify api token: ${error.message}`);
         return null;
+    }
+};
+
+/* GET /api/v2/api-tokens/me — whoami for API clients (PAT or JWT).
+ * The MCP server calls this once after connect to resolve the identity
+ * behind a token: { userId, companyId, name, email, scopes }. */
+exports.whoami = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'] || '';
+        const userId = actingUserId(req);
+        if (!companyId || !userId) {
+            return res.status(401).send({ status: false, statusText: 'Unauthorized.' });
+        }
+        let user = null;
+        try {
+            user = await MongoDbCrudOpration(dbCollections.GLOBAL, {
+                type: dbCollections.USERS,
+                data: [{ _id: new mongoose.Types.ObjectId(userId) }],
+            }, 'findOne');
+        } catch (lookupError) {
+            logger.error(`ERROR in whoami user lookup: ${lookupError.message}`);
+        }
+        // Effective permission map so MCP clients can enforce every tool
+        // against the user's role/permissions (read-only; no side effects).
+        let roleType = null;
+        let permissions = {};
+        try {
+            const { evaluateMany } = require('../../Config/permissionGuard');
+            const result = await evaluateMany(companyId, userId);
+            roleType = result.roleType;
+            permissions = result.permissions;
+        } catch (permError) {
+            logger.error(`ERROR in whoami permission eval: ${permError.message}`);
+        }
+        return res.send({
+            status: true,
+            statusText: 'Identity resolved.',
+            data: {
+                userId,
+                companyId,
+                name: (user && user.Employee_Name) || '',
+                email: (user && user.Employee_Email) || '',
+                timeZone: (user && user.Time_Zone) || '',
+                roleType,
+                permissions,
+                scopes: (req.apiToken && req.apiToken.scopes) || [],
+                tokenName: (req.apiToken && req.apiToken.name) || null,
+            },
+        });
+    } catch (error) {
+        logger.error(`ERROR in whoami: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
     }
 };
 
