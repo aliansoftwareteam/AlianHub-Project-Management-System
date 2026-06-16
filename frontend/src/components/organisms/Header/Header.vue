@@ -62,6 +62,9 @@
                 <img src="@/assets/images/comment_mention.png" class="cursor-pointer" id="mention_driver" @click="getMentions(!mentions.length), showNotification = 1, notificationVisible = true">
                 <span :class="{'notification-tick': totalMentions > 0}" class="blinking"></span>
             </div>
+            <div class="position-re" :class="{'mr-2' : clientWidth > 1440, 'mr-1' : clientWidth<=1440}" v-if="rules && Object.keys(rules).length">
+                <img src="@/assets/images/svg/sticky_note_icon.svg" class="cursor-pointer" id="stickies_driver" :title="$t('Stickies.title')" @click="stickiesVisible = true">
+            </div>
             <div class="position-re" :class="{'pr-2' : clientWidth > 1440, 'pr-1' : clientWidth<=1440}" v-if="rules && Object.keys(rules).length && (companyUser.roleType === 1 || companyUser.roleType === 2)">
                 <img src="@/assets/images/svg/tour_image.svg" class="cursor-pointer" id="tour_icon" @click="getTourDetails(),tourVisible = true">
             </div>
@@ -99,6 +102,8 @@
                 v{{version}}
             </span>
         </div>
+
+        <StickiesPanel v-model="stickiesVisible" />
 
         <Sidebar
             title="Test"
@@ -334,6 +339,7 @@ import { useCustomComposable, useGetterFunctions } from "@/composable/index.js";
 import NavLinks from "@/components/organisms/NavLinks/NavLinks.vue";
 import WasabiIamgeCompp from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue"
 import Sidebar from "@/components/molecules/Sidebar/Sidebar.vue";
+import StickiesPanel from "@/components/molecules/Stickies/StickiesPanel.vue";
 import DropDown from "@/components/molecules/DropDown/DropDown.vue";
 import DropDownOption from "@/components/molecules/DropDownOption/DropDownOption.vue";
 import DropDownRouterOption from "@/components/molecules/DropDownRouterOption/DropDownRouterOption.vue";
@@ -436,6 +442,7 @@ const visible = ref(false);
 const showNotification = ref(0);
 const notificationVisible = ref(false);
 const tourVisible = ref(false);
+const stickiesVisible = ref(false);
 const myCounts = computed(() => getters["users/myCounts"]?.data || {})
 const totalNotification = computed(() => myCounts.value?.notification_counts);
 const totalMentions = computed(() => myCounts.value?.mention_counts)

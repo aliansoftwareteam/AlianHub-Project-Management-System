@@ -212,6 +212,7 @@ function initializeControllers() {
     require('./Modules/Webhooks/init').init(app);
     require('./Modules/Reactions/init').init(app);
     require('./Modules/RecentVisits/init').init(app);
+    require('./Modules/Stickies/init').init(app);
     require('./Modules/GlobalSearch/init').init(app);
     require('./Modules/Epics/init').init(app);
     require('./Modules/ExportJobs/init').init(app);
