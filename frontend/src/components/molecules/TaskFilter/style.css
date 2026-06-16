@@ -293,8 +293,10 @@
 
 }
 .task-filtersearch {
+    /* Shrink to content (capped) so the action buttons fit on the same
+       line — a fixed 43% starved the right-side button group. */
     max-width: 43%;
-    width: 43%;
+    width: auto;
 }
 .task-fitler-search .form-control{
     font-size: 16px;

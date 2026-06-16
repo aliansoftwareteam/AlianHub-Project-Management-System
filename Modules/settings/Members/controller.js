@@ -219,6 +219,23 @@ exports.updateMember = async (req, res) => {
             });
         }
 
+        // Defense in depth: granting owner/admin (roleType 1/2) is OWNER-only.
+        // SCOPED TO PAT/MCP REQUESTS ONLY (req.apiToken) so the web app's role
+        // management behaves exactly as before — MCP changes must never affect
+        // existing frontend/backend behavior (2026-06-15).
+        if (req.apiToken && data && data.roleType !== undefined) {
+            const { getRoleType, ROLE_OWNER, ROLE_ADMIN } = require('../../../Config/permissionGuard');
+            const callerRole = await getRoleType(req.headers['companyid'] || '', req.uid);
+            const targetRole = Number(data.roleType);
+            if ((targetRole === ROLE_OWNER || targetRole === ROLE_ADMIN) && callerRole !== ROLE_OWNER) {
+                return res.status(403).json({
+                    status: false,
+                    statusText: 'Only the owner can grant owner or admin roles.',
+                    error: 'Forbidden',
+                });
+            }
+        }
+
         const params = {
             type: SCHEMA_TYPE.COMPANY_USERS,
             data: [

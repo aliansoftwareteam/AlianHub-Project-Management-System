@@ -20,6 +20,9 @@ exports.getOAuthCred = async (req, res) => {
                 githubClientId: backendEnvVars.GITHUB_CLIENT_ID || '',
                 githubClientSecret: backendEnvVars.GITHUB_CLIENT_SECRET || '',
                 isGithubLogin: envVars.VUE_APP_IS_GITHUB_LOGIN === "true",
+                gitlabClientId: backendEnvVars.GITLAB_CLIENT_ID || '',
+                gitlabClientSecret: backendEnvVars.GITLAB_CLIENT_SECRET || '',
+                isGitlabLogin: envVars.VUE_APP_IS_GITLAB_LOGIN === "true",
             },
         });
     } catch (error) {

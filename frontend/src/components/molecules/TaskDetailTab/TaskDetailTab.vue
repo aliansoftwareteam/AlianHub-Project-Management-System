@@ -40,6 +40,10 @@
                 :task="task"
                 class="mt-1"
             />
+            <EpicPicker
+                :task="task"
+                class="mt-1"
+            />
             <div class="position-re">
                 <div v-if="checkPermission('task.task_custom_field',projectData?.isGlobalPermission) !== null && checkApps('CustomFields')">
                     <div :class="[{'pointer-event-none opacity-5 blur-3-px':!currentCompany?.planFeature?.customFields}]">
@@ -105,7 +109,7 @@
 import Swal from 'sweetalert2';
 import { useStore } from 'vuex';
 import { useToast } from 'vue-toast-notification';
-import { computed, defineProps, inject, ref, nextTick,onMounted } from 'vue';
+import { computed, defineProps, inject, ref, nextTick,onMounted, watch } from 'vue';
 
 // COMPONENTS
 import { dbCollections } from '@/utils/Collections';
@@ -114,6 +118,7 @@ import Attachments from '@/components/atom/Attachments/Attachments.vue'
 import CheckListComponent from '@/components/molecules/CheckList/CheckList.vue'
 import SubTasks from '@/components/organisms/SubTasks/SubTasks.vue'
 import LinkedTasks from '@/components/organisms/LinkedTasks/LinkedTasks.vue'
+import EpicPicker from '@/components/molecules/Epics/EpicPicker.vue'
 import CreateTagPopup from "@/components/molecules/TagList/CreateTagPopup.vue";
 import TagChip from '@/components/atom/TagChip/TagChip.vue'
 import PromptSidebar from "@/components/molecules/PromptSidebar/PromptSidebar.vue";
@@ -187,6 +192,21 @@ const isSpinnerAi = ref(false);
 
 // inject
 const userId = inject('$userId');
+
+// Recently-visited tracking — fire-and-forget on every task open.
+function recordRecentVisit() {
+    if (!props.task?._id) return;
+    const user = getUser(userId.value);
+    apiRequest('post', '/api/v2/recent-visits', {
+        entityType: 'task',
+        entityId: props.task._id,
+        userData: { id: user.id },
+    }).catch((error) => {
+        console.error('ERROR in record recent visit: ', error);
+    });
+}
+onMounted(recordRecentVisit);
+watch(() => props.task?._id, recordRecentVisit);
 const companyId = inject('$companyId');
 const clientWidth = inject("$clientWidth");
 const projectData = inject("selectedProject");

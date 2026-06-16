@@ -1,21 +1,10 @@
-const { spawn } = require('child_process');
-let server;
-
-// Function to start the crash server
-function startCrashServer() {
-    server = spawn('node', ['server.js'], { stdio: 'inherit' });
-}
-
-// Function to start the server
-function startServer() {
-    // Start the server process
-    server = spawn('node', ['index.js'], { stdio: 'inherit' });
-    server.on('exit', (code) => {
-        console.log(`Server exited with code ${code}. Restarting...`);
-        server.kill();
-        startCrashServer(); // Restart the server on exit
-    });
-}
-
-// Start the server initially
-startServer();
+// Entry point for `npm start` / pm2.
+//
+// This file used to be a restart wrapper that re-spawned `node server.js`
+// recursively on every crash. Under a crash-loop each exit stacked another
+// wrapper process, exhausting the OS process table until every spawn failed
+// with EAGAIN and took the whole instance down (staging outage, 2026-06-10).
+//
+// Process supervision belongs to pm2 (autorestart with backoff) — the app
+// now simply runs in-process.
+require('./index.js');

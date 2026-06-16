@@ -45,6 +45,10 @@ const userData = ref();
 const isLoading = ref(false);
 
 onMounted(async () => {
+    // Only handle the redirect if THIS provider started it. GitHub and GitLab
+    // both come back with ?code=, so without this guard both components would
+    // grab the same code and one would strip it from the URL before the other.
+    if (!localStorage.getItem("githubAuthMode")) return;
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     if (!code) return;
@@ -103,6 +107,11 @@ const login = async (userInfo) => {
         const object = {
             email: userInfo.email,
             githubId: userInfo.githubId,
+            // Forward the GitHub access token so the backend can re-verify the
+            // identity against GitHub's /user API instead of trusting the
+            // client-supplied id/email. Without this, login is rejected in the
+            // default (strict) server mode.
+            accessToken: userInfo.accessToken,
             isLoginType: "frontend",
             authProvider: "github"
         }
@@ -278,6 +287,7 @@ async function fetchGitHubUser(token) {
             githubId: userData.id,
             firstName,
             lastName,
+            accessToken: token,
         }
 
         // Call API's

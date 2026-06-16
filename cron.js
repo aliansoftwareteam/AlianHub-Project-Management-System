@@ -4,6 +4,7 @@ const taskIndexRef = require("./Modules/taskIndex/controller");
 const { handleBucketSizeUpdateCron } = require(`./common-storage/common-${process.env.STORAGE_TYPE}.js`);
 const aiRef = require("./Modules/AI/controller")
 const screenshotRetention = require("./Modules/ScreenshotRetention/helper");
+const autoArchive = require("./Modules/projectSetting/autoArchive");
 
 // BUG-035 / #89 — pin every cron to a known timezone so schedules don't
 // shift when the server's local tz changes (DST transition, container
@@ -39,6 +40,18 @@ schedule.scheduleJob({ rule: '30 0 * * *', tz: CRON_TZ }, async () => {
 schedule.scheduleJob({ rule: '0 * * * *', tz: CRON_TZ }, async () => {
     logger.info(`[Cron] createUnIndexTask`);
     taskIndexRef.createUnIndexTask();
+})
+
+// Auto-archive — daily at 01:00 UTC (off-peak vs the midnight jobs). For
+// every project with `autoArchive.enabled`, archives completed tasks
+// (status type 'close') untouched for `afterDays` days.
+schedule.scheduleJob({ rule: '0 1 * * *', tz: CRON_TZ }, async () => {
+    logger.info(`[Cron] autoArchive.runAutoArchiveForAllCompanies`);
+    try {
+        await autoArchive.runAutoArchiveForAllCompanies();
+    } catch (err) {
+        logger.error(`[Cron] autoArchive failed: ${err && err.message ? err.message : err}`);
+    }
 })
 
 // // This cron job executes daily at midnight (12 AM) and remove ai request count.

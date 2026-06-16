@@ -8,7 +8,7 @@
                         type="text"
                         :placeHolder="$t('PlaceHolder.search')"
                         class="form-control"
-                        :style="{width: (clientWidth > 1025 ? '392px' : '90%')}"
+                        :style="{width: (clientWidth > 1025 ? '260px' : '90%')}"
                         :value="taskSearch"
                         @input="$emit('update:taskSearch', $event.target.value)"
                     >
@@ -94,6 +94,54 @@
                             </DropDownOption>
                         </template>
                     </DropDown>
+                    <!-- All newer features live behind one "…" menu (matches
+                         the task context-menu pattern) instead of nine
+                         separate toolbar buttons. -->
+                    <DropDown id="more_features" class="mr-1" :zIndex="10">
+                        <template #button>
+                            <button class="text-nowrap btn-white border-groupBy border-radius-6-px cursor-pointer" ref="more_features_trigger" :title="$t('Projects.more_features')">
+                                <img :src="horizontalDots" alt="more" class="vertical-middle">
+                            </button>
+                        </template>
+                        <template #options>
+                            <DropDownOption @click="$refs.more_features_trigger.click(); showGlobalSearch = true">
+                                <div><span class="dropdown-label">{{ $t('Projects.global_search') }}</span></div>
+                            </DropDownOption>
+                            <DropDownOption @click="$refs.more_features_trigger.click(); showRecent = true">
+                                <div><span class="dropdown-label">{{ $t('Projects.recent_tasks') }}</span></div>
+                            </DropDownOption>
+                            <DropDownOption @click="$refs.more_features_trigger.click(); showBurndown = true">
+                                <div><span class="dropdown-label">{{ $t('Projects.burndown') }}</span></div>
+                            </DropDownOption>
+                            <DropDownOption @click="$refs.more_features_trigger.click(); showEpics = true">
+                                <div><span class="dropdown-label">{{ $t('Projects.epics') }}</span></div>
+                            </DropDownOption>
+                            <DropDownOption @click="$refs.more_features_trigger.click(); showPages = true">
+                                <div><span class="dropdown-label">{{ $t('Projects.pages') }}</span></div>
+                            </DropDownOption>
+                            <DropDownOption @click="$refs.more_features_trigger.click(); showExport = true">
+                                <div><span class="dropdown-label">{{ $t('Projects.export_tasks') }}</span></div>
+                            </DropDownOption>
+                            <DropDownOption @click="$refs.more_features_trigger.click(); showPublicShare = true">
+                                <div><span class="dropdown-label">{{ $t('Projects.public_link') }}</span></div>
+                            </DropDownOption>
+                            <DropDownOption @click="$refs.more_features_trigger.click(); showImportJira = true">
+                                <div><span class="dropdown-label">{{ $t('Projects.import_jira') }}</span></div>
+                            </DropDownOption>
+                            <DropDownOption @click="$refs.more_features_trigger.click(); showAutoArchive = true">
+                                <div><span class="dropdown-label">{{ $t('Projects.auto_archive') }}</span></div>
+                            </DropDownOption>
+                        </template>
+                    </DropDown>
+                    <GlobalSearchModal v-model="showGlobalSearch" />
+                    <RecentVisitsDropdown v-model="showRecent" />
+                    <BurndownModal v-model="showBurndown" :projectData="projectData" />
+                    <EpicsPanel v-model="showEpics" :projectData="projectData" />
+                    <PagesPanel v-model="showPages" :projectData="projectData" />
+                    <ExportTasksDropdown v-model="showExport" :projectData="projectData" />
+                    <PublicShareModal v-model="showPublicShare" :projectData="projectData" />
+                    <ImportJiraModal v-model="showImportJira" :projectData="projectData" />
+                    <AutoArchiveModal v-model="showAutoArchive" :projectData="projectData" />
                     <div class="mr-1 border-groupBy border-radius-6-px d-flex align-items-center assignee-filter manage__filter-users">
                         <div
                             @click="$emit('manageFilterUsers', userId)"
@@ -179,6 +227,25 @@ import Toggle from '@/components/atom/Toggle/Toggle.vue';
 import Assignee from '@/components/molecules/Assignee/Assignee.vue';
 import TaskFilter from '@/components/molecules/TaskFilter/TaskFilter.vue';
 import MonthlyCalendarMilestone from '@/components/atom/MonthlyCalendarMilestone/MonthlyCalendarMilestone.vue';
+import BurndownModal from '@/components/molecules/Burndown/BurndownModal.vue';
+import RecentVisitsDropdown from '@/components/molecules/RecentVisits/RecentVisitsDropdown.vue';
+import GlobalSearchModal from '@/components/molecules/GlobalSearch/GlobalSearchModal.vue';
+import EpicsPanel from '@/components/molecules/Epics/EpicsPanel.vue';
+import ExportTasksDropdown from '@/components/molecules/ExportTasks/ExportTasksDropdown.vue';
+import PagesPanel from '@/components/molecules/Pages/PagesPanel.vue';
+import PublicShareModal from '@/components/molecules/PublicShare/PublicShareModal.vue';
+import ImportJiraModal from '@/components/molecules/ImportJira/ImportJiraModal.vue';
+import AutoArchiveModal from '@/components/molecules/AutoArchive/AutoArchiveModal.vue';
+
+const showBurndown = ref(false);
+const showGlobalSearch = ref(false);
+const showEpics = ref(false);
+const showPages = ref(false);
+const showPublicShare = ref(false);
+const showImportJira = ref(false);
+const showAutoArchive = ref(false);
+const showRecent = ref(false);
+const showExport = ref(false);
 import { useCustomComposable } from '@/composable';
 
 const { checkPermission, checkApps } = useCustomComposable();

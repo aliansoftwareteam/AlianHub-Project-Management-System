@@ -209,6 +209,17 @@ function initializeControllers() {
     require('./Modules/settings/settingCurrency/init').init(app);
     require('./Modules/settings/settingNotifications/init').init(app);
     require('./Modules/projectRules/init').init(app);
+    require('./Modules/Webhooks/init').init(app);
+    require('./Modules/Reactions/init').init(app);
+    require('./Modules/RecentVisits/init').init(app);
+    require('./Modules/Stickies/init').init(app);
+    require('./Modules/GlobalSearch/init').init(app);
+    require('./Modules/Epics/init').init(app);
+    require('./Modules/ExportJobs/init').init(app);
+    require('./Modules/ApiTokens/init').init(app);
+    require('./Modules/Pages/init').init(app);
+    require('./Modules/PublicShares/init').init(app);
+    require('./Modules/Importers/init').init(app);
     require('./Modules/EstimatedTime/init').init(app);
     require('./Modules/CustomField/init').init(app);
     require('./Modules/ProjectTemplates/init').init(app);
@@ -244,6 +255,8 @@ function initializeControllers() {
     require("./Modules/OAuth/init.js").init(app);
     require("./Modules/githubOAuth/init.js").init(app);
     require("./Modules/googleOAuth/init.js").init(app);
+    require("./Modules/gitlabOAuth/init.js").init(app);
+    require("./Modules/Changelog/init.js").init(app);
 }
 
 // SET MIDDLEWARE

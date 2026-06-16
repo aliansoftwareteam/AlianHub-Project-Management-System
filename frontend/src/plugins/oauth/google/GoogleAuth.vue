@@ -104,6 +104,11 @@ const login = async (userInfo) => {
         const object = {
             email: userInfo.email,
             googleId: userInfo.sub,
+            // Forward the signed Google ID token so the backend can verify the
+            // identity server-side (google-auth-library) instead of trusting the
+            // client-supplied email/sub. Without this, login is rejected when
+            // the server runs in hardened mode.
+            idToken: userInfo.idToken,
             isLoginType: "frontend",
             authProvider: "google"
         }
@@ -239,8 +244,10 @@ async function handleGoogleCallback(response) {
         const tokenRes = await apiRequestWithoutSecure("post", `${env.API_OAUTH_GOOGLE}/access-token`, { code: response.code });
         const tokens = tokenRes.data;
 
-        // Decode ID token manually to get profile
+        // Decode ID token manually to get profile, and keep the raw token so
+        // the backend can verify it (the decoded copy is for display only).
         const userInfo = parseJwt(tokens.id_token);
+        userInfo.idToken = tokens.id_token;
 
         // Call API's
         if (props.mode === 'login') {

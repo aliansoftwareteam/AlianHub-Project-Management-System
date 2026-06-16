@@ -22,10 +22,10 @@
 <br/>
 
 <div align="center">
-<strong>An open-source, full-stack project management system for teams that need control, extensibility, and self-hosting.</strong>
+<strong>The open-source, self-hosted project management platform — a ClickUp / Jira alternative with built-in time tracking (screenshots + timesheets) and AI project planning.</strong>
 <br/>
 <br/>
-Built for enterprises, startups, and growing teams — without vendor lock-in.
+Built for enterprises, startups, and growing teams — no per-seat pricing, no vendor lock-in, your data on your own servers.
 </div>
 
 <br/>
@@ -207,7 +207,38 @@ AlianHub is built using a pragmatic and scalable stack:
 
 - **🏠 Self-hosted, your data** — Run on your own servers with MongoDB and Wasabi/S3 (or local filesystem) storage. **No vendor lock-in, no per-seat pricing, no data leaving your infrastructure.**
 
-> Features evolve continuously — see [ROADMAP.md](ROADMAP.md) for what's next and [CHANGELOG.md](CHANGELOG.md) for what just shipped.
+> Features evolve continuously — see [Discussions](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/discussions) for what's next and [CHANGELOG.md](CHANGELOG.md) for what just shipped.
+
+---
+
+## Feature status
+
+| Capability | Status |
+|---|---|
+| List · Board (Kanban) · Table · Calendar · Workload views | ✅ Shipped |
+| Sub-tasks, checklists, attachments, comments, custom fields | ✅ Shipped |
+| Time tracking — timesheets + optional screenshots / activity | ✅ Shipped |
+| Custom roles & per-company RBAC | ✅ Shipped |
+| Sprints, milestones & reports | ✅ Shipped |
+| AI task / sub-task / project generation | ✅ Shipped |
+| Built-in chat & channels · real-time sync (Socket.io) | ✅ Shipped |
+| **Gantt / timeline view** | 🔜 On the roadmap |
+
+## How AlianHub compares
+
+Capabilities that are **free and built-in** here — but paid, limited, or absent in other open-source PM tools:
+
+| Capability | AlianHub | Plane (open-source) |
+|---|---|---|
+| Time tracking with screenshots | ✅ Free | ❌ Not available |
+| Custom fields | ✅ Free | 💲 Paid |
+| Custom roles & permission matrix | ✅ Free | ❌ 3 fixed roles |
+| Dashboards & widgets | ✅ Free | 💲 Paid (custom) |
+| Built-in chat | ✅ Free | ❌ Not available |
+| AI project generation | ✅ Free (your API key) | ❌ Not available |
+| Milestones | ✅ Free | ❌ Not available |
+
+> Comparison reflects each project's open-source edition; both are AGPL-3.0. AlianHub is younger and still closing gaps of its own (e.g. Gantt) — see the table above.
 
 ---
 
@@ -341,7 +372,7 @@ You can explore a live demo here:
 
 ## Roadmap
 
-What we're working on, what's planned, and what we're considering — see [ROADMAP.md](ROADMAP.md).
+What we're working on, what's planned, and what we're considering — follow along in [GitHub Discussions](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/discussions).
 
 Want to suggest something? [Open a feature request](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/issues/new?template=feature_request.yml) or [start a discussion](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/discussions).
 
@@ -373,6 +404,16 @@ Looking for something to work on? Browse [good first issues](https://github.com/
 | 🏢 **Commercial support** | [support@aliansoftware.net](mailto:support@aliansoftware.net) |
 
 Full guide: [SUPPORT.md](SUPPORT.md).
+
+---
+
+## Deploy & customize with Aliansoftware
+
+AlianHub is built and maintained by [Aliansoftware](https://aliansoftware.net). Want it run for you? We also **deploy, customize, and support** AlianHub for teams:
+
+- 🚀 **Managed hosting & deployment** — on your infrastructure or ours
+- 🛠️ **Custom features & integrations** — tailored to your workflow
+- 🤝 **Priority support & response-time targets** — [support@aliansoftware.net](mailto:support@aliansoftware.net)
 
 ---
 

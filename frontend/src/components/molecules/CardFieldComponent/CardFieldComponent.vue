@@ -90,6 +90,7 @@
                         :projects="newlyAddedProjects"
                         :selectedIds="selectedProjects"
                         @toggle="toggleNewProject"
+                        @dismiss="dismissNewProject"
                     />
                 </template>
             </div>
@@ -263,6 +264,21 @@ const isNewlyAddedProject = (project) => {
     const threshold = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2).getTime();
     return created > threshold;
 };
+// Projects the user explicitly dismissed (the X on a suggestion row). Persisted
+// in localStorage per user so a dismissed suggestion stays gone after the card
+// is closed and reopened — even without saving. Only ids still inside the "new"
+// window are retained (see dismissNewProject), so the stored list stays bounded.
+const dismissKey = () => `rap_dismissed_${userId?.value || 'anon'}`;
+const dismissedNewProjects = ref([]);
+const loadDismissedProjects = () => {
+    try {
+        const raw = localStorage.getItem(dismissKey());
+        dismissedNewProjects.value = raw ? (JSON.parse(raw) || []) : [];
+    } catch (e) {
+        dismissedNewProjects.value = [];
+    }
+};
+
 const newlyAddedProjects = computed(() => {
     if (props.componentId !== 'EmployeeWorkloadReportCard') return [];
     return (props.allProjectsArray || [])
@@ -271,6 +287,8 @@ const newlyAddedProjects = computed(() => {
         // to selectedProjects (what Save persists), so it drops out of this
         // list immediately and won't be suggested again on reopen.
         .filter((p) => !selectedProjects.value.includes(p._id))
+        // …and not ones the user dismissed with the X.
+        .filter((p) => !dismissedNewProjects.value.includes(p._id))
         .sort((a, b) => resolveCreatedMs(b?.createdAt) - resolveCreatedMs(a?.createdAt));
 });
 // Toggle a project in/out of the SAME selectedProjects array the Project
@@ -280,6 +298,26 @@ const toggleNewProject = (projectId) => {
     selectedProjects.value = selectedProjects.value.includes(projectId)
         ? selectedProjects.value.filter((id) => id !== projectId)
         : [...selectedProjects.value, projectId];
+};
+// Dismiss a suggestion (the X). Persist immediately so it survives the card
+// being closed and reopened, pruning to ids still in the "new" window to keep
+// the stored list bounded. Does NOT touch selectedProjects — only hides it.
+const dismissNewProject = (projectId) => {
+    if (!projectId) return;
+    const candidateIds = (props.allProjectsArray || [])
+        .filter(isNewlyAddedProject)
+        .map((p) => p._id);
+    const next = new Set(
+        dismissedNewProjects.value.filter((id) => candidateIds.includes(id))
+    );
+    next.add(projectId);
+    dismissedNewProjects.value = [...next];
+    try {
+        localStorage.setItem(dismissKey(), JSON.stringify(dismissedNewProjects.value));
+    } catch (e) {
+        // localStorage unavailable (private mode / quota) — the dismissal still
+        // applies for this session via the reactive ref above.
+    }
 };
 
 const error = ref('');
@@ -306,6 +344,7 @@ watch(()=>selectedProjects.value, (newValue) => {
 },{deep:true,immediate: true});
 
 onMounted(() =>{
+    loadDismissedProjects();
     initializeFormObject();
 });
 

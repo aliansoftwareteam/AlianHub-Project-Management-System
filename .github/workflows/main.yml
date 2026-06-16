@@ -65,6 +65,20 @@ jobs:
           # ── App configuration ────────────────────────────────────────
           VUE_APP_STORAGE_TYPE:      ${{ secrets.VUE_APP_STORAGE_TYPE }}
           VUE_APP_AFFILIATEON:       ${{ secrets.VUE_APP_AFFILIATEON }}
+          # ── OAuth / social login ─────────────────────────────────────
+          # Client ids + enable flags are inlined into the bundle here, so
+          # they must come from GitHub secrets — the server-side frontend/.env
+          # is NOT used (the bundle is built on this runner, not the VPS).
+          # Set these in GitHub → Settings → Secrets and variables → Actions.
+          # Base URLs are constant for github.com / gitlab.com SaaS.
+          VUE_APP_IS_GOOGLE_LOGIN:       ${{ secrets.VUE_APP_IS_GOOGLE_LOGIN }}
+          VUE_APP_GOOGLE_CLIENT_ID:      ${{ secrets.VUE_APP_GOOGLE_CLIENT_ID }}
+          VUE_APP_IS_GITHUB_LOGIN:       ${{ secrets.VUE_APP_IS_GITHUB_LOGIN }}
+          VUE_APP_GITHUB_CLIENT_ID:      ${{ secrets.VUE_APP_GITHUB_CLIENT_ID }}
+          VUE_APP_GITHUB_BASE_OAUTH_URL: "https://github.com/login/oauth"
+          VUE_APP_IS_GITLAB_LOGIN:       ${{ secrets.VUE_APP_IS_GITLAB_LOGIN }}
+          VUE_APP_GITLAB_CLIENT_ID:      ${{ secrets.VUE_APP_GITLAB_CLIENT_ID }}
+          VUE_APP_GITLAB_BASE_OAUTH_URL: "https://gitlab.com/oauth"
 
       # ---------------------------------
       # Create Frontend Artifact
@@ -83,7 +97,10 @@ jobs:
 
   deploy:
     needs: validate
-    if: github.event_name == 'push'
+    # Deploy on a push to staging (PR merge) or a manual re-run from the
+    # Actions tab (workflow_dispatch) — the latter lets us rebuild + redeploy
+    # after a server-side env change without an empty commit.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     steps:
@@ -251,8 +268,29 @@ jobs:
 
             pm2 restart 18
 
+            # ---------------------------------
+            # Post-restart health check + diagnostics
+            # ---------------------------------
+            # Give the app a moment to boot, then probe it directly. A deploy
+            # that leaves the process crash-looping previously reported
+            # success (staging 502, 2026-06-10) — surface the truth in the
+            # run log instead. Never fail the deploy step itself: the log
+            # tail is the diagnostic.
+
+            sleep 8
+
             echo "📊 PM2 Status"
 
             pm2 status
+
+            if curl -sf -o /dev/null --max-time 5 http://127.0.0.1:4003/; then
+              echo "✅ App is responding on 4003"
+            else
+              echo "❌ App NOT responding on 4003 — recent logs follow"
+            fi
+
+            echo "🩺 Recent app logs (stdout + stderr)"
+
+            pm2 logs 18 --lines 60 --nostream || true
 
             echo "✅ Deployment completed"

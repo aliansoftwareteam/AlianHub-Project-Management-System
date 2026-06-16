@@ -91,12 +91,24 @@ exports.makeDefaultBrandSettings = () => {
 
 exports.getBrandSettingsData = (req, res) => {
     try {
+        // Public demo flag (+ shared demo creds) surfaced on this already-public,
+        // pre-auth endpoint so the demo banner / login can read it without a
+        // build-time var. Off unless DEMO_MODE=true in the server env.
+        const demo = process.env.DEMO_MODE === 'true';
+        const withDemo = (obj) => ({
+            ...obj,
+            demoMode: demo,
+            ...(demo ? { demoEmail: process.env.DEMO_EMAIL || '', demoPassword: process.env.DEMO_PASSWORD || '' } : {}),
+        });
+
         const filePath = path.join(__dirname,'/../../../', 'brandSettings.json');
 
         if (!fs.existsSync(filePath)) {
             exports.makeDefaultBrandSettings()
             .then((data) => {
-                res.status(200).json(JSON.parse(data));
+                // makeDefaultBrandSettings resolves an OBJECT (not a JSON string),
+                // so it must not be JSON.parse'd — that threw on first run.
+                res.status(200).json(withDemo(data));
             })
             .catch((error) => {
                 res.status(404).send(error);
@@ -107,7 +119,7 @@ exports.getBrandSettingsData = (req, res) => {
                     logger.error('Error writing file getBrandSettingsData:', err);
                     return res.status(500).send('Internal Server Error');
                 }
-                res.status(200).json(JSON.parse(data));
+                res.status(200).json(withDemo(JSON.parse(data)));
             });
         }
     } catch (error) {
