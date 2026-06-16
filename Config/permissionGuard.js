@@ -38,6 +38,17 @@ const ROLE_CACHE_TTL_SECONDS = 60;
 // privilege-escalation endpoints stay ON regardless — they are not affected.
 const fineGrainedEnforced = () => process.env.DISABLE_PERMISSION_ENFORCEMENT !== 'true';
 
+// HARD ISOLATION (2026-06-15): these guards must NEVER affect the web app.
+// Web-app requests authenticate via JWT session and set `req.uid` but NOT
+// `req.apiToken`. MCP / PAT requests (Authorization: Bearer ahp_…) set
+// `req.apiToken` (see Config/jwt.js verifyApiTokenRequest). We therefore run
+// permission/role enforcement ONLY for PAT requests and let every JWT/web
+// request fall straight through — so the existing frontend/backend behavior
+// is byte-for-byte unchanged. (The backend mirror of frontend checkPermission
+// is not yet a perfect match for per-project overrides, so gating shared web
+// routes caused false denials in production — e.g. assigning a task.)
+const isApiTokenRequest = (req) => Boolean(req && req.apiToken);
+
 // PATCH /api/v2/tasks dispatches many actions; map each to its permission
 // key (mirrors the frontend per-field gates). Actions not listed pass
 // through (structural ops like moveTask/convert have no single key).
@@ -128,6 +139,7 @@ const evaluatePermission = async (companyId, uid, path) => {
  * Reads req.uid (set by both the JWT and PAT auth branches) + companyid header.
  */
 const requireRole = (allowed = [ROLE_OWNER, ROLE_ADMIN]) => async (req, res, next) => {
+    if (!isApiTokenRequest(req)) return next(); // web/JWT requests pass through untouched
     try {
         const companyId = req.headers["companyid"] || "";
         const roleType = await getRoleType(companyId, req.uid);
@@ -156,6 +168,7 @@ const isWritable = (permission) => permission === true || permission === 1 || pe
 const isReadable = (permission) => permission !== null && permission !== undefined && permission !== 0;
 
 const requirePermission = (path, { write = true } = {}) => async (req, res, next) => {
+    if (!isApiTokenRequest(req)) return next(); // web/JWT requests pass through untouched
     if (!fineGrainedEnforced()) return next();
     try {
         const companyId = req.headers["companyid"] || "";
@@ -181,6 +194,7 @@ const requirePermission = (path, { write = true } = {}) => async (req, res, next
  * mapped to req.body.action. Unmapped actions pass through.
  */
 const requireTaskActionPermission = () => async (req, res, next) => {
+    if (!isApiTokenRequest(req)) return next(); // web/JWT requests pass through untouched
     if (!fineGrainedEnforced()) return next();
     const action = req.body && req.body.action;
     const key = action && TASK_ACTION_PERMISSION[action];
@@ -210,6 +224,8 @@ const MCP_PERMISSION_KEYS = [
     'task.task_move',
     'task.task_comment',
     'task.task_estimated_hours',
+    'sheet_settings.user_timesheet',
+    'sheet_settings.workload_timesheet',
 ];
 
 /**

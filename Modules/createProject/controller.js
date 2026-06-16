@@ -39,39 +39,10 @@ exports.checkProjectPlan = (req) => {
 
             if(companyData === null) return;
 
-            let data = JSON.parse(JSON.stringify(companyData?.data))
-            let planfeatures = data.planFeature;
-            let projectCount = data?.projectCount.projectCount || 0;
-            if(planfeatures === undefined){
-                reject({status : false});
-            }
-            if(planfeatures.project === null || planfeatures.project >= projectCount){
-                if(req.body.isPrivateSpace === false){
-                    exports.checkProjectCount('public',data).then((ress) => {
-                        if(ress === true) {
-                            resolve({status : true});
-                        }else{
-                            reject({status : false});
-                        }
-                    }).catch(() => {
-                        reject({status : false});
-                    });
-                }
-                else{
-                    exports.checkProjectCount('private',data).then((ress) => {
-                        if(ress === true) {
-                            resolve({status : true});
-                        }else{
-                            reject({status : false});
-                        }
-                    }).catch(() => {
-                        reject({status : false});
-                    });
-                }
-            }
-            else{
-                reject({status : false});
-            }
+            // Plan/payment limits were removed — project creation is gated only
+            // by the project.project_create permission (route guard + MCP client),
+            // not by any project-count cap. Always pass the plan check.
+            resolve({ status: true });
         } catch (error) {
             reject({status : false,error:error});
         }
