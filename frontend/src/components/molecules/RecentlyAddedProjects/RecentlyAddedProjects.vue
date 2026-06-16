@@ -14,6 +14,20 @@
                 :class="{ 'rap-row-selected': isChecked(p._id) }"
                 @click="$emit('toggle', p._id)"
             >
+                <!-- Dismiss (X): removes this suggestion for good (the parent
+                     persists it so it won't come back). .stop keeps it from
+                     triggering the row's add-toggle. -->
+                <button
+                    type="button"
+                    class="rap-dismiss"
+                    :title="$t('dashboardCard.dismiss_recent_project')"
+                    @click.stop="$emit('dismiss', p._id)"
+                >
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M1.5 1.5l7 7m0-7l-7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                    </svg>
+                </button>
+
                 <!-- Project icon — mirrors the project dropdown / sidebar rendering -->
                 <span
                     v-if="p.projectIcon && p.projectIcon.type === 'color'"
@@ -56,7 +70,7 @@ const props = defineProps({
     selectedIds: { type: Array, default: () => [] },
 });
 
-defineEmits(['toggle']);
+defineEmits(['toggle', 'dismiss']);
 
 const isChecked = (id) => props.selectedIds.includes(id);
 
@@ -155,6 +169,27 @@ const createdLabel = (p) => {
     background: #F2F4FE;
     border-color: #C9D0F8;
     border-left-color: #3ba510;
+}
+/* Dismiss (X) — leftmost in the row, just inside the green marker. Subtle
+   grey by default, turns red on hover to read as a "remove" action. */
+.rap-dismiss {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: #B6BCC9;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.rap-dismiss:hover {
+    background: #FDECEC;
+    color: #E5484D;
 }
 .rap-icon {
     display: inline-flex;

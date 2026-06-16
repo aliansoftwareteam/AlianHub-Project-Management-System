@@ -2575,6 +2575,7 @@ export default {
         recently_added_projects: "Recently Added Projects",
         recently_added_projects_hint: "New projects from the last 2 days — tick one to add it to this card.",
         new_badge: "New",
+        dismiss_recent_project: "Remove from suggestions",
         Today: "Today",
         Yesterday: "Yesterday",
         Tomorrow: "Tomorrow",
