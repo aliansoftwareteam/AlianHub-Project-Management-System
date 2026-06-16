@@ -581,7 +581,10 @@ const verifyLocalAuth = async (reqData, cb) => {
 
         cb({
             status: true,
-            data: { ...reqData, _id: resData._id },
+            // twoFactorEnabled tells loginAuth whether to gate this login behind
+            // the TOTP second-step. Password login only (Phase 1); the OAuth
+            // paths don't set it, so they are unaffected.
+            data: { ...reqData, _id: resData._id, twoFactorEnabled: !!(resData.twoFactor && resData.twoFactor.enabled) },
             message: "User Login Successfully",
         });
     } catch (error) {

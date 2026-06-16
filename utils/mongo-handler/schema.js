@@ -2631,6 +2631,15 @@ const schema = {
             type: String,
             required: false
         },
+        // Two-factor auth (TOTP). Opt-in, password-login only (Phase 1).
+        // Stored as a free-form object: { enabled, secretEnc, pendingSecretEnc,
+        // recoveryCodes:[bcryptHash], enrolledAt }. The secret is AES-encrypted
+        // and recovery codes are bcrypt-hashed — nothing here is ever returned
+        // to the client. Object (Mixed) so these blobs are persisted as-is.
+        twoFactor: {
+            type: Object,
+            required: false,
+        },
     },
     resetAttempt: {
         ip: {
