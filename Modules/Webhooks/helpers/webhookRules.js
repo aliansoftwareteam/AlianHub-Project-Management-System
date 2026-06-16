@@ -16,6 +16,18 @@ const WILDCARD = '*';
 const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
 const MAX_NAME_LENGTH = 80;
 
+// Outbound payload shapes. 'json' ships the raw envelope; 'slack' and
+// 'discord' render the event into that platform's incoming-webhook format.
+const WEBHOOK_FORMATS = Object.freeze(['json', 'slack', 'discord']);
+
+const EVENT_LABELS = Object.freeze({
+    'task.created': 'Task created',
+    'task.updated': 'Task updated',
+    'task.deleted': 'Task deleted',
+    'task.archived': 'Task archived',
+    'task.restored': 'Task restored',
+});
+
 const isObjectIdString = (id) => OBJECT_ID_PATTERN.test(String(id || ''));
 
 const isValidUrl = (value) => {
@@ -28,7 +40,7 @@ const isValidUrl = (value) => {
 };
 
 /* Validate create/update input. Returns { valid, reason }. */
-const validateWebhookInput = ({ name, url, events }) => {
+const validateWebhookInput = ({ name, url, events, format }) => {
     if (!name || !String(name).trim() || String(name).length > MAX_NAME_LENGTH) {
         return { valid: false, reason: `A name up to ${MAX_NAME_LENGTH} characters is required.` };
     }
@@ -42,7 +54,50 @@ const validateWebhookInput = ({ name, url, events }) => {
     if (unknown.length) {
         return { valid: false, reason: `Unknown events: ${unknown.join(', ')}.` };
     }
+    if (format !== undefined && !WEBHOOK_FORMATS.includes(String(format))) {
+        return { valid: false, reason: `format must be one of: ${WEBHOOK_FORMATS.join(', ')}.` };
+    }
     return { valid: true, reason: '' };
+};
+
+const normalizeFormat = (format) => (WEBHOOK_FORMATS.includes(String(format)) ? String(format) : 'json');
+
+// Best-effort human status label from the trimmed task (status may be an
+// object, a string, or absent).
+const statusLabel = (task) => {
+    const s = task.status;
+    return String((s && (s.text || s.statusName || s.name)) || task.statusType || '—');
+};
+
+/* Render the canonical delivery body into the target platform's shape.
+ * Slack expects { text, blocks }; Discord expects { embeds }. 'json' (and
+ * anything unknown) ships the raw envelope unchanged. Pure — no I/O. */
+const formatForTarget = (format, body) => {
+    const fmt = normalizeFormat(format);
+    if (fmt === 'json') return body;
+
+    const task = body.data || {};
+    const label = EVENT_LABELS[body.event] || body.event;
+    const title = `${task.TaskKey ? task.TaskKey + ' — ' : ''}${task.TaskName || 'Task'}`;
+    const meta = `Status: ${statusLabel(task)} · Priority: ${task.Task_Priority || '—'}${task.DueDate ? ' · Due: ' + task.DueDate : ''}`;
+
+    if (fmt === 'slack') {
+        return {
+            text: `${label}: ${title}`,
+            blocks: [
+                { type: 'section', text: { type: 'mrkdwn', text: `*${label}*\n*${task.TaskKey || ''}* ${task.TaskName || ''}`.trim() } },
+                { type: 'context', elements: [{ type: 'mrkdwn', text: meta }] },
+            ],
+        };
+    }
+
+    // discord
+    const fields = [
+        { name: 'Status', value: statusLabel(task), inline: true },
+        { name: 'Priority', value: String(task.Task_Priority || '—'), inline: true },
+    ];
+    if (task.DueDate) fields.push({ name: 'Due', value: String(task.DueDate), inline: true });
+    return { embeds: [{ title, description: label, fields }] };
 };
 
 /* Does a webhook's subscription cover this event? */
@@ -96,6 +151,7 @@ const generateSecret = () => crypto.randomBytes(24).toString('hex');
 module.exports = {
     EVENT_TYPES,
     WILDCARD,
+    WEBHOOK_FORMATS,
     isObjectIdString,
     isValidUrl,
     validateWebhookInput,
@@ -104,4 +160,6 @@ module.exports = {
     trimTaskForDelivery,
     signPayload,
     generateSecret,
+    normalizeFormat,
+    formatForTarget,
 };

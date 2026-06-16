@@ -14,6 +14,7 @@ const maskHook = (hook) => ({
     url: hook.url,
     events: hook.events,
     active: hook.active !== false,
+    format: hook.format || 'json',
     createdBy: hook.createdBy || '',
     lastStatus: hook.lastStatus,
     lastDeliveredAt: hook.lastDeliveredAt,
@@ -29,11 +30,11 @@ exports.listEvents = (req, res) => {
 exports.createWebhook = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
-        const { name, url, events, userData } = req.body || {};
+        const { name, url, events, format, userData } = req.body || {};
         if (!companyId) {
             return res.send({ status: false, statusText: 'companyId is required.' });
         }
-        const check = validateWebhookInput({ name, url, events });
+        const check = validateWebhookInput({ name, url, events, format });
         if (!check.valid) {
             return res.send({ status: false, statusText: check.reason });
         }
@@ -47,6 +48,7 @@ exports.createWebhook = async (req, res) => {
                 events,
                 secret,
                 active: true,
+                format: format || 'json',
                 createdBy: userData && (userData.id || userData._id) ? String(userData.id || userData._id) : '',
             },
         }, 'save');
@@ -86,13 +88,14 @@ exports.updateWebhook = async (req, res) => {
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid webhook id are required.' });
         }
-        const { name, url, events, active } = req.body || {};
+        const { name, url, events, active, format } = req.body || {};
         const update = {};
-        if (name !== undefined || url !== undefined || events !== undefined) {
+        if (name !== undefined || url !== undefined || events !== undefined || format !== undefined) {
             const check = validateWebhookInput({
                 name: name !== undefined ? name : 'placeholder',
                 url: url !== undefined ? url : 'https://placeholder.invalid',
                 events: events !== undefined ? events : ['*'],
+                format,
             });
             if (!check.valid) {
                 return res.send({ status: false, statusText: check.reason });
@@ -100,6 +103,7 @@ exports.updateWebhook = async (req, res) => {
             if (name !== undefined) update.name = String(name).trim();
             if (url !== undefined) update.url = String(url).trim();
             if (events !== undefined) update.events = events;
+            if (format !== undefined) update.format = format;
         }
         if (active !== undefined) update.active = active === true;
         if (!Object.keys(update).length) {
