@@ -2655,4 +2655,10 @@ export default {
         load_failed: "Couldn't load the changelog.",
         retry: "Retry",
     },
+    Demo: {
+        banner: "You're on the AlianHub live demo — data may reset periodically.",
+        login_with: "Log in with",
+        star: "Star on GitHub",
+        deploy: "Deploy your own",
+    },
 };

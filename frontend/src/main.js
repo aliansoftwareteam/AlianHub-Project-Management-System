@@ -13,6 +13,7 @@ import { DatePicker } from 'v-calendar';
 import 'v-calendar/style.css';
 import {i18n } from '@/locales/main';
 import VueApexCharts from "vue3-apexcharts";
+import DemoBanner from "@/components/atom/DemoBanner/DemoBanner.vue";
 // Plugins Path
 import registerPlugin from './plugins/register/registerPlugin';
 import createcompanyinsidePlugin from './plugins/createcompanyinside/createcompanyinsidePlugin';
@@ -61,6 +62,8 @@ for (let index = 0; index < pluginArray.length; index++) {
 app.use(ToastPlugin,{position: 'top-right'});
 app.use(plugin, defaultConfig({ plugins: [pro]}))
 app.use(i18n);
+// Registered before mount so the root App.vue template can resolve it.
+app.component('DemoBanner', DemoBanner);
 app.mount('#app');
 // Use plugin defaults (optional)
 app.component('ApexChart', VueApexCharts); // Register the apexchart component globally

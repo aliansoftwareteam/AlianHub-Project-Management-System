@@ -1,5 +1,6 @@
 <template>
 	<div v-if="!underMaintainance">
+		<DemoBanner/>
 		<template v-if="$route.meta.requiresAuth">
 			<template v-if="logged && (rules && Object.keys(rules).length && companyUserDetail && Object.keys(companyUserDetail).length) && socket">
                 <HeaderComponent v-if="!$route.meta.hideHeader" @change="changeCompany($event)" @filter="handleFilter"/>
