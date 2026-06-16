@@ -16,6 +16,38 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.3.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.2.0...v14.3.0) (2026-06-16)
+
+
+### 🚀 Features
+
+* **platform:** Tier 2 & Tier 3 — outgoing webhooks with delivery log, global search, epics, async CSV/XLSX export jobs, personal API tokens + activity log, pages/wiki, public sharing + intake forms, and the import framework ([#229](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/229))
+* **tier1:** comment reactions, recent tasks, auto-archive, burndown chart, and relation alerts ([#228](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/228))
+* **auth:** add GitLab OAuth login and harden Google/GitHub sign-in ([#235](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/235))
+* **mcp:** server-side permission enforcement and token auth for the AlianHub MCP server ([#238](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/238))
+* **stickies:** add personal sticky notes ([#239](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/239))
+* **webhooks:** add Slack and Discord delivery format presets ([#243](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/243))
+* **demo:** env-gated demo-mode banner ([#244](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/244))
+* **dashboard:** dismiss recently-added project suggestions ([#246](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/246))
+* **changelog:** show release time in 12-hour format on the What's New page ([#233](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/233))
+
+
+### 🐛 Bug Fixes
+
+* **exports:** restore staging boot — xlsx was a frontend-only dependency ([#230](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/230))
+* **server:** stop the recursive restart wrapper causing spawn EAGAIN outages ([#231](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/231))
+* **ui:** consolidate toolbar features into a more-menu and fix Search-All and public share links ([#232](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/232))
+* **i18n:** close the Stickies object in en.js so the frontend builds ([#245](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/245))
+* scope MCP permission guards to PAT requests and drop the project-count cap ([#248](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/248))
+* address safe CodeRabbit findings from the promotion review ([#249](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/249))
+
+
+### 📘 Documentation
+
+* **readme:** honest feature table, Plane comparison, and services section ([#241](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/241))
+* add ROADMAP with a free-stays-free commitment ([#242](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/242))
+* add manual test cases for the new features ([#234](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/234))
+
 ## [14.2.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.1.0...v14.2.0) (2026-06-10)
 
 
