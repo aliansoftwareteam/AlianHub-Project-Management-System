@@ -3,7 +3,7 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
 const socketEmitter = require('../../event/socketEventEmitter');
-const { subscribesTo, classifyTaskEvent, trimTaskForDelivery, signPayload } = require('./helpers/webhookRules');
+const { subscribesTo, classifyTaskEvent, trimTaskForDelivery, signPayload, formatForTarget } = require('./helpers/webhookRules');
 
 // Webhook dispatcher. Piggybacks on the namespaced socketEmitter events that
 // every task mutation already fires, so no write path needed changes:
@@ -66,7 +66,9 @@ async function logDelivery(companyId, webhookId, entry) {
 }
 
 async function deliverToHook(companyId, hook, body, attempt) {
-    const bodyString = JSON.stringify(body);
+    // Shape the payload for the hook's target (raw json / Slack / Discord).
+    // The signature covers exactly what we send; body.event is kept for logging.
+    const bodyString = JSON.stringify(formatForTarget(hook.format, body));
     const startedAt = Date.now();
     try {
         const response = await axios.post(hook.url, bodyString, {
