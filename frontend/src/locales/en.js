@@ -2668,6 +2668,7 @@ export default {
         pin: "Pin",
         unpin: "Unpin",
         drag_hint: "Drag to reorder",
+    },
     Demo: {
         banner: "You're on the AlianHub live demo — data may reset periodically.",
         login_with: "Log in with",
