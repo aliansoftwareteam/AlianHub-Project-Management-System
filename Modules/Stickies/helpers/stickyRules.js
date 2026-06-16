@@ -43,7 +43,8 @@ const validateStickyPayload = (payload = {}, { partial = false } = {}) => {
     }
 
     if (payload.isPinned !== undefined) {
-        out.isPinned = Boolean(payload.isPinned);
+        // Strict boolean — the string "false" must not coerce to true.
+        out.isPinned = payload.isPinned === true || payload.isPinned === 'true' || payload.isPinned === 1 || payload.isPinned === '1';
     }
 
     if (payload.sortIndex !== undefined) {

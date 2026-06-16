@@ -413,7 +413,7 @@ AlianHub is built and maintained by [Aliansoftware](https://aliansoftware.net). 
 
 - 🚀 **Managed hosting & deployment** — on your infrastructure or ours
 - 🛠️ **Custom features & integrations** — tailored to your workflow
-- 🤝 **Priority support & SLAs** — [support@aliansoftware.net](mailto:support@aliansoftware.net)
+- 🤝 **Priority support & response-time targets** — [support@aliansoftware.net](mailto:support@aliansoftware.net)
 
 ---
 
