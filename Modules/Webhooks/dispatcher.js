@@ -144,6 +144,7 @@ function onTaskEvent(type) {
                 timer: setTimeout(() => {
                     const entry = pending.get(key);
                     pending.delete(key);
+                    if (!entry) return; // key already replaced/cleaned up — nothing to flush
                     flush(companyId, event, entry.doc).catch((error) => {
                         logger.error(`${LOG_PREFIX} flush failed: ${error.message}`);
                     });

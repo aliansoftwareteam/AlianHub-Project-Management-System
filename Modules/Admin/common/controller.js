@@ -106,7 +106,9 @@ exports.getBrandSettingsData = (req, res) => {
         if (!fs.existsSync(filePath)) {
             exports.makeDefaultBrandSettings()
             .then((data) => {
-                res.status(200).json(withDemo(JSON.parse(data)));
+                // makeDefaultBrandSettings resolves an OBJECT (not a JSON string),
+                // so it must not be JSON.parse'd — that threw on first run.
+                res.status(200).json(withDemo(data));
             })
             .catch((error) => {
                 res.status(404).send(error);

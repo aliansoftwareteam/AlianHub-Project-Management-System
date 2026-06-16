@@ -28,7 +28,7 @@ exports.getAccessToken = async (req, res) => {
             code,
             grant_type: "authorization_code",
             redirect_uri: redirectUri,
-        }, { headers: { Accept: "application/json" } });
+        }, { headers: { Accept: "application/json" }, timeout: 15000 });
 
         const accessToken = tokenResponse.data.access_token;
 

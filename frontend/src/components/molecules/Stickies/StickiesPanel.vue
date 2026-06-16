@@ -259,6 +259,11 @@ function onReorder() {
 
 function remove(note) {
     openMenuId.value = null;
+    // Cancel any pending debounced save so it can't fire a stale PUT after delete.
+    if (saveTimers[note._id]) {
+        clearTimeout(saveTimers[note._id]);
+        delete saveTimers[note._id];
+    }
     apiRequest('delete', `/api/v2/stickies/${note._id}?uid=${encodeURIComponent(userId.value)}`)
     .then((response) => {
         if (response.data?.status) {
