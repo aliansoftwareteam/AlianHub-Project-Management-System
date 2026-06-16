@@ -219,10 +219,11 @@ exports.updateMember = async (req, res) => {
             });
         }
 
-        // Defense in depth (route is already owner/admin-gated): granting
-        // owner/admin (roleType 1/2) is OWNER-only — prevents an admin from
-        // promoting anyone (incl. self) to owner. Members never reach here.
-        if (data && data.roleType !== undefined) {
+        // Defense in depth: granting owner/admin (roleType 1/2) is OWNER-only.
+        // SCOPED TO PAT/MCP REQUESTS ONLY (req.apiToken) so the web app's role
+        // management behaves exactly as before — MCP changes must never affect
+        // existing frontend/backend behavior (2026-06-15).
+        if (req.apiToken && data && data.roleType !== undefined) {
             const { getRoleType, ROLE_OWNER, ROLE_ADMIN } = require('../../../Config/permissionGuard');
             const callerRole = await getRoleType(req.headers['companyid'] || '', req.uid);
             const targetRole = Number(data.roleType);
