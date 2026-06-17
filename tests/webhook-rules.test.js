@@ -14,6 +14,9 @@ const {
     validateWebhookInput,
     subscribesTo,
     classifyTaskEvent,
+    shouldDeliverTask,
+    normalizeChangedFields,
+    summarizeTaskChange,
     trimTaskForDelivery,
     signPayload,
     generateSecret,
@@ -22,9 +25,11 @@ const {
 } = require('../Modules/Webhooks/helpers/webhookRules');
 
 describe('webhook format presets', () => {
+    // A back-to-back status + priority + due change collapsed into one window.
     const body = {
         event: 'task.updated',
         companyId: 'c1',
+        changedFields: ['status', 'Task_Priority', 'DueDate'],
         data: { TaskKey: 'AHE-1', TaskName: 'Fix login', status: { text: 'In Progress' }, Task_Priority: 'HIGH', DueDate: '2026-07-01' },
     };
 
@@ -40,22 +45,38 @@ describe('webhook format presets', () => {
         expect(formatForTarget(undefined, body)).toBe(body);
     });
 
-    test('slack format produces text + blocks with the task details', () => {
+    test('slack format announces the change with text + blocks', () => {
         const out = formatForTarget('slack', body);
         expect(out.text).toContain('AHE-1');
         expect(Array.isArray(out.blocks)).toBe(true);
         const rendered = JSON.stringify(out);
-        expect(rendered).toContain('Task updated');
+        expect(rendered).toContain('Task updated'); // multi-field change → generic headline
         expect(rendered).toContain('In Progress');
         expect(rendered).toContain('HIGH');
     });
 
-    test('discord format produces an embed with status/priority/due fields', () => {
+    test('discord format embeds only the fields that actually changed', () => {
         const out = formatForTarget('discord', body);
         expect(Array.isArray(out.embeds)).toBe(true);
         expect(out.embeds[0].title).toContain('Fix login');
         const names = out.embeds[0].fields.map((f) => f.name);
         expect(names).toEqual(expect.arrayContaining(['Status', 'Priority', 'Due']));
+    });
+
+    test('a single-field change announces that one action and omits the rest', () => {
+        const assigneeChange = {
+            event: 'task.updated',
+            changedFields: ['AssigneeUserId'],
+            data: { TaskKey: 'AHE-1', TaskName: 'Fix login', status: { text: 'In Progress' }, Task_Priority: 'HIGH', assigneeNames: ['Jane Doe'] },
+        };
+        const out = formatForTarget('discord', assigneeChange);
+        expect(out.embeds[0].description).toBe('Assignees updated');
+        expect(out.embeds[0].fields.map((f) => f.name)).toEqual(['Assignees']);
+        expect(out.embeds[0].fields[0].value).toBe('Jane Doe');
+        // Status/Priority are NOT shown on an assignee-only change.
+        const rendered = JSON.stringify(out);
+        expect(rendered).not.toContain('In Progress');
+        expect(rendered).not.toContain('HIGH');
     });
 
     test('validateWebhookInput rejects an unknown format but accepts a valid one', () => {
@@ -144,9 +165,135 @@ describe('🪝 WEBHOOKS - Rules', () => {
             expect(classifyTaskEvent({ type: 'update', doc, updatedFields: { TaskKey: 'AH-1' }, now })).toBe('task.updated');
         });
 
+        test('create-flow churn right after creation is suppressed (no spurious task.updated)', () => {
+            const fresh = { ...doc, createdAt: new Date(now - 3000) };
+            // The TaskKey assignment emits with no updatedFields; counter/index
+            // writes carry only internal fields — the insert already fired created.
+            expect(classifyTaskEvent({ type: 'update', doc: fresh, updatedFields: {}, now })).toBe(null);
+            expect(classifyTaskEvent({ type: 'update', doc: fresh, updatedFields: { groupByStatusIndex: 2, subTasks: 0 }, now })).toBe(null);
+            // ...but a genuine field change right after create still notifies.
+            expect(classifyTaskEvent({ type: 'update', doc: fresh, updatedFields: { status: { text: 'In Progress' } }, now })).toBe('task.updated');
+            // Outside the create window, behaviour is unchanged (still an update).
+            expect(classifyTaskEvent({ type: 'update', doc, updatedFields: {}, now })).toBe('task.updated');
+        });
+
         test('everything else is task.updated; missing doc is null', () => {
             expect(classifyTaskEvent({ type: 'update', doc, updatedFields: { TaskName: 'x' }, now })).toBe('task.updated');
             expect(classifyTaskEvent({ type: 'update', doc: null, updatedFields: {}, now })).toBe(null);
+        });
+    });
+
+    describe('shouldDeliverTask', () => {
+
+        test('a real task (re-read found one) is delivered', () => {
+            expect(shouldDeliverTask({ _id: 'task1', TaskKey: 'AH-1' }, false)).toBe(true);
+        });
+
+        test('a clean read that found no task is dropped (non-task payload)', () => {
+            // The create flow bumps the project counter and emits the PROJECT doc
+            // under module:'task'; its _id is a project id, so the task re-read is
+            // empty — that must not deliver a phantom task.updated.
+            expect(shouldDeliverTask(null, false)).toBe(false);
+            expect(shouldDeliverTask(undefined, false)).toBe(false);
+            expect(shouldDeliverTask({}, false)).toBe(false);
+        });
+
+        test('a transient read error falls back to best-effort delivery', () => {
+            expect(shouldDeliverTask(null, true)).toBe(true);
+        });
+    });
+
+    describe('normalizeChangedFields', () => {
+
+        test('flattens mongo operators (the assignee path) to field names', () => {
+            expect([...normalizeChangedFields({ $addToSet: { AssigneeUserId: 'u1' } })]).toEqual(['AssigneeUserId']);
+            expect([...normalizeChangedFields({ $pull: { AssigneeUserId: 'u1' } })]).toEqual(['AssigneeUserId']);
+            expect([...normalizeChangedFields({ $set: { AssigneeUserId: ['u1', 'u2'] } })]).toEqual(['AssigneeUserId']);
+        });
+
+        test('keeps plain field maps and strips dotted suffixes', () => {
+            const out = normalizeChangedFields({ Task_Priority: 'HIGH', 'customField.abc': 1 });
+            expect(out.has('Task_Priority')).toBe(true);
+            expect(out.has('customField')).toBe(true);
+        });
+
+        test('empty or missing payloads yield an empty set', () => {
+            expect(normalizeChangedFields(undefined).size).toBe(0);
+            expect(normalizeChangedFields({}).size).toBe(0);
+        });
+    });
+
+    describe('summarizeTaskChange', () => {
+
+        const task = {
+            TaskKey: 'AHE-1', TaskName: 'Fix login',
+            status: { text: 'In Progress' }, Task_Priority: 'HIGH',
+            DueDate: '2026-07-01', assigneeNames: ['Jane'], leadName: 'Sam',
+        };
+
+        test('created announces creation with the practical fields', () => {
+            const s = summarizeTaskChange({ event: 'task.created', changedFields: [], task });
+            expect(s.headline).toBe('Task created');
+            expect(s.fields.map((f) => f.name)).toEqual(expect.arrayContaining(['Assignees', 'Priority', 'Due']));
+        });
+
+        test('a single change names the action and shows only that field', () => {
+            expect(summarizeTaskChange({ event: 'task.updated', changedFields: ['status'], task }).headline).toBe('Status changed');
+            const assignee = summarizeTaskChange({ event: 'task.updated', changedFields: ['AssigneeUserId'], task });
+            expect(assignee.headline).toBe('Assignees updated');
+            expect(assignee.fields.map((f) => f.name)).toEqual(['Assignees']);
+            expect(assignee.fields[0].value).toBe('Jane');
+        });
+
+        test('multiple changes use a generic headline listing each field', () => {
+            const s = summarizeTaskChange({ event: 'task.updated', changedFields: ['status', 'Task_Priority'], task });
+            expect(s.headline).toBe('Task updated');
+            expect(s.fields.map((f) => f.name)).toEqual(expect.arrayContaining(['Status', 'Priority']));
+        });
+
+        test('rename shows the name; description stays headline-only', () => {
+            const renamed = summarizeTaskChange({ event: 'task.updated', changedFields: ['TaskName'], task });
+            expect(renamed.headline).toBe('Task renamed');
+            expect(renamed.fields).toEqual([{ name: 'Name', value: 'Fix login', inline: true }]);
+            expect(summarizeTaskChange({ event: 'task.updated', changedFields: ['rawDescription'], task }).headline)
+                .toBe('Description updated');
+        });
+
+        test('renders a from → to transition when the previous value is known', () => {
+            const previous = { ...task, status: { text: 'To Do' }, TaskName: 'Old title' };
+            const status = summarizeTaskChange({ event: 'task.updated', changedFields: ['status'], task, previous });
+            expect(status.headline).toBe('Status changed');
+            expect(status.fields[0].value).toBe('To Do → In Progress');
+
+            const renamed = summarizeTaskChange({ event: 'task.updated', changedFields: ['TaskName'], task, previous });
+            expect(renamed.fields[0].value).toBe('Old title → Fix login');
+        });
+
+        test('omits the arrow when the value did not actually change', () => {
+            const status = summarizeTaskChange({ event: 'task.updated', changedFields: ['status'], task, previous: { ...task } });
+            expect(status.fields[0].value).toBe('In Progress');
+        });
+
+        test('estimate renders minutes as a readable duration with a transition', () => {
+            const s = summarizeTaskChange({
+                event: 'task.updated', changedFields: ['totalEstimatedTime'],
+                task: { ...task, totalEstimatedTime: 240 },
+                previous: { ...task, totalEstimatedTime: 120 },
+            });
+            expect(s.headline).toBe('Estimate updated');
+            expect(s.fields[0].value).toBe('2h → 4h');
+        });
+
+        test('an internal-only / unrecognized change is a quiet generic update', () => {
+            const s = summarizeTaskChange({ event: 'task.updated', changedFields: ['subTasks'], task });
+            expect(s.headline).toBe('Task updated');
+            expect(s.fields).toEqual([]);
+        });
+
+        test('lifecycle events announce the action with no rows', () => {
+            expect(summarizeTaskChange({ event: 'task.deleted', changedFields: [], task }).headline).toBe('Task deleted');
+            expect(summarizeTaskChange({ event: 'task.archived', changedFields: [], task }).headline).toBe('Task archived');
+            expect(summarizeTaskChange({ event: 'task.restored', changedFields: [], task }).fields).toEqual([]);
         });
     });
 

@@ -94,6 +94,15 @@ export default [
                 component: () => import(/* webpackChunkName: Two Factor Auth */ '@/views/Settings/TwoFactorAuth/TwoFactorAuth.vue')
             },
             {
+                path: "integrations",
+                name: "Integrations",
+                meta: {
+                    title: "Integrations",
+                    requiresAuth: true
+                },
+                component: () => import(/* webpackChunkName: Integrations */ '@/views/Settings/Integrations/Integrations.vue')
+            },
+            {
                 path: "company",
                 name: "Company",
                 meta: {
