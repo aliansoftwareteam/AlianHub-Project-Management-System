@@ -195,6 +195,11 @@ const schema = {
         remainingHours:{
             type: Number,
             required: false
+        },
+        points: {
+            type: Number,
+            default: null,
+            required: false
         }
     },
     timesheet: {
@@ -1489,6 +1494,11 @@ const schema = {
         viewColumn: {
             type: Array,
             required: false,
+        },
+        estimationScale: {
+            type: String,
+            required: false,
+            default: 'fibonacci'
         },
         favouriteTasks:{
             type: Array,

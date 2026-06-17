@@ -1,0 +1,44 @@
+{
+  "name": "Sample Trello Board (rich)",
+  "lists": [
+    { "id": "list-todo", "name": "To Do", "closed": false },
+    { "id": "list-hold", "name": "On Hold", "closed": false },
+    { "id": "list-done", "name": "Complete", "closed": false }
+  ],
+  "members": [
+    { "id": "m1", "fullName": "Parth Detroja", "username": "parth", "email": "harmit.mendapara@aliansoftware.net" }
+  ],
+  "cards": [
+    {
+      "id": "c1", "name": "Set up project repo", "desc": "Init repo and CI pipeline",
+      "due": "2026-06-24T10:00:00.000Z", "idList": "list-todo", "closed": false,
+      "idMembers": ["m1"],
+      "labels": [{ "name": "Backend", "color": "blue" }, { "name": "P0", "color": "red" }],
+      "attachments": [{ "name": "spec.pdf", "url": "https://trello.com/attach/spec.pdf", "bytes": 20480 }]
+    },
+    {
+      "id": "c2", "name": "Build landing page", "desc": "Hero, features and pricing sections",
+      "due": null, "idList": "list-hold", "closed": false,
+      "idMembers": [],
+      "labels": [{ "name": "Frontend", "color": "green" }],
+      "attachments": []
+    },
+    {
+      "id": "c3", "name": "Archived card should be skipped", "desc": "this card is closed",
+      "due": null, "idList": "list-done", "closed": true
+    }
+  ],
+  "checklists": [
+    {
+      "id": "cl1", "idCard": "c1", "name": "Acceptance criteria",
+      "checkItems": [
+        { "name": "Repo created", "state": "complete", "pos": 100 },
+        { "name": "CI pipeline green", "state": "incomplete", "pos": 200 }
+      ]
+    }
+  ],
+  "actions": [
+    { "type": "commentCard", "date": "2026-06-18T09:00:00.000Z", "data": { "text": "Use the org template for CI.", "card": { "id": "c1" } }, "memberCreator": { "fullName": "Parth Detroja" } },
+    { "type": "commentCard", "date": "2026-06-18T11:00:00.000Z", "data": { "text": "Landing copy is in the brief.", "card": { "id": "c2" } }, "memberCreator": { "fullName": "Jane Doe" } }
+  ]
+}

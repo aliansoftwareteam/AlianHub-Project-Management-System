@@ -262,6 +262,9 @@ module.exports = {
                         'sprintArray': sprint,
                         'customField': task.customField || {},
                         'descriptionBlock': task.descriptionBlock || {},
+                        'rawDescription': task.rawDescription || '',
+                        'checklistArray': task.checklistArray || [],
+                        'attachments': task.attachments || [],
                     };
                     if(sprint.folderId) {
                         parentTaskObj.folderObjId = sprint.folderId;
@@ -275,6 +278,7 @@ module.exports = {
                         setNotif: true
                     }).then(taskResult => {
                         idMapping[task._id] = taskResult.id;
+                        task.createdTaskId = taskResult.id;
                         completedTasks++;
                         updateProgress();
                     })

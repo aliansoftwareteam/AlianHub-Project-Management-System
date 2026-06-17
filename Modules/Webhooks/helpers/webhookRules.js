@@ -136,6 +136,7 @@ const CHANGE_CATEGORIES = [
     { match: ['attachments'],                                       headline: 'Attachments updated',  label: null,        value: () => null },
     { match: ['relations'],                                         headline: 'Linked tasks updated', label: null,        value: () => null },
     { match: ['totalEstimatedTime'],                                headline: 'Estimate updated',     label: 'Estimate',  value: (t) => formatMinutes(t.totalEstimatedTime) },
+    { match: ['points'],                                            headline: 'Story points changed', label: 'Points',    value: (t) => (t.points == null || t.points === '' ? null : String(t.points)) },
     { match: ['TaskType', 'TaskTypeKey'],                           headline: 'Task type changed',    label: 'Type',      value: (t) => t.TaskType || null },
     { match: ['customField'],                                       headline: 'Custom field updated', label: null,        value: () => null },
 ];
@@ -291,6 +292,7 @@ const trimTaskForDelivery = (doc) => ({
     statusType: doc.statusType,
     Task_Priority: doc.Task_Priority,
     totalEstimatedTime: doc.totalEstimatedTime,
+    points: doc.points,
     Task_Leader: doc.Task_Leader,
     TaskType: doc.TaskType,
     ProjectID: doc.ProjectID,

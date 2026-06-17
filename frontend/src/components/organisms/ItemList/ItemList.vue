@@ -41,7 +41,7 @@
                                 <h5 class="text-ellipse item-title" :style="`color: ${item.textColor ? item.textColor : '#818181'}; background-color: ${item.backColor ? item.backColor : 'transparent'}; margin-left: 5px;`">{{$t('general.unassigned')}}</h5>
                             </div>
                             <!-- <span>{{getTaskCount(item)}} Tasks</span> -->
-                            <span class="font-size-14 ml-6px dark-gray">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Projects.tasks')}}</span>
+                            <span class="font-size-14 ml-6px dark-gray">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Projects.tasks')}}<template v-if="pointsTotal"> · {{pointsTotal}} pts</template></span>
                         </template>
                         <template v-else>
                             <img src="@/assets/images/svg/triangleBlack.svg" alt="traingle" class="mr-5px" :style="`transform: rotateZ(${item.isExpanded ? 90 : 0}deg); width: 6px;`">
@@ -50,7 +50,7 @@
                                 {{item.name}}
                             </span>
                             <!-- <span>{{getTaskCount(item)}} Tasks</span> -->
-                            <span class="dark-gray font-size-13 font-weight-400 ml-6px tasks__title">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Projects.tasks')}}</span>
+                            <span class="dark-gray font-size-13 font-weight-400 ml-6px tasks__title">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Projects.tasks')}}<template v-if="pointsTotal"> · {{pointsTotal}} pts</template></span>
                         </template>
                     </div>
                 </div>
@@ -513,6 +513,12 @@ const tasksFound = computed(() => {
         return 0;
     }
 })
+
+// S3-02: total story points across this group's tasks (shown beside the count).
+const pointsTotal = computed(() => {
+    const list = Array.isArray(items.value) ? items.value : [];
+    return list.reduce((total, t) => total + (Number(t && t.points) || 0), 0);
+});
 
 const tasksGetter = ref([])
 watch(() => getters['projectData/tasks']?.[props.projectId]?.[props.sprintId]?.tasks, () => {

@@ -284,6 +284,16 @@ describe('🪝 WEBHOOKS - Rules', () => {
             expect(s.fields[0].value).toBe('2h → 4h');
         });
 
+        test('story points changes announce with a from → to transition', () => {
+            const s = summarizeTaskChange({
+                event: 'task.updated', changedFields: ['points'],
+                task: { ...task, points: 8 },
+                previous: { ...task, points: 3 },
+            });
+            expect(s.headline).toBe('Story points changed');
+            expect(s.fields).toEqual([{ name: 'Points', value: '3 → 8', inline: true }]);
+        });
+
         test('an internal-only / unrecognized change is a quiet generic update', () => {
             const s = summarizeTaskChange({ event: 'task.updated', changedFields: ['subTasks'], task });
             expect(s.headline).toBe('Task updated');
