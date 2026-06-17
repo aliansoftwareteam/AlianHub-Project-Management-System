@@ -93,6 +93,90 @@ const loadImportContext = async (companyId, projectId) => {
     return { project, statusArray };
 };
 
+/* Map the parser's rich card data onto each task into the shapes the task
+ * create path persists (S3-01): resolve member emails → assignees, build
+ * checklistArray + attachment link-references, and fold Trello labels into the
+ * description (there is no programmatic tag-create path). Mutates `tasks`; a
+ * no-op for CSV/Jira tasks, which carry none of these fields. */
+const enrichImportTasks = async (companyId, tasks) => {
+    const emails = Array.from(new Set(
+        tasks.flatMap((t) => (Array.isArray(t.memberEmails) ? t.memberEmails : [])).filter(Boolean),
+    ));
+    const emailToId = {};
+    if (emails.length) {
+        try {
+            const users = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
+                type: SCHEMA_TYPE.USERS,
+                data: [{ Employee_Email: { $in: emails } }, { _id: 1, Employee_Email: 1 }],
+            }, 'find');
+            (users || []).forEach((u) => {
+                if (u && u.Employee_Email) emailToId[String(u.Employee_Email).toLowerCase()] = String(u._id);
+            });
+        } catch (error) {
+            logger.error(`[importers] member email resolve failed: ${error.message}`);
+        }
+    }
+
+    tasks.forEach((task) => {
+        if (Array.isArray(task.memberEmails) && task.memberEmails.length) {
+            const ids = task.memberEmails.map((e) => emailToId[String(e).toLowerCase()]).filter(Boolean);
+            if (ids.length) task.AssigneeUserId = Array.from(new Set([...(task.AssigneeUserId || []), ...ids]));
+        }
+        if (Array.isArray(task.checklists) && task.checklists.length) {
+            task.checklistArray = task.checklists.map((cl) => ({
+                id: new mongoose.Types.ObjectId().toString(),
+                name: cl.name || 'Checklist',
+                items: (Array.isArray(cl.items) ? cl.items : []).map((it) => ({ name: it.name, isChecked: !!it.isChecked })),
+            }));
+        }
+        if (Array.isArray(task.attachments) && task.attachments.length) {
+            task.attachments = task.attachments.map((att) => ({
+                id: new mongoose.Types.ObjectId().toString(),
+                filename: att.name || att.url,
+                mediaURL: att.url,
+                size: att.bytes || 0,
+                type: 'link',
+            }));
+        }
+        if (Array.isArray(task.labels) && task.labels.length) {
+            const names = task.labels.map((l) => l && l.name).filter(Boolean);
+            if (names.length) {
+                task.rawDescription = `${task.rawDescription || ''}${task.rawDescription ? '\n\n' : ''}Labels: ${names.join(', ')}`.slice(0, 10000);
+            }
+        }
+    });
+};
+
+/* Create the parsed Trello comments on the freshly-created tasks. Each input
+ * task was stamped with `createdTaskId` by createMultipleTasks. Best-effort:
+ * a failed comment never fails the import. */
+const createImportComments = async (companyId, projectData, sprintId, folderId, tasks, userId) => {
+    for (const task of tasks) {
+        if (!task.createdTaskId || !Array.isArray(task.comments) || !task.comments.length) continue;
+        for (const c of task.comments) {
+            if (!c || !c.text) continue;
+            const body = `${c.author ? c.author + ': ' : ''}${c.text}`.slice(0, 10000);
+            try {
+                await MongoDbCrudOpration(companyId, {
+                    type: SCHEMA_TYPE.COMMENTS,
+                    data: {
+                        message: body,
+                        userId,
+                        type: 'text',
+                        projectId: new mongoose.Types.ObjectId(projectData._id),
+                        taskId: new mongoose.Types.ObjectId(task.createdTaskId),
+                        sprintId: new mongoose.Types.ObjectId(sprintId),
+                        project: false,
+                        ...(folderId ? { folderId: new mongoose.Types.ObjectId(folderId) } : {}),
+                    },
+                }, 'save');
+            } catch (error) {
+                logger.error(`[importers] comment import failed for task ${task.createdTaskId}: ${error.message}`);
+            }
+        }
+    }
+};
+
 /* Record the job, feed the bulk-create pipeline, update the job. Returns the
  * response envelope. Identical create path to the Jira importer. */
 const finishImport = async (companyId, { source, project, sprintId, sprintName, folderId, folderName, userData, statusArray, tasks, skipped }) => {
@@ -124,6 +208,9 @@ const finishImport = async (companyId, { source, project, sprintId, sprintName, 
         sprint.folderId = folderId;
         sprint.folderName = folderName || '';
     }
+    // S3-01: fold Trello rich data (checklists, attachments, members, labels)
+    // onto each task before creation; comments are added after (they need ids).
+    await enrichImportTasks(companyId, tasks);
     const tasksWithSprint = tasks.map((task) => ({ ...task, sprintId, sprintArray: sprint }));
 
     try {
@@ -135,6 +222,8 @@ const finishImport = async (companyId, { source, project, sprintId, sprintName, 
             statusArray,
             sprint,
         });
+        await createImportComments(companyId, projectData, sprintId, folderId, tasksWithSprint, userId)
+            .catch((commentErr) => logger.error(`[importers] comment import error: ${commentErr.message}`));
         const createdCount = Array.isArray(result?.data) ? result.data.length : tasks.length;
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.IMPORT_JOBS,

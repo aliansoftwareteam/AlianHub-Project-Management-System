@@ -61,6 +61,7 @@ const TASK_ACTION_PERMISSION = {
     updateTaskType: 'task.task_type',
     updateDescription: 'task.task_description',
     updateTaskTotalEstimate: 'task.task_estimated_hours',
+    updatePoints: 'task.task_estimated_hours',
 };
 
 /** Resolve a user's roleType within a company (cached 60s). null if not a member. */

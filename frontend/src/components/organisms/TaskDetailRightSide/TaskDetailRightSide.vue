@@ -112,6 +112,16 @@
                     :permission="checkPermission('task.task_priority',project?.isGlobalPermission) === true"
                 />
             </div>
+            <div class="d-flex task-detail-right-side-label" v-if="checkPermission('task.task_estimated_hours',project?.isGlobalPermission) !== null">
+                <h4>Story Points</h4>
+                <StoryPoints
+                    :pointsVal="task.points"
+                    :estimationScale="project?.estimationScale || 'fibonacci'"
+                    :permission="checkPermission('task.task_estimated_hours',project?.isGlobalPermission) === true"
+                    @select="updatePoints($event)"
+                    class="taskdetail-label task-detail-right-wrapper ml-0"
+                />
+            </div>
             <div class="d-flex task-detail-right-side-label" v-if="isSupport === false && checkPermission('task.task_start_date',project?.isGlobalPermission) !== null">
                 <h4>{{$t('Milestone.start_date')}}</h4>
                 <Skelaton v-if="!task?.startDate && isMainSpinner" style="height: 36px;" class="w-100px border-radius-7-px"/>
@@ -213,6 +223,7 @@ import TaskStatus from '@/components/molecules/TaskStatus/TaskStatus.vue';
 import Assignee from '@/components/molecules/Assignee/Assignee.vue';
 import UserProfile from '@/components/atom/UserProfile/UserProfile.vue';
 import PriorityComp from '@/components/molecules/PriorityCompo/PriorityComp.vue';
+import StoryPoints from '@/components/atom/StoryPoints/StoryPoints.vue';
 import DueDateCompo from '@/components/molecules/DueDateCompo/DueDateCompo.vue';
 
 import { useConvertDate, useCustomComposable, useGetterFunctions, useMoment } from '@/composable'
@@ -491,6 +502,29 @@ const updatePriority = async(val) => {
     } catch (error) {
         console.error('updatePriority error', error);
         $toast.error(t('Toast.Priority_not_updated'),{position: 'top-right'});
+    }
+}
+
+const updatePoints = (val) => {
+    try {
+        const userData = getUserData();
+        const projectData = {
+            '_id': project.value._id ? project.value._id : "",
+            'ProjectName': project.value.ProjectName,
+            "CompanyId": project.value.CompanyId,
+        };
+        const updateObj = { points: (val === null || val === undefined || val === '') ? null : Number(val) };
+        taskClass.updatePoints({ firebaseObj: updateObj, projectData, taskData: props.task, userData })
+        .then(() => {
+            $toast.success('Story points updated', { position: 'top-right' });
+        })
+        .catch((error) => {
+            console.error("ERROR in update points: ", error);
+            $toast.error('Story points not updated', { position: 'top-right' });
+        });
+    } catch (error) {
+        console.error('updatePoints error', error);
+        $toast.error('Story points not updated', { position: 'top-right' });
     }
 }
 
