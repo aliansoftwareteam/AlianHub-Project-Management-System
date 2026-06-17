@@ -82,6 +82,17 @@ exports.init = (app) => {
     app.post("/api/v2/auth/login", ctrl.loginAuth, ctrl.manageAttempt)
     app.post("/api/v1/auth/loginAuthTracker", ctrl.loginAuthTracker)
 
+    // Two-factor auth (TOTP) — Phase 1, password login only.
+    // setup/verify/disable require a logged-in session (gated by
+    // verifyJWTTokenWithCV2 via Config/setMiddleware.js); validate is public
+    // and exchanges a tempToken + code for a real session, rate-limited like
+    // login via manageAttempt.
+    app.get("/api/v2/auth/2fa/status", ctrl.twoFaStatus)
+    app.post("/api/v2/auth/2fa/setup", ctrl.twoFaSetup)
+    app.post("/api/v2/auth/2fa/verify", ctrl.twoFaVerify)
+    app.post("/api/v2/auth/2fa/disable", ctrl.twoFaDisable)
+    app.post("/api/v2/auth/2fa/validate", ctrl.twoFaValidate, ctrl.manageAttempt)
+
 
     /**
      * @swagger
