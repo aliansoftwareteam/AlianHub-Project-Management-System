@@ -128,8 +128,17 @@
                             <DropDownOption @click="$refs.more_features_trigger.click(); showImportJira = true">
                                 <div><span class="dropdown-label">{{ $t('Projects.import_jira') }}</span></div>
                             </DropDownOption>
+                            <DropDownOption @click="$refs.more_features_trigger.click(); showImportCsv = true">
+                                <div><span class="dropdown-label">{{ $t('Projects.import_csv') }}</span></div>
+                            </DropDownOption>
+                            <DropDownOption @click="$refs.more_features_trigger.click(); showImportTrello = true">
+                                <div><span class="dropdown-label">{{ $t('Projects.import_trello') }}</span></div>
+                            </DropDownOption>
                             <DropDownOption @click="$refs.more_features_trigger.click(); showAutoArchive = true">
                                 <div><span class="dropdown-label">{{ $t('Projects.auto_archive') }}</span></div>
+                            </DropDownOption>
+                            <DropDownOption @click="$refs.more_features_trigger.click(); showEstimationScale = true">
+                                <div><span class="dropdown-label">Estimation scale</span></div>
                             </DropDownOption>
                         </template>
                     </DropDown>
@@ -141,7 +150,10 @@
                     <ExportTasksDropdown v-model="showExport" :projectData="projectData" />
                     <PublicShareModal v-model="showPublicShare" :projectData="projectData" />
                     <ImportJiraModal v-model="showImportJira" :projectData="projectData" />
+                    <ImportCsvModal v-model="showImportCsv" :projectData="projectData" />
+                    <ImportTrelloModal v-model="showImportTrello" :projectData="projectData" />
                     <AutoArchiveModal v-model="showAutoArchive" :projectData="projectData" />
+                    <EstimationScaleModal v-model="showEstimationScale" :projectData="projectData" />
                     <div class="mr-1 border-groupBy border-radius-6-px d-flex align-items-center assignee-filter manage__filter-users">
                         <div
                             @click="$emit('manageFilterUsers', userId)"
@@ -235,7 +247,10 @@ import ExportTasksDropdown from '@/components/molecules/ExportTasks/ExportTasksD
 import PagesPanel from '@/components/molecules/Pages/PagesPanel.vue';
 import PublicShareModal from '@/components/molecules/PublicShare/PublicShareModal.vue';
 import ImportJiraModal from '@/components/molecules/ImportJira/ImportJiraModal.vue';
+import ImportCsvModal from '@/components/molecules/ImportCsv/ImportCsvModal.vue';
+import ImportTrelloModal from '@/components/molecules/ImportTrello/ImportTrelloModal.vue';
 import AutoArchiveModal from '@/components/molecules/AutoArchive/AutoArchiveModal.vue';
+import EstimationScaleModal from '@/components/molecules/EstimationScale/EstimationScaleModal.vue';
 
 const showBurndown = ref(false);
 const showGlobalSearch = ref(false);
@@ -243,7 +258,10 @@ const showEpics = ref(false);
 const showPages = ref(false);
 const showPublicShare = ref(false);
 const showImportJira = ref(false);
+const showImportCsv = ref(false);
+const showImportTrello = ref(false);
 const showAutoArchive = ref(false);
+const showEstimationScale = ref(false);
 const showRecent = ref(false);
 const showExport = ref(false);
 import { useCustomComposable } from '@/composable';

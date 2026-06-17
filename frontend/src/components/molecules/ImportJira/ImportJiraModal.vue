@@ -8,6 +8,8 @@
 
             <div class="font-size-12 gray81 jimport__hint">{{ $t('Projects.import_jira_hint') }}</div>
 
+            <span class="font-size-12 jimport__sample" @click="downloadSample">&#8595; {{ $t('Projects.download_sample') }}</span>
+
             <input ref="fileEl" type="file" accept=".csv,.xlsx" class="font-size-13 jimport__file" @change="parseFile" />
 
             <div v-if="rows.length" class="font-size-13 jimport__preview">
@@ -111,6 +113,28 @@ function parseFile(event) {
     reader.readAsArrayBuffer(file);
 }
 
+function triggerDownload(filename, content, mime) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+
+function downloadSample() {
+    const csv = [
+        'Summary,Status,Priority,Due Date,Description',
+        'Design login screen,To Do,High,2026-06-25,Create the Figma mockups for the login flow',
+        'Implement auth API,In Progress,Highest,2026-06-28,JWT-based login plus refresh tokens',
+        'Write unit tests,To Do,Medium,2026-07-02,Cover the auth controller and helpers',
+    ].join('\n');
+    triggerDownload('alianhub-jira-sample.csv', csv, 'text/csv;charset=utf-8;');
+}
+
 function startImport() {
     if (!rows.value.length || isImporting.value) return;
     isImporting.value = true;
@@ -163,6 +187,8 @@ function startImport() {
 .jimport__close { color: #9a9a9a; }
 .jimport__close:hover { color: #e84a4a; }
 .jimport__hint { margin-bottom: 12px; }
+.jimport__sample { display: inline-block; margin-bottom: 12px; color: #2f3990; text-decoration: underline; cursor: pointer; }
+.jimport__sample:hover { opacity: 0.8; }
 .jimport__file { margin-bottom: 12px; }
 .jimport__preview { margin-bottom: 10px; }
 .jimport__select {
