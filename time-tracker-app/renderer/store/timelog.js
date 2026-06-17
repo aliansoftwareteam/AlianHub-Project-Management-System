@@ -46,53 +46,28 @@ const timeLog = createSlice({
     setCaptures: (state, action) => {
       state.captures = [...state.captures,{...action.payload}]
     },
-    setKeyboardClick: (state, action) => {
-      if (state.trackerStart) {
+    // One activity "tick" = one second in which the OS reported recent input
+    // (keyboard or mouse). Ticks are bucketed per minute into { time, active:N },
+    // reusing the same 60-second window the old keystroke counter used. This
+    // replaces the removed node-global-key-listener keyboard/mouse counters.
+    setActivityTick: (state) => {
+      if (!state.trackerStart) return;
 
-        function updateTracker(dt) {
-          var obj=[...state.keyboardClicks]
-          
-          let temp=[]
-          if(dt.index==-1){
-            var key=dt.key=="keyboard"?"mouse":"keyboard"
-            temp=[...obj,{time:new Date().getTime(),[key]:0,[dt.key]:1}]
-          }else{
-            obj.map((itm,ind)=>{
-              if(dt.index==ind){
-                temp.push({...itm,[dt.key]:itm[dt.key]+1})
-              }else{
-                temp.push({...itm})
-              }
-            })
-          }
-          
-          state.keyboardClicks = [...temp]
-        }
+      const now = new Date().getTime();
+      const last = state.keyboardClicks.length > 0
+        ? state.keyboardClicks[state.keyboardClicks.length - 1]
+        : null;
+      const withinSameMinute = last && Math.abs(now - new Date(last.time).getTime()) <= 60000;
 
-        const checkTimeKeyboard = (time) => {
-          const currentTime = new Date();
-          const otherTime = new Date(time);
-          const timeDifference = Math.abs(currentTime - otherTime);
-          return timeDifference <= 60000;
-        };
-
-        const lastTime = state.keyboardClicks.length > 0 ? state.keyboardClicks[state.keyboardClicks.length - 1] : {};
-        if (Object.keys(lastTime).length > 0) {
-          
-          const isMinute = checkTimeKeyboard(lastTime.time);
-          
-          if (isMinute) {
-            updateTracker({ key: action.payload.key, index: state.keyboardClicks.length - 1 });
-          } else {
-            updateTracker({ key: action.payload.key, index: -1 });
-          }
-        } else {
-          updateTracker({ key: action.payload.key, index: -1 });
-        }
+      if (withinSameMinute) {
+        state.keyboardClicks = state.keyboardClicks.map((itm, ind) =>
+          ind === state.keyboardClicks.length - 1
+            ? { ...itm, active: (itm.active || 0) + 1 }
+            : { ...itm }
+        );
+      } else {
+        state.keyboardClicks = [...state.keyboardClicks, { time: now, active: 1 }];
       }
-      
-    
-      
     },
     removeExtraClicks:(state)=>{
       var obj=[...state.keyboardClicks];
@@ -121,5 +96,5 @@ const timeLog = createSlice({
   },
 });
 
-export const { setComment, setTrackerStartTime, setTrackerStopTime,removeAllTimeLog,setCaptures ,setKeyboardClick,removeExtraClicks} = timeLog.actions;
+export const { setComment, setTrackerStartTime, setTrackerStopTime,removeAllTimeLog,setCaptures ,setActivityTick,removeExtraClicks} = timeLog.actions;
 export default timeLog.reducer;

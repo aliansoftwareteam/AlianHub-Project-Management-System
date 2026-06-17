@@ -81,7 +81,6 @@
     "fs": "^0.0.1-security",
     "luxon": "^3.5.0",
     "moment": "^2.30.1",
-    "node-global-key-listener": "^0.3.0",
     "postcss": "^8.5.3",
     "react-redux": "^9.2.0",
     "react-select": "^5.10.1",

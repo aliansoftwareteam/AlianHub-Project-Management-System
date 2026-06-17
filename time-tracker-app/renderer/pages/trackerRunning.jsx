@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import Router from 'next/router';
-import { setCaptures, setKeyboardClick, setTrackerStopTime, removeExtraClicks } from '../store/timelog';
+import { setCaptures, setActivityTick, setTrackerStopTime, removeExtraClicks } from '../store/timelog';
 import { TrackerController } from '../controller/tracker/tracker';
 import store from '../store/store';
 import moment from 'moment';
@@ -32,11 +32,11 @@ function TimeTrackerView() {
   // Main effect without timeLog dependency
   useEffect(() => {
     window.ipc.removeAll('screenshot:captured');
-    window.ipc.removeAll('keyboard:click');
+    window.ipc.removeAll('activity:tick');
     window.ipc.removeAll('trackerStop:capture');
     // Setup event listeners
     window.ipc.on('screenshot:captured', handleScreenShot);
-    window.ipc.on('keyboard:click', setClickEvent);
+    window.ipc.on('activity:tick', setActivityEvent);
     window.ipc.on('trackerStop:capture', stopScreenshotCapture);
 
     // Start screenshot capture
@@ -143,7 +143,7 @@ function TimeTrackerView() {
         const parsedDateTime = DateTime.fromMillis(Number(item.time), { zone: 'utc' });
         const utcTimestamp = parsedDateTime.set({ second: 0 });
         const utcTime = utcTimestamp.ts;
-        return { [utcTime]: { keyboard: item.keyboard, mouse: item.mouse } };
+        return { [utcTime]: { active: item.active || 0 } };
       });
     }
     return strokesData;
@@ -160,9 +160,8 @@ function TimeTrackerView() {
     }
   };
 
-  const setClickEvent = (e) => {
-    let keyName = e.e.includes("MOUSE") ? "mouse" : "keyboard";
-    dispatch(setKeyboardClick({ key: keyName }));
+  const setActivityEvent = () => {
+    dispatch(setActivityTick());
   };
 
   const getTimeAgo = (pastTime) => {
