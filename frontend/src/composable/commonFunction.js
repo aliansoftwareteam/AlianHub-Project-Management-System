@@ -172,6 +172,11 @@ export const projectComponentsIcons = (key) => {
             icon: require("@/assets/images/svg/component-inactive-icons/comp_embed_inactive.svg"),
             activeIcon: require("@/assets/images/svg/component-active-icons/comp_embed_active.svg"),
             keyName: "Embed"
+        },
+        {
+            icon: require("@/assets/images/svg/component-inactive-icons/comp_activity_inactive.svg"),
+            activeIcon: require("@/assets/images/svg/component-active-icons/comp_activity_active.svg"),
+            keyName: "Reports"
         }
     ];
 

@@ -258,6 +258,7 @@
                                             activeTab !== 'Calendar' &&
                                             activeTab !== 'ProjectKanban' &&
                                             activeTab !== 'TableView' &&
+                                            activeTab !== 'Reports' &&
                                             (clientWidth > 767 || activeTab !== 'ProjectDetail')
                                 },
                                 {'board-veiw-main-parent': activeTab === 'ProjectKanban'}
@@ -302,7 +303,7 @@
                             />
                             <component
                                 v-if="(clientWidth <= 767 && isVisible == true && isRuleData == false) || (clientWidth > 767 && isRuleData == false)"
-                                :class="[{'showProjectDetailRight':activeTab !== 'ProjectListView' && activeTab !== 'Calendar' && activeTab != 'EmbedViewItem' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView'}]"
+                                :class="[{'showProjectDetailRight':activeTab !== 'ProjectListView' && activeTab !== 'Calendar' && activeTab != 'EmbedViewItem' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports'}]"
                                 :is="getView(activeTab)"
                                 :data="selectedEmbedView"
                                 :sprints="sprints"
@@ -324,7 +325,7 @@
                                 :sprintLoading="sprintLoading"
                                 :commentType="'project'"
                             />
-                            <ProjectDetailRightSide v-if="activeTab !== 'ProjectListView' && clientWidth > 767 && activeTab !== 'Calendar' && activeTab != 'EmbedView' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView'" :projectData="projectData" @rightSideBarEmit="handleEmitProjectRightSide" @description="handleDescription"/>
+                            <ProjectDetailRightSide v-if="activeTab !== 'ProjectListView' && clientWidth > 767 && activeTab !== 'Calendar' && activeTab != 'EmbedView' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports'" :projectData="projectData" @rightSideBarEmit="handleEmitProjectRightSide" @description="handleDescription"/>
                         </div>
                         <div class="position-ab z-index-1 p-5px border-radius-5-px text-center p0x-15px archived_wrapper" v-if="projectData?.deletedStatusKey === 2">
                             <div>
@@ -466,6 +467,7 @@ const BoardView = defineAsyncComponent(() => import(/* webpackChunkName: "projec
 const ProjectDetail = defineAsyncComponent(() => import(/* webpackChunkName: "project-detail" */ '@/views/Projects/ProjectDetail/ProjectDetail.vue'));
 const TableViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-table-view" */ '@/views/Projects/TableView/TableView.vue'));
 const EmbedViewItem = defineAsyncComponent(() => import(/* webpackChunkName: "embed-view" */ '@/components/molecules/EmbedView/EmbedViewItem.vue'));
+const ReportsView = defineAsyncComponent(() => import(/* webpackChunkName: "project-reports" */ '@/views/Projects/Reports/ReportsView.vue'));
 import NotFound from '../NotFound.vue';
 
 // EXTRACTED PIECES
@@ -1084,6 +1086,8 @@ function getView(val) {
             return ProjectListView;
         case 'ProjectKanban':
             return BoardView;
+        case 'Reports':
+            return ReportsView;
         default:
             return NotFound;
     }
