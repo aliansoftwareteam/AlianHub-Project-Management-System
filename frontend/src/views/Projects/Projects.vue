@@ -259,6 +259,8 @@
                                             activeTab !== 'ProjectKanban' &&
                                             activeTab !== 'TableView' &&
                                             activeTab !== 'Reports' &&
+                                            activeTab !== 'GanttView' &&
+                                            activeTab !== 'RecurringTasks' &&
                                             (clientWidth > 767 || activeTab !== 'ProjectDetail')
                                 },
                                 {'board-veiw-main-parent': activeTab === 'ProjectKanban'}
@@ -303,7 +305,7 @@
                             />
                             <component
                                 v-if="(clientWidth <= 767 && isVisible == true && isRuleData == false) || (clientWidth > 767 && isRuleData == false)"
-                                :class="[{'showProjectDetailRight':activeTab !== 'ProjectListView' && activeTab !== 'Calendar' && activeTab != 'EmbedViewItem' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports'}]"
+                                :class="[{'showProjectDetailRight':activeTab !== 'ProjectListView' && activeTab !== 'Calendar' && activeTab != 'EmbedViewItem' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports' && activeTab !== 'GanttView' && activeTab !== 'RecurringTasks'}]"
                                 :is="getView(activeTab)"
                                 :data="selectedEmbedView"
                                 :sprints="sprints"
@@ -325,7 +327,7 @@
                                 :sprintLoading="sprintLoading"
                                 :commentType="'project'"
                             />
-                            <ProjectDetailRightSide v-if="activeTab !== 'ProjectListView' && clientWidth > 767 && activeTab !== 'Calendar' && activeTab != 'EmbedView' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports'" :projectData="projectData" @rightSideBarEmit="handleEmitProjectRightSide" @description="handleDescription"/>
+                            <ProjectDetailRightSide v-if="activeTab !== 'ProjectListView' && clientWidth > 767 && activeTab !== 'Calendar' && activeTab != 'EmbedView' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports' && activeTab !== 'GanttView' && activeTab !== 'RecurringTasks'" :projectData="projectData" @rightSideBarEmit="handleEmitProjectRightSide" @description="handleDescription"/>
                         </div>
                         <div class="position-ab z-index-1 p-5px border-radius-5-px text-center p0x-15px archived_wrapper" v-if="projectData?.deletedStatusKey === 2">
                             <div>
@@ -468,6 +470,8 @@ const ProjectDetail = defineAsyncComponent(() => import(/* webpackChunkName: "pr
 const TableViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-table-view" */ '@/views/Projects/TableView/TableView.vue'));
 const EmbedViewItem = defineAsyncComponent(() => import(/* webpackChunkName: "embed-view" */ '@/components/molecules/EmbedView/EmbedViewItem.vue'));
 const ReportsView = defineAsyncComponent(() => import(/* webpackChunkName: "project-reports" */ '@/views/Projects/Reports/ReportsView.vue'));
+const GanttViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-gantt" */ '@/views/Projects/GanttView/GanttView.vue'));
+const RecurringTasksComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-recurring" */ '@/views/Projects/RecurringTasks/RecurringTasksManager.vue'));
 import NotFound from '../NotFound.vue';
 
 // EXTRACTED PIECES
@@ -1088,6 +1092,10 @@ function getView(val) {
             return BoardView;
         case 'Reports':
             return ReportsView;
+        case 'GanttView':
+            return GanttViewComp;
+        case 'RecurringTasks':
+            return RecurringTasksComp;
         default:
             return NotFound;
     }

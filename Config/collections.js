@@ -70,6 +70,7 @@ const dbCollections = {
     PUBLIC_SHARES: "publicShares",
     INTAKE_ITEMS: "intakeItems",
     PUBLIC_SHARE_INDEX: "publicShareIndex",
+    RECURRING_TASKS: "recurring_tasks",
 }
 
 /** DOCUMENT ID'S NAME WHICH IS USED IN THE "SETTINGS" COLLECTION NAME **/
