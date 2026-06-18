@@ -26,7 +26,9 @@ const dayKey = (date) => {
 exports.getSprintBurndown = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
-        const { sprintId } = req.body || {};
+        // Accept sprintId from POST body (existing /api/v2/sprints/burndown) or
+        // query string (GET /api/v1/agile/burndown?sprintId=).
+        const sprintId = (req.body && req.body.sprintId) || (req.query && req.query.sprintId) || '';
         if (!companyId || !OBJECT_ID_PATTERN.test(String(sprintId || ''))) {
             return res.send({ status: false, statusText: 'companyId and a valid sprintId are required.' });
         }
@@ -45,7 +47,7 @@ exports.getSprintBurndown = async (req, res) => {
             type: SCHEMA_TYPE.TASKS,
             data: [
                 { sprintId: sprintObjId, deletedStatusKey: { $in: [0, 2, undefined] }, isParentTask: true },
-                '_id TaskKey statusType totalEstimatedTime createdAt updatedAt',
+                '_id TaskKey statusType points totalEstimatedTime createdAt updatedAt',
             ],
         }, 'find');
 
@@ -77,6 +79,7 @@ exports.getSprintBurndown = async (req, res) => {
         const enriched = tasks.map((task) => ({
             createdAt: new Date(task.createdAt),
             estimate: Number(task.totalEstimatedTime) || 0,
+            points: Number(task.points) || 0,
             completedAt: task.statusType === 'close'
                 ? (lastStatusChange.get(String(task._id)) || new Date(task.updatedAt))
                 : null,
@@ -91,6 +94,7 @@ exports.getSprintBurndown = async (req, res) => {
 
         const totalCount = enriched.length;
         const totalEstimate = enriched.reduce((sum, task) => sum + task.estimate, 0);
+        const totalPoints = enriched.reduce((sum, task) => sum + task.points, 0);
         const days = [];
         for (let i = 0; i < totalDays; i++) {
             const cursor = endOfDay(new Date(rangeStart.getTime() + i * 86400000));
@@ -98,12 +102,17 @@ exports.getSprintBurndown = async (req, res) => {
             const completed = scoped.filter((task) => task.completedAt && task.completedAt <= cursor);
             const completedEstimate = completed.reduce((sum, task) => sum + task.estimate, 0);
             const scopedEstimate = scoped.reduce((sum, task) => sum + task.estimate, 0);
+            const completedPoints = completed.reduce((sum, task) => sum + task.points, 0);
+            const scopedPoints = scoped.reduce((sum, task) => sum + task.points, 0);
+            // Straight line from full scope on day one to zero on the last day.
+            const idealFactor = (totalDays - 1 - i) / Math.max(1, totalDays - 1);
             days.push({
                 date: dayKey(cursor),
                 remainingCount: scoped.length - completed.length,
                 remainingEstimate: Math.max(0, scopedEstimate - completedEstimate),
-                // Straight line from full scope on day one to zero on the last day.
-                ideal: Math.max(0, Math.round((totalCount * (totalDays - 1 - i)) / Math.max(1, totalDays - 1))),
+                remainingPoints: Math.max(0, scopedPoints - completedPoints),
+                ideal: Math.max(0, Math.round(totalCount * idealFactor)),
+                idealPoints: Math.max(0, Math.round(totalPoints * idealFactor)),
             });
         }
 
@@ -114,6 +123,7 @@ exports.getSprintBurndown = async (req, res) => {
                 sprintName: sprint.name || '',
                 totalCount,
                 totalEstimate,
+                totalPoints,
                 days,
             },
         });

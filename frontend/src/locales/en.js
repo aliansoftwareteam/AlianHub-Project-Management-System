@@ -694,6 +694,7 @@ export default {
         Table: "Table",
         Timeline: "Timeline",
         Embed: "Embed",
+        Reports: "Reports",
         Comment: "Comment",
         to_unlock_list_view: "To Unlock List View",
         error_message_for_empty: "Please select at least one view",
@@ -754,6 +755,8 @@ export default {
             "See your team's capacity, who is over or under and reassign tasks accordingly.",
         activitylog_view:
             "Get an aggregated view of all activity across a location. Filter for people and type to get granular with the activity you see.",
+        reports_view:
+            "Track sprint progress with burndown, velocity, and cumulative flow charts — and export them as branded PDFs.",
         add_msg1: "Add apps and websites alongside your tasks with Embed view",
         add_msg2: "to save time and reduce context switching.",
         view_name: "View Name",
