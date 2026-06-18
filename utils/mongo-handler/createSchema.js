@@ -115,6 +115,9 @@ const intakeItemsSchema = new Schema(schema.intakeItems, {strict: true, timestam
 intakeItemsSchema.index({ publicShareId: 1, status: 1 });
 const publicShareIndexSchema = new Schema(schema.publicShareIndex, {strict: true, timestamps: true});
 publicShareIndexSchema.index({ token: 1 }, { unique: true });
+const recurringTasksSchema = new Schema(schema.recurringTasks, {strict: true, timestamps: true});
+recurringTasksSchema.index({ ProjectID: 1, deletedStatusKey: 1 });
+recurringTasksSchema.index({ enabled: 1, deletedStatusKey: 1, nextRunAt: 1 });
 // Global search: one combined text index per collection.
 taskSchema.index({ TaskName: 'text', rawDescription: 'text' });
 projectsSchema.index({ ProjectName: 'text' });
@@ -193,6 +196,7 @@ module.exports = {
     publicSharesSchema,
     intakeItemsSchema,
     publicShareIndexSchema,
+    recurringTasksSchema,
     historySchema,
     userIdSchema, 
     usersSchema,

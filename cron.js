@@ -5,6 +5,7 @@ const { handleBucketSizeUpdateCron } = require(`./common-storage/common-${proces
 const aiRef = require("./Modules/AI/controller")
 const screenshotRetention = require("./Modules/ScreenshotRetention/helper");
 const autoArchive = require("./Modules/projectSetting/autoArchive");
+const recurringTasks = require("./Modules/RecurringTasks/controller");
 
 // BUG-035 / #89 — pin every cron to a known timezone so schedules don't
 // shift when the server's local tz changes (DST transition, container
@@ -51,6 +52,18 @@ schedule.scheduleJob({ rule: '0 1 * * *', tz: CRON_TZ }, async () => {
         await autoArchive.runAutoArchiveForAllCompanies();
     } catch (err) {
         logger.error(`[Cron] autoArchive failed: ${err && err.message ? err.message : err}`);
+    }
+})
+
+// Recurring tasks — every 15 minutes, instantiate any definition whose nextRunAt
+// has passed, across all companies. Advancement of nextRunAt makes it idempotent;
+// the /run-due and /run-now endpoints exercise the same path in dev (cron is prod-only).
+schedule.scheduleJob({ rule: '*/15 * * * *', tz: CRON_TZ }, async () => {
+    logger.info(`[Cron] recurringTasks.runRecurringForAllCompanies`);
+    try {
+        await recurringTasks.runRecurringForAllCompanies();
+    } catch (err) {
+        logger.error(`[Cron] recurringTasks failed: ${err && err.message ? err.message : err}`);
     }
 })
 

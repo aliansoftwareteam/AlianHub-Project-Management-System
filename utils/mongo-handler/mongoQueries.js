@@ -67,7 +67,8 @@ const {
     pageVersionsSchema,
     publicSharesSchema,
     intakeItemsSchema,
-    publicShareIndexSchema
+    publicShareIndexSchema,
+    recurringTasksSchema
 } = require('./createSchema');
 
 
@@ -207,6 +208,8 @@ exports.checkType = (type) => {
             return intakeItemsSchema
         case SCHEMA_TYPE.PUBLIC_SHARE_INDEX:
             return publicShareIndexSchema
+        case SCHEMA_TYPE.RECURRING_TASKS:
+            return recurringTasksSchema
         default:
             return ""
     }
@@ -349,6 +352,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.INTAKE_ITEMS}`
         case SCHEMA_TYPE.PUBLIC_SHARE_INDEX:
                 return `${dbCollections.PUBLIC_SHARE_INDEX}`
+        case SCHEMA_TYPE.RECURRING_TASKS:
+                return `${dbCollections.RECURRING_TASKS}`
         default:
             return ""
     }

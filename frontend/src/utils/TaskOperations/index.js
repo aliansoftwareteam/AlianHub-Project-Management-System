@@ -345,6 +345,41 @@ class Task {
         })
     }
 
+    /* -------------- UPDATE DATES (start + due together) — Gantt drag / resize -----------------*/
+
+    updateDates({ firebaseObj, projectData, taskData, userData }) {
+        return new Promise((resolve,reject) => {
+            try {
+                const {sprintId,ProjectID} = taskData;
+                // Optimistic store update so the Gantt (and every other open view) moves immediately.
+                Store.commit('projectData/mutateUpdateFirebaseTasks', {snap:null, op: "modified", pid:ProjectID, sprintId, data: {...taskData, ...firebaseObj},updatedFields:{...firebaseObj}});
+                apiRequest("patch", env.V2_TASKS, {
+                    action: "updateDates",
+                    firebaseObj,
+                    projectData,
+                    taskData,
+                    userData: {
+                        "Employee_Name": userData.Employee_Name,
+                        "id": userData.id,
+                        "companyOwnerId": userData.companyOwnerId
+                    }
+                })
+                .then((response) => {
+                    if (response.data.status) {
+                        resolve({status: true, statusText: "Task dates updated successfully"});
+                    } else {
+                        reject({status: false, error: response.data.error})
+                    }
+                })
+                .catch((error) => {
+                    reject({status: false, error: error})
+                })
+            } catch (error) {
+                reject({status: false, error: error})
+            }
+        })
+    }
+
     /* -------------- UPDATE ASSIGNEE ADD OR ASSIGNEE REMOVE FUNCTION FOR TASK -----------------*/
 
     updateAssignee({ firebaseObj,projectData ,taskData,employeeName,type,userData,isUpdateTask = true}) {
