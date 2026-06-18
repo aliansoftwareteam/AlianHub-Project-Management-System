@@ -303,30 +303,41 @@ if (!gotTheLock) {
   })
 }
 
-// Activity sampling via OS idle time. Replaces node-global-key-listener, whose
-// bundled native hook binary (e.g. WinKeyServer.exe) was flagged and quarantined
-// by antivirus as a keylogger, which silently stopped all keyboard/mouse counts.
-// powerMonitor.getSystemIdleTime() is built into Electron, ships no native
-// binary, needs no accessibility permission, and reflects both keyboard and
-// mouse input. While tracking we sample once per second and emit one
-// 'activity:tick' for each second the user was recently active.
+// Activity sampling WITHOUT a global input hook (a hook is what antivirus flags
+// as a keylogger — the bug that quarantined the old node-global-key-listener
+// binary). Each second we read two built-in, hook-free signals:
+//   - powerMonitor.getSystemIdleTime(): seconds since the last input (kbd OR mouse)
+//   - screen.getCursorScreenPoint(): the current mouse cursor position
+// If the cursor moved this second it's MOUSE activity; if there was input but the
+// cursor did not move (typing) it's KEYBOARD activity. Limitation: a mouse click
+// that doesn't move the cursor is counted as keyboard — acceptable, since exact
+// click counts would require the AV-flagged global hook. No native binary, no
+// accessibility permission.
+let lastCursorPoint = null
 const startActivitySampling = () => {
   if (activityInterval) return
+  lastCursorPoint = null
   activityInterval = setInterval(() => {
     if (!isTracking || !mainWindow || mainWindow.isDestroyed()) return
     const idleSeconds = powerMonitor.getSystemIdleTime()
-    if (idleSeconds <= ACTIVE_IDLE_THRESHOLD_SEC) {
-      mainWindow.webContents.send('activity:tick', { active: 1 })
+    const cursor = screen.getCursorScreenPoint()
+    const mouseMoved = lastCursorPoint !== null && (cursor.x !== lastCursorPoint.x || cursor.y !== lastCursorPoint.y)
+    lastCursorPoint = cursor
+    if (mouseMoved) {
+      mainWindow.webContents.send('activity:tick', { type: 'mouse' })
+    } else if (idleSeconds <= ACTIVE_IDLE_THRESHOLD_SEC) {
+      mainWindow.webContents.send('activity:tick', { type: 'keyboard' })
     }
   }, 1000)
 }
 
-// Stop the idle sampler.
+// Stop the activity sampler.
 const stopActivitySampling = () => {
   if (activityInterval) {
     clearInterval(activityInterval)
     activityInterval = null
   }
+  lastCursorPoint = null
 }
 
 // Add IPC listeners for start and stop events

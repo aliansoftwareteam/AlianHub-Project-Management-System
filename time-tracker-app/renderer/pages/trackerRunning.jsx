@@ -143,7 +143,7 @@ function TimeTrackerView() {
         const parsedDateTime = DateTime.fromMillis(Number(item.time), { zone: 'utc' });
         const utcTimestamp = parsedDateTime.set({ second: 0 });
         const utcTime = utcTimestamp.ts;
-        return { [utcTime]: { active: item.active || 0 } };
+        return { [utcTime]: { keyboard: item.keyboard || 0, mouse: item.mouse || 0 } };
       });
     }
     return strokesData;
@@ -160,8 +160,8 @@ function TimeTrackerView() {
     }
   };
 
-  const setActivityEvent = () => {
-    dispatch(setActivityTick());
+  const setActivityEvent = (e) => {
+    dispatch(setActivityTick({ type: e && e.type }));
   };
 
   const getTimeAgo = (pastTime) => {

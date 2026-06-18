@@ -46,13 +46,14 @@ const timeLog = createSlice({
     setCaptures: (state, action) => {
       state.captures = [...state.captures,{...action.payload}]
     },
-    // One activity "tick" = one second in which the OS reported recent input
-    // (keyboard or mouse). Ticks are bucketed per minute into { time, active:N },
-    // reusing the same 60-second window the old keystroke counter used. This
-    // replaces the removed node-global-key-listener keyboard/mouse counters.
-    setActivityTick: (state) => {
+    // One activity "tick" = one second of detected input, classified by the
+    // desktop sampler as 'mouse' (cursor moved) or 'keyboard' (input, no cursor
+    // movement). Ticks are bucketed per minute into { time, keyboard, mouse } —
+    // the same shape older timesheets use — over a 60-second window.
+    setActivityTick: (state, action) => {
       if (!state.trackerStart) return;
 
+      const key = action.payload && action.payload.type === 'mouse' ? 'mouse' : 'keyboard';
       const now = new Date().getTime();
       const last = state.keyboardClicks.length > 0
         ? state.keyboardClicks[state.keyboardClicks.length - 1]
@@ -62,11 +63,11 @@ const timeLog = createSlice({
       if (withinSameMinute) {
         state.keyboardClicks = state.keyboardClicks.map((itm, ind) =>
           ind === state.keyboardClicks.length - 1
-            ? { ...itm, active: (itm.active || 0) + 1 }
+            ? { ...itm, [key]: (itm[key] || 0) + 1 }
             : { ...itm }
         );
       } else {
-        state.keyboardClicks = [...state.keyboardClicks, { time: now, active: 1 }];
+        state.keyboardClicks = [...state.keyboardClicks, { time: now, keyboard: key === 'keyboard' ? 1 : 0, mouse: key === 'mouse' ? 1 : 0 }];
       }
     },
     removeExtraClicks:(state)=>{

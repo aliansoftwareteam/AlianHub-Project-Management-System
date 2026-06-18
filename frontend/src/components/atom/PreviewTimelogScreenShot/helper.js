@@ -24,19 +24,10 @@ export const prepareData = (trackObj,userObj) => {
             finalMinuteArray.forEach((ele)=>{
                 let min = trackObj.strokes.find((x)=> getDateType(Object.keys(x)[0],userObj) == ele)
                 if (min) {
-                    const val = Object.values(min)[0] || {};
-                    // Newer desktop builds report a single per-minute "active" seconds
-                    // count (OS idle sampling) instead of separate keyboard/mouse counts.
-                    // Idle time can't distinguish keyboard from mouse, so the activity is
-                    // surfaced under the Keyboard column with Mouse left at 0; keyBoard +
-                    // mouse still equals the active value, so the existing active-minute
-                    // threshold and activity bar keep working unchanged. Older timesheets
-                    // keep their original keyboard/mouse counts.
-                    const hasActive = val.active !== undefined && val.active !== null;
                     let obj = {
                         time : getDateType(Object.keys(min)[0],userObj),
-                        keyBoard: hasActive ? Number(val.active) : (val.keyboard || 0),
-                        mouse: hasActive ? 0 : (val.mouse || 0)
+                        keyBoard: Object.values(min)[0].keyboard,
+                        mouse: Object.values(min)[0].mouse
                     }
                     finalArray.push(obj);
                 } else {

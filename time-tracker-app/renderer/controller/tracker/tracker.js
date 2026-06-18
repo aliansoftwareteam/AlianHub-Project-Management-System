@@ -66,7 +66,7 @@ export const TrackerController = {
         
         const parsedDateTime = DateTime.fromMillis(item.time, { zone: 'utc' });
         const utcTimestamp = parsedDateTime.toMillis();
-        strokesData.push({ [utcTimestamp]: { active: item.active || 0 } });
+        strokesData.push({ [utcTimestamp]: { keyboard: item.keyboard || 0, mouse: item.mouse || 0 } });
       });
     }
     return strokesData;
