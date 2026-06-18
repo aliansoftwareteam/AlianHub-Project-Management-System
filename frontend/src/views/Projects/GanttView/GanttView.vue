@@ -52,6 +52,7 @@ import { useCustomComposable } from '@/composable';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import taskClass from '@/utils/TaskOperations';
+import { taskListHelper } from '@/views/Projects/helper.js';
 
 const props = defineProps({
     projectData: { type: Object, default: () => ({}) },
@@ -60,6 +61,7 @@ const props = defineProps({
 
 const { getters } = useStore();
 const { checkPermission } = useCustomComposable();
+const { groupBy } = taskListHelper();
 const selectedProject = inject('selectedProject', ref({}));
 
 const ganttEl = ref(null);
@@ -249,7 +251,23 @@ function setZoom(level) {
 }
 
 /* ----------------------------------- lifecycle ---------------------------------- */
+// Ensure the project's task list is in the store. Other views (List/Table/Board) trigger
+// this load via taskListHelper on mount; Gantt must too — otherwise a direct reload INTO
+// the Gantt tab finds an empty store and renders nothing (it only worked when another view
+// had already populated it). Mirrors ListView's onMounted loader (state.tasks via Mongo).
+function ensureTasksLoaded() {
+    if (tasks.value.length) return; // already loaded (e.g. arrived here from another view)
+    const proj = (selectedProject.value && selectedProject.value._id) ? selectedProject.value : props.projectData;
+    if (!proj || !proj._id || !Array.isArray(props.sprints) || !props.sprints.length) return;
+    try {
+        groupBy(0, true, proj, props.sprints, ref([]), false, 'list', false, true, () => {});
+    } catch (e) {
+        console.error('Gantt: task-load trigger failed', e);
+    }
+}
+
 onMounted(async () => {
+    ensureTasksLoaded();
     let mod;
     try {
         mod = await import(/* webpackChunkName: "dhtmlx-gantt" */ 'dhtmlx-gantt');
@@ -323,6 +341,9 @@ watch(readOnly, (ro) => {
     gantt.config.drag_links = !ro;
     gantt.render();
 });
+
+// Sprints can arrive after mount on a fresh reload — trigger the load once they're present.
+watch(() => props.sprints, () => ensureTasksLoaded(), { deep: true });
 
 onBeforeUnmount(() => {
     try {
