@@ -120,7 +120,7 @@ All work happens on short-lived **topic branches** that target `staging` (or `ma
 - ✅ All CI checks passing
 - ✅ No merge conflicts
 - ✅ Conventional Commit format in PR title
-- ✅ Linear history (squash or rebase merge only)
+- ✅ **Merge method — the `staging → main` promotion MUST use a _merge commit_** (not squash, not rebase) so every `feat`/`fix` commit lands on `main` and release-please can read them and cut the release automatically. Squashing collapses the whole promotion into a single `chore` commit, which starves release-please and forces a manual release cut. (Hotfix PRs into `main` may squash.)
 - ✅ Conversation resolution required
 
 **For PRs into `staging`:**
@@ -158,23 +158,23 @@ For urgent production bugs that can't wait for the next `staging → main` promo
 
 Releases happen **on demand** when `staging` is stable and ready to ship. There is no fixed cadence — release when there is meaningful value to ship (typically every 1–4 weeks).
 
+Versioning, the `CHANGELOG.md`, the git tag, and the GitHub Release are all cut **automatically by release-please** — **provided the promotion is merged with a merge commit.** A squashed promotion hides the Conventional Commits from release-please and produces no release (this was the cause of releases silently not being tagged through v14.4.0).
+
 ### Steps
 
-1. Verify all PRs intended for the release are merged into `staging`.
-2. Verify CI is green on `staging` HEAD.
-3. Open a release PR: branch `release/v14.x.x` from `staging`, target `main`.
-   - PR body: a changelog of all merged PRs since the last release.
-4. After approval and CI pass, **merge** the release PR into `main`.
-5. Tag the release on `main`:
-   ```bash
-   git checkout main
-   git pull
-   git tag -a v14.x.x -m "Release v14.x.x"
-   git push origin v14.x.x
-   ```
-6. A GitHub Release is created automatically by release tooling (see step 4 of the OSS baseline — `release-please`). Until that's set up, create the Release manually with the same changelog body.
+1. Verify all PRs intended for the release are merged into `staging`, and CI is green on `staging` HEAD.
+2. Open the promotion PR: base **`main`**, head **`staging`**. Title: `chore(release): promote staging to main`.
+   - Head = `staging` (not a `release/v*` branch) keeps it exempt from the per-commit commitlint job, which would otherwise fail on legacy commit subjects.
+3. After approval + green CI, merge it with **"Create a merge commit" — never squash, never rebase.** This brings every `feat`/`fix` commit onto `main`.
+4. release-please runs on the push to `main` and **opens a Release PR** (`chore: release main`) that bumps `package.json` + `.release-please-manifest.json` and writes the `CHANGELOG.md` section from the commits.
+5. Review and **merge the Release PR.** release-please then **creates the `v14.x.x` tag and the GitHub Release automatically** — no manual tagging or changelog editing.
+6. **Back-merge `main → staging`** via a `chore/backmerge-main-vX.Y.Z` branch, **merged with a merge commit (never squash)**, so staging carries the version bump and stays an ancestor of `main`.
 
-> 💡 This whole flow will be automated via `release-please` in step 4 of the open-source repo maintenance baseline initiative.
+> ⚠️ **Never squash or rebase the `staging → main` promotion.** A merge commit is what makes the entire release automatic; squashing it silently breaks release-please and forces the manual fallback below.
+
+### Manual fallback (only if a release was missed)
+
+If a promotion was squashed by mistake and no release was cut: run `gh release create vX.Y.Z --target main --notes-file <notes>`, then open a `chore(release): vX.Y.Z` PR bumping `package.json` / `.release-please-manifest.json` / `CHANGELOG.md`, then back-merge `main → staging`.
 
 ---
 
