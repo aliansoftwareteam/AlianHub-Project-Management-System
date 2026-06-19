@@ -5,14 +5,15 @@ const crypto = require('crypto');
 
 const ENTITY_TYPES = Object.freeze(['sprint']);
 const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
-const TOKEN_PATTERN = /^[0-9a-f]{32}$/;
+// Accept legacy 16-byte (32-hex) tokens and new 32-byte (64-hex) tokens.
+const TOKEN_PATTERN = /^[0-9a-f]{32,64}$/;
 const MAX_TITLE_LENGTH = 200;
 const MAX_TEXT_LENGTH = 5000;
 const MAX_NAME_LENGTH = 120;
 
 const isObjectIdString = (id) => OBJECT_ID_PATTERN.test(String(id || ''));
 
-const generateShareToken = () => crypto.randomBytes(16).toString('hex');
+const generateShareToken = () => crypto.randomBytes(32).toString('hex');
 
 const isShareToken = (token) => TOKEN_PATTERN.test(String(token || ''));
 

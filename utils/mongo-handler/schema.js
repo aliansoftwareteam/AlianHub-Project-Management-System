@@ -454,6 +454,8 @@ const schema = {
         enabled: { type: Boolean, default: true, required: false },
         allowIntake: { type: Boolean, default: false, required: false },
         createdBy: { type: String, required: false },
+        expiresAt: { type: Date, required: false },
+        passwordHash: { type: String, required: false },
     },
     // Submissions arriving through a public intake form
     intakeItems: {

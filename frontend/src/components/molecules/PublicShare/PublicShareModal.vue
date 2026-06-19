@@ -30,6 +30,12 @@
                     </label>
                 </div>
 
+                <div class="d-flex align-items-center pshare__meta font-size-12 gray81">
+                    <span v-if="share.hasPassword" class="mr-10px">🔒 {{ $t('Projects.password_protected') }}</span>
+                    <span v-if="share.expiresAt" class="mr-10px">{{ $t('Projects.share_expires_on') }}: {{ formatDate(share.expiresAt) }}</span>
+                    <span class="cursor-pointer red" @click="deleteShare">{{ $t('Projects.delete_link') }}</span>
+                </div>
+
                 <div v-if="share.allowIntake" class="pshare__intake">
                     <div class="font-size-13 font-weight-700 mb-5px">{{ $t('Projects.intake_inbox') }} ({{ intakeItems.length }})</div>
                     <div v-if="!intakeItems.length" class="gray81 font-size-12">{{ $t('Projects.no_intake') }}</div>
@@ -45,6 +51,10 @@
                 </div>
             </template>
             <div v-else class="pshare__create">
+                <div class="font-size-12 gray81 mb-5px">{{ $t('Projects.expires_optional') }}</div>
+                <input type="date" v-model="newExpiry" class="pshare__field" />
+                <div class="font-size-12 gray81 mb-5px">{{ $t('Projects.password_optional') }}</div>
+                <input type="text" v-model="newPassword" class="pshare__field" autocomplete="off" />
                 <button class="btn-primary font-size-13" :disabled="!selectedSprintId || isSaving" @click="createShare">{{ $t('Projects.create_public_link') }}</button>
             </div>
         </div>
@@ -83,6 +93,8 @@ const selectedSprintId = ref('');
 const share = ref(null);
 const intakeItems = ref([]);
 const isSaving = ref(false);
+const newExpiry = ref('');
+const newPassword = ref('');
 
 const sprintOptions = computed(() => {
     const options = [];
@@ -139,10 +151,13 @@ function createShare() {
         entityType: 'sprint',
         entityId: selectedSprintId.value,
         allowIntake: false,
+        expiresAt: newExpiry.value || undefined,
+        password: newPassword.value || undefined,
         userData: { id: user.id, Employee_Name: user.Employee_Name },
     }).then((response) => {
         if (response.data?.status) {
             share.value = response.data.data;
+            newPassword.value = '';
         } else {
             $toast.error(response.data?.statusText || t('Toast.something_went_wrong'), { position: 'top-right' });
         }
@@ -170,6 +185,24 @@ function review(item, action) {
 function copyLink() {
     navigator.clipboard.writeText(shareUrl.value);
     $toast.success(t('Toast.Link_is_Copied_to_clipboard'), { position: 'top-right' });
+}
+
+function deleteShare() {
+    if (!share.value?._id) return;
+    apiRequest('delete', `/api/v2/public-shares/${share.value._id}`)
+    .then((response) => {
+        if (response.data?.status) {
+            share.value = null;
+            intakeItems.value = [];
+            newExpiry.value = '';
+            newPassword.value = '';
+            $toast.success('Public link deleted', { position: 'top-right' });
+        }
+    }).catch((error) => console.error('ERROR in delete share: ', error));
+}
+
+function formatDate(d) {
+    return d ? new Date(d).toLocaleDateString() : '';
 }
 </script>
 
@@ -217,4 +250,7 @@ function copyLink() {
 .pshare__intake { border-top: 1px solid #eee; padding-top: 10px; }
 .pshare__intake-row { padding: 8px 0; border-bottom: 1px solid #f2f2f2; }
 .pshare__intake-desc { margin: 2px 0 4px; white-space: pre-wrap; }
+.pshare__field { display: block; width: 100%; box-sizing: border-box; border: 1px solid #e0e0e0; border-radius: 6px; padding: 7px 10px; margin-bottom: 10px; font-size: 13px; }
+.pshare__meta { margin: 0 0 12px; }
+.pshare__meta .red { margin-left: auto; }
 </style>
