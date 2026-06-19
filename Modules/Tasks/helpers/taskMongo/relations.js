@@ -5,7 +5,7 @@ const { default: mongoose } = require("mongoose");
 const socketEmitter = require('../../../../event/socketEventEmitter');
 const { HandleHistory } = require("../mongo_helper");
 const { HandleBothNotification } = require("../handleNotification");
-const { INVERSE_RELATION, RELATION_LABELS, validateTaskRef, validateRelationPair, validateRelationInput } = require('./relationRules');
+const { INVERSE_RELATION, RELATION_LABELS, validateTaskRef, validateRelationPair, validateRelationInput, selectOpenBlockers } = require('./relationRules');
 
 // Task-to-task relations (blocks / blocked_by / duplicates / duplicated_by /
 // relates_to). A link is stored on BOTH task documents as an entry in the
@@ -171,6 +171,27 @@ module.exports = {
                 resolve({ status: true, statusText: 'Linked tasks fetched successfully.', data });
             } catch (error) {
                 logger.error(`ERROR in get task relations: ${error.message}`);
+                reject(error);
+            }
+        })
+    },
+
+    /* -------------- LIST OPEN BLOCKERS OF A TASK -----------------*/
+    // payload: { companyId, taskId }. Returns the `blocked_by` links whose
+    // blocking task is still open — i.e. why this task isn't unblocked yet.
+    // Drives the "blocked by N open task(s)" warning shown on the task.
+    getOpenBlockers({ companyId, taskId }) {
+        return new Promise(async (resolve, reject) => {
+            try {
+                const relationsResult = await this.getTaskRelations({ companyId, taskId });
+                const openBlockers = selectOpenBlockers(relationsResult.data || []);
+                resolve({
+                    status: true,
+                    statusText: openBlockers.length ? `${openBlockers.length} open blocker(s).` : 'No open blockers.',
+                    data: openBlockers,
+                });
+            } catch (error) {
+                logger.error(`ERROR in get open blockers: ${error.message}`);
                 reject(error);
             }
         })
