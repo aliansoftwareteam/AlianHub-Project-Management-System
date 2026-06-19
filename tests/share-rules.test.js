@@ -20,11 +20,15 @@ describe('🌐 PUBLIC SHARES - Rules', () => {
 
     describe('tokens', () => {
 
-        test('generated tokens are 32 hex chars, unique, and recognised', () => {
+        test('generated tokens are 64 hex chars (32 bytes), unique, and recognised', () => {
             const token = generateShareToken();
-            expect(token).toMatch(/^[0-9a-f]{32}$/);
+            expect(token).toMatch(/^[0-9a-f]{64}$/);
             expect(isShareToken(token)).toBe(true);
             expect(generateShareToken()).not.toBe(token);
+        });
+
+        test('legacy 32-hex tokens are still recognised (backward compatible)', () => {
+            expect(isShareToken('a'.repeat(32))).toBe(true);
         });
 
         test('junk tokens are rejected', () => {
