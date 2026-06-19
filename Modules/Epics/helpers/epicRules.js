@@ -3,12 +3,13 @@
 const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
 const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 const MAX_NAME_LENGTH = 120;
-const EPIC_STATUSES = Object.freeze(['open', 'done']);
+const EPIC_STATUSES = Object.freeze(['open', 'in_progress', 'done']);
+const EPIC_PRIORITIES = Object.freeze(['low', 'medium', 'high']);
 
 const isObjectIdString = (id) => OBJECT_ID_PATTERN.test(String(id || ''));
 
 /* Validate epic creation/update input. Returns { valid, reason }. */
-const validateEpicInput = ({ companyId, name, projectId, color }) => {
+const validateEpicInput = ({ companyId, name, projectId, color, priority }) => {
     if (!companyId) {
         return { valid: false, reason: 'companyId is required.' };
     }
@@ -20,6 +21,9 @@ const validateEpicInput = ({ companyId, name, projectId, color }) => {
     }
     if (color !== undefined && color !== '' && !HEX_COLOR_PATTERN.test(String(color))) {
         return { valid: false, reason: 'color must be a #rrggbb hex value.' };
+    }
+    if (priority !== undefined && priority !== '' && priority !== null && !EPIC_PRIORITIES.includes(String(priority))) {
+        return { valid: false, reason: `priority must be one of: ${EPIC_PRIORITIES.join(', ')}.` };
     }
     return { valid: true, reason: '' };
 };
@@ -56,11 +60,39 @@ const countDeltas = ({ oldEpicId, newEpicId, isCompleted }) => {
     return deltas;
 };
 
+/* Parse + validate optional epic dates. Returns { valid, reason, startDate,
+ * dueDate } with Date objects (or null). Rejects unparseable dates, and a
+ * startDate later than dueDate when both are supplied in the same call. */
+const parseEpicDates = ({ startDate, dueDate }) => {
+    const toDate = (v) => {
+        if (v === null || v === '') return null;
+        const d = new Date(v);
+        return Number.isNaN(d.getTime()) ? false : d;
+    };
+    const out = { valid: true, reason: '', startDate: undefined, dueDate: undefined };
+    if (startDate !== undefined) {
+        const d = toDate(startDate);
+        if (d === false) return { valid: false, reason: 'startDate is not a valid date.' };
+        out.startDate = d;
+    }
+    if (dueDate !== undefined) {
+        const d = toDate(dueDate);
+        if (d === false) return { valid: false, reason: 'dueDate is not a valid date.' };
+        out.dueDate = d;
+    }
+    if (out.startDate && out.dueDate && out.startDate.getTime() > out.dueDate.getTime()) {
+        return { valid: false, reason: 'startDate must be on or before dueDate.' };
+    }
+    return out;
+};
+
 module.exports = {
     EPIC_STATUSES,
+    EPIC_PRIORITIES,
     MAX_NAME_LENGTH,
     isObjectIdString,
     validateEpicInput,
     validateAssignInput,
+    parseEpicDates,
     countDeltas,
 };

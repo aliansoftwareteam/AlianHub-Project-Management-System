@@ -75,12 +75,31 @@ const validateRelationInput = ({ companyId, taskId, relatedTaskId, type }) => {
     return { valid: true, reason: '' };
 };
 
+// A task is complete when its statusType is 'close' — the same signal the epic
+// counters and /recount use. A blocker only "blocks" while it is still open.
+const isClosedStatusType = (statusType) => String(statusType || '') === 'close';
+
+/* From a task's relation-list entries (each `{ type, task }`, as returned by
+ * getTaskRelations), pick the OPEN blockers: `blocked_by` links whose blocking
+ * task still exists, isn't soft-deleted, and isn't closed. Pure — shared by the
+ * controller and the unit tests so "what counts as blocked" lives in one place. */
+const selectOpenBlockers = (relationItems) =>
+    (relationItems || []).filter((item) =>
+        item &&
+        item.type === RELATION_TYPES.BLOCKED_BY &&
+        item.task &&
+        item.task.deletedStatusKey !== 1 &&
+        !isClosedStatusType(item.task.statusType)
+    );
+
 module.exports = {
     RELATION_TYPES,
     RELATION_TYPE_LIST,
     INVERSE_RELATION,
     RELATION_LABELS,
     isObjectIdString,
+    isClosedStatusType,
+    selectOpenBlockers,
     validateTaskRef,
     validateRelationPair,
     validateRelationInput,

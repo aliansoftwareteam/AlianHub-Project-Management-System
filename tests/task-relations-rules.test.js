@@ -12,6 +12,8 @@ const {
     INVERSE_RELATION,
     RELATION_LABELS,
     isObjectIdString,
+    isClosedStatusType,
+    selectOpenBlockers,
     validateTaskRef,
     validateRelationPair,
     validateRelationInput,
@@ -136,6 +138,68 @@ describe('🔗 TASK RELATIONS - Rules', () => {
             const result = validateRelationInput({ companyId: COMPANY_ID, taskId: VALID_ID_A, relatedTaskId: VALID_ID_A, type: RELATION_TYPES.BLOCKS });
             expect(result.valid).toBe(false);
             expect(result.reason).toMatch(/itself/);
+        });
+    });
+
+    describe('isClosedStatusType', () => {
+
+        test('only "close" counts as closed', () => {
+            expect(isClosedStatusType('close')).toBe(true);
+            expect(isClosedStatusType('open')).toBe(false);
+            expect(isClosedStatusType('')).toBe(false);
+            expect(isClosedStatusType(undefined)).toBe(false);
+        });
+    });
+
+    describe('selectOpenBlockers', () => {
+
+        const blockerItem = (overrides = {}) => ({
+            taskId: VALID_ID_B,
+            type: RELATION_TYPES.BLOCKED_BY,
+            task: { TaskKey: 'AH-2', statusType: 'open', deletedStatusKey: 0 },
+            ...overrides,
+        });
+
+        test('an open blocked_by link counts as an open blocker', () => {
+            expect(selectOpenBlockers([blockerItem()])).toHaveLength(1);
+        });
+
+        test('a closed blocker does NOT count', () => {
+            const item = blockerItem({ task: { TaskKey: 'AH-2', statusType: 'close', deletedStatusKey: 0 } });
+            expect(selectOpenBlockers([item])).toHaveLength(0);
+        });
+
+        test('a soft-deleted blocker is ignored', () => {
+            const item = blockerItem({ task: { TaskKey: 'AH-2', statusType: 'open', deletedStatusKey: 1 } });
+            expect(selectOpenBlockers([item])).toHaveLength(0);
+        });
+
+        test('only blocked_by links count — blocks / relates_to / duplicates do not', () => {
+            const items = [
+                blockerItem({ type: RELATION_TYPES.BLOCKS }),
+                blockerItem({ type: RELATION_TYPES.RELATES_TO }),
+                blockerItem({ type: RELATION_TYPES.DUPLICATES }),
+            ];
+            expect(selectOpenBlockers(items)).toHaveLength(0);
+        });
+
+        test('an item with no resolved task is skipped', () => {
+            expect(selectOpenBlockers([blockerItem({ task: null })])).toHaveLength(0);
+        });
+
+        test('empty / nullish input returns []', () => {
+            expect(selectOpenBlockers([])).toEqual([]);
+            expect(selectOpenBlockers(null)).toEqual([]);
+            expect(selectOpenBlockers(undefined)).toEqual([]);
+        });
+
+        test('a mixed list returns only the open blockers', () => {
+            const items = [
+                blockerItem(),
+                blockerItem({ task: { TaskKey: 'AH-3', statusType: 'close', deletedStatusKey: 0 } }),
+                blockerItem({ type: RELATION_TYPES.BLOCKS }),
+            ];
+            expect(selectOpenBlockers(items)).toHaveLength(1);
         });
     });
 });

@@ -5,6 +5,13 @@
             <span v-if="!isAdding" @click="startAdding" class="blue font-size-14 font-weight-500 cursor-pointer pl-20px text-decoration-underline">+ {{$t('Projects.add_link')}}</span>
         </div>
 
+        <!-- Blocked-by warning: this task can't proceed while open blockers remain -->
+        <div v-if="openBlockers.length > 0" class="linked-tasks__blocked-banner font-size-12 mt-5px">
+            <span class="linked-tasks__blocked-icon">&#9888;</span>
+            {{ $t('Projects.blocked_warning', { count: openBlockers.length }) }}
+            <span class="font-weight-700">{{ openBlockerKeys }}</span>
+        </div>
+
         <!-- Existing links -->
         <div v-if="linkedItems.length > 0" class="border-bottom linked-tasks__list">
             <div
@@ -116,6 +123,21 @@ const relationTypeOptions = [
     { value: 'duplicated_by', labelKey: 'Projects.relation_duplicated_by' },
     { value: 'relates_to', labelKey: 'Projects.relation_relates_to' },
 ];
+
+// Open blockers: `blocked_by` links whose blocking task is still open (not
+// closed, not deleted). Mirrors selectOpenBlockers on the backend. The list
+// response already carries each linked task's statusType, so no extra call.
+const openBlockers = computed(() =>
+    linkedItems.value.filter((item) =>
+        item.type === 'blocked_by' &&
+        item.task &&
+        item.task.deletedStatusKey !== 1 &&
+        String(item.task.statusType || '') !== 'close'
+    )
+);
+const openBlockerKeys = computed(() =>
+    openBlockers.value.map((item) => item.task && item.task.TaskKey).filter(Boolean).join(', ')
+);
 
 const companyOwner = computed(() => {
     return getters["settings/companyOwnerDetail"];
@@ -330,5 +352,16 @@ function removeRelation(item) {
 }
 .linked-tasks__result:hover {
     background: #f7f9fc;
+}
+.linked-tasks__blocked-banner {
+    background: #fff5e6;
+    border: 1px solid #f0d8a8;
+    border-radius: 6px;
+    color: #b06a00;
+    padding: 6px 10px;
+    margin-bottom: 6px;
+}
+.linked-tasks__blocked-icon {
+    margin-right: 4px;
 }
 </style>
