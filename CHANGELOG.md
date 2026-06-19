@@ -16,6 +16,25 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.4.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.3.0...v14.4.0) (2026-06-19)
+
+
+### 🚀 Features
+
+* **agile:** Sprint 2 — integrations: webhooks UI, CSV/Trello importers, action-aware notifications ([#252](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/252))
+* **agile:** Sprint 3 — story points + estimation scale, Trello rich import, @mention notifications ([#253](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/253))
+* **reports:** Sprint 4 — agile reports: burndown, velocity, CFD + branded PDF export ([#255](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/255))
+* **gantt:** Sprint 5 — Gantt / timeline view + recurring tasks ([#256](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/256))
+* **public-share:** harden public read-only links — expiry, password, hard-revoke, rate-limit ([#258](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/258))
+* **tasks, epics:** blocked-task warning + epic dates / owner / priority / progress ([#259](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/259))
+
+
+### 🐛 Bug Fixes
+
+* **tracker:** detect keyboard vs mouse via cursor movement; powerMonitor idle activity ([#254](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/254))
+* **gantt:** render tasks when the Gantt tab is the reload entry point ([#257](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/257))
+
+
 ## [14.3.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.2.0...v14.3.0) (2026-06-16)
 
 
