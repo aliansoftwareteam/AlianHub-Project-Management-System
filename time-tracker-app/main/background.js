@@ -2,7 +2,6 @@ import { app, ipcMain, Menu, Tray, BrowserWindow, shell, dialog, desktopCapturer
 import serve from 'electron-serve'
 import { createWindow } from './helpers'
 const path = require('node:path')
-const { GlobalKeyboardListener } = require("node-global-key-listener")
 const fs = require('fs')
 const iconPath = path.join(__dirname, 'logo.png')
 const trayIconPath = path.join(__dirname, 'traylogo.png')
@@ -48,11 +47,13 @@ if (process.defaultApp) {
   app.setAsDefaultProtocolClient('myapp')
 }
 
-const v = new GlobalKeyboardListener()
 let mainWindow
 let tray = null
-let keyboardListener = null
 let isTracking = null
+let activityInterval = null
+
+// A second counts as "active" when the OS reports input within this many seconds.
+const ACTIVE_IDLE_THRESHOLD_SEC = 2
 
 if (isProd) {
   serve({ directory: 'app' })
@@ -302,39 +303,53 @@ if (!gotTheLock) {
   })
 }
 
-const setupKeyboardListener = () => {
-  if (!verifyAccessibilityPermission()) {
-    mainWindow.webContents.send('permission:denied', { type: 'keyboard' })
-    return false
-  }
-  
-  keyboardListener = function (e, down) {
-    if (e.state == 'UP' && isTracking) {
-      mainWindow.webContents.send('keyboard:click', { key: 'keyboard', e: e.name })
+// Activity sampling WITHOUT a global input hook (a hook is what antivirus flags
+// as a keylogger — the bug that quarantined the old node-global-key-listener
+// binary). Each second we read two built-in, hook-free signals:
+//   - powerMonitor.getSystemIdleTime(): seconds since the last input (kbd OR mouse)
+//   - screen.getCursorScreenPoint(): the current mouse cursor position
+// If the cursor moved this second it's MOUSE activity; if there was input but the
+// cursor did not move (typing) it's KEYBOARD activity. Limitation: a mouse click
+// that doesn't move the cursor is counted as keyboard — acceptable, since exact
+// click counts would require the AV-flagged global hook. No native binary, no
+// accessibility permission.
+let lastCursorPoint = null
+const startActivitySampling = () => {
+  if (activityInterval) return
+  lastCursorPoint = null
+  activityInterval = setInterval(() => {
+    if (!isTracking || !mainWindow || mainWindow.isDestroyed()) return
+    const idleSeconds = powerMonitor.getSystemIdleTime()
+    const cursor = screen.getCursorScreenPoint()
+    const mouseMoved = lastCursorPoint !== null && (cursor.x !== lastCursorPoint.x || cursor.y !== lastCursorPoint.y)
+    lastCursorPoint = cursor
+    if (mouseMoved) {
+      mainWindow.webContents.send('activity:tick', { type: 'mouse' })
+    } else if (idleSeconds <= ACTIVE_IDLE_THRESHOLD_SEC) {
+      mainWindow.webContents.send('activity:tick', { type: 'keyboard' })
     }
-  }
-  v.addListener(keyboardListener)
-  return true
+  }, 1000)
 }
 
-// Function to remove keyboard listener
-const removeKeyboardListener = () => {
-  if (keyboardListener) {
-    v.removeListener(keyboardListener)
-    keyboardListener = null
+// Stop the activity sampler.
+const stopActivitySampling = () => {
+  if (activityInterval) {
+    clearInterval(activityInterval)
+    activityInterval = null
   }
+  lastCursorPoint = null
 }
 
 // Add IPC listeners for start and stop events
 ipcMain.on('start-listen-event', () => {
-  isTracking = setupKeyboardListener()
-  // Inform renderer process if setup was successful
-  mainWindow.webContents.send('tracking:status', { active: isTracking })
+  isTracking = true
+  startActivitySampling()
+  mainWindow.webContents.send('tracking:status', { active: true })
 })
 
 ipcMain.on('stop-listen-event', () => {
   isTracking = false
-  removeKeyboardListener()
+  stopActivitySampling()
   mainWindow.webContents.send('tracking:status', { active: false })
 })
 

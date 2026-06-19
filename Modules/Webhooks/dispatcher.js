@@ -1,9 +1,10 @@
 const axios = require('axios');
+const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
 const socketEmitter = require('../../event/socketEventEmitter');
-const { subscribesTo, classifyTaskEvent, trimTaskForDelivery, signPayload, formatForTarget } = require('./helpers/webhookRules');
+const { subscribesTo, classifyTaskEvent, shouldDeliverTask, normalizeChangedFields, trimTaskForDelivery, signPayload, formatForTarget } = require('./helpers/webhookRules');
 
 // Webhook dispatcher. Piggybacks on the namespaced socketEmitter events that
 // every task mutation already fires, so no write path needed changes:
@@ -28,6 +29,19 @@ const CACHE_TTL_MS = 60000;
 const hookCache = new Map();
 // `${companyId}:${taskId}:${event}` -> { timer, payload }
 const pending = new Map();
+
+// taskId -> the last delivered snapshot (trimmed + name-enriched `data`). Lets a
+// delivery diff against the prior state to render "from → to". Bounded FIFO so a
+// long-lived process can't grow it without limit.
+const taskSnapshots = new Map();
+const MAX_SNAPSHOTS = 5000;
+function rememberSnapshot(taskId, data) {
+    taskSnapshots.delete(taskId); // re-insert to move it to the newest position
+    taskSnapshots.set(taskId, data);
+    if (taskSnapshots.size > MAX_SNAPSHOTS) {
+        taskSnapshots.delete(taskSnapshots.keys().next().value);
+    }
+}
 
 let started = false;
 
@@ -113,17 +127,89 @@ async function deliverToHook(companyId, hook, body, attempt) {
     }
 }
 
-async function flush(companyId, event, doc) {
+// Resolve user ids → display names. Users live in the 'global' DB. Best-effort:
+// any miss or error just yields an empty map (caller falls back to a count).
+async function resolveUserNames(ids) {
+    const list = (Array.isArray(ids) ? ids : [ids]).filter(Boolean);
+    if (!list.length) return {};
+    const objectIds = [];
+    list.forEach((id) => {
+        try { objectIds.push(new mongoose.Types.ObjectId(String(id))); } catch (e) { /* skip non-ObjectId ids */ }
+    });
+    if (!objectIds.length) return {};
+    try {
+        const users = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
+            type: SCHEMA_TYPE.USERS,
+            data: [{ _id: { $in: objectIds } }, { Employee_Name: 1 }],
+        }, 'find');
+        const map = {};
+        (users || []).forEach((u) => { if (u && u._id) map[String(u._id)] = u.Employee_Name; });
+        return map;
+    } catch (error) {
+        logger.error(`${LOG_PREFIX} could not resolve user names: ${error.message}`);
+        return {};
+    }
+}
+
+async function flush(companyId, event, doc, changedKeys) {
     const hooks = await getCompanyWebhooks(companyId);
     const targets = hooks.filter((hook) => subscribesTo(hook, event));
     if (!targets.length) return;
+
+    // Task socket payloads can be partial (only the changed fields), which would
+    // deliver a payload missing the key/name/priority and a status with no
+    // friendly name (it falls back to the raw statusType). Re-read the full task
+    // so every delivery is complete. Only runs when a webhook actually subscribes.
+    //
+    // The re-read is also a correctness gate: some create-flow emits carry a
+    // NON-task document under module:'task' (the project counter bump fires
+    // { data: <project>, updatedFields: {} }). Its _id is a project id, so the
+    // task lookup finds nothing — and we must not deliver a project as a phantom
+    // task.updated. shouldDeliverTask drops that case; a transient read error
+    // still falls back to best-effort delivery with the socket doc.
+    let fullDoc = null;
+    let readErrored = false;
+    try {
+        const fresh = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS,
+            data: [{ _id: doc._id }],
+        }, 'findOne');
+        if (fresh && fresh._id) fullDoc = fresh;
+    } catch (error) {
+        readErrored = true;
+        logger.error(`${LOG_PREFIX} could not re-read task ${doc._id}: ${error.message}`);
+    }
+
+    if (!shouldDeliverTask(fullDoc, readErrored)) return;
+    if (!fullDoc) fullDoc = doc; // transient read error → best-effort with the socket payload
+
+    const data = trimTaskForDelivery(fullDoc);
+
+    // Always resolve assignee + lead ids → names (one batched lookup) so the
+    // snapshot we cache is complete — that's what lets the NEXT change render a
+    // clean assignee/lead from→to. A lookup miss just falls back to a count.
+    const userIds = [];
+    if (Array.isArray(fullDoc.AssigneeUserId)) userIds.push(...fullDoc.AssigneeUserId);
+    if (fullDoc.Task_Leader) userIds.push(fullDoc.Task_Leader);
+    const nameMap = userIds.length ? await resolveUserNames(userIds) : {};
+    data.assigneeNames = (Array.isArray(fullDoc.AssigneeUserId) ? fullDoc.AssigneeUserId : [])
+        .map((id) => nameMap[String(id)]).filter(Boolean);
+    if (fullDoc.Task_Leader) data.leadName = nameMap[String(fullDoc.Task_Leader)] || null;
+
+    // before→after: diff against the last state we delivered for this task.
+    const taskId = String(fullDoc._id);
+    const previous = taskSnapshots.get(taskId) || null;
 
     const body = {
         event,
         companyId,
         deliveredAt: new Date().toISOString(),
-        data: trimTaskForDelivery(doc),
+        changedFields: Array.from(new Set(changedKeys || [])),
+        data,
     };
+    if (previous) body.previous = previous;
+
+    rememberSnapshot(taskId, data);
     targets.forEach((hook) => { deliverToHook(companyId, hook, body, 1); });
 }
 
@@ -139,13 +225,19 @@ function onTaskEvent(type) {
             const key = `${companyId}:${String(doc._id)}:${event}`;
             const existing = pending.get(key);
             if (existing) clearTimeout(existing.timer);
+            // Accumulate the changed field names across every emit collapsed into
+            // this debounce window, so the delivered notification reflects the
+            // whole burst (e.g. status then priority changed back to back).
+            const changed = new Set(existing ? existing.changed : []);
+            normalizeChangedFields(payload?.updatedFields).forEach((field) => changed.add(field));
             pending.set(key, {
                 doc,
+                changed,
                 timer: setTimeout(() => {
                     const entry = pending.get(key);
                     pending.delete(key);
                     if (!entry) return; // key already replaced/cleaned up — nothing to flush
-                    flush(companyId, event, entry.doc).catch((error) => {
+                    flush(companyId, event, entry.doc, entry.changed).catch((error) => {
                         logger.error(`${LOG_PREFIX} flush failed: ${error.message}`);
                     });
                 }, DEBOUNCE_MS),

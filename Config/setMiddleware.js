@@ -161,6 +161,13 @@ const verifyJWTTokenWithCRoute = [
     // unauthenticated (trusted body userData) — now JWT-protected; the
     // PAT branch in jwt.js blocks PATs from token management except /me.
     '/api/v2/api-tokens',
+    // Two-factor auth management (Phase 1). JWT + companyId required so req.uid
+    // is populated for the handlers. /api/v2/auth/2fa/validate is intentionally
+    // NOT here — it is public (the user is mid-login, holding only a tempToken).
+    '/api/v2/auth/2fa/status',
+    '/api/v2/auth/2fa/setup',
+    '/api/v2/auth/2fa/verify',
+    '/api/v2/auth/2fa/disable',
 ];
 const verifyJWTToken = [
     "/api/v2/company/delete",

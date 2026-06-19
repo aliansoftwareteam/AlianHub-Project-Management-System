@@ -8,4 +8,5 @@ module.exports = {
     ...require('./controller/register'),
     ...require('./controller/loginSession'),
     ...require('./controller/password'),
+    ...require('./controller/twoFactor'),
 };

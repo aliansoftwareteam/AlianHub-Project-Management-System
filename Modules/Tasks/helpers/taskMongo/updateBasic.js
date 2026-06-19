@@ -442,6 +442,44 @@ module.exports = {
         })
     },
 
+    /* -------------- UPDATE STORY POINTS FUNCTION -----------------*/
+
+    updatePoints({firebaseObj, projectData, taskData, userData}) {
+        return new Promise((resolve, reject) => {
+            try {
+                const query = {
+                    type: dbCollections.TASKS,
+                    data: [
+                        { _id: new mongoose.Types.ObjectId(taskData._id) },
+                        { $set: { ...firebaseObj } },
+                        { returnDocument: "after" }
+                    ]
+                }
+                MongoDbCrudOpration(projectData.CompanyId, query, "findOneAndUpdate")
+                .then((result) => {
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task' });
+                    resolve({status: true, statusText: "Story points updated successfully"});
+
+                    const pointsValue = (firebaseObj.points === null || firebaseObj.points === undefined || firebaseObj.points === '') ? '—' : firebaseObj.points;
+                    const historyObj = {
+                        key: "task_points",
+                        message: `<b>${userData.Employee_Name}</b> set <b>Story Points</b> as <b>${pointsValue}</b>.`,
+                        sprintId: taskData.sprintId
+                    };
+                    HandleHistory('task', projectData.CompanyId, projectData._id, taskData._id, historyObj, userData)
+                    .catch((error) => { logger.error(`ERROR in task points history : ${error.message}`); });
+                })
+                .catch((error) => {
+                    logger.error(`ERROR in update points : ${error.message}`);
+                    reject(error);
+                })
+            } catch (error) {
+                logger.error(`ERROR in update points : ${error.message}`);
+                reject(error);
+            }
+        })
+    },
+
     /* -------------- UPDATE TASK NAME FUNCTION -----------------*/
 
     updateTaskName({firebaseObj,projectData ,taskData , obj, userData}) {
@@ -507,6 +545,52 @@ module.exports = {
             } catch (error) {
                 logger.error(`ERROR in task Name update : ${error.message}`);
                 reject(error)
+            }
+        })
+    },
+
+    /* -------------- UPDATE DATES (start + due together) — used by the Gantt drag/resize -----------------*/
+    // Mirrors updatePoints: single $set, socket emit, history. Sets startDate and/or
+    // DueDate in one atomic write so a Gantt bar move emits one update, not two.
+    updateDates({firebaseObj, projectData, taskData, userData}) {
+        return new Promise((resolve, reject) => {
+            try {
+                const src = firebaseObj || {};
+                const setObj = {};
+                if (Object.prototype.hasOwnProperty.call(src, 'startDate')) {
+                    setObj.startDate = src.startDate ? new Date(src.startDate) : null;
+                }
+                if (Object.prototype.hasOwnProperty.call(src, 'DueDate')) {
+                    setObj.DueDate = src.DueDate ? new Date(src.DueDate) : null;
+                }
+                const query = {
+                    type: dbCollections.TASKS,
+                    data: [
+                        { _id: new mongoose.Types.ObjectId(taskData._id) },
+                        { $set: { ...setObj } },
+                        { returnDocument: "after" }
+                    ]
+                }
+                MongoDbCrudOpration(projectData.CompanyId, query, "findOneAndUpdate")
+                .then((result) => {
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: setObj, module: 'task' });
+                    resolve({status: true, statusText: "Dates updated successfully"});
+
+                    const historyObj = {
+                        key: "Project_DueDate",
+                        message: `<b>${userData.Employee_Name}</b> rescheduled the task on the Gantt.`,
+                        sprintId: taskData.sprintId
+                    };
+                    HandleHistory('task', projectData.CompanyId, projectData._id, taskData._id, historyObj, userData)
+                    .catch((error) => { logger.error(`ERROR in task dates history : ${error.message}`); });
+                })
+                .catch((error) => {
+                    logger.error(`ERROR in update dates : ${error.message}`);
+                    reject(error);
+                })
+            } catch (error) {
+                logger.error(`ERROR in update dates : ${error.message}`);
+                reject(error);
             }
         })
     }

@@ -3,6 +3,7 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { isShareToken, validateIntakeSubmission, escapeHtml } = require('./helpers/shareRules');
+const bcrypt = require('bcrypt');
 
 // Unauthenticated public pages, server-rendered as plain HTML so the public
 // surface needs no SPA route, login or token. The share token resolves the
@@ -33,6 +34,15 @@ const htmlPage = (title, body) => `<!DOCTYPE html>
 <meta name="robots" content="noindex"><title>${escapeHtml(title)}</title><style>${PAGE_STYLE}</style></head>
 <body><div class="wrap">${body}<div class="footer">Shared via AlianHub</div></div></body></html>`;
 
+// Password gate (server-rendered) shown when a share is password-protected.
+const passwordForm = (token, wrong) => `<h1>Password required</h1>
+    <div class="muted">This shared view is password-protected.</div>
+    ${wrong ? '<div class="muted" style="color:#c0392b">Incorrect password — please try again.</div>' : ''}
+    <form method="POST" action="/share/${escapeHtml(token)}">
+        <label>Password</label><input name="password" type="password" autofocus>
+        <button type="submit">View</button>
+    </form>`;
+
 /* Token -> { companyId, share } or null. */
 async function resolveShare(token) {
     if (!isShareToken(token)) return null;
@@ -46,6 +56,7 @@ async function resolveShare(token) {
         data: [{ _id: index.shareId }],
     }, 'findOne');
     if (!share || share.enabled === false) return null;
+    if (share.expiresAt && new Date(share.expiresAt).getTime() < Date.now()) return null;
     return { companyId: index.companyId, share };
 }
 
@@ -57,6 +68,15 @@ exports.renderShare = async (req, res) => {
             return res.status(404).send(htmlPage('Not found', '<h1>This link is not available.</h1>'));
         }
         const { companyId, share } = resolved;
+
+        // Optional password gate (stateless — re-entered per visit).
+        if (share.passwordHash) {
+            const supplied = (req.body && req.body.password) ? String(req.body.password) : '';
+            const ok = supplied && await bcrypt.compare(supplied, share.passwordHash);
+            if (!ok) {
+                return res.send(htmlPage('Protected', passwordForm(req.params.token, req.method === 'POST')));
+            }
+        }
 
         const [sprint, tasks] = await Promise.all([
             MongoDbCrudOpration(companyId, {

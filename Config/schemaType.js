@@ -69,6 +69,7 @@ const SCHEMA_TYPE = {
     PUBLIC_SHARES: "publicShares",
     INTAKE_ITEMS: "intakeItems",
     PUBLIC_SHARE_INDEX: "publicShareIndex",
+    RECURRING_TASKS: "recurring_tasks",
 }
 
 module.exports = {

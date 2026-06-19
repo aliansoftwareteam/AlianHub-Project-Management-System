@@ -195,6 +195,11 @@ const schema = {
         remainingHours:{
             type: Number,
             required: false
+        },
+        points: {
+            type: Number,
+            default: null,
+            required: false
         }
     },
     timesheet: {
@@ -393,10 +398,38 @@ const schema = {
         ProjectID: { type: mongoose.Schema.Types.ObjectId, required: true },
         color: { type: String, required: false },
         status: { type: String, required: false },
+        priority: { type: String, required: false },
+        ownerUserId: { type: String, required: false },
+        startDate: { type: Date, required: false },
+        dueDate: { type: Date, required: false },
         createdBy: { type: String, required: false },
         taskCount: { type: Number, default: 0, required: false },
         completedCount: { type: Number, default: 0, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // Recurring task definitions — managed by Modules/RecurringTasks, instantiated by the cron / run-due endpoint
+    recurringTasks: {
+        name: { type: String, required: true },
+        ProjectID: { type: mongoose.Schema.Types.ObjectId, required: true },
+        sprintId: { type: String, required: false },
+        enabled: { type: Boolean, default: true },
+        freq: { type: String, required: true },
+        interval: { type: Number, default: 1 },
+        byweekday: { type: Array, default: [] },
+        monthday: { type: Number, required: false },
+        runHour: { type: Number, default: 9 },
+        skipIfOpen: { type: Boolean, default: false },
+        until: { type: Date, required: false },
+        nextRunAt: { type: Date, required: false },
+        lastRunAt: { type: Date, required: false },
+        lastInstanceTaskId: { type: String, required: false },
+        runCount: { type: Number, default: 0 },
+        templateSnapshot: { type: Object, required: true },
+        projectSnapshot: { type: Object, required: false },
+        userSnapshot: { type: Object, required: false },
+        sprintArray: { type: Object, required: false },
+        createdBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0 },
     },
     // Wiki pages (Editor.js blocks; versioned) — managed by Modules/Pages
     pages: {
@@ -425,6 +458,8 @@ const schema = {
         enabled: { type: Boolean, default: true, required: false },
         allowIntake: { type: Boolean, default: false, required: false },
         createdBy: { type: String, required: false },
+        expiresAt: { type: Date, required: false },
+        passwordHash: { type: String, required: false },
     },
     // Submissions arriving through a public intake form
     intakeItems: {
@@ -1489,6 +1524,11 @@ const schema = {
         viewColumn: {
             type: Array,
             required: false,
+        },
+        estimationScale: {
+            type: String,
+            required: false,
+            default: 'fibonacci'
         },
         favouriteTasks:{
             type: Array,
@@ -2630,6 +2670,15 @@ const schema = {
         gitlabId: {
             type: String,
             required: false
+        },
+        // Two-factor auth (TOTP). Opt-in, password-login only (Phase 1).
+        // Stored as a free-form object: { enabled, secretEnc, pendingSecretEnc,
+        // recoveryCodes:[bcryptHash], enrolledAt }. The secret is AES-encrypted
+        // and recovery codes are bcrypt-hashed — nothing here is ever returned
+        // to the client. Object (Mixed) so these blobs are persisted as-is.
+        twoFactor: {
+            type: Object,
+            required: false,
         },
     },
     resetAttempt: {

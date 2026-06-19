@@ -108,6 +108,15 @@ module.exports.FORGOTPASSWORD = '/api/v2/auth/forgot-password';
 module.exports.TOKEN_VERIFY_FORGOTPASSWORD = '/api/v2/auth/token-verify-forgotpassword';
 module.exports.RESETPASSWORD = '/api/v2/auth/reset-password';
 module.exports.LOGIN = '/api/v2/auth/login';
+module.exports.TWO_FA_STATUS = '/api/v2/auth/2fa/status';
+module.exports.TWO_FA_SETUP = '/api/v2/auth/2fa/setup';
+module.exports.TWO_FA_VERIFY = '/api/v2/auth/2fa/verify';
+module.exports.TWO_FA_DISABLE = '/api/v2/auth/2fa/disable';
+module.exports.TWO_FA_VALIDATE = '/api/v2/auth/2fa/validate';
+
+// Webhooks / integrations (Modules/Webhooks)
+module.exports.WEBHOOKS = '/api/v2/webhooks';
+module.exports.WEBHOOK_EVENTS = '/api/v2/webhooks/events';
 module.exports.AUTH = '/api/v2/auth';
 module.exports.DELETE_SESSION = '/api/v2/session/delete';
 module.exports.UPDATE_SESSION = '/api/v2/session/update';

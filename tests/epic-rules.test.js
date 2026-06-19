@@ -9,7 +9,10 @@ const {
     validateEpicInput,
     validateAssignInput,
     countDeltas,
+    parseEpicDates,
     MAX_NAME_LENGTH,
+    EPIC_STATUSES,
+    EPIC_PRIORITIES,
 } = require('../Modules/Epics/helpers/epicRules');
 
 const COMPANY = '64b7f0c2a1b2c3d4e5f60700';
@@ -35,6 +38,12 @@ describe('🏔️ EPICS - Rules', () => {
             expect(validateEpicInput({ companyId: COMPANY, name: '  ', projectId: PROJECT }).valid).toBe(false);
             expect(validateEpicInput({ companyId: COMPANY, name: 'x'.repeat(MAX_NAME_LENGTH + 1), projectId: PROJECT }).valid).toBe(false);
             expect(validateEpicInput({ companyId: COMPANY, name: 'E', projectId: 'nope' }).valid).toBe(false);
+        });
+
+        test('valid priority passes; unknown priority fails; omitted priority is fine', () => {
+            expect(validateEpicInput({ companyId: COMPANY, name: 'E', projectId: PROJECT, priority: 'high' }).valid).toBe(true);
+            expect(validateEpicInput({ companyId: COMPANY, name: 'E', projectId: PROJECT, priority: 'urgent' }).valid).toBe(false);
+            expect(validateEpicInput({ companyId: COMPANY, name: 'E', projectId: PROJECT }).valid).toBe(true);
         });
     });
 
@@ -75,6 +84,53 @@ describe('🏔️ EPICS - Rules', () => {
         test('no-op when nothing changes', () => {
             expect(countDeltas({ oldEpicId: EPIC_A, newEpicId: EPIC_A, isCompleted: true })).toEqual([]);
             expect(countDeltas({ oldEpicId: null, newEpicId: null, isCompleted: true })).toEqual([]);
+        });
+    });
+
+    describe('statuses & priorities', () => {
+
+        test('EPIC_STATUSES includes the new in_progress state', () => {
+            expect(EPIC_STATUSES).toContain('open');
+            expect(EPIC_STATUSES).toContain('in_progress');
+            expect(EPIC_STATUSES).toContain('done');
+        });
+
+        test('EPIC_PRIORITIES are low / medium / high', () => {
+            expect(EPIC_PRIORITIES).toEqual(['low', 'medium', 'high']);
+        });
+    });
+
+    describe('parseEpicDates', () => {
+
+        test('parses a valid start + due into Date objects', () => {
+            const result = parseEpicDates({ startDate: '2026-06-01', dueDate: '2026-06-30' });
+            expect(result.valid).toBe(true);
+            expect(result.startDate instanceof Date).toBe(true);
+            expect(result.dueDate instanceof Date).toBe(true);
+        });
+
+        test('empty string / null clears a date to null', () => {
+            const result = parseEpicDates({ startDate: '', dueDate: null });
+            expect(result.valid).toBe(true);
+            expect(result.startDate).toBeNull();
+            expect(result.dueDate).toBeNull();
+        });
+
+        test('omitted fields stay undefined (partial update, no change)', () => {
+            const result = parseEpicDates({});
+            expect(result.valid).toBe(true);
+            expect(result.startDate).toBeUndefined();
+            expect(result.dueDate).toBeUndefined();
+        });
+
+        test('an unparseable date fails', () => {
+            expect(parseEpicDates({ dueDate: 'not-a-date' }).valid).toBe(false);
+        });
+
+        test('startDate after dueDate fails', () => {
+            const result = parseEpicDates({ startDate: '2026-07-01', dueDate: '2026-06-01' });
+            expect(result.valid).toBe(false);
+            expect(result.reason).toMatch(/on or before/);
         });
     });
 });

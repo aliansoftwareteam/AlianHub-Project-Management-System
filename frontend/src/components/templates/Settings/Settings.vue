@@ -197,6 +197,18 @@
             isVisible:true,
             activeIcon: require("@/assets/images/svg/WorkspaceSettings.svg")
         },{
+            label: "Two-Factor Authentication",
+            to: {name: "twoFactorAuth"},
+            icon: require("@/assets/images/svg/WorkspaceSettingsInactive.svg"),
+            isVisible:true,
+            activeIcon: require("@/assets/images/svg/WorkspaceSettings.svg")
+        },{
+            label: "Integrations",
+            to: {name: "Integrations"},
+            icon: require("@/assets/images/svg/WorkspaceSettingsInactive.svg"),
+            isVisible:true,
+            activeIcon: require("@/assets/images/svg/WorkspaceSettings.svg")
+        },{
             label: "Company",
             to: {name: "Company"},
             icon: require("@/assets/images/svg/Workspace.svg"),

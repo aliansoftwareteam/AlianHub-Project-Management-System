@@ -107,6 +107,7 @@ exports.init = (app) => {
                 add: 'addTaskRelation',
                 remove: 'removeTaskRelation',
                 list: 'getTaskRelations',
+                openBlockers: 'getOpenBlockers',
             };
             const method = RELATION_ACTIONS[req.body && req.body.action];
             if (!method) {

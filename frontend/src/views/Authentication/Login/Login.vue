@@ -1,5 +1,5 @@
 <template>
-	<AuthTemplate v-if="isShowResend === false">
+	<AuthTemplate v-if="isShowResend === false && twoFactor.show === false">
 		<div class="ah-rightside" :class="[{'disableInputField':submitted}]">
 			<div class="sinup-login-title-wrapper">
                 <h3>{{$t('Auth.login_statement')}}</h3>
@@ -90,6 +90,50 @@
             <oAuthProviders mode="login"/>
 		</div>
 	</AuthTemplate>
+    <AuthTemplate v-if="twoFactor.show === true">
+        <div class="ah-rightside" :class="[{'disableInputField':submitted}]">
+            <div class="sinup-login-title-wrapper">
+                <h3>{{ $t('Auth.two_factor_title') }}</h3>
+                <p>{{ twoFactor.isRecovery ? $t('Auth.two_factor_recovery_hint') : $t('Auth.two_factor_hint') }}</p>
+            </div>
+            <form action="#" @submit.prevent="submit2fa">
+                <div class="form-group">
+                    <label for="twofa-code">{{ twoFactor.isRecovery ? $t('Auth.two_factor_recovery_label') : $t('Auth.two_factor_code_label') }}<span class="invalid-feedback red">*</span></label>
+                    <InputText
+                        id="twofa-code"
+                        class="login-input"
+                        :placeHolder="twoFactor.isRecovery ? 'xxxxx-xxxxx' : '123456'"
+                        v-model.trim="twoFactor.code"
+                        height="56px"
+                        width="100%"
+                        maxlength="20"
+                        type="text"
+                        @enter="submit2fa"
+                    />
+                    <div class="invalid-feedback red">{{ twoFactor.error }}</div>
+                </div>
+                <div class="form-group">
+                    <button v-if="!isSpinner" type="submit" class="btn btn-blue btn-login font-roboto-sans bg-blue white cursor-pointer font-weight-500">{{ $t('Auth.two_factor_verify') }}</button>
+                    <button v-else type="button" class="btn btn-blue btn-login font-roboto-sans bg-blue white cursor-pointer font-weight-500" disabled>
+                        {{ $t('Auth.loading') }}
+                        <div class="load">
+                            <div class="progress"></div>
+                            <div class="progress"></div>
+                            <div class="progress"></div>
+                        </div>
+                    </button>
+                </div>
+                <div class="create-accountlink text-center">
+                    <span class="font-roboto-sans light-purple font-weight-500 cursor-pointer" @click="toggleRecoveryMode">
+                        {{ twoFactor.isRecovery ? $t('Auth.two_factor_use_app') : $t('Auth.two_factor_use_recovery') }}
+                    </span>
+                </div>
+                <div class="create-accountlink text-center mt-2">
+                    <span class="font-roboto-sans gray cursor-pointer" @click="backToLoginFrom2fa">{{ $t('Auth.backlogin') }}</span>
+                </div>
+            </form>
+        </div>
+    </AuthTemplate>
     <Template v-if="isShowResend === true">
         <div class="ah-rightside">
             <div>
@@ -132,6 +176,10 @@ const rememberMe = ref(false)
 const submitted = ref(false)
 const isSpinner = ref(false)
 const isShowResend = ref(false);
+// 2FA second-step state. When login returns twoFactorRequired we hide the
+// password form and show this; submit2fa() exchanges tempToken + code at
+// /api/v2/auth/2fa/validate for the real session.
+const twoFactor = ref({ show: false, tempToken: '', code: '', error: '', isRecovery: false });
 const userData = ref();
 const router = useRouter()
 const route = useRoute()
@@ -284,72 +332,18 @@ defineComponent({
                 // $toast.warning(t("Toast.Password_reset_link"),{position: 'top-right'});
                 return;
             }
-            const userId = user.data.uid;
-
-            localStorage.setItem("userId", userId);
-            const [userResponse] = await Promise.all([
-                userCompanyStatusCheck(userId),
-                getAuth(userId, true)
-            ]);
-
-            userData.value = userResponse?.data?.data.userData;
-            if(userResponse.data.status == false) {
+            // 2FA second-step: the backend returns this (HTTP 200) instead of a
+            // session when the account has TOTP enabled. Show the code form and
+            // stop here; submit2fa() completes the login via /2fa/validate.
+            if (user?.data?.twoFactorRequired === true && user?.data?.tempToken) {
+                twoFactor.value.tempToken = user.data.tempToken;
+                twoFactor.value.show = true;
                 isSpinner.value = false;
                 submitted.value = false;
-                localStorage.removeItem("updateToken");
-                Cookies.remove('refreshToken');
-                Cookies.remove('accessToken');
-                throw new Error('MongoDB Error from Api')
-            }
-
-            const {userData: uData, companyId: companyID, isCompanyFind} = userResponse.data.data;
-            let cid = localStorage.getItem("selectedCompany") ?? companyID;
-            if (!uData.isEmailVerified) {
-                isSpinner.value = false;
-                submitted.value = false;
-                localStorage.removeItem("updateToken");
-                Cookies.remove('refreshToken');
-                Cookies.remove('accessToken');
-                throw new Error("Verify your email and try again");
-            }
-
-            localStorage.setItem('SubmenuScreen', 'project');
-
-            if (uData.AssignCompany && uData.AssignCompany.length) {
-                updateUserStatus(userId);
-                if (cid && isCompanyFind === false) {
-                    router.push({ name: "Create_Company" });
-                    return;
-                } else {
-                    localStorage.setItem('selectedCompany', cid);
-                }
-            } else {
-                updateUserStatus(userId);
-                router.push({ name: "Create_Company" });
                 return;
-            }            
-
-            localStorage.setItem("isLogging", "true");
-
-            if (route.query.redirect_url && route.query.redirect_url !== '/login') {
-                if(route.query.redirect_url === "/") {
-                    await router.replace(`${route.query.redirect_url}${cid}`);
-                } else {
-                    const tmpcid = route.query.redirect_url?.split("/")[1];
-                    if ((tmpcid && uData.AssignCompany.includes(tmpcid)) || tmpcid === 'oauth2') {
-                        await router.replace(route.query.redirect_url );
-                    } else {
-                        await router.replace(`/${cid}`);
-                    }
-                }
-                localStorage.removeItem('ForgotEmail');
-                window.location.reload();
-            } else {
-                localStorage.removeItem('ForgotEmail');
-                window.location.reload();
             }
-            submitted.value = false;
-            localStorage.removeItem('ForgotEmail');
+            const userId = user.data.uid;
+            await proceedAfterAuth(userId);
 
         } catch (error) {
             console.error(error);
@@ -384,6 +378,125 @@ defineComponent({
             localStorage.removeItem("isLogging");
             localStorage.removeItem("remember");
         }
+    };
+
+    // Shared post-authentication flow: company-status check, token refresh,
+    // email-verification gate, company selection, and redirect. Runs for both
+    // password login and the 2FA second-step so they behave identically.
+    const proceedAfterAuth = async (userId) => {
+        localStorage.setItem("userId", userId);
+        const [userResponse] = await Promise.all([
+            userCompanyStatusCheck(userId),
+            getAuth(userId, true)
+        ]);
+
+        userData.value = userResponse?.data?.data.userData;
+        if(userResponse.data.status == false) {
+            isSpinner.value = false;
+            submitted.value = false;
+            localStorage.removeItem("updateToken");
+            Cookies.remove('refreshToken');
+            Cookies.remove('accessToken');
+            throw new Error('MongoDB Error from Api')
+        }
+
+        const {userData: uData, companyId: companyID, isCompanyFind} = userResponse.data.data;
+        let cid = localStorage.getItem("selectedCompany") ?? companyID;
+        if (!uData.isEmailVerified) {
+            isSpinner.value = false;
+            submitted.value = false;
+            localStorage.removeItem("updateToken");
+            Cookies.remove('refreshToken');
+            Cookies.remove('accessToken');
+            throw new Error("Verify your email and try again");
+        }
+
+        localStorage.setItem('SubmenuScreen', 'project');
+
+        if (uData.AssignCompany && uData.AssignCompany.length) {
+            updateUserStatus(userId);
+            if (cid && isCompanyFind === false) {
+                router.push({ name: "Create_Company" });
+                return;
+            } else {
+                localStorage.setItem('selectedCompany', cid);
+            }
+        } else {
+            updateUserStatus(userId);
+            router.push({ name: "Create_Company" });
+            return;
+        }
+
+        localStorage.setItem("isLogging", "true");
+
+        if (route.query.redirect_url && route.query.redirect_url !== '/login') {
+            if(route.query.redirect_url === "/") {
+                await router.replace(`${route.query.redirect_url}${cid}`);
+            } else {
+                const tmpcid = route.query.redirect_url?.split("/")[1];
+                if ((tmpcid && uData.AssignCompany.includes(tmpcid)) || tmpcid === 'oauth2') {
+                    await router.replace(route.query.redirect_url );
+                } else {
+                    await router.replace(`/${cid}`);
+                }
+            }
+            localStorage.removeItem('ForgotEmail');
+            window.location.reload();
+        } else {
+            localStorage.removeItem('ForgotEmail');
+            window.location.reload();
+        }
+        submitted.value = false;
+        localStorage.removeItem('ForgotEmail');
+    };
+
+    // 2FA second-step submit: exchange tempToken + code (TOTP or recovery) for a
+    // real session, then run the same post-auth flow as a password login.
+    const submit2fa = async () => {
+        try {
+            if (!twoFactor.value.code || !twoFactor.value.code.trim()) {
+                twoFactor.value.error = t('Auth.two_factor_enter_code');
+                return;
+            }
+            twoFactor.value.error = '';
+            isSpinner.value = true;
+            submitted.value = true;
+            const res = await apiRequestWithoutSecure("post", env.TWO_FA_VALIDATE, {
+                tempToken: twoFactor.value.tempToken,
+                code: twoFactor.value.code.trim(),
+            });
+            if (res.status !== 200 || !res?.data?.uid) {
+                isSpinner.value = false;
+                submitted.value = false;
+                twoFactor.value.error = t('Auth.two_factor_invalid_code');
+                return;
+            }
+            await proceedAfterAuth(res.data.uid);
+        } catch (error) {
+            console.error(error);
+            isSpinner.value = false;
+            submitted.value = false;
+            const msg = error?.response?.data?.message;
+            if (msg === 'Auth.too_many_request') {
+                twoFactor.value.error = t('Toast.Too_many_request');
+            } else if (typeof msg === 'string' && /expired/i.test(msg)) {
+                // tempToken expired — send the user back to the password step.
+                twoFactor.value.error = '';
+                backToLoginFrom2fa();
+                $toast.error(t('Auth.two_factor_session_expired'), { position: 'top-right' });
+            } else {
+                twoFactor.value.error = t('Auth.two_factor_invalid_code');
+            }
+        }
+    };
+
+    const toggleRecoveryMode = () => {
+        twoFactor.value.isRecovery = !twoFactor.value.isRecovery;
+        twoFactor.value.code = '';
+        twoFactor.value.error = '';
+    };
+    const backToLoginFrom2fa = () => {
+        twoFactor.value = { show: false, tempToken: '', code: '', error: '', isRecovery: false };
     };
 
     const handleSubmitResend = () => {

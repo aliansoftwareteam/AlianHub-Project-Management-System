@@ -178,6 +178,9 @@ function initializeControllers() {
     require('./Modules/ImportSettings/init').init(app);
     require('./Modules/Tasks/init.js').init(app);
     require('./Modules/Sprints/init.js').init(app);
+    require('./Modules/AgileReports/init').init(app);
+    require('./Modules/Export/init').init(app);
+    require('./Modules/RecurringTasks/init').init(app);
     require('./Modules/LogTime/init.js').init(app);
     require('./Modules/Milestone/init.js').init(app);
     require('./Modules/Company/init.js').init(app);

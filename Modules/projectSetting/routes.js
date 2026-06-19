@@ -1,5 +1,6 @@
 const ctrl = require('./controller');
 const autoArchive = require('./autoArchive');
+const estimationScale = require('./estimationScale');
 
 exports.init = (app) => {
      /**
@@ -103,4 +104,7 @@ exports.init = (app) => {
     // applied by the nightly cron in cron.js).
     app.get('/api/v1/projectSetting/autoArchive/:pid', autoArchive.getAutoArchive);
     app.post('/api/v1/projectSetting/autoArchive', autoArchive.setAutoArchive);
+
+    // Per-project story-point estimation scale (drives the points picker).
+    app.post('/api/v1/projectSetting/estimationScale', estimationScale.setEstimationScale);
 }

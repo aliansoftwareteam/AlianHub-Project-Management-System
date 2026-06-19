@@ -3,7 +3,7 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const socketEmitter = require('../../event/socketEventEmitter');
-const { validateEpicInput, validateAssignInput, countDeltas, isObjectIdString, EPIC_STATUSES } = require('./helpers/epicRules');
+const { validateEpicInput, validateAssignInput, countDeltas, isObjectIdString, EPIC_STATUSES, EPIC_PRIORITIES, parseEpicDates } = require('./helpers/epicRules');
 
 // Epics: a grouping layer above tasks with progress roll-up. Tasks carry an
 // optional epicId; epics keep denormalised taskCount/completedCount which
@@ -13,10 +13,14 @@ const { validateEpicInput, validateAssignInput, countDeltas, isObjectIdString, E
 exports.createEpic = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
-        const { name, description, color, projectId, userData } = req.body || {};
-        const check = validateEpicInput({ companyId, name, projectId, color });
+        const { name, description, color, projectId, priority, ownerUserId, startDate, dueDate, userData } = req.body || {};
+        const check = validateEpicInput({ companyId, name, projectId, color, priority });
         if (!check.valid) {
             return res.send({ status: false, statusText: check.reason });
+        }
+        const dateCheck = parseEpicDates({ startDate, dueDate });
+        if (!dateCheck.valid) {
+            return res.send({ status: false, statusText: dateCheck.reason });
         }
         const created = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.EPICS,
@@ -26,6 +30,10 @@ exports.createEpic = async (req, res) => {
                 ProjectID: new mongoose.Types.ObjectId(projectId),
                 color: color || '#7b68ee',
                 status: 'open',
+                priority: priority ? String(priority) : 'medium',
+                ownerUserId: ownerUserId ? String(ownerUserId) : '',
+                startDate: dateCheck.startDate || null,
+                dueDate: dateCheck.dueDate || null,
                 createdBy: userData && (userData.id || userData._id) ? String(userData.id || userData._id) : '',
                 taskCount: 0,
                 completedCount: 0,
@@ -70,7 +78,7 @@ exports.updateEpic = async (req, res) => {
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid epic id are required.' });
         }
-        const { name, color, status, description } = req.body || {};
+        const { name, color, status, description, priority, ownerUserId, startDate, dueDate } = req.body || {};
         const update = {};
         if (name !== undefined) {
             if (!String(name).trim()) return res.send({ status: false, statusText: 'name cannot be empty.' });
@@ -81,6 +89,19 @@ exports.updateEpic = async (req, res) => {
         if (status !== undefined) {
             if (!EPIC_STATUSES.includes(status)) return res.send({ status: false, statusText: 'Invalid status.' });
             update.status = status;
+        }
+        if (priority !== undefined) {
+            if (priority !== '' && priority !== null && !EPIC_PRIORITIES.includes(String(priority))) {
+                return res.send({ status: false, statusText: 'Invalid priority.' });
+            }
+            update.priority = priority ? String(priority) : '';
+        }
+        if (ownerUserId !== undefined) update.ownerUserId = ownerUserId ? String(ownerUserId) : '';
+        if (startDate !== undefined || dueDate !== undefined) {
+            const dateCheck = parseEpicDates({ startDate, dueDate });
+            if (!dateCheck.valid) return res.send({ status: false, statusText: dateCheck.reason });
+            if (startDate !== undefined) update.startDate = dateCheck.startDate || null;
+            if (dueDate !== undefined) update.dueDate = dateCheck.dueDate || null;
         }
         if (!Object.keys(update).length) {
             return res.send({ status: false, statusText: 'Nothing to update.' });

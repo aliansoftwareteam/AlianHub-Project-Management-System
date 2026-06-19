@@ -85,6 +85,24 @@ export default [
                 component: () => import(/* webpackChunkName: Change Password */ '@/views/Settings/ChangePassword/ChangePassword.vue')
             },
             {
+                path: "two-factor-auth",
+                name: "twoFactorAuth",
+                meta: {
+                    title: "Two-Factor Authentication",
+                    requiresAuth: true
+                },
+                component: () => import(/* webpackChunkName: Two Factor Auth */ '@/views/Settings/TwoFactorAuth/TwoFactorAuth.vue')
+            },
+            {
+                path: "integrations",
+                name: "Integrations",
+                meta: {
+                    title: "Integrations",
+                    requiresAuth: true
+                },
+                component: () => import(/* webpackChunkName: Integrations */ '@/views/Settings/Integrations/Integrations.vue')
+            },
+            {
                 path: "company",
                 name: "Company",
                 meta: {
