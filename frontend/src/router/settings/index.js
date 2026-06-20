@@ -31,6 +31,15 @@ export default [
                 component: () => import(/* webpackChunkName: Members */ '@/views/Settings/Members/Members.vue')
             },
             {
+                path: "sso",
+                name: "SsoSettings",
+                meta: {
+                    title: "SSO",
+                    requiresAuth: true
+                },
+                component: () => import(/* webpackChunkName: SsoSettings */ '@/views/Settings/Sso/SsoSettings.vue')
+            },
+            {
                 path: "teams",
                 name: "Teams",
                 meta: {
