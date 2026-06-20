@@ -168,6 +168,10 @@ const verifyJWTTokenWithCRoute = [
     '/api/v2/auth/2fa/setup',
     '/api/v2/auth/2fa/verify',
     '/api/v2/auth/2fa/disable',
+    // SSO admin config (Modules/SSO) — JWT+company so the owner/admin gate has
+    // req.uid. The login-flow routes (/api/v2/sso/oidc|saml|public) stay PUBLIC
+    // (pre-auth), so they are intentionally NOT listed here.
+    '/api/v2/sso/config',
 ];
 const verifyJWTToken = [
     "/api/v2/company/delete",

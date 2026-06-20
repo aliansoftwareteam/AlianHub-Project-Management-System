@@ -70,7 +70,8 @@ const {
     publicShareIndexSchema,
     recurringTasksSchema,
     timesheetApprovalSchema,
-    billingRatesSchema
+    billingRatesSchema,
+    ssoConfigsSchema
 } = require('./createSchema');
 
 
@@ -216,6 +217,8 @@ exports.checkType = (type) => {
             return timesheetApprovalSchema
         case SCHEMA_TYPE.BILLING_RATES:
             return billingRatesSchema
+        case SCHEMA_TYPE.SSO_CONFIGS:
+            return ssoConfigsSchema
         default:
             return ""
     }
@@ -364,6 +367,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.TIMESHEET_APPROVAL}`
         case SCHEMA_TYPE.BILLING_RATES:
                 return `${dbCollections.BILLING_RATES}`
+        case SCHEMA_TYPE.SSO_CONFIGS:
+                return `${dbCollections.SSO_CONFIGS}`
         default:
             return ""
     }

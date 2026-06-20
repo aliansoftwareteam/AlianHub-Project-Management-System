@@ -73,6 +73,7 @@ const dbCollections = {
     RECURRING_TASKS: "recurring_tasks",
     TIMESHEET_APPROVAL: "timesheet_approval",
     BILLING_RATES: "billing_rates",
+    SSO_CONFIGS: "sso_configs",
 }
 
 /** DOCUMENT ID'S NAME WHICH IS USED IN THE "SETTINGS" COLLECTION NAME **/

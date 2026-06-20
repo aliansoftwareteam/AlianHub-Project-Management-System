@@ -123,6 +123,7 @@ timesheetApprovalSchema.index({ userId: 1, periodStart: 1, periodEnd: 1 });
 timesheetApprovalSchema.index({ status: 1, periodStart: -1 });
 const billingRatesSchema = new Schema(schema.billingRates, {strict: true, timestamps: true});
 billingRatesSchema.index({ scope: 1, refId: 1, deletedStatusKey: 1 });
+const ssoConfigsSchema = new Schema(schema.ssoConfigs, {strict: true, timestamps: true});
 // Global search: one combined text index per collection.
 taskSchema.index({ TaskName: 'text', rawDescription: 'text' });
 projectsSchema.index({ ProjectName: 'text' });
@@ -204,6 +205,7 @@ module.exports = {
     recurringTasksSchema,
     timesheetApprovalSchema,
     billingRatesSchema,
+    ssoConfigsSchema,
     historySchema,
     userIdSchema, 
     usersSchema,

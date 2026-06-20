@@ -463,6 +463,18 @@ const schema = {
         createdBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // Per-company enterprise SSO config (OIDC/SAML) — managed by Modules/SSO (SEC-02)
+    ssoConfigs: {
+        provider: { type: String, default: 'oidc', required: false },
+        isEnabled: { type: Boolean, default: false, required: false },
+        autoProvisionUsers: { type: Boolean, default: true, required: false },
+        defaultRoleType: { type: Number, default: 3, required: false },
+        oidc: { type: Object, required: false },
+        saml: { type: Object, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Wiki pages (Editor.js blocks; versioned) — managed by Modules/Pages
     pages: {
         title: { type: String, required: true },
