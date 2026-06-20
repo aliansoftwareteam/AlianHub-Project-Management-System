@@ -74,6 +74,40 @@
                     </details>
                 </div>
 
+                <!-- Marketplace (AUTO-05) -->
+                <div v-else-if="active === 'marketplace'">
+                    <div class="ig-head">
+                        <h2>{{ $t('IntegrationsHub.marketplace') }}</h2>
+                        <p>{{ $t('IntegrationsHub.mp_intro') }}</p>
+                    </div>
+                    <input v-model="mpSearch" class="form-control ig-mp-search" :placeholder="$t('IntegrationsHub.mp_search')" />
+                    <div class="ig-mp-grid">
+                        <div v-for="item in filteredCatalog" :key="item.key" class="ig-mp-card">
+                            <div class="ig-mp-top">
+                                <span class="ig-mp-ic">{{ item.icon }}</span>
+                                <span class="ig-mp-name">{{ item.name }}</span>
+                                <span v-if="connectedFor(item.key)" class="ig-pill on">{{ $t('IntegrationsHub.connected') }}</span>
+                                <span v-else class="ig-mp-cat">{{ item.category }}</span>
+                            </div>
+                            <p class="ig-mp-desc">{{ item.description }}</p>
+                            <div v-if="mpForm.type === item.key" class="ig-mp-form">
+                                <div v-for="f in item.fields" :key="f.key" class="ig-mp-field">
+                                    <label class="ig-lbl">{{ f.label }}</label>
+                                    <input v-model="mpForm.config[f.key]" :type="f.secret ? 'password' : 'text'" class="form-control" autocomplete="off" />
+                                </div>
+                                <div class="ig-row ig-mt10">
+                                    <button class="ig-btn" :disabled="busy" @click="submitConnect(item)">{{ $t('IntegrationsHub.mp_save') }}</button>
+                                    <button class="ig-mini" @click="mpForm.type = ''">{{ $t('IntegrationsHub.mp_cancel') }}</button>
+                                </div>
+                            </div>
+                            <div v-else class="ig-mp-actions">
+                                <button class="ig-mini" @click="openConnect(item)">{{ connectedFor(item.key) ? $t('IntegrationsHub.mp_reconfigure') : $t('IntegrationsHub.mp_connect') }}</button>
+                                <button v-if="connectedFor(item.key)" class="ig-mini del" @click="disconnect(connectedFor(item.key))">{{ $t('IntegrationsHub.mp_disconnect') }}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Automations (AUTO-03) -->
                 <div v-else-if="active === 'automations'">
                     <div class="ig-head">
@@ -197,7 +231,7 @@ const cats = [
     { key: 'emailToTask', icon: '✉️', soon: false },
     { key: 'automations', icon: '⚡', soon: false },
     { key: 'calendar', icon: '📅', soon: false },
-    { key: 'marketplace', icon: '🧩', soon: true },
+    { key: 'marketplace', icon: '🧩', soon: false },
     { key: 'slack', icon: '💬', soon: true },
     { key: 'apps', icon: '🪟', soon: true },
 ];
@@ -212,7 +246,19 @@ const calScope = ref('my');
 const calProjectId = ref('');
 const rules = ref([]);
 const ruleForm = reactive({ name: '', projectId: '', condPriority: '', actionPriority: 'HIGH' });
+const catalog = ref([]);
+const connections = ref([]);
+const mpSearch = ref('');
+const mpForm = reactive({ type: '', config: {} });
 const busy = ref(false);
+
+const filteredCatalog = computed(() => {
+    const q = mpSearch.value.trim().toLowerCase();
+    return catalog.value
+        .filter((i) => !i.multiple)
+        .filter((i) => !q || (i.name || '').toLowerCase().includes(q) || (i.category || '').toLowerCase().includes(q));
+});
+const connectedFor = (type) => connections.value.find((c) => c.type === type) || null;
 
 const webhookUrl = (token) => `${window.location.origin}${env.EMAIL_IN}/${token}`;
 
@@ -293,7 +339,32 @@ const removeRule = async (r) => {
     try { await apiRequest('delete', `${env.AUTOMATIONS}/${r._id}`); await loadRules(); } catch (e) { /* noop */ }
 };
 
-onMounted(() => { loadProjects(); loadInboxes(); loadFeeds(); loadRules(); });
+// AUTO-05 — integrations marketplace (consumes the AUTO-04 catalog + connections).
+const loadCatalog = async () => {
+    try { const b = (await apiRequest('get', `${env.INTEGRATIONS}/catalog`))?.data; catalog.value = (b && b.data) || []; } catch (e) { catalog.value = []; }
+};
+const loadConnections = async () => {
+    try { const b = (await apiRequest('get', `${env.INTEGRATIONS}/connections`))?.data; connections.value = (b && b.data) || []; } catch (e) { connections.value = []; }
+};
+const openConnect = (item) => {
+    mpForm.type = item.key; mpForm.config = {};
+    const existing = connectedFor(item.key);
+    if (existing && existing.config) (item.fields || []).forEach((f) => { if (!f.secret && existing.config[f.key] != null) mpForm.config[f.key] = existing.config[f.key]; });
+};
+const submitConnect = async (item) => {
+    busy.value = true;
+    try {
+        await apiRequest('post', `${env.INTEGRATIONS}/connections`, { type: item.key, config: { ...mpForm.config } });
+        mpForm.type = ''; mpForm.config = {};
+        await loadConnections();
+    } catch (e) { /* noop */ } finally { busy.value = false; }
+};
+const disconnect = async (conn) => {
+    if (!conn) return;
+    try { await apiRequest('delete', `${env.INTEGRATIONS}/connections/${conn._id}`); await loadConnections(); } catch (e) { /* noop */ }
+};
+
+onMounted(() => { loadProjects(); loadInboxes(); loadFeeds(); loadRules(); loadCatalog(); loadConnections(); });
 </script>
 
 <style scoped>
@@ -348,4 +419,16 @@ onMounted(() => { loadProjects(); loadInboxes(); loadFeeds(); loadRules(); });
 @media (max-width: 600px) { .ig-auto-grid { grid-template-columns: 1fr; } }
 .ig-mt6 { margin-top: 6px; }
 .ig-mt10 { margin-top: 12px; }
+.ig-mp-search { max-width: 360px; margin-bottom: 16px; }
+.ig-mp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.ig-mp-card { background: #fff; border: 1px solid #e6e7ee; border-radius: 12px; padding: 15px 16px; }
+.ig-mp-top { display: flex; align-items: center; gap: 9px; }
+.ig-mp-ic { font-size: 20px; }
+.ig-mp-name { font-size: 14.5px; font-weight: 700; color: #2b2f44; }
+.ig-mp-cat { margin-left: auto; font-size: 10.5px; color: #9aa0b4; background: #f2f3fb; border-radius: 6px; padding: 2px 8px; }
+.ig-mp-top .ig-pill { margin-left: auto; }
+.ig-mp-desc { font-size: 12.5px; color: #6b7280; margin: 9px 0 12px; min-height: 34px; }
+.ig-mp-form { border-top: 1px solid #f0f1f6; padding-top: 10px; }
+.ig-mp-field { margin-bottom: 8px; }
+.ig-mp-actions { display: flex; gap: 8px; }
 </style>
