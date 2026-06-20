@@ -1925,5 +1925,46 @@
         "backgroundColor": "#6473E8",
         "updatedAt": "2026-05-26T00:00:00.000Z",
         "createdAt": "2026-05-26T00:00:00.000Z"
+    },
+    {
+        "_id": "6a3700000000000000000301",
+        "name": "tasks_by_status_card_title",
+        "description": "tasks_by_status_card_description",
+        "permission": [],
+        "fields": [
+            { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "Tasks by Status", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false },
+            { "label": "location", "groupBy": "data", "type": "dropdown", "name": "projectId", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false }
+        ],
+        "key": "TasksByStatusCard",
+        "image": "PieChartWorkload",
+        "cardType": "task",
+        "backgroundColor": "#2f3a8f"
+    },
+    {
+        "_id": "6a3700000000000000000302",
+        "name": "tasks_by_project_card_title",
+        "description": "tasks_by_project_card_description",
+        "permission": [],
+        "fields": [
+            { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "Tasks by Project", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false }
+        ],
+        "key": "TasksByProjectCard",
+        "image": "PieChartWorkload",
+        "cardType": "task",
+        "backgroundColor": "#1c7a43"
+    },
+    {
+        "_id": "6a3700000000000000000303",
+        "name": "total_tasks_card_title",
+        "description": "total_tasks_card_description",
+        "permission": [],
+        "fields": [
+            { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "Total Tasks", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false },
+            { "label": "location", "groupBy": "data", "type": "dropdown", "name": "projectId", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false }
+        ],
+        "key": "TotalTasksCard",
+        "image": "EmployeeWorkloadReport",
+        "cardType": "task",
+        "backgroundColor": "#9a6b00"
     }
 ]

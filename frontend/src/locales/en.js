@@ -2780,6 +2780,13 @@ export default {
         refferal_code_error: "Refferal code is not valid",
     },
     dashboardCard: {
+        tasks_by_status_card_title: "Tasks by Status",
+        tasks_by_status_card_description: "Count of tasks grouped by status",
+        tasks_by_project_card_title: "Tasks by Project",
+        tasks_by_project_card_description: "Count of tasks grouped by project",
+        total_tasks_card_title: "Total Tasks",
+        total_tasks_card_description: "A single total count of tasks",
+        no_data_available: "No data available",
         tasks_by_assignee_bar_chart_description:
             "Display a bar graph of your total tasks by Assignee",
         tasks_by_assignee_bar_chart_title: "Tasks by Assignee",
