@@ -26,5 +26,5 @@ exports.init = (app) => {
     app.post('/api/v1/project/checklist', checklistCtrl.handleChecklist);
     app.post('/api/v1/get-remaining-projects', projectFilterCtrl.getRemainingProject);
     app.post('/api/v1/project/tags', tagsCtrl.handleTags);
-    app.get('/api/v1/projectdata/taskData',getQueryCtrl.getQueryFun)
+    app.get('/api/v1/projectdata/taskData', requireGuestProjectAccess(), getQueryCtrl.getQueryFun)
 }
