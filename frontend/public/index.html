@@ -28,11 +28,18 @@
     <div id="app"></div>
     <!-- built files will be auto injected -->
     <script>
-      // PWA service worker registration (SEC-03). Failures are non-fatal.
+      // SEC-03 PWA worker withdrawn (its cache-first strategy caused a reload
+      // loop). Proactively unregister any previously-installed AlianHub PWA
+      // worker so existing browsers self-heal immediately. Only the
+      // /service-worker.js registration is touched — the firebase-messaging
+      // worker is left intact. A production-only PWA worker can return later.
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function () {
-          navigator.serviceWorker.register('/service-worker.js').catch(function () {});
-        });
+        navigator.serviceWorker.getRegistrations().then(function (regs) {
+          regs.forEach(function (r) {
+            var url = (r.active && r.active.scriptURL) || (r.installing && r.installing.scriptURL) || (r.waiting && r.waiting.scriptURL) || '';
+            if (url.indexOf('/service-worker.js') !== -1) { r.unregister(); }
+          });
+        }).catch(function () {});
       }
     </script>
   </body>
