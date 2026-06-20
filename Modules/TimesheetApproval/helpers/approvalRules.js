@@ -93,6 +93,25 @@ const validateReason = (reason) => {
     return { valid: true, reason: '' };
 };
 
+/* Normalise a value to local start-of-day Date (null if invalid). TIME-03. */
+const startOfDay = (d) => {
+    if (d === null || d === undefined || d === '') return null;
+    const x = new Date(d);
+    if (Number.isNaN(x.getTime())) return null;
+    x.setHours(0, 0, 0, 0);
+    return x;
+};
+
+/* TIME-03 — does an approved period [periodStart, periodEnd] cover `date`?
+ * Day-granular and inclusive of both ends. */
+const coversDate = ({ periodStart, periodEnd, date } = {}) => {
+    const s = startOfDay(periodStart);
+    const e = startOfDay(periodEnd);
+    const d = startOfDay(date);
+    if (!s || !e || !d) return false;
+    return s.getTime() <= d.getTime() && d.getTime() <= e.getTime();
+};
+
 module.exports = {
     APPROVAL_STATUSES,
     REVIEW_ACTIONS,
@@ -107,4 +126,6 @@ module.exports = {
     validateSubmitInput,
     resolveTransition,
     validateReason,
+    startOfDay,
+    coversDate,
 };

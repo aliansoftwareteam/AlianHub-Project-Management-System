@@ -376,7 +376,7 @@
                         isSpinner.value = false;
                     }else{
                         isSpinner.value = false;
-                        $toast.error(t("Toast.something_went_wrong"),{position: 'top-right'});
+                        $toast.error(result.data.statusText || t("Toast.something_went_wrong"),{position: 'top-right'});
                     }
                 }).catch((err)=>{
                     isSpinner.value = false;

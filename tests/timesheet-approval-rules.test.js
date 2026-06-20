@@ -15,6 +15,7 @@ const {
     resolveTransition,
     validateReason,
     isApprovalStatus,
+    coversDate,
 } = require('../Modules/TimesheetApproval/helpers/approvalRules');
 
 const USER = '64b7f0c2a1b2c3d4e5f60700';
@@ -119,5 +120,15 @@ describe('⏱️ TIMESHEET APPROVAL - Rules', () => {
             expect(isApprovalStatus('submitted')).toBe(true);
             expect(isApprovalStatus('draft')).toBe(false);
         });
+    });
+
+    describe('coversDate (TIME-03 period lock)', () => {
+        const P = { periodStart: '2026-06-15', periodEnd: '2026-06-21' };
+        test('date inside the period is covered', () => { expect(coversDate({ ...P, date: '2026-06-17' })).toBe(true); });
+        test('start boundary is covered', () => { expect(coversDate({ ...P, date: '2026-06-15' })).toBe(true); });
+        test('end boundary is covered', () => { expect(coversDate({ ...P, date: '2026-06-21' })).toBe(true); });
+        test('date before the period is not covered', () => { expect(coversDate({ ...P, date: '2026-06-14' })).toBe(false); });
+        test('date after the period is not covered', () => { expect(coversDate({ ...P, date: '2026-06-22' })).toBe(false); });
+        test('invalid date is not covered', () => { expect(coversDate({ ...P, date: 'nope' })).toBe(false); });
     });
 });
