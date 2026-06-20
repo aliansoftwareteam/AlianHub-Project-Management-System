@@ -133,6 +133,10 @@ const scimConfigsSchema = new Schema(schema.scimConfigs, {strict: true, timestam
 const ptoEntriesSchema = new Schema(schema.ptoEntries, {strict: true, timestamps: true});
 ptoEntriesSchema.index({ userId: 1, startDate: 1 });
 ptoEntriesSchema.index({ status: 1 });
+const portfoliosSchema = new Schema(schema.portfolios, {strict: true, timestamps: true});
+portfoliosSchema.index({ deletedStatusKey: 1 });
+const savedReportsSchema = new Schema(schema.savedReports, {strict: true, timestamps: true});
+savedReportsSchema.index({ deletedStatusKey: 1 });
 // Global search: one combined text index per collection.
 taskSchema.index({ TaskName: 'text', rawDescription: 'text' });
 projectsSchema.index({ ProjectName: 'text' });
@@ -218,6 +222,8 @@ module.exports = {
     auditLogsSchema,
     scimConfigsSchema,
     ptoEntriesSchema,
+    portfoliosSchema,
+    savedReportsSchema,
     historySchema,
     userIdSchema, 
     usersSchema,
