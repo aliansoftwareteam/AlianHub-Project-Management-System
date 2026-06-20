@@ -39,32 +39,84 @@ const buildTemplate = (b, companyId) => {
     };
 };
 
-// POST /api/v1/email-in/inboxes
+// Pick the project's first usable sprint (top-level first, then inside folders) so
+// the inbound task has a real target. Projects embed sprintsObj / sprintsfolders.
+const resolveDefaultSprint = (project) => {
+    if (!project) return null;
+    const pick = (obj, folder) => {
+        for (const k of Object.keys(obj || {})) {
+            const s = obj[k];
+            if (s && s.deletedStatusKey !== 1) {
+                const sid = String(s.id || s._id || k);
+                const out = { sprintId: sid, sprintArray: { id: sid, name: s.name || 'Sprint' } };
+                if (folder) {
+                    out.sprintArray.folderId = folder.folderId;
+                    out.sprintArray.folderName = folder.folderName || '';
+                    out.folderObjId = folder.folderId;
+                }
+                return out;
+            }
+        }
+        return null;
+    };
+    const top = pick(project.sprintsObj);
+    if (top) return top;
+    const folders = project.sprintsfolders || {};
+    for (const fk of Object.keys(folders)) {
+        const f = folders[fk];
+        const inFolder = pick(f && f.sprintsObj, { folderId: (f && (f.folderId || fk)), folderName: f && f.folderName });
+        if (inFolder) return inFolder;
+    }
+    return null;
+};
+
+// POST /api/v1/email-in/inboxes  { projectId | projectData:{_id}, userData, name? }
+// Loads the project (company DB) for code/name + resolves a default sprint, so the
+// caller only needs to pick a project.
 exports.createInbox = async (req, res) => {
     try {
         const companyId = companyOf(req);
         const b = req.body || {};
-        if (!companyId || !b.projectData || !b.projectData._id) {
-            return res.send({ status: false, statusText: 'companyId and projectData (with _id) are required.' });
+        const projectId = (b.projectData && b.projectData._id) || b.projectId;
+        if (!companyId || !projectId || !oid(projectId)) {
+            return res.send({ status: false, statusText: 'companyId and a valid projectId are required.' });
         }
+        const project = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{ _id: oid(projectId) }] }, 'findOne').catch(() => null);
+        if (!project) return res.send({ status: false, statusText: 'Project not found.' });
+        const projObj = project.toObject ? project.toObject() : project;
+
+        // Sprint: a client-supplied sprintArray wins; otherwise resolve the project's first sprint.
+        let sprintId = (b.sprintArray && (b.sprintArray.id || b.sprintArray._id)) || b.sprintId || '';
+        let sprintArray = (b.sprintArray && (b.sprintArray.id || b.sprintArray._id)) ? b.sprintArray : null;
+        let folderObjId = '';
+        if (!sprintId || !sprintArray) {
+            const def = resolveDefaultSprint(projObj);
+            if (!def) return res.send({ status: false, statusText: 'This project has no sprint to receive tasks — create a sprint first.' });
+            sprintId = def.sprintId; sprintArray = def.sprintArray; folderObjId = def.folderObjId || '';
+        }
+
+        const tmpl = buildTemplate(b, companyId);
+        tmpl.ProjectID = projObj._id;
+        tmpl.CompanyId = companyId;
+        tmpl.sprintId = sprintId;
+        tmpl.sprintArray = sprintArray;
+        if (folderObjId) tmpl.folderObjId = folderObjId;
+
         const token = R.generateInboxToken();
         const doc = {
             _id: new mongoose.Types.ObjectId(),
             token,
             companyId: String(companyId),
-            name: b.name || (b.projectData.ProjectName ? `${b.projectData.ProjectName} inbox` : 'Email inbox'),
-            ProjectID: oid(b.projectData._id),
-            sprintId: b.sprintId || (b.sprintArray && (b.sprintArray.id || b.sprintArray._id)) || '',
-            templateSnapshot: buildTemplate(b, companyId),
-            projectSnapshot: {
-                _id: b.projectData._id, CompanyId: b.projectData.CompanyId || companyId,
-                ProjectCode: b.projectData.ProjectCode, ProjectName: b.projectData.ProjectName,
-            },
+            name: b.name || (projObj.ProjectName ? `${projObj.ProjectName} inbox` : 'Email inbox'),
+            ProjectID: oid(projectId),
+            sprintId,
+            sprintArray,
+            templateSnapshot: tmpl,
+            projectSnapshot: { _id: projObj._id, CompanyId: companyId, ProjectCode: projObj.ProjectCode, ProjectName: projObj.ProjectName },
             userSnapshot: {
                 id: b.userData && b.userData.id, Employee_Name: b.userData && b.userData.Employee_Name,
                 companyOwnerId: b.userData && b.userData.companyOwnerId,
             },
-            sprintArray: b.sprintArray || {},
             enabled: true,
             createdBy: (b.userData && b.userData.id) || '',
             receivedCount: 0,
