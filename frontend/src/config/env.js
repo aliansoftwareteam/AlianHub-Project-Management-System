@@ -188,6 +188,7 @@ module.exports.PTO = '/api/v1/pto';
 module.exports.PORTFOLIO = '/api/v1/portfolio';
 module.exports.CUSTOM_REPORT = '/api/v1/reports/custom';
 module.exports.VARIANCE_REPORT = '/api/v1/reports/variance';
+module.exports.CAPACITY = '/api/v1/reports/capacity';
 module.exports.EXPORT_CSV = '/api/v1/export/csv';
 module.exports.EXPORT_XLSX = '/api/v1/export/xlsx';
 module.exports.MAIN_CHATS = '/api/v1/main-chats'

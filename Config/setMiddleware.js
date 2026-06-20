@@ -188,6 +188,7 @@ const verifyJWTTokenWithCRoute = [
     // prefix-matches /reports/custom, /reports/custom/run, /reports/custom/:id.
     '/api/v1/reports/custom',
     '/api/v1/reports/variance',
+    '/api/v1/reports/capacity',
 ];
 const verifyJWTToken = [
     "/api/v2/company/delete",
