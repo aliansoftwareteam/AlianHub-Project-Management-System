@@ -80,6 +80,7 @@ const SCHEMA_TYPE = {
     SAVED_REPORTS: "saved_reports",
     REPORT_SCHEDULES: "report_schedules",
     EMAIL_INBOXES: "email_inboxes",
+    CALENDAR_FEEDS: "calendar_feeds",
 }
 
 module.exports = {

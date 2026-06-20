@@ -194,6 +194,9 @@ const verifyJWTTokenWithCRoute = [
     // routes are JWT-protected; the public inbound webhook /api/v1/email-in/:token
     // is intentionally NOT listed (its secret token authenticates it).
     '/api/v1/email-in/inboxes',
+    // Calendar feed management (AUTO-02). The public .ics feed
+    // /api/v1/calendar/ics/:token is intentionally NOT listed (token authenticates it).
+    '/api/v1/calendar/feeds',
 ];
 const verifyJWTToken = [
     "/api/v2/company/delete",

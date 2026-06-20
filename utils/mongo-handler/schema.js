@@ -572,6 +572,19 @@ const schema = {
         receivedCount: { type: Number, default: 0, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // Calendar feeds — managed by Modules/Calendar (AUTO-02). Token-keyed in the
+    // GLOBAL db; an unauthenticated .ics URL resolves its company + scope.
+    calendarFeeds: {
+        token: { type: String, required: true },
+        companyId: { type: String, required: true },
+        userId: { type: String, required: false },
+        scope: { type: String, default: 'my', required: false },
+        projectId: { type: String, required: false },
+        name: { type: String, required: false },
+        enabled: { type: Boolean, default: true, required: false },
+        createdBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Wiki pages (Editor.js blocks; versioned) — managed by Modules/Pages
     pages: {
         title: { type: String, required: true },

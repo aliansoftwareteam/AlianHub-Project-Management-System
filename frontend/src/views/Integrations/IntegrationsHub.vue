@@ -74,7 +74,51 @@
                     </details>
                 </div>
 
-                <!-- Placeholder sections (filled as AUTO-02..07 land) -->
+                <!-- Calendar (AUTO-02) -->
+                <div v-else-if="active === 'calendar'">
+                    <div class="ig-head">
+                        <h2>{{ $t('IntegrationsHub.calendar') }}</h2>
+                        <p>{{ $t('IntegrationsHub.cal_intro') }}</p>
+                    </div>
+                    <div class="ig-card ig-create">
+                        <label class="ig-lbl">{{ $t('IntegrationsHub.cal_scope') }}</label>
+                        <div class="ig-row">
+                            <select v-model="calScope" class="form-control">
+                                <option value="my">{{ $t('IntegrationsHub.cal_my') }}</option>
+                                <option value="project">{{ $t('IntegrationsHub.cal_project') }}</option>
+                            </select>
+                            <select v-if="calScope === 'project'" v-model="calProjectId" class="form-control">
+                                <option value="">{{ $t('IntegrationsHub.email_select') }}</option>
+                                <option v-for="p in projects" :key="p._id" :value="String(p._id)">{{ p.ProjectName || '(untitled)' }}</option>
+                            </select>
+                            <button class="ig-btn" :disabled="busy || (calScope === 'project' && !calProjectId)" @click="createFeed">{{ busy ? $t('IntegrationsHub.creating') : $t('IntegrationsHub.cal_create') }}</button>
+                        </div>
+                    </div>
+                    <div v-if="!feeds.length" class="ig-empty">{{ $t('IntegrationsHub.cal_none') }}</div>
+                    <div v-for="f in feeds" :key="f._id" class="ig-card ig-inbox">
+                        <div class="ig-inbox-top">
+                            <span class="ig-inbox-name">{{ f.name }}</span>
+                            <span class="ig-pill on">{{ f.scope === 'my' ? $t('IntegrationsHub.cal_my') : $t('IntegrationsHub.cal_project') }}</span>
+                        </div>
+                        <label class="ig-lbl">{{ $t('IntegrationsHub.cal_url') }}</label>
+                        <div class="ig-row">
+                            <input class="form-control ig-mono" :value="f.url" readonly @focus="$event.target.select()" />
+                            <button class="ig-mini" @click="copy(f.url)">{{ $t('IntegrationsHub.copy') }}</button>
+                        </div>
+                        <div class="ig-inbox-actions">
+                            <button class="ig-mini del" @click="removeFeed(f)">{{ $t('IntegrationsHub.delete') }}</button>
+                        </div>
+                    </div>
+                    <details class="ig-help">
+                        <summary>{{ $t('IntegrationsHub.cal_help_title') }}</summary>
+                        <ol>
+                            <li>{{ $t('IntegrationsHub.cal_help_1') }}</li>
+                            <li>{{ $t('IntegrationsHub.cal_help_2') }}</li>
+                        </ol>
+                    </details>
+                </div>
+
+                <!-- Placeholder sections (filled as AUTO-03..07 land) -->
                 <div v-else class="ig-soon-panel">
                     <div class="ig-soon-ic">{{ activeCat.icon }}</div>
                     <h2>{{ $t('IntegrationsHub.' + active) }}</h2>
@@ -106,7 +150,7 @@ const cid = computed(() => (companyIdRef && companyIdRef.value) || companyIdRef 
 const cats = [
     { key: 'emailToTask', icon: '✉️', soon: false },
     { key: 'automations', icon: '⚡', soon: true },
-    { key: 'calendar', icon: '📅', soon: true },
+    { key: 'calendar', icon: '📅', soon: false },
     { key: 'marketplace', icon: '🧩', soon: true },
     { key: 'slack', icon: '💬', soon: true },
     { key: 'apps', icon: '🪟', soon: true },
@@ -117,6 +161,9 @@ const activeCat = computed(() => cats.find((c) => c.key === active.value) || cat
 const projects = ref([]);
 const inboxes = ref([]);
 const newProjectId = ref('');
+const feeds = ref([]);
+const calScope = ref('my');
+const calProjectId = ref('');
 const busy = ref(false);
 
 const webhookUrl = (token) => `${window.location.origin}${env.EMAIL_IN}/${token}`;
@@ -154,7 +201,28 @@ const remove = async (ib) => {
 };
 const copy = (text) => { if (text) navigator.clipboard.writeText(text); };
 
-onMounted(() => { loadProjects(); loadInboxes(); });
+// AUTO-02 — calendar feeds.
+const loadFeeds = async () => {
+    try { const body = (await apiRequest('get', `${env.CALENDAR_FEED}/feeds`))?.data; feeds.value = (body && body.data) || []; } catch (e) { feeds.value = []; }
+};
+const createFeed = async () => {
+    if (busy.value || (calScope.value === 'project' && !calProjectId.value)) return;
+    busy.value = true;
+    try {
+        const u = (getUser && getUser(userId && userId.value)) || {};
+        await apiRequest('post', `${env.CALENDAR_FEED}/feeds`, {
+            scope: calScope.value, projectId: calProjectId.value,
+            userData: { id: u.id || (userId && userId.value), Employee_Name: u.Employee_Name || '' },
+        });
+        calProjectId.value = '';
+        await loadFeeds();
+    } catch (e) { /* noop */ } finally { busy.value = false; }
+};
+const removeFeed = async (f) => {
+    try { await apiRequest('delete', `${env.CALENDAR_FEED}/feeds/${f._id}`); await loadFeeds(); } catch (e) { /* noop */ }
+};
+
+onMounted(() => { loadProjects(); loadInboxes(); loadFeeds(); });
 </script>
 
 <style scoped>

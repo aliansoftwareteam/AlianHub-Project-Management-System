@@ -192,6 +192,7 @@ module.exports.REPORT_SCHEDULES = '/api/v1/reports/schedules';
 module.exports.VARIANCE_REPORT = '/api/v1/reports/variance';
 module.exports.CAPACITY = '/api/v1/reports/capacity';
 module.exports.EMAIL_IN = '/api/v1/email-in';
+module.exports.CALENDAR_FEED = '/api/v1/calendar';
 module.exports.EXPORT_CSV = '/api/v1/export/csv';
 module.exports.EXPORT_XLSX = '/api/v1/export/xlsx';
 module.exports.MAIN_CHATS = '/api/v1/main-chats'
