@@ -140,6 +140,9 @@ savedReportsSchema.index({ deletedStatusKey: 1 });
 const reportSchedulesSchema = new Schema(schema.reportSchedules, {strict: true, timestamps: true});
 reportSchedulesSchema.index({ deletedStatusKey: 1 });
 reportSchedulesSchema.index({ active: 1, nextRunAt: 1 });
+const emailInboxesSchema = new Schema(schema.emailInboxes, {strict: true, timestamps: true});
+emailInboxesSchema.index({ token: 1 });
+emailInboxesSchema.index({ companyId: 1, deletedStatusKey: 1 });
 // Global search: one combined text index per collection.
 taskSchema.index({ TaskName: 'text', rawDescription: 'text' });
 projectsSchema.index({ ProjectName: 'text' });
@@ -228,6 +231,7 @@ module.exports = {
     portfoliosSchema,
     savedReportsSchema,
     reportSchedulesSchema,
+    emailInboxesSchema,
     historySchema,
     userIdSchema, 
     usersSchema,

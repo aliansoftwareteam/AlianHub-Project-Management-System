@@ -77,7 +77,8 @@ const {
     ptoEntriesSchema,
     portfoliosSchema,
     savedReportsSchema,
-    reportSchedulesSchema
+    reportSchedulesSchema,
+    emailInboxesSchema
 } = require('./createSchema');
 
 
@@ -237,6 +238,8 @@ exports.checkType = (type) => {
             return savedReportsSchema
         case SCHEMA_TYPE.REPORT_SCHEDULES:
             return reportSchedulesSchema
+        case SCHEMA_TYPE.EMAIL_INBOXES:
+            return emailInboxesSchema
         default:
             return ""
     }
@@ -399,6 +402,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.SAVED_REPORTS}`
         case SCHEMA_TYPE.REPORT_SCHEDULES:
                 return `${dbCollections.REPORT_SCHEDULES}`
+        case SCHEMA_TYPE.EMAIL_INBOXES:
+                return `${dbCollections.EMAIL_INBOXES}`
         default:
             return ""
     }

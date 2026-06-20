@@ -190,6 +190,10 @@ const verifyJWTTokenWithCRoute = [
     '/api/v1/reports/variance',
     '/api/v1/reports/capacity',
     '/api/v1/reports/schedules',
+    // Email-to-task management (AUTO-01). NOTE: only the /inboxes management
+    // routes are JWT-protected; the public inbound webhook /api/v1/email-in/:token
+    // is intentionally NOT listed (its secret token authenticates it).
+    '/api/v1/email-in/inboxes',
 ];
 const verifyJWTToken = [
     "/api/v2/company/delete",

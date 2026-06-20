@@ -79,6 +79,7 @@ const SCHEMA_TYPE = {
     PORTFOLIOS: "portfolios",
     SAVED_REPORTS: "saved_reports",
     REPORT_SCHEDULES: "report_schedules",
+    EMAIL_INBOXES: "email_inboxes",
 }
 
 module.exports = {

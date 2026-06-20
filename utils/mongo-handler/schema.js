@@ -551,6 +551,27 @@ const schema = {
         updatedBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // Email-to-task inboxes — managed by Modules/EmailIn (AUTO-01). Lives in the
+    // GLOBAL db keyed by token so the unauthenticated inbound webhook can resolve
+    // token -> company. Snapshots project/sprint/user so taskMongo.create needs no reload.
+    emailInboxes: {
+        token: { type: String, required: true },
+        companyId: { type: String, required: true },
+        name: { type: String, required: false },
+        ProjectID: { type: mongoose.Schema.Types.ObjectId, required: false },
+        sprintId: { type: String, required: false },
+        templateSnapshot: { type: Object, default: {}, required: false },
+        projectSnapshot: { type: Object, default: {}, required: false },
+        userSnapshot: { type: Object, default: {}, required: false },
+        sprintArray: { type: Object, default: {}, required: false },
+        enabled: { type: Boolean, default: true, required: false },
+        createdBy: { type: String, required: false },
+        lastEmailFrom: { type: String, required: false },
+        lastTaskId: { type: String, required: false },
+        lastReceivedAt: { type: Date, required: false },
+        receivedCount: { type: Number, default: 0, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Wiki pages (Editor.js blocks; versioned) — managed by Modules/Pages
     pages: {
         title: { type: String, required: true },
