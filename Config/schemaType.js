@@ -81,6 +81,7 @@ const SCHEMA_TYPE = {
     REPORT_SCHEDULES: "report_schedules",
     EMAIL_INBOXES: "email_inboxes",
     CALENDAR_FEEDS: "calendar_feeds",
+    AUTOMATION_RULES: "automation_rules",
 }
 
 module.exports = {

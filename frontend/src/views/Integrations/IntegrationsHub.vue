@@ -74,6 +74,52 @@
                     </details>
                 </div>
 
+                <!-- Automations (AUTO-03) -->
+                <div v-else-if="active === 'automations'">
+                    <div class="ig-head">
+                        <h2>{{ $t('IntegrationsHub.automations') }}</h2>
+                        <p>{{ $t('IntegrationsHub.auto_intro') }}</p>
+                    </div>
+                    <div class="ig-card">
+                        <label class="ig-lbl">{{ $t('IntegrationsHub.auto_name') }}</label>
+                        <input v-model="ruleForm.name" class="form-control" :placeholder="$t('IntegrationsHub.auto_name_ph')" />
+                        <div class="ig-auto-grid">
+                            <div>
+                                <label class="ig-lbl">{{ $t('IntegrationsHub.auto_when') }}</label>
+                                <select v-model="ruleForm.projectId" class="form-control">
+                                    <option value="">{{ $t('IntegrationsHub.auto_any_project') }}</option>
+                                    <option v-for="p in projects" :key="p._id" :value="String(p._id)">{{ p.ProjectName || '(untitled)' }}</option>
+                                </select>
+                                <select v-model="ruleForm.condPriority" class="form-control ig-mt6">
+                                    <option value="">{{ $t('IntegrationsHub.auto_any_priority') }}</option>
+                                    <option value="LOW">LOW</option><option value="MEDIUM">MEDIUM</option><option value="HIGH">HIGH</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="ig-lbl">{{ $t('IntegrationsHub.auto_then') }}</label>
+                                <select v-model="ruleForm.actionPriority" class="form-control">
+                                    <option value="LOW">LOW</option><option value="MEDIUM">MEDIUM</option><option value="HIGH">HIGH</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="ig-row ig-mt10">
+                            <button class="ig-btn" :disabled="!ruleForm.name.trim() || busy" @click="createRule">{{ busy ? $t('IntegrationsHub.creating') : $t('IntegrationsHub.auto_create') }}</button>
+                        </div>
+                    </div>
+                    <div v-if="!rules.length" class="ig-empty">{{ $t('IntegrationsHub.auto_none') }}</div>
+                    <div v-for="r in rules" :key="r._id" class="ig-card ig-inbox">
+                        <div class="ig-inbox-top">
+                            <span class="ig-inbox-name">{{ r.name }}</span>
+                            <span class="ig-inbox-count">{{ r.lastRunCount || 0 }} {{ $t('IntegrationsHub.auto_affected') }}</span>
+                        </div>
+                        <p class="ig-note">{{ r.summary }}</p>
+                        <div class="ig-inbox-actions">
+                            <button class="ig-mini" @click="applyRule(r)">{{ $t('IntegrationsHub.auto_apply') }}</button>
+                            <button class="ig-mini del" @click="removeRule(r)">{{ $t('IntegrationsHub.delete') }}</button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Calendar (AUTO-02) -->
                 <div v-else-if="active === 'calendar'">
                     <div class="ig-head">
@@ -135,7 +181,7 @@ export default { name: 'IntegrationsHub' };
 </script>
 
 <script setup>
-import { ref, computed, onMounted, inject } from 'vue';
+import { ref, reactive, computed, onMounted, inject } from 'vue';
 import { apiRequest } from '@/services';
 import { useGetterFunctions } from '@/composable';
 import * as env from '@/config/env';
@@ -149,7 +195,7 @@ const cid = computed(() => (companyIdRef && companyIdRef.value) || companyIdRef 
 
 const cats = [
     { key: 'emailToTask', icon: '✉️', soon: false },
-    { key: 'automations', icon: '⚡', soon: true },
+    { key: 'automations', icon: '⚡', soon: false },
     { key: 'calendar', icon: '📅', soon: false },
     { key: 'marketplace', icon: '🧩', soon: true },
     { key: 'slack', icon: '💬', soon: true },
@@ -164,6 +210,8 @@ const newProjectId = ref('');
 const feeds = ref([]);
 const calScope = ref('my');
 const calProjectId = ref('');
+const rules = ref([]);
+const ruleForm = reactive({ name: '', projectId: '', condPriority: '', actionPriority: 'HIGH' });
 const busy = ref(false);
 
 const webhookUrl = (token) => `${window.location.origin}${env.EMAIL_IN}/${token}`;
@@ -222,7 +270,30 @@ const removeFeed = async (f) => {
     try { await apiRequest('delete', `${env.CALENDAR_FEED}/feeds/${f._id}`); await loadFeeds(); } catch (e) { /* noop */ }
 };
 
-onMounted(() => { loadProjects(); loadInboxes(); loadFeeds(); });
+// AUTO-03 — automation rules.
+const loadRules = async () => {
+    try { const b = (await apiRequest('get', env.AUTOMATIONS))?.data; rules.value = (b && b.data) || []; } catch (e) { rules.value = []; }
+};
+const createRule = async () => {
+    if (!ruleForm.name.trim() || busy.value) return;
+    busy.value = true;
+    try {
+        const conditions = {};
+        if (ruleForm.projectId) conditions.projectId = ruleForm.projectId;
+        if (ruleForm.condPriority) conditions.priority = ruleForm.condPriority;
+        await apiRequest('post', env.AUTOMATIONS, { name: ruleForm.name.trim(), conditions, actions: [{ type: 'set_priority', value: ruleForm.actionPriority }] });
+        ruleForm.name = ''; ruleForm.projectId = ''; ruleForm.condPriority = '';
+        await loadRules();
+    } catch (e) { /* noop */ } finally { busy.value = false; }
+};
+const applyRule = async (r) => {
+    try { await apiRequest('post', `${env.AUTOMATIONS}/${r._id}/apply`, {}); await loadRules(); } catch (e) { /* noop */ }
+};
+const removeRule = async (r) => {
+    try { await apiRequest('delete', `${env.AUTOMATIONS}/${r._id}`); await loadRules(); } catch (e) { /* noop */ }
+};
+
+onMounted(() => { loadProjects(); loadInboxes(); loadFeeds(); loadRules(); });
 </script>
 
 <style scoped>
@@ -273,4 +344,8 @@ onMounted(() => { loadProjects(); loadInboxes(); loadFeeds(); });
 .ig-soon-ic { font-size: 44px; margin-bottom: 10px; }
 .ig-soon-panel h2 { font-size: 20px; color: #2b2f44; margin: 0 0 6px; }
 .ig-soon-panel p { font-size: 13px; margin: 0 0 14px; }
+.ig-auto-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px; }
+@media (max-width: 600px) { .ig-auto-grid { grid-template-columns: 1fr; } }
+.ig-mt6 { margin-top: 6px; }
+.ig-mt10 { margin-top: 12px; }
 </style>

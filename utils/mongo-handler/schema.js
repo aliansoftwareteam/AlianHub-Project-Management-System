@@ -585,6 +585,19 @@ const schema = {
         createdBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // Automation rules — managed by Modules/Automations (AUTO-03). conditions
+    // (which tasks) + actions (set_priority); applied on demand as a bulk update.
+    automationRules: {
+        name: { type: String, required: true },
+        trigger: { type: String, default: 'manual', required: false },
+        conditions: { type: Object, default: {}, required: false },
+        actions: { type: Array, default: [], required: false },
+        enabled: { type: Boolean, default: true, required: false },
+        lastRunAt: { type: Date, required: false },
+        lastRunCount: { type: Number, default: 0, required: false },
+        createdBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Wiki pages (Editor.js blocks; versioned) — managed by Modules/Pages
     pages: {
         title: { type: String, required: true },

@@ -197,6 +197,7 @@ const verifyJWTTokenWithCRoute = [
     // Calendar feed management (AUTO-02). The public .ics feed
     // /api/v1/calendar/ics/:token is intentionally NOT listed (token authenticates it).
     '/api/v1/calendar/feeds',
+    '/api/v1/automations',
 ];
 const verifyJWTToken = [
     "/api/v2/company/delete",

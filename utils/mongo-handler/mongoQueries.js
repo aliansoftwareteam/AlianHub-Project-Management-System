@@ -79,7 +79,8 @@ const {
     savedReportsSchema,
     reportSchedulesSchema,
     emailInboxesSchema,
-    calendarFeedsSchema
+    calendarFeedsSchema,
+    automationRulesSchema
 } = require('./createSchema');
 
 
@@ -243,6 +244,8 @@ exports.checkType = (type) => {
             return emailInboxesSchema
         case SCHEMA_TYPE.CALENDAR_FEEDS:
             return calendarFeedsSchema
+        case SCHEMA_TYPE.AUTOMATION_RULES:
+            return automationRulesSchema
         default:
             return ""
     }
@@ -409,6 +412,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.EMAIL_INBOXES}`
         case SCHEMA_TYPE.CALENDAR_FEEDS:
                 return `${dbCollections.CALENDAR_FEEDS}`
+        case SCHEMA_TYPE.AUTOMATION_RULES:
+                return `${dbCollections.AUTOMATION_RULES}`
         default:
             return ""
     }
