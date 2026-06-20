@@ -1508,6 +1508,11 @@ export default {
         prev: "Prev",
         next: "Next",
     },
+    Offline: {
+        offline_msg: "You're offline — changes are saved and will sync when you reconnect.",
+        syncing: "Syncing {n} change(s)…",
+        pending: "{n} change(s) waiting to sync",
+    },
     Integrations: {
         title: "Integrations",
         desc: "Send task events to Slack, Discord, or any HTTPS endpoint via outgoing webhooks.",
