@@ -513,6 +513,16 @@ const schema = {
         createdBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // Cross-project portfolios — managed by Modules/Portfolio (REP-01). Groups N
+    // projects for a rolled-up leadership/CEO view (progress / at-risk / milestones).
+    portfolios: {
+        name: { type: String, required: true },
+        projectIds: { type: Array, default: [], required: false },
+        description: { type: String, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Wiki pages (Editor.js blocks; versioned) — managed by Modules/Pages
     pages: {
         title: { type: String, required: true },

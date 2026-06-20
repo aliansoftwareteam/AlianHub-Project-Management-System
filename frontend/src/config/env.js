@@ -185,6 +185,7 @@ module.exports.AUDIT_LOGS = '/api/v1/audit-logs';
 module.exports.SCIM_CONFIG = '/api/v2/scim/config';
 module.exports.SCIM_TOKEN = '/api/v2/scim/token';
 module.exports.PTO = '/api/v1/pto';
+module.exports.PORTFOLIO = '/api/v1/portfolio';
 module.exports.MAIN_CHATS = '/api/v1/main-chats'
 module.exports.ACTIVITYLOG = '/api/v1/activity-log'
 module.exports.SETTING_CATEGORY = '/api/v1/setting/category';

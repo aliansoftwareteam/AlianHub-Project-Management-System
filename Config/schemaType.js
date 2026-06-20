@@ -76,6 +76,7 @@ const SCHEMA_TYPE = {
     AUDIT_LOGS: "audit_logs",
     SCIM_CONFIGS: "scim_configs",
     PTO_ENTRIES: "pto_entries",
+    PORTFOLIOS: "portfolios",
 }
 
 module.exports = {

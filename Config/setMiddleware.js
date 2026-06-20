@@ -181,6 +181,9 @@ const verifyJWTTokenWithCRoute = [
     // Time-off / PTO (Modules/Pto) — JWT+company; prefix-matches /pto, /pto/:id,
     // /pto/:id/status, /pto/capacity. Role checks are enforced in-controller.
     '/api/v1/pto',
+    // Cross-project Portfolio rollup (Modules/Portfolio, REP-01) — JWT+company;
+    // prefix-matches /portfolio, /portfolio/:id, /portfolio/:id/rollup.
+    '/api/v1/portfolio',
 ];
 const verifyJWTToken = [
     "/api/v2/company/delete",
