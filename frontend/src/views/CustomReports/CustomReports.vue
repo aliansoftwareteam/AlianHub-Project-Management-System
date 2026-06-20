@@ -43,6 +43,8 @@
                 <div class="cr-save">
                     <input v-model="reportName" class="form-control" :placeholder="$t('CustomReport.name_ph')" />
                     <button class="cr-btn" :disabled="busy || !reportName.trim()" @click="save">{{ busy ? $t('CustomReport.saving') : $t('CustomReport.save') }}</button>
+                    <button class="cr-btn" :disabled="!result.length" @click="exportReport('csv')">{{ $t('CustomReport.export_csv') }}</button>
+                    <button class="cr-btn" :disabled="!result.length" @click="exportReport('xlsx')">{{ $t('CustomReport.export_excel') }}</button>
                 </div>
             </div>
 
@@ -69,11 +71,54 @@
 
             <!-- Saved reports -->
             <div class="cr-saved">
+                <div v-if="templates.length" class="cr-tpl">
+                    <label>{{ $t('CustomReport.start_from_template') }}</label>
+                    <select v-model="tplPick" class="form-control" @change="applyTemplate">
+                        <option value="">{{ $t('CustomReport.choose_template') }}</option>
+                        <option v-for="t in templates" :key="t.key" :value="t.key">{{ t.name }}</option>
+                    </select>
+                </div>
                 <h3 class="m-0">{{ $t('CustomReport.saved_list') }}</h3>
                 <div v-if="!saved.length" class="cr-empty">{{ $t('CustomReport.none_saved') }}</div>
-                <div v-for="s in saved" :key="s._id" class="cr-saved-item">
-                    <button class="cr-saved-name" @click="loadSaved(s)">{{ s.name }}</button>
-                    <button class="cr-mini del" @click="removeSaved(s)">{{ $t('CustomReport.delete') }}</button>
+                <div v-for="s in saved" :key="s._id" class="cr-saved-block">
+                    <div class="cr-saved-item">
+                        <button class="cr-saved-name" @click="loadSaved(s)">{{ s.name }}</button>
+                        <button class="cr-mini" @click="openShare(s)">{{ $t('CustomReport.share') }}</button>
+                        <button class="cr-mini" :title="$t('CustomReport.duplicate')" @click="duplicateSaved(s)">{{ $t('CustomReport.duplicate') }}</button>
+                        <button class="cr-mini del" @click="removeSaved(s)">{{ $t('CustomReport.delete') }}</button>
+                    </div>
+                    <div v-if="shareState.id === s._id" class="cr-share">
+                        <input class="form-control cr-share-url" :value="shareState.url" readonly @focus="$event.target.select()" :placeholder="$t('CustomReport.generating')" />
+                        <button class="cr-mini" :disabled="!shareState.url" @click="copyShareUrl">{{ $t('CustomReport.copy') }}</button>
+                        <button class="cr-mini del" @click="revokeReportShare">{{ $t('CustomReport.revoke') }}</button>
+                    </div>
+                </div>
+
+                <!-- Scheduled email deliveries (REP-08) -->
+                <div class="cr-sched">
+                    <h3 class="m-0">{{ $t('CustomReport.schedules') }}</h3>
+                    <div class="cr-sched-form">
+                        <select v-model="sched.savedReportId" class="form-control">
+                            <option value="">{{ $t('CustomReport.pick_report') }}</option>
+                            <option v-for="s in saved" :key="s._id" :value="String(s._id)">{{ s.name }}</option>
+                        </select>
+                        <select v-model="sched.cadence" class="form-control">
+                            <option value="daily">{{ $t('CustomReport.daily') }}</option>
+                            <option value="weekly">{{ $t('CustomReport.weekly') }}</option>
+                            <option value="monthly">{{ $t('CustomReport.monthly') }}</option>
+                        </select>
+                        <input v-model="sched.recipients" class="form-control" :placeholder="$t('CustomReport.recipients_ph')" />
+                        <button class="cr-btn" :disabled="!sched.savedReportId || !sched.recipients.trim()" @click="createSchedule">{{ $t('CustomReport.schedule_it') }}</button>
+                    </div>
+                    <div v-if="!schedules.length" class="cr-empty">{{ $t('CustomReport.no_schedules') }}</div>
+                    <div v-for="sc in schedules" :key="sc._id" class="cr-sched-item">
+                        <div class="cr-sched-meta">
+                            <span class="cr-sched-name" :title="sc.reportName">{{ sc.reportName }}</span>
+                            <span class="cr-sched-sub">{{ $t('CustomReport.' + sc.cadence) }} · {{ (sc.recipients || []).length }} {{ $t('CustomReport.recipients_short') }}</span>
+                        </div>
+                        <button class="cr-mini" @click="runScheduleNow(sc)">{{ $t('CustomReport.send_now') }}</button>
+                        <button class="cr-mini del" @click="removeSchedule(sc)">{{ $t('CustomReport.delete') }}</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -88,6 +133,7 @@ export default { name: 'CustomReportBuilder' };
 import { ref, reactive, computed, onMounted, inject } from 'vue';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import { downloadExport } from '@/composable/exportDownload';
 
 // REP-02 — custom report builder. Pick a dimension + metric + project filter +
 // chart type, preview live, save, and reload a saved report. The backend
@@ -100,6 +146,11 @@ const reportName = ref('');
 const projects = ref([]);
 const result = ref([]);
 const saved = ref([]);
+const templates = ref([]);
+const tplPick = ref('');
+const schedules = ref([]);
+const sched = reactive({ savedReportId: '', cadence: 'weekly', recipients: '' });
+const shareState = reactive({ id: '', shareId: '', url: '' });
 const busy = ref(false);
 
 const DIM_LABELS = { status: 'Status', project: 'Project', sprint: 'Sprint' };
@@ -159,8 +210,81 @@ const save = async () => {
 const removeSaved = async (s) => {
     try { await apiRequest('delete', `${env.CUSTOM_REPORT}/${s._id}`); await listSaved(); } catch (e) { /* noop */ }
 };
+// REP-07 — built-in reusable templates.
+const loadTemplates = async () => {
+    try {
+        const body = (await apiRequest('get', env.CUSTOM_REPORT_TEMPLATES))?.data;
+        templates.value = (body && body.data) || [];
+    } catch (e) { templates.value = []; }
+};
+const applyTemplate = () => {
+    const t = templates.value.find((x) => x.key === tplPick.value);
+    tplPick.value = '';
+    if (!t) return;
+    const c = t.config || {};
+    cfg.dimension = c.dimension || 'status';
+    cfg.metric = c.metric || 'count';
+    cfg.chartType = c.chartType || 'bar';
+    cfg.filters.project = (c.filters && c.filters.project) || '';
+    reportName.value = t.name;
+    runPreview();
+};
+const duplicateSaved = async (s) => {
+    try { await apiRequest('post', `${env.CUSTOM_REPORT}/${s._id}/duplicate`, {}); await listSaved(); } catch (e) { /* noop */ }
+};
+// REP-08 — scheduled email deliveries of a saved report.
+const loadSchedules = async () => {
+    try {
+        const body = (await apiRequest('get', env.REPORT_SCHEDULES))?.data;
+        schedules.value = (body && body.data) || [];
+    } catch (e) { schedules.value = []; }
+};
+const createSchedule = async () => {
+    if (!sched.savedReportId || !sched.recipients.trim()) return;
+    try {
+        await apiRequest('post', env.REPORT_SCHEDULES, { savedReportId: sched.savedReportId, cadence: sched.cadence, recipients: sched.recipients });
+        sched.savedReportId = ''; sched.recipients = ''; sched.cadence = 'weekly';
+        await loadSchedules();
+    } catch (e) { /* surfaced via reload */ }
+};
+const runScheduleNow = async (sc) => {
+    try { await apiRequest('post', `${env.REPORT_SCHEDULES}/${sc._id}/run-now`, {}); } catch (e) { /* noop */ }
+};
+const removeSchedule = async (sc) => {
+    try { await apiRequest('delete', `${env.REPORT_SCHEDULES}/${sc._id}`); await loadSchedules(); } catch (e) { /* noop */ }
+};
+// REP-09 — public read-only share link for a saved report (reuses /api/v2/public-shares).
+const openShare = async (s) => {
+    if (shareState.id === s._id) { shareState.id = ''; return; }
+    shareState.id = s._id; shareState.shareId = ''; shareState.url = '';
+    try {
+        const ex = (await apiRequest('get', `/api/v2/public-shares?entityId=${s._id}`))?.data;
+        if (ex && ex.status && ex.data && ex.data.token) {
+            shareState.shareId = ex.data._id; shareState.url = `${window.location.origin}/share/${ex.data.token}`; return;
+        }
+        const cr = (await apiRequest('post', '/api/v2/public-shares', { entityType: 'report', entityId: s._id }))?.data;
+        if (cr && cr.status && cr.data && cr.data.token) {
+            shareState.shareId = cr.data._id; shareState.url = `${window.location.origin}/share/${cr.data.token}`;
+        }
+    } catch (e) { /* surfaced via empty url */ }
+};
+const copyShareUrl = () => { if (shareState.url) navigator.clipboard.writeText(shareState.url); };
+const revokeReportShare = async () => {
+    if (shareState.shareId) { try { await apiRequest('delete', `/api/v2/public-shares/${shareState.shareId}`); } catch (e) { /* noop */ } }
+    shareState.id = ''; shareState.shareId = ''; shareState.url = '';
+};
+const exportReport = (format) => {
+    if (!result.value.length) return;
+    downloadExport(format, {
+        filename: 'custom-report',
+        sheetName: 'Custom Report',
+        tableHead: [dimLabel.value, metricLabel.value],
+        tableRows: result.value.map((r) => [r.label, r.value]),
+        totalRow: ['Total', total.value],
+    });
+};
 
-onMounted(() => { loadProjects(); listSaved(); runPreview(); });
+onMounted(() => { loadProjects(); listSaved(); loadTemplates(); loadSchedules(); runPreview(); });
 </script>
 
 <style scoped>
@@ -189,6 +313,19 @@ onMounted(() => { loadProjects(); listSaved(); runPreview(); });
 .cr-table .cr-total td { font-weight: 700; background: #fafbff; }
 .cr-saved { grid-area: saved; background: #fff; border: 1px solid #e6e7ee; border-radius: 10px; padding: 14px; height: fit-content; }
 .cr-saved h3 { font-size: 14px; margin-bottom: 10px; }
+.cr-tpl { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid #f0f1f6; }
+.cr-tpl > label { font-size: 12px; font-weight: 600; color: #3a3f52; }
+.cr-sched { margin-top: 16px; padding-top: 14px; border-top: 1px solid #f0f1f6; }
+.cr-sched h3 { font-size: 14px; margin-bottom: 10px; }
+.cr-sched-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.cr-sched-item { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #f0f1f6; }
+.cr-sched-meta { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.cr-sched-name { font-size: 13px; color: #3a3f52; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cr-sched-sub { font-size: 11px; color: #9aa0b4; }
+.cr-saved-block { border-bottom: 1px solid #f0f1f6; }
+.cr-saved-block .cr-saved-item { border-bottom: none; flex-wrap: wrap; }
+.cr-share { display: flex; align-items: center; gap: 6px; padding: 0 0 9px; }
+.cr-share-url { flex: 1; min-width: 0; font-size: 11px !important; background: #fafbff; }
 .cr-saved-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 0; border-bottom: 1px solid #f0f1f6; }
 .cr-saved-name { background: none; border: none; color: #2f3a8f; font-size: 13px; cursor: pointer; text-align: left; flex: 1; }
 .cr-mini { border: none; border-radius: 5px; padding: 3px 8px; font-size: 11.5px; cursor: pointer; }

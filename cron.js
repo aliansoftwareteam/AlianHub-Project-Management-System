@@ -8,6 +8,7 @@ const autoArchive = require("./Modules/projectSetting/autoArchive");
 const recurringTasks = require("./Modules/RecurringTasks/controller");
 const timeReminders = require("./Modules/TimeSheet/controller/timeReminders");
 const auditRecorder = require("./Modules/Audit/recorder");
+const scheduledReports = require("./Modules/ScheduledReports/controller");
 
 // BUG-035 / #89 — pin every cron to a known timezone so schedules don't
 // shift when the server's local tz changes (DST transition, container
@@ -93,5 +94,17 @@ schedule.scheduleJob({ rule: '0 2 * * *', tz: CRON_TZ }, async () => {
         await auditRecorder.runAuditRetentionForAllCompanies();
     } catch (err) {
         logger.error(`[Cron] audit retention failed: ${err && err.message ? err.message : err}`);
+    }
+})
+
+// Scheduled reports — hourly, email any saved-report schedule whose nextRunAt has
+// passed, across all companies. nextRunAt advancement makes it idempotent; the
+// /run-due and /run-now endpoints exercise the same path in dev (cron is prod-only).
+schedule.scheduleJob({ rule: '0 * * * *', tz: CRON_TZ }, async () => {
+    logger.info(`[Cron] scheduledReports.runScheduledReportsForAllCompanies`);
+    try {
+        await scheduledReports.runScheduledReportsForAllCompanies();
+    } catch (err) {
+        logger.error(`[Cron] scheduledReports failed: ${err && err.message ? err.message : err}`);
     }
 })

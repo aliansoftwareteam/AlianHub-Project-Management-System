@@ -9,6 +9,7 @@ import reports from './reports';
 import portfolio from './portfolio';
 import customReports from './customReports';
 import varianceReport from './varianceReport';
+import capacityPlanning from './capacityPlanning';
 
 import { useCustomComposable } from '@/composable'
 import dashboard from "../plugins/dashboard/router";
@@ -50,6 +51,9 @@ const routes = [
 
 	// VARIANCE REPORT ROUTE (REP-04)
 	...varianceReport,
+
+	// CAPACITY PLANNING ROUTE (REP-06)
+	...capacityPlanning,
 
 	// CHANGELOG / WHAT'S NEW ROUTE
 	{

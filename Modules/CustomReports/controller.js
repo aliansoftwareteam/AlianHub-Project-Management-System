@@ -4,6 +4,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { removeCache } = require('../../utils/commonFunctions');
 const logger = require('../../Config/loggerConfig');
 const R = require('./helpers/reportRules');
+const T = require('./helpers/reportTemplates');
 
 const companyOf = (req) => req.headers['companyid'] || (req.body && req.body.companyId) || (req.query && req.query.companyId);
 const oid = (id) => new mongoose.Types.ObjectId(String(id));
@@ -104,4 +105,47 @@ exports.deleteReport = async (req, res) => {
         removeCache(`saved_reports:${companyId}`);
         return res.json({ status: true, statusText: 'Report removed.' });
     } catch (e) { logger.error(`deleteReport: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
+};
+
+// GET /api/v1/reports/custom/templates — built-in reusable templates (REP-07, static).
+exports.listTemplates = async (req, res) => {
+    try {
+        return res.json({ status: true, data: T.listTemplates() });
+    } catch (e) { logger.error(`listTemplates: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
+};
+
+// POST /api/v1/reports/custom/from-template { templateKey, name? } — create a new
+// saved report seeded from a built-in template (REP-07).
+exports.createFromTemplate = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const tpl = T.getTemplate(req.body && req.body.templateKey);
+        if (!tpl) return res.status(404).json({ status: false, statusText: 'Unknown template.' });
+        const check = R.validateConfig(tpl.config);
+        if (!check.valid) return res.status(400).json({ status: false, statusText: check.errors.join('; ') });
+        const name = String((req.body && req.body.name) || tpl.name).trim() || tpl.name;
+        const data = { name, ...check.value, createdBy: String(req.uid || ''), deletedStatusKey: 0 };
+        const saved = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SAVED_REPORTS, data }, 'save');
+        removeCache(`saved_reports:${companyId}`);
+        return res.status(201).json({ status: true, statusText: 'Report created from template.', data: saved });
+    } catch (e) { logger.error(`createFromTemplate: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
+};
+
+// POST /api/v1/reports/custom/:id/duplicate — clone an existing saved report (REP-07).
+exports.duplicateReport = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const src = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.SAVED_REPORTS, data: [{ _id: oid(req.params.id) }],
+        }, 'findOne');
+        if (!src || src.deletedStatusKey === 1) return res.status(404).json({ status: false, statusText: 'Not found.' });
+        const check = R.validateConfig(src);
+        if (!check.valid) return res.status(400).json({ status: false, statusText: check.errors.join('; ') });
+        const data = { name: `${src.name} (copy)`, ...check.value, createdBy: String(req.uid || ''), deletedStatusKey: 0 };
+        const saved = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SAVED_REPORTS, data }, 'save');
+        removeCache(`saved_reports:${companyId}`);
+        return res.status(201).json({ status: true, statusText: 'Report duplicated.', data: saved });
+    } catch (e) { logger.error(`duplicateReport: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
 };

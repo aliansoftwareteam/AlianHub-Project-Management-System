@@ -78,6 +78,7 @@ const SCHEMA_TYPE = {
     PTO_ENTRIES: "pto_entries",
     PORTFOLIOS: "portfolios",
     SAVED_REPORTS: "saved_reports",
+    REPORT_SCHEDULES: "report_schedules",
 }
 
 module.exports = {
