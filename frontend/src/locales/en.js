@@ -386,6 +386,8 @@ export default {
         delete: "Delete",
         no_data: "No data for this configuration.",
         total: "Total",
+        export_csv: "Export CSV",
+        export_excel: "Export Excel",
     },
     VarianceReport: {
         select_project: "Select a project…",
@@ -402,6 +404,8 @@ export default {
         s_under: "Under",
         s_on_track: "On track",
         s_no_estimate: "No estimate",
+        export_csv: "Export CSV",
+        export_excel: "Export Excel",
     },
     Header: {
         Project_Forecasting: "Project Forecasting (Coming soon)",

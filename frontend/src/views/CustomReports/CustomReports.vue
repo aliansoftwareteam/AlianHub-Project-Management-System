@@ -43,6 +43,8 @@
                 <div class="cr-save">
                     <input v-model="reportName" class="form-control" :placeholder="$t('CustomReport.name_ph')" />
                     <button class="cr-btn" :disabled="busy || !reportName.trim()" @click="save">{{ busy ? $t('CustomReport.saving') : $t('CustomReport.save') }}</button>
+                    <button class="cr-btn" :disabled="!result.length" @click="exportReport('csv')">{{ $t('CustomReport.export_csv') }}</button>
+                    <button class="cr-btn" :disabled="!result.length" @click="exportReport('xlsx')">{{ $t('CustomReport.export_excel') }}</button>
                 </div>
             </div>
 
@@ -88,6 +90,7 @@ export default { name: 'CustomReportBuilder' };
 import { ref, reactive, computed, onMounted, inject } from 'vue';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import { downloadExport } from '@/composable/exportDownload';
 
 // REP-02 — custom report builder. Pick a dimension + metric + project filter +
 // chart type, preview live, save, and reload a saved report. The backend
@@ -158,6 +161,16 @@ const save = async () => {
 };
 const removeSaved = async (s) => {
     try { await apiRequest('delete', `${env.CUSTOM_REPORT}/${s._id}`); await listSaved(); } catch (e) { /* noop */ }
+};
+const exportReport = (format) => {
+    if (!result.value.length) return;
+    downloadExport(format, {
+        filename: 'custom-report',
+        sheetName: 'Custom Report',
+        tableHead: [dimLabel.value, metricLabel.value],
+        tableRows: result.value.map((r) => [r.label, r.value]),
+        totalRow: ['Total', total.value],
+    });
 };
 
 onMounted(() => { loadProjects(); listSaved(); runPreview(); });

@@ -9,6 +9,8 @@
                 <option value="">{{ $t('VarianceReport.select_project') }}</option>
                 <option v-for="p in projects" :key="p._id" :value="String(p._id)">{{ p.ProjectName || '(untitled)' }}</option>
             </select>
+            <button class="vr-btn" :disabled="!data" @click="exportReport('csv')">{{ $t('VarianceReport.export_csv') }}</button>
+            <button class="vr-btn" :disabled="!data" @click="exportReport('xlsx')">{{ $t('VarianceReport.export_excel') }}</button>
         </div>
 
         <div class="vr-body">
@@ -62,6 +64,7 @@ export default { name: 'VarianceReport' };
 import { ref, computed, onMounted, inject } from 'vue';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import { downloadExport } from '@/composable/exportDownload';
 
 // REP-04 — estimate-vs-actual variance. Pick a project → per-task estimate
 // (tasks.totalEstimatedTime) vs actual (summed timesheet minutes) with over/under
@@ -98,6 +101,17 @@ const load = async () => {
         data.value = (b && b.status) ? b.data : null;
     } catch (e) { data.value = null; }
 };
+const exportReport = (format) => {
+    if (!data.value) return;
+    const tt = data.value.totals;
+    downloadExport(format, {
+        filename: 'variance-report',
+        sheetName: 'Variance',
+        tableHead: ['Task', 'Estimated (min)', 'Actual (min)', 'Variance (min)', 'Variance %', 'Status'],
+        tableRows: data.value.tasks.map((r) => [r.name, r.estimatedMinutes, r.actualMinutes, r.variance, r.variancePct, r.status]),
+        totalRow: ['Total', tt.totalEstimated, tt.totalActual, tt.totalVariance, tt.totalVariancePct, ''],
+    });
+};
 
 onMounted(loadProjects);
 </script>
@@ -108,6 +122,8 @@ onMounted(loadProjects);
 .vr-home img { width: 20px; height: 20px; }
 .vr-title { font-size: 18px; margin: 0; flex: 0 0 auto; }
 .vr-proj { max-width: 280px; margin-left: auto; }
+.vr-btn { background: #fff; color: #2f3a8f; border: 1px solid #cdd2e6; border-radius: 7px; padding: 7px 12px; font-size: 12.5px; cursor: pointer; }
+.vr-btn:disabled { opacity: .5; cursor: default; }
 .vr-body { flex: 1; overflow-y: auto; padding: 18px 22px; }
 .vr-placeholder { color: #9aa0b4; font-size: 13px; padding: 16px 4px; }
 .vr-totals { display: flex; flex-wrap: wrap; gap: 22px; background: #f7f8fc; border: 1px solid #e6e7ee; border-radius: 10px; padding: 14px 18px; margin-bottom: 16px; }
