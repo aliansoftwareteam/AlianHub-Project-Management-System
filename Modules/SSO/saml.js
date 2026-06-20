@@ -15,9 +15,9 @@ const ensureValidator = () => {
     if (validatorReady) return;
     const samlify = require('samlify');
     try {
-        samlify.setSchemaValidator(require('@authenio/samlify-node-saml2'));
+        samlify.setSchemaValidator(require('@authenio/samlify-xsd-schema-validator'));
     } catch (e) {
-        logger.error(`samlify schema validator missing — install @authenio/samlify-node-saml2: ${e.message || e}`);
+        logger.error(`samlify schema validator missing — install @authenio/samlify-xsd-schema-validator: ${e.message || e}`);
         throw new Error('SAML validator not available on the server');
     }
     validatorReady = true;
