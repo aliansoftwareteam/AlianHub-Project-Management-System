@@ -189,6 +189,7 @@ const verifyJWTTokenWithCRoute = [
     '/api/v1/reports/custom',
     '/api/v1/reports/variance',
     '/api/v1/reports/capacity',
+    '/api/v1/reports/schedules',
 ];
 const verifyJWTToken = [
     "/api/v2/company/delete",

@@ -537,6 +537,20 @@ const schema = {
         updatedBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // Scheduled report deliveries — managed by Modules/ScheduledReports (REP-08).
+    // Emails a saved report (savedReportId) to recipients on a cadence; nextRunAt
+    // is advanced after each run so the prod cron stays idempotent.
+    reportSchedules: {
+        savedReportId: { type: String, required: true },
+        cadence: { type: String, default: 'weekly', required: false },
+        recipients: { type: Array, default: [], required: false },
+        active: { type: Boolean, default: true, required: false },
+        lastRunAt: { type: Date, required: false },
+        nextRunAt: { type: Date, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Wiki pages (Editor.js blocks; versioned) — managed by Modules/Pages
     pages: {
         title: { type: String, required: true },

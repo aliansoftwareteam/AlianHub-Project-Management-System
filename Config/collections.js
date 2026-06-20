@@ -79,6 +79,7 @@ const dbCollections = {
     PTO_ENTRIES: "pto_entries",
     PORTFOLIOS: "portfolios",
     SAVED_REPORTS: "saved_reports",
+    REPORT_SCHEDULES: "report_schedules",
 }
 
 /** DOCUMENT ID'S NAME WHICH IS USED IN THE "SETTINGS" COLLECTION NAME **/

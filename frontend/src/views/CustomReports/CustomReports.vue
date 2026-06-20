@@ -85,6 +85,33 @@
                     <button class="cr-mini" :title="$t('CustomReport.duplicate')" @click="duplicateSaved(s)">{{ $t('CustomReport.duplicate') }}</button>
                     <button class="cr-mini del" @click="removeSaved(s)">{{ $t('CustomReport.delete') }}</button>
                 </div>
+
+                <!-- Scheduled email deliveries (REP-08) -->
+                <div class="cr-sched">
+                    <h3 class="m-0">{{ $t('CustomReport.schedules') }}</h3>
+                    <div class="cr-sched-form">
+                        <select v-model="sched.savedReportId" class="form-control">
+                            <option value="">{{ $t('CustomReport.pick_report') }}</option>
+                            <option v-for="s in saved" :key="s._id" :value="String(s._id)">{{ s.name }}</option>
+                        </select>
+                        <select v-model="sched.cadence" class="form-control">
+                            <option value="daily">{{ $t('CustomReport.daily') }}</option>
+                            <option value="weekly">{{ $t('CustomReport.weekly') }}</option>
+                            <option value="monthly">{{ $t('CustomReport.monthly') }}</option>
+                        </select>
+                        <input v-model="sched.recipients" class="form-control" :placeholder="$t('CustomReport.recipients_ph')" />
+                        <button class="cr-btn" :disabled="!sched.savedReportId || !sched.recipients.trim()" @click="createSchedule">{{ $t('CustomReport.schedule_it') }}</button>
+                    </div>
+                    <div v-if="!schedules.length" class="cr-empty">{{ $t('CustomReport.no_schedules') }}</div>
+                    <div v-for="sc in schedules" :key="sc._id" class="cr-sched-item">
+                        <div class="cr-sched-meta">
+                            <span class="cr-sched-name" :title="sc.reportName">{{ sc.reportName }}</span>
+                            <span class="cr-sched-sub">{{ $t('CustomReport.' + sc.cadence) }} · {{ (sc.recipients || []).length }} {{ $t('CustomReport.recipients_short') }}</span>
+                        </div>
+                        <button class="cr-mini" @click="runScheduleNow(sc)">{{ $t('CustomReport.send_now') }}</button>
+                        <button class="cr-mini del" @click="removeSchedule(sc)">{{ $t('CustomReport.delete') }}</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -113,6 +140,8 @@ const result = ref([]);
 const saved = ref([]);
 const templates = ref([]);
 const tplPick = ref('');
+const schedules = ref([]);
+const sched = reactive({ savedReportId: '', cadence: 'weekly', recipients: '' });
 const busy = ref(false);
 
 const DIM_LABELS = { status: 'Status', project: 'Project', sprint: 'Sprint' };
@@ -194,6 +223,27 @@ const applyTemplate = () => {
 const duplicateSaved = async (s) => {
     try { await apiRequest('post', `${env.CUSTOM_REPORT}/${s._id}/duplicate`, {}); await listSaved(); } catch (e) { /* noop */ }
 };
+// REP-08 — scheduled email deliveries of a saved report.
+const loadSchedules = async () => {
+    try {
+        const body = (await apiRequest('get', env.REPORT_SCHEDULES))?.data;
+        schedules.value = (body && body.data) || [];
+    } catch (e) { schedules.value = []; }
+};
+const createSchedule = async () => {
+    if (!sched.savedReportId || !sched.recipients.trim()) return;
+    try {
+        await apiRequest('post', env.REPORT_SCHEDULES, { savedReportId: sched.savedReportId, cadence: sched.cadence, recipients: sched.recipients });
+        sched.savedReportId = ''; sched.recipients = ''; sched.cadence = 'weekly';
+        await loadSchedules();
+    } catch (e) { /* surfaced via reload */ }
+};
+const runScheduleNow = async (sc) => {
+    try { await apiRequest('post', `${env.REPORT_SCHEDULES}/${sc._id}/run-now`, {}); } catch (e) { /* noop */ }
+};
+const removeSchedule = async (sc) => {
+    try { await apiRequest('delete', `${env.REPORT_SCHEDULES}/${sc._id}`); await loadSchedules(); } catch (e) { /* noop */ }
+};
 const exportReport = (format) => {
     if (!result.value.length) return;
     downloadExport(format, {
@@ -205,7 +255,7 @@ const exportReport = (format) => {
     });
 };
 
-onMounted(() => { loadProjects(); listSaved(); loadTemplates(); runPreview(); });
+onMounted(() => { loadProjects(); listSaved(); loadTemplates(); loadSchedules(); runPreview(); });
 </script>
 
 <style scoped>
@@ -236,6 +286,13 @@ onMounted(() => { loadProjects(); listSaved(); loadTemplates(); runPreview(); })
 .cr-saved h3 { font-size: 14px; margin-bottom: 10px; }
 .cr-tpl { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid #f0f1f6; }
 .cr-tpl > label { font-size: 12px; font-weight: 600; color: #3a3f52; }
+.cr-sched { margin-top: 16px; padding-top: 14px; border-top: 1px solid #f0f1f6; }
+.cr-sched h3 { font-size: 14px; margin-bottom: 10px; }
+.cr-sched-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.cr-sched-item { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #f0f1f6; }
+.cr-sched-meta { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.cr-sched-name { font-size: 13px; color: #3a3f52; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cr-sched-sub { font-size: 11px; color: #9aa0b4; }
 .cr-saved-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 0; border-bottom: 1px solid #f0f1f6; }
 .cr-saved-name { background: none; border: none; color: #2f3a8f; font-size: 13px; cursor: pointer; text-align: left; flex: 1; }
 .cr-mini { border: none; border-radius: 5px; padding: 3px 8px; font-size: 11.5px; cursor: pointer; }

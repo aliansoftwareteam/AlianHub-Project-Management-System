@@ -182,6 +182,7 @@ function initializeControllers() {
     require('./Modules/CustomReports/init').init(app);
     require('./Modules/VarianceReport/init').init(app);
     require('./Modules/CapacityPlanning/init').init(app);
+    require('./Modules/ScheduledReports/init').init(app);
     require('./Modules/notification1/init').init(app);
     require('./Modules/ImportSettings/init').init(app);
     require('./Modules/Tasks/init.js').init(app);

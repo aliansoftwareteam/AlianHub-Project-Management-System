@@ -137,6 +137,9 @@ const portfoliosSchema = new Schema(schema.portfolios, {strict: true, timestamps
 portfoliosSchema.index({ deletedStatusKey: 1 });
 const savedReportsSchema = new Schema(schema.savedReports, {strict: true, timestamps: true});
 savedReportsSchema.index({ deletedStatusKey: 1 });
+const reportSchedulesSchema = new Schema(schema.reportSchedules, {strict: true, timestamps: true});
+reportSchedulesSchema.index({ deletedStatusKey: 1 });
+reportSchedulesSchema.index({ active: 1, nextRunAt: 1 });
 // Global search: one combined text index per collection.
 taskSchema.index({ TaskName: 'text', rawDescription: 'text' });
 projectsSchema.index({ ProjectName: 'text' });
@@ -224,6 +227,7 @@ module.exports = {
     ptoEntriesSchema,
     portfoliosSchema,
     savedReportsSchema,
+    reportSchedulesSchema,
     historySchema,
     userIdSchema, 
     usersSchema,
