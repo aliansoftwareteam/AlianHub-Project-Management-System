@@ -80,10 +80,18 @@
                 </div>
                 <h3 class="m-0">{{ $t('CustomReport.saved_list') }}</h3>
                 <div v-if="!saved.length" class="cr-empty">{{ $t('CustomReport.none_saved') }}</div>
-                <div v-for="s in saved" :key="s._id" class="cr-saved-item">
-                    <button class="cr-saved-name" @click="loadSaved(s)">{{ s.name }}</button>
-                    <button class="cr-mini" :title="$t('CustomReport.duplicate')" @click="duplicateSaved(s)">{{ $t('CustomReport.duplicate') }}</button>
-                    <button class="cr-mini del" @click="removeSaved(s)">{{ $t('CustomReport.delete') }}</button>
+                <div v-for="s in saved" :key="s._id" class="cr-saved-block">
+                    <div class="cr-saved-item">
+                        <button class="cr-saved-name" @click="loadSaved(s)">{{ s.name }}</button>
+                        <button class="cr-mini" @click="openShare(s)">{{ $t('CustomReport.share') }}</button>
+                        <button class="cr-mini" :title="$t('CustomReport.duplicate')" @click="duplicateSaved(s)">{{ $t('CustomReport.duplicate') }}</button>
+                        <button class="cr-mini del" @click="removeSaved(s)">{{ $t('CustomReport.delete') }}</button>
+                    </div>
+                    <div v-if="shareState.id === s._id" class="cr-share">
+                        <input class="form-control cr-share-url" :value="shareState.url" readonly @focus="$event.target.select()" :placeholder="$t('CustomReport.generating')" />
+                        <button class="cr-mini" :disabled="!shareState.url" @click="copyShareUrl">{{ $t('CustomReport.copy') }}</button>
+                        <button class="cr-mini del" @click="revokeReportShare">{{ $t('CustomReport.revoke') }}</button>
+                    </div>
                 </div>
 
                 <!-- Scheduled email deliveries (REP-08) -->
@@ -142,6 +150,7 @@ const templates = ref([]);
 const tplPick = ref('');
 const schedules = ref([]);
 const sched = reactive({ savedReportId: '', cadence: 'weekly', recipients: '' });
+const shareState = reactive({ id: '', shareId: '', url: '' });
 const busy = ref(false);
 
 const DIM_LABELS = { status: 'Status', project: 'Project', sprint: 'Sprint' };
@@ -244,6 +253,26 @@ const runScheduleNow = async (sc) => {
 const removeSchedule = async (sc) => {
     try { await apiRequest('delete', `${env.REPORT_SCHEDULES}/${sc._id}`); await loadSchedules(); } catch (e) { /* noop */ }
 };
+// REP-09 — public read-only share link for a saved report (reuses /api/v2/public-shares).
+const openShare = async (s) => {
+    if (shareState.id === s._id) { shareState.id = ''; return; }
+    shareState.id = s._id; shareState.shareId = ''; shareState.url = '';
+    try {
+        const ex = (await apiRequest('get', `/api/v2/public-shares?entityId=${s._id}`))?.data;
+        if (ex && ex.status && ex.data && ex.data.token) {
+            shareState.shareId = ex.data._id; shareState.url = `${window.location.origin}/share/${ex.data.token}`; return;
+        }
+        const cr = (await apiRequest('post', '/api/v2/public-shares', { entityType: 'report', entityId: s._id }))?.data;
+        if (cr && cr.status && cr.data && cr.data.token) {
+            shareState.shareId = cr.data._id; shareState.url = `${window.location.origin}/share/${cr.data.token}`;
+        }
+    } catch (e) { /* surfaced via empty url */ }
+};
+const copyShareUrl = () => { if (shareState.url) navigator.clipboard.writeText(shareState.url); };
+const revokeReportShare = async () => {
+    if (shareState.shareId) { try { await apiRequest('delete', `/api/v2/public-shares/${shareState.shareId}`); } catch (e) { /* noop */ } }
+    shareState.id = ''; shareState.shareId = ''; shareState.url = '';
+};
 const exportReport = (format) => {
     if (!result.value.length) return;
     downloadExport(format, {
@@ -293,6 +322,10 @@ onMounted(() => { loadProjects(); listSaved(); loadTemplates(); loadSchedules();
 .cr-sched-meta { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .cr-sched-name { font-size: 13px; color: #3a3f52; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cr-sched-sub { font-size: 11px; color: #9aa0b4; }
+.cr-saved-block { border-bottom: 1px solid #f0f1f6; }
+.cr-saved-block .cr-saved-item { border-bottom: none; flex-wrap: wrap; }
+.cr-share { display: flex; align-items: center; gap: 6px; padding: 0 0 9px; }
+.cr-share-url { flex: 1; min-width: 0; font-size: 11px !important; background: #fafbff; }
 .cr-saved-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 0; border-bottom: 1px solid #f0f1f6; }
 .cr-saved-name { background: none; border: none; color: #2f3a8f; font-size: 13px; cursor: pointer; text-align: left; flex: 1; }
 .cr-mini { border: none; border-radius: 5px; padding: 3px 8px; font-size: 11.5px; cursor: pointer; }

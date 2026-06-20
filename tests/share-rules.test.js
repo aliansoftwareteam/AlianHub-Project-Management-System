@@ -40,8 +40,9 @@ describe('🌐 PUBLIC SHARES - Rules', () => {
 
     describe('validateCreateShare', () => {
 
-        test('sprint shares pass; unknown entity types fail', () => {
+        test('sprint + report shares pass; unknown entity types fail', () => {
             expect(validateCreateShare({ companyId: COMPANY, entityType: 'sprint', entityId: SPRINT }).valid).toBe(true);
+            expect(validateCreateShare({ companyId: COMPANY, entityType: 'report', entityId: SPRINT }).valid).toBe(true);
             expect(validateCreateShare({ companyId: COMPANY, entityType: 'page', entityId: SPRINT }).valid).toBe(false);
         });
 
