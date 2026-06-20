@@ -75,7 +75,8 @@ const {
     auditLogsSchema,
     scimConfigsSchema,
     ptoEntriesSchema,
-    portfoliosSchema
+    portfoliosSchema,
+    savedReportsSchema
 } = require('./createSchema');
 
 
@@ -231,6 +232,8 @@ exports.checkType = (type) => {
             return ptoEntriesSchema
         case SCHEMA_TYPE.PORTFOLIOS:
             return portfoliosSchema
+        case SCHEMA_TYPE.SAVED_REPORTS:
+            return savedReportsSchema
         default:
             return ""
     }
@@ -389,6 +392,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.PTO_ENTRIES}`
         case SCHEMA_TYPE.PORTFOLIOS:
                 return `${dbCollections.PORTFOLIOS}`
+        case SCHEMA_TYPE.SAVED_REPORTS:
+                return `${dbCollections.SAVED_REPORTS}`
         default:
             return ""
     }

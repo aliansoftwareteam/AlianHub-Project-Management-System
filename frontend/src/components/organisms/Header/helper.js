@@ -30,6 +30,13 @@ export function useHelper() {
             isActive: true
         },
         {
+            name: "Custom_Report",
+            to: {path: `/${companyId.value}/custom-reports`},
+            show: true,
+            submenu: [],
+            isActive: true
+        },
+        {
             name: "Time_Sheet",
             id: "time_sheet_driver",
             show:checkPermission('sheet_settings.workload_timesheet') !== null || checkPermission('sheet_settings.project_timesheet') !== null || checkPermission('sheet_settings.user_timesheet') !== null,

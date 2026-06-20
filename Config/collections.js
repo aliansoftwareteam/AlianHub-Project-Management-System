@@ -78,6 +78,7 @@ const dbCollections = {
     SCIM_CONFIGS: "scim_configs",
     PTO_ENTRIES: "pto_entries",
     PORTFOLIOS: "portfolios",
+    SAVED_REPORTS: "saved_reports",
 }
 
 /** DOCUMENT ID'S NAME WHICH IS USED IN THE "SETTINGS" COLLECTION NAME **/

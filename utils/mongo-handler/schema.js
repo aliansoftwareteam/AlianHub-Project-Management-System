@@ -523,6 +523,20 @@ const schema = {
         updatedBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // Saved custom reports — managed by Modules/CustomReports (REP-02). A report
+    // config (metric + dimension + filters + chartType) resolved by a whitelisted
+    // query engine; values are validated against an allow-list, never raw fields.
+    savedReports: {
+        name: { type: String, required: true },
+        source: { type: String, default: 'tasks', required: false },
+        metric: { type: String, default: 'count', required: false },
+        dimension: { type: String, default: 'statusType', required: false },
+        filters: { type: Object, default: {}, required: false },
+        chartType: { type: String, default: 'bar', required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Wiki pages (Editor.js blocks; versioned) — managed by Modules/Pages
     pages: {
         title: { type: String, required: true },
