@@ -6,6 +6,7 @@ const aiRef = require("./Modules/AI/controller")
 const screenshotRetention = require("./Modules/ScreenshotRetention/helper");
 const autoArchive = require("./Modules/projectSetting/autoArchive");
 const recurringTasks = require("./Modules/RecurringTasks/controller");
+const timeReminders = require("./Modules/TimeSheet/controller/timeReminders");
 
 // BUG-035 / #89 — pin every cron to a known timezone so schedules don't
 // shift when the server's local tz changes (DST transition, container
@@ -70,4 +71,15 @@ schedule.scheduleJob({ rule: '*/15 * * * *', tz: CRON_TZ }, async () => {
 // // This cron job executes daily at midnight (12 AM) and remove ai request count.
 schedule.scheduleJob({ rule: '0 0 * * *', tz: CRON_TZ }, async () => {
     aiRef.resetAiRequestCount();
+})
+
+// Time-entry reminders — daily at 17:00, nudge members who haven't logged time
+// today. The /api/v1/timesheet/send-reminders endpoint runs the same path in dev.
+schedule.scheduleJob({ rule: '0 17 * * *', tz: CRON_TZ }, async () => {
+    logger.info(`[Cron] timeReminders.runRemindersForAllCompanies`);
+    try {
+        await timeReminders.runRemindersForAllCompanies();
+    } catch (err) {
+        logger.error(`[Cron] timeReminders failed: ${err && err.message ? err.message : err}`);
+    }
 })

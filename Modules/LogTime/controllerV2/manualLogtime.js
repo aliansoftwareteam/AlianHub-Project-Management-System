@@ -25,6 +25,7 @@ const { handleFileUploadForTrackerSS,handleuploadMainFileForbase64Thumbnail } = 
  * @returns
  */
 const { updateProjectForTimelog, findAndUpdateProjectOrTaskStartDate, updateRemainingTime } = require('./helpers');
+const { isPeriodLocked } = require('../../TimesheetApproval/helpers/lockGuard');
 exports.manualLogTime = async (req, res) => {
     if (!(req.body && req.body.logTimeDate)) {
         res.send({
@@ -184,13 +185,25 @@ exports.manualLogTime = async (req, res) => {
         LogTimeDuration: diffMin,
         LogDescription: req.body.description,
         Loggeduser: req.body.userId,
-        logAddType : 0
+        logAddType : 0,
+        billable: req.body.billable !== false
     }
     if(req.body.isEdit === false){
         data.TicketID = req.body.ticketId
     }
 
     if (req.body.isEdit === true) {
+       // TIME-03: block editing an entry whose day falls in an approved (locked) period.
+       const lockedCheckEntry = await MongoDbCrudOpration(req.body.companyId, {
+           type, data: [{ _id: new mongoose.Types.ObjectId(req.body.timeSheetId) }],
+       }, "findOne");
+       if (lockedCheckEntry) {
+           const entryDate = new Date((Number(lockedCheckEntry.LogStartTime) || 0) * 1000);
+           const locked = await isPeriodLocked({ companyId: req.body.companyId, userId: lockedCheckEntry.Loggeduser || req.body.userId, date: entryDate });
+           if (locked) {
+               return res.send({ status: false, statusText: "This timesheet period is approved and locked — the entry can't be edited." });
+           }
+       }
        let obj = {
             type: type,
             data: [
@@ -462,6 +475,18 @@ exports.deleteManualLogtime = async (req, res) => {
     }
     let companyId = req.body.companyId
     let type = req.body.type || SCHEMA_TYPE.TIMESHEET
+
+    // TIME-03: block deleting an entry whose day falls in an approved (locked) period.
+    const lockedDelEntry = await MongoDbCrudOpration(companyId, {
+        type, data: [{ _id: new mongoose.Types.ObjectId(req.body.timeSheetId) }],
+    }, "findOne");
+    if (lockedDelEntry) {
+        const entryDate = new Date((Number(lockedDelEntry.LogStartTime) || 0) * 1000);
+        const locked = await isPeriodLocked({ companyId, userId: lockedDelEntry.Loggeduser || req.body.userId, date: entryDate });
+        if (locked) {
+            return res.send({ status: false, statusText: "This timesheet period is approved and locked — the entry can't be deleted." });
+        }
+    }
 
     let obj = {
         type: type,

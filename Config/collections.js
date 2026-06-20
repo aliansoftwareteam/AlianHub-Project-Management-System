@@ -71,6 +71,8 @@ const dbCollections = {
     INTAKE_ITEMS: "intakeItems",
     PUBLIC_SHARE_INDEX: "publicShareIndex",
     RECURRING_TASKS: "recurring_tasks",
+    TIMESHEET_APPROVAL: "timesheet_approval",
+    BILLING_RATES: "billing_rates",
 }
 
 /** DOCUMENT ID'S NAME WHICH IS USED IN THE "SETTINGS" COLLECTION NAME **/
