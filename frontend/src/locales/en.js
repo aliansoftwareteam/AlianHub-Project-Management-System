@@ -1003,6 +1003,12 @@ export default {
         export_csv: "Export CSV",
         exporting: "Exporting…",
     },
+    TimesheetInvoice: {
+        invoice: "Invoice",
+        generating: "Generating…",
+        rate: "$/h",
+        rate_hint: "Default hourly rate applied to time without a configured rate",
+    },
     ProjectWorkplace: {
         msg1: "Project can be shared with members. You can add guests to Folders, Lists, and tasks after creating a Project.",
         msg2: "Currently, there are no plans in place to create private or public projects. If you'd like to initiate a project, upgrading your plan would be necessary.",

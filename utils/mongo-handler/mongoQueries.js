@@ -69,7 +69,8 @@ const {
     intakeItemsSchema,
     publicShareIndexSchema,
     recurringTasksSchema,
-    timesheetApprovalSchema
+    timesheetApprovalSchema,
+    billingRatesSchema
 } = require('./createSchema');
 
 
@@ -213,6 +214,8 @@ exports.checkType = (type) => {
             return recurringTasksSchema
         case SCHEMA_TYPE.TIMESHEET_APPROVAL:
             return timesheetApprovalSchema
+        case SCHEMA_TYPE.BILLING_RATES:
+            return billingRatesSchema
         default:
             return ""
     }
@@ -359,6 +362,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.RECURRING_TASKS}`
         case SCHEMA_TYPE.TIMESHEET_APPROVAL:
                 return `${dbCollections.TIMESHEET_APPROVAL}`
+        case SCHEMA_TYPE.BILLING_RATES:
+                return `${dbCollections.BILLING_RATES}`
         default:
             return ""
     }

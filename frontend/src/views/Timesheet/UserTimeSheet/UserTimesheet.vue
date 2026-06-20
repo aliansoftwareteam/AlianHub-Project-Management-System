@@ -166,6 +166,12 @@
                     :user-ids="billableUserIds"
                     :project-ids="exportProjectIds"
                 />
+                <TimesheetInvoice
+                    class="ml-2"
+                    :period-start="dateRange.startDate"
+                    :period-end="dateRange.endDate"
+                    :user-ids="billableUserIds"
+                />
             </div>
             </div>
             
@@ -201,6 +207,7 @@
     import TimesheetApproval from '@/components/molecules/TimesheetApproval/TimesheetApproval.vue';
     import BillableSummary from '@/components/molecules/BillableSummary/BillableSummary.vue';
     import TimesheetExport from '@/components/molecules/TimesheetExport/TimesheetExport.vue';
+    import TimesheetInvoice from '@/components/molecules/TimesheetInvoice/TimesheetInvoice.vue';
 
     defineComponent({
         name: "UserTimesheet",

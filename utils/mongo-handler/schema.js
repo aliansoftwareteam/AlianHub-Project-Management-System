@@ -454,6 +454,15 @@ const schema = {
         rejectionReason: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // Billing rates — per user / project / default hourly rate — managed by Modules/TimeSheet (TIME-07)
+    billingRates: {
+        scope: { type: String, required: true },
+        refId: { type: String, default: '', required: false },
+        rate: { type: Number, required: true },
+        currency: { type: String, default: 'USD', required: false },
+        createdBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Wiki pages (Editor.js blocks; versioned) — managed by Modules/Pages
     pages: {
         title: { type: String, required: true },

@@ -9,11 +9,15 @@ const getTimeSheetByAggregate = require('./controller/getTimeSheetByAggregate');
 const billablectrl = require('./controller/billableSummary');
 const csvctrl = require('./controller/timesheetExport');
 const reminderctrl = require('./controller/timeReminders');
+const billingctrl = require('./controller/billing');
 exports.init = (app) => {
     app.post('/api/v1/timesheet/user',userctrl.getUserTimeSheet);
     app.post('/api/v1/timesheet/billable-summary', billablectrl.getBillableSummary);
     app.post('/api/v1/timesheet/export-csv', csvctrl.exportTimesheetCsv);
     app.post('/api/v1/timesheet/send-reminders', reminderctrl.triggerReminders);
+    app.post('/api/v1/timesheet/rates', billingctrl.setRate);
+    app.get('/api/v1/timesheet/rates', billingctrl.listRates);
+    app.post('/api/v1/timesheet/generate-invoice', billingctrl.generateInvoice);
     app.post('/api/v1/timesheet/workload',workloadctrl.getWorkloadTimeSheet);
     app.post('/api/v1/timesheet/project',projectctrl.getProjectTimeSheet);
     app.post('/api/v1/timesheet/tracker',trackerctrl.getTrackerTimeSheet);
