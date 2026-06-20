@@ -187,6 +187,7 @@ module.exports.SCIM_TOKEN = '/api/v2/scim/token';
 module.exports.PTO = '/api/v1/pto';
 module.exports.PORTFOLIO = '/api/v1/portfolio';
 module.exports.CUSTOM_REPORT = '/api/v1/reports/custom';
+module.exports.CUSTOM_REPORT_TEMPLATES = '/api/v1/reports/custom/templates';
 module.exports.VARIANCE_REPORT = '/api/v1/reports/variance';
 module.exports.CAPACITY = '/api/v1/reports/capacity';
 module.exports.EXPORT_CSV = '/api/v1/export/csv';

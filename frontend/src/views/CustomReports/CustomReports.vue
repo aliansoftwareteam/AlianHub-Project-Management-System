@@ -71,10 +71,18 @@
 
             <!-- Saved reports -->
             <div class="cr-saved">
+                <div v-if="templates.length" class="cr-tpl">
+                    <label>{{ $t('CustomReport.start_from_template') }}</label>
+                    <select v-model="tplPick" class="form-control" @change="applyTemplate">
+                        <option value="">{{ $t('CustomReport.choose_template') }}</option>
+                        <option v-for="t in templates" :key="t.key" :value="t.key">{{ t.name }}</option>
+                    </select>
+                </div>
                 <h3 class="m-0">{{ $t('CustomReport.saved_list') }}</h3>
                 <div v-if="!saved.length" class="cr-empty">{{ $t('CustomReport.none_saved') }}</div>
                 <div v-for="s in saved" :key="s._id" class="cr-saved-item">
                     <button class="cr-saved-name" @click="loadSaved(s)">{{ s.name }}</button>
+                    <button class="cr-mini" :title="$t('CustomReport.duplicate')" @click="duplicateSaved(s)">{{ $t('CustomReport.duplicate') }}</button>
                     <button class="cr-mini del" @click="removeSaved(s)">{{ $t('CustomReport.delete') }}</button>
                 </div>
             </div>
@@ -103,6 +111,8 @@ const reportName = ref('');
 const projects = ref([]);
 const result = ref([]);
 const saved = ref([]);
+const templates = ref([]);
+const tplPick = ref('');
 const busy = ref(false);
 
 const DIM_LABELS = { status: 'Status', project: 'Project', sprint: 'Sprint' };
@@ -162,6 +172,28 @@ const save = async () => {
 const removeSaved = async (s) => {
     try { await apiRequest('delete', `${env.CUSTOM_REPORT}/${s._id}`); await listSaved(); } catch (e) { /* noop */ }
 };
+// REP-07 — built-in reusable templates.
+const loadTemplates = async () => {
+    try {
+        const body = (await apiRequest('get', env.CUSTOM_REPORT_TEMPLATES))?.data;
+        templates.value = (body && body.data) || [];
+    } catch (e) { templates.value = []; }
+};
+const applyTemplate = () => {
+    const t = templates.value.find((x) => x.key === tplPick.value);
+    tplPick.value = '';
+    if (!t) return;
+    const c = t.config || {};
+    cfg.dimension = c.dimension || 'status';
+    cfg.metric = c.metric || 'count';
+    cfg.chartType = c.chartType || 'bar';
+    cfg.filters.project = (c.filters && c.filters.project) || '';
+    reportName.value = t.name;
+    runPreview();
+};
+const duplicateSaved = async (s) => {
+    try { await apiRequest('post', `${env.CUSTOM_REPORT}/${s._id}/duplicate`, {}); await listSaved(); } catch (e) { /* noop */ }
+};
 const exportReport = (format) => {
     if (!result.value.length) return;
     downloadExport(format, {
@@ -173,7 +205,7 @@ const exportReport = (format) => {
     });
 };
 
-onMounted(() => { loadProjects(); listSaved(); runPreview(); });
+onMounted(() => { loadProjects(); listSaved(); loadTemplates(); runPreview(); });
 </script>
 
 <style scoped>
@@ -202,6 +234,8 @@ onMounted(() => { loadProjects(); listSaved(); runPreview(); });
 .cr-table .cr-total td { font-weight: 700; background: #fafbff; }
 .cr-saved { grid-area: saved; background: #fff; border: 1px solid #e6e7ee; border-radius: 10px; padding: 14px; height: fit-content; }
 .cr-saved h3 { font-size: 14px; margin-bottom: 10px; }
+.cr-tpl { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid #f0f1f6; }
+.cr-tpl > label { font-size: 12px; font-weight: 600; color: #3a3f52; }
 .cr-saved-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 0; border-bottom: 1px solid #f0f1f6; }
 .cr-saved-name { background: none; border: none; color: #2f3a8f; font-size: 13px; cursor: pointer; text-align: left; flex: 1; }
 .cr-mini { border: none; border-radius: 5px; padding: 3px 8px; font-size: 11.5px; cursor: pointer; }
