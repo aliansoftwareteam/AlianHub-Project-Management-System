@@ -7,6 +7,7 @@ const screenshotRetention = require("./Modules/ScreenshotRetention/helper");
 const autoArchive = require("./Modules/projectSetting/autoArchive");
 const recurringTasks = require("./Modules/RecurringTasks/controller");
 const timeReminders = require("./Modules/TimeSheet/controller/timeReminders");
+const auditRecorder = require("./Modules/Audit/recorder");
 
 // BUG-035 / #89 — pin every cron to a known timezone so schedules don't
 // shift when the server's local tz changes (DST transition, container
@@ -81,5 +82,16 @@ schedule.scheduleJob({ rule: '0 17 * * *', tz: CRON_TZ }, async () => {
         await timeReminders.runRemindersForAllCompanies();
     } catch (err) {
         logger.error(`[Cron] timeReminders failed: ${err && err.message ? err.message : err}`);
+    }
+})
+
+// Audit-log retention — daily at 02:00, prune rows older than AUDIT_RETENTION_DAYS
+// (default 365) across all companies.
+schedule.scheduleJob({ rule: '0 2 * * *', tz: CRON_TZ }, async () => {
+    logger.info(`[Cron] auditRecorder.runAuditRetentionForAllCompanies`);
+    try {
+        await auditRecorder.runAuditRetentionForAllCompanies();
+    } catch (err) {
+        logger.error(`[Cron] audit retention failed: ${err && err.message ? err.message : err}`);
     }
 })

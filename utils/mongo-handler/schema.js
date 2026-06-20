@@ -463,6 +463,56 @@ const schema = {
         createdBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // Per-company enterprise SSO config (OIDC/SAML) — managed by Modules/SSO (SEC-02)
+    ssoConfigs: {
+        provider: { type: String, default: 'oidc', required: false },
+        isEnabled: { type: Boolean, default: false, required: false },
+        autoProvisionUsers: { type: Boolean, default: true, required: false },
+        defaultRoleType: { type: Number, default: 3, required: false },
+        oidc: { type: Object, required: false },
+        saml: { type: Object, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // Immutable audit trail — managed by Modules/Audit (SEC-04). Insert-only;
+    // pruned by retention. No deletedStatusKey (rows are never soft-deleted).
+    auditLogs: {
+        actorId: { type: String, required: false },
+        actorName: { type: String, required: false },
+        action: { type: String, required: true },
+        entityType: { type: String, required: false },
+        entityId: { type: String, required: false },
+        entityName: { type: String, required: false },
+        meta: { type: Object, required: false },
+        ip: { type: String, required: false },
+    },
+    // Per-company SCIM 2.0 provisioning config — managed by Modules/Scim (SEC-05).
+    // The IdP-held bearer token is stored only as a bcrypt hash; the company is
+    // resolved from the token itself, so SCIM requests carry no companyId header.
+    scimConfigs: {
+        isEnabled: { type: Boolean, default: false, required: false },
+        tokenHash: { type: String, required: false },
+        tokenLast4: { type: String, required: false },
+        defaultRoleType: { type: Number, default: 3, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // Time-off / PTO entries — managed by Modules/Pto (SEC-08). Approved entries
+    // reduce a user's available capacity (helpers/ptoRules.computeAvailableCapacity).
+    ptoEntries: {
+        userId: { type: String, required: true },
+        type: { type: String, default: 'vacation', required: false },
+        startDate: { type: Date, required: true },
+        endDate: { type: Date, required: true },
+        hoursPerDay: { type: Number, default: 8, required: false },
+        status: { type: String, default: 'pending', required: false },
+        reason: { type: String, required: false },
+        approvedBy: { type: String, required: false },
+        createdBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Wiki pages (Editor.js blocks; versioned) — managed by Modules/Pages
     pages: {
         title: { type: String, required: true },
@@ -1188,6 +1238,11 @@ const schema = {
         roleType: {
             type: Number,
             required: true
+        },
+        guestProjectIds: {
+            type: Array,
+            default: [],
+            required: false
         },
         sendInvitationTime: {
             type: Number,

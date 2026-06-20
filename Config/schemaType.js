@@ -72,6 +72,10 @@ const SCHEMA_TYPE = {
     RECURRING_TASKS: "recurring_tasks",
     TIMESHEET_APPROVAL: "timesheet_approval",
     BILLING_RATES: "billing_rates",
+    SSO_CONFIGS: "sso_configs",
+    AUDIT_LOGS: "audit_logs",
+    SCIM_CONFIGS: "scim_configs",
+    PTO_ENTRIES: "pto_entries",
 }
 
 module.exports = {

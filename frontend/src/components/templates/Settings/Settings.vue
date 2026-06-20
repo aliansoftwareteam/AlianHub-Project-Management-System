@@ -178,6 +178,30 @@
             permissions:['settings.settings_security_permissions'],
             activeIcon: require("@/assets/images/svg/workspaceSecurityActive.svg")
         },{
+            label: "SSO",
+            to: {name: "SsoSettings"},
+            icon: require("@/assets/images/svg/workspaceSecurity.svg"),
+            permissions:['settings.settings_security_permissions'],
+            activeIcon: require("@/assets/images/svg/workspaceSecurityActive.svg")
+        },{
+            label: "SCIM",
+            to: {name: "ScimSettings"},
+            icon: require("@/assets/images/svg/workspaceSecurity.svg"),
+            permissions:['settings.settings_security_permissions'],
+            activeIcon: require("@/assets/images/svg/workspaceSecurityActive.svg")
+        },{
+            label: "Audit Log",
+            to: {name: "AuditLog"},
+            icon: require("@/assets/images/svg/workspaceSecurity.svg"),
+            permissions:['settings.settings_security_permissions'],
+            activeIcon: require("@/assets/images/svg/workspaceSecurityActive.svg")
+        },{
+            label: "Time Off",
+            to: {name: "TimeOff"},
+            icon: require("@/assets/images/svg/WorkspaceSettingsInactive.svg"),
+            isVisible:true,
+            activeIcon: require("@/assets/images/svg/WorkspaceSettings.svg")
+        },{
             label: UserName,
             to: {name: UserName},
             section: true,

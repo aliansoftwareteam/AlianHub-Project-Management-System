@@ -174,6 +174,10 @@ function initializeControllers() {
     })
     //IMPORT CUSTOM FILES
     require('./Modules/Auth/init').init(app);
+    require('./Modules/SSO/init').init(app);
+    require('./Modules/Audit/init').init(app);
+    require('./Modules/Scim/init').init(app);
+    require('./Modules/Pto/init').init(app);
     require('./Modules/notification1/init').init(app);
     require('./Modules/ImportSettings/init').init(app);
     require('./Modules/Tasks/init.js').init(app);

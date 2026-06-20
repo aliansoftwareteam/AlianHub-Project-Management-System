@@ -70,7 +70,11 @@ const {
     publicShareIndexSchema,
     recurringTasksSchema,
     timesheetApprovalSchema,
-    billingRatesSchema
+    billingRatesSchema,
+    ssoConfigsSchema,
+    auditLogsSchema,
+    scimConfigsSchema,
+    ptoEntriesSchema
 } = require('./createSchema');
 
 
@@ -216,6 +220,14 @@ exports.checkType = (type) => {
             return timesheetApprovalSchema
         case SCHEMA_TYPE.BILLING_RATES:
             return billingRatesSchema
+        case SCHEMA_TYPE.SSO_CONFIGS:
+            return ssoConfigsSchema
+        case SCHEMA_TYPE.AUDIT_LOGS:
+            return auditLogsSchema
+        case SCHEMA_TYPE.SCIM_CONFIGS:
+            return scimConfigsSchema
+        case SCHEMA_TYPE.PTO_ENTRIES:
+            return ptoEntriesSchema
         default:
             return ""
     }
@@ -364,6 +376,14 @@ exports.tableType = (type) => {
                 return `${dbCollections.TIMESHEET_APPROVAL}`
         case SCHEMA_TYPE.BILLING_RATES:
                 return `${dbCollections.BILLING_RATES}`
+        case SCHEMA_TYPE.SSO_CONFIGS:
+                return `${dbCollections.SSO_CONFIGS}`
+        case SCHEMA_TYPE.AUDIT_LOGS:
+                return `${dbCollections.AUDIT_LOGS}`
+        case SCHEMA_TYPE.SCIM_CONFIGS:
+                return `${dbCollections.SCIM_CONFIGS}`
+        case SCHEMA_TYPE.PTO_ENTRIES:
+                return `${dbCollections.PTO_ENTRIES}`
         default:
             return ""
     }

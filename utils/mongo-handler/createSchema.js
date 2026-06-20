@@ -123,6 +123,16 @@ timesheetApprovalSchema.index({ userId: 1, periodStart: 1, periodEnd: 1 });
 timesheetApprovalSchema.index({ status: 1, periodStart: -1 });
 const billingRatesSchema = new Schema(schema.billingRates, {strict: true, timestamps: true});
 billingRatesSchema.index({ scope: 1, refId: 1, deletedStatusKey: 1 });
+const ssoConfigsSchema = new Schema(schema.ssoConfigs, {strict: true, timestamps: true});
+const auditLogsSchema = new Schema(schema.auditLogs, {strict: true, timestamps: true});
+auditLogsSchema.index({ createdAt: -1 });
+auditLogsSchema.index({ actorId: 1, createdAt: -1 });
+auditLogsSchema.index({ entityType: 1, entityId: 1, createdAt: -1 });
+auditLogsSchema.index({ action: 1, createdAt: -1 });
+const scimConfigsSchema = new Schema(schema.scimConfigs, {strict: true, timestamps: true});
+const ptoEntriesSchema = new Schema(schema.ptoEntries, {strict: true, timestamps: true});
+ptoEntriesSchema.index({ userId: 1, startDate: 1 });
+ptoEntriesSchema.index({ status: 1 });
 // Global search: one combined text index per collection.
 taskSchema.index({ TaskName: 'text', rawDescription: 'text' });
 projectsSchema.index({ ProjectName: 'text' });
@@ -204,6 +214,10 @@ module.exports = {
     recurringTasksSchema,
     timesheetApprovalSchema,
     billingRatesSchema,
+    ssoConfigsSchema,
+    auditLogsSchema,
+    scimConfigsSchema,
+    ptoEntriesSchema,
     historySchema,
     userIdSchema, 
     usersSchema,

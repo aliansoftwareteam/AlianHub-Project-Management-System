@@ -255,6 +255,19 @@ exports.updateMember = async (req, res) => {
         removeCache("UserProjectData:", true);
         removeCache(`UserData:${response.userId}`, false);
         removeCache(`UserAllData:${req.headers['companyid']}`);
+        // SEC-01: a role / guest-projects change must take effect immediately in
+        // the access guards (permissionGuard.getRoleType is cached 60s).
+        if (response && response.userId) {
+            const { invalidateRoleCache } = require('../../../Config/permissionGuard');
+            invalidateRoleCache(req.headers['companyid'], response.userId);
+        }
+        // SEC-04: audit member updates (role / guest-projects / status changes).
+        try {
+            require('../../Audit/recorder').recordAuditFromReq(req, {
+                action: 'member.update', entityType: 'member', entityId: String(id),
+                meta: { fields: Object.keys(data || {}) },
+            });
+        } catch (e) { /* audit is best-effort */ }
 
         if(response) {
             return res.status(200).json({ status: true, data: response });

@@ -168,6 +168,19 @@ const verifyJWTTokenWithCRoute = [
     '/api/v2/auth/2fa/setup',
     '/api/v2/auth/2fa/verify',
     '/api/v2/auth/2fa/disable',
+    // SSO admin config (Modules/SSO) — JWT+company so the owner/admin gate has
+    // req.uid. The login-flow routes (/api/v2/sso/oidc|saml|public) stay PUBLIC
+    // (pre-auth), so they are intentionally NOT listed here.
+    '/api/v2/sso/config',
+    '/api/v1/audit-logs',
+    // SCIM admin config (Modules/Scim) — JWT+company; owner/admin gated
+    // in-controller. The SCIM 2.0 protocol routes (/scim/v2/*) use bearer-token
+    // auth (company resolved from the token) and are intentionally NOT listed.
+    '/api/v2/scim/config',
+    '/api/v2/scim/token',
+    // Time-off / PTO (Modules/Pto) — JWT+company; prefix-matches /pto, /pto/:id,
+    // /pto/:id/status, /pto/capacity. Role checks are enforced in-controller.
+    '/api/v1/pto',
 ];
 const verifyJWTToken = [
     "/api/v2/company/delete",
