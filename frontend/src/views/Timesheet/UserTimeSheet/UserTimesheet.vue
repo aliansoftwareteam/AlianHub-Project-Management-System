@@ -145,6 +145,12 @@
                     <div class="circlePurple mr-6px"></div>
                     <span class="font-size-14 GunPowder font-weight-400">{{ $t('UserTimesheet.manual_time') }}</span>
                 </span>
+                <BillableSummary
+                    class="ml-2"
+                    :period-start="dateRange.startDate"
+                    :period-end="dateRange.endDate"
+                    :user-ids="billableUserIds"
+                />
                 <TimesheetApproval
                     class="ml-2"
                     :period-start="dateRange.startDate"
@@ -186,6 +192,7 @@
     import { apiRequest } from '../../../services';
     import * as env from '@/config/env';
     import TimesheetApproval from '@/components/molecules/TimesheetApproval/TimesheetApproval.vue';
+    import BillableSummary from '@/components/molecules/BillableSummary/BillableSummary.vue';
 
     defineComponent({
         name: "UserTimesheet",
@@ -235,6 +242,7 @@
     })
     const finalFilter = ref([]);
     const companyUserDetail = computed(() => getters["settings/companyUserDetail"]);
+    const billableUserIds = computed(() => (users.value || []).map((u) => u._id).filter(Boolean));
     const usersArray = ref([]);
     // dateRange.value.startDate = new Date(date.getFullYear(), date.getMonth(), 1);
     // dateRange.value.endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0);

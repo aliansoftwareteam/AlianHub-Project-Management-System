@@ -995,6 +995,10 @@ export default {
         status_approved: "Approved",
         status_rejected: "Rejected",
     },
+    Billable: {
+        billable: "Billable",
+        non_billable: "Non-billable",
+    },
     ProjectWorkplace: {
         msg1: "Project can be shared with members. You can add guests to Folders, Lists, and tasks after creating a Project.",
         msg2: "Currently, there are no plans in place to create private or public projects. If you'd like to initiate a project, upgrading your plan would be necessary.",

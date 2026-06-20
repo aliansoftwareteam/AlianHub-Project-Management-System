@@ -107,6 +107,15 @@
                         <div class="invalid-feedback red">{{formData.description.error}}</div>
                     </div>
                 </div>
+                <div class="form-group d-flex align-items-baseline">
+                    <label class="black font-weight-500">{{$t('Billable.billable')}}</label>
+                    <div class="input-field-group ml-0">
+                        <label class="billable-toggle d-flex align-items-center cursor-pointer">
+                            <input type="checkbox" v-model="billable" />
+                            <span class="ml-2">{{ billable ? $t('Billable.billable') : $t('Billable.non_billable') }}</span>
+                        </label>
+                    </div>
+                </div>
             </div>
             <SpinnerComp :is-spinner="isSpinner" v-if="isSpinner"/>
         </template>
@@ -173,6 +182,8 @@
     const projectData = inject("selectedProject");
     const errorTimeEnd = ref('');
     const isSpinner = ref(false);
+    // TIME-02: billable defaults to true; on edit, prefill from the row if it carries the flag.
+    const billable = ref(props.selectedTimeRow && props.selectedTimeRow.billable !== undefined ? props.selectedTimeRow.billable !== false : true);
 
      const timeData = computed({
         get() {
@@ -354,7 +365,8 @@
                     projectName : projectData.value.ProjectName,
                     previousLoggedTime : props.selectedTimeRow ? props.selectedTimeRow.totalTimeDuration : '',
                     timeZone:getUser(userId.value).timeZone,
-                    timeFormat: getUser(userId.value).timeFormat
+                    timeFormat: getUser(userId.value).timeFormat,
+                    billable: billable.value
                 }
                 apiRequest("post", env.ADD_TIMELOG, axiosData).then((result)=>{
                     props.closeTimeLogSidebar();
