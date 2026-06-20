@@ -6,8 +6,10 @@ const timelogctrl = require('./controller/timeLog');
 const logDetailctrl = require('./controller/logDetailView');
 const milestonectrl = require('./controller/milestone');
 const getTimeSheetByAggregate = require('./controller/getTimeSheetByAggregate');
+const billablectrl = require('./controller/billableSummary');
 exports.init = (app) => {
     app.post('/api/v1/timesheet/user',userctrl.getUserTimeSheet);
+    app.post('/api/v1/timesheet/billable-summary', billablectrl.getBillableSummary);
     app.post('/api/v1/timesheet/workload',workloadctrl.getWorkloadTimeSheet);
     app.post('/api/v1/timesheet/project',projectctrl.getProjectTimeSheet);
     app.post('/api/v1/timesheet/tracker',trackerctrl.getTrackerTimeSheet);

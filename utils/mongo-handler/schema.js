@@ -244,6 +244,11 @@ const schema = {
             type: Number,
             required: false,
         },
+        billable: {
+            type: Boolean,
+            default: true,
+            required: false,
+        },
     },
     history: {
         Key: {

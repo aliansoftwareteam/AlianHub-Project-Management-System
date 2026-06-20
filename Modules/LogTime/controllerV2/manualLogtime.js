@@ -184,7 +184,8 @@ exports.manualLogTime = async (req, res) => {
         LogTimeDuration: diffMin,
         LogDescription: req.body.description,
         Loggeduser: req.body.userId,
-        logAddType : 0
+        logAddType : 0,
+        billable: req.body.billable !== false
     }
     if(req.body.isEdit === false){
         data.TicketID = req.body.ticketId
