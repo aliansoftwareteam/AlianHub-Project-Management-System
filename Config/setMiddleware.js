@@ -172,6 +172,7 @@ const verifyJWTTokenWithCRoute = [
     // req.uid. The login-flow routes (/api/v2/sso/oidc|saml|public) stay PUBLIC
     // (pre-auth), so they are intentionally NOT listed here.
     '/api/v2/sso/config',
+    '/api/v1/audit-logs',
 ];
 const verifyJWTToken = [
     "/api/v2/company/delete",

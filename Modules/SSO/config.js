@@ -54,6 +54,12 @@ exports.setSsoConfig = async (req, res) => {
                 { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
             ],
         }, 'findOneAndUpdate');
+        // SEC-04: audit SSO config changes.
+        try {
+            require('../Audit/recorder').recordAuditFromReq(req, {
+                action: 'sso.config_update', entityType: 'sso', meta: { provider: set.provider, isEnabled: set.isEnabled },
+            });
+        } catch (e) { /* audit is best-effort */ }
         return res.send({ status: true, statusText: 'SSO config saved.', data: saved });
     } catch (error) {
         logger.error(`setSsoConfig: ${error.message}`);

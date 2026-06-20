@@ -475,6 +475,18 @@ const schema = {
         updatedBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // Immutable audit trail — managed by Modules/Audit (SEC-04). Insert-only;
+    // pruned by retention. No deletedStatusKey (rows are never soft-deleted).
+    auditLogs: {
+        actorId: { type: String, required: false },
+        actorName: { type: String, required: false },
+        action: { type: String, required: true },
+        entityType: { type: String, required: false },
+        entityId: { type: String, required: false },
+        entityName: { type: String, required: false },
+        meta: { type: Object, required: false },
+        ip: { type: String, required: false },
+    },
     // Wiki pages (Editor.js blocks; versioned) — managed by Modules/Pages
     pages: {
         title: { type: String, required: true },

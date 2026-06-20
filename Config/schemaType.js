@@ -73,6 +73,7 @@ const SCHEMA_TYPE = {
     TIMESHEET_APPROVAL: "timesheet_approval",
     BILLING_RATES: "billing_rates",
     SSO_CONFIGS: "sso_configs",
+    AUDIT_LOGS: "audit_logs",
 }
 
 module.exports = {

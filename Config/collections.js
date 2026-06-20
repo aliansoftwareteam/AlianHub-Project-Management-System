@@ -74,6 +74,7 @@ const dbCollections = {
     TIMESHEET_APPROVAL: "timesheet_approval",
     BILLING_RATES: "billing_rates",
     SSO_CONFIGS: "sso_configs",
+    AUDIT_LOGS: "audit_logs",
 }
 
 /** DOCUMENT ID'S NAME WHICH IS USED IN THE "SETTINGS" COLLECTION NAME **/
