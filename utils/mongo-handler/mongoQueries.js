@@ -77,7 +77,11 @@ const {
     ptoEntriesSchema,
     portfoliosSchema,
     savedReportsSchema,
-    reportSchedulesSchema
+    reportSchedulesSchema,
+    emailInboxesSchema,
+    calendarFeedsSchema,
+    automationRulesSchema,
+    integrationConnectionsSchema
 } = require('./createSchema');
 
 
@@ -237,6 +241,14 @@ exports.checkType = (type) => {
             return savedReportsSchema
         case SCHEMA_TYPE.REPORT_SCHEDULES:
             return reportSchedulesSchema
+        case SCHEMA_TYPE.EMAIL_INBOXES:
+            return emailInboxesSchema
+        case SCHEMA_TYPE.CALENDAR_FEEDS:
+            return calendarFeedsSchema
+        case SCHEMA_TYPE.AUTOMATION_RULES:
+            return automationRulesSchema
+        case SCHEMA_TYPE.INTEGRATION_CONNECTIONS:
+            return integrationConnectionsSchema
         default:
             return ""
     }
@@ -399,6 +411,14 @@ exports.tableType = (type) => {
                 return `${dbCollections.SAVED_REPORTS}`
         case SCHEMA_TYPE.REPORT_SCHEDULES:
                 return `${dbCollections.REPORT_SCHEDULES}`
+        case SCHEMA_TYPE.EMAIL_INBOXES:
+                return `${dbCollections.EMAIL_INBOXES}`
+        case SCHEMA_TYPE.CALENDAR_FEEDS:
+                return `${dbCollections.CALENDAR_FEEDS}`
+        case SCHEMA_TYPE.AUTOMATION_RULES:
+                return `${dbCollections.AUTOMATION_RULES}`
+        case SCHEMA_TYPE.INTEGRATION_CONNECTIONS:
+                return `${dbCollections.INTEGRATION_CONNECTIONS}`
         default:
             return ""
     }

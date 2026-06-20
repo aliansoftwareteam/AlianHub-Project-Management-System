@@ -551,6 +551,66 @@ const schema = {
         updatedBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // Email-to-task inboxes — managed by Modules/EmailIn (AUTO-01). Lives in the
+    // GLOBAL db keyed by token so the unauthenticated inbound webhook can resolve
+    // token -> company. Snapshots project/sprint/user so taskMongo.create needs no reload.
+    emailInboxes: {
+        token: { type: String, required: true },
+        companyId: { type: String, required: true },
+        name: { type: String, required: false },
+        ProjectID: { type: mongoose.Schema.Types.ObjectId, required: false },
+        sprintId: { type: String, required: false },
+        templateSnapshot: { type: Object, default: {}, required: false },
+        projectSnapshot: { type: Object, default: {}, required: false },
+        userSnapshot: { type: Object, default: {}, required: false },
+        sprintArray: { type: Object, default: {}, required: false },
+        enabled: { type: Boolean, default: true, required: false },
+        createdBy: { type: String, required: false },
+        lastEmailFrom: { type: String, required: false },
+        lastTaskId: { type: String, required: false },
+        lastReceivedAt: { type: Date, required: false },
+        receivedCount: { type: Number, default: 0, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // Calendar feeds — managed by Modules/Calendar (AUTO-02). Token-keyed in the
+    // GLOBAL db; an unauthenticated .ics URL resolves its company + scope.
+    calendarFeeds: {
+        token: { type: String, required: true },
+        companyId: { type: String, required: true },
+        userId: { type: String, required: false },
+        scope: { type: String, default: 'my', required: false },
+        projectId: { type: String, required: false },
+        name: { type: String, required: false },
+        enabled: { type: Boolean, default: true, required: false },
+        createdBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // Automation rules — managed by Modules/Automations (AUTO-03). conditions
+    // (which tasks) + actions (set_priority); applied on demand as a bulk update.
+    automationRules: {
+        name: { type: String, required: true },
+        trigger: { type: String, default: 'manual', required: false },
+        conditions: { type: Object, default: {}, required: false },
+        actions: { type: Array, default: [], required: false },
+        enabled: { type: Boolean, default: true, required: false },
+        lastRunAt: { type: Date, required: false },
+        lastRunCount: { type: Number, default: 0, required: false },
+        createdBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // Integration connections — managed by Modules/Integrations (AUTO-04). Generic
+    // registry backing the marketplace, Slack and iframe apps. Secrets live in
+    // config but are redacted before reaching the client.
+    integrationConnections: {
+        type: { type: String, required: true },
+        name: { type: String, required: false },
+        config: { type: Object, default: {}, required: false },
+        status: { type: String, default: 'connected', required: false },
+        enabled: { type: Boolean, default: true, required: false },
+        createdBy: { type: String, required: false },
+        connectedAt: { type: Date, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Wiki pages (Editor.js blocks; versioned) — managed by Modules/Pages
     pages: {
         title: { type: String, required: true },
