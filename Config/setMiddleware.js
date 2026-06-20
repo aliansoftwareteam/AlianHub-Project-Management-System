@@ -198,6 +198,7 @@ const verifyJWTTokenWithCRoute = [
     // /api/v1/calendar/ics/:token is intentionally NOT listed (token authenticates it).
     '/api/v1/calendar/feeds',
     '/api/v1/automations',
+    '/api/v1/integrations',
 ];
 const verifyJWTToken = [
     "/api/v2/company/delete",

@@ -186,6 +186,7 @@ function initializeControllers() {
     require('./Modules/EmailIn/init').init(app);
     require('./Modules/Calendar/init').init(app);
     require('./Modules/Automations/init').init(app);
+    require('./Modules/Integrations/init').init(app);
     require('./Modules/notification1/init').init(app);
     require('./Modules/ImportSettings/init').init(app);
     require('./Modules/Tasks/init.js').init(app);

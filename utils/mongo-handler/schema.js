@@ -598,6 +598,19 @@ const schema = {
         createdBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // Integration connections — managed by Modules/Integrations (AUTO-04). Generic
+    // registry backing the marketplace, Slack and iframe apps. Secrets live in
+    // config but are redacted before reaching the client.
+    integrationConnections: {
+        type: { type: String, required: true },
+        name: { type: String, required: false },
+        config: { type: Object, default: {}, required: false },
+        status: { type: String, default: 'connected', required: false },
+        enabled: { type: Boolean, default: true, required: false },
+        createdBy: { type: String, required: false },
+        connectedAt: { type: Date, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Wiki pages (Editor.js blocks; versioned) — managed by Modules/Pages
     pages: {
         title: { type: String, required: true },

@@ -80,7 +80,8 @@ const {
     reportSchedulesSchema,
     emailInboxesSchema,
     calendarFeedsSchema,
-    automationRulesSchema
+    automationRulesSchema,
+    integrationConnectionsSchema
 } = require('./createSchema');
 
 
@@ -246,6 +247,8 @@ exports.checkType = (type) => {
             return calendarFeedsSchema
         case SCHEMA_TYPE.AUTOMATION_RULES:
             return automationRulesSchema
+        case SCHEMA_TYPE.INTEGRATION_CONNECTIONS:
+            return integrationConnectionsSchema
         default:
             return ""
     }
@@ -414,6 +417,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.CALENDAR_FEEDS}`
         case SCHEMA_TYPE.AUTOMATION_RULES:
                 return `${dbCollections.AUTOMATION_RULES}`
+        case SCHEMA_TYPE.INTEGRATION_CONNECTIONS:
+                return `${dbCollections.INTEGRATION_CONNECTIONS}`
         default:
             return ""
     }

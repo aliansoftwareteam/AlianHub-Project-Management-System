@@ -83,6 +83,7 @@ const dbCollections = {
     EMAIL_INBOXES: "email_inboxes",
     CALENDAR_FEEDS: "calendar_feeds",
     AUTOMATION_RULES: "automation_rules",
+    INTEGRATION_CONNECTIONS: "integration_connections",
 }
 
 /** DOCUMENT ID'S NAME WHICH IS USED IN THE "SETTINGS" COLLECTION NAME **/
