@@ -255,6 +255,12 @@ exports.updateMember = async (req, res) => {
         removeCache("UserProjectData:", true);
         removeCache(`UserData:${response.userId}`, false);
         removeCache(`UserAllData:${req.headers['companyid']}`);
+        // SEC-01: a role / guest-projects change must take effect immediately in
+        // the access guards (permissionGuard.getRoleType is cached 60s).
+        if (response && response.userId) {
+            const { invalidateRoleCache } = require('../../../Config/permissionGuard');
+            invalidateRoleCache(req.headers['companyid'], response.userId);
+        }
 
         if(response) {
             return res.status(200).json({ status: true, data: response });
