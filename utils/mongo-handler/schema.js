@@ -431,6 +431,24 @@ const schema = {
         createdBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0 },
     },
+    // Timesheet approval submissions — one per user per period (week/month) — managed by Modules/TimesheetApproval
+    timesheetApproval: {
+        userId: { type: String, required: true },
+        periodType: { type: String, default: 'week', required: false },
+        periodStart: { type: Date, required: true },
+        periodEnd: { type: Date, required: true },
+        status: { type: String, default: 'submitted', required: false },
+        totalMinutes: { type: Number, default: 0, required: false },
+        entryCount: { type: Number, default: 0, required: false },
+        note: { type: String, required: false },
+        submittedAt: { type: Date, required: false },
+        submittedBy: { type: String, required: false },
+        reviewedAt: { type: Date, required: false },
+        reviewedBy: { type: String, required: false },
+        reviewerName: { type: String, required: false },
+        rejectionReason: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Wiki pages (Editor.js blocks; versioned) — managed by Modules/Pages
     pages: {
         title: { type: String, required: true },
