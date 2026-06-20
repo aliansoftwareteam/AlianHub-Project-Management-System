@@ -159,6 +159,13 @@
                     :current-user-name="currentUserRef?.Employee_Name || ''"
                     :role-type="companyUserDetail?.roleType"
                 />
+                <TimesheetExport
+                    class="ml-2"
+                    :period-start="dateRange.startDate"
+                    :period-end="dateRange.endDate"
+                    :user-ids="billableUserIds"
+                    :project-ids="exportProjectIds"
+                />
             </div>
             </div>
             
@@ -193,6 +200,7 @@
     import * as env from '@/config/env';
     import TimesheetApproval from '@/components/molecules/TimesheetApproval/TimesheetApproval.vue';
     import BillableSummary from '@/components/molecules/BillableSummary/BillableSummary.vue';
+    import TimesheetExport from '@/components/molecules/TimesheetExport/TimesheetExport.vue';
 
     defineComponent({
         name: "UserTimesheet",
@@ -248,6 +256,7 @@
     // dateRange.value.endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0);
     selectedDates.value = [dateRange.value.startDate,dateRange.value.endDate];
     const projects = ref([]);
+    const exportProjectIds = computed(() => selectedFilters.value.filter((x) => x.type === 'Projects').map((x) => x.id).filter(Boolean));
     const projectsGetter = computed(() => getters["projectData/allProjects"]);
     const currentCompany = computed(() => getters["settings/selectedCompany"])
 
