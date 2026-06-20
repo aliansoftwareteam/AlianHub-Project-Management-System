@@ -7,7 +7,7 @@
 // `secret:true` fields are never returned to the client. `multiple:true` allows
 // many instances (e.g. custom embeds). `oauth:true` marks credential-gated ones.
 const CATALOG = [
-    { key: 'slack', name: 'Slack', category: 'Chat', icon: '💬', description: 'Slash commands and task notifications in Slack.', fields: [{ key: 'signing_secret', label: 'Signing secret', secret: true }, { key: 'default_channel', label: 'Default channel' }] },
+    { key: 'slack', name: 'Slack', category: 'Chat', icon: '💬', description: 'Slash commands (/alianhub) from your Slack workspace.', fields: [{ key: 'verification_token', label: 'Slack verification token', secret: true }, { key: 'default_channel', label: 'Default channel' }] },
     { key: 'github', name: 'GitHub', category: 'Dev', icon: '🐙', description: 'Link commits and pull requests to tasks.', fields: [{ key: 'token', label: 'Personal access token', secret: true }, { key: 'repo', label: 'owner/repo' }] },
     { key: 'gitlab', name: 'GitLab', category: 'Dev', icon: '🦊', description: 'Link merge requests and commits to tasks.', fields: [{ key: 'token', label: 'Access token', secret: true }, { key: 'project', label: 'Project path' }] },
     { key: 'google_calendar', name: 'Google Calendar', category: 'Calendar', icon: '📅', description: '2-way calendar sync (OAuth). The read-only iCal feed needs no setup.', oauth: true, fields: [{ key: 'client_id', label: 'OAuth client ID' }, { key: 'client_secret', label: 'OAuth client secret', secret: true }] },

@@ -4,6 +4,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { removeCache } = require('../../utils/commonFunctions');
 const logger = require('../../Config/loggerConfig');
 const R = require('./helpers/integrationsRules');
+const S = require('./helpers/slackRules'); // AUTO-06
 
 // AUTO-04 — generic integration connections registry (per-company). Backs the
 // marketplace (AUTO-05), Slack (AUTO-06) and custom iframe apps (AUTO-07).
@@ -90,4 +91,29 @@ exports.disconnect = async (req, res) => {
         removeCache(`integration_connections:${companyId}`);
         return res.send({ status: true, statusText: 'Disconnected.' });
     } catch (e) { logger.error(`disconnect: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
+};
+
+// POST /api/v1/slack/command/:companyId — PUBLIC Slack slash-command handler.
+// Authenticated by the per-workspace verification token on the slack connection.
+// Read-only commands (help, projects); always replies with an ephemeral message.
+exports.slackCommand = async (req, res) => {
+    try {
+        const companyId = String(req.params.companyId || '');
+        if (!companyId) return res.json(S.ephemeral('Missing workspace id.'));
+        const conn = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS, data: [{ type: 'slack', deletedStatusKey: { $ne: 1 } }],
+        }, 'findOne').catch(() => null);
+        if (!conn || conn.enabled === false || !conn.config || !conn.config.verification_token) {
+            return res.json(S.ephemeral('Slack isn’t connected for this workspace yet — add it in AlianHub → Integrations → Marketplace.'));
+        }
+        if (!S.verifyToken(conn.config.verification_token, req.body && req.body.token)) {
+            return res.status(401).json(S.ephemeral('Verification failed.'));
+        }
+        const { sub } = S.parseCommand(req.body && req.body.text);
+        if (sub === 'projects') {
+            const projects = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{}, 'ProjectName', { limit: 50 }] }, 'find').catch(() => []);
+            return res.json(S.ephemeral(S.projectsText((projects || []).map((p) => p.ProjectName).filter(Boolean))));
+        }
+        return res.json(S.ephemeral(S.helpText()));
+    } catch (e) { logger.error(`slackCommand: ${e.message}`); return res.json(S.ephemeral('Something went wrong.')); }
 };

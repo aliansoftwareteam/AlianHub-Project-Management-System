@@ -488,6 +488,8 @@ export default {
         mp_disconnect: "Disconnect",
         mp_save: "Save connection",
         mp_cancel: "Cancel",
+        slack_url: "Slash command request URL",
+        slack_hint: "In your Slack app → Slash Commands, create /alianhub and paste this Request URL. Put your app's Verification Token (Basic Information) in the field above.",
     },
     Capacity: {
         apply: "Apply",

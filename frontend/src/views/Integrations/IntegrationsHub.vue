@@ -104,6 +104,14 @@
                                 <button class="ig-mini" @click="openConnect(item)">{{ connectedFor(item.key) ? $t('IntegrationsHub.mp_reconfigure') : $t('IntegrationsHub.mp_connect') }}</button>
                                 <button v-if="connectedFor(item.key)" class="ig-mini del" @click="disconnect(connectedFor(item.key))">{{ $t('IntegrationsHub.mp_disconnect') }}</button>
                             </div>
+                            <div v-if="item.key === 'slack' && connectedFor(item.key)" class="ig-mp-slack">
+                                <label class="ig-lbl">{{ $t('IntegrationsHub.slack_url') }}</label>
+                                <div class="ig-row">
+                                    <input class="form-control ig-mono" :value="slackUrl" readonly @focus="$event.target.select()" />
+                                    <button class="ig-mini" @click="copy(slackUrl)">{{ $t('IntegrationsHub.copy') }}</button>
+                                </div>
+                                <p class="ig-note">{{ $t('IntegrationsHub.slack_hint') }}</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -259,6 +267,7 @@ const filteredCatalog = computed(() => {
         .filter((i) => !q || (i.name || '').toLowerCase().includes(q) || (i.category || '').toLowerCase().includes(q));
 });
 const connectedFor = (type) => connections.value.find((c) => c.type === type) || null;
+const slackUrl = computed(() => `${window.location.origin}/api/v1/slack/command/${cid.value}`);
 
 const webhookUrl = (token) => `${window.location.origin}${env.EMAIL_IN}/${token}`;
 
