@@ -26,10 +26,13 @@ const companyOf = (req) => String(
 const computePeriodTotals = async (companyId, userId, periodStart, periodEnd) => {
     const start = new Date(periodStart); start.setHours(0, 0, 0, 0);
     const end = new Date(periodEnd); end.setHours(23, 59, 59, 999);
+    // LogStartTime is stored in Unix SECONDS (see manualLogtime getTimeStamp), not ms.
+    const startSec = Math.floor(start.getTime() / 1000);
+    const endSec = Math.floor(end.getTime() / 1000);
     const entries = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TIMESHEET,
         data: [
-            { Loggeduser: String(userId), LogStartTime: { $gte: start.getTime(), $lte: end.getTime() } },
+            { Loggeduser: String(userId), LogStartTime: { $gte: startSec, $lte: endSec } },
             { LogTimeDuration: 1 },
         ],
     }, 'find');
