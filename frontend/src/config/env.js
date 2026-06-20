@@ -179,6 +179,7 @@ module.exports.RULES = '/api/v1/securityPermissions';
 module.exports.PROJECTS_APPS = '/api/v1/projects-apps';
 module.exports.PROJECTS_TABS = '/api/v1/projectTabs';
 module.exports.TIMESHEET = '/api/v1/timesheet';
+module.exports.TIMESHEET_APPROVAL = '/api/v2/timesheet-approval';
 module.exports.MAIN_CHATS = '/api/v1/main-chats'
 module.exports.ACTIVITYLOG = '/api/v1/activity-log'
 module.exports.SETTING_CATEGORY = '/api/v1/setting/category';

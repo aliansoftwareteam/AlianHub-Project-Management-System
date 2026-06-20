@@ -145,6 +145,14 @@
                     <div class="circlePurple mr-6px"></div>
                     <span class="font-size-14 GunPowder font-weight-400">{{ $t('UserTimesheet.manual_time') }}</span>
                 </span>
+                <TimesheetApproval
+                    class="ml-2"
+                    :period-start="dateRange.startDate"
+                    :period-end="dateRange.endDate"
+                    :current-user-id="currentUserId"
+                    :current-user-name="currentUserRef?.Employee_Name || ''"
+                    :role-type="companyUserDetail?.roleType"
+                />
             </div>
             </div>
             
@@ -177,6 +185,7 @@
     import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
     import { apiRequest } from '../../../services';
     import * as env from '@/config/env';
+    import TimesheetApproval from '@/components/molecules/TimesheetApproval/TimesheetApproval.vue';
 
     defineComponent({
         name: "UserTimesheet",
