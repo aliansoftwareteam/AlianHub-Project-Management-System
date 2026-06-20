@@ -487,6 +487,18 @@ const schema = {
         meta: { type: Object, required: false },
         ip: { type: String, required: false },
     },
+    // Per-company SCIM 2.0 provisioning config — managed by Modules/Scim (SEC-05).
+    // The IdP-held bearer token is stored only as a bcrypt hash; the company is
+    // resolved from the token itself, so SCIM requests carry no companyId header.
+    scimConfigs: {
+        isEnabled: { type: Boolean, default: false, required: false },
+        tokenHash: { type: String, required: false },
+        tokenLast4: { type: String, required: false },
+        defaultRoleType: { type: Number, default: 3, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Wiki pages (Editor.js blocks; versioned) — managed by Modules/Pages
     pages: {
         title: { type: String, required: true },

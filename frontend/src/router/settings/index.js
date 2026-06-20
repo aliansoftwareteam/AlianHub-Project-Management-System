@@ -49,6 +49,15 @@ export default [
                 component: () => import(/* webpackChunkName: AuditLog */ '@/views/Settings/Audit/AuditLog.vue')
             },
             {
+                path: "scim",
+                name: "ScimSettings",
+                meta: {
+                    title: "SCIM",
+                    requiresAuth: true
+                },
+                component: () => import(/* webpackChunkName: ScimSettings */ '@/views/Settings/Scim/ScimSettings.vue')
+            },
+            {
                 path: "teams",
                 name: "Teams",
                 meta: {

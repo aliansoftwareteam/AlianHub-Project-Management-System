@@ -129,6 +129,7 @@ auditLogsSchema.index({ createdAt: -1 });
 auditLogsSchema.index({ actorId: 1, createdAt: -1 });
 auditLogsSchema.index({ entityType: 1, entityId: 1, createdAt: -1 });
 auditLogsSchema.index({ action: 1, createdAt: -1 });
+const scimConfigsSchema = new Schema(schema.scimConfigs, {strict: true, timestamps: true});
 // Global search: one combined text index per collection.
 taskSchema.index({ TaskName: 'text', rawDescription: 'text' });
 projectsSchema.index({ ProjectName: 'text' });
@@ -212,6 +213,7 @@ module.exports = {
     billingRatesSchema,
     ssoConfigsSchema,
     auditLogsSchema,
+    scimConfigsSchema,
     historySchema,
     userIdSchema, 
     usersSchema,

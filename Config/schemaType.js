@@ -74,6 +74,7 @@ const SCHEMA_TYPE = {
     BILLING_RATES: "billing_rates",
     SSO_CONFIGS: "sso_configs",
     AUDIT_LOGS: "audit_logs",
+    SCIM_CONFIGS: "scim_configs",
 }
 
 module.exports = {

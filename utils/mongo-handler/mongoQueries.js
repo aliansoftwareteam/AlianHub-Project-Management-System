@@ -72,7 +72,8 @@ const {
     timesheetApprovalSchema,
     billingRatesSchema,
     ssoConfigsSchema,
-    auditLogsSchema
+    auditLogsSchema,
+    scimConfigsSchema
 } = require('./createSchema');
 
 
@@ -222,6 +223,8 @@ exports.checkType = (type) => {
             return ssoConfigsSchema
         case SCHEMA_TYPE.AUDIT_LOGS:
             return auditLogsSchema
+        case SCHEMA_TYPE.SCIM_CONFIGS:
+            return scimConfigsSchema
         default:
             return ""
     }
@@ -374,6 +377,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.SSO_CONFIGS}`
         case SCHEMA_TYPE.AUDIT_LOGS:
                 return `${dbCollections.AUDIT_LOGS}`
+        case SCHEMA_TYPE.SCIM_CONFIGS:
+                return `${dbCollections.SCIM_CONFIGS}`
         default:
             return ""
     }
