@@ -184,6 +184,12 @@
             permissions:['settings.settings_security_permissions'],
             activeIcon: require("@/assets/images/svg/workspaceSecurityActive.svg")
         },{
+            label: "Audit Log",
+            to: {name: "AuditLog"},
+            icon: require("@/assets/images/svg/workspaceSecurity.svg"),
+            permissions:['settings.settings_security_permissions'],
+            activeIcon: require("@/assets/images/svg/workspaceSecurityActive.svg")
+        },{
             label: UserName,
             to: {name: UserName},
             section: true,

@@ -40,6 +40,15 @@ export default [
                 component: () => import(/* webpackChunkName: SsoSettings */ '@/views/Settings/Sso/SsoSettings.vue')
             },
             {
+                path: "audit-logs",
+                name: "AuditLog",
+                meta: {
+                    title: "Audit Log",
+                    requiresAuth: true
+                },
+                component: () => import(/* webpackChunkName: AuditLog */ '@/views/Settings/Audit/AuditLog.vue')
+            },
+            {
                 path: "teams",
                 name: "Teams",
                 meta: {
