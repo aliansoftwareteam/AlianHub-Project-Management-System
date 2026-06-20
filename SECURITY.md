@@ -1,5 +1,9 @@
 # Security Policy
 
+> **Compliance & security posture:** AlianHub's security whitepaper, control mapping for
+> **SOC 2 / ISO 27001 / HIPAA**, the self-hosted **shared-responsibility model**, and the
+> tracked **compliance gap register** live in [`docs/compliance/`](docs/compliance/README.md).
+
 ## Supported Versions
 
 This project follows Semantic Versioning (SemVer), but **does not provide guaranteed security support for specific versions**.
