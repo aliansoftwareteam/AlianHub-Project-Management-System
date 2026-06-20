@@ -74,6 +74,31 @@
                     </details>
                 </div>
 
+                <!-- Custom apps / iframe plugins (AUTO-07) -->
+                <div v-else-if="active === 'apps'">
+                    <div class="ig-head">
+                        <h2>{{ $t('IntegrationsHub.apps') }}</h2>
+                        <p>{{ $t('IntegrationsHub.apps_intro') }}</p>
+                    </div>
+                    <div class="ig-card">
+                        <div class="ig-row">
+                            <input v-model="appForm.name" class="form-control" :placeholder="$t('IntegrationsHub.apps_name')" />
+                            <input v-model="appForm.url" class="form-control" :placeholder="$t('IntegrationsHub.apps_url')" />
+                            <button class="ig-btn" :disabled="busy || !appForm.name.trim() || !appForm.url.trim()" @click="addApp">{{ $t('IntegrationsHub.apps_add') }}</button>
+                        </div>
+                        <p class="ig-note">{{ $t('IntegrationsHub.apps_note') }}</p>
+                    </div>
+                    <div v-if="!apps.length" class="ig-empty">{{ $t('IntegrationsHub.apps_none') }}</div>
+                    <div v-if="apps.length" class="ig-apps-tabs">
+                        <button v-for="a in apps" :key="a._id" class="ig-app-tab" :class="{ active: activeApp && activeApp._id === a._id }" @click="openApp(a)">
+                            {{ a.name }}<span class="ig-app-x" @click.stop="removeApp(a)">✕</span>
+                        </button>
+                    </div>
+                    <div v-if="activeApp" class="ig-app-frame">
+                        <iframe :src="activeApp.config && activeApp.config.url" sandbox="allow-scripts allow-forms allow-popups allow-same-origin" referrerpolicy="no-referrer" loading="lazy"></iframe>
+                    </div>
+                </div>
+
                 <!-- Marketplace (AUTO-05) -->
                 <div v-else-if="active === 'marketplace'">
                     <div class="ig-head">
@@ -241,7 +266,7 @@ const cats = [
     { key: 'calendar', icon: '📅', soon: false },
     { key: 'marketplace', icon: '🧩', soon: false },
     { key: 'slack', icon: '💬', soon: true },
-    { key: 'apps', icon: '🪟', soon: true },
+    { key: 'apps', icon: '🪟', soon: false },
 ];
 const active = ref('emailToTask');
 const activeCat = computed(() => cats.find((c) => c.key === active.value) || cats[0]);
@@ -258,7 +283,11 @@ const catalog = ref([]);
 const connections = ref([]);
 const mpSearch = ref('');
 const mpForm = reactive({ type: '', config: {} });
+const appForm = reactive({ name: '', url: '' });
+const activeApp = ref(null);
 const busy = ref(false);
+
+const apps = computed(() => connections.value.filter((c) => c.type === 'custom_iframe'));
 
 const filteredCatalog = computed(() => {
     const q = mpSearch.value.trim().toLowerCase();
@@ -373,6 +402,25 @@ const disconnect = async (conn) => {
     try { await apiRequest('delete', `${env.INTEGRATIONS}/connections/${conn._id}`); await loadConnections(); } catch (e) { /* noop */ }
 };
 
+// AUTO-07 — custom iframe apps (stored as custom_iframe connections).
+const addApp = async () => {
+    if (busy.value || !appForm.name.trim() || !appForm.url.trim()) return;
+    busy.value = true;
+    try {
+        await apiRequest('post', `${env.INTEGRATIONS}/connections`, { type: 'custom_iframe', config: { name: appForm.name.trim(), url: appForm.url.trim() } });
+        appForm.name = ''; appForm.url = '';
+        await loadConnections();
+    } catch (e) { /* noop */ } finally { busy.value = false; }
+};
+const openApp = (a) => { activeApp.value = a; };
+const removeApp = async (a) => {
+    try {
+        await apiRequest('delete', `${env.INTEGRATIONS}/connections/${a._id}`);
+        if (activeApp.value && activeApp.value._id === a._id) activeApp.value = null;
+        await loadConnections();
+    } catch (e) { /* noop */ }
+};
+
 onMounted(() => { loadProjects(); loadInboxes(); loadFeeds(); loadRules(); loadCatalog(); loadConnections(); });
 </script>
 
@@ -440,4 +488,12 @@ onMounted(() => { loadProjects(); loadInboxes(); loadFeeds(); loadRules(); loadC
 .ig-mp-form { border-top: 1px solid #f0f1f6; padding-top: 10px; }
 .ig-mp-field { margin-bottom: 8px; }
 .ig-mp-actions { display: flex; gap: 8px; }
+.ig-mp-slack { border-top: 1px solid #f0f1f6; margin-top: 10px; padding-top: 10px; }
+.ig-apps-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.ig-app-tab { display: inline-flex; align-items: center; gap: 8px; border: 1px solid #e0e2ee; background: #fff; border-radius: 8px; padding: 7px 12px; font-size: 13px; cursor: pointer; color: #33384a; }
+.ig-app-tab.active { background: #eef0ff; border-color: #d7dbff; }
+.ig-app-x { color: #9aa0b4; font-size: 11px; }
+.ig-app-x:hover { color: #c0392b; }
+.ig-app-frame { border: 1px solid #e6e7ee; border-radius: 10px; overflow: hidden; background: #fff; height: calc(100dvh - 230px); min-height: 360px; }
+.ig-app-frame iframe { width: 100%; height: 100%; border: 0; }
 </style>

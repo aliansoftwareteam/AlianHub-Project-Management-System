@@ -490,6 +490,12 @@ export default {
         mp_cancel: "Cancel",
         slack_url: "Slash command request URL",
         slack_hint: "In your Slack app → Slash Commands, create /alianhub and paste this Request URL. Put your app's Verification Token (Basic Information) in the field above.",
+        apps_intro: "Embed an external tool (dashboard, docs, BI board) as an in-app panel. https URLs only.",
+        apps_name: "App name",
+        apps_url: "Embed URL (https://…)",
+        apps_add: "Add app",
+        apps_note: "The embedded site must allow being framed (some set X-Frame-Options / frame-ancestors to block it).",
+        apps_none: "No embedded apps yet. Add one above.",
     },
     Capacity: {
         apply: "Apply",

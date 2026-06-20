@@ -20,6 +20,9 @@ const byKey = (key) => CATALOG.find((c) => c.key === String(key)) || null;
 const getCatalog = () => CATALOG.map((c) => ({ key: c.key, name: c.name, category: c.category, icon: c.icon, description: c.description, oauth: !!c.oauth, multiple: !!c.multiple, fields: (c.fields || []).map((f) => ({ key: f.key, label: f.label, secret: !!f.secret })) }));
 
 const clip = (s) => String(s == null ? '' : s).slice(0, 2000);
+// AUTO-07 — only https URLs may be embedded as iframe apps (blocks http /
+// javascript: / data: and mixed content).
+const isEmbeddableUrl = (u) => /^https:\/\/[^\s]+$/i.test(String(u || ''));
 
 // Validate a connect request against the catalog. Returns { valid, reason, value }.
 const validateConnection = ({ type, config } = {}) => {
@@ -29,7 +32,7 @@ const validateConnection = ({ type, config } = {}) => {
     const allowed = (item.fields || []).map((f) => f.key);
     const out = {};
     for (const k of allowed) if (raw[k] !== undefined && raw[k] !== null && String(raw[k]).length) out[k] = clip(raw[k]);
-    if (item.multiple && (!out.url || !/^https?:\/\//i.test(out.url))) return { valid: false, reason: 'A valid https URL is required.' };
+    if (item.multiple && !isEmbeddableUrl(out.url)) return { valid: false, reason: 'A valid https:// URL is required.' };
     const name = item.multiple ? (out.name || item.name) : item.name;
     return { valid: true, reason: '', value: { type: item.key, name, config: out } };
 };
@@ -46,4 +49,4 @@ const redact = (conn) => {
     return { ...o, config: cfg, secrets };
 };
 
-module.exports = { CATALOG, byKey, getCatalog, validateConnection, redact };
+module.exports = { CATALOG, byKey, getCatalog, validateConnection, redact, isEmbeddableUrl };
