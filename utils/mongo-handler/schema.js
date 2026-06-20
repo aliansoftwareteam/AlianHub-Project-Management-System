@@ -499,6 +499,20 @@ const schema = {
         updatedBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // Time-off / PTO entries — managed by Modules/Pto (SEC-08). Approved entries
+    // reduce a user's available capacity (helpers/ptoRules.computeAvailableCapacity).
+    ptoEntries: {
+        userId: { type: String, required: true },
+        type: { type: String, default: 'vacation', required: false },
+        startDate: { type: Date, required: true },
+        endDate: { type: Date, required: true },
+        hoursPerDay: { type: Number, default: 8, required: false },
+        status: { type: String, default: 'pending', required: false },
+        reason: { type: String, required: false },
+        approvedBy: { type: String, required: false },
+        createdBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Wiki pages (Editor.js blocks; versioned) — managed by Modules/Pages
     pages: {
         title: { type: String, required: true },

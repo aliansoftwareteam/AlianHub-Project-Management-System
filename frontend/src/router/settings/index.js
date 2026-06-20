@@ -58,6 +58,15 @@ export default [
                 component: () => import(/* webpackChunkName: ScimSettings */ '@/views/Settings/Scim/ScimSettings.vue')
             },
             {
+                path: "time-off",
+                name: "TimeOff",
+                meta: {
+                    title: "Time Off",
+                    requiresAuth: true
+                },
+                component: () => import(/* webpackChunkName: TimeOff */ '@/views/Settings/TimeOff/TimeOff.vue')
+            },
+            {
                 path: "teams",
                 name: "Teams",
                 meta: {

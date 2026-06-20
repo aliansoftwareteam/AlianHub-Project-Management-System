@@ -178,6 +178,9 @@ const verifyJWTTokenWithCRoute = [
     // auth (company resolved from the token) and are intentionally NOT listed.
     '/api/v2/scim/config',
     '/api/v2/scim/token',
+    // Time-off / PTO (Modules/Pto) — JWT+company; prefix-matches /pto, /pto/:id,
+    // /pto/:id/status, /pto/capacity. Role checks are enforced in-controller.
+    '/api/v1/pto',
 ];
 const verifyJWTToken = [
     "/api/v2/company/delete",

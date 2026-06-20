@@ -75,6 +75,7 @@ const SCHEMA_TYPE = {
     SSO_CONFIGS: "sso_configs",
     AUDIT_LOGS: "audit_logs",
     SCIM_CONFIGS: "scim_configs",
+    PTO_ENTRIES: "pto_entries",
 }
 
 module.exports = {

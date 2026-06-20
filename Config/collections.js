@@ -76,6 +76,7 @@ const dbCollections = {
     SSO_CONFIGS: "sso_configs",
     AUDIT_LOGS: "audit_logs",
     SCIM_CONFIGS: "scim_configs",
+    PTO_ENTRIES: "pto_entries",
 }
 
 /** DOCUMENT ID'S NAME WHICH IS USED IN THE "SETTINGS" COLLECTION NAME **/
