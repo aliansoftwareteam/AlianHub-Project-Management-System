@@ -1,10 +1,15 @@
 <template>
-    <div class="clip__overlay" @click.self="close">
+    <!-- FULL MODAL — hidden while minimized so the user can work over the page -->
+    <div v-if="!minimized" class="clip__overlay" @click.self="requestClose">
         <div class="clip__card">
             <!-- HEAD -->
             <div class="d-flex align-items-center justify-content-between clip__head">
                 <span class="font-size-16 font-weight-700">{{ $t('ClipRecorder.record_clip') }}</span>
-                <span class="cursor-pointer font-size-16 clip__close" @click="close">&#10005;</span>
+                <div class="d-flex align-items-center clip__head-actions">
+                    <span v-if="phase === 'recording'" class="cursor-pointer clip__icon-btn"
+                        :title="$t('ClipRecorder.minimize')" @click="minimize">&#8211;</span>
+                    <span class="cursor-pointer font-size-16 clip__close" :title="$t('ClipRecorder.close')" @click="requestClose">&#10005;</span>
+                </div>
             </div>
 
             <!-- UNSUPPORTED -->
@@ -13,7 +18,7 @@
             </div>
 
             <template v-else>
-                <!-- MODE SELECT (only before a recording exists / while idle) -->
+                <!-- MODE SELECT (only while idle) -->
                 <div v-if="phase === 'idle'" class="clip__modes">
                     <label class="clip__mode" :class="{ 'clip__mode--active': mode === 'voice' }">
                         <input type="radio" value="voice" v-model="mode" />
@@ -44,6 +49,9 @@
                     <span class="font-size-14 font-weight-600">{{ $t('ClipRecorder.recording') }}</span>
                     <span class="clip__timer font-size-14">{{ formattedElapsed }}</span>
                 </div>
+                <div v-if="phase === 'recording'" class="font-size-12 gray81 clip__hint">
+                    {{ $t('ClipRecorder.minimize_hint') }}
+                </div>
 
                 <!-- PREVIEW -->
                 <div v-if="phase === 'preview' && previewUrl" class="clip__preview">
@@ -53,49 +61,41 @@
 
                 <!-- CONTROLS -->
                 <div class="d-flex justify-content-end clip__actions">
-                    <button
-                        v-if="phase === 'idle'"
-                        type="button"
-                        class="btn-primary font-size-13"
-                        @click="startRecording"
-                    >{{ $t('ClipRecorder.start') }}</button>
+                    <button v-if="phase === 'idle'" type="button" class="btn-primary font-size-13" @click="startRecording">{{ $t('ClipRecorder.start') }}</button>
 
-                    <button
-                        v-if="phase === 'recording'"
-                        type="button"
-                        class="btn-primary font-size-13 clip__stop"
-                        @click="stopRecording"
-                    >{{ $t('ClipRecorder.stop') }}</button>
+                    <template v-if="phase === 'recording'">
+                        <button type="button" class="clip__btn-ghost font-size-13 mr-10px" @click="minimize">{{ $t('ClipRecorder.minimize') }}</button>
+                        <button type="button" class="btn-primary font-size-13 clip__stop" @click="stopRecording">{{ $t('ClipRecorder.stop') }}</button>
+                    </template>
 
                     <template v-if="phase === 'preview'">
-                        <button
-                            type="button"
-                            class="clip__btn-ghost font-size-13 mr-10px"
-                            @click="reRecord"
-                        >{{ $t('ClipRecorder.re_record') }}</button>
-                        <button
-                            type="button"
-                            class="btn-primary font-size-13"
-                            @click="attachClip"
-                        >{{ $t('ClipRecorder.attach') }}</button>
+                        <button type="button" class="clip__btn-ghost font-size-13 mr-10px" @click="reRecord">{{ $t('ClipRecorder.re_record') }}</button>
+                        <button type="button" class="btn-primary font-size-13" @click="attachClip">{{ $t('ClipRecorder.attach') }}</button>
                     </template>
                 </div>
             </template>
         </div>
     </div>
+
+    <!-- MINIMIZED WIDGET — floats over the app while recording continues in the background -->
+    <div v-else class="clip__mini">
+        <span class="clip__dot"></span>
+        <span class="clip__mini-timer font-size-13 font-weight-600">{{ formattedElapsed }}</span>
+        <button type="button" class="clip__mini-stop" @click="stopRecording">{{ $t('ClipRecorder.stop') }}</button>
+        <span class="cursor-pointer clip__icon-btn" :title="$t('ClipRecorder.maximize')" @click="maximize">&#9974;</span>
+    </div>
 </template>
 
 <script setup>
 // PACKAGES
-import { defineEmits, ref, computed, onMounted, onBeforeUnmount } from "vue";
+import { defineEmits, ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 const emit = defineEmits(["attach", "close"]);
 
-// FEATURE DETECTION
-// getDisplayMedia is undefined on plain http (non-secure context); guard so the
-// modal degrades gracefully to voice-only instead of crashing.
+// FEATURE DETECTION — getDisplayMedia is undefined on plain http (non-secure
+// context); guard so the modal degrades gracefully to voice-only.
 const isMediaSupported = ref(
     typeof navigator !== "undefined" &&
     !!navigator.mediaDevices &&
@@ -111,6 +111,7 @@ const isDisplaySupported = ref(
 // STATE
 const mode = ref("voice"); // 'voice' | 'screen' | 'screenMic'
 const phase = ref("idle"); // 'idle' | 'recording' | 'preview'
+const minimized = ref(false);
 const errorMessage = ref("");
 const previewUrl = ref("");
 const recordedBlob = ref(null);
@@ -124,6 +125,10 @@ let timerId = null;
 
 const isVideo = computed(() => mode.value === "screen" || mode.value === "screenMic");
 
+// True while there's recording in progress OR a recorded-but-not-attached clip —
+// i.e. closing/leaving now would lose work.
+const hasUnsavedWork = computed(() => phase.value === "recording" || (phase.value === "preview" && !!recordedBlob.value));
+
 const formattedElapsed = computed(() => {
     const total = elapsed.value;
     const mm = String(Math.floor(total / 60)).padStart(2, "0");
@@ -131,7 +136,6 @@ const formattedElapsed = computed(() => {
     return `${mm}:${ss}`;
 });
 
-// Pick the first supported mimeType, falling back to '' (browser default).
 function pickMimeType(video) {
     const candidates = video
         ? ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"]
@@ -143,10 +147,9 @@ function pickMimeType(video) {
             }
         }
     }
-    return ""; // let the browser default
+    return "";
 }
 
-// Acquire the stream for the chosen mode (combining screen video + mic audio when needed).
 async function acquireStream() {
     if (mode.value === "voice") {
         return await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -154,13 +157,11 @@ async function acquireStream() {
     if (mode.value === "screen") {
         return await navigator.mediaDevices.getDisplayMedia({ video: true });
     }
-    // screen + mic: merge the display video track with a mic audio track.
     const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
     let micStream = null;
     try {
         micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (micError) {
-        // If the mic is denied, fall back to screen-only rather than aborting.
         console.error("Microphone unavailable for screen+mic clip:", micError);
     }
     const combined = new MediaStream();
@@ -180,7 +181,6 @@ async function startRecording() {
     try {
         mediaStream = await acquireStream();
     } catch (error) {
-        // Permission denied / dismissed / device missing.
         console.error("Clip capture permission error:", error);
         errorMessage.value = t("ClipRecorder.permission_denied");
         stopTracks();
@@ -221,6 +221,7 @@ async function startRecording() {
         revokePreview();
         previewUrl.value = URL.createObjectURL(recordedBlob.value);
         phase.value = "preview";
+        minimized.value = false; // restore the modal so the user can preview + attach
         stopTracks();
     };
 
@@ -235,10 +236,20 @@ async function startRecording() {
 function stopRecording() {
     stopTimer();
     if (mediaRecorder && mediaRecorder.state !== "inactive") {
-        mediaRecorder.stop(); // onstop builds the blob + preview and stops tracks
+        mediaRecorder.stop(); // onstop builds the blob + preview, restores the modal, stops tracks
     } else {
         stopTracks();
     }
+}
+
+function minimize() {
+    if (phase.value === "recording") {
+        minimized.value = true;
+    }
+}
+
+function maximize() {
+    minimized.value = false;
 }
 
 function reRecord() {
@@ -256,6 +267,18 @@ function attachClip() {
     const type = recordedBlob.value.type || recordedMime.value || (isVideo.value ? "video/webm" : "audio/webm");
     const file = new File([recordedBlob.value], "clip-" + Date.now() + ".webm", { type });
     emit("attach", file);
+    close();
+}
+
+// Close intent: confirm if there's an in-progress / unsaved recording so the user
+// never loses a clip by clicking outside or hitting the X.
+function requestClose() {
+    if (hasUnsavedWork.value) {
+        const ok = typeof window !== "undefined" && typeof window.confirm === "function"
+            ? window.confirm(t("ClipRecorder.discard_confirm"))
+            : true;
+        if (!ok) return;
+    }
     close();
 }
 
@@ -300,6 +323,21 @@ function close() {
     emit("close");
 }
 
+// Warn before the user navigates away / closes the tab while a clip is unsaved.
+const beforeUnloadHandler = (event) => {
+    event.preventDefault();
+    event.returnValue = "";
+    return "";
+};
+watch(hasUnsavedWork, (val) => {
+    if (typeof window === "undefined") return;
+    if (val) {
+        window.addEventListener("beforeunload", beforeUnloadHandler);
+    } else {
+        window.removeEventListener("beforeunload", beforeUnloadHandler);
+    }
+});
+
 onMounted(() => {
     if (!isDisplaySupported.value && (mode.value === "screen" || mode.value === "screenMic")) {
         mode.value = "voice";
@@ -307,6 +345,9 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+    if (typeof window !== "undefined") {
+        window.removeEventListener("beforeunload", beforeUnloadHandler);
+    }
     teardown();
 });
 </script>
@@ -330,6 +371,17 @@ onBeforeUnmount(() => {
 }
 .clip__head {
     margin-bottom: 12px;
+}
+.clip__head-actions {
+    gap: 14px;
+}
+.clip__icon-btn {
+    font-size: 18px;
+    line-height: 1;
+    color: #5b5b6b;
+}
+.clip__icon-btn:hover {
+    color: #2f3990;
 }
 .clip__close {
     color: #9a9a9a;
@@ -376,7 +428,7 @@ onBeforeUnmount(() => {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
 }
 .clip__dot {
     width: 10px;
@@ -384,6 +436,7 @@ onBeforeUnmount(() => {
     border-radius: 50%;
     background: #e84a4a;
     animation: clip-pulse 1s infinite;
+    flex: 0 0 auto;
 }
 .clip__timer {
     margin-left: auto;
@@ -414,6 +467,40 @@ onBeforeUnmount(() => {
 }
 .clip__btn-ghost:hover {
     background: #e7e7e7;
+}
+/* Minimized floating widget — keeps recording visible without blocking the page. */
+.clip__mini {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #1b1b38;
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 30px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+.clip__mini-timer {
+    font-variant-numeric: tabular-nums;
+    min-width: 42px;
+}
+.clip__mini-stop {
+    background: #e84a4a;
+    color: #fff;
+    border: 0;
+    border-radius: 16px;
+    padding: 4px 12px;
+    font-size: 12px;
+    cursor: pointer;
+}
+.clip__mini .clip__icon-btn {
+    color: #fff;
+}
+.clip__mini .clip__icon-btn:hover {
+    color: #cfd2ff;
 }
 @keyframes clip-pulse {
     0% { opacity: 1; }

@@ -1130,6 +1130,11 @@ export default {
         permission_denied: "Could not access your camera, microphone or screen. Please grant permission and try again.",
         unsupported: "Recording is not supported in this browser.",
         screen_https_hint: "Screen recording requires a secure (HTTPS) connection. Voice recording is still available.",
+        minimize: "Minimize",
+        maximize: "Maximize",
+        close: "Close",
+        minimize_hint: "You can minimize this — recording keeps running in the background while you work.",
+        discard_confirm: "Recording in progress. Discard this clip?",
     },
     Milestone: {
         milestone: "Milestone",

@@ -23,6 +23,11 @@ existing attachment viewer. No new dependency, no backend change.
 | M7 | Native "stop sharing" | start a screen clip, hit the browser's stop-sharing | recording ends cleanly → preview |
 | M8 | **Cleanup** | stop / cancel / close / navigate away mid-record | camera/mic/screen indicator turns OFF (all tracks stopped; object URLs revoked) |
 | M9 | Plays back later | reopen the task | the clip attachment opens + plays in the existing viewer |
+| M10 | **Minimize → record in background** | start recording → **Minimize** | modal collapses to a floating pill (red dot + timer + Stop); the page is fully interactive; recording + timer keep running while you work |
+| M11 | Maximize | click maximize on the pill | the full modal returns, still recording |
+| M12 | Stop from pill | Stop on the minimized pill | recording ends → modal restores to the preview |
+| M13 | **No silent discard** | during recording / unsaved preview, click outside the modal or the ✕ | a confirm ("Discard this clip?") — cancel keeps recording; only an explicit Yes discards. (When idle, outside-click just closes.) |
+| M14 | **Warn before leaving** | while recording / with an unsaved clip, refresh or close the tab / navigate away | the browser's native "Leave site?" prompt appears (beforeunload), so the clip isn't lost |
 
 ## Guards / non-regression
 - One new isolated component + additive hooks; `uploadFiles`/`newAttachments`/storage controller/attachment write-path/`ImagePreview` all **unchanged**. Existing file-attachment upload + display behave exactly as before.
