@@ -1853,6 +1853,14 @@ exports.importProjectTabComponents = (companyName) => {
             value: "embed",
             setAsDefault: false,
             viewStatus: false
+        },
+        {
+            name: "Timeline View",
+            sortIndex: 12,
+            keyName: "TimelineView",
+            value: "timelineview",
+            setAsDefault: false,
+            viewStatus: false
         }
     ];
     return new Promise(async (resolve, reject) => {

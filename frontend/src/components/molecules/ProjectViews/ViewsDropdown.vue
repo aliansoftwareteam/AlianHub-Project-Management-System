@@ -90,7 +90,8 @@ const images = {
     ActivityLog: {image: require('@/assets/images/png/Activity.png'), description: 'activitylog_view'},
     Reports: {image: require('@/assets/images/png/Activity.png'), description: 'reports_view'},
     GanttView: {image: require('@/assets/images/png/Table.png'), description: 'gantt_view'},
-    RecurringTasks: {image: require('@/assets/images/png/Calendar.png'), description: 'recurring_view'}
+    RecurringTasks: {image: require('@/assets/images/png/Calendar.png'), description: 'recurring_view'},
+    TimelineView: {image: require('@/assets/images/png/Table.png'), description: 'timeline_view'}
 }
 const viewItem = ref('')
 const companyId = inject('$companyId')

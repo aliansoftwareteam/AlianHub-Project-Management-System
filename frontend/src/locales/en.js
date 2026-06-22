@@ -904,6 +904,7 @@ export default {
         Reports: "Reports",
         GanttView: "Gantt",
         RecurringTasks: "Recurring Tasks",
+        TimelineView: "Timeline",
         Comment: "Comment",
         to_unlock_list_view: "To Unlock List View",
         error_message_for_empty: "Please select at least one view",
@@ -948,6 +949,8 @@ export default {
         to_unlock_embed_view: "To Unlock Embed View",
     },
     ViewListdescription: {
+        timeline_view:
+            "See your scheduled tasks laid out on a shared date axis to spot overlaps and gaps at a glance.",
         list_view:
             "Use List view to organize your tasks in anyway imaginable – sort, filter, group, and customize columns.",
         kanban_view:
