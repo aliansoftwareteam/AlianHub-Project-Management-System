@@ -181,7 +181,7 @@
                             <div :key="'nested-item-'+index" v-else>
                                 <DropDown :id="'nav_menu'+index" :title="$t(`Header.${item.name}`)">
                                     <template #button>
-                                        <div :class="{'active-list-mobile': item.name==='Time_Sheet' ? $route.name.toLowerCase().includes('timesheet') : $route.name.toLowerCase().includes('report')}" class="hover-white p-1 cursor-pointer border-radius-7-px mobile-menu-list mobile-menu-list-arrow">
+                                        <div :class="{'active-list-mobile': item.submenu.some((s) => s.to && s.to.path && $route.path.startsWith(s.to.path))}" class="hover-white p-1 cursor-pointer border-radius-7-px mobile-menu-list mobile-menu-list-arrow">
                                             {{ $t(`Header.${item.name}`) }}
                                         </div>
                                     </template>
