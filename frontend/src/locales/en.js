@@ -904,6 +904,21 @@ export default {
         Reports: "Reports",
         GanttView: "Gantt",
         RecurringTasks: "Recurring Tasks",
+        TimelineView: "Timeline",
+        MindMapView: "Mind Map",
+        WhiteboardView: "Whiteboard",
+        CanvasView: "Canvas",
+        MapView: "Map",
+        // The catalog/tab labels key off the DB record's `name` field
+        // ($t(`ViewList.${item.name}`)), so the KEYS must match those names verbatim.
+        // The VALUES are the short display labels (no "View" suffix).
+        "Gantt View": "Gantt",
+        "Recurring Tasks": "Recurring Tasks",
+        "Timeline View": "Timeline",
+        "Mind Map View": "Mind Map",
+        "Whiteboard View": "Whiteboard",
+        "Canvas View": "Canvas",
+        "Map View": "Map",
         Comment: "Comment",
         to_unlock_list_view: "To Unlock List View",
         error_message_for_empty: "Please select at least one view",
@@ -948,6 +963,16 @@ export default {
         to_unlock_embed_view: "To Unlock Embed View",
     },
     ViewListdescription: {
+        timeline_view:
+            "See your scheduled tasks laid out on a shared date axis to spot overlaps and gaps at a glance.",
+        mindmap_view:
+            "Visualize the project as a mind map — parent tasks branching into their subtasks.",
+        whiteboard_view:
+            "Arrange tasks as free-floating cards on a board — drag them anywhere to map out your thinking.",
+        canvas_view:
+            "A configurable dashboard of project widgets — status, priority, progress, overdue and upcoming work.",
+        map_view:
+            "Pin tasks onto a world map to see where your work happens — placements are saved to your browser.",
         list_view:
             "Use List view to organize your tasks in anyway imaginable – sort, filter, group, and customize columns.",
         kanban_view:

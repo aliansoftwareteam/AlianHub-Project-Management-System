@@ -5,7 +5,7 @@
                 {{$t('Projects.task_view')}}
             </span>
             <div v-for="(item, index) in navOptions" :key="index">
-                <DropDownOption :class="{'activeView': item.name == viewItem.name}" class="options" :style="`${clientWidth <= 767 ? 'padding: 5px 0px !important;' : ''}`" :item="{label:$t(`ViewList.${item.name}`), image: projectComponentsIcons(item.keyName).icon}"  @click="viewItem = {...item}"/>
+                <DropDownOption :class="{'activeView': item.name == viewItem.name}" class="options" :style="`${clientWidth <= 767 ? 'padding: 5px 0px !important;' : ''}`" :item="{label:$t(`ViewList.${item.name}`), image: projectComponentsIcons(item.keyName)?.icon}"  @click="viewItem = {...item}"/>
                 <div  v-if="index == 3 && clientWidth > 767" class="p0x-10px">
                     <div class="comments__divider"></div>
                 </div>
@@ -90,7 +90,12 @@ const images = {
     ActivityLog: {image: require('@/assets/images/png/Activity.png'), description: 'activitylog_view'},
     Reports: {image: require('@/assets/images/png/Activity.png'), description: 'reports_view'},
     GanttView: {image: require('@/assets/images/png/Table.png'), description: 'gantt_view'},
-    RecurringTasks: {image: require('@/assets/images/png/Calendar.png'), description: 'recurring_view'}
+    RecurringTasks: {image: require('@/assets/images/png/Calendar.png'), description: 'recurring_view'},
+    TimelineView: {image: require('@/assets/images/png/Table.png'), description: 'timeline_view'},
+    MindMapView: {image: require('@/assets/images/png/Activity.png'), description: 'mindmap_view'},
+    WhiteboardView: {image: require('@/assets/images/png/Board.png'), description: 'whiteboard_view'},
+    CanvasView: {image: require('@/assets/images/png/Activity.png'), description: 'canvas_view'},
+    MapView: {image: require('@/assets/images/png/Workload.png'), description: 'map_view'}
 }
 const viewItem = ref('')
 const companyId = inject('$companyId')
@@ -114,6 +119,16 @@ onMounted(() => {
         const data = response.data;
         navOptions.value = data.map((item) => { return {...item ,image: (images[item?.keyName])?.image , description : (images[item?.keyName])?.description , sortIndex: item?.sortIndex != 6 && item?.sortIndex != 9 ? item?.sortIndex : (item?.sortIndex == 9 ? 6 : 9 ) }})
         navOptions.value = (navOptions.value.filter((element) => element?.keyName != 'Gantt' && element?.keyName != 'Timeline')).sort((a,b) => (a.sortIndex < b.sortIndex) ? -1 : 1 )
+        // Collapse duplicate catalog records that resolve to the same view label — an
+        // existing company can carry a legacy "Timeline" record alongside the new
+        // "Timeline View" (both display as "Timeline"). Keep the first after sort.
+        const seenViewLabels = new Set();
+        navOptions.value = navOptions.value.filter((element) => {
+            const label = t(`ViewList.${element?.name}`);
+            if (seenViewLabels.has(label)) return false;
+            seenViewLabels.add(label);
+            return true;
+        });
         viewItem.value = {...navOptions.value[0]}
     })
     companyUser.value = (companyUserData.value.filter((item) => userId.value === item.userId )[0])

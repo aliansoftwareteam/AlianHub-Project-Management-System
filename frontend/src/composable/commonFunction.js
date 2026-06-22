@@ -187,11 +187,43 @@ export const projectComponentsIcons = (key) => {
             icon: require("@/assets/images/svg/component-inactive-icons/comp_calender_inactive.svg"),
             activeIcon: require("@/assets/images/svg/component-active-icons/comp_calender_active.svg"),
             keyName: "RecurringTasks"
+        },
+        {
+            icon: require("@/assets/images/svg/component-inactive-icons/comp_timeline_inactive.svg"),
+            activeIcon: require("@/assets/images/svg/component-active-icons/comp_timeline_active.svg"),
+            keyName: "TimelineView"
+        },
+        {
+            icon: require("@/assets/images/svg/component-inactive-icons/comp_mindmap_inactive.svg"),
+            activeIcon: require("@/assets/images/svg/component-active-icons/comp_mindmap_active.svg"),
+            keyName: "MindMapView"
+        },
+        {
+            icon: require("@/assets/images/svg/component-inactive-icons/comp_whiteboard_inactive.svg"),
+            activeIcon: require("@/assets/images/svg/component-active-icons/comp_whiteboard_active.svg"),
+            keyName: "WhiteboardView"
+        },
+        {
+            icon: require("@/assets/images/svg/component-inactive-icons/comp_canvas_inactive.svg"),
+            activeIcon: require("@/assets/images/svg/component-active-icons/comp_canvas_active.svg"),
+            keyName: "CanvasView"
+        },
+        {
+            icon: require("@/assets/images/svg/component-inactive-icons/comp_map_inactive.svg"),
+            activeIcon: require("@/assets/images/svg/component-active-icons/comp_map_active.svg"),
+            keyName: "MapView"
         }
     ];
 
     const result = data.filter(x => x.keyName === key);
-    return result[0];
+    // Fallback so an unknown / just-added catalog keyName never returns undefined —
+    // callers read .icon/.activeIcon directly (e.g. the "+ View" dropdown renders the
+    // whole catalog), and a missing entry must degrade to a default icon, not crash.
+    return result[0] || {
+        icon: require("@/assets/images/svg/component-inactive-icons/comp_gantt_inactive.svg"),
+        activeIcon: require("@/assets/images/svg/component-active-icons/comp_gantt_active.svg"),
+        keyName: key
+    };
 }
 
 export const projectAppsIcons = (key) => {
