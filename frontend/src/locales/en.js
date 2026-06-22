@@ -909,15 +909,16 @@ export default {
         WhiteboardView: "Whiteboard",
         CanvasView: "Canvas",
         MapView: "Map",
-        // The "+ View" catalog labels off the DB record's `name` field
-        // ($t(`ViewList.${item.name}`)), so these keys must match those names verbatim.
-        "Gantt View": "Gantt View",
+        // The catalog/tab labels key off the DB record's `name` field
+        // ($t(`ViewList.${item.name}`)), so the KEYS must match those names verbatim.
+        // The VALUES are the short display labels (no "View" suffix).
+        "Gantt View": "Gantt",
         "Recurring Tasks": "Recurring Tasks",
-        "Timeline View": "Timeline View",
-        "Mind Map View": "Mind Map View",
-        "Whiteboard View": "Whiteboard View",
-        "Canvas View": "Canvas View",
-        "Map View": "Map View",
+        "Timeline View": "Timeline",
+        "Mind Map View": "Mind Map",
+        "Whiteboard View": "Whiteboard",
+        "Canvas View": "Canvas",
+        "Map View": "Map",
         Comment: "Comment",
         to_unlock_list_view: "To Unlock List View",
         error_message_for_empty: "Please select at least one view",

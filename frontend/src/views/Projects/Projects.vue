@@ -86,7 +86,7 @@
                                                             <img :src="activeTab !== 'EmbedView'
                                                                     ? projectComponentsIcons(projectData?.ProjectRequiredComponent?.find(x => x.keyName === activeTab)?.keyName)?.icon
                                                                     : projectComponentsIcons(projectData?.ProjectRequiredComponent?.find(x => x.name === embedViewName)?.type)?.icon" alt="list" class="mr-5px">
-                                                            {{activeTab !== 'EmbedView' ? projectData?.ProjectRequiredComponent?.find(x => x.keyName === activeTab)?.name || "N/A" : embedViewName || "N/A"}}
+                                                            {{activeTab !== 'EmbedView' ? viewLabel(projectData?.ProjectRequiredComponent?.find(x => x.keyName === activeTab)?.name) : embedViewName || "N/A"}}
                                                         </span>
                                                         <img :src="listDropIcon" alt="ListDropIcon" :style="[{marginLeft : clientWidth <=375 ? '2px' : '10px'}]"/>
                                                     </div>
@@ -504,7 +504,10 @@ import { useProjectsHelper } from './helper';
 
 // UTILS
 const { checkErrors } = useValidation();
-const { t } = useI18n();
+const { t, te } = useI18n();
+// Short display label for a view tab: the ViewList i18n value drops the "View"
+// suffix (e.g. "Map View" → "Map"); fall back to the raw name for custom/embed views.
+const viewLabel = (name) => (name && te(`ViewList.${name}`)) ? t(`ViewList.${name}`) : (name || 'N/A');
 const { projects, filteredProjects, dispatchProjects } = useProjectsHelper();
 const showArchivedProjects = ref(false);
 const isAdvanceFilterApplied = ref(false);
