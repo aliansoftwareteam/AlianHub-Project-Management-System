@@ -81,9 +81,9 @@
             imgSrc.value = require('@/assets/images/icon/PHP.png');
         } else if (extention.value === 'sql' ) {
             imgSrc.value = require('@/assets/images/icon/SQL.png');
-        } else if (extention.value === 'mp4' || extention.value === 'video' || extention.value === 'mkv' || extention.value === 'mov') {
+        } else if (extention.value === 'mp4' || extention.value === 'video' || extention.value === 'mkv' || extention.value === 'mov' || extention.value === 'webm') {
             imgSrc.value = require('@/assets/images/icon/video.png');
-        } else if (extention.value === 'mp3' ) {
+        } else if (extention.value === 'mp3' || extention.value === 'audio' ) {
             imgSrc.value = require('@/assets/images/icon/audio.png');
         } else if (extention.value === 'pub' ) {
             imgSrc.value = require('@/assets/images/pub.png');

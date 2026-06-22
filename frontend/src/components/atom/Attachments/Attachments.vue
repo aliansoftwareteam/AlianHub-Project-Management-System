@@ -34,6 +34,11 @@
                         @click="downloadAllImages()"
                     >Download All</button>
                 </template>
+                <button v-if="permission === true && !(props.isMainSpinner === true || isLoadingAttachments)"
+                    type="button" class="clip-record-btn cursor-pointer mr-10px"
+                    :title="$t('ClipRecorder.record_clip')" @click="openRecorder">
+                    <img src="@/assets/images/icon/video.png" alt="record clip" width="18px" />
+                </button>
                 <label for="UploadedFile" v-if="permission === true">
                     <div class="cursor-link cursor-pointer" v-if="props.isMainSpinner === true || isLoadingAttachments">
                         <Skelaton style="height: 30px;width: 25px;" class="border-radius-6-px mb-5px" />
@@ -72,6 +77,7 @@
                 :items="transformedAttachments" :activeIndex="activeIndex" @close="closePreviewer"
                 @loadMore="loadMoreAttachments" :config="{ handlesTimer: 2000 }" />
         </div>
+        <ClipRecorder v-if="showRecorder" @attach="onClipAttach" @close="showRecorder = false" />
     </div>
 </template>
 
@@ -85,6 +91,7 @@ import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import JSZip from "jszip";
 import ImagesPreviewer from "@/components/organisms/ImagePreviewer/ImagesPreviewer.vue";
+import ClipRecorder from "@/components/molecules/ClipRecorder/ClipRecorder.vue";
 import * as env from "@/config/env";
 import { storageHelper } from "@/composable/commonFunction";
 import Skelaton from "../Skelaton/Skelaton.vue";
@@ -145,7 +152,22 @@ const transformedAttachments = ref([]);
 const sliderMain = ref(null);
 const loadMoreTrigger = ref(null);
 const isLoadingAttachments = ref(false);
+const showRecorder = ref(false);
 let observer = null;
+
+// COLLAB-04: open the clip recorder modal (gated by the same upload permission).
+const openRecorder = () => {
+    showRecorder.value = true;
+};
+
+// COLLAB-04: route the recorded clip through the exact same path the file input
+// uses — emit update:add with the File so the parent's newAttachments upload runs unchanged.
+const onClipAttach = (file) => {
+    showRecorder.value = false;
+    if (file) {
+        emit("update:add", [file]);
+    }
+};
 
 const setupIntersectionObserver = (val) => {
     nextTick(() => {
@@ -558,6 +580,23 @@ watch(
     color: inherit;
 }
 .download-all-btn:focus-visible {
+    outline: 2px solid #2f3990;
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+/*
+ * COLLAB-04 — "Record clip" trigger. Strip native button chrome so it sits
+ * inline next to the upload (+) control as a plain icon.
+ */
+.clip-record-btn {
+    background: none;
+    border: 0;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+}
+.clip-record-btn:focus-visible {
     outline: 2px solid #2f3990;
     outline-offset: 2px;
     border-radius: 2px;
