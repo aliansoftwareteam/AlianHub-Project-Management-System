@@ -908,6 +908,7 @@ export default {
         MindMapView: "Mind Map",
         WhiteboardView: "Whiteboard",
         CanvasView: "Canvas",
+        MapView: "Map",
         // The "+ View" catalog labels off the DB record's `name` field
         // ($t(`ViewList.${item.name}`)), so these keys must match those names verbatim.
         "Gantt View": "Gantt View",
@@ -969,6 +970,8 @@ export default {
             "Arrange tasks as free-floating cards on a board — drag them anywhere to map out your thinking.",
         canvas_view:
             "A configurable dashboard of project widgets — status, priority, progress, overdue and upcoming work.",
+        map_view:
+            "Pin tasks onto a world map to see where your work happens — placements are saved to your browser.",
         list_view:
             "Use List view to organize your tasks in anyway imaginable – sort, filter, group, and customize columns.",
         kanban_view:

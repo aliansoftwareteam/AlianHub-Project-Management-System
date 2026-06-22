@@ -207,6 +207,11 @@ export const projectComponentsIcons = (key) => {
             icon: require("@/assets/images/svg/component-inactive-icons/comp_gantt_inactive.svg"),
             activeIcon: require("@/assets/images/svg/component-active-icons/comp_gantt_active.svg"),
             keyName: "CanvasView"
+        },
+        {
+            icon: require("@/assets/images/svg/component-inactive-icons/comp_gantt_inactive.svg"),
+            activeIcon: require("@/assets/images/svg/component-active-icons/comp_gantt_active.svg"),
+            keyName: "MapView"
         }
     ];
 

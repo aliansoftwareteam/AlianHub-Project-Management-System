@@ -1909,6 +1909,14 @@ exports.importProjectTabComponents = (companyName) => {
             value: "canvasview",
             setAsDefault: false,
             viewStatus: false
+        },
+        {
+            name: "Map View",
+            sortIndex: 16,
+            keyName: "MapView",
+            value: "mapview",
+            setAsDefault: false,
+            viewStatus: false
         }
     ];
     return new Promise(async (resolve, reject) => {
