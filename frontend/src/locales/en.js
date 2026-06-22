@@ -906,6 +906,7 @@ export default {
         RecurringTasks: "Recurring Tasks",
         TimelineView: "Timeline",
         MindMapView: "Mind Map",
+        WhiteboardView: "Whiteboard",
         // The "+ View" catalog labels off the DB record's `name` field
         // ($t(`ViewList.${item.name}`)), so these keys must match those names verbatim.
         "Gantt View": "Gantt View",
@@ -963,6 +964,8 @@ export default {
             "See your scheduled tasks laid out on a shared date axis to spot overlaps and gaps at a glance.",
         mindmap_view:
             "Visualize the project as a mind map — parent tasks branching into their subtasks.",
+        whiteboard_view:
+            "Arrange tasks as free-floating cards on a board — drag them anywhere to map out your thinking.",
         list_view:
             "Use List view to organize your tasks in anyway imaginable – sort, filter, group, and customize columns.",
         kanban_view:

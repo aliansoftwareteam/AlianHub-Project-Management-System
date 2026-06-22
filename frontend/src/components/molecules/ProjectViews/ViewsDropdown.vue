@@ -92,7 +92,8 @@ const images = {
     GanttView: {image: require('@/assets/images/png/Table.png'), description: 'gantt_view'},
     RecurringTasks: {image: require('@/assets/images/png/Calendar.png'), description: 'recurring_view'},
     TimelineView: {image: require('@/assets/images/png/Table.png'), description: 'timeline_view'},
-    MindMapView: {image: require('@/assets/images/png/Activity.png'), description: 'mindmap_view'}
+    MindMapView: {image: require('@/assets/images/png/Activity.png'), description: 'mindmap_view'},
+    WhiteboardView: {image: require('@/assets/images/png/Board.png'), description: 'whiteboard_view'}
 }
 const viewItem = ref('')
 const companyId = inject('$companyId')

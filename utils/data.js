@@ -1893,6 +1893,14 @@ exports.importProjectTabComponents = (companyName) => {
             value: "mindmapview",
             setAsDefault: false,
             viewStatus: false
+        },
+        {
+            name: "Whiteboard View",
+            sortIndex: 14,
+            keyName: "WhiteboardView",
+            value: "whiteboardview",
+            setAsDefault: false,
+            viewStatus: false
         }
     ];
     return new Promise(async (resolve, reject) => {
