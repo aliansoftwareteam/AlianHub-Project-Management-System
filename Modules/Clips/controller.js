@@ -15,10 +15,12 @@ const logger = require('../../Config/loggerConfig');
 // then body) — identical resolution order to Modules/Notes/controller.js.
 function resolveUserId(req) {
     const b = req.body || {};
+    const q = req.query || {};
     return (req.user && (req.user.id || req.user._id))
         || req.headers['userid']
         || b.userId
         || (b.userData && b.userData.id)
+        || q.userId   // GET has no body — the client passes ?userId= for list
         || '';
 }
 
