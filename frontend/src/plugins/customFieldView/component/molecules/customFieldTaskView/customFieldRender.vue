@@ -90,20 +90,35 @@
         rollup: ComputedComponentListing
     };
 
-    // Flat task list (incl. subtasks expanded from subtaskArray) for rollup aggregation.
-    // Returns [] when the store getter is unavailable so rollups degrade to '—'.
+    // Flat, de-duped task list (parents + their subtasks) for rollup aggregation.
+    // Pulls from the sources actually populated in the List/Board/detail flow — the
+    // viewed task's own subtaskArray and the projectData/tasks map — with the
+    // dashboard-only projectData/alltasks as a fallback. De-duped by _id so a task
+    // present in more than one source is never counted twice. Returns [] on failure
+    // so rollups degrade to '—' rather than erroring.
     const getAllTasks = () => {
         try {
-            const parents = getters['projectData/alltasks'] || [];
-            if (!Array.isArray(parents)) return [];
+            const seen = new Set();
             const flat = [];
-            parents.forEach((task) => {
-                if (!task) return;
-                flat.push(task);
-                if (Array.isArray(task.subtaskArray)) {
-                    task.subtaskArray.forEach((sub) => sub && flat.push(sub));
+            const add = (t) => {
+                if (t && t._id && !seen.has(String(t._id))) { seen.add(String(t._id)); flat.push(t); }
+            };
+            const addWithKids = (t) => {
+                add(t);
+                if (t && Array.isArray(t.subtaskArray)) t.subtaskArray.forEach(add);
+            };
+            addWithKids(props.task);
+            const map = getters['projectData/tasks'] || {};
+            Object.values(map).forEach((byProject) => {
+                if (byProject && typeof byProject === 'object') {
+                    Object.values(byProject).forEach((node) => {
+                        const tasks = node && Array.isArray(node.tasks) ? node.tasks : [];
+                        tasks.forEach(addWithKids);
+                    });
                 }
             });
+            const alt = getters['projectData/alltasks'];
+            if (Array.isArray(alt)) alt.forEach(addWithKids);
             return flat;
         } catch (error) {
             return [];
