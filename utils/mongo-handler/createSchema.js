@@ -118,6 +118,8 @@ publicShareIndexSchema.index({ token: 1 }, { unique: true });
 const recurringTasksSchema = new Schema(schema.recurringTasks, {strict: true, timestamps: true});
 recurringTasksSchema.index({ ProjectID: 1, deletedStatusKey: 1 });
 recurringTasksSchema.index({ enabled: 1, deletedStatusKey: 1, nextRunAt: 1 });
+const remindersSchema = new Schema(schema.reminders, {strict: true, timestamps: true});
+remindersSchema.index({ userId: 1, fired: 1, reminderAt: 1 });
 const timesheetApprovalSchema = new Schema(schema.timesheetApproval, {strict: true, timestamps: true});
 timesheetApprovalSchema.index({ userId: 1, periodStart: 1, periodEnd: 1 });
 timesheetApprovalSchema.index({ status: 1, periodStart: -1 });
@@ -229,6 +231,7 @@ module.exports = {
     intakeItemsSchema,
     publicShareIndexSchema,
     recurringTasksSchema,
+    remindersSchema,
     timesheetApprovalSchema,
     billingRatesSchema,
     ssoConfigsSchema,

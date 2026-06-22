@@ -436,6 +436,22 @@ const schema = {
         createdBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0 },
     },
+    // Personal reminders (COLLAB-03) — one-shot, per-user. A node-schedule cron
+    // (every minute) fires any reminder whose reminderAt has passed and that
+    // hasn't fired yet, delivering an in-app notification to userId. Managed by
+    // Modules/Reminders. fired/firedAt make the firing idempotent.
+    reminders: {
+        userId: { type: String, required: true },
+        companyId: { type: String, required: false },
+        taskId: { type: mongoose.Schema.Types.ObjectId, required: false },
+        projectId: { type: mongoose.Schema.Types.ObjectId, required: false },
+        reminderText: { type: String, required: false },
+        reminderAt: { type: Date, required: true },
+        fired: { type: Boolean, default: false },
+        firedAt: { type: Date, required: false },
+        createdBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0 },
+    },
     // Timesheet approval submissions — one per user per period (week/month) — managed by Modules/TimesheetApproval
     timesheetApproval: {
         userId: { type: String, required: true },
