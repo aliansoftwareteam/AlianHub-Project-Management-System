@@ -119,6 +119,16 @@ onMounted(() => {
         const data = response.data;
         navOptions.value = data.map((item) => { return {...item ,image: (images[item?.keyName])?.image , description : (images[item?.keyName])?.description , sortIndex: item?.sortIndex != 6 && item?.sortIndex != 9 ? item?.sortIndex : (item?.sortIndex == 9 ? 6 : 9 ) }})
         navOptions.value = (navOptions.value.filter((element) => element?.keyName != 'Gantt' && element?.keyName != 'Timeline')).sort((a,b) => (a.sortIndex < b.sortIndex) ? -1 : 1 )
+        // Collapse duplicate catalog records that resolve to the same view label — an
+        // existing company can carry a legacy "Timeline" record alongside the new
+        // "Timeline View" (both display as "Timeline"). Keep the first after sort.
+        const seenViewLabels = new Set();
+        navOptions.value = navOptions.value.filter((element) => {
+            const label = t(`ViewList.${element?.name}`);
+            if (seenViewLabels.has(label)) return false;
+            seenViewLabels.add(label);
+            return true;
+        });
         viewItem.value = {...navOptions.value[0]}
     })
     companyUser.value = (companyUserData.value.filter((item) => userId.value === item.userId )[0])
