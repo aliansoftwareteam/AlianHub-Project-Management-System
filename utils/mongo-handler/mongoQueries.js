@@ -70,6 +70,7 @@ const {
     publicShareIndexSchema,
     recurringTasksSchema,
     remindersSchema,
+    notesSchema,
     timesheetApprovalSchema,
     billingRatesSchema,
     ssoConfigsSchema,
@@ -226,6 +227,8 @@ exports.checkType = (type) => {
             return recurringTasksSchema
         case SCHEMA_TYPE.REMINDERS:
             return remindersSchema
+        case SCHEMA_TYPE.NOTES:
+            return notesSchema
         case SCHEMA_TYPE.TIMESHEET_APPROVAL:
             return timesheetApprovalSchema
         case SCHEMA_TYPE.BILLING_RATES:
@@ -398,6 +401,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.RECURRING_TASKS}`
         case SCHEMA_TYPE.REMINDERS:
                 return `${dbCollections.REMINDERS}`
+        case SCHEMA_TYPE.NOTES:
+                return `${dbCollections.NOTES}`
         case SCHEMA_TYPE.TIMESHEET_APPROVAL:
                 return `${dbCollections.TIMESHEET_APPROVAL}`
         case SCHEMA_TYPE.BILLING_RATES:

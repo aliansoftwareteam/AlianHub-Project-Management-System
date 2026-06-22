@@ -452,6 +452,17 @@ const schema = {
         createdBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0 },
     },
+    // Personal notepad (COLLAB-06) — quick per-user notes, convertible to tasks.
+    // Managed by Modules/Notes. convertedTaskId is stamped (frontend) once a note
+    // has been turned into a task via the existing task-create flow.
+    notes: {
+        userId: { type: String, required: true },
+        companyId: { type: String, required: false },
+        title: { type: String, required: false },
+        content: { type: String, required: false },
+        convertedTaskId: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0 },
+    },
     // Timesheet approval submissions — one per user per period (week/month) — managed by Modules/TimesheetApproval
     timesheetApproval: {
         userId: { type: String, required: true },

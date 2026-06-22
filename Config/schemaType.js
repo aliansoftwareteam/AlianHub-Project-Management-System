@@ -71,6 +71,7 @@ const SCHEMA_TYPE = {
     PUBLIC_SHARE_INDEX: "publicShareIndex",
     RECURRING_TASKS: "recurring_tasks",
     REMINDERS: "reminders",
+    NOTES: "notes",
     TIMESHEET_APPROVAL: "timesheet_approval",
     BILLING_RATES: "billing_rates",
     SSO_CONFIGS: "sso_configs",
