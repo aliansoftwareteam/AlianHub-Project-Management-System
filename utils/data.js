@@ -1855,6 +1855,30 @@ exports.importProjectTabComponents = (companyName) => {
             viewStatus: false
         },
         {
+            name: "Reports",
+            sortIndex: 12,
+            keyName: "Reports",
+            value: "reports",
+            setAsDefault: false,
+            viewStatus: false
+        },
+        {
+            name: "Gantt View",
+            sortIndex: 12,
+            keyName: "GanttView",
+            value: "ganttview",
+            setAsDefault: false,
+            viewStatus: false
+        },
+        {
+            name: "Recurring Tasks",
+            sortIndex: 12,
+            keyName: "RecurringTasks",
+            value: "recurringtasks",
+            setAsDefault: false,
+            viewStatus: false
+        },       
+        {
             name: "Timeline View",
             sortIndex: 12,
             keyName: "TimelineView",
