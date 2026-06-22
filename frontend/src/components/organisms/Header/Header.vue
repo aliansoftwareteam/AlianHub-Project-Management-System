@@ -66,7 +66,7 @@
                 <img src="@/assets/images/svg/sticky_note_icon.svg" class="cursor-pointer" id="stickies_driver" :title="$t('Stickies.title')" @click="stickiesVisible = true">
             </div>
             <div class="position-re" :class="{'mr-2' : clientWidth > 1440, 'mr-1' : clientWidth<=1440}" v-if="rules && Object.keys(rules).length">
-                <img src="@/assets/images/svg/CreateTask.svg" class="cursor-pointer" id="notepad_driver" :title="$t('Notepad.title')" @click="notepadVisible = true">
+                <img src="@/assets/images/svg/notepad_icon.svg" class="cursor-pointer" id="notepad_driver" :title="$t('Notepad.title')" @click="notepadVisible = true">
             </div>
             <div class="position-re" :class="{'pr-2' : clientWidth > 1440, 'pr-1' : clientWidth<=1440}" v-if="rules && Object.keys(rules).length && (companyUser.roleType === 1 || companyUser.roleType === 2)">
                 <img src="@/assets/images/svg/tour_image.svg" class="cursor-pointer" id="tour_icon" @click="getTourDetails(),tourVisible = true">
