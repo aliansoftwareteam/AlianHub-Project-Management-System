@@ -1885,6 +1885,14 @@ exports.importProjectTabComponents = (companyName) => {
             value: "timelineview",
             setAsDefault: false,
             viewStatus: false
+        },
+        {
+            name: "Mind Map View",
+            sortIndex: 13,
+            keyName: "MindMapView",
+            value: "mindmapview",
+            setAsDefault: false,
+            viewStatus: false
         }
     ];
     return new Promise(async (resolve, reject) => {

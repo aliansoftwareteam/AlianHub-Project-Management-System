@@ -905,6 +905,7 @@ export default {
         GanttView: "Gantt",
         RecurringTasks: "Recurring Tasks",
         TimelineView: "Timeline",
+        MindMapView: "Mind Map",
         Comment: "Comment",
         to_unlock_list_view: "To Unlock List View",
         error_message_for_empty: "Please select at least one view",
@@ -951,6 +952,8 @@ export default {
     ViewListdescription: {
         timeline_view:
             "See your scheduled tasks laid out on a shared date axis to spot overlaps and gaps at a glance.",
+        mindmap_view:
+            "Visualize the project as a mind map — parent tasks branching into their subtasks.",
         list_view:
             "Use List view to organize your tasks in anyway imaginable – sort, filter, group, and customize columns.",
         kanban_view:

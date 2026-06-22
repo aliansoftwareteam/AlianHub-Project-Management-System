@@ -262,6 +262,7 @@
                                             activeTab !== 'GanttView' &&
                                             activeTab !== 'RecurringTasks' &&
                                             activeTab !== 'TimelineView' &&
+                                            activeTab !== 'MindMapView' &&
                                             (clientWidth > 767 || activeTab !== 'ProjectDetail')
                                 },
                                 {'board-veiw-main-parent': activeTab === 'ProjectKanban'}
@@ -306,7 +307,7 @@
                             />
                             <component
                                 v-if="(clientWidth <= 767 && isVisible == true && isRuleData == false) || (clientWidth > 767 && isRuleData == false)"
-                                :class="[{'showProjectDetailRight':activeTab !== 'ProjectListView' && activeTab !== 'Calendar' && activeTab != 'EmbedViewItem' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports' && activeTab !== 'GanttView' && activeTab !== 'RecurringTasks' && activeTab !== 'TimelineView'}]"
+                                :class="[{'showProjectDetailRight':activeTab !== 'ProjectListView' && activeTab !== 'Calendar' && activeTab != 'EmbedViewItem' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports' && activeTab !== 'GanttView' && activeTab !== 'RecurringTasks' && activeTab !== 'TimelineView' && activeTab !== 'MindMapView'}]"
                                 :is="getView(activeTab)"
                                 :data="selectedEmbedView"
                                 :sprints="sprints"
@@ -328,7 +329,7 @@
                                 :sprintLoading="sprintLoading"
                                 :commentType="'project'"
                             />
-                            <ProjectDetailRightSide v-if="activeTab !== 'ProjectListView' && clientWidth > 767 && activeTab !== 'Calendar' && activeTab != 'EmbedView' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports' && activeTab !== 'GanttView' && activeTab !== 'RecurringTasks' && activeTab !== 'TimelineView'" :projectData="projectData" @rightSideBarEmit="handleEmitProjectRightSide" @description="handleDescription"/>
+                            <ProjectDetailRightSide v-if="activeTab !== 'ProjectListView' && clientWidth > 767 && activeTab !== 'Calendar' && activeTab != 'EmbedView' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports' && activeTab !== 'GanttView' && activeTab !== 'RecurringTasks' && activeTab !== 'TimelineView' && activeTab !== 'MindMapView'" :projectData="projectData" @rightSideBarEmit="handleEmitProjectRightSide" @description="handleDescription"/>
                         </div>
                         <div class="position-ab z-index-1 p-5px border-radius-5-px text-center p0x-15px archived_wrapper" v-if="projectData?.deletedStatusKey === 2">
                             <div>
@@ -474,6 +475,7 @@ const ReportsView = defineAsyncComponent(() => import(/* webpackChunkName: "proj
 const GanttViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-gantt" */ '@/views/Projects/GanttView/GanttView.vue'));
 const RecurringTasksComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-recurring" */ '@/views/Projects/RecurringTasks/RecurringTasksManager.vue'));
 const TimelineViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-timeline" */ '@/views/Projects/TimelineView/TimelineView.vue'));
+const MindMapViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-mindmap" */ '@/views/Projects/MindMapView/MindMapView.vue'));
 import NotFound from '../NotFound.vue';
 
 // EXTRACTED PIECES
@@ -1100,6 +1102,8 @@ function getView(val) {
             return RecurringTasksComp;
         case 'TimelineView':
             return TimelineViewComp;
+        case 'MindMapView':
+            return MindMapViewComp;
         default:
             return NotFound;
     }
