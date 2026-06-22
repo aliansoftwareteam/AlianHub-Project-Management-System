@@ -231,10 +231,15 @@ async function startRecording() {
     chunks = [];
     const mime = pickMimeType(isVideo.value);
     recordedMime.value = mime;
+    // Cap the encoding bitrate so clips stay small enough to upload within the
+    // storage client's socket timeout (server→Wasabi). 2.5 Mbps keeps screen text
+    // readable; unsupported browsers just ignore these hints.
+    const recorderOptions = {};
+    if (mime) recorderOptions.mimeType = mime;
+    if (isVideo.value) recorderOptions.videoBitsPerSecond = 2500000;
+    recorderOptions.audioBitsPerSecond = 128000;
     try {
-        mediaRecorder = mime
-            ? new window.MediaRecorder(mediaStream, { mimeType: mime })
-            : new window.MediaRecorder(mediaStream);
+        mediaRecorder = new window.MediaRecorder(mediaStream, recorderOptions);
     } catch (error) {
         console.error("MediaRecorder init failed:", error);
         errorMessage.value = t("ClipRecorder.unsupported");
@@ -615,6 +620,11 @@ onBeforeUnmount(() => {
 }
 .clip__stop {
     background: #e84a4a !important;
+}
+/* btn-primary has no disabled style of its own — show the saving state clearly. */
+.clip__actions .btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 .clip__btn-ghost {
     background: #f1f1f1;
