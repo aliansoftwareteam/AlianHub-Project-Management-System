@@ -28,6 +28,15 @@
                 </div>
             </template>
         </template>
+        <!-- Read-only computed columns (formula/rollup) are never stored on the task, so render them from the live def. -->
+        <div v-if="computedDefs[obj.key]" class="position-re">
+            <ComputedComponentViewColumn
+                :def="computedDefs[obj.key]"
+                :task="props.task"
+                :allTasks="allTasksList"
+                :defs="finalCustomFieldsList"
+            />
+        </div>
     </span>
 </template>
 
@@ -48,6 +57,7 @@
     import TextareaComponentListing from '../../atom/customFieldViewColumn/textareaComponentViewColumn.vue';
     import CheckboxComponentListing from '../../atom/customFieldViewColumn/checkboxComponentViewColumn.vue';
     import DropdownComponentListing from '../../atom/customFieldViewColumn/dropdownComponentViewColumn.vue';
+    import ComputedComponentViewColumn from '../../atom/customFieldViewColumn/computedComponentViewColumn.vue';
     import { useStore } from 'vuex';
     import { useI18n } from "vue-i18n";
     const { t } = useI18n();
@@ -68,6 +78,53 @@
     });
 
     const {getters} = useStore();
+
+    // All custom field definitions (used to resolve formula references and rollup sources).
+    const finalCustomFieldsList = computed(() => getters['settings/finalCustomFields'] || []);
+
+    // Map of computed (formula/rollup) field definitions keyed by their _id.
+    const computedDefs = computed(() => {
+        const map = {};
+        finalCustomFieldsList.value.forEach((def) => {
+            if (def && (def.fieldType === 'formula' || def.fieldType === 'rollup')) {
+                map[def._id] = def;
+            }
+        });
+        return map;
+    });
+
+    // Flat, de-duped task list (parents + subtasks) for rollup aggregation — from the
+    // sources populated in the List/Board/Table flow (the row task's own subtaskArray
+    // and the projectData/tasks map), with the dashboard-only projectData/alltasks as
+    // a fallback. De-duped by _id. Returns [] on failure so rollups degrade to '—'.
+    const allTasksList = computed(() => {
+        try {
+            const seen = new Set();
+            const flat = [];
+            const add = (t) => {
+                if (t && t._id && !seen.has(String(t._id))) { seen.add(String(t._id)); flat.push(t); }
+            };
+            const addWithKids = (t) => {
+                add(t);
+                if (t && Array.isArray(t.subtaskArray)) t.subtaskArray.forEach(add);
+            };
+            addWithKids(props.task);
+            const map = getters['projectData/tasks'] || {};
+            Object.values(map).forEach((byProject) => {
+                if (byProject && typeof byProject === 'object') {
+                    Object.values(byProject).forEach((node) => {
+                        const tasks = node && Array.isArray(node.tasks) ? node.tasks : [];
+                        tasks.forEach(addWithKids);
+                    });
+                }
+            });
+            const alt = getters['projectData/alltasks'];
+            if (Array.isArray(alt)) alt.forEach(addWithKids);
+            return flat;
+        } catch (error) {
+            return [];
+        }
+    });
 
     // ref
     const taskId = ref('');

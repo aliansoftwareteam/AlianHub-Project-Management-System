@@ -2653,6 +2653,21 @@ const schema = {
             type:mongoose.Schema.Types.Mixed,
             required: false,
             default:''
+        },
+        formulaExpression:{
+            type:String,
+            required: false,
+            default:''
+        },
+        rollupSourceFieldId:{
+            type:String,
+            required: false,
+            default:''
+        },
+        rollupFunction:{
+            type:String,
+            required: false,
+            default:''
         }
     },
     sprints: {

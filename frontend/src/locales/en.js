@@ -1231,6 +1231,13 @@ export default {
     CustomField: {
         custom_field: "Custom Field",
         create_custom_field: "Create Custom Field",
+        formula_expression: "Formula",
+        formula_expression_placeholder: "e.g. {Estimate} * 2 + {Buffer}",
+        referenceable_fields: "Available fields",
+        rollup_function: "Aggregate function",
+        rollup_source_field: "Source field",
+        select_source_field: "Select a field",
+        no_numeric_field_found: "No numeric field found",
         lable: "Label",
         action: "Action",
         add_custom_field: "Add Custom Field",
