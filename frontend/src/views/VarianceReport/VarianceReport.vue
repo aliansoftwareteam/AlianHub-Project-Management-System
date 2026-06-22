@@ -91,7 +91,9 @@ const varClass = (v) => (v > 0 ? 'over' : (v < 0 ? 'under' : ''));
 const loadProjects = async () => {
     try {
         const b = (await apiRequest('get', env.PROJECT))?.data;
-        projects.value = Array.isArray(b) ? b : (b && b.data) || [];
+        const list = Array.isArray(b) ? b : (b && b.data) || [];
+        // Active projects only — hide closed / deleted / archived from the picker.
+        projects.value = list.filter((p) => p && p.status !== 'close' && p.deletedStatusKey !== 1 && p.deletedStatusKey !== 2);
     } catch (e) { projects.value = []; }
 };
 const load = async () => {
