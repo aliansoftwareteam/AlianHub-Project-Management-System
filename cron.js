@@ -6,6 +6,7 @@ const aiRef = require("./Modules/AI/controller")
 const screenshotRetention = require("./Modules/ScreenshotRetention/helper");
 const autoArchive = require("./Modules/projectSetting/autoArchive");
 const recurringTasks = require("./Modules/RecurringTasks/controller");
+const reminders = require("./Modules/Reminders/controller");
 const timeReminders = require("./Modules/TimeSheet/controller/timeReminders");
 const auditRecorder = require("./Modules/Audit/recorder");
 const scheduledReports = require("./Modules/ScheduledReports/controller");
@@ -67,6 +68,19 @@ schedule.scheduleJob({ rule: '*/15 * * * *', tz: CRON_TZ }, async () => {
         await recurringTasks.runRecurringForAllCompanies();
     } catch (err) {
         logger.error(`[Cron] recurringTasks failed: ${err && err.message ? err.message : err}`);
+    }
+})
+
+// Personal reminders (COLLAB-03) — every minute, fire any reminder whose
+// reminderAt has passed and that hasn't fired yet, across all companies. The
+// fired flag makes it idempotent; the /run-due and /run-now endpoints exercise
+// the same path in dev (cron is prod-only).
+schedule.scheduleJob({ rule: '* * * * *', tz: CRON_TZ }, async () => {
+    logger.info(`[Cron] reminders.runRemindersForAllCompanies`);
+    try {
+        await reminders.runRemindersForAllCompanies();
+    } catch (err) {
+        logger.error(`[Cron] reminders failed: ${err && err.message ? err.message : err}`);
     }
 })
 
