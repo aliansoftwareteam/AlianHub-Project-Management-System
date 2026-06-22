@@ -504,6 +504,9 @@ onBeforeUnmount(() => {
     width: min(460px, 92vw);
     padding: 16px 20px;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+    /* Mounted at the app shell (navy Header) — set an explicit dark text colour so
+       labels/title don't inherit the header's white text and vanish on the card. */
+    color: #2b2b2b;
 }
 .clip__head {
     margin-bottom: 12px;

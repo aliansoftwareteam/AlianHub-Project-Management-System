@@ -256,6 +256,9 @@ function recordNew() {
     padding: 16px 18px;
     overflow-y: auto;
     box-shadow: -8px 0 30px rgba(0, 0, 0, 0.18);
+    /* Mounted at the app shell (navy Header) — explicit dark text so the heading
+       and inherited-colour text don't render white-on-white. */
+    color: #2b2b2b;
 }
 .clips__head { margin-bottom: 14px; }
 .clips__add-btn { color: #fff; }
