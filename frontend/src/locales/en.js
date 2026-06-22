@@ -906,6 +906,15 @@ export default {
         RecurringTasks: "Recurring Tasks",
         TimelineView: "Timeline",
         MindMapView: "Mind Map",
+        // The "+ View" catalog labels off the DB record's `name` field
+        // ($t(`ViewList.${item.name}`)), so these keys must match those names verbatim.
+        "Gantt View": "Gantt View",
+        "Recurring Tasks": "Recurring Tasks",
+        "Timeline View": "Timeline View",
+        "Mind Map View": "Mind Map View",
+        "Whiteboard View": "Whiteboard View",
+        "Canvas View": "Canvas View",
+        "Map View": "Map View",
         Comment: "Comment",
         to_unlock_list_view: "To Unlock List View",
         error_message_for_empty: "Please select at least one view",
