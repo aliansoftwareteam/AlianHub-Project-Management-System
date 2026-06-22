@@ -216,7 +216,14 @@ export const projectComponentsIcons = (key) => {
     ];
 
     const result = data.filter(x => x.keyName === key);
-    return result[0];
+    // Fallback so an unknown / just-added catalog keyName never returns undefined —
+    // callers read .icon/.activeIcon directly (e.g. the "+ View" dropdown renders the
+    // whole catalog), and a missing entry must degrade to a default icon, not crash.
+    return result[0] || {
+        icon: require("@/assets/images/svg/component-inactive-icons/comp_gantt_inactive.svg"),
+        activeIcon: require("@/assets/images/svg/component-active-icons/comp_gantt_active.svg"),
+        keyName: key
+    };
 }
 
 export const projectAppsIcons = (key) => {

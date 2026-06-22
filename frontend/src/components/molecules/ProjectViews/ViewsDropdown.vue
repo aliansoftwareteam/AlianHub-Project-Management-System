@@ -5,7 +5,7 @@
                 {{$t('Projects.task_view')}}
             </span>
             <div v-for="(item, index) in navOptions" :key="index">
-                <DropDownOption :class="{'activeView': item.name == viewItem.name}" class="options" :style="`${clientWidth <= 767 ? 'padding: 5px 0px !important;' : ''}`" :item="{label:$t(`ViewList.${item.name}`), image: projectComponentsIcons(item.keyName).icon}"  @click="viewItem = {...item}"/>
+                <DropDownOption :class="{'activeView': item.name == viewItem.name}" class="options" :style="`${clientWidth <= 767 ? 'padding: 5px 0px !important;' : ''}`" :item="{label:$t(`ViewList.${item.name}`), image: projectComponentsIcons(item.keyName)?.icon}"  @click="viewItem = {...item}"/>
                 <div  v-if="index == 3 && clientWidth > 767" class="p0x-10px">
                     <div class="comments__divider"></div>
                 </div>

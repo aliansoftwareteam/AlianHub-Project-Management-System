@@ -9,7 +9,7 @@
         :style="{ height: active ? '48px' : 'auto' }">
            <span v-if="commentCount" class="count-block comment__count white position-ab">{{commentCount <= 99 ? commentCount : '+99'}}</span> 
            <img class="position-ab list_make_as_defaultimg" v-if="item.setAsDefault" :src="viewDefaultIcon" />
-           <img :src="active ? projectComponentsIcons(item.keyName).activeIcon : projectComponentsIcons(item.keyName)?.icon" :alt="item.name" class="mr-10px">
+           <img :src="active ? projectComponentsIcons(item.keyName)?.activeIcon : projectComponentsIcons(item.keyName)?.icon" :alt="item.name" class="mr-10px">
            <span class="gray81">{{$t(`ViewList.${item.name}`)}}</span>
            <img :src="active ? activePin : pin" v-if="item?.isPin && item.isPin" class="ml-10px active__pin-condition">
            <span class="notification-tick blinking position-sti ml-7px" v-if="item?.isPrivate"></span>
