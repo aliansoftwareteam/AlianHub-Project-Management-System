@@ -129,14 +129,6 @@
                                 <button class="ig-mini" @click="openConnect(item)">{{ connectedFor(item.key) ? $t('IntegrationsHub.mp_reconfigure') : $t('IntegrationsHub.mp_connect') }}</button>
                                 <button v-if="connectedFor(item.key)" class="ig-mini del" @click="disconnect(connectedFor(item.key))">{{ $t('IntegrationsHub.mp_disconnect') }}</button>
                             </div>
-                            <div v-if="item.key === 'slack' && connectedFor(item.key)" class="ig-mp-slack">
-                                <label class="ig-lbl">{{ $t('IntegrationsHub.slack_url') }}</label>
-                                <div class="ig-row">
-                                    <input class="form-control ig-mono" :value="slackUrl" readonly @focus="$event.target.select()" />
-                                    <button class="ig-mini" @click="copy(slackUrl)">{{ $t('IntegrationsHub.copy') }}</button>
-                                </div>
-                                <p class="ig-note">{{ $t('IntegrationsHub.slack_hint') }}</p>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -231,7 +223,45 @@
                     </details>
                 </div>
 
-                <!-- Placeholder sections (filled as AUTO-03..07 land) -->
+                <!-- Slack (AUTO-06) -->
+                <div v-else-if="active === 'slack'">
+                    <div class="ig-head">
+                        <h2>{{ $t('IntegrationsHub.slack') }}</h2>
+                        <p>{{ $t('IntegrationsHub.slack_intro') }}</p>
+                    </div>
+                    <div class="ig-card">
+                        <label class="ig-lbl">{{ $t('IntegrationsHub.slack_token') }}</label>
+                        <input v-model="slackForm.verification_token" type="password" class="form-control" autocomplete="off" :placeholder="connectedFor('slack') ? '••••••••••' : ''" />
+                        <label class="ig-lbl">{{ $t('IntegrationsHub.slack_channel') }}</label>
+                        <input v-model="slackForm.default_channel" class="form-control" placeholder="#general" />
+                        <div class="ig-row ig-mt10">
+                            <button class="ig-btn" :disabled="busy || !slackForm.verification_token.trim()" @click="connectSlack">{{ busy ? $t('IntegrationsHub.creating') : (connectedFor('slack') ? $t('IntegrationsHub.mp_reconfigure') : $t('IntegrationsHub.slack_connect')) }}</button>
+                            <button v-if="connectedFor('slack')" class="ig-mini del" @click="disconnect(connectedFor('slack'))">{{ $t('IntegrationsHub.mp_disconnect') }}</button>
+                        </div>
+                    </div>
+                    <div v-if="connectedFor('slack')" class="ig-card ig-inbox">
+                        <div class="ig-inbox-top">
+                            <span class="ig-inbox-name">{{ $t('IntegrationsHub.connected') }}</span>
+                            <span class="ig-pill on">{{ $t('IntegrationsHub.active') }}</span>
+                        </div>
+                        <label class="ig-lbl">{{ $t('IntegrationsHub.slack_url') }}</label>
+                        <div class="ig-row">
+                            <input class="form-control ig-mono" :value="slackUrl" readonly @focus="$event.target.select()" />
+                            <button class="ig-mini" @click="copy(slackUrl)">{{ $t('IntegrationsHub.copy') }}</button>
+                        </div>
+                        <p class="ig-note">{{ $t('IntegrationsHub.slack_commands') }}</p>
+                    </div>
+                    <details class="ig-help">
+                        <summary>{{ $t('IntegrationsHub.slack_help_title') }}</summary>
+                        <ol>
+                            <li>{{ $t('IntegrationsHub.slack_help_1') }}</li>
+                            <li>{{ $t('IntegrationsHub.slack_help_2') }}</li>
+                            <li>{{ $t('IntegrationsHub.slack_help_3') }}</li>
+                        </ol>
+                    </details>
+                </div>
+
+                <!-- Placeholder sections (all real sections handled above) -->
                 <div v-else class="ig-soon-panel">
                     <div class="ig-soon-ic">{{ activeCat.icon }}</div>
                     <h2>{{ $t('IntegrationsHub.' + active) }}</h2>
@@ -265,7 +295,7 @@ const cats = [
     { key: 'automations', icon: '⚡', soon: false },
     { key: 'calendar', icon: '📅', soon: false },
     { key: 'marketplace', icon: '🧩', soon: false },
-    { key: 'slack', icon: '💬', soon: true },
+    { key: 'slack', icon: '💬', soon: false },
     { key: 'apps', icon: '🪟', soon: false },
 ];
 const active = ref('emailToTask');
@@ -285,6 +315,7 @@ const mpSearch = ref('');
 const mpForm = reactive({ type: '', config: {} });
 const appForm = reactive({ name: '', url: '' });
 const activeApp = ref(null);
+const slackForm = reactive({ verification_token: '', default_channel: '' });
 const busy = ref(false);
 
 const apps = computed(() => connections.value.filter((c) => c.type === 'custom_iframe'));
@@ -292,7 +323,7 @@ const apps = computed(() => connections.value.filter((c) => c.type === 'custom_i
 const filteredCatalog = computed(() => {
     const q = mpSearch.value.trim().toLowerCase();
     return catalog.value
-        .filter((i) => !i.multiple)
+        .filter((i) => !i.multiple && i.key !== 'slack') // slack has its own dedicated section
         .filter((i) => !q || (i.name || '').toLowerCase().includes(q) || (i.category || '').toLowerCase().includes(q));
 });
 const connectedFor = (type) => connections.value.find((c) => c.type === type) || null;
@@ -421,6 +452,20 @@ const removeApp = async (a) => {
         if (activeApp.value && activeApp.value._id === a._id) activeApp.value = null;
         await loadConnections();
     } catch (e) { /* noop */ }
+};
+
+// AUTO-06 — Slack connection (verification token + default channel).
+const connectSlack = async () => {
+    if (busy.value || !slackForm.verification_token.trim()) return;
+    busy.value = true;
+    try {
+        await apiRequest('post', `${env.INTEGRATIONS}/connections`, {
+            type: 'slack',
+            config: { verification_token: slackForm.verification_token.trim(), default_channel: slackForm.default_channel.trim() },
+        });
+        slackForm.verification_token = ''; slackForm.default_channel = '';
+        await loadConnections();
+    } catch (e) { /* noop */ } finally { busy.value = false; }
 };
 
 onMounted(() => { loadProjects(); loadInboxes(); loadFeeds(); loadRules(); loadCatalog(); loadConnections(); });
