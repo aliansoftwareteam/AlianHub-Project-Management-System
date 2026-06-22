@@ -7,7 +7,7 @@
                 </router-link>
 
             <!-- FOR SUB MENU -->
-            <div :key="'nested-item-'+index+item.name" v-else class="link-item link-dropdown-menu" :class="{'active': item.name==='Time_Sheet' ? $route.name.toLowerCase().includes('timesheet') : $route.name.toLowerCase().includes('report')}">
+            <div :key="'nested-item-'+index+item.name" v-else class="link-item link-dropdown-menu" :class="{'active': isDropdownActive(item)}">
                 <DropDown :id="'nav_menu2'+index+item.name" :title="item.name">
                     <template #button>
                         <div class="cursor-pointer dropdown_wrapper h-100" :id="item.id ? item.id : ''">
@@ -57,6 +57,13 @@ defineProps({
 const handleItemClick = (value,idex)  =>{
     document.getElementById(`list_dropdown_header${value}${idex}`).click()
 }
+
+// A dropdown is active when the current route matches any of its submenu paths.
+// Generalizes the old hardcoded Time_Sheet/Reports check so the Workspace menu
+// (Portfolio / Capacity / Integrations) highlights correctly too.
+const isDropdownActive = (item) => (item.submenu || []).some(
+    (s) => s && s.to && s.to.path && route.path.startsWith(s.to.path)
+);
 
 </script>
 

@@ -523,6 +523,7 @@ export default {
         Variance_Report: "Variance Report",
         Capacity_Planning: "Capacity Planning",
         Integrations: "Integrations",
+        Workspace: "Workspace",
         Time_Sheet: "Time Sheet",
         User_Timesheet: "User Timesheet",
         project_Timesheet: "Project Timesheet",

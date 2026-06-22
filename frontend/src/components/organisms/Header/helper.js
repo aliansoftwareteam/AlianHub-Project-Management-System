@@ -23,39 +23,26 @@ export function useHelper() {
             isActive: true
         },
         {
-            name: "Portfolio",
-            to: {path: `/${companyId.value}/portfolio`},
+            // Workspace — oversight + planning + apps grouped under one menu.
+            name: "Workspace",
             show: true,
-            submenu: [],
-            isActive: true
-        },
-        {
-            name: "Custom_Report",
-            to: {path: `/${companyId.value}/custom-reports`},
-            show: true,
-            submenu: [],
-            isActive: true
-        },
-        {
-            name: "Variance_Report",
-            to: {path: `/${companyId.value}/reports/variance`},
-            show: true,
-            submenu: [],
-            isActive: true
-        },
-        {
-            name: "Capacity_Planning",
-            to: {path: `/${companyId.value}/reports/capacity`},
-            show: true,
-            submenu: [],
-            isActive: true
-        },
-        {
-            name: "Integrations",
-            to: {path: `/${companyId.value}/integrations`},
-            show: true,
-            submenu: [],
-            isActive: true
+            submenu: [
+                {
+                    name: "Portfolio",
+                    to: {path: `/${companyId.value}/portfolio`},
+                    show: true
+                },
+                {
+                    name: "Capacity_Planning",
+                    to: {path: `/${companyId.value}/reports/capacity`},
+                    show: true
+                },
+                {
+                    name: "Integrations",
+                    to: {path: `/${companyId.value}/integrations`},
+                    show: true
+                }
+            ]
         },
         {
             name: "Time_Sheet",
@@ -109,13 +96,24 @@ export function useHelper() {
             ]
         },
         {
+            // Reports — Milestone (permission-gated) + the always-on Custom & Variance reports.
             name: "Reports",
-            show:checkPermission('sheet_settings.milestone_report') !== null,
+            show: true,
             submenu: [
                 {
                     name: "Milestone_Report",
                     to: {path: `/${companyId.value}/report/milestone`},
                     show:checkPermission('sheet_settings.milestone_report') !== null
+                },
+                {
+                    name: "Custom_Report",
+                    to: {path: `/${companyId.value}/custom-reports`},
+                    show: true
+                },
+                {
+                    name: "Variance_Report",
+                    to: {path: `/${companyId.value}/reports/variance`},
+                    show: true
                 }
             ]
         }
