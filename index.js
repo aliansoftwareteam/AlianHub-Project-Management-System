@@ -196,6 +196,7 @@ function initializeControllers() {
     require('./Modules/RecurringTasks/init').init(app);
     require('./Modules/Reminders/init').init(app);
     require('./Modules/Notes/init').init(app);
+    require('./Modules/Clips/init').init(app);
     require('./Modules/LogTime/init.js').init(app);
     require('./Modules/TimesheetApproval/init').init(app);
     require('./Modules/Milestone/init.js').init(app);

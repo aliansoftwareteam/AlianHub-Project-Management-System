@@ -88,6 +88,7 @@
                 @update:add="(files) => newAttachments(files)"
                 @update:delete="(file) => deleteAttachments(file)"
                 @seAll="(val)=>{openSeeAll(val)}"
+                @record-clip="onRecordClip"
                 :isSpinner="isSpinner"
                 :selectedData="task"
             />
@@ -131,6 +132,7 @@ import { useCustomComposable, useGetterFunctions } from '@/composable';
 import taskClass from '@/utils/TaskOperations';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import {storageQueryBuilder,generateFileName} from '@/utils/storageQueryBuild.js';
+import { useClipRecorder } from '@/composables/useClipRecorder';
 import { useI18n } from 'vue-i18n';
 
 
@@ -139,6 +141,7 @@ const {t} = useI18n();
 const { getters,commit } = useStore();
 const { getUser } = useGetterFunctions();
 const { checkPermission, makeUniqueId, checkBucketStorage,checkApps } = useCustomComposable();
+const { openRecorder } = useClipRecorder();
 
 // props
 const props = defineProps({
@@ -350,6 +353,59 @@ const newAttachments = (files) => {
         }
     }
     countFun(fileList[count.value]);
+};
+
+// Record-from-task: open the GLOBAL recorder with this task as the target. When
+// the user saves, the clip is uploaded once + recorded globally (My Clips), and
+// the returned clip record is attached to THIS task via attachClipToTask.
+const onRecordClip = () => {
+    openRecorder(
+        { type: "task", taskId: props.task._id, projectId: props.task.ProjectID },
+        (clip) => attachClipToTask(clip)
+    );
+};
+
+// Attach an already-uploaded clip to the task. Reuses the SECOND half of the
+// newAttachments flow: build the same attachment object shape and call the
+// existing taskClass.updateAttachments({ operation:'add' }) ($push + socket).
+// No upload here — the clip blob was uploaded once by the global recorder.
+const attachClipToTask = (clip) => {
+    if (!clip || !clip.url) {
+        return;
+    }
+    let findIndex = allProjectsArrayFilter.value.findIndex((ele)=>{return ele.id === props?.task?.ProjectID});
+    const imagObj = {
+        filename: (clip.title ? `${clip.title}.webm` : `clip-${makeUniqueId(12)}.webm`),
+        extension: "webm",
+        size: clip.size,
+        id: makeUniqueId(17),
+        createdAt: new Date(),
+        userId: userId.value,
+        type: clip.mediaType, // 'video' | 'audio'
+        url: clip.url,
+    };
+    taskClass.updateAttachments({
+        companyId: companyId.value,
+        sprintId: props.task.sprintId,
+        taskId: props.task._id,
+        taskData: props.task,
+        operation: "add",
+        data: imagObj,
+        userData: {
+            id: user.id,
+            name: user.Employee_Name,
+            companyOwnerId: companyOwner.value._id,
+        },
+        projectData: {
+            id: findIndex == -1 ? projectData.value._id : allProjectsArrayFilter.value[findIndex]._id,
+            ProjectName: findIndex == -1 ? projectData.value.ProjectName : allProjectsArrayFilter.value[findIndex].ProjectName
+        }
+    }).then(() => {
+        $toast.success(t('Toast.Attachments_uploaded_successfully'),{position: 'top-right'});
+    }).catch((error) => {
+        console.error("Error in attaching clip to task: ", error);
+        $toast.error(t('Toast.Please_try_again'),{position: 'top-right'});
+    });
 };
 
 const deleteAttachments = (attachment) => {

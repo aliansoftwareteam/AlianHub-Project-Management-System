@@ -71,6 +71,7 @@ const {
     recurringTasksSchema,
     remindersSchema,
     notesSchema,
+    clipsSchema,
     timesheetApprovalSchema,
     billingRatesSchema,
     ssoConfigsSchema,
@@ -229,6 +230,8 @@ exports.checkType = (type) => {
             return remindersSchema
         case SCHEMA_TYPE.NOTES:
             return notesSchema
+        case SCHEMA_TYPE.CLIPS:
+            return clipsSchema
         case SCHEMA_TYPE.TIMESHEET_APPROVAL:
             return timesheetApprovalSchema
         case SCHEMA_TYPE.BILLING_RATES:
@@ -403,6 +406,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.REMINDERS}`
         case SCHEMA_TYPE.NOTES:
                 return `${dbCollections.NOTES}`
+        case SCHEMA_TYPE.CLIPS:
+                return `${dbCollections.CLIPS}`
         case SCHEMA_TYPE.TIMESHEET_APPROVAL:
                 return `${dbCollections.TIMESHEET_APPROVAL}`
         case SCHEMA_TYPE.BILLING_RATES:
