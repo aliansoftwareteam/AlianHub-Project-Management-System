@@ -68,6 +68,9 @@
             <div class="position-re" :class="{'mr-2' : clientWidth > 1440, 'mr-1' : clientWidth<=1440}" v-if="rules && Object.keys(rules).length">
                 <img src="@/assets/images/svg/notepad_icon.svg" class="cursor-pointer" id="notepad_driver" :title="$t('Notepad.title')" @click="notepadVisible = true">
             </div>
+            <div class="position-re" :class="{'mr-2' : clientWidth > 1440, 'mr-1' : clientWidth<=1440}" v-if="rules && Object.keys(rules).length">
+                <img src="@/assets/images/svg/clips_icon.svg" class="cursor-pointer" id="clips_driver" :title="$t('Clips.title')" @click="clipsVisible = true">
+            </div>
             <div class="position-re" :class="{'pr-2' : clientWidth > 1440, 'pr-1' : clientWidth<=1440}" v-if="rules && Object.keys(rules).length && (companyUser.roleType === 1 || companyUser.roleType === 2)">
                 <img src="@/assets/images/svg/tour_image.svg" class="cursor-pointer" id="tour_icon" @click="getTourDetails(),tourVisible = true">
             </div>
@@ -109,6 +112,13 @@
         <StickiesPanel v-model="stickiesVisible" />
 
         <NotepadPanel v-model="notepadVisible" />
+
+        <ClipsPanel v-model="clipsVisible" />
+
+        <!-- Single GLOBAL clip recorder: mounted here at the app shell (sibling of
+             router-view in App.vue) so an in-progress recording survives task
+             open/close + route changes. Controlled by the useClipRecorder composable. -->
+        <ClipRecorder />
 
         <Sidebar
             title="Test"
@@ -346,6 +356,8 @@ import WasabiIamgeCompp from "@/components/atom/WasabiIamgeCompp/WasabiIamgeComp
 import Sidebar from "@/components/molecules/Sidebar/Sidebar.vue";
 import StickiesPanel from "@/components/molecules/Stickies/StickiesPanel.vue";
 import NotepadPanel from "@/components/molecules/Notepad/NotepadPanel.vue";
+import ClipsPanel from "@/components/molecules/Clips/ClipsPanel.vue";
+import ClipRecorder from "@/components/molecules/ClipRecorder/ClipRecorder.vue";
 import DropDown from "@/components/molecules/DropDown/DropDown.vue";
 import DropDownOption from "@/components/molecules/DropDownOption/DropDownOption.vue";
 import DropDownRouterOption from "@/components/molecules/DropDownRouterOption/DropDownRouterOption.vue";
@@ -450,6 +462,7 @@ const notificationVisible = ref(false);
 const tourVisible = ref(false);
 const stickiesVisible = ref(false);
 const notepadVisible = ref(false);
+const clipsVisible = ref(false);
 const myCounts = computed(() => getters["users/myCounts"]?.data || {})
 const totalNotification = computed(() => myCounts.value?.notification_counts);
 const totalMentions = computed(() => myCounts.value?.mention_counts)

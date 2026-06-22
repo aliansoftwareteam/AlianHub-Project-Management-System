@@ -463,6 +463,24 @@ const schema = {
         convertedTaskId: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0 },
     },
+    // Clips (COLLAB-04) — first-class, reusable screen/voice recordings owned by
+    // a user and company-scoped. Recorded once, stored once (the media file is
+    // uploaded via the EXISTING storage endpoint; only its url is kept here),
+    // then referenced anywhere (task attachment, comment, share, or the owner's
+    // library). Managed by Modules/Clips.
+    clips: {
+        clipId: { type: String, required: false },
+        userId: { type: String, required: true },
+        companyId: { type: String, required: false },
+        title: { type: String, required: false },
+        url: { type: String, required: true },
+        mediaType: { type: String, required: false },
+        mimeType: { type: String, required: false },
+        size: { type: Number, required: false },
+        durationSec: { type: Number, required: false },
+        source: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0 },
+    },
     // Timesheet approval submissions — one per user per period (week/month) — managed by Modules/TimesheetApproval
     timesheetApproval: {
         userId: { type: String, required: true },

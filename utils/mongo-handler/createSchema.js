@@ -122,6 +122,8 @@ const remindersSchema = new Schema(schema.reminders, {strict: true, timestamps: 
 remindersSchema.index({ userId: 1, fired: 1, reminderAt: 1 });
 const notesSchema = new Schema(schema.notes, {strict: true, timestamps: true});
 notesSchema.index({ userId: 1, deletedStatusKey: 1 });
+const clipsSchema = new Schema(schema.clips, {strict: true, timestamps: true});
+clipsSchema.index({ userId: 1, deletedStatusKey: 1 });
 const timesheetApprovalSchema = new Schema(schema.timesheetApproval, {strict: true, timestamps: true});
 timesheetApprovalSchema.index({ userId: 1, periodStart: 1, periodEnd: 1 });
 timesheetApprovalSchema.index({ status: 1, periodStart: -1 });
@@ -235,6 +237,7 @@ module.exports = {
     recurringTasksSchema,
     remindersSchema,
     notesSchema,
+    clipsSchema,
     timesheetApprovalSchema,
     billingRatesSchema,
     ssoConfigsSchema,

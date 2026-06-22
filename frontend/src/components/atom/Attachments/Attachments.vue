@@ -36,7 +36,7 @@
                 </template>
                 <button v-if="permission === true && !(props.isMainSpinner === true || isLoadingAttachments)"
                     type="button" class="clip-record-btn cursor-pointer mr-10px"
-                    :title="$t('ClipRecorder.record_clip')" @click="openRecorder">
+                    :title="$t('ClipRecorder.record_clip')" @click="$emit('record-clip')">
                     <img src="@/assets/images/svg/clip_record_icon.svg" alt="record clip" />
                 </button>
                 <label for="UploadedFile" v-if="permission === true">
@@ -77,7 +77,6 @@
                 :items="transformedAttachments" :activeIndex="activeIndex" @close="closePreviewer"
                 @loadMore="loadMoreAttachments" :config="{ handlesTimer: 2000 }" />
         </div>
-        <ClipRecorder v-if="showRecorder" @attach="onClipAttach" @close="showRecorder = false" />
     </div>
 </template>
 
@@ -91,7 +90,6 @@ import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import JSZip from "jszip";
 import ImagesPreviewer from "@/components/organisms/ImagePreviewer/ImagesPreviewer.vue";
-import ClipRecorder from "@/components/molecules/ClipRecorder/ClipRecorder.vue";
 import * as env from "@/config/env";
 import { storageHelper } from "@/composable/commonFunction";
 import Skelaton from "../Skelaton/Skelaton.vue";
@@ -137,7 +135,7 @@ const props = defineProps({
     }
 });
 const showDropZone = ref(false);
-const emit = defineEmits(["update:add", "update:delete", "seAll","updateProjectAttachment"]);
+const emit = defineEmits(["update:add", "update:delete", "seAll","updateProjectAttachment","record-clip"]);
 // eslint-disable-next-line
 const extensions = ref("");
 extensions.value = props.extensions.map(exe => exe.name).join();
@@ -152,22 +150,11 @@ const transformedAttachments = ref([]);
 const sliderMain = ref(null);
 const loadMoreTrigger = ref(null);
 const isLoadingAttachments = ref(false);
-const showRecorder = ref(false);
 let observer = null;
 
-// COLLAB-04: open the clip recorder modal (gated by the same upload permission).
-const openRecorder = () => {
-    showRecorder.value = true;
-};
-
-// COLLAB-04: route the recorded clip through the exact same path the file input
-// uses — emit update:add with the File so the parent's newAttachments upload runs unchanged.
-const onClipAttach = (file) => {
-    showRecorder.value = false;
-    if (file) {
-        emit("update:add", [file]);
-    }
-};
+// COLLAB-04 / global clips: the "Record clip" button no longer mounts a local
+// recorder. It emits `record-clip` to the task container (which owns taskClass),
+// which opens the GLOBAL recorder and attaches the resulting clip to the task.
 
 const setupIntersectionObserver = (val) => {
     nextTick(() => {
