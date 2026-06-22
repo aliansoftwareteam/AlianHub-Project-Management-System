@@ -37,7 +37,7 @@
                 <button v-if="permission === true && !(props.isMainSpinner === true || isLoadingAttachments)"
                     type="button" class="clip-record-btn cursor-pointer mr-10px"
                     :title="$t('ClipRecorder.record_clip')" @click="openRecorder">
-                    <img src="@/assets/images/icon/video.png" alt="record clip" width="18px" />
+                    <img src="@/assets/images/svg/clip_record_icon.svg" alt="record clip" />
                 </button>
                 <label for="UploadedFile" v-if="permission === true">
                     <div class="cursor-link cursor-pointer" v-if="props.isMainSpinner === true || isLoadingAttachments">
@@ -595,6 +595,11 @@ watch(
     padding: 0;
     display: inline-flex;
     align-items: center;
+}
+.clip-record-btn img {
+    width: 18px;
+    height: 18px;
+    display: block;
 }
 .clip-record-btn:focus-visible {
     outline: 2px solid #2f3990;
