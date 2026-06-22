@@ -184,11 +184,23 @@ function commitRename(clip) {
         });
 }
 
-function copyLink(clip) {
+async function copyLink(clip) {
     openMenuId.value = null;
-    const text = clip.url || "";
     const done = () => $toast.success(t("Clips.copied"), { position: "top-right" });
     const fail = () => $toast.error(t("Clips.copy_failed"), { position: "top-right" });
+    // The stored value is an internal storage path (on Wasabi it's an object key,
+    // not openable). Resolve it to a real url the same way playback does — reuse an
+    // already-resolved one if present, else resolve on demand.
+    let text = playUrls.value[clip._id] || "";
+    if (!text) {
+        try {
+            const res = await handleStorageImageRequest({ companyId: companyId.value, data: { url: clip.url } });
+            text = (res && (res.url || res.downloadUrl)) || clip.url || "";
+        } catch (error) {
+            console.error("ERROR resolving clip link: ", error);
+            text = clip.url || "";
+        }
+    }
     if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
         navigator.clipboard.writeText(text).then(done).catch(fail);
         return;
