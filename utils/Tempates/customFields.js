@@ -79,5 +79,23 @@ exports.defaultCustomFields = [
 		"cfTitle": "Checkbox",
 		"cfIconGrey": "CustomFieldCheckboxGrey",
 		"cfBackgroundColor": "#FFECDA"
+	},
+	{
+		"cfPrimaryColor": "#7C3AED",
+		"cfType": "formula",
+		"cfDescrption": "Create a read-only field whose value is calculated from other numeric fields using a formula expression.",
+		"cfIcon": "Calculation",
+		"cfTitle": "Formula",
+		"cfIconGrey": "Calculation",
+		"cfBackgroundColor": "#EDE4FF"
+	},
+	{
+		"cfPrimaryColor": "#0EA5A4",
+		"cfType": "rollup",
+		"cfDescrption": "Create a read-only field that aggregates a numeric field across a task's subtasks (sum, avg, count, min, max).",
+		"cfIcon": "BarChart",
+		"cfTitle": "Rollup",
+		"cfIconGrey": "BarChart",
+		"cfBackgroundColor": "#D7F5F5"
 	}
 ];

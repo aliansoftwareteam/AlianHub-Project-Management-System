@@ -28,6 +28,15 @@
                 </div>
             </template>
         </template>
+        <!-- Read-only computed columns (formula/rollup) are never stored on the task, so render them from the live def. -->
+        <div v-if="computedDefs[obj.key]" class="position-re">
+            <ComputedComponentViewColumn
+                :def="computedDefs[obj.key]"
+                :task="props.task"
+                :allTasks="allTasksList"
+                :defs="finalCustomFieldsList"
+            />
+        </div>
     </span>
 </template>
 
@@ -48,6 +57,7 @@
     import TextareaComponentListing from '../../atom/customFieldViewColumn/textareaComponentViewColumn.vue';
     import CheckboxComponentListing from '../../atom/customFieldViewColumn/checkboxComponentViewColumn.vue';
     import DropdownComponentListing from '../../atom/customFieldViewColumn/dropdownComponentViewColumn.vue';
+    import ComputedComponentViewColumn from '../../atom/customFieldViewColumn/computedComponentViewColumn.vue';
     import { useStore } from 'vuex';
     import { useI18n } from "vue-i18n";
     const { t } = useI18n();
@@ -68,6 +78,39 @@
     });
 
     const {getters} = useStore();
+
+    // All custom field definitions (used to resolve formula references and rollup sources).
+    const finalCustomFieldsList = computed(() => getters['settings/finalCustomFields'] || []);
+
+    // Map of computed (formula/rollup) field definitions keyed by their _id.
+    const computedDefs = computed(() => {
+        const map = {};
+        finalCustomFieldsList.value.forEach((def) => {
+            if (def && (def.fieldType === 'formula' || def.fieldType === 'rollup')) {
+                map[def._id] = def;
+            }
+        });
+        return map;
+    });
+
+    // Flat task list (incl. subtasks expanded from subtaskArray) for rollup aggregation.
+    const allTasksList = computed(() => {
+        try {
+            const parents = getters['projectData/alltasks'] || [];
+            if (!Array.isArray(parents)) return [];
+            const flat = [];
+            parents.forEach((task) => {
+                if (!task) return;
+                flat.push(task);
+                if (Array.isArray(task.subtaskArray)) {
+                    task.subtaskArray.forEach((sub) => sub && flat.push(sub));
+                }
+            });
+            return flat;
+        } catch (error) {
+            return [];
+        }
+    });
 
     // ref
     const taskId = ref('');

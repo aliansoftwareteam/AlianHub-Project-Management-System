@@ -55,6 +55,14 @@
         {
             type:"email",
             tab:[t('general.general')]
+        },
+        {
+            type:'formula',
+            tab:[t('general.general')]
+        },
+        {
+            type:'rollup',
+            tab:[t('general.general')]
         }
     ]);
     const emit = defineEmits(['handleIndex']);

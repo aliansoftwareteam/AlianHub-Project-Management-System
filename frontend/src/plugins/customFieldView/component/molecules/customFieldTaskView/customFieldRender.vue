@@ -46,6 +46,8 @@
     import NumberComponentListing from '../../atom/customFieldTaskView/numberComponentListing.vue';
     import EmailComponentListing from '../../atom/customFieldTaskView/emailComponentListing.vue';
     import PhoneComponentListing from '../../atom/customFieldTaskView/phoneComponentListing.vue';
+    import ComputedComponentListing from '../../atom/customFieldTaskView/computedComponentListing.vue';
+    import { computeCustomFieldValue } from '@/plugins/customFieldView/formulaEngine.js';
     import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 
 
@@ -83,7 +85,29 @@
         textarea: TextareaComponentListing,
         number: NumberComponentListing,
         email: EmailComponentListing,
-        phone: PhoneComponentListing
+        phone: PhoneComponentListing,
+        formula: ComputedComponentListing,
+        rollup: ComputedComponentListing
+    };
+
+    // Flat task list (incl. subtasks expanded from subtaskArray) for rollup aggregation.
+    // Returns [] when the store getter is unavailable so rollups degrade to '—'.
+    const getAllTasks = () => {
+        try {
+            const parents = getters['projectData/alltasks'] || [];
+            if (!Array.isArray(parents)) return [];
+            const flat = [];
+            parents.forEach((task) => {
+                if (!task) return;
+                flat.push(task);
+                if (Array.isArray(task.subtaskArray)) {
+                    task.subtaskArray.forEach((sub) => sub && flat.push(sub));
+                }
+            });
+            return flat;
+        } catch (error) {
+            return [];
+        }
     };
 
     const performanceDelay = (milliseconds) => {
@@ -159,9 +183,23 @@
                 return removeCustomFieldProperties(val);
             });
         } else {
-            processedCustomFieldList.value = data.map(val => 
+            processedCustomFieldList.value = data.map(val =>
                 removeCustomFieldProperties(val)
             );
+        }
+        // Compute read-only formula/rollup values from the live task store (additive only).
+        const computedTypes = ['formula', 'rollup'];
+        if (processedCustomFieldList.value.some(item => computedTypes.includes(item?.fieldType))) {
+            const allTasks = getAllTasks();
+            processedCustomFieldList.value = processedCustomFieldList.value.map(item => {
+                if (item && computedTypes.includes(item.fieldType)) {
+                    return {
+                        ...item,
+                        fieldValue: computeCustomFieldValue(item, props.task, allTasks, data)
+                    };
+                }
+                return item;
+            });
         }
         isInitialLoading.value = false;
     };
