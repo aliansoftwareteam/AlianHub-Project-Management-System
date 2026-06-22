@@ -303,7 +303,9 @@ const webhookUrl = (token) => `${window.location.origin}${env.EMAIL_IN}/${token}
 const loadProjects = async () => {
     try {
         const body = (await apiRequest('get', env.PROJECT))?.data;
-        projects.value = Array.isArray(body) ? body : (body && body.data) || [];
+        const list = Array.isArray(body) ? body : (body && body.data) || [];
+        // Active projects only — hide closed / deleted / archived from the pickers.
+        projects.value = list.filter((p) => p && p.status !== 'close' && p.deletedStatusKey !== 1 && p.deletedStatusKey !== 2);
     } catch (e) { projects.value = []; }
 };
 const loadInboxes = async () => {

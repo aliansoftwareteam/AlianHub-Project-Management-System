@@ -88,7 +88,7 @@ exports.getRollup = async (req, res) => {
         const projectDocs = projectIds.length
             ? await MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.PROJECTS,
-                data: [{ _id: { $in: projectIds.map(oid) }, deletedStatusKey: { $nin: [1] } }, 'ProjectName status statusType DueDate'],
+                data: [{ _id: { $in: projectIds.map(oid) }, deletedStatusKey: { $nin: [1, 2] }, status: { $ne: 'close' } }, 'ProjectName status statusType DueDate'],
             }, 'find')
             : [];
         const projById = {};
