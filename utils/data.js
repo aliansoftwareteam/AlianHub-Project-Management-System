@@ -1901,6 +1901,14 @@ exports.importProjectTabComponents = (companyName) => {
             value: "whiteboardview",
             setAsDefault: false,
             viewStatus: false
+        },
+        {
+            name: "Canvas View",
+            sortIndex: 15,
+            keyName: "CanvasView",
+            value: "canvasview",
+            setAsDefault: false,
+            viewStatus: false
         }
     ];
     return new Promise(async (resolve, reject) => {

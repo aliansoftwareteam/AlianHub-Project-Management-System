@@ -264,6 +264,7 @@
                                             activeTab !== 'TimelineView' &&
                                             activeTab !== 'MindMapView' &&
                                             activeTab !== 'WhiteboardView' &&
+                                            activeTab !== 'CanvasView' &&
                                             (clientWidth > 767 || activeTab !== 'ProjectDetail')
                                 },
                                 {'board-veiw-main-parent': activeTab === 'ProjectKanban'}
@@ -308,7 +309,7 @@
                             />
                             <component
                                 v-if="(clientWidth <= 767 && isVisible == true && isRuleData == false) || (clientWidth > 767 && isRuleData == false)"
-                                :class="[{'showProjectDetailRight':activeTab !== 'ProjectListView' && activeTab !== 'Calendar' && activeTab != 'EmbedViewItem' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports' && activeTab !== 'GanttView' && activeTab !== 'RecurringTasks' && activeTab !== 'TimelineView' && activeTab !== 'MindMapView' && activeTab !== 'WhiteboardView'}]"
+                                :class="[{'showProjectDetailRight':activeTab !== 'ProjectListView' && activeTab !== 'Calendar' && activeTab != 'EmbedViewItem' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports' && activeTab !== 'GanttView' && activeTab !== 'RecurringTasks' && activeTab !== 'TimelineView' && activeTab !== 'MindMapView' && activeTab !== 'WhiteboardView' && activeTab !== 'CanvasView'}]"
                                 :is="getView(activeTab)"
                                 :data="selectedEmbedView"
                                 :sprints="sprints"
@@ -330,7 +331,7 @@
                                 :sprintLoading="sprintLoading"
                                 :commentType="'project'"
                             />
-                            <ProjectDetailRightSide v-if="activeTab !== 'ProjectListView' && clientWidth > 767 && activeTab !== 'Calendar' && activeTab != 'EmbedView' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports' && activeTab !== 'GanttView' && activeTab !== 'RecurringTasks' && activeTab !== 'TimelineView' && activeTab !== 'MindMapView' && activeTab !== 'WhiteboardView'" :projectData="projectData" @rightSideBarEmit="handleEmitProjectRightSide" @description="handleDescription"/>
+                            <ProjectDetailRightSide v-if="activeTab !== 'ProjectListView' && clientWidth > 767 && activeTab !== 'Calendar' && activeTab != 'EmbedView' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports' && activeTab !== 'GanttView' && activeTab !== 'RecurringTasks' && activeTab !== 'TimelineView' && activeTab !== 'MindMapView' && activeTab !== 'WhiteboardView' && activeTab !== 'CanvasView'" :projectData="projectData" @rightSideBarEmit="handleEmitProjectRightSide" @description="handleDescription"/>
                         </div>
                         <div class="position-ab z-index-1 p-5px border-radius-5-px text-center p0x-15px archived_wrapper" v-if="projectData?.deletedStatusKey === 2">
                             <div>
@@ -478,6 +479,7 @@ const RecurringTasksComp = defineAsyncComponent(() => import(/* webpackChunkName
 const TimelineViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-timeline" */ '@/views/Projects/TimelineView/TimelineView.vue'));
 const MindMapViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-mindmap" */ '@/views/Projects/MindMapView/MindMapView.vue'));
 const WhiteboardViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-whiteboard" */ '@/views/Projects/WhiteboardView/WhiteboardView.vue'));
+const CanvasViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-canvas" */ '@/views/Projects/CanvasView/CanvasView.vue'));
 import NotFound from '../NotFound.vue';
 
 // EXTRACTED PIECES
@@ -1108,6 +1110,8 @@ function getView(val) {
             return MindMapViewComp;
         case 'WhiteboardView':
             return WhiteboardViewComp;
+        case 'CanvasView':
+            return CanvasViewComp;
         default:
             return NotFound;
     }
