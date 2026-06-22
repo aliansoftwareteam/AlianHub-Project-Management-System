@@ -61,6 +61,8 @@ export default {
         accept: "承認",
         reject: "却下",
         import_jira: "Jiraインポート",
+        import_asana: "Asanaインポート",
+        import_monday: "Monday.comインポート",
         importing: "インポート中...",
         start_import: "インポート",
         linked_tasks: "リンクされたタスク",

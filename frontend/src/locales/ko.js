@@ -61,6 +61,8 @@ export default {
         accept: "승인",
         reject: "거절",
         import_jira: "Jira 가져오기",
+        import_asana: "Asana 가져오기",
+        import_monday: "Monday.com 가져오기",
         importing: "가져오는 중...",
         start_import: "가져오기",
         linked_tasks: "연결된 작업",

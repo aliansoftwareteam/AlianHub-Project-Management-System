@@ -7,6 +7,8 @@ const { taskMongo } = require('../Tasks/helpers/task_class_Mongo');
 const { validateImportInput, transformJiraRows } = require('./helpers/jiraRules');
 const { validateCsvInput, transformCsvRows } = require('./helpers/csvRules');
 const { validateTrelloInput, parseTrelloBoard } = require('./helpers/trelloRules');
+const { validateAsanaInput, parseAsanaExport } = require('./helpers/asanaRules');
+const { validateMondayInput, parseMondayExport } = require('./helpers/mondayRules');
 
 // Jira importer. The client parses the Jira CSV export (the xlsx lib reads
 // CSV) and posts plain rows; the server maps statuses/priorities and feeds
@@ -284,6 +286,54 @@ exports.importFromTrello = async (req, res) => {
         return res.send(out);
     } catch (error) {
         logger.error(`ERROR in trello import: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+/* POST /api/v2/imports/asana
+ * body: { asana, projectId, sprintId, sprintName?, folderId?, folderName?, userData } */
+exports.importFromAsana = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'] || '';
+        const { asana, projectId, sprintId, sprintName, folderId, folderName, userData } = req.body || {};
+        const userId = userData && (userData.id || userData._id) ? String(userData.id || userData._id) : '';
+        const check = validateAsanaInput({ companyId, projectId, sprintId, asana, userId });
+        if (!check.valid) return res.send({ status: false, statusText: check.reason });
+
+        const ctx = await loadImportContext(companyId, projectId);
+        if (ctx.error) return res.send({ status: false, statusText: ctx.error });
+
+        const { tasks, skipped } = parseAsanaExport({ asana, statusNames: ctx.statusArray.map((status) => status.name), leaderId: userId });
+        if (!tasks.length) return res.send({ status: false, statusText: 'No importable tasks found.' });
+
+        const out = await finishImport(companyId, { source: 'asana', project: ctx.project, sprintId, sprintName, folderId, folderName, userData, statusArray: ctx.statusArray, tasks, skipped });
+        return res.send(out);
+    } catch (error) {
+        logger.error(`ERROR in asana import: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+/* POST /api/v2/imports/monday
+ * body: { rows, mapping?, projectId, sprintId, sprintName?, folderId?, folderName?, userData } */
+exports.importFromMonday = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'] || '';
+        const { rows, mapping, projectId, sprintId, sprintName, folderId, folderName, userData } = req.body || {};
+        const userId = userData && (userData.id || userData._id) ? String(userData.id || userData._id) : '';
+        const check = validateMondayInput({ companyId, projectId, sprintId, rows, userId });
+        if (!check.valid) return res.send({ status: false, statusText: check.reason });
+
+        const ctx = await loadImportContext(companyId, projectId);
+        if (ctx.error) return res.send({ status: false, statusText: ctx.error });
+
+        const { tasks, skipped } = parseMondayExport({ rows, mapping, statusNames: ctx.statusArray.map((status) => status.name), leaderId: userId });
+        if (!tasks.length) return res.send({ status: false, statusText: 'No importable rows found (a task-name column is required).' });
+
+        const out = await finishImport(companyId, { source: 'monday', project: ctx.project, sprintId, sprintName, folderId, folderName, userData, statusArray: ctx.statusArray, tasks, skipped });
+        return res.send(out);
+    } catch (error) {
+        logger.error(`ERROR in monday import: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
 };

@@ -61,6 +61,8 @@ export default {
         accept: "Aceitar",
         reject: "Rejeitar",
         import_jira: "Importar do Jira",
+        import_asana: "Importar do Asana",
+        import_monday: "Importar do Monday.com",
         importing: "Importando...",
         start_import: "Importar",
         linked_tasks: "Tarefas vinculadas",
