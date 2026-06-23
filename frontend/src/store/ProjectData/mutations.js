@@ -798,6 +798,108 @@ export const mutateSprints = (state,payload) => {
     }
 }
 
+// RELOCATE A SPRINT BETWEEN BUCKETS (root <-> folder) ON THE LIVE PROJECT OBJECT
+// payload: { data: <updated sprint from PATCH response>, oldFolderId: <folderId before the move|null> }
+// Re-groups the sprint in state.allProjects.data[index] so both the project list (Projects.vue grouping)
+// and the sidebar (Item.vue setSprints/setFolders) reflect the move without a refresh.
+export const relocateSprint = (state, payload) => {
+    const { data, oldFolderId } = payload || {};
+    if(!data) return;
+
+    const pId = data?.projectId;
+    const projects = state.allProjects && state.allProjects.data;
+    if(!pId || !projects || !projects.length) return;
+
+    const index = projects.findIndex((x) => x._id === pId);
+    if(index === -1) return;
+
+    const sortObject = (object = {}) => {
+        let obj = {};
+        Object.values(object || {}).sort((a, b) => a?.createdAt?.seconds > b?.createdAt?.seconds ? -1 : 1).forEach((x) => {
+            obj[x.id] = x;
+        });
+        return obj;
+    };
+
+    const project = projects[index];
+    const sprintId = data.id || data._id;
+    const newFolderId = data.folderId || null;
+
+    // BUILD THE SPRINT AS THE LISTS EXPECT IT (id mirrors _id, carries folderName for the legend)
+    const movedSprint = { ...data, id: sprintId, folderId: newFolderId, folderName: newFolderId ? (data.folderName || '') : '' };
+
+    // OMIT A KEY FROM A BUCKET OBJECT WITHOUT MUTATING THE ORIGINAL
+    const omitKey = (object = {}, key) => {
+        const next = {};
+        Object.keys(object || {}).forEach((k) => {
+            if(k !== key) {
+                next[k] = object[k];
+            }
+        });
+        return next;
+    };
+
+    // 1) REMOVE FROM THE CURRENT BUCKET (root or old folder)
+    if(oldFolderId) {
+        const oldFolder = project.sprintsfolders && project.sprintsfolders[oldFolderId];
+        if(oldFolder && oldFolder.sprintsObj && oldFolder.sprintsObj[sprintId]) {
+            project.sprintsfolders[oldFolderId] = { ...oldFolder, sprintsObj: omitKey(oldFolder.sprintsObj, sprintId) };
+        }
+    } else if(project.sprintsObj && project.sprintsObj[sprintId]) {
+        project.sprintsObj = omitKey(project.sprintsObj, sprintId);
+    }
+
+    // 2) INSERT INTO THE NEW BUCKET (target folder or root)
+    if(newFolderId) {
+        if(!project.sprintsfolders) {
+            project.sprintsfolders = {};
+        }
+        const targetFolder = project.sprintsfolders[newFolderId] || {};
+        project.sprintsfolders[newFolderId] = {
+            ...targetFolder,
+            sprintsObj: sortObject({ ...(targetFolder.sprintsObj || {}), [sprintId]: movedSprint }),
+        };
+    } else {
+        project.sprintsObj = sortObject({ ...(project.sprintsObj || {}), [sprintId]: movedSprint });
+    }
+
+    // RE-ASSIGN THE PROJECT REFERENCE SO DOWNSTREAM WATCHERS (projectData / Item.vue) PICK UP THE CHANGE
+    state.allProjects.data[index] = { ...project };
+
+    // CASCADE THE MOVE ONTO ANY ALREADY-LOADED TASKS OF THIS SPRINT (mirrors the server-side cascade in
+    // Modules/Sprints/controller.js updateSprintFun). A task carries its folder as `folderObjId` (+
+    // `sprintArray.folderId`/`folderName`); breadcrumb + every "open task" route builds `fs/:folderId` from it.
+    // Patching the in-memory copies means task-detail / kanban / board navigation uses the right folder
+    // immediately after the move, without waiting for a re-fetch.
+    const applyFolderToTask = (taskObj) => {
+        if(!taskObj) return;
+        if(newFolderId) {
+            taskObj.folderObjId = newFolderId;
+            taskObj.sprintArray = { ...(taskObj.sprintArray || {}), folderId: newFolderId, folderName: movedSprint.folderName || '' };
+        } else {
+            delete taskObj.folderObjId;
+            if(taskObj.sprintArray) {
+                const nextSprintArray = { ...taskObj.sprintArray };
+                delete nextSprintArray.folderId;
+                delete nextSprintArray.folderName;
+                taskObj.sprintArray = nextSprintArray;
+            }
+        }
+    };
+    const cascadeFolderToTaskBucket = (bucket) => {
+        const sprintBucket = bucket && bucket[pId] && bucket[pId][sprintId];
+        if(!sprintBucket || !Array.isArray(sprintBucket.tasks)) return;
+        sprintBucket.tasks.forEach((taskObj) => {
+            applyFolderToTask(taskObj);
+            if(Array.isArray(taskObj?.subtaskArray)) {
+                taskObj.subtaskArray.forEach((subTask) => applyFolderToTask(subTask));
+            }
+        });
+    };
+    cascadeFolderToTaskBucket(state.tasks);
+    cascadeFolderToTaskBucket(state.tableTasks);
+}
+
 export const mutateFolders = (state,payload) => {
     const {op, data} = payload;
     let pId = data?.projectId;
