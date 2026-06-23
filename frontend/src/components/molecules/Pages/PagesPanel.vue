@@ -27,12 +27,32 @@
                     />
                     <span v-else class="gray81 font-size-13">{{ $t('Projects.select_page') }}</span>
                     <div class="d-flex align-items-center">
+                        <div v-if="current" class="pages__mode-toggle d-flex align-items-center mr-10px">
+                            <span
+                                class="pages__mode-tab font-size-12"
+                                :class="{'pages__mode-tab--active': mode === 'edit'}"
+                                @click="mode = 'edit'"
+                            >{{ $t('Projects.edit') }}</span>
+                            <span
+                                class="pages__mode-tab font-size-12"
+                                :class="{'pages__mode-tab--active': mode === 'preview'}"
+                                @click="openPreview"
+                            >{{ $t('Projects.preview') }}</span>
+                        </div>
+                        <button v-if="current && mode === 'edit'" class="btn-secondary font-size-13 mr-10px" @click="showPicker = !showPicker">+ {{ $t('Projects.insert_task_chip') }}</button>
                         <button v-if="current" class="btn-primary font-size-13 mr-10px" :disabled="isSaving" @click="savePage">{{ $t('Projects.save_page') }}</button>
                         <span v-if="current" class="cursor-pointer red font-size-13 mr-10px" @click="deletePage">{{ $t('Projects.delete') }}</span>
                         <span class="cursor-pointer font-size-16 pages__close" @click="$emit('update:modelValue', false)">&#10005;</span>
                     </div>
                 </div>
-                <VueEditor v-if="current" v-model="contentHtml" class="pages__editor" />
+                <TaskChipPicker
+                    v-if="current && mode === 'edit' && showPicker"
+                    :project-id="String(props.projectData._id)"
+                    @pick="insertTaskChip"
+                    @close="showPicker = false"
+                />
+                <VueEditor v-if="current && mode === 'edit'" ref="editorRef" v-model="contentHtml" class="pages__editor" @ready="onEditorReady" />
+                <div v-else-if="current && mode === 'preview'" class="pages__editor pages__preview ql-editor" v-html="previewHtml"></div>
                 <div v-if="current && versions.length" class="pages__versions font-size-12">
                     <span class="gray81">{{ $t('Projects.page_versions') }}:</span>
                     <span
@@ -55,14 +75,24 @@ import { VueEditor } from "vue3-editor";
 import { useToast } from "vue-toast-notification";
 import { useI18n } from "vue-i18n";
 
+// COMPONENTS
+import TaskChipPicker from "@/components/molecules/Pages/TaskChipPicker.vue";
+
 // UTILS
 import { apiRequest } from '@/services';
+import * as env from '@/config/env';
 import { useGetterFunctions } from "@/composable";
 
 const { t } = useI18n();
 const $toast = useToast();
-const { getUser } = useGetterFunctions();
+const { getUser, getTaskStatus } = useGetterFunctions();
 const userId = inject('$userId');
+
+// A task reference is stored in the page HTML as a plain-text token
+// `{{task:<taskId>|<TASKKEY>}}`; plain text survives Quill's sanitiser so it
+// round-trips through edit/save unchanged. Preview mode hydrates each token
+// into a live status chip.
+const TASK_TOKEN_REGEX = /\{\{task:([a-f\d]{24})\|([^}|]*)\}\}/gi;
 
 const props = defineProps({
     projectData: {
@@ -82,6 +112,13 @@ const current = ref(null);
 const contentHtml = ref('');
 const versions = ref([]);
 const isSaving = ref(false);
+
+// DOCS-02 — live task-status chips
+const mode = ref('edit');          // 'edit' | 'preview'
+const showPicker = ref(false);
+const editorRef = ref(null);
+const quillInstance = ref(null);   // captured from VueEditor's @ready
+const previewHtml = ref('');
 
 watch(() => props.modelValue, (open) => {
     if (open) fetchPages();
@@ -106,6 +143,9 @@ function openPage(id) {
         if (response.data?.status) {
             current.value = response.data.data;
             contentHtml.value = (current.value.content && current.value.content.html) || '';
+            mode.value = 'edit';
+            showPicker.value = false;
+            previewHtml.value = '';
             fetchVersions(id);
         }
     })
@@ -176,6 +216,99 @@ function restoreVersion(version) {
             $toast.success(t('Projects.page_restored'), { position: 'top-right' });
         }
     }).catch((error) => console.error('ERROR in restore version: ', error));
+}
+
+function onEditorReady(quill) {
+    quillInstance.value = quill;
+}
+
+// Insert the plain-text token at the Quill cursor (falls back to appending if
+// the Quill instance is unavailable). Token text survives Quill's sanitiser.
+function insertTaskChip(taskItem) {
+    if (!taskItem || !taskItem._id) return;
+    const token = `{{task:${taskItem._id}|${taskItem.TaskKey || ''}}}`;
+    const quill = quillInstance.value || editorRef.value?.quill;
+    if (quill && typeof quill.insertText === 'function') {
+        const range = quill.getSelection(true);
+        const index = range ? range.index : quill.getLength();
+        quill.insertText(index, token, 'user');
+        quill.setSelection(index + token.length, 0);
+    } else {
+        contentHtml.value = `${contentHtml.value || ''}<p>${token}</p>`;
+    }
+    showPicker.value = false;
+}
+
+function escapeHtml(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function chipSpan({ taskKey, statusName, bgColor, textColor, taskName }) {
+    const bg = bgColor || '#c1c1c1';
+    const fg = textColor || '#ffffff';
+    const title = `${escapeHtml(taskKey)} — ${escapeHtml(taskName)}`;
+    return `<span class="ah-task-chip" style="background:${escapeHtml(bg)};color:${escapeHtml(fg)};padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600;" title="${title}">${escapeHtml(taskKey)}: ${escapeHtml(statusName)}</span>`;
+}
+
+// "Live": fetch each referenced task's current status every time Preview opens,
+// then replace every token in the saved HTML with a static chip span. A
+// deleted/unknown task renders a neutral "—" chip instead of crashing.
+async function buildPreviewHtml() {
+    const html = contentHtml.value || '';
+    const tokens = [...html.matchAll(TASK_TOKEN_REGEX)];
+    if (!tokens.length) {
+        previewHtml.value = html;
+        return;
+    }
+
+    // Unique task ids → fetch once each.
+    const uniqueIds = [...new Set(tokens.map((m) => m[1]))];
+    const chipById = {};
+
+    await Promise.all(uniqueIds.map(async (taskId) => {
+        try {
+            const response = await apiRequest('get', `${env.TASK}/${taskId}`);
+            const taskDoc = response?.status === 200 ? response.data : null;
+            if (taskDoc && taskDoc.statusKey !== undefined && taskDoc.statusKey !== null) {
+                const status = getTaskStatus(taskDoc.statusKey) || {};
+                chipById[taskId] = {
+                    taskName: taskDoc.TaskName || '',
+                    statusName: status.name || t('Projects.unknown_status'),
+                    bgColor: status.bgColor,
+                    textColor: status.textColor,
+                };
+            }
+        } catch (error) {
+            console.error('ERROR in fetch task for chip: ', error);
+        }
+    }));
+
+    previewHtml.value = html.replace(TASK_TOKEN_REGEX, (match, taskId, taskKey) => {
+        const data = chipById[taskId];
+        if (!data) {
+            // Deleted / unavailable / errored task — neutral fallback chip.
+            return chipSpan({ taskKey, statusName: '—', taskName: t('Projects.unknown_status') });
+        }
+        return chipSpan({
+            taskKey,
+            statusName: data.statusName,
+            bgColor: data.bgColor,
+            textColor: data.textColor,
+            taskName: data.taskName,
+        });
+    });
+}
+
+function openPreview() {
+    if (!current.value) return;
+    showPicker.value = false;
+    mode.value = 'preview';
+    buildPreviewHtml();
 }
 
 function formatStamp(value) {
@@ -258,4 +391,33 @@ function formatStamp(value) {
     gap: 8px;
 }
 .pages__version { text-decoration: underline; }
+
+/* DOCS-02 — Edit/Preview toggle + insert button + preview surface */
+.pages__mode-toggle {
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    overflow: hidden;
+}
+.pages__mode-tab {
+    padding: 4px 10px;
+    cursor: pointer;
+    color: #6b6b6b;
+    user-select: none;
+}
+.pages__mode-tab--active {
+    background: #f3f0ff;
+    color: #2f3990;
+    font-weight: 600;
+}
+.pages__main-head :deep(.btn-secondary) { padding: 0 10px; }
+.pages__preview {
+    border: 1px solid #eee;
+    border-radius: 6px;
+    padding: 12px 14px;
+    background: #fff;
+}
+.pages__preview :deep(.ah-task-chip) {
+    display: inline-block;
+    vertical-align: middle;
+}
 </style>
