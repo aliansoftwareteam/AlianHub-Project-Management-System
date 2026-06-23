@@ -865,6 +865,39 @@ export const relocateSprint = (state, payload) => {
 
     // RE-ASSIGN THE PROJECT REFERENCE SO DOWNSTREAM WATCHERS (projectData / Item.vue) PICK UP THE CHANGE
     state.allProjects.data[index] = { ...project };
+
+    // CASCADE THE MOVE ONTO ANY ALREADY-LOADED TASKS OF THIS SPRINT (mirrors the server-side cascade in
+    // Modules/Sprints/controller.js updateSprintFun). A task carries its folder as `folderObjId` (+
+    // `sprintArray.folderId`/`folderName`); breadcrumb + every "open task" route builds `fs/:folderId` from it.
+    // Patching the in-memory copies means task-detail / kanban / board navigation uses the right folder
+    // immediately after the move, without waiting for a re-fetch.
+    const applyFolderToTask = (taskObj) => {
+        if(!taskObj) return;
+        if(newFolderId) {
+            taskObj.folderObjId = newFolderId;
+            taskObj.sprintArray = { ...(taskObj.sprintArray || {}), folderId: newFolderId, folderName: movedSprint.folderName || '' };
+        } else {
+            delete taskObj.folderObjId;
+            if(taskObj.sprintArray) {
+                const nextSprintArray = { ...taskObj.sprintArray };
+                delete nextSprintArray.folderId;
+                delete nextSprintArray.folderName;
+                taskObj.sprintArray = nextSprintArray;
+            }
+        }
+    };
+    const cascadeFolderToTaskBucket = (bucket) => {
+        const sprintBucket = bucket && bucket[pId] && bucket[pId][sprintId];
+        if(!sprintBucket || !Array.isArray(sprintBucket.tasks)) return;
+        sprintBucket.tasks.forEach((taskObj) => {
+            applyFolderToTask(taskObj);
+            if(Array.isArray(taskObj?.subtaskArray)) {
+                taskObj.subtaskArray.forEach((subTask) => applyFolderToTask(subTask));
+            }
+        });
+    };
+    cascadeFolderToTaskBucket(state.tasks);
+    cascadeFolderToTaskBucket(state.tableTasks);
 }
 
 export const mutateFolders = (state,payload) => {
