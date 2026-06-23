@@ -1,8 +1,11 @@
 # What you produce
 
-A single integer estimate of how many minutes an AI coding agent
-(Claude Code) needs to complete this task end-to-end, with NO manual
-human implementation work.
+A calibrated estimate of how many minutes the work in this task takes,
+expressed as a three-point range (optimistic / likely / pessimistic) plus
+a confidence level. The estimate is for the {{ESTIMATE_TARGET_LABEL}}
+described below — estimate THAT worker's effort, nothing else.
+
+{{ESTIMATE_TARGET_GUIDANCE}}
 
 # Accuracy matters
 
@@ -17,6 +20,11 @@ Two failure modes ruin estimates equally:
 
 Your job is to extract the **actual unique work** from the
 description and estimate that — nothing more, nothing less.
+
+If "Comparable past tasks" are provided below, they are the single most
+important signal you have: they show how long THIS team actually takes for
+similar work. Anchor your numbers to them. If your instinct disagrees with
+the actuals, trust the actuals and adjust.
 
 # How you make the estimate
 
@@ -62,6 +70,10 @@ Bad items: "Make the system better", "Improve user experience",
 "Polish the UI" — these are too vague to be a single deliverable;
 either translate them into concrete items or drop them.
 
+If subtasks are listed below, treat each as work that must be accounted
+for in the total — fold them into your work-item list (deduplicating
+against the description) rather than ignoring them.
+
 ## Phase 3 — Estimate each unique work item
 
 For EACH item on your list (not for the whole description), judge:
@@ -78,27 +90,46 @@ For EACH item on your list (not for the whole description), judge:
    tests, third-party services. More surface = more time.
 
 3. **Clarity.** Specific requirements estimate tighter than vague
-   ones. If an item leaves open questions the agent will have to
-   resolve mid-task, add time for that exploration.
+   ones. If an item leaves open questions that have to be resolved
+   mid-task, add time for that exploration.
 
 4. **Verification.** Pure internal refactors verify by running
    tests. Anything touching data, auth, payments, or UI needs a
    real verification loop (run, click, observe, iterate).
 
-5. **Iteration overhead.** The agent typically writes, runs, sees
-   a failure, and fixes — 1-2 iteration loops on anything
+5. **Iteration overhead.** Real work is rarely right the first time —
+   write, run, see a failure, fix: 1-2 iteration loops on anything
    non-trivial. Bake that in per item.
 
-## Phase 4 — Sum and return
+6. **Who is doing it.** If an assignee with a known role/seniority is
+   given below, calibrate to them: a senior engineer on familiar work
+   is faster; a junior or someone new to the area needs more time and
+   iteration.
 
-Add up the per-item estimates. If two items genuinely share setup
-(e.g. both touch the same new file), don't double-count the setup.
-The final number is the sum of the unique work, not the sum of every
-line in the description.
+## Phase 4 — Produce the three-point range
+
+Add up the per-item estimates into a single **likely** figure. If two
+items genuinely share setup (e.g. both touch the same new file), don't
+double-count the setup. The likely number is the sum of the unique work,
+not the sum of every line in the description.
+
+Then bracket it:
+
+- **optimistic** — everything goes smoothly, no surprises, requirements
+  are exactly as clear as they look. Strictly ≤ likely.
+- **pessimistic** — realistic bad case: hidden complexity surfaces,
+  extra iteration, a tricky edge case. Strictly ≥ likely.
+- **confidence** — `high` when the work is well-specified and you have
+  good anchors; `medium` when there's moderate ambiguity; `low` when the
+  description is vague, the work is novel, or you have no anchors.
+
+The spread between optimistic and pessimistic should reflect the genuine
+uncertainty: tight for a well-specified copy tweak, wide for a vague
+integration.
 
 # Scope of the estimate
 
-The number represents the AI agent's wall-clock time:
+The numbers represent hands-on working time on the task:
 
 - Reading the task and locating the relevant code.
 - Planning the change.
@@ -108,19 +139,18 @@ The number represents the AI agent's wall-clock time:
 
 Do NOT include:
 
-- Human review or approval time.
+- Review or approval time by someone else.
 - Waiting for CI queues, deploys, or external systems.
 - Meetings, handoffs, or status updates.
 
 # Bounds
 
-- Minimum: 5 minutes.
+- Minimum: 5 minutes (applies to every figure).
 - Maximum: 10080 minutes (7 days). Anything that would genuinely
   take longer should have been split into multiple tasks.
 
-Pick a specific integer based on the work items. Do not default to
-round numbers like 60 / 120 / 240 unless the math actually lands
-there.
+Pick specific integers based on the work items. Do not default to
+round numbers like 60 / 120 / 240 unless the math actually lands there.
 
 # Worked examples
 
@@ -154,6 +184,10 @@ Shape:
 ```
 {
   "work_items": ["<item 1>", "<item 2>", ...],
+  "optimistic": <integer>,
+  "likely": <integer>,
+  "pessimistic": <integer>,
+  "confidence": "low" | "medium" | "high",
   "minutes": <integer>,
   "reasoning": "<one short sentence>"
 }
@@ -162,6 +196,11 @@ Shape:
 - `work_items` is the deduplicated list of distinct deliverables you
   extracted in Phase 2. Each entry is a short, concrete phrase.
   Keep this list to the items that actually drove the estimate.
-- `minutes` is an integer between 5 and 10080.
+- `optimistic`, `likely`, `pessimistic` are integers in [5, 10080] with
+  `optimistic` ≤ `likely` ≤ `pessimistic`.
+- `confidence` is one of `low`, `medium`, `high`.
+- `minutes` is your single best point estimate as an integer in
+  [5, 10080] — normally equal to `likely`. (It is kept for backward
+  compatibility; the caller may recompute a PERT point from the range.)
 - `reasoning` is one short sentence (under 25 words) naming the
   concrete factors that drove the number.
