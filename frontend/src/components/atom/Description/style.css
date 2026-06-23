@@ -222,28 +222,7 @@ max-width: 100% !important;
     justify-content: flex-end;
     padding: 0 4px 6px;
 }
-.ai-write-desc-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 28px;
-    padding: 0 12px;
-    background: #ffffff;
-    border: 1px solid #2f3990;
-    border-radius: 6px;
-    color: #2f3990;
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    font-family: 'Roboto', sans-serif;
-    transition: background 0.15s ease;
-}
-.ai-write-desc-btn:hover {
-    background: #f2f3fb;
-}
-.ai-write-desc-spark {
-    font-size: 13px;
-    line-height: 1;
-}
+/* The trigger reuses the shared AI link style (.ai-color gradient text +
+   .ai-border-bottom), matching "Suggest Tasks"/"Suggest Subtasks". */
 
 
