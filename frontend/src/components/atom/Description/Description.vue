@@ -9,10 +9,10 @@
         </div>
         <div class="editor-container description_componenet" v-show="!noDescription">
             <div v-if="editPermission && checkAiProject && checkAiDescription" class="ai-write-desc-bar">
-                <button type="button" class="ai-write-desc-btn" @click="openAiWriteDescription()">
-                    <span class="ai-write-desc-spark">&#10024;</span>
-                    {{ $t('AI.ai_write_description') }}
-                </button>
+                <div class="d-flex align-items-center cursor-pointer" @click="openAiWriteDescription()">
+                    <img :src="aiIcon" class="mr-3px" alt="ai" />
+                    <span class="font-size-14 font-weight-500 ai-color ai-border-bottom">{{ $t('AI.ai_write_description') }}</span>
+                </div>
             </div>
             <div v-show="contentLoaded" id="editorjs" :class="{'ml-10px mr-10-px': clientWidth < 767, 'show_hide_class': !isShow}" @click="isShow = true"></div>
             <Transition>
@@ -81,6 +81,7 @@ import * as env from '@/config/env';
 import { useCustomComposable } from '@/composable';
 import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 import taskClass from '@/utils/TaskOperations';
+const aiIcon = require('@/assets/images/svg/ai_image.svg');
 
 
 defineComponent({
