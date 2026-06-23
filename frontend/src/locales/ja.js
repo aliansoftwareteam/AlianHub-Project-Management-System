@@ -90,4 +90,16 @@ export default {
         less: "閉じる",
         edited: "編集済み",
     },
+    AI: {
+        ...en.AI,
+        ai_write_description: "AIで作成",
+        ai_desc_intent_placeholder: "この説明には何を含めますか？（任意）",
+        ai_desc_intent_hint: "空欄にするとタイトルから生成します。",
+        ai_generate: "生成",
+        ai_regenerate: "再生成",
+        ai_use_this: "これを使用",
+        ai_answer_questions: "正確な説明のために、いくつかの簡単な質問に答えてください：",
+        ai_generating: "生成中…",
+        ai_failed: "説明を生成できませんでした。もう一度お試しください。",
+    },
 };

@@ -90,4 +90,16 @@ export default {
         less: "접기",
         edited: "수정됨",
     },
+    AI: {
+        ...en.AI,
+        ai_write_description: "AI로 작성",
+        ai_desc_intent_placeholder: "이 설명에 무엇을 담을까요? (선택)",
+        ai_desc_intent_hint: "비워 두면 제목에서 생성합니다.",
+        ai_generate: "생성",
+        ai_regenerate: "다시 생성",
+        ai_use_this: "사용하기",
+        ai_answer_questions: "정확한 설명을 위해 간단한 질문 몇 가지에 답해 주세요:",
+        ai_generating: "생성 중…",
+        ai_failed: "설명을 생성하지 못했습니다. 다시 시도해 주세요.",
+    },
 };

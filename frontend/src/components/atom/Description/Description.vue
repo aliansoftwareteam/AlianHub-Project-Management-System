@@ -8,6 +8,12 @@
             </div>
         </div>
         <div class="editor-container description_componenet" v-show="!noDescription">
+            <div v-if="editPermission && checkAiProject && checkAiDescription" class="ai-write-desc-bar">
+                <button type="button" class="ai-write-desc-btn" @click="openAiWriteDescription()">
+                    <span class="ai-write-desc-spark">&#10024;</span>
+                    {{ $t('AI.ai_write_description') }}
+                </button>
+            </div>
             <div v-show="contentLoaded" id="editorjs" :class="{'ml-10px mr-10-px': clientWidth < 767, 'show_hide_class': !isShow}" @click="isShow = true"></div>
             <Transition>
                 <span v-if="showMessage" class="saved_message">{{$t('Description.saved')}}</span>
@@ -24,6 +30,14 @@
             </div>
 
             <PromptSidebar v-if="isOpenPromptDeatil" @closePrompt="isOpenPromptDeatil = false, resetAiBlocks()" :selectedPrompt="selectedPrompt" @closeMainSidebar="(e) => {isOpenPromptDeatil = false; e ? resetAiBlocks() : '';}" :project="project" :task="task" />
+
+            <AiWriteDescription
+                v-model="showAiWrite"
+                :title="aiWriteTitle"
+                :taskType="aiWriteTaskType"
+                :existingDescription="aiWriteExistingDescription"
+                @apply="applyAiDescription"
+            />
         </div>
     </div>
 </template>
@@ -40,10 +54,16 @@ const { t } = useI18n();
 const mardownInit = markdownit({
     html: true
 })
+// Emit inline code as <code class="inline-code"> (the class @editorjs/inline-code
+// uses) so Editor.js preserves + styles it when markdown is converted into
+// description blocks — a bare <code> loses the inline-code styling on sanitize.
+mardownInit.renderer.rules.code_inline = (tokens, idx) =>
+    `<code class="inline-code">${mardownInit.utils.escapeHtml(tokens[idx].content)}</code>`;
 // mardownInit.renderer.rules.strong_open = () => "<b>";
 // mardownInit.renderer.rules.strong_close = () => "</b>";
 
 import PromptSidebar from "@/components/molecules/PromptSidebar/PromptSidebar.vue"
+import AiWriteDescription from "@/components/molecules/AiWriteDescription/AiWriteDescription.vue"
 
 import EditorJS from '@editorjs/editorjs';
 import Header from '@editorjs/header';
@@ -80,6 +100,15 @@ const noDescription = ref(false)
 const contentExceeds = ref(false)
 const tempBlock = ref([])
 const isChanged = ref(false);
+
+// "Write with AI" popover (dedicated lightweight entry point — separate from
+// the Editor.js WriteWithAi block / PromptSidebar).
+const showAiWrite = ref(false);
+// One-shot flag: a programmatic editor.render() (how AI content is applied) does
+// NOT fire the editor's onChange, so it wouldn't auto-save. We set this before
+// applying AI content and persist explicitly once injectBlocks has rendered it,
+// otherwise the description shows but isn't saved (lost on reload).
+const pendingAiSave = ref(false);
 
 const contentLoaded = ref(false)
 
@@ -126,6 +155,22 @@ const clientWidth = inject('$clientWidth');
 
 const checkAiProject = computed(() => checkApps('AI',props.projectData));
 const checkAiDescription = props.from === 'project' ? computed(() => checkPermission("project.project_description", props.projectData?.isGlobalPermission, {gettersVal: getters})) : computed(() => checkPermission("task.task_description", props.projectData?.isGlobalPermission, {gettersVal: getters}));
+
+// Inputs handed to the lightweight "Write with AI" popover. Title + type come
+// from the task when editing a task, or the project name when from==='project'
+// (Description.vue is shared between both). Existing description is sent as
+// plain text so the model can rewrite/improve rather than start from scratch.
+const aiWriteTitle = computed(() => props.from === 'project'
+    ? (props.projectData?.ProjectName || '')
+    : (props.task?.TaskName || ''));
+const aiWriteTaskType = computed(() => props.from === 'project' ? 'project' : (props.task?.TaskType || ''));
+const aiWriteExistingDescription = computed(() => {
+    const d = props.description;
+    if (!d) return '';
+    if (typeof d === 'string') return d;
+    if (Array.isArray(d.blocks)) return blocksToText(d.blocks);
+    return '';
+});
 
 const editorTools = {
     WriteWithAi: {
@@ -396,6 +441,51 @@ function openDescriptionWithAi () {
     })
 }
 
+// Opens the dedicated lightweight popover. Reuses the EXACT same AI-plan gate
+// as openDescriptionWithAi (the Editor.js block tool entry point) so both
+// entry points behave identically on free plans.
+function openAiWriteDescription() {
+    if(!currentCompany.value?.planFeature?.aiPermission){
+        Swal.fire({
+            title: t('AI.please_upgrade_plan_to_use_ai'),
+            text: t('AI.ai_available_on_paid_plans_upgrade_now'),
+            icon: 'info',
+            confirmButtonColor: '#28C76F',
+            confirmButtonText: t('Header.upgrade_now'),
+            showCloseButton:true
+        }).then((result) => {
+            if (result.isConfirmed) {
+                router.push({name: 'Upgrade', params: {cid: companyId.value}})
+            }
+        })
+        return;
+    }
+    showAiWrite.value = true;
+}
+
+// Apply an AI-generated description by REUSING the exact, proven path the
+// existing "Write a Description" sidebar uses: injectDescription ->
+// converter.blocks.renderFromHTML -> converter.onChange -> injectBlocks ->
+// editor.render. That single converter operation is the only thing that
+// reliably works here; the earlier version reinvented it with extra
+// clear/render/save calls that raced Editor.js' BlockManager and threw
+// "Can't find a Block to remove".
+//
+// This is a "write THE description" action, so we make it a full REPLACE by
+// resetting the working block set first: injectBlocks then splices the
+// generated blocks into an empty set (blockIndex 1), producing ONLY the new
+// content. The resulting editor change triggers the debounced onChange ->
+// saveData(), which persists it (task -> taskClass.updateDescription,
+// project -> updateProjectDescription).
+async function applyAiDescription(markdown = '') {
+    if (!markdown || !editor.value || !converter.value) return;
+    tempBlock.value = { blocks: [] };
+    blockIndex.value = 1;
+    noDescription.value = false;
+    pendingAiSave.value = true;
+    await injectDescription(markdown);
+}
+
 async function injectDescription(description = '') {
     try {
         description = description.replaceAll(/\\n/g, '\n');
@@ -414,6 +504,13 @@ async function injectBlocks (newBlocks) {
     })
     await editor.value.render({...tempBlock.value, blocks})
     checkContentSize()
+    // The AI "Use this" path renders programmatically (no editor onChange fires),
+    // so persist explicitly once the generated content is in the editor —
+    // otherwise it shows but isn't saved (lost on reload). One-shot.
+    if (pendingAiSave.value) {
+        pendingAiSave.value = false;
+        saveData();
+    }
 }
 
 // async function cancelData () {
