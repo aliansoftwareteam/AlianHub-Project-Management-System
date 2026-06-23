@@ -23,6 +23,28 @@ export function useHelper() {
             isActive: true
         },
         {
+            // Workspace — oversight + planning + apps grouped under one menu.
+            name: "Workspace",
+            show: true,
+            submenu: [
+                {
+                    name: "Portfolio",
+                    to: {path: `/${companyId.value}/portfolio`},
+                    show: true
+                },
+                {
+                    name: "Capacity_Planning",
+                    to: {path: `/${companyId.value}/reports/capacity`},
+                    show: true
+                },
+                {
+                    name: "Integrations",
+                    to: {path: `/${companyId.value}/integrations`},
+                    show: true
+                }
+            ]
+        },
+        {
             name: "Time_Sheet",
             id: "time_sheet_driver",
             show:checkPermission('sheet_settings.workload_timesheet') !== null || checkPermission('sheet_settings.project_timesheet') !== null || checkPermission('sheet_settings.user_timesheet') !== null,
@@ -74,13 +96,24 @@ export function useHelper() {
             ]
         },
         {
+            // Reports — Milestone (permission-gated) + the always-on Custom & Variance reports.
             name: "Reports",
-            show:checkPermission('sheet_settings.milestone_report') !== null,
+            show: true,
             submenu: [
                 {
                     name: "Milestone_Report",
                     to: {path: `/${companyId.value}/report/milestone`},
                     show:checkPermission('sheet_settings.milestone_report') !== null
+                },
+                {
+                    name: "Custom_Report",
+                    to: {path: `/${companyId.value}/custom-reports`},
+                    show: true
+                },
+                {
+                    name: "Variance_Report",
+                    to: {path: `/${companyId.value}/reports/variance`},
+                    show: true
                 }
             ]
         }

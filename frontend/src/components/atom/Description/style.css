@@ -215,7 +215,14 @@ max-width: 100% !important;
     }
 }
 
-
-
+/* "Write with AI" header bar — right-aligned compact button above #editorjs.
+   Separate, lightweight entry point from the Editor.js WriteWithAi block. */
+.ai-write-desc-bar {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0 4px 6px;
+}
+/* The trigger reuses the shared AI link style (.ai-color gradient text +
+   .ai-border-bottom), matching "Suggest Tasks"/"Suggest Subtasks". */
 
 

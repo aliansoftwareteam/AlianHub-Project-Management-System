@@ -118,6 +118,44 @@ publicShareIndexSchema.index({ token: 1 }, { unique: true });
 const recurringTasksSchema = new Schema(schema.recurringTasks, {strict: true, timestamps: true});
 recurringTasksSchema.index({ ProjectID: 1, deletedStatusKey: 1 });
 recurringTasksSchema.index({ enabled: 1, deletedStatusKey: 1, nextRunAt: 1 });
+const remindersSchema = new Schema(schema.reminders, {strict: true, timestamps: true});
+remindersSchema.index({ userId: 1, fired: 1, reminderAt: 1 });
+const notesSchema = new Schema(schema.notes, {strict: true, timestamps: true});
+notesSchema.index({ userId: 1, deletedStatusKey: 1 });
+const clipsSchema = new Schema(schema.clips, {strict: true, timestamps: true});
+clipsSchema.index({ userId: 1, deletedStatusKey: 1 });
+const timesheetApprovalSchema = new Schema(schema.timesheetApproval, {strict: true, timestamps: true});
+timesheetApprovalSchema.index({ userId: 1, periodStart: 1, periodEnd: 1 });
+timesheetApprovalSchema.index({ status: 1, periodStart: -1 });
+const billingRatesSchema = new Schema(schema.billingRates, {strict: true, timestamps: true});
+billingRatesSchema.index({ scope: 1, refId: 1, deletedStatusKey: 1 });
+const ssoConfigsSchema = new Schema(schema.ssoConfigs, {strict: true, timestamps: true});
+const auditLogsSchema = new Schema(schema.auditLogs, {strict: true, timestamps: true});
+auditLogsSchema.index({ createdAt: -1 });
+auditLogsSchema.index({ actorId: 1, createdAt: -1 });
+auditLogsSchema.index({ entityType: 1, entityId: 1, createdAt: -1 });
+auditLogsSchema.index({ action: 1, createdAt: -1 });
+const scimConfigsSchema = new Schema(schema.scimConfigs, {strict: true, timestamps: true});
+const ptoEntriesSchema = new Schema(schema.ptoEntries, {strict: true, timestamps: true});
+ptoEntriesSchema.index({ userId: 1, startDate: 1 });
+ptoEntriesSchema.index({ status: 1 });
+const portfoliosSchema = new Schema(schema.portfolios, {strict: true, timestamps: true});
+portfoliosSchema.index({ deletedStatusKey: 1 });
+const savedReportsSchema = new Schema(schema.savedReports, {strict: true, timestamps: true});
+savedReportsSchema.index({ deletedStatusKey: 1 });
+const reportSchedulesSchema = new Schema(schema.reportSchedules, {strict: true, timestamps: true});
+reportSchedulesSchema.index({ deletedStatusKey: 1 });
+reportSchedulesSchema.index({ active: 1, nextRunAt: 1 });
+const emailInboxesSchema = new Schema(schema.emailInboxes, {strict: true, timestamps: true});
+emailInboxesSchema.index({ token: 1 });
+emailInboxesSchema.index({ companyId: 1, deletedStatusKey: 1 });
+const calendarFeedsSchema = new Schema(schema.calendarFeeds, {strict: true, timestamps: true});
+calendarFeedsSchema.index({ token: 1 });
+calendarFeedsSchema.index({ companyId: 1, deletedStatusKey: 1 });
+const automationRulesSchema = new Schema(schema.automationRules, {strict: true, timestamps: true});
+automationRulesSchema.index({ deletedStatusKey: 1 });
+const integrationConnectionsSchema = new Schema(schema.integrationConnections, {strict: true, timestamps: true});
+integrationConnectionsSchema.index({ type: 1, deletedStatusKey: 1 });
 // Global search: one combined text index per collection.
 taskSchema.index({ TaskName: 'text', rawDescription: 'text' });
 projectsSchema.index({ ProjectName: 'text' });
@@ -197,6 +235,22 @@ module.exports = {
     intakeItemsSchema,
     publicShareIndexSchema,
     recurringTasksSchema,
+    remindersSchema,
+    notesSchema,
+    clipsSchema,
+    timesheetApprovalSchema,
+    billingRatesSchema,
+    ssoConfigsSchema,
+    auditLogsSchema,
+    scimConfigsSchema,
+    ptoEntriesSchema,
+    portfoliosSchema,
+    savedReportsSchema,
+    reportSchedulesSchema,
+    emailInboxesSchema,
+    calendarFeedsSchema,
+    automationRulesSchema,
+    integrationConnectionsSchema,
     historySchema,
     userIdSchema, 
     usersSchema,

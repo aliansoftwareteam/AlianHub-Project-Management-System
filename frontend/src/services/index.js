@@ -3,6 +3,7 @@ import * as env from '@/config/env';
 import Cookies from 'js-cookie';
 import Store from "@/store/index";
 import { useCustomComposable } from '@/composable';
+import * as offline from '@/offline';
 const { logOut } = useAuth();
 const apiHost = env.API_URI;
 export const axiosInstance = axios.create({ baseURL: apiHost });
@@ -173,6 +174,7 @@ export const apiRequest = (type, endPoint, data, dataType, options) => {
                     .then((resData) => {
                         resolve(resData);
                         delete abortControllers[abortKey];
+                        offline.maybeCacheResponse(type, endPoint, resData);
                     })
                     .catch(async (err) => {
                         delete abortControllers[abortKey];
@@ -191,6 +193,8 @@ export const apiRequest = (type, endPoint, data, dataType, options) => {
                             });
                             return;
                         }
+                        const offlineResult = await offline.handleOfflineFailure(type, endPoint, data, dataType, err);
+                        if (offlineResult) { resolve(offlineResult); return; }
                         reject(err);
                     });
             } else {
@@ -202,6 +206,9 @@ export const apiRequest = (type, endPoint, data, dataType, options) => {
         }
     })
 }
+
+// SEC-06 — let the offline write-queue replay through the real request path.
+offline.registerReplayer(apiRequest);
 
 
 export const apiRequestWithoutCompnay = (type, endPoint, data, dataType,options) => {
@@ -298,6 +305,7 @@ export function useAuth() {
         localStorage.removeItem('logged');
         Cookies.remove('refreshToken');
         Cookies.remove('accessToken');
+        try { offline.clearOffline(); } catch (e) { /* offline cleanup best-effort */ }
         if(value?.withOutRefresh !== true){
             window.location.reload();
         }

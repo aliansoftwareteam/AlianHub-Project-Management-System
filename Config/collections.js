@@ -71,6 +71,22 @@ const dbCollections = {
     INTAKE_ITEMS: "intakeItems",
     PUBLIC_SHARE_INDEX: "publicShareIndex",
     RECURRING_TASKS: "recurring_tasks",
+    REMINDERS: "reminders",
+    NOTES: "notes",
+    CLIPS: "clips",
+    TIMESHEET_APPROVAL: "timesheet_approval",
+    BILLING_RATES: "billing_rates",
+    SSO_CONFIGS: "sso_configs",
+    AUDIT_LOGS: "audit_logs",
+    SCIM_CONFIGS: "scim_configs",
+    PTO_ENTRIES: "pto_entries",
+    PORTFOLIOS: "portfolios",
+    SAVED_REPORTS: "saved_reports",
+    REPORT_SCHEDULES: "report_schedules",
+    EMAIL_INBOXES: "email_inboxes",
+    CALENDAR_FEEDS: "calendar_feeds",
+    AUTOMATION_RULES: "automation_rules",
+    INTEGRATION_CONNECTIONS: "integration_connections",
 }
 
 /** DOCUMENT ID'S NAME WHICH IS USED IN THE "SETTINGS" COLLECTION NAME **/

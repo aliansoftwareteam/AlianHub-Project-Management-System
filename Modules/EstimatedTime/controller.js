@@ -93,7 +93,9 @@ exports.generateAiEstimate = async (req, res) => {
 
         // Fetch the task with just the fields the estimator needs so the
         // payload to the LLM is built from the canonical DB state — not
-        // from whatever stale shape the client happened to send.
+        // from whatever stale shape the client happened to send. ProjectID +
+        // tagsArray feed the historical-actuals grounding/calibration; the
+        // rest feed the prompt.
         const taskObj = {
             type: SCHEMA_TYPE.TASKS,
             data: [
@@ -106,12 +108,44 @@ exports.generateAiEstimate = async (req, res) => {
                     rawDescription: 1,
                     descriptionBlock: 1,
                     totalEstimatedTime: 1,
+                    ProjectID: 1,
+                    tagsArray: 1,
                 },
             ],
         };
-        const taskDoc = await MongoDbCrudOpration(companyId, taskObj, 'findOne');
-        if (!taskDoc || !taskDoc._id) {
+        const taskDocRaw = await MongoDbCrudOpration(companyId, taskObj, 'findOne');
+        if (!taskDocRaw || !taskDocRaw._id) {
             return res.status(404).json({ status: false, statusText: 'task not found' });
+        }
+        // Work with a plain object so we can attach derived fields (e.g.
+        // subtaskTitles) that aren't part of the task schema — a Mongoose doc
+        // would silently drop unknown-path assignments.
+        const taskDoc = (typeof taskDocRaw.toObject === 'function')
+            ? taskDocRaw.toObject()
+            : taskDocRaw;
+
+        // Subtask rollup (richer input): if this is a parent task, attach its
+        // subtasks' titles so the model accounts for the work they represent.
+        // Best-effort and capped — a failure here must not block the estimate.
+        if (taskDoc.isParentTask !== false) {
+            try {
+                const subs = await MongoDbCrudOpration(companyId, {
+                    type: SCHEMA_TYPE.TASKS,
+                    data: [
+                        {
+                            ParentTaskId: String(taskId),
+                            deletedStatusKey: { $in: [0, undefined] },
+                        },
+                        { TaskName: 1 },
+                        { limit: 50 },
+                    ],
+                }, 'find').catch(() => []);
+                if (Array.isArray(subs) && subs.length) {
+                    taskDoc.subtaskTitles = subs
+                        .map((s) => (s && s.TaskName ? String(s.TaskName) : ''))
+                        .filter(Boolean);
+                }
+            } catch (_e) { /* subtask rollup is best-effort */ }
         }
 
         // Actor for the activity-log entry the estimator writes. The client
@@ -138,10 +172,24 @@ exports.generateAiEstimate = async (req, res) => {
                 statusText: result.reason || 'estimate not generated',
             });
         }
+        // Return the full ranged estimate so the UI can surface the
+        // optimistic/likely/pessimistic range + confidence. `totalEstimatedTime`
+        // (the persisted point estimate) is kept exactly as before for any
+        // existing consumer of this response.
         return res.status(200).json({
             status: true,
             statusText: 'Estimate generated successfully',
-            data: { totalEstimatedTime: result.minutes },
+            data: {
+                totalEstimatedTime: result.minutes,
+                minutes: result.minutes,
+                optimistic: result.optimistic,
+                likely: result.likely,
+                pessimistic: result.pessimistic,
+                confidence: result.confidence,
+                work_items: result.work_items,
+                reasoning: result.reasoning,
+                basedOnSamples: result.basedOnSamples,
+            },
         });
     } catch (error) {
         loggerConfig.error(`generateAiEstimate error: ${error && error.message ? error.message : error}`);

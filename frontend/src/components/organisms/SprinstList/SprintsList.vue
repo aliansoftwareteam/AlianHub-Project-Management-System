@@ -130,6 +130,12 @@
                                 {{$t('Projects.archive')}}
                             </div>
                         </DropDownOption>
+                        <DropDownOption @click="$refs[sprint.id]?.click(), showMoveToFolder = true" v-if="!showArchiveVar && !sprint.isFolder && folderList.length">
+                            <div class="d-flex align-items-center project-mobile-desc">
+                                <img :src="folder" alt="folder" class="mr-10px" style="width: 16px;">
+                                {{$t('Projects.move_to_folder')}}
+                            </div>
+                        </DropDownOption>
                     <DropDownOption @click="$refs[sprint.id]?.click(), showSidebar = true, archive = false">
                         <div class="d-flex align-items-center project-mobile-desc mobile-deleteIcon red">
                             <img :src="deleteIcon" alt="deleteIcon" class="mr-10px">
@@ -225,6 +231,12 @@
             @selected="changeAssignee('add', $event.id)"
             @removed="changeAssignee('remove', $event.id)"
         />
+        <MoveToFolderModal
+            v-model="showMoveToFolder"
+            :folders="folderList"
+            :currentFolderId="sprint.folderId"
+            @select="moveToFolder"
+        />
         <SpinnerComp :is-spinner="isCreateSpinner" />
     </div>
 </template>
@@ -245,6 +257,7 @@ import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption
 import Toggle from "@/components/atom/Toggle/Toggle.vue"
 import Assignee from "@/components/molecules/Assignee/Assignee.vue"
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue"
+import MoveToFolderModal from "@/components/molecules/MoveToFolder/MoveToFolderModal.vue"
 import CalendarViewComponent from '@/views/Projects/ProjectCalendarView/CalendarViewComponent.vue';
 import Skelaton from "@/components/atom/Skelaton/AiSkelaton.vue"
 import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp'
@@ -296,7 +309,8 @@ defineComponent({
         DropDownOption,
         Toggle,
         Assignee,
-        ConfirmationSidebar
+        ConfirmationSidebar,
+        MoveToFolderModal
     }
 })
 
@@ -341,6 +355,27 @@ const isSpinner = ref(false);
 const isCreateSpinner = ref(false);
 const isError = ref(false);
 const showImportModal = ref(false);
+const showMoveToFolder = ref(false);
+
+// LIST OF FOLDERS A SPRINT CAN BE MOVED INTO (excludes deleted folders + the sprint's own id when it is a folder)
+const folderList = computed(() => {
+    return Object.values(project.value?.sprintsfolders || {})
+        .filter((f) => !f?.deletedStatusKey && (f?.folderId || f?._id) !== props.sprint?.id)
+        .map((f) => ({ id: f.folderId || f._id, name: f.name || f.folderName || '' }));
+})
+
+// MOVE SPRINT INTO A FOLDER (or back to root when folder is null)
+function moveToFolder(folder) {
+    // CAPTURE THE BUCKET THE SPRINT IS LEAVING (null = root) BEFORE THE PATCH MUTATES IT
+    const oldFolderId = props.sprint?.folderId || null;
+    updateSprintAPICALL({
+        $set: {
+            folderId: folder ? folder.id : null,
+            folderName: folder ? folder.name : ''
+        }
+    }, { type: 'moved' }, oldFolderId);
+    showMoveToFolder.value = false;
+}
 
 
 watch(props.sprint, (val) => {
@@ -501,8 +536,20 @@ function changeAssignee(type, uid) {
 
     updateSprintAPICALL(updateData,obj)
 }
+// RELOCATE THE SPRINT BETWEEN BUCKETS ON THE STORE, THEN RE-TRIGGER THE LIST GROUPING WATCHER
+function relocateSprintLive(sprint, oldFolderId) {
+    if(!sprint) return;
+    const pid = sprint.projectId || project.value?._id;
+    commit('projectData/relocateSprint', { data: sprint, oldFolderId: oldFolderId || null });
+    // selectedProject is provided as a ref; reassigning .value re-runs the (non-deep) sprint grouping watcher in Projects.vue
+    const relocated = getters['projectData/projects']?.data?.find((p) => p._id === pid);
+    if(relocated) {
+        project.value = relocated;
+    }
+}
+
 // CALL SPRINT UPDATE
-function updateSprintAPICALL(updateData = null,historyObj) {
+function updateSprintAPICALL(updateData = null,historyObj, oldFolderId = undefined) {
     if(updateData) {
         try {
             const userData = getUserData();
@@ -524,6 +571,10 @@ function updateSprintAPICALL(updateData = null,historyObj) {
             .then((resp) => {
                 if(resp.data.status) {
                     commit('projectData/mutateSprints', {op: "modified", data: resp.data.data});
+                    // RE-GROUP LIVE WHEN THIS WAS A FOLDER MOVE (root<->folder / folder<->folder)
+                    if(historyObj?.type === 'moved') {
+                        relocateSprintLive(resp.data.data, oldFolderId);
+                    }
                     // let historyObj = {
                     //     message: `<b>${userData.Employee_Name}</b> has ${type} <b>${props.sprint.name}</b> sprint ${props.sprint?.folderId === null ? '' : `in <b>${props.sprint.isFolder ? props.sprint?.folderName : ""}</b> folder`} in <b>${project.value.ProjectName}</b> project.`,
                     //     key: "project_sprint_removed",

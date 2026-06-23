@@ -73,7 +73,13 @@
                                     {{$t('Projects.archive')}}
                                 </div>
                             </DropDownOption>
-                       
+                            <DropDownOption v-if="!folder && folderList.length" @click="$refs[itemId]?.click(), showMoveToFolder = true">
+                                <div class="d-flex align-items-center project-mobile-desc">
+                                    <img :src="folderIcon" alt="folderIcon" class="mr-10px" style="width: 16px;">
+                                    {{$t('Projects.move_to_folder')}}
+                                </div>
+                            </DropDownOption>
+
                         </template>
                         <DropDownOption v-if="(folder ? checkPermission('project.folder_restore',project.isGlobalPermission) === true : checkPermission('project.sprint_restore',project.isGlobalPermission) === true) && showArchived == true" @click="$refs[itemId]?.click(), updateItem(0)">
                             <div class="d-flex align-items-center project-mobile-desc">
@@ -137,6 +143,12 @@
             @confirm="updateItem()"
             :showSpinner="showSpinner"
         />
+        <MoveToFolderModal
+            v-model="showMoveToFolder"
+            :folders="folderList"
+            :currentFolderId="data.folderId"
+            @select="moveToFolder"
+        />
     </div>
 </template>
 
@@ -154,6 +166,7 @@ import DropDown from '@/components/molecules/DropDown/DropDown.vue'
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue'
 import SprintFolderInput from '@/components/atom/SprintFolderInput/SprintFolderInput.vue'
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue"
+import MoveToFolderModal from "@/components/molecules/MoveToFolder/MoveToFolderModal.vue"
 import Spinner from "@/components/atom/SpinnerComp/SpinnerComp.vue"
 import { apiRequest } from '../../../services';
 import * as env from '@/config/env';
@@ -192,6 +205,7 @@ defineComponent({
         DropDownOption,
         SprintFolderInput,
         ConfirmationSidebar,
+        MoveToFolderModal,
     }
 })
 
@@ -260,7 +274,15 @@ const showSidebar = ref(false);
 const createSprint = ref(false);
 const renameFolder = ref(false);
 const renameSprint = ref(false);
+const showMoveToFolder = ref(false);
 const project = inject("selectedProject");
+
+// LIST OF FOLDERS A SPRINT CAN BE MOVED INTO (excludes deleted folders + the current item's own id)
+const folderList = computed(() => {
+    return Object.values(project.value?.sprintsfolders || {})
+        .filter((f) => !f?.deletedStatusKey && (f?.folderId || f?._id) !== (props.data?.id || props.data?._id))
+        .map((f) => ({ id: f.folderId || f._id, name: f.name || f.folderName || '' }));
+})
 const favourite = computed(() => {
     return props.data?.favouriteTasks && props.data.favouriteTasks.length && props.data.favouriteTasks.filter((x) => userId.value && x.userId === userId.value).length;
 })
@@ -424,6 +446,65 @@ function updateItem(value = null) {
         $toast.error(t(`Toast.something_went_wrong`), {position: "top-right"})
         console.error("ERROR in updateItem: ", error);
     })
+}
+
+// RELOCATE THE SPRINT BETWEEN BUCKETS ON THE STORE, THEN RE-TRIGGER THE LIST GROUPING WATCHER
+function relocateSprintLive(sprint, oldFolderId) {
+    if(!sprint) return;
+    const pid = sprint.projectId || project.value?._id;
+    commit('projectData/relocateSprint', { data: sprint, oldFolderId: oldFolderId || null });
+    // selectedProject is provided as a ref; reassigning .value re-runs the (non-deep) sprint grouping watcher in Projects.vue
+    const relocated = getters['projectData/projects']?.data?.find((p) => p._id === pid);
+    if(relocated) {
+        project.value = relocated;
+    }
+}
+
+// MOVE SPRINT INTO A FOLDER (or back to root when folder is null) — mirrors SprintsList.updateSprintAPICALL
+function moveToFolder(folder) {
+    // CAPTURE THE BUCKET THE SPRINT IS LEAVING (null = root) BEFORE THE PATCH MUTATES IT
+    const oldFolderId = props.data?.folderId || null;
+    const updateObject = {
+        $set: {
+            folderId: folder ? folder.id : null,
+            folderName: folder ? folder.name : ''
+        }
+    };
+    const userData = getUserData();
+    apiRequest("patch", `${env.SPRINT}/${itemId.value}`, {
+        companyId: companyId.value,
+        projectId: project.value._id,
+        folderId: props.data?.folderId || null,
+        type: "updateSprint",
+        updateObject,
+        userData,
+        sprintName: props.data.name,
+        projectData: {
+            id: project.value._id,
+            ProjectName: project.value.ProjectName
+        },
+        folderName: props.data?.folderName || "",
+        historyData: { type: 'moved' }
+    })
+    .then((res) => {
+        if (res?.data?.status) {
+            commit("projectData/mutateSprints", { op: 'modified', data: { ...res?.data?.data } });
+            // RE-GROUP LIVE: relocate between buckets (root<->folder / folder<->folder) and re-trigger list grouping
+            relocateSprintLive(res?.data?.data, oldFolderId);
+            if (res?.data?.data) {
+                emit("updateFolderAndSprint", res?.data?.data, 'Sprint');
+            }
+            $toast.success(t(`Toast.Sprint updated successfully`), { position: "top-right" });
+        } else {
+            $toast.error(t(`Toast.something_went_wrong`), { position: "top-right" });
+        }
+        showMoveToFolder.value = false;
+    })
+    .catch((error) => {
+        showMoveToFolder.value = false;
+        $toast.error(t(`Toast.something_went_wrong`), { position: "top-right" });
+        console.error("ERROR in moveToFolder: ", error);
+    });
 }
 
 function markFavourite() {

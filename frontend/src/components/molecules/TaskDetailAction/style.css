@@ -151,3 +151,47 @@ ul.task_detail_navbar_ul li:last-child span {
     .watcher__action-dropdown{border-radius: 12px !important;}
     .watcher__action-dropdown .drop-down-item {padding: 10px !important;margin-bottom: 10px;border-radius: 8px !important;}
 }
+/* Personal reminder modal (COLLAB-03) */
+.reminder-modal__overlay{
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+.reminder-modal{
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    width: 320px;
+    max-width: 90vw;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+}
+.reminder-modal__title{
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+.reminder-modal__label{
+    display: block;
+    font-size: 12px;
+    color: #818181;
+    margin-bottom: 5px;
+}
+.reminder-modal__field{
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 13px;
+    margin-bottom: 14px;
+}
+.reminder-modal__actions{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 4px;
+}

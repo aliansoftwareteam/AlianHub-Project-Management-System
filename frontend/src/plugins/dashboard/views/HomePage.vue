@@ -167,6 +167,7 @@
     import StackBarChartCardComponent from "@/components/organisms/StackBarChartCardComponent/StackBarChartCardComponent.vue";
     import TimeEstimatedWorkloadComp from "@/components/atom/Dashboard/TimeEstimatedWorkloadComp.vue"
     import EmployeeWorkloadReportCard from "@/components/organisms/EmployeeWorkloadReportCard/EmployeeWorkloadReportCard.vue";
+    import MetricSummaryCard from "@/components/organisms/MetricSummaryCard/MetricSummaryCard.vue";
     import { useCustomComposable } from '@/composable';
     import { onBeforeRouteLeave } from 'vue-router';
     import { abortAllRequests } from "@/services";
@@ -323,6 +324,10 @@
                 return TimeEstimatedWorkloadComp;
             case 'EmployeeWorkloadReportCard':
                 return EmployeeWorkloadReportCard;
+            case 'TasksByStatusCard':
+            case 'TasksByProjectCard':
+            case 'TotalTasksCard':
+                return MetricSummaryCard;
             default:
                 return null;
         }

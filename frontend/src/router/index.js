@@ -6,6 +6,11 @@ import settings from './settings'
 import timesheet from './timesheet'
 import milestonesheet from './milestonesheet'
 import reports from './reports';
+import portfolio from './portfolio';
+import customReports from './customReports';
+import varianceReport from './varianceReport';
+import capacityPlanning from './capacityPlanning';
+import integrations from './integrations';
 
 import { useCustomComposable } from '@/composable'
 import dashboard from "../plugins/dashboard/router";
@@ -38,6 +43,21 @@ const routes = [
 
 	// REPORTS ROUTE
 	...reports,
+
+	// PORTFOLIO ROUTE (REP-01)
+	...portfolio,
+
+	// CUSTOM REPORTS ROUTE (REP-02)
+	...customReports,
+
+	// VARIANCE REPORT ROUTE (REP-04)
+	...varianceReport,
+
+	// CAPACITY PLANNING ROUTE (REP-06)
+	...capacityPlanning,
+
+	// INTEGRATIONS & AUTOMATION HUB (AUTO-01..07)
+	...integrations,
 
 	// CHANGELOG / WHAT'S NEW ROUTE
 	{

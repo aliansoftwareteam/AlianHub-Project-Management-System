@@ -244,6 +244,11 @@ const schema = {
             type: Number,
             required: false,
         },
+        billable: {
+            type: Boolean,
+            default: true,
+            required: false,
+        },
     },
     history: {
         Key: {
@@ -430,6 +435,226 @@ const schema = {
         sprintArray: { type: Object, required: false },
         createdBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0 },
+    },
+    // Personal reminders (COLLAB-03) — one-shot, per-user. A node-schedule cron
+    // (every minute) fires any reminder whose reminderAt has passed and that
+    // hasn't fired yet, delivering an in-app notification to userId. Managed by
+    // Modules/Reminders. fired/firedAt make the firing idempotent.
+    reminders: {
+        userId: { type: String, required: true },
+        companyId: { type: String, required: false },
+        taskId: { type: mongoose.Schema.Types.ObjectId, required: false },
+        projectId: { type: mongoose.Schema.Types.ObjectId, required: false },
+        reminderText: { type: String, required: false },
+        reminderAt: { type: Date, required: true },
+        fired: { type: Boolean, default: false },
+        firedAt: { type: Date, required: false },
+        createdBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0 },
+    },
+    // Personal notepad (COLLAB-06) — quick per-user notes, convertible to tasks.
+    // Managed by Modules/Notes. convertedTaskId is stamped (frontend) once a note
+    // has been turned into a task via the existing task-create flow.
+    notes: {
+        userId: { type: String, required: true },
+        companyId: { type: String, required: false },
+        title: { type: String, required: false },
+        content: { type: String, required: false },
+        convertedTaskId: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0 },
+    },
+    // Clips (COLLAB-04) — first-class, reusable screen/voice recordings owned by
+    // a user and company-scoped. Recorded once, stored once (the media file is
+    // uploaded via the EXISTING storage endpoint; only its url is kept here),
+    // then referenced anywhere (task attachment, comment, share, or the owner's
+    // library). Managed by Modules/Clips.
+    clips: {
+        clipId: { type: String, required: false },
+        userId: { type: String, required: true },
+        companyId: { type: String, required: false },
+        title: { type: String, required: false },
+        url: { type: String, required: true },
+        mediaType: { type: String, required: false },
+        mimeType: { type: String, required: false },
+        size: { type: Number, required: false },
+        durationSec: { type: Number, required: false },
+        source: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0 },
+    },
+    // Timesheet approval submissions — one per user per period (week/month) — managed by Modules/TimesheetApproval
+    timesheetApproval: {
+        userId: { type: String, required: true },
+        periodType: { type: String, default: 'week', required: false },
+        periodStart: { type: Date, required: true },
+        periodEnd: { type: Date, required: true },
+        status: { type: String, default: 'submitted', required: false },
+        totalMinutes: { type: Number, default: 0, required: false },
+        entryCount: { type: Number, default: 0, required: false },
+        note: { type: String, required: false },
+        submittedAt: { type: Date, required: false },
+        submittedBy: { type: String, required: false },
+        reviewedAt: { type: Date, required: false },
+        reviewedBy: { type: String, required: false },
+        reviewerName: { type: String, required: false },
+        rejectionReason: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // Billing rates — per user / project / default hourly rate — managed by Modules/TimeSheet (TIME-07)
+    billingRates: {
+        scope: { type: String, required: true },
+        refId: { type: String, default: '', required: false },
+        rate: { type: Number, required: true },
+        currency: { type: String, default: 'USD', required: false },
+        createdBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // Per-company enterprise SSO config (OIDC/SAML) — managed by Modules/SSO (SEC-02)
+    ssoConfigs: {
+        provider: { type: String, default: 'oidc', required: false },
+        isEnabled: { type: Boolean, default: false, required: false },
+        autoProvisionUsers: { type: Boolean, default: true, required: false },
+        defaultRoleType: { type: Number, default: 3, required: false },
+        oidc: { type: Object, required: false },
+        saml: { type: Object, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // Immutable audit trail — managed by Modules/Audit (SEC-04). Insert-only;
+    // pruned by retention. No deletedStatusKey (rows are never soft-deleted).
+    auditLogs: {
+        actorId: { type: String, required: false },
+        actorName: { type: String, required: false },
+        action: { type: String, required: true },
+        entityType: { type: String, required: false },
+        entityId: { type: String, required: false },
+        entityName: { type: String, required: false },
+        meta: { type: Object, required: false },
+        ip: { type: String, required: false },
+    },
+    // Per-company SCIM 2.0 provisioning config — managed by Modules/Scim (SEC-05).
+    // The IdP-held bearer token is stored only as a bcrypt hash; the company is
+    // resolved from the token itself, so SCIM requests carry no companyId header.
+    scimConfigs: {
+        isEnabled: { type: Boolean, default: false, required: false },
+        tokenHash: { type: String, required: false },
+        tokenLast4: { type: String, required: false },
+        defaultRoleType: { type: Number, default: 3, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // Time-off / PTO entries — managed by Modules/Pto (SEC-08). Approved entries
+    // reduce a user's available capacity (helpers/ptoRules.computeAvailableCapacity).
+    ptoEntries: {
+        userId: { type: String, required: true },
+        type: { type: String, default: 'vacation', required: false },
+        startDate: { type: Date, required: true },
+        endDate: { type: Date, required: true },
+        hoursPerDay: { type: Number, default: 8, required: false },
+        status: { type: String, default: 'pending', required: false },
+        reason: { type: String, required: false },
+        approvedBy: { type: String, required: false },
+        createdBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // Cross-project portfolios — managed by Modules/Portfolio (REP-01). Groups N
+    // projects for a rolled-up leadership/CEO view (progress / at-risk / milestones).
+    portfolios: {
+        name: { type: String, required: true },
+        projectIds: { type: Array, default: [], required: false },
+        description: { type: String, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // Saved custom reports — managed by Modules/CustomReports (REP-02). A report
+    // config (metric + dimension + filters + chartType) resolved by a whitelisted
+    // query engine; values are validated against an allow-list, never raw fields.
+    savedReports: {
+        name: { type: String, required: true },
+        source: { type: String, default: 'tasks', required: false },
+        metric: { type: String, default: 'count', required: false },
+        dimension: { type: String, default: 'statusType', required: false },
+        filters: { type: Object, default: {}, required: false },
+        chartType: { type: String, default: 'bar', required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // Scheduled report deliveries — managed by Modules/ScheduledReports (REP-08).
+    // Emails a saved report (savedReportId) to recipients on a cadence; nextRunAt
+    // is advanced after each run so the prod cron stays idempotent.
+    reportSchedules: {
+        savedReportId: { type: String, required: true },
+        cadence: { type: String, default: 'weekly', required: false },
+        recipients: { type: Array, default: [], required: false },
+        active: { type: Boolean, default: true, required: false },
+        lastRunAt: { type: Date, required: false },
+        nextRunAt: { type: Date, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // Email-to-task inboxes — managed by Modules/EmailIn (AUTO-01). Lives in the
+    // GLOBAL db keyed by token so the unauthenticated inbound webhook can resolve
+    // token -> company. Snapshots project/sprint/user so taskMongo.create needs no reload.
+    emailInboxes: {
+        token: { type: String, required: true },
+        companyId: { type: String, required: true },
+        name: { type: String, required: false },
+        ProjectID: { type: mongoose.Schema.Types.ObjectId, required: false },
+        sprintId: { type: String, required: false },
+        templateSnapshot: { type: Object, default: {}, required: false },
+        projectSnapshot: { type: Object, default: {}, required: false },
+        userSnapshot: { type: Object, default: {}, required: false },
+        sprintArray: { type: Object, default: {}, required: false },
+        enabled: { type: Boolean, default: true, required: false },
+        createdBy: { type: String, required: false },
+        lastEmailFrom: { type: String, required: false },
+        lastTaskId: { type: String, required: false },
+        lastReceivedAt: { type: Date, required: false },
+        receivedCount: { type: Number, default: 0, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // Calendar feeds — managed by Modules/Calendar (AUTO-02). Token-keyed in the
+    // GLOBAL db; an unauthenticated .ics URL resolves its company + scope.
+    calendarFeeds: {
+        token: { type: String, required: true },
+        companyId: { type: String, required: true },
+        userId: { type: String, required: false },
+        scope: { type: String, default: 'my', required: false },
+        projectId: { type: String, required: false },
+        name: { type: String, required: false },
+        enabled: { type: Boolean, default: true, required: false },
+        createdBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // Automation rules — managed by Modules/Automations (AUTO-03). conditions
+    // (which tasks) + actions (set_priority); applied on demand as a bulk update.
+    automationRules: {
+        name: { type: String, required: true },
+        trigger: { type: String, default: 'manual', required: false },
+        conditions: { type: Object, default: {}, required: false },
+        actions: { type: Array, default: [], required: false },
+        enabled: { type: Boolean, default: true, required: false },
+        lastRunAt: { type: Date, required: false },
+        lastRunCount: { type: Number, default: 0, required: false },
+        createdBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // Integration connections — managed by Modules/Integrations (AUTO-04). Generic
+    // registry backing the marketplace, Slack and iframe apps. Secrets live in
+    // config but are redacted before reaching the client.
+    integrationConnections: {
+        type: { type: String, required: true },
+        name: { type: String, required: false },
+        config: { type: Object, default: {}, required: false },
+        status: { type: String, default: 'connected', required: false },
+        enabled: { type: Boolean, default: true, required: false },
+        createdBy: { type: String, required: false },
+        connectedAt: { type: Date, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
     },
     // Wiki pages (Editor.js blocks; versioned) — managed by Modules/Pages
     pages: {
@@ -1156,6 +1381,11 @@ const schema = {
         roleType: {
             type: Number,
             required: true
+        },
+        guestProjectIds: {
+            type: Array,
+            default: [],
+            required: false
         },
         sendInvitationTime: {
             type: Number,
@@ -2466,6 +2696,21 @@ const schema = {
         },
         projectId:{
             type:mongoose.Schema.Types.Mixed,
+            required: false,
+            default:''
+        },
+        formulaExpression:{
+            type:String,
+            required: false,
+            default:''
+        },
+        rollupSourceFieldId:{
+            type:String,
+            required: false,
+            default:''
+        },
+        rollupFunction:{
+            type:String,
             required: false,
             default:''
         }

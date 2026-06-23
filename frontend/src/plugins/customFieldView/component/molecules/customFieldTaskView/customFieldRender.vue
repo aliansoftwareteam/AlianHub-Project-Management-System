@@ -46,6 +46,8 @@
     import NumberComponentListing from '../../atom/customFieldTaskView/numberComponentListing.vue';
     import EmailComponentListing from '../../atom/customFieldTaskView/emailComponentListing.vue';
     import PhoneComponentListing from '../../atom/customFieldTaskView/phoneComponentListing.vue';
+    import ComputedComponentListing from '../../atom/customFieldTaskView/computedComponentListing.vue';
+    import { computeCustomFieldValue } from '@/plugins/customFieldView/formulaEngine.js';
     import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 
 
@@ -83,7 +85,44 @@
         textarea: TextareaComponentListing,
         number: NumberComponentListing,
         email: EmailComponentListing,
-        phone: PhoneComponentListing
+        phone: PhoneComponentListing,
+        formula: ComputedComponentListing,
+        rollup: ComputedComponentListing
+    };
+
+    // Flat, de-duped task list (parents + their subtasks) for rollup aggregation.
+    // Pulls from the sources actually populated in the List/Board/detail flow — the
+    // viewed task's own subtaskArray and the projectData/tasks map — with the
+    // dashboard-only projectData/alltasks as a fallback. De-duped by _id so a task
+    // present in more than one source is never counted twice. Returns [] on failure
+    // so rollups degrade to '—' rather than erroring.
+    const getAllTasks = () => {
+        try {
+            const seen = new Set();
+            const flat = [];
+            const add = (t) => {
+                if (t && t._id && !seen.has(String(t._id))) { seen.add(String(t._id)); flat.push(t); }
+            };
+            const addWithKids = (t) => {
+                add(t);
+                if (t && Array.isArray(t.subtaskArray)) t.subtaskArray.forEach(add);
+            };
+            addWithKids(props.task);
+            const map = getters['projectData/tasks'] || {};
+            Object.values(map).forEach((byProject) => {
+                if (byProject && typeof byProject === 'object') {
+                    Object.values(byProject).forEach((node) => {
+                        const tasks = node && Array.isArray(node.tasks) ? node.tasks : [];
+                        tasks.forEach(addWithKids);
+                    });
+                }
+            });
+            const alt = getters['projectData/alltasks'];
+            if (Array.isArray(alt)) alt.forEach(addWithKids);
+            return flat;
+        } catch (error) {
+            return [];
+        }
     };
 
     const performanceDelay = (milliseconds) => {
@@ -159,9 +198,23 @@
                 return removeCustomFieldProperties(val);
             });
         } else {
-            processedCustomFieldList.value = data.map(val => 
+            processedCustomFieldList.value = data.map(val =>
                 removeCustomFieldProperties(val)
             );
+        }
+        // Compute read-only formula/rollup values from the live task store (additive only).
+        const computedTypes = ['formula', 'rollup'];
+        if (processedCustomFieldList.value.some(item => computedTypes.includes(item?.fieldType))) {
+            const allTasks = getAllTasks();
+            processedCustomFieldList.value = processedCustomFieldList.value.map(item => {
+                if (item && computedTypes.includes(item.fieldType)) {
+                    return {
+                        ...item,
+                        fieldValue: computeCustomFieldValue(item, props.task, allTasks, data)
+                    };
+                }
+                return item;
+            });
         }
         isInitialLoading.value = false;
     };

@@ -36,6 +36,8 @@
     import TextareaComponent from "../../../atom/customFieldSidebar/customFieldSidebarComponent/textareaComponent.vue";
     import NumberComponent from "../../../atom/customFieldSidebar/customFieldSidebarComponent/numberComponent.vue";
     import EmailComponent from "../../../atom/customFieldSidebar/customFieldSidebarComponent/emailComponent.vue";
+    import FormulaComponent from "../../../atom/customFieldSidebar/customFieldSidebarComponent/formulaComponent.vue";
+    import RollupComponent from "../../../atom/customFieldSidebar/customFieldSidebarComponent/rollupComponent.vue";
     import { useToast } from "vue-toast-notification";
     import { useI18n } from "vue-i18n";
     const { t } = useI18n();
@@ -120,8 +122,12 @@
                 return PhoneComponent;
             case 'email':
                 return EmailComponent;
+            case 'formula':
+                return FormulaComponent;
+            case 'rollup':
+                return RollupComponent;
         }
-    }; 
+    };
 </script>
 <style scoped>
     @import "./style.css"; 

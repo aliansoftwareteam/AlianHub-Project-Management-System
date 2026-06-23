@@ -6,6 +6,10 @@ const aiRef = require("./Modules/AI/controller")
 const screenshotRetention = require("./Modules/ScreenshotRetention/helper");
 const autoArchive = require("./Modules/projectSetting/autoArchive");
 const recurringTasks = require("./Modules/RecurringTasks/controller");
+const reminders = require("./Modules/Reminders/controller");
+const timeReminders = require("./Modules/TimeSheet/controller/timeReminders");
+const auditRecorder = require("./Modules/Audit/recorder");
+const scheduledReports = require("./Modules/ScheduledReports/controller");
 
 // BUG-035 / #89 — pin every cron to a known timezone so schedules don't
 // shift when the server's local tz changes (DST transition, container
@@ -67,7 +71,54 @@ schedule.scheduleJob({ rule: '*/15 * * * *', tz: CRON_TZ }, async () => {
     }
 })
 
+// Personal reminders (COLLAB-03) — every minute, fire any reminder whose
+// reminderAt has passed and that hasn't fired yet, across all companies. The
+// fired flag makes it idempotent; the /run-due and /run-now endpoints exercise
+// the same path in dev (cron is prod-only).
+schedule.scheduleJob({ rule: '* * * * *', tz: CRON_TZ }, async () => {
+    logger.info(`[Cron] reminders.runRemindersForAllCompanies`);
+    try {
+        await reminders.runRemindersForAllCompanies();
+    } catch (err) {
+        logger.error(`[Cron] reminders failed: ${err && err.message ? err.message : err}`);
+    }
+})
+
 // // This cron job executes daily at midnight (12 AM) and remove ai request count.
 schedule.scheduleJob({ rule: '0 0 * * *', tz: CRON_TZ }, async () => {
     aiRef.resetAiRequestCount();
+})
+
+// Time-entry reminders — daily at 17:00, nudge members who haven't logged time
+// today. The /api/v1/timesheet/send-reminders endpoint runs the same path in dev.
+schedule.scheduleJob({ rule: '0 17 * * *', tz: CRON_TZ }, async () => {
+    logger.info(`[Cron] timeReminders.runRemindersForAllCompanies`);
+    try {
+        await timeReminders.runRemindersForAllCompanies();
+    } catch (err) {
+        logger.error(`[Cron] timeReminders failed: ${err && err.message ? err.message : err}`);
+    }
+})
+
+// Audit-log retention — daily at 02:00, prune rows older than AUDIT_RETENTION_DAYS
+// (default 365) across all companies.
+schedule.scheduleJob({ rule: '0 2 * * *', tz: CRON_TZ }, async () => {
+    logger.info(`[Cron] auditRecorder.runAuditRetentionForAllCompanies`);
+    try {
+        await auditRecorder.runAuditRetentionForAllCompanies();
+    } catch (err) {
+        logger.error(`[Cron] audit retention failed: ${err && err.message ? err.message : err}`);
+    }
+})
+
+// Scheduled reports — hourly, email any saved-report schedule whose nextRunAt has
+// passed, across all companies. nextRunAt advancement makes it idempotent; the
+// /run-due and /run-now endpoints exercise the same path in dev (cron is prod-only).
+schedule.scheduleJob({ rule: '0 * * * *', tz: CRON_TZ }, async () => {
+    logger.info(`[Cron] scheduledReports.runScheduledReportsForAllCompanies`);
+    try {
+        await scheduledReports.runScheduledReportsForAllCompanies();
+    } catch (err) {
+        logger.error(`[Cron] scheduledReports failed: ${err && err.message ? err.message : err}`);
+    }
 })

@@ -34,6 +34,11 @@
                         @click="downloadAllImages()"
                     >Download All</button>
                 </template>
+                <button v-if="permission === true && !(props.isMainSpinner === true || isLoadingAttachments)"
+                    type="button" class="clip-record-btn cursor-pointer mr-10px"
+                    :title="$t('ClipRecorder.record_clip')" @click="$emit('record-clip')">
+                    <img src="@/assets/images/svg/clip_record_icon.svg" alt="record clip" />
+                </button>
                 <label for="UploadedFile" v-if="permission === true">
                     <div class="cursor-link cursor-pointer" v-if="props.isMainSpinner === true || isLoadingAttachments">
                         <Skelaton style="height: 30px;width: 25px;" class="border-radius-6-px mb-5px" />
@@ -130,7 +135,7 @@ const props = defineProps({
     }
 });
 const showDropZone = ref(false);
-const emit = defineEmits(["update:add", "update:delete", "seAll","updateProjectAttachment"]);
+const emit = defineEmits(["update:add", "update:delete", "seAll","updateProjectAttachment","record-clip"]);
 // eslint-disable-next-line
 const extensions = ref("");
 extensions.value = props.extensions.map(exe => exe.name).join();
@@ -146,6 +151,10 @@ const sliderMain = ref(null);
 const loadMoreTrigger = ref(null);
 const isLoadingAttachments = ref(false);
 let observer = null;
+
+// COLLAB-04 / global clips: the "Record clip" button no longer mounts a local
+// recorder. It emits `record-clip` to the task container (which owns taskClass),
+// which opens the GLOBAL recorder and attaches the resulting clip to the task.
 
 const setupIntersectionObserver = (val) => {
     nextTick(() => {
@@ -558,6 +567,28 @@ watch(
     color: inherit;
 }
 .download-all-btn:focus-visible {
+    outline: 2px solid #2f3990;
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+/*
+ * COLLAB-04 — "Record clip" trigger. Strip native button chrome so it sits
+ * inline next to the upload (+) control as a plain icon.
+ */
+.clip-record-btn {
+    background: none;
+    border: 0;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+}
+.clip-record-btn img {
+    width: 18px;
+    height: 18px;
+    display: block;
+}
+.clip-record-btn:focus-visible {
     outline: 2px solid #2f3990;
     outline-offset: 2px;
     border-radius: 2px;

@@ -39,6 +39,30 @@ function savePermissionsState() {
   }
 }
 
+// TIME-05: idle-time detection config (threshold in seconds; 0 disables).
+const idleConfigPath = path.join(app.getPath('userData'), 'idle-config.json')
+let idleThresholdSec = 300
+let idleHandled = false
+function loadIdleConfig() {
+  try {
+    if (fs.existsSync(idleConfigPath)) {
+      const data = JSON.parse(fs.readFileSync(idleConfigPath, 'utf8'))
+      if (data && Number.isFinite(data.idleThresholdSec) && data.idleThresholdSec >= 0) {
+        idleThresholdSec = data.idleThresholdSec
+      }
+    }
+  } catch (error) {
+    console.error('Error loading idle config:', error)
+  }
+}
+function saveIdleConfig() {
+  try {
+    fs.writeFileSync(idleConfigPath, JSON.stringify({ idleThresholdSec }), 'utf8')
+  } catch (error) {
+    console.error('Error saving idle config:', error)
+  }
+}
+
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
     app.setAsDefaultProtocolClient('myapp', process.execPath, [path.resolve(process.argv[1])])
@@ -203,6 +227,7 @@ function verifyScreenCapturePermission() {
   
   // Load saved permissions state
   loadPermissionsState()
+  loadIdleConfig()
   
   if (tray) { return }
   if (process.platform == 'darwin') {
@@ -323,6 +348,17 @@ const startActivitySampling = () => {
     const cursor = screen.getCursorScreenPoint()
     const mouseMoved = lastCursorPoint !== null && (cursor.x !== lastCursorPoint.x || cursor.y !== lastCursorPoint.y)
     lastCursorPoint = cursor
+    // TIME-05: pause tracking once idle for the configured threshold (0 disables).
+    if (mouseMoved || idleSeconds <= ACTIVE_IDLE_THRESHOLD_SEC) {
+      idleHandled = false
+    } else if (idleThresholdSec > 0 && idleSeconds >= idleThresholdSec && !idleHandled) {
+      idleHandled = true
+      mainWindow.webContents.send('idle:detected', { idleSeconds, thresholdSeconds: idleThresholdSec })
+      mainWindow.webContents.send('stop-tracker', true)
+      try {
+        new Notification({ title: 'Alianhub Time Tracker', body: `Tracking paused — no activity for ${Math.round(idleThresholdSec / 60)} min.` }).show()
+      } catch (e) { /* notifications are best-effort */ }
+    }
     if (mouseMoved) {
       mainWindow.webContents.send('activity:tick', { type: 'mouse' })
     } else if (idleSeconds <= ACTIVE_IDLE_THRESHOLD_SEC) {
@@ -343,6 +379,7 @@ const stopActivitySampling = () => {
 // Add IPC listeners for start and stop events
 ipcMain.on('start-listen-event', () => {
   isTracking = true
+  idleHandled = false
   startActivitySampling()
   mainWindow.webContents.send('tracking:status', { active: true })
 })
@@ -352,6 +389,19 @@ ipcMain.on('stop-listen-event', () => {
   stopActivitySampling()
   mainWindow.webContents.send('tracking:status', { active: false })
 })
+
+// TIME-05: configurable idle threshold (value in minutes; 0 disables auto-pause).
+ipcMain.on('idle:set-threshold', (event, value) => {
+  const minutes = Number(value)
+  if (Number.isFinite(minutes) && minutes >= 0) {
+    idleThresholdSec = Math.round(minutes * 60)
+    saveIdleConfig()
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('idle:threshold', { minutes, seconds: idleThresholdSec })
+    }
+  }
+})
+ipcMain.handle('idle:get-threshold', () => ({ seconds: idleThresholdSec, minutes: idleThresholdSec / 60 }))
 
 ipcMain.on("open-external-url", (event, url) => {
   shell.openExternal(url)

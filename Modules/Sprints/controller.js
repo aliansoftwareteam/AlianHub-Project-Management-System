@@ -285,6 +285,54 @@ exports.updateSprintFun = (req) => {
             MongoQ.MongoDbCrudOpration(companyId, obj, "findOneAndUpdate").then((response) => {
                 resolve({ status: true, statusText: "Sprint_updated_successfully",data:response });
                 if(mainChat) return;
+
+                // CASCADE A FOLDER MOVE ONTO THIS SPRINT'S TASKS.
+                // A task carries its folder as `folderObjId` (+ `sprintArray.folderId`/`folderName`),
+                // mirrored from its sprint's `folderId` at create/move time (see Tasks/helpers/mongo_helper.js).
+                // When a sprint is moved between buckets we only change the SPRINT's folderId here, so without
+                // this cascade every task keeps a stale folder -> the task-detail breadcrumb + every route that
+                // builds `fs/:folderId` from `task.folderObjId` resolve to the wrong (or no) folder.
+                // Detect a genuine move by the presence of the `folderId` key under `$set`
+                // (value is the target folder, or null when moving back to root); the denormalised
+                // task-count `$inc` updates do not carry it, so they are unaffected.
+                if (updateObject && updateObject.$set && Object.prototype.hasOwnProperty.call(updateObject.$set, 'folderId')) {
+                    try {
+                        const newFolderId = updateObject.$set.folderId || null;
+                        const newFolderName = updateObject.$set.folderName || "";
+                        const taskMatch = { sprintId: new mongoose.Types.ObjectId(id) };
+                        let taskUpdate;
+                        if (newFolderId) {
+                            // INTO A FOLDER (root->folder or folder->folder)
+                            taskUpdate = {
+                                $set: {
+                                    folderObjId: new mongoose.Types.ObjectId(newFolderId),
+                                    'sprintArray.folderId': new mongoose.Types.ObjectId(newFolderId),
+                                    'sprintArray.folderName': newFolderName,
+                                },
+                            };
+                        } else {
+                            // BACK TO ROOT (folder->root): drop the folder linkage entirely
+                            taskUpdate = {
+                                $unset: {
+                                    folderObjId: '',
+                                    'sprintArray.folderId': '',
+                                    'sprintArray.folderName': '',
+                                },
+                            };
+                        }
+                        const taskFolderUpdateQuery = {
+                            type: SCHEMA_TYPE.TASKS,
+                            data: [taskMatch, taskUpdate],
+                        };
+                        MongoQ.MongoDbCrudOpration(companyId, taskFolderUpdateQuery, "updateMany")
+                        .catch((error) => {
+                            logger.error(`ERROR in cascade folder move to sprint tasks: ${error.message}`);
+                        });
+                    } catch (error) {
+                        logger.error(`ERROR in cascade folder move to sprint tasks: ${error.message}`);
+                    }
+                }
+
                 if (updatedValueDeleteStatusKey !== undefined) {
                     // UPDATE CHILD TASKS | TYPESENE
                     try {

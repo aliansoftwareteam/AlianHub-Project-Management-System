@@ -1,5 +1,6 @@
 <template>
 	<div v-if="!underMaintainance">
+		<OfflineBanner/>
 		<DemoBanner/>
 		<template v-if="$route.meta.requiresAuth">
 			<template v-if="logged && (rules && Object.keys(rules).length && companyUserDetail && Object.keys(companyUserDetail).length) && socket">
@@ -96,6 +97,8 @@ import { languageTranslateHelper } from './composable/index';
 import {socketHelper} from './composable/socketHelper';
 import { useCustomComposable } from '@/composable';
 import { apiRequest,apiRequestWithoutCompnay } from './services';
+import OfflineBanner from '@/components/offline/OfflineBanner.vue';
+import { initOffline } from '@/offline';
 import * as env from '@/config/env';
 import {tabSyncHelper} from '@/utils/tabSyncs.js';
 import Cookies from 'js-cookie'
@@ -766,6 +769,7 @@ onMounted(() => {
         })
     }
     getFirebaseData();
+    initOffline();
     userId.value = localStorage.getItem("userId") !== null ? localStorage.getItem("userId") :  '';
     try {
        paymentInit();

@@ -26,6 +26,10 @@ import BarChart from '@/assets/images/svg/card_svg/barChart.svg';
 import Calculation from '@/assets/images/svg/calculation.svg';
 import CalendarCard from '@/assets/images/svg/CalendarCard.svg';
 import TaskList from '@/assets/images/svg/TaskList.svg';
+import CustomFieldFormula from '@/assets/images/svg/CustomFieldsIcons/CustomFieldFormula.svg';
+import CustomFieldFormulaGrey from '@/assets/images/svg/CustomFieldsIcons/CustomFieldFormulaGrey.svg';
+import CustomFieldRollup from '@/assets/images/svg/CustomFieldsIcons/CustomFieldRollup.svg';
+import CustomFieldRollupGrey from '@/assets/images/svg/CustomFieldsIcons/CustomFieldRollupGrey.svg';
 
 const customeFieldIcons = {
     CustomFieldText,
@@ -54,7 +58,11 @@ const customeFieldIcons = {
     PieChartWorkload,
     Calculation,
     CalendarCard,
-    TaskList
+    TaskList,
+    CustomFieldFormula,
+    CustomFieldFormulaGrey,
+    CustomFieldRollup,
+    CustomFieldRollupGrey
 };
 
 export default function useCustomFieldImage() {

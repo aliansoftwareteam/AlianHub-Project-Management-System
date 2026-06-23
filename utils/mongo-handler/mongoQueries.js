@@ -68,7 +68,23 @@ const {
     publicSharesSchema,
     intakeItemsSchema,
     publicShareIndexSchema,
-    recurringTasksSchema
+    recurringTasksSchema,
+    remindersSchema,
+    notesSchema,
+    clipsSchema,
+    timesheetApprovalSchema,
+    billingRatesSchema,
+    ssoConfigsSchema,
+    auditLogsSchema,
+    scimConfigsSchema,
+    ptoEntriesSchema,
+    portfoliosSchema,
+    savedReportsSchema,
+    reportSchedulesSchema,
+    emailInboxesSchema,
+    calendarFeedsSchema,
+    automationRulesSchema,
+    integrationConnectionsSchema
 } = require('./createSchema');
 
 
@@ -210,6 +226,38 @@ exports.checkType = (type) => {
             return publicShareIndexSchema
         case SCHEMA_TYPE.RECURRING_TASKS:
             return recurringTasksSchema
+        case SCHEMA_TYPE.REMINDERS:
+            return remindersSchema
+        case SCHEMA_TYPE.NOTES:
+            return notesSchema
+        case SCHEMA_TYPE.CLIPS:
+            return clipsSchema
+        case SCHEMA_TYPE.TIMESHEET_APPROVAL:
+            return timesheetApprovalSchema
+        case SCHEMA_TYPE.BILLING_RATES:
+            return billingRatesSchema
+        case SCHEMA_TYPE.SSO_CONFIGS:
+            return ssoConfigsSchema
+        case SCHEMA_TYPE.AUDIT_LOGS:
+            return auditLogsSchema
+        case SCHEMA_TYPE.SCIM_CONFIGS:
+            return scimConfigsSchema
+        case SCHEMA_TYPE.PTO_ENTRIES:
+            return ptoEntriesSchema
+        case SCHEMA_TYPE.PORTFOLIOS:
+            return portfoliosSchema
+        case SCHEMA_TYPE.SAVED_REPORTS:
+            return savedReportsSchema
+        case SCHEMA_TYPE.REPORT_SCHEDULES:
+            return reportSchedulesSchema
+        case SCHEMA_TYPE.EMAIL_INBOXES:
+            return emailInboxesSchema
+        case SCHEMA_TYPE.CALENDAR_FEEDS:
+            return calendarFeedsSchema
+        case SCHEMA_TYPE.AUTOMATION_RULES:
+            return automationRulesSchema
+        case SCHEMA_TYPE.INTEGRATION_CONNECTIONS:
+            return integrationConnectionsSchema
         default:
             return ""
     }
@@ -354,6 +402,38 @@ exports.tableType = (type) => {
                 return `${dbCollections.PUBLIC_SHARE_INDEX}`
         case SCHEMA_TYPE.RECURRING_TASKS:
                 return `${dbCollections.RECURRING_TASKS}`
+        case SCHEMA_TYPE.REMINDERS:
+                return `${dbCollections.REMINDERS}`
+        case SCHEMA_TYPE.NOTES:
+                return `${dbCollections.NOTES}`
+        case SCHEMA_TYPE.CLIPS:
+                return `${dbCollections.CLIPS}`
+        case SCHEMA_TYPE.TIMESHEET_APPROVAL:
+                return `${dbCollections.TIMESHEET_APPROVAL}`
+        case SCHEMA_TYPE.BILLING_RATES:
+                return `${dbCollections.BILLING_RATES}`
+        case SCHEMA_TYPE.SSO_CONFIGS:
+                return `${dbCollections.SSO_CONFIGS}`
+        case SCHEMA_TYPE.AUDIT_LOGS:
+                return `${dbCollections.AUDIT_LOGS}`
+        case SCHEMA_TYPE.SCIM_CONFIGS:
+                return `${dbCollections.SCIM_CONFIGS}`
+        case SCHEMA_TYPE.PTO_ENTRIES:
+                return `${dbCollections.PTO_ENTRIES}`
+        case SCHEMA_TYPE.PORTFOLIOS:
+                return `${dbCollections.PORTFOLIOS}`
+        case SCHEMA_TYPE.SAVED_REPORTS:
+                return `${dbCollections.SAVED_REPORTS}`
+        case SCHEMA_TYPE.REPORT_SCHEDULES:
+                return `${dbCollections.REPORT_SCHEDULES}`
+        case SCHEMA_TYPE.EMAIL_INBOXES:
+                return `${dbCollections.EMAIL_INBOXES}`
+        case SCHEMA_TYPE.CALENDAR_FEEDS:
+                return `${dbCollections.CALENDAR_FEEDS}`
+        case SCHEMA_TYPE.AUTOMATION_RULES:
+                return `${dbCollections.AUTOMATION_RULES}`
+        case SCHEMA_TYPE.INTEGRATION_CONNECTIONS:
+                return `${dbCollections.INTEGRATION_CONNECTIONS}`
         default:
             return ""
     }

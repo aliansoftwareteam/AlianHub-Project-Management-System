@@ -3,8 +3,16 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
     <link rel="icon" href="/api/v1/getlogo?key=favicon">
+    <!-- PWA (SEC-03): installable + mobile meta -->
+    <meta name="theme-color" content="#2F3990">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="AlianHub">
+    <link rel="apple-touch-icon" href="/api/v1/getlogo?key=favicon">
+    <link rel="manifest" href="/manifest.webmanifest">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
@@ -19,6 +27,20 @@
     </noscript>
     <div id="app"></div>
     <!-- built files will be auto injected -->
-    
+    <script>
+      // SEC-03 PWA worker withdrawn (its cache-first strategy caused a reload
+      // loop). Proactively unregister any previously-installed AlianHub PWA
+      // worker so existing browsers self-heal immediately. Only the
+      // /service-worker.js registration is touched — the firebase-messaging
+      // worker is left intact. A production-only PWA worker can return later.
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function (regs) {
+          regs.forEach(function (r) {
+            var url = (r.active && r.active.scriptURL) || (r.installing && r.installing.scriptURL) || (r.waiting && r.waiting.scriptURL) || '';
+            if (url.indexOf('/service-worker.js') !== -1) { r.unregister(); }
+          });
+        }).catch(function () {});
+      }
+    </script>
   </body>
 </html>

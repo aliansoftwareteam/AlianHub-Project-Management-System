@@ -11,6 +11,11 @@ exports.init = (app) => {
     app.post('/api/v1/getAiModels', ctrl.getAiModels);
     app.post('/api/v1/updateAiModel', ctrl.updateAiModel);
     app.post('/api/v1/findOneAiModel', ctrl.findOneAiModel);
+    // "Write with AI" for the task/project description editor. Provider-
+    // agnostic (Anthropic / OpenAI / DeepSeek via the AIProjectGenerator
+    // llmProvider). companyId resolves from the companyid header (set by the
+    // axios interceptor). Returns { questions } or { description }.
+    app.post('/api/v1/ai/description', ctrl.writeDescription);
     app.get('/api/v1/generatePrompt/events/:id', (req, res) => {
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');

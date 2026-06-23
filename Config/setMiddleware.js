@@ -168,6 +168,37 @@ const verifyJWTTokenWithCRoute = [
     '/api/v2/auth/2fa/setup',
     '/api/v2/auth/2fa/verify',
     '/api/v2/auth/2fa/disable',
+    // SSO admin config (Modules/SSO) — JWT+company so the owner/admin gate has
+    // req.uid. The login-flow routes (/api/v2/sso/oidc|saml|public) stay PUBLIC
+    // (pre-auth), so they are intentionally NOT listed here.
+    '/api/v2/sso/config',
+    '/api/v1/audit-logs',
+    // SCIM admin config (Modules/Scim) — JWT+company; owner/admin gated
+    // in-controller. The SCIM 2.0 protocol routes (/scim/v2/*) use bearer-token
+    // auth (company resolved from the token) and are intentionally NOT listed.
+    '/api/v2/scim/config',
+    '/api/v2/scim/token',
+    // Time-off / PTO (Modules/Pto) — JWT+company; prefix-matches /pto, /pto/:id,
+    // /pto/:id/status, /pto/capacity. Role checks are enforced in-controller.
+    '/api/v1/pto',
+    // Cross-project Portfolio rollup (Modules/Portfolio, REP-01) — JWT+company;
+    // prefix-matches /portfolio, /portfolio/:id, /portfolio/:id/rollup.
+    '/api/v1/portfolio',
+    // Custom report builder (Modules/CustomReports, REP-02) — JWT+company;
+    // prefix-matches /reports/custom, /reports/custom/run, /reports/custom/:id.
+    '/api/v1/reports/custom',
+    '/api/v1/reports/variance',
+    '/api/v1/reports/capacity',
+    '/api/v1/reports/schedules',
+    // Email-to-task management (AUTO-01). NOTE: only the /inboxes management
+    // routes are JWT-protected; the public inbound webhook /api/v1/email-in/:token
+    // is intentionally NOT listed (its secret token authenticates it).
+    '/api/v1/email-in/inboxes',
+    // Calendar feed management (AUTO-02). The public .ics feed
+    // /api/v1/calendar/ics/:token is intentionally NOT listed (token authenticates it).
+    '/api/v1/calendar/feeds',
+    '/api/v1/automations',
+    '/api/v1/integrations',
 ];
 const verifyJWTToken = [
     "/api/v2/company/delete",

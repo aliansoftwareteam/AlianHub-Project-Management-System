@@ -31,6 +31,42 @@ export default [
                 component: () => import(/* webpackChunkName: Members */ '@/views/Settings/Members/Members.vue')
             },
             {
+                path: "sso",
+                name: "SsoSettings",
+                meta: {
+                    title: "SSO",
+                    requiresAuth: true
+                },
+                component: () => import(/* webpackChunkName: SsoSettings */ '@/views/Settings/Sso/SsoSettings.vue')
+            },
+            {
+                path: "audit-logs",
+                name: "AuditLog",
+                meta: {
+                    title: "Audit Log",
+                    requiresAuth: true
+                },
+                component: () => import(/* webpackChunkName: AuditLog */ '@/views/Settings/Audit/AuditLog.vue')
+            },
+            {
+                path: "scim",
+                name: "ScimSettings",
+                meta: {
+                    title: "SCIM",
+                    requiresAuth: true
+                },
+                component: () => import(/* webpackChunkName: ScimSettings */ '@/views/Settings/Scim/ScimSettings.vue')
+            },
+            {
+                path: "time-off",
+                name: "TimeOff",
+                meta: {
+                    title: "Time Off",
+                    requiresAuth: true
+                },
+                component: () => import(/* webpackChunkName: TimeOff */ '@/views/Settings/TimeOff/TimeOff.vue')
+            },
+            {
                 path: "teams",
                 name: "Teams",
                 meta: {

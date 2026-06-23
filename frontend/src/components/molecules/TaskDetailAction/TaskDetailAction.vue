@@ -36,6 +36,12 @@
                                 <span class="dropdown-label">{{$t('ProjectDetails.copy_task_key')}}</span>
                             </div>
                         </DropDownOption>
+                        <DropDownOption @click="$refs['horizontalDocs'].click(),openReminderModal()">
+                            <div>
+                                <img :src="linkIcon" />
+                                <span class="dropdown-label">{{$t('ProjectDetails.remind_me')}}</span>
+                            </div>
+                        </DropDownOption>
                         <DropDownOption v-if="(task.queueListArray == undefined || (task.queueListArray && task.queueListArray.indexOf(userId) == -1)) && (task.AssigneeUserId && task.AssigneeUserId.indexOf(userId) !== -1) && checkPermission('task.queue_list',projectData.isGlobalPermission) == true" @click="$refs['horizontalDocs'].click(),addToQueue('add')">
                             <div>
                                 <img :src="cancelIcon" />
@@ -175,6 +181,20 @@
             @confirm="updateTask()"
             :showSpinner="showSpinner"
         />
+        <!-- Personal reminder (COLLAB-03) — pick a date/time to be reminded about this task. -->
+        <div v-if="showReminderModal" class="reminder-modal__overlay" @click.self="showReminderModal = false">
+            <div class="reminder-modal">
+                <div class="reminder-modal__title">{{ $t('ProjectDetails.remind_me') }}</div>
+                <label class="reminder-modal__label">{{ $t('ProjectDetails.reminder_when') }}</label>
+                <input type="datetime-local" v-model="reminderAt" class="reminder-modal__field" />
+                <label class="reminder-modal__label">{{ $t('ProjectDetails.reminder_note') }}</label>
+                <input type="text" v-model="reminderText" class="reminder-modal__field" :placeholder="$t('ProjectDetails.reminder_note')" autocomplete="off" />
+                <div class="reminder-modal__actions">
+                    <span class="cursor-pointer gray81" @click="showReminderModal = false">{{ $t('Projects.cancel') }}</span>
+                    <button class="btn-primary font-size-13" :disabled="!reminderAt || reminderSaving" @click="saveReminder()">{{ $t('Projects.save') }}</button>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -189,6 +209,7 @@
 
     import { computed, defineProps,defineEmits, ref, inject, watch } from 'vue';
     import taskClass from "@/utils/TaskOperations"
+    import { apiRequest } from '@/services';
     import { useGetterFunctions, useCustomComposable } from '@/composable';
     const { getUser } = useGetterFunctions();
     const { checkPermission, debounce } = useCustomComposable();
@@ -252,6 +273,12 @@
     const showSidebar = ref(false);
     const showSpinner = ref(false);
     const archive = ref(true);
+
+    // Personal reminder (COLLAB-03) state.
+    const showReminderModal = ref(false);
+    const reminderAt = ref('');
+    const reminderText = ref('');
+    const reminderSaving = ref(false);
 
     //watchers user details
     const getWatcherUsers = () => {
@@ -440,6 +467,45 @@
         openConvertSubTaskSidebar.value = true;
         openConvertToTask.value = true;
     }
+    // Open the reminder modal, defaulting the time to one hour from now.
+    const openReminderModal = () => {
+        const d = new Date(Date.now() + 60 * 60 * 1000);
+        // datetime-local needs a local "YYYY-MM-DDTHH:mm" value.
+        const pad = (n) => String(n).padStart(2, '0');
+        reminderAt.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        reminderText.value = '';
+        showReminderModal.value = true;
+    };
+
+    // Create a personal reminder for the logged-in user on this task.
+    const saveReminder = () => {
+        if (!reminderAt.value || reminderSaving.value) return;
+        reminderSaving.value = true;
+        // Send an ISO timestamp so the server parses the instant unambiguously.
+        const isoWhen = new Date(reminderAt.value).toISOString();
+        apiRequest('post', '/api/v1/reminders', {
+            taskId: props.task && props.task._id,
+            projectId: projectData.value && projectData.value._id,
+            userId: userId.value,
+            reminderAt: isoWhen,
+            reminderText: reminderText.value || '',
+        })
+            .then((res) => {
+                if (res && res.data && res.data.status) {
+                    $toast.success(t('ProjectDetails.reminder_set'), { position: 'top-right' });
+                    showReminderModal.value = false;
+                } else {
+                    $toast.error(t('ProjectDetails.reminder_failed'), { position: 'top-right' });
+                }
+                reminderSaving.value = false;
+            })
+            .catch((error) => {
+                console.error('ERROR in saveReminder: ', error);
+                $toast.error(t('ProjectDetails.reminder_failed'), { position: 'top-right' });
+                reminderSaving.value = false;
+            });
+    };
+
     const addToQueue = (action) => {
         try {
             taskClass.updateQueueList({CompanyId:companyId.value, projectId:projectData.value._id, sprintId:props.task.sprintId, taskId:props.task._id,userId:userId.value,actionType:action,queueListArray: props.task.queueListArray})
