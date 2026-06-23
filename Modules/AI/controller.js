@@ -14,6 +14,7 @@ const { getCachedPromptData, getCachedAllPromptData, getCachedCategoryData, getC
 const { updateCompanyFun, getCompanyDataFun } = require('../Company/controller/updateCompany.js');
 const { updateMemberFunction } = require('../settings/Members/controller.js');
 const aiPrompts = require('../../utils/aiPrompts.json');
+const { generateDescription } = require('./aiDescriptionWriter');
 
 // GENERATE INITIAL REQUEST AND FOR FUNCTION USE (SUB TASK,CHECKLIST)
 exports.generatePrompt = (req,res) => {
@@ -362,6 +363,57 @@ exports.updateAiModel = (req,res) => {
         console.error(error,"ERROR IN UPDATE MODELS:")
     }
 }
+
+// "Write with AI" for the description editor (task + project). Provider-
+// agnostic — uses the AIProjectGenerator llmProvider factory via
+// aiDescriptionWriter, NOT the OpenAI-hardcoded generatePrompt path. One LLM
+// call returns EITHER up to 3 clarifying questions (when the input is too
+// vague) OR the generated markdown description. When the client sends back
+// `answers`, the writer always returns a description (it never re-asks).
+// This endpoint only GENERATES — the client previews the result and persists
+// it through the normal description save path only after the user approves.
+exports.writeDescription = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'];
+        if (!companyId) {
+            return res.status(400).send({ status: false, statusText: 'companyId header required' });
+        }
+
+        const {
+            title = '',
+            taskType = '',
+            existingDescription = '',
+            intent = '',
+            answers = [],
+        } = req.body || {};
+
+        const result = await generateDescription({
+            title,
+            taskType,
+            existingDescription,
+            intent,
+            answers,
+        });
+
+        if (!result.status) {
+            // No-provider / parse failure / LLM error → graceful failure in
+            // the standard error response shape so the popover can show a
+            // friendly message and offer a retry.
+            return res.send({
+                status: false,
+                statusText: result.reason || 'Could not generate a description.',
+            });
+        }
+
+        return res.send({ status: true, data: result.data });
+    } catch (error) {
+        logger.error(`writeDescription error: ${error && error.message ? error.message : error}`);
+        return res.send({
+            status: false,
+            statusText: (error && error.message) || 'An error occurred while generating the description.',
+        });
+    }
+};
 
 exports.generateWithStream = (axiosData,header,userId,companyId,uniqueUserId,eventId) => {
     return new Promise((resolve,reject) => {

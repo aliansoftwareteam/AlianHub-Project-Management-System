@@ -41,6 +41,8 @@ module.exports.AI_PROJECT_PLAN = "/api/v1/ai/project/plan";
 module.exports.AI_PROJECT_CLARIFY = "/api/v1/ai/project/clarify";
 module.exports.AI_PROJECT_EXECUTE = "/api/v1/ai/project/execute";
 module.exports.AI_PROJECT_EVENTS = "/api/v1/ai-progress";
+// "Write with AI" for the task/project description editor (Modules/AI)
+module.exports.AI_WRITE_DESCRIPTION = "/api/v1/ai/description";
 module.exports.WASABI_UPLOAD_FILE = "/api/v1/wasabi/uploadFile";
 module.exports.WASABI_UPLOAD64_FILE = "/api/v1/wasabi/uploadFile_64";
 module.exports.WASABI_RETRIVE_USER_PROFILE = "/api/v1/wasabi/retriveUserProfile";

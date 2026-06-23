@@ -90,4 +90,16 @@ export default {
         less: "Ver menos",
         edited: "editado",
     },
+    AI: {
+        ...en.AI,
+        ai_write_description: "Escrever com IA",
+        ai_desc_intent_placeholder: "O que esta descrição deve abordar? (opcional)",
+        ai_desc_intent_hint: "Deixe em branco para gerar a partir do título.",
+        ai_generate: "Gerar",
+        ai_regenerate: "Gerar novamente",
+        ai_use_this: "Usar esta",
+        ai_answer_questions: "Responda algumas perguntas rápidas para que a descrição fique precisa:",
+        ai_generating: "Gerando…",
+        ai_failed: "Não foi possível gerar uma descrição. Tente novamente.",
+    },
 };
