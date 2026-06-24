@@ -301,6 +301,7 @@
                                 @manageFilterUsers="manageFilterUsers"
                                 @changeAssignee="(type, $event) => changeAssignee(type, $event)"
                                 @openAi="openAiSidebar = true"
+                                @openAiAssist="showAiTaskCreator = true"
                                 @update:showArchived="(v) => showArchived = v"
                                 @openCalendar="calendartoggle = true; rangeObjectFRun(calendarDate ? new Date(calenderSelectDate) : new Date())"
                                 @handleStartEndDate="handleStartEndDate"
@@ -308,6 +309,8 @@
                                 @nextMonth="nextMonth"
                                 @defaultMonth="defaultMonth"
                             />
+                            <!-- AI Assist (AHE-3777): project-level AI task generation, opened from the toolbar. -->
+                            <AiTaskCreator v-if="projectData && projectData._id" v-model="showAiTaskCreator" :projectId="String(projectData._id)" />
                             <component
                                 v-if="(clientWidth <= 767 && isVisible == true && isRuleData == false) || (clientWidth > 767 && isRuleData == false)"
                                 :class="[{'showProjectDetailRight':activeTab !== 'ProjectListView' && activeTab !== 'Calendar' && activeTab != 'EmbedViewItem' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports' && activeTab !== 'GanttView' && activeTab !== 'RecurringTasks' && activeTab !== 'TimelineView' && activeTab !== 'MindMapView' && activeTab !== 'WhiteboardView' && activeTab !== 'CanvasView' && activeTab !== 'MapView'}]"
@@ -487,6 +490,7 @@ import NotFound from '../NotFound.vue';
 // EXTRACTED PIECES
 import ProjectActionsBar from './components/ProjectActionsBar.vue';
 import ProjectFiltersToolbar from './components/ProjectFiltersToolbar.vue';
+import AiTaskCreator from '@/components/organisms/AiTaskCreator/AiTaskCreator.vue';
 import ProjectSidebars from './components/ProjectSidebars.vue';
 import ProjectBottomModals from './components/ProjectBottomModals.vue';
 import ProjectEmptyState from './components/ProjectEmptyState.vue';
@@ -518,6 +522,7 @@ provide('showArchivedProjects', showArchivedProjects);
 const currentVideoUrl = ref(0);
 const openAiSidebar = ref(false);
 const showDriverSidebar = ref(false);
+const showAiTaskCreator = ref(false);
 const skipWatcher = ref(false);
 const socket = inject('$socket');
 

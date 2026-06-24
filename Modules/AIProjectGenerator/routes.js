@@ -53,6 +53,28 @@ exports.init = (app) => {
 
     /**
      * @swagger
+     * /api/v1/ai/project/{projectId}/tasks/plan:
+     *   post:
+     *     summary: Start async AI task-plan generation for an EXISTING project (AHE-3777)
+     *     tags: [AI Project Generator]
+     *     description: |
+     *       Generates sprints + tasks for the given existing project from the
+     *       team's requirements. Returns a jobId immediately; the plan is
+     *       delivered on /api/v1/ai-progress/{jobId}. Does NOT create a project.
+     */
+    app.post('/api/v1/ai/project/:projectId/tasks/plan', ctrl.tasksPlan);
+
+    /**
+     * @swagger
+     * /api/v1/ai/project/{projectId}/tasks/execute:
+     *   post:
+     *     summary: Persist an approved AI task plan into an EXISTING project (AHE-3777)
+     *     tags: [AI Project Generator]
+     */
+    app.post('/api/v1/ai/project/:projectId/tasks/execute', ctrl.tasksExecute);
+
+    /**
+     * @swagger
      * /api/v1/ai-progress/{jobId}:
      *   get:
      *     summary: SSE stream of progress events for an executing plan

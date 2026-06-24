@@ -8,8 +8,8 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const multer = require('multer');
 
 const { getProvider, isAnyProviderConfigured } = require('./llmProvider');
-const { PlanSchema, ClarifyResponseSchema, sanitizeMemberIds, tryParseJson } = require('./schemaValidator');
-const { buildSystemPrompt, buildUserMessage, buildRepairPrompt } = require('./promptBuilder');
+const { PlanSchema, ClarifyResponseSchema, TasksPlanSchema, TasksResponseSchema, sanitizeMemberIds, sanitizeTaskPlanMemberIds, tryParseJson } = require('./schemaValidator');
+const { buildSystemPrompt, buildUserMessage, buildRepairPrompt, buildTasksSystemPrompt, buildTasksUserMessage } = require('./promptBuilder');
 const { briefUpload, extractFromFile, safeUnlink, MAX_BRIEF_BYTES } = require('./briefExtractor');
 const sseEmitter = require('./sseEmitter');
 const orchestrator = require('./orchestrator');
@@ -558,5 +558,244 @@ function applyEdits(plan, edits) {
     }
     return next;
 }
+
+// ─── Tasks into an existing project (AHE-3777) ─────────────────────────
+//
+// Same engine as the project-plan flow (LLM provider, JSON-mode, repair
+// pass, SSE), but generates sprints + tasks ONLY and persists them into an
+// EXISTING project via orchestrator.executeTasksIntoProject. Mirrors
+// callLlmForPlan / generatePlanForJob / exports.plan / exports.execute.
+
+async function callLlmForTasksPlan({ project, additionalRequirements, briefText, members, clarifications }) {
+    const provider = getProvider();
+    const systemPrompt = buildTasksSystemPrompt();
+    const userMessage = buildTasksUserMessage({ project, additionalRequirements, briefText, members, clarifications });
+    const maxTokens = Number(process.env.LLM_MAX_TOKENS_PLAN) || 32000;
+
+    const firstAttempt = await provider.chat({
+        systemPrompt,
+        messages: [{ role: 'user', content: userMessage }],
+        jsonMode: true,
+        maxTokens,
+        temperature: 0.4,
+    });
+    if (firstAttempt.truncated) {
+        const err = new Error(
+            'The AI ran out of output token budget mid-plan. Raise LLM_MAX_TOKENS_PLAN '
+            + `(currently ${maxTokens}) in your .env, or ask for fewer tasks.`,
+        );
+        err.code = 'LLM_TRUNCATED';
+        throw err;
+    }
+
+    const tryValidate = (raw) => {
+        const parsed = tryParseJson(raw);
+        if (!parsed.ok) return { ok: false, error: `JSON parse failed: ${parsed.error}` };
+        const result = TasksResponseSchema.safeParse(parsed.value);
+        if (!result.success) {
+            const issues = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n');
+            return { ok: false, error: issues };
+        }
+        return { ok: true, value: result.data };
+    };
+
+    let validated = tryValidate(firstAttempt.content);
+    let usedTokens = firstAttempt.totalTokens || 0;
+
+    if (!validated.ok) {
+        const repairAttempt = await provider.chat({
+            systemPrompt,
+            messages: [
+                { role: 'user', content: userMessage },
+                { role: 'assistant', content: firstAttempt.content },
+                { role: 'user', content: buildRepairPrompt(firstAttempt.content, validated.error) },
+            ],
+            jsonMode: true,
+            maxTokens,
+            temperature: 0.2,
+        });
+        usedTokens += repairAttempt.totalTokens || 0;
+        if (repairAttempt.truncated) {
+            const err = new Error(
+                'The AI ran out of output token budget on the repair attempt. Raise '
+                + `LLM_MAX_TOKENS_PLAN (currently ${maxTokens}) in your .env, or ask for fewer tasks.`,
+            );
+            err.code = 'LLM_TRUNCATED';
+            throw err;
+        }
+        validated = tryValidate(repairAttempt.content);
+        if (!validated.ok) {
+            const err = new Error(`LLM output failed validation after repair: ${validated.error}`);
+            err.code = 'LLM_INVALID_OUTPUT';
+            err.details = validated.error;
+            throw err;
+        }
+    }
+
+    return { result: validated.value, tokens: usedTokens, model: (provider && provider.name) || 'unknown' };
+}
+
+async function generateTasksPlanForJob({ jobId, uid, companyId, projectId, additionalRequirements, briefText, clarifications }) {
+    const emit = (payload) => sseEmitter.emit(jobId, payload);
+    try {
+        emit({ event: 'progress', phase: 'plan', step: 'context', status: 'started' });
+        const projectDoc = await orchestrator.loadProjectForTasks(companyId, projectId);
+        if (!projectDoc) throw new Error('Project not found');
+
+        const project = {
+            ProjectName: projectDoc.ProjectName,
+            description: projectDoc.description || '',
+            taskStatusNames: (projectDoc.taskStatusData || []).map((s) => s.name).filter(Boolean),
+            taskTypes: (projectDoc.taskTypeCounts || []).map((t) => ({ key: t.key, name: t.name })),
+            sprintNames: Object.values(projectDoc.sprintsObj || {}).map((s) => s && s.name).filter(Boolean),
+        };
+        const members = await loadActiveMembers(companyId);
+        emit({ event: 'progress', phase: 'plan', step: 'context', status: 'done' });
+
+        emit({ event: 'progress', phase: 'plan', step: 'ai', status: 'started' });
+        const { result, tokens, model } = await callLlmForTasksPlan({
+            project, additionalRequirements, briefText, members, clarifications,
+        });
+
+        let plan = result.plan;
+        if (!plan || !Array.isArray(plan.sprints)) {
+            throw new Error('The AI did not return any tasks. Please try again.');
+        }
+        try {
+            const allowed = new Set(members.map((m) => String(m.id)));
+            plan = sanitizeTaskPlanMemberIds(plan, allowed).plan;
+        } catch (_e) { /* leave as-is */ }
+
+        const reCheck = TasksPlanSchema.safeParse(plan);
+        if (!reCheck.success) {
+            const issues = reCheck.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n');
+            throw new Error(`Plan failed final validation: ${issues}`);
+        }
+        plan = reCheck.data;
+
+        const planId = token();
+        myCache.set(cacheKey('tasksplan', uid, planId), {
+            companyId,
+            projectId: String(projectId),
+            plan,
+            createdAt: Date.now(),
+        }, PLAN_TTL_SECONDS);
+
+        emit({
+            event: 'complete',
+            phase: 'plan',
+            status: true,
+            needsClarification: false,
+            planId,
+            projectId: String(projectId),
+            plan,
+            tokensUsed: tokens,
+            model,
+        });
+    } catch (error) {
+        logger.error(`AIPG tasks-plan job error: ${error && error.message ? error.message : error}`);
+        emit({
+            event: 'error',
+            phase: 'plan',
+            error: error && error.message ? error.message : 'Task generation failed. Please try again.',
+            code: error && error.code ? error.code : undefined,
+        });
+    }
+}
+
+exports.tasksPlan = async (req, res) => {
+    if (!isAnyProviderConfigured()) {
+        return sendError(res, 503, 'AI provider is not configured');
+    }
+    try {
+        const uid = req.uid;
+        if (!uid) return sendError(res, 401, 'Unauthorized');
+        const companyId = resolveCompanyId(req);
+        if (!companyId) return sendError(res, 403, 'Company access denied');
+
+        const projectId = String((req.params && req.params.projectId) || '').trim();
+        if (!OBJECT_ID_PATTERN.test(projectId)) return sendError(res, 400, 'Valid projectId required');
+
+        const additionalRequirements = String((req.body && req.body.additionalRequirements) || '').trim().slice(0, 2000);
+        let briefText = '';
+        if (req.body && req.body.briefId) {
+            const stash = myCache.get(cacheKey('brief', uid, req.body.briefId));
+            if (stash && stash.companyId === companyId) briefText = stash.text;
+        }
+        const clarifications = sanitizeClarifications(req.body && req.body.clarifications);
+
+        const jobId = token();
+        res.send({ status: true, jobId, queued: true });
+
+        setTimeout(() => {
+            generateTasksPlanForJob({
+                jobId, uid, companyId, projectId, additionalRequirements, briefText, clarifications,
+            }).catch((error) => {
+                logger.error(`AIPG tasks-plan job outer error: ${error && error.message ? error.message : error}`);
+                sseEmitter.emit(jobId, {
+                    event: 'error',
+                    phase: 'plan',
+                    error: error && error.message ? error.message : 'Task generation failed. Please try again.',
+                });
+            });
+        }, 200);
+        return;
+    } catch (error) {
+        logger.error(`AIPG tasksPlan error: ${error && error.message ? error.message : error}`);
+        const httpCode = llmErrorToHttpStatus(error);
+        return sendError(res, httpCode, error && error.message ? error.message : 'Task generation failed. Please try again.');
+    }
+};
+
+exports.tasksExecute = async (req, res) => {
+    try {
+        const uid = req.uid;
+        if (!uid) return sendError(res, 401, 'Unauthorized');
+        const companyId = resolveCompanyId(req);
+        if (!companyId) return sendError(res, 403, 'Company access denied');
+
+        const projectId = String((req.params && req.params.projectId) || '').trim();
+        if (!OBJECT_ID_PATTERN.test(projectId)) return sendError(res, 400, 'Valid projectId required');
+
+        let plan = req.body && req.body.plan;
+        if (!plan || typeof plan !== 'object') return sendError(res, 400, 'plan required in request body');
+
+        // Never trust a client-supplied plan — re-validate server-side.
+        const reCheck = TasksPlanSchema.safeParse(plan);
+        if (!reCheck.success) {
+            const issues = reCheck.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n');
+            return sendError(res, 400, `Plan failed validation: ${issues}`);
+        }
+        plan = reCheck.data;
+
+        let currentUserName = '';
+        try {
+            const members = await loadActiveMembers(companyId);
+            const allowed = new Set(members.map((m) => String(m.id)));
+            const me = members.find((m) => String(m.id) === String(uid));
+            if (me && me.name) currentUserName = me.name;
+            plan = sanitizeTaskPlanMemberIds(plan, allowed).plan;
+        } catch (_e) { /* leave as-is */ }
+
+        const userData = {
+            id: String(uid),
+            Employee_Name: currentUserName || (req.body && req.body.userName) || 'AlianHub AI',
+            companyOwnerId: companyId,
+        };
+
+        const jobId = token();
+        res.send({ status: true, jobId });
+
+        setTimeout(() => {
+            orchestrator.executeTasksIntoProject({ tasksPlan: plan, projectId, companyId, uid: String(uid), userData, jobId })
+                .catch((e) => {
+                    logger.error(`AIPG tasksExecute error: ${e && e.message ? e.message : e}`);
+                });
+        }, 200);
+    } catch (error) {
+        logger.error(`AIPG tasksExecute outer error: ${error && error.message ? error.message : error}`);
+        return sendError(res, 500, error && error.message ? error.message : 'Execute failed');
+    }
+};
 
 exports.events = (req, res) => sseEmitter.handleEvents(req, res);

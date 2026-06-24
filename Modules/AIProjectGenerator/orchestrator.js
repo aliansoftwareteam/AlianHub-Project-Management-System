@@ -1064,8 +1064,126 @@ function normalizePlanColors(plan) {
     return plan;
 }
 
+// ─── Tasks-into-existing-project (AHE-3777) ────────────────────────────
+//
+// Loads an EXISTING project doc (company-scoped, non-deleted) so the tasks
+// flow can reuse the same task-building internals (createSprint +
+// createTasksForSprint) without creating a project. Returns null if not
+// found.
+async function loadProjectForTasks(companyId, projectId) {
+    let oid;
+    try { oid = new mongoose.Types.ObjectId(String(projectId)); } catch (_e) { return null; }
+    const rows = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.PROJECTS,
+        data: [{ _id: oid, deletedStatusKey: 0 }],
+    }, 'find').catch(() => []);
+    return (Array.isArray(rows) && rows[0]) || null;
+}
+
+async function rollbackTasks({ companyId, tracker }) {
+    try {
+        if (tracker.tasks.length) {
+            const taskIds = tracker.tasks.map((id) => new mongoose.Types.ObjectId(id));
+            await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.TASKS,
+                data: [{ _id: { $in: taskIds } }, { $set: { deletedStatusKey: 1 } }],
+            }, 'updateMany').catch(() => {});
+        }
+        // Only sprints WE created in this run are rolled back — never a
+        // pre-existing project sprint.
+        if (tracker.sprints.length) {
+            const sprintIds = tracker.sprints.map((s) => new mongoose.Types.ObjectId(s.id));
+            await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.SPRINTS,
+                data: [{ _id: { $in: sprintIds } }, { $set: { deletedStatusKey: 1 } }],
+            }, 'updateMany').catch(() => {});
+        }
+    } catch (e) {
+        logger.error(`AIPG-tasks rollback error: ${e && e.message ? e.message : e}`);
+    }
+}
+
+/**
+ * Persist an AI tasks plan into an EXISTING project. Mirrors executePlan's
+ * sprint/task steps but skips all project creation (no checkProjectPlan,
+ * buildProjectDoc, or saveProject). Reuses createSprint + createTasksForSprint
+ * (which handle task-key reservation, socket emits, history, and background
+ * AI time-estimates) against the loaded project doc.
+ */
+async function executeTasksIntoProject({ tasksPlan, projectId, companyId, uid, userData, jobId }) {
+    const tracker = { sprints: [], tasks: [] };
+    const emit = (payload) => sseEmitter.emit(jobId, payload);
+    try {
+        emit({ event: 'progress', step: 'project', status: 'started' });
+        const projectDoc = await withTimeout(loadProjectForTasks(companyId, projectId), 45000, 'loadProjectForTasks');
+        if (!projectDoc) throw new Error('Project not found');
+        if (!Array.isArray(projectDoc.taskStatusData) || !projectDoc.taskStatusData.length) {
+            throw new Error('Project has no task statuses configured');
+        }
+        emit({ event: 'progress', step: 'project', status: 'done', projectId: String(projectDoc._id) });
+
+        const taskStatusByName = new Map(projectDoc.taskStatusData.map((s) => [String(s.name).toLowerCase(), { name: s.name, key: s.key, type: s.type }]));
+        const taskTypeByKey = new Map((projectDoc.taskTypeCounts || []).map((t) => [String(t.key), t]));
+
+        const sprints = Array.isArray(tasksPlan.sprints) ? tasksPlan.sprints : [];
+
+        // Sprints (sequential) — every plan sprint is created fresh.
+        emit({ event: 'progress', step: 'sprint', status: 'started', total: sprints.length });
+        const sprintRecords = [];
+        for (const sprint of sprints) {
+            emit({ event: 'progress', step: 'sprint', status: 'progress', name: sprint.sprintName });
+            const sprintDoc = await createSprint({
+                companyId,
+                projectId: projectDoc._id,
+                projectName: projectDoc.ProjectName,
+                sprintName: sprint.sprintName,
+                userData,
+            });
+            tracker.sprints.push({ id: sprintDoc._id.toString(), name: sprint.sprintName });
+            sprintRecords.push({ sprint, sprintDoc });
+        }
+        emit({ event: 'progress', step: 'sprint', status: 'done', completed: tracker.sprints.length });
+
+        // Tasks (bulk per sprint).
+        const totalTasks = sprints.reduce((acc, s) => acc + (s.tasks || []).length, 0);
+        let completed = 0;
+        emit({ event: 'progress', step: 'tasks', status: 'started', total: totalTasks });
+        for (const { sprint, sprintDoc } of sprintRecords) {
+            const created = await createTasksForSprint({
+                companyId,
+                projectDoc,
+                sprintDoc,
+                tasks: sprint.tasks || [],
+                statusByName: taskStatusByName,
+                taskTypeByKey,
+                creatorUid: uid,
+                userData,
+            });
+            for (const t of created) tracker.tasks.push(t._id.toString());
+            completed += created.length;
+            emit({ event: 'progress', step: 'tasks', status: 'progress', completed, total: totalTasks });
+        }
+
+        try { removeCache('UserProjectData:', true); } catch (_e) { /* ignore */ }
+
+        emit({
+            event: 'complete',
+            projectId: String(projectDoc._id),
+            totals: { sprints: tracker.sprints.length, tasks: tracker.tasks.length },
+        });
+        return { ok: true, projectId: String(projectDoc._id), totals: { sprints: tracker.sprints.length, tasks: tracker.tasks.length } };
+    } catch (error) {
+        logger.error(`[AIPG-tasks][${jobId}] orchestrator catch: ${error && error.message ? error.message : error}${error && error.stack ? '\n' + error.stack : ''}`);
+        await rollbackTasks({ companyId, tracker });
+        emit({ event: 'error', error: error && error.message ? error.message : String(error), rolledBack: true, code: error && error.code });
+        return { ok: false, error: error && error.message ? error.message : String(error) };
+    }
+}
+
 module.exports = {
     executePlan,
+    executeTasksIntoProject,
+    loadProjectForTasks,
     normalizePlanColors,
     // Exported for tests / debugging.
     buildProjectDoc,
