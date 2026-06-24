@@ -1,6 +1,16 @@
 <template>
     <div class="task-detail-action">
         <ul class="task-detail-action-ul">
+            <!-- Subtask completion badge (AHE-3776): at-a-glance % of this parent's
+                 subtasks that are done. Hidden when the task has no subtasks. -->
+            <!-- width:auto so the pill isn't clipped by the shared `li { width:30px }` icon sizing. -->
+            <li v-if="subtaskCompletion && subtaskCompletion.total" style="display:flex; align-items:center; width:auto;">
+                <SubtaskProgressBadge
+                    :completed="subtaskCompletion.completed"
+                    :total="subtaskCompletion.total"
+                    variant="pill"
+                />
+            </li>
             <li>
                 <Skelaton v-if="isSpinner" style="height: 30px;" class="w-30px border-radius-6-px"/>
                 <img v-else @click="$emit('open', 'filesLinks')" src="@/assets/images/svg/Fileslinks.svg" />
@@ -206,6 +216,7 @@
     import ConvertToList from '@/components/molecules/ConvertToList/ConvertToList.vue';
     import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue"
     import WasabiIamgeCompp from '@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue';
+    import SubtaskProgressBadge from '@/components/atom/SubtaskProgressBadge/SubtaskProgressBadge.vue';
 
     import { computed, defineProps,defineEmits, ref, inject, watch } from 'vue';
     import taskClass from "@/utils/TaskOperations"
@@ -261,6 +272,8 @@
     const userId = inject('$userId')
     const companyId = inject('$companyId')
     const clientWidth = inject('$clientWidth');
+    // Provided by TaskDetail.vue — { total, completed } for the subtask % badge.
+    const subtaskCompletion = inject('subtaskCompletion', null);
     const openConvertSubTaskSidebar = ref(false);
     const converrtToListSidebar = ref(false);
     const openMoveSidebar = ref(false);

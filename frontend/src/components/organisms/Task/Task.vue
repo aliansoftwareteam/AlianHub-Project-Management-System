@@ -97,6 +97,15 @@
                                     {{myParentCounts > 99 ? "+99" : myParentCounts}}
                                 </div>
                             </div>
+                            <!-- Subtask completion % (AHE-3776), right after the subtask count.
+                                 Appears once the row's subtasks are loaded (parent expanded). -->
+                            <SubtaskProgressBadge
+                                v-if="data?.isParentTask && subtaskProgress.total"
+                                :completed="subtaskProgress.completed"
+                                :total="subtaskProgress.total"
+                                variant="pill"
+                                class="ml-5px"
+                            />
                         </template>
                         <!-- TASK OPTIONS -->
                         <div class="align-items-center justify-content-evenly task-options" :class="[{'d-flex':dropVisible, 'd-none' : !dropVisible }]" v-if="!showArchiveVar && !editTaskName && clientWidth > 768">
@@ -290,6 +299,9 @@ import CreateTagPopup from '@/components/molecules/TagList/CreateTagPopup.vue';
 import TagChip from '@/components/atom/TagChip/TagChip.vue';
 import ConvertToSubTaskSidebar from '@/components/molecules/ConvertToSubTaskSidebar/ConvertToSubTaskSidebar.vue';
 import ConvertToList from '@/components/molecules/ConvertToList/ConvertToList.vue';
+import SubtaskProgressBadge from '@/components/atom/SubtaskProgressBadge/SubtaskProgressBadge.vue';
+import { apiRequest } from '@/services';
+import * as env from '@/config/env';
 
 import TaskQuickMenu from './components/TaskQuickMenu.vue';
 import { useTaskActions } from './composables/useTaskActions';
@@ -397,6 +409,51 @@ const projectTaskType = computed(() => projectData.value.taskTypeCounts);
 const taskStatus = computed(() => projectData.value.taskStatusData.find((x) => x.key === task.value.statusKey));
 const taskType = computed(() => projectData.value.taskTypeCounts.find((x) => x.key === task.value.TaskTypeKey));
 
+// Subtask completion (AHE-3776) for the list-row badge shown after the subtask
+// count. When the row is expanded its subtasks are loaded into `subtaskArray`
+// (used live); when collapsed they aren't loaded, so we fetch a lightweight
+// done/total count once on mount (`fetchedProgress`) and fall back to it — that
+// way the badge shows on a collapsed row right after reload. A subtask is done
+// when statusType is 'close'; only non-deleted subtasks count.
+const fetchedProgress = ref({ total: 0, completed: 0 });
+
+const subtaskProgress = computed(() => {
+    const loaded = Array.isArray(task.value?.subtaskArray)
+        ? task.value.subtaskArray.filter((s) => s && (s.deletedStatusKey === 0 || s.deletedStatusKey === undefined))
+        : [];
+    if (loaded.length) {
+        const completed = loaded.filter((s) => (s?.status?.type || s?.statusType) === 'close').length;
+        return { total: loaded.length, completed };
+    }
+    // Collapsed row — subtasks not loaded; use the count fetched on mount.
+    return fetchedProgress.value;
+});
+
+// One-time, read-only count of this parent's subtasks (done vs total) so the
+// badge can show on a COLLAPSED row right after reload. Uses the existing
+// /task/find aggregate endpoint (no backend change). Best-effort: any failure
+// just leaves the badge hidden. Skipped for non-parents, parents with no
+// subtasks, or rows whose subtasks are already loaded (expanded).
+function fetchSubtaskProgress() {
+    if (!task.value?.isParentTask) return;
+    if ((Number(task.value?.subTasks) || 0) <= 0) return;
+    if (Array.isArray(task.value?.subtaskArray) && task.value.subtaskArray.length) return;
+    const findQuery = [
+        { $match: { ParentTaskId: String(task.value._id), deletedStatusKey: { $in: [0, undefined] } } },
+        { $group: { _id: null, total: { $sum: 1 }, completed: { $sum: { $cond: [{ $eq: ['$statusType', 'close'] }, 1, 0] } } } },
+    ];
+    apiRequest('post', `${env.TASK}/find`, { findQuery })
+        .then((response) => {
+            const row = response?.data && response.data[0];
+            if (row) {
+                fetchedProgress.value = { total: Number(row.total) || 0, completed: Number(row.completed) || 0 };
+            }
+        })
+        .catch((error) => {
+            console.error('ERROR in fetchSubtaskProgress: ', error);
+        });
+}
+
 const sprintData = computed(() => {
     let sprintData = false;
     if (projectData.value && props.data) {
@@ -471,7 +528,9 @@ watch(() => getters['settings/finalCustomFields'], (newVal) => {
 const taskCollapsed = inject('taskCollapsed');
 onMounted(() => {
     if (taskCollapsed.value !== undefined && !taskCollapsed.value) {
-        emit('toggle');
+        emit('toggle');   // auto-expand mode → subtasks load, badge uses them live
+    } else {
+        fetchSubtaskProgress();   // collapsed → fetch the count so the badge shows on reload
     }
     manageCustomField(customFieldList.value);
 });
