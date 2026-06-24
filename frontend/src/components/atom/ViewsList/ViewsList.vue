@@ -13,7 +13,8 @@
            <span class="gray81">{{$t(`ViewList.${item.name}`)}}</span>
            <img :src="active ? activePin : pin" v-if="item?.isPin && item.isPin" class="ml-10px active__pin-condition">
            <span class="notification-tick blinking position-sti ml-7px" v-if="item?.isPrivate"></span>
-           <DropDown :id="item._id" @isVisible="isDropDownVisible" :zIndex="6" v-if="checkPermission('project.view_list',project.isGlobalPermission) === true">
+           <div class="view-list__menu" v-if="checkPermission('project.view_list',project.isGlobalPermission) === true">
+           <DropDown :id="item._id" @isVisible="isDropDownVisible" :zIndex="6">
                 <template #button>
                     <img :src="dots" class="dots ml-5px" :ref="item._id">
                 </template>
@@ -36,6 +37,7 @@
                     </div>
                 </template>
             </DropDown>
+            </div>
             <ConfirmationSidebar
                 v-model="isDelete"
                 :title="$t('Projects.deleteview')"
@@ -203,9 +205,35 @@ const editOptions = (type) =>{
 defineEmits(['click']);
 </script>
 <style scoped>
-.dots, .list__edit{
+.list__edit{
     height: 20px;
     width: 15px;
+}
+/* ⋯ menu: positioned OVER the tab's right edge (out of flow) so it never
+   reserves space or resizes the tab — it only appears on hover. */
+.view-list__menu{
+    position: absolute;
+    right: 2px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+}
+/* The trigger is a proper rounded button (white chip + soft shadow) so it
+   reads as a control and cleanly masks the sliver of label it overlaps. */
+.dots{
+    height: 24px;
+    width: 28px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    box-sizing: border-box;
+    object-fit: contain;
+    cursor: pointer;
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(16, 24, 40, 0.18);
+}
+.dots:hover{
+    background: #f1f2f4;
 }
 .count-block.comment__count{
    color: #eabb00 !important;

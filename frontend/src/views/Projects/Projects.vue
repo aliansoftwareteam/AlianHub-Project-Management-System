@@ -128,7 +128,7 @@
                                 </div>
                                 <div class="list-head-mid h-100" :class="{'desktop-view' : clientWidth > 767}" id="projectview_driver">
                                     <template v-if="clientWidth > 765">
-                                        <div class="d-flex align-items-center overflow-x-auto style-scroll view_list_scroll h-100">
+                                        <div class="d-flex align-items-center overflow-x-auto view_list_scroll h-100">
                                             <ViewsList
                                                 v-for="(view, index) in (viewsListArray)"
                                                 :key="view._id"
