@@ -14,7 +14,8 @@ const logger = require('../../Config/loggerConfig');
 // then body) — identical resolution order to Modules/Reminders/controller.js.
 function resolveUserId(req) {
     const b = req.body || {};
-    return (req.user && (req.user.id || req.user._id))
+    return (req.uid && String(req.uid))
+        || (req.user && (req.user.id || req.user._id))
         || req.headers['userid']
         || b.userId
         || (b.userData && b.userData.id)
