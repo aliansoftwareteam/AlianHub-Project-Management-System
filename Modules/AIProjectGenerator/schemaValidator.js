@@ -240,6 +240,29 @@ const ClarifyResponseSchema = z.object({
     plan: PlanSchema,
 });
 
+// ─── Tasks-into-existing-project plan ──────────────────────────────────
+//
+// For the "AI Assistant for task creation" flow (AHE-3777): the project
+// already exists, with its statuses and task types. So the plan is sprints
+// + tasks ONLY — no project / status / type invention. Reuses SprintSchema
+// (and thus TaskSchema, including the 5-block description skeleton). The
+// orchestrator forces new tasks into the project's first status column and
+// falls back to its first task type, so task.status / TaskTypeKey are
+// advisory; we only enforce structure + the total-task safety cap here.
+const TasksPlanSchema = z.object({
+    sprints: z.array(SprintSchema).min(1).max(200),
+}).superRefine((plan, ctx) => {
+    const total = plan.sprints.reduce((acc, s) => acc + s.tasks.length, 0);
+    if (total > 2000) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Plan has ${total} tasks; safety cap is 2000.`, path: [] });
+    }
+});
+
+const TasksResponseSchema = z.object({
+    needsClarification: z.literal(false),
+    plan: TasksPlanSchema,
+});
+
 // ─── Clarifying questions schema ───────────────────────────────────────
 //
 // Validates the JSON output of the clarify LLM call (before plan
@@ -402,6 +425,31 @@ function sanitizeMemberIds(plan, allowedIds) {
 }
 
 /**
+ * Member-id sanitizer for the tasks-only plan (no project.LeadUserId).
+ * Drops AssigneeUserId values that aren't current company members.
+ */
+function sanitizeTaskPlanMemberIds(plan, allowedIds) {
+    const removed = [];
+    const filterIds = (arr, label) => {
+        if (!Array.isArray(arr)) return [];
+        const kept = [];
+        for (const id of arr) {
+            if (allowedIds.has(String(id))) kept.push(String(id));
+            else removed.push({ label, id });
+        }
+        return kept;
+    };
+    if (Array.isArray(plan && plan.sprints)) {
+        for (const sprint of plan.sprints) {
+            for (const task of (sprint.tasks || [])) {
+                task.AssigneeUserId = filterIds(task.AssigneeUserId, `task:${task.TaskName}`);
+            }
+        }
+    }
+    return { plan, removed };
+}
+
+/**
  * Tolerant JSON extraction:
  *   - Strips ``` and ```json fences if present.
  *   - Slices from first `{` to last `}` so any prose around the JSON is dropped.
@@ -429,6 +477,9 @@ module.exports = {
     PlanSchema,
     ClarifyResponseSchema,
     ClarifyQuestionsSchema,
+    TasksPlanSchema,
+    TasksResponseSchema,
     sanitizeMemberIds,
+    sanitizeTaskPlanMemberIds,
     tryParseJson,
 };

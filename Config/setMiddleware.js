@@ -157,6 +157,13 @@ const verifyJWTTokenWithCRoute = [
     '/api/v1/ai/project/plan',
     '/api/v1/ai/project/clarify',
     '/api/v1/ai/project/execute',
+    // AHE-3777 — task generation into an existing project lives at
+    // /api/v1/ai/project/:projectId/tasks/{plan,execute}. The :projectId is
+    // mid-path, so an exact entry can't be listed; this prefix (app.use
+    // prefix-matching) covers those sub-routes — and the four explicit paths
+    // above. Safe: nothing public lives under /api/v1/ai/project (the SSE
+    // stream is /api/v1/ai-progress, a different prefix).
+    '/api/v1/ai/project',
     // Personal API tokens (Modules/ApiTokens). app.use prefix-matching
     // covers /:id, /:id/logs and /me too. Routes were previously
     // unauthenticated (trusted body userData) — now JWT-protected; the
