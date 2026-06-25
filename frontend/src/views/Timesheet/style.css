@@ -520,7 +520,7 @@ td .inner_div span:last-child {
 .wf_filter {
   display: flex;
   align-items: center;
-  max-width: 85%;
+  max-width: 75%;
   width: 100%;
   background-color: #fff;
   border: 1px solid #ececec;

@@ -185,6 +185,20 @@
         return getters["projectData/gettaskDetailData"];
     })
 
+    // Subtask completion (AHE-3776): how many of this parent's loaded subtasks
+    // are done (statusType 'close'), used by the progress badge in the task
+    // header and the subtask section. Derived from the same reactive `subTasks`
+    // the detail view already loads, so it stays live — getQueryFun() reloads
+    // the subtasks on every subtask socket update. Only non-deleted subtasks
+    // count; a task with no subtasks yields total 0 and the badge hides itself.
+    const subtaskCompletion = computed(() => {
+        const list = Array.isArray(subTasks.value) ? subTasks.value : [];
+        const valid = list.filter((s) => s && (s.deletedStatusKey === 0 || s.deletedStatusKey === undefined));
+        const total = valid.length;
+        const completed = valid.filter((s) => (s?.status?.type || s?.statusType) === 'close').length;
+        return { total, completed };
+    });
+
     const currentUserId = inject("$userId");
     const user = getUser(currentUserId.value);
     const isSpinner = ref(true);
@@ -514,6 +528,9 @@
         document.removeEventListener('visibilitychange', visibilityHandler);
     })
     provide("selectedProject", projectData);
+    // Shared so both the header badge (TaskDetailAction) and the subtask section
+    // header (SubTasks) read one identical value and never disagree.
+    provide("subtaskCompletion", subtaskCompletion);
 
     function getParentTask() {
         if(task?.value?.ParentTaskId) {
