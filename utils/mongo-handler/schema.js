@@ -314,40 +314,6 @@ const schema = {
             required: true,
         },
     },
-    // Personal sticky notes — per-user quick-capture scratchpad,
-    // company-DB-scoped and private to the owning user. Managed by
-    // Modules/Stickies. Content is plain text (rendered as text, never HTML).
-    stickies: {
-        userId: {
-            type: String,
-            required: true,
-        },
-        title: {
-            type: String,
-            required: false,
-            default: "",
-        },
-        content: {
-            type: String,
-            required: false,
-            default: "",
-        },
-        color: {
-            type: String,
-            required: false,
-            default: "yellow",
-        },
-        sortIndex: {
-            type: Number,
-            required: false,
-            default: 0,
-        },
-        isPinned: {
-            type: Boolean,
-            required: false,
-            default: false,
-        },
-    },
     // Personal API tokens (hashed at rest; prefix shown for identification)
     // — managed by Modules/ApiTokens
     apiTokens: {
