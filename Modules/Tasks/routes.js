@@ -5,7 +5,7 @@ const advanceFilter = require('./helpers/manageGlobalFilter');
 const getTaskCtrl = require('./helpers/getTasksData');
 const { handleEvents } = require('../Company/eventController');
 const logger = require('../../Config/loggerConfig');
-const { requireTaskActionPermission, requirePermission, requireGuestTaskAccess, requireGuestProjectAccess } = require('../../Config/permissionGuard');
+const { requireTaskActionPermission, requirePermission } = require('../../Config/permissionGuard');
 
 exports.init = (app) => {
     app.post('/api/tasks', (req, res) => {
@@ -141,7 +141,7 @@ exports.init = (app) => {
         });
     });
     
-    app.post('/api/v1/tabSyncTask', requireGuestProjectAccess((req) => req.body && req.body.pid), tabSyncTaskCtrl.getTabSyncTasks);
+    app.post('/api/v1/tabSyncTask',tabSyncTaskCtrl.getTabSyncTasks);
 
     app.post('/api/v1/task/filter/create', advanceFilter.saveFilter);
 
@@ -151,9 +151,9 @@ exports.init = (app) => {
 
     app.delete('/api/v1/task/filter/delete/:cid/:id', advanceFilter.deleteFilter);
 
-    app.get('/api/v1/task/:id', requireGuestTaskAccess(), getTaskCtrl.getTask);
+    app.get('/api/v1/task/:id',getTaskCtrl.getTask);
 
-    app.post('/api/v1/task/find', requireGuestProjectAccess(), getTaskCtrl.getTaskByQyery);
+    app.post('/api/v1/task/find', getTaskCtrl.getTaskByQyery);
 
     app.put('/api/v1/task',getTaskCtrl.updateTask);
 

@@ -1382,11 +1382,6 @@ const schema = {
             type: Number,
             required: true
         },
-        guestProjectIds: {
-            type: Array,
-            default: [],
-            required: false
-        },
         sendInvitationTime: {
             type: Number,
             required: false

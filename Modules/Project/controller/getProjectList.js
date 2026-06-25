@@ -2,8 +2,6 @@ const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const {myCache} = require('../../../Config/config');
 const { fetchRules } = require("../../settings/securityPermissions/controller");
-const mongoose = require("mongoose");
-const { ROLE_GUEST } = require("../../Auth/helpers/guestAccessRules");
 
 exports.getProjectList = async (req, res) => {
     try {
@@ -35,7 +33,7 @@ exports.getProjectList = async (req, res) => {
             type: SCHEMA_TYPE.COMPANY_USERS,
             data: [
                 { userId: uid },
-                { roleType: 1, guestProjectIds: 1, _id: 0 }
+                { roleType: 1, _id: 0 }
             ]
         };
         const [teams, companyUsers] = await Promise.all([
@@ -45,22 +43,6 @@ exports.getProjectList = async (req, res) => {
 
         const teamIds = teams.map((team) => 'tId_' + team._id);
         const roleType = companyUsers?.roleType;
-
-        // SEC-01 — a guest (roleType 4) sees ONLY their explicitly-assigned projects.
-        if (roleType === ROLE_GUEST) {
-            const guestIds = (Array.isArray(companyUsers?.guestProjectIds) ? companyUsers.guestProjectIds : [])
-                .map((id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } })
-                .filter(Boolean);
-            const guestQuery = [
-                { $match: { _id: { $in: guestIds }, deletedStatusKey: { $nin: [1] } } },
-                { $project: { legacyId: 0 } },
-            ];
-            if (req.query.skip) guestQuery.push({ $skip: Number(req.query.skip) });
-            if (req.query.limit) guestQuery.push({ $limit: Number(req.query.limit) });
-            const guestProjects = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [guestQuery] }, 'aggregate');
-            myCache.set(cacheKey, JSON.stringify(guestProjects), 480);
-            return res.status(200).json(guestProjects);
-        }
 
         const response = await fetchRules(companyId);
 
