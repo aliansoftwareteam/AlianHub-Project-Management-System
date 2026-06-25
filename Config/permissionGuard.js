@@ -28,7 +28,6 @@ const logger = require("./loggerConfig");
 
 const ROLE_OWNER = 1;
 const ROLE_ADMIN = 2;
-const { isGuest, guestAllowsProject } = require('../Modules/Auth/helpers/guestAccessRules');
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 const ROLE_CACHE_TTL_SECONDS = 60;
 
@@ -275,70 +274,6 @@ const invalidateRoleCache = (companyId, uid) => {
     if (companyId && uid) myCache.del(`roleType:${companyId}:${uid}`);
 };
 
-// SEC-01 — a guest's assigned project ids (from company_users). [] if none/not a guest.
-const getGuestProjectIds = async (companyId, uid) => {
-    try {
-        const cu = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.COMPANY_USERS,
-            data: [{ userId: String(uid) }, { guestProjectIds: 1 }],
-        }, 'findOne');
-        return cu && Array.isArray(cu.guestProjectIds) ? cu.guestProjectIds : [];
-    } catch (error) {
-        logger.error(`getGuestProjectIds error: ${error.message || error}`);
-        return [];
-    }
-};
-
-/**
- * SEC-01 — block a GUEST (roleType 4) from a project outside their assigned set.
- * Unlike requireRole/requirePermission (PAT-only), this enforces for ALL clients
- * (guests are web users); every non-guest passes straight through untouched.
- * `getProjectId(req)` resolves the project id; defaults to common locations.
- */
-const requireGuestProjectAccess = (getProjectId) => async (req, res, next) => {
-    try {
-        const companyId = req.headers['companyid'] || '';
-        const roleType = await getRoleType(companyId, req.uid);
-        if (!isGuest(roleType)) return next();
-        const projectId = typeof getProjectId === 'function'
-            ? getProjectId(req)
-            : (req.params.id || req.params.projectId || (req.body && req.body.projectId) || (req.query && req.query.projectId));
-        const allowed = await getGuestProjectIds(companyId, req.uid);
-        if (guestAllowsProject({ guestProjectIds: allowed, projectId })) return next();
-        return res.status(403).json({ status: false, statusText: 'Access denied: you do not have access to this project.', error: 'Forbidden' });
-    } catch (error) {
-        logger.error(`requireGuestProjectAccess error: ${error.message || error}`);
-        return res.status(403).json({ status: false, statusText: 'Permission check failed.', error: 'Forbidden' });
-    }
-};
-
-/**
- * SEC-01 — block a GUEST from a task whose project is outside their set. Loads
- * the task, reads its ProjectID, and checks membership. Non-guests pass through.
- */
-const requireGuestTaskAccess = (getTaskId) => async (req, res, next) => {
-    try {
-        const companyId = req.headers['companyid'] || '';
-        const roleType = await getRoleType(companyId, req.uid);
-        if (!isGuest(roleType)) return next();
-        const taskId = typeof getTaskId === 'function' ? getTaskId(req) : (req.params.id || (req.body && req.body.taskId));
-        if (!taskId || !OBJECT_ID_PATTERN.test(String(taskId))) {
-            return res.status(403).json({ status: false, statusText: 'Access denied.', error: 'Forbidden' });
-        }
-        const task = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.TASKS,
-            data: [{ _id: new mongoose.Types.ObjectId(String(taskId)) }, { ProjectID: 1 }],
-        }, 'findOne');
-        if (!task) return res.status(404).json({ status: false, statusText: 'Not found.' });
-        const allowed = await getGuestProjectIds(companyId, req.uid);
-        if (guestAllowsProject({ guestProjectIds: allowed, projectId: task.ProjectID })) return next();
-        return res.status(403).json({ status: false, statusText: 'Access denied: this task is in a project you cannot access.', error: 'Forbidden' });
-    } catch (error) {
-        logger.error(`requireGuestTaskAccess error: ${error.message || error}`);
-        return res.status(403).json({ status: false, statusText: 'Permission check failed.', error: 'Forbidden' });
-    }
-};
-
 module.exports = {
     ROLE_OWNER,
     ROLE_ADMIN,
@@ -352,8 +287,4 @@ module.exports = {
     evaluateMany,
     MCP_PERMISSION_KEYS,
     invalidateRoleCache,
-    ROLE_GUEST: 4,
-    getGuestProjectIds,
-    requireGuestProjectAccess,
-    requireGuestTaskAccess,
 };
