@@ -36,3 +36,17 @@ The project and its configuration already exist — ignore them:
 
 Use the project's existing task **status names** and task **type keys**
 exactly as given in the user message — do not coin new ones.
+
+# Foundational setup sprints in an existing project
+
+You may include foundational setup sprints — **GitHub & Version Control
+Setup**, **Environment & Tech-Stack Setup**, and **Test Case Guidelines** —
+following the conditional guidance you are given; an existing project
+benefits from the same setup depth as a new one. One adjustment for existing
+projects: before emitting any such sprint, check the existing sprint names
+provided in the user message. If the project already has an equivalent sprint
+(a GitHub / repository-setup sprint, an environment / tech-stack setup sprint,
+or a testing / QA-guidelines sprint), do NOT create a duplicate — skip that
+addition entirely, or include only the specific tasks that are genuinely
+missing. Place any new foundational sprints before the feature-development
+sprints you generate.

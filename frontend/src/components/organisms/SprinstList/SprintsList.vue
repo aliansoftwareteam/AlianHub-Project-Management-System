@@ -30,7 +30,7 @@
                             + {{$t('Projects.new_task')}}
                         </button>
                     </template>
-                    <div class="d-flex align-items-center ml-10px cursor-pointer" :class="[{'pointer-event-none' : isSpinner}]" v-if="checkApps('AI',project) && 
+                    <div class="d-flex align-items-center ml-10px cursor-pointer suggest-tasks-cta" :class="[{'pointer-event-none' : isSpinner}]" v-if="checkApps('AI',project) &&
                         checkPermission('task.task_list',project?.isGlobalPermission) === true && 
                         checkPermission('task.task_create',project?.isGlobalPermission) === true">
                         <img :src="aiIcon" class="mr-3px" />
@@ -855,6 +855,10 @@ function startTaskTour(key) {
 }
 .ai-generated-task-div{
     border: 1px solid #DFE1E6;
+}
+/* Hide the per-sprint "Suggest Tasks" AI CTA in the list view */
+.suggest-tasks-cta{
+    display: none;
 }
 
 </style>

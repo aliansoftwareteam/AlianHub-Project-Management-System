@@ -81,14 +81,19 @@ const CLARIFY_SYSTEM = composeSystem([
 // ─── PROJECT-TASKS stage (AHE-3777) ────────────────────────────────────
 //
 // Generates sprints + tasks for an EXISTING project (no project/status/type
-// invention). Reuses the same role + sprint/task guidance + member/output
-// rules as the project-plan stage, but swaps the framing (project-tasks/
-// system.md) and the schema (project-tasks/schema.md — sprints only).
+// invention). Reuses the same role + sprint/task guidance + the conditional
+// special-sprints guidance (GitHub / Environment & Tech-Stack / Test-Case
+// foundational sprints) + member/output rules as the project-plan stage, but
+// swaps the framing (project-tasks/system.md) and the schema
+// (project-tasks/schema.md — sprints only). The existing-project guard inside
+// project-tasks/system.md keeps it from duplicating a setup sprint the project
+// already has.
 const PROJECT_TASKS_SYSTEM = composeSystem([
     'role-pm.md',
     ['project-tasks', 'system.md'],
     ['project-plan', 'workflow-guidance.md'],
     ['project-plan', 'sprint-guidance.md'],
+    ['project-plan', 'special-sprints-guidance.md'],
     ['project-plan', 'task-guidance.md'],
     'member-rule.md',
     ['project-tasks', 'schema.md'],
