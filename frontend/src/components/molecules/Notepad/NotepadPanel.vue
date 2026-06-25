@@ -1,25 +1,25 @@
 <template>
     <div v-if="modelValue" class="notepad__overlay" @click.self="close">
         <div class="notepad__panel" @click="openMenuId = null">
-            <div class="d-flex align-items-center justify-content-between notepad__head">
-                <span class="font-size-16 font-weight-700">{{ $t('Notepad.title') }}</span>
-                <div class="d-flex align-items-center">
-                    <button class="btn-primary font-size-12 mr-10px notepad__add-btn" :disabled="isBusy" @click="addNote">+ {{ $t('Notepad.add') }}</button>
-                    <span class="cursor-pointer font-size-16 notepad__close" @click="close">&#10005;</span>
+            <div class="notepad__head">
+                <span class="notepad__title">{{ $t('Notepad.title') }}</span>
+                <div class="notepad__head-actions">
+                    <button class="notepad__add" :disabled="isBusy" @click="addNote">+ {{ $t('Notepad.add') }}</button>
+                    <button class="notepad__close" @click="close" aria-label="Close">&#10005;</button>
                 </div>
             </div>
 
-            <p class="gray81 font-size-11 notepad__hint">{{ $t('Notepad.hint') }}</p>
+            <p class="notepad__hint">{{ $t('Notepad.hint') }}</p>
 
-            <div v-if="isLoading" class="gray81 font-size-12 notepad__empty">{{ $t('Notepad.loading') }}</div>
-            <div v-else-if="!notes.length" class="gray81 font-size-12 notepad__empty">{{ $t('Notepad.empty') }}</div>
+            <div v-if="isLoading" class="notepad__state">{{ $t('Notepad.loading') }}</div>
+            <div v-else-if="!notes.length" class="notepad__state notepad__state--empty">{{ $t('Notepad.empty') }}</div>
 
             <div v-else class="notepad__list">
                 <div
                     v-for="note in notes"
                     :key="note._id"
                     class="notepad__note"
-                    :class="{ 'notepad__note--menu-open': openMenuId === note._id }"
+                    :class="{ 'notepad__note--menu-open': openMenuId === note._id, 'notepad__note--converted': note.convertedTaskId }"
                 >
                     <div class="notepad__note-head">
                         <span v-if="note.convertedTaskId" class="notepad__badge" :title="$t('Notepad.converted_badge')">&#10003; {{ $t('Notepad.converted_badge') }}</span>
@@ -36,7 +36,7 @@
 
                     <input
                         v-model="note.title"
-                        class="notepad__title"
+                        class="notepad__note-title"
                         :placeholder="$t('Notepad.title_placeholder')"
                         :maxlength="250"
                         @input="scheduleSave(note)"
@@ -199,90 +199,181 @@ function remove(note) {
 .notepad__overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.35);
+    background: rgba(17, 24, 39, 0.38);
+    backdrop-filter: blur(2px);
     z-index: 1000;
     display: flex;
     justify-content: flex-end;
+    font-family: 'Roboto', sans-serif;
 }
 .notepad__panel {
-    background: #fff;
-    width: min(400px, 92vw);
+    background: #f6f8fc;
+    width: min(420px, 94vw);
     height: 100%;
-    padding: 16px 18px;
+    padding: 20px 18px 26px;
     overflow-y: auto;
-    box-shadow: -8px 0 30px rgba(0, 0, 0, 0.18);
+    border-radius: 18px 0 0 18px;
+    box-shadow: -16px 0 48px rgba(20, 30, 60, 0.20);
+    animation: notepad-slide-in 0.22s ease;
 }
-.notepad__head { margin-bottom: 6px; }
-.notepad__add-btn { color: #fff; }
-.notepad__close { color: #9a9a9a; }
-.notepad__close:hover { color: #e84a4a; }
-.notepad__hint { margin: 0 0 14px; }
-.notepad__empty { padding: 32px 12px; text-align: center; }
-.notepad__list { display: flex; flex-direction: column; gap: 12px; }
+@keyframes notepad-slide-in {
+    from { transform: translateX(26px); opacity: 0.5; }
+    to { transform: translateX(0); opacity: 1; }
+}
+/* Header */
+.notepad__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.notepad__title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1b2233;
+    letter-spacing: -0.2px;
+}
+.notepad__head-actions { display: flex; align-items: center; gap: 8px; }
+.notepad__add {
+    border: none;
+    cursor: pointer;
+    color: #fff;
+    background: linear-gradient(120deg, #4d7cff, #6a5cff);
+    border-radius: 9px;
+    padding: 7px 14px;
+    font-size: 12.5px;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(77, 124, 255, 0.34);
+    transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+}
+.notepad__add:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(77, 124, 255, 0.42); }
+.notepad__add:active { transform: translateY(0); }
+.notepad__add:disabled { opacity: 0.55; cursor: default; box-shadow: none; transform: none; }
+.notepad__close {
+    border: none;
+    background: transparent;
+    color: #9aa1b2;
+    font-size: 15px;
+    cursor: pointer;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+.notepad__close:hover { background: #fdeaea; color: #e84a4a; }
+.notepad__hint { margin: 4px 0 16px; color: #8b91a0; font-size: 11.5px; line-height: 1.5; }
+/* States */
+.notepad__state {
+    color: #9aa1b2;
+    font-size: 12.5px;
+    text-align: center;
+    padding: 40px 16px;
+}
+.notepad__state--empty {
+    border: 1px dashed #d7dbe6;
+    border-radius: 14px;
+    background: #fff;
+}
+/* List + cards */
+.notepad__list { display: flex; flex-direction: column; gap: 14px; }
 .notepad__note {
     position: relative;
-    border: 1px solid #ececf0;
-    border-radius: 8px;
-    padding: 10px;
-    background: #fcfcfd;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    border: 1px solid #ebedf3;
+    border-radius: 14px;
+    padding: 12px 14px 14px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(20, 30, 60, 0.05);
     display: flex;
     flex-direction: column;
+    transition: box-shadow 0.16s ease, transform 0.16s ease, border-color 0.16s ease;
+}
+.notepad__note::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 14px;
+    bottom: 14px;
+    width: 3px;
+    border-radius: 3px;
+    background: linear-gradient(#4d7cff, #6a5cff);
+    opacity: 0.85;
+}
+.notepad__note:hover {
+    box-shadow: 0 8px 22px rgba(20, 30, 60, 0.10);
+    transform: translateY(-1px);
+    border-color: #dfe3ee;
 }
 .notepad__note--menu-open { z-index: 5; }
+.notepad__note--converted::before { background: linear-gradient(#2e7d32, #43a047); }
 .notepad__note-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    min-height: 18px;
-    margin-bottom: 2px;
+    min-height: 20px;
+    margin-bottom: 4px;
 }
 .notepad__badge {
     font-size: 10px;
-    font-weight: 600;
-    color: #2e7d32;
-    background: #e7f5e8;
-    border-radius: 10px;
-    padding: 2px 8px;
+    font-weight: 700;
+    color: #1e7a35;
+    background: #e7f7ec;
+    border: 1px solid #c7ebcf;
+    border-radius: 20px;
+    padding: 2px 9px;
+    letter-spacing: 0.2px;
 }
 .notepad__menu-btn {
     background: transparent;
     border: none;
     cursor: pointer;
-    padding: 0 2px;
+    padding: 2px;
     line-height: 1;
+    width: 26px;
+    height: 24px;
+    border-radius: 7px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.12s ease;
 }
+.notepad__menu-btn:hover { background: #f0f2f7; }
 .notepad__menu {
     position: absolute;
-    top: 26px;
-    right: 8px;
+    top: 30px;
+    right: 10px;
     z-index: 10;
     background: #fff;
-    border: 1px solid #e6e6e6;
-    border-radius: 8px;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+    border: 1px solid #ececf0;
+    border-radius: 10px;
+    box-shadow: 0 10px 28px rgba(20, 30, 60, 0.18);
     padding: 6px;
-    min-width: 150px;
+    min-width: 158px;
 }
 .notepad__menu-item {
     font-size: 13px;
-    color: #3a3a3a;
-    padding: 7px 8px;
-    border-radius: 6px;
+    color: #3a3f4d;
+    padding: 8px 10px;
+    border-radius: 7px;
     cursor: pointer;
+    transition: background 0.1s ease;
 }
-.notepad__menu-item:hover { background: #f5f6fa; }
+.notepad__menu-item:hover { background: #f4f6fb; }
 .notepad__menu-item--danger { color: #e84a4a; }
-.notepad__title {
+.notepad__menu-item--danger:hover { background: #fdeaea; }
+.notepad__note-title {
     background: transparent;
     border: none;
     outline: none;
     width: 100%;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 700;
-    color: #2b2b2b;
-    margin-bottom: 4px;
+    color: #20263a;
+    padding: 2px 0;
+    margin-bottom: 2px;
 }
+.notepad__note-title::placeholder { color: #b6bccb; font-weight: 600; }
 .notepad__text {
     background: transparent;
     border: none;
@@ -290,20 +381,27 @@ function remove(note) {
     outline: none;
     width: 100%;
     font-size: 13px;
-    color: #3a3a3a;
-    line-height: 1.4;
-    min-height: 70px;
+    color: #515869;
+    line-height: 1.5;
+    min-height: 64px;
+    padding: 2px 0;
 }
+.notepad__text::placeholder { color: #b6bccb; }
 .notepad__convert-btn {
     align-self: flex-start;
-    margin-top: 8px;
-    background: #eef0ff;
-    color: #1b1b38;
+    margin-top: 10px;
+    background: #eef2ff;
+    color: #3856d6;
     border: none;
-    border-radius: 6px;
-    padding: 5px 12px;
+    border-radius: 8px;
+    padding: 6px 14px;
     font-size: 12px;
+    font-weight: 600;
     cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease;
 }
-.notepad__convert-btn:hover { background: #e2e5ff; }
+.notepad__convert-btn:hover { background: #e0e7ff; color: #2b44b8; }
+.notepad__panel::-webkit-scrollbar { width: 7px; }
+.notepad__panel::-webkit-scrollbar-thumb { background: #d3d8e4; border-radius: 7px; }
+.notepad__panel::-webkit-scrollbar-track { background: transparent; }
 </style>
