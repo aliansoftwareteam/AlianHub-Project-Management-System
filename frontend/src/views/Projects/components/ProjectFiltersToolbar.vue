@@ -379,4 +379,23 @@ const groupIcon = require('@/assets/images/peopleGray.png');
     font-size: 13px;
     line-height: 1;
 }
+
+/* Keep the filter/action row on a single line (desktop). The global .mr-1
+   gap is 16px (1rem); with ~6 action buttons that was wide enough that adding
+   the "AI Assist" pill pushed the whole action group onto a second line.
+   Tighten the gaps to 8px, and stop the wrapper from wrapping the action group
+   below the search — the group already scrolls horizontally (overflow:auto)
+   when space is tight, so it stays on one line instead of dropping down. */
+@media (min-width: 768px) {
+    .task-filtersearchassignee-wrapper {
+        flex-wrap: nowrap !important;
+    }
+    .task-filter-assignee {
+        flex: 1 1 0%;
+        min-width: 0;
+    }
+    .task-filter-assignee > :deep(.mr-1) {
+        margin-right: 8px;
+    }
+}
 </style>
