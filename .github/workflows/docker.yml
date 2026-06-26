@@ -30,11 +30,6 @@ on:
   release:
     types: [published]
 
-  # Build + publish image on every commit to main (after a PR merges)
-  push:
-    branches:
-      - main
-
   # Manual trigger from the Actions UI
   workflow_dispatch:
 
