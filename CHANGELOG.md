@@ -16,6 +16,39 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.6.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.5.0...v14.6.0) (2026-06-26)
+
+
+### 🚀 Features
+
+* AI Assist — plan a project (sprints + tasks) with AI (AHE-3777) ([20685f3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/20685f396b08f8f3fa94e995f7e3c851378628e9))
+* **ai-assist:** richer task plans and hide list-view suggest-tasks link ([0065682](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/00656822db4b3ff589db1e4cebbf12b18a53c4f2))
+* plan sprints and tasks with AI for an existing project (AHE-3777) ([4cc6415](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4cc64155c962f0c41bd1fed458d78d610a229011))
+* show subtask completion percentage badge on parent tasks (AHE-3776) ([8c2a3f6](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8c2a3f6d34a34afddd0f6bbc03bc48e2a92486a8))
+* show subtask completion percentage badge on parent tasks (AHE-3776) ([3d4ef75](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3d4ef756f6692083ea75e34f74d34f517cbce508))
+
+
+### 🐛 Bug Fixes
+
+* **ai-assist:** show AI-created sprints and tasks live without reload ([85e5441](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/85e54413fb4b898d6ef7fc3028bf012a825ddba9))
+* **email:** send via AWS SES instead of SMTP/Resend (BUG-041) ([0dac7db](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0dac7db0983c21b3ca9fdbbf73be4e589b4e93f1))
+* force-hide list-view Suggest Tasks CTA in production ([07ba4f8](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/07ba4f8763f036e75960820bb31f5c70c94c8751))
+* keep list-view filter toolbar on a single line (AHE-3783) ([cbfaf45](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/cbfaf45da4f64b001288d9b610bdde86c5575118))
+* list-view filter actions hidden on sub-desktop widths (AHE-3783) ([171382f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/171382fcbb56ade69b0d3ed8dba9e2c3c4d746f2))
+* **notes:** resolve notes by authenticated user + modern Notepad UI ([5c02d4c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5c02d4c5950a2ac8205e6ddbcfe056aa4ebd706e))
+* **notes:** resolve notes by authenticated user + modern Notepad UI ([a17024b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a17024b572bbaa335f62840b57c27699c117f703))
+* **projects:** force-hide list-view Suggest Tasks CTA in production ([b29d6b6](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b29d6b6ee755de012a15aab33574fe5146b37496))
+* **projects:** keep list-view filter toolbar on a single line ([59c13c4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/59c13c4e790ba5c5726b5b28dfb6c6961670da45))
+* **projects:** list-view filter actions hidden on sub-desktop widths ([8c0a9a0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8c0a9a0fb4f4607699c85e7302212ddd136a5f63))
+* **projects:** make project view-tabs responsive and readable ([23936ac](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/23936aca9da995a0b7cd9ac382e1d46e43900d24))
+* **projects:** make project view-tabs responsive and readable ([7e87e1b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7e87e1b3d5111afb0cce51bddb49d9bd9530bddf))
+* **rbac:** remove SEC-01 guest-role scoping that broke dynamic roles ([3846541](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3846541ddc1254e331099c3a068d611ee3e501e7))
+* **rbac:** remove SEC-01 guest-role scoping that broke dynamic roles ([3ad3b9a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3ad3b9a8a71733b4012c8dcb6239c25b5a76a61a))
+* send email via AWS SES instead of SMTP/Resend (BUG-041) ([4f08749](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4f087498c8a966ea60d68577ca4d8fa816cf8d37))
+* show AI-created sprints and tasks live without reload (AHE-3777) ([dc536d6](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/dc536d6ddf1d3a7e73c979321cc5f8ecd8737536))
+* **timesheet:** tidy the User Timesheet header toolbar layout ([39db515](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/39db51544988bbb2203f9f14fb8c0f431ffc9357))
+* **timesheet:** tidy the User Timesheet header toolbar layout ([fa250ba](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fa250ba42ee3cf7b7a643db84ba11b8ffc43c43c))
+
 ## [14.5.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.4.0...v14.5.0) (2026-06-23)
 
 
