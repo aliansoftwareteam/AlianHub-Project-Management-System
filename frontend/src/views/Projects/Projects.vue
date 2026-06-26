@@ -310,7 +310,7 @@
                                 @defaultMonth="defaultMonth"
                             />
                             <!-- AI Assist (AHE-3777): project-level AI task generation, opened from the toolbar. -->
-                            <AiTaskCreator v-if="projectData && projectData._id" v-model="showAiTaskCreator" :projectId="String(projectData._id)" />
+                            <AiTaskCreator v-if="projectData && projectData._id" v-model="showAiTaskCreator" :projectId="String(projectData._id)" @done="onAiTasksCreated" />
                             <component
                                 v-if="(clientWidth <= 767 && isVisible == true && isRuleData == false) || (clientWidth > 767 && isRuleData == false)"
                                 :class="[{'showProjectDetailRight':activeTab !== 'ProjectListView' && activeTab !== 'Calendar' && activeTab != 'EmbedViewItem' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports' && activeTab !== 'GanttView' && activeTab !== 'RecurringTasks' && activeTab !== 'TimelineView' && activeTab !== 'MindMapView' && activeTab !== 'WhiteboardView' && activeTab !== 'CanvasView' && activeTab !== 'MapView'}]"
@@ -746,6 +746,37 @@ function closeSidebar(value) {
 const openAiCreator = () => {
     isActiveAiCreator.value = true;
 };
+// AI Assist creates the sprints + tasks server-side; there is no sprint socket,
+// so the live refresh is a forced re-fetch. getSprintData caches per project and
+// would otherwise skip the GET, so the AI sprints only showed after a full
+// reload (empty store). We pass forceRefresh=true to bypass that guard, rebuild
+// the project's sprint tree, and give projectData a fresh reference so the list
+// watcher re-runs. We retry briefly until the expected new sprints arrive
+// (totals.sprints from the 'done' event); each rendered sprint loads its tasks.
+async function onAiTasksCreated(totals) {
+    const proj = projectData.value;
+    if (!proj || !proj._id || !projectList.value || typeof projectList.value.getSprintFolderData !== 'function') return;
+    const pid = String(proj._id);
+    const sprintCount = () => {
+        const p = getters['projectData/projects']?.data?.find((x) => x._id === pid);
+        return p && p.sprintsObj ? Object.keys(p.sprintsObj).length : 0;
+    };
+    const expectedNew = (totals && Number(totals.sprints)) || 0;
+    const target = sprintCount() + expectedNew;
+    let prev = -1;
+    for (let attempt = 0; attempt < 10; attempt++) {
+        await projectList.value.getSprintFolderData(pid, true, true);
+        const fresh = getters['projectData/projects']?.data?.find((p) => p._id === pid);
+        if (fresh) projectData.value = { ...fresh };
+        const now = sprintCount();
+        // Stop once the expected new sprints have arrived; if totals is missing,
+        // stop when the count stops growing across two consecutive fetches.
+        if (expectedNew ? now >= target : (attempt > 0 && now === prev)) break;
+        prev = now;
+        await new Promise((r) => setTimeout(r, 600));
+    }
+}
+
 async function onAiProjectCreated({ projectId }) {
     if (!projectId) {
         isActiveAiCreator.value = false;
