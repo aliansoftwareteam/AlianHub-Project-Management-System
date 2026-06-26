@@ -16,6 +16,28 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.6.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.5.0...v14.6.0) (2026-06-26)
+
+
+### 🚀 Features
+
+* AI Assist — plan sprints and tasks with AI for an existing project (AHE-3777) ([20685f3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/20685f396b08f8f3fa94e995f7e3c851378628e9))
+* AI Assist — richer task plans and hide the list-view "Suggest Tasks" link ([0065682](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/00656822db4b3ff589db1e4cebbf12b18a53c4f2))
+* Subtask completion-percentage badge on parent tasks (AHE-3776) ([3d4ef75](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3d4ef756f6692083ea75e34f74d34f517cbce508))
+
+
+### 🐛 Bug Fixes
+
+* AI Assist — show AI-created sprints and tasks live without reload (AHE-3777) ([85e5441](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/85e54413fb4b898d6ef7fc3028bf012a825ddba9))
+* Email — send via AWS SES instead of SMTP/Resend (BUG-041) ([0dac7db](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0dac7db0983c21b3ca9fdbbf73be4e589b4e93f1))
+* Projects — force-hide the list-view "Suggest Tasks" CTA in production ([b29d6b6](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b29d6b6ee755de012a15aab33574fe5146b37496))
+* Projects — keep the filter toolbar on a single line (AHE-3783) ([59c13c4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/59c13c4e790ba5c5726b5b28dfb6c6961670da45))
+* Projects — filter actions were hidden on sub-desktop widths (AHE-3783) ([8c0a9a0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8c0a9a0fb4f4607699c85e7302212ddd136a5f63))
+* Projects — make project view-tabs responsive and readable ([7e87e1b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7e87e1b3d5111afb0cce51bddb49d9bd9530bddf))
+* Notes — resolve notes by authenticated user + modern Notepad UI ([a17024b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a17024b572bbaa335f62840b57c27699c117f703))
+* RBAC — remove SEC-01 guest-role scoping that broke dynamic roles ([3ad3b9a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3ad3b9a8a71733b4012c8dcb6239c25b5a76a61a))
+* Timesheet — tidy the User Timesheet header toolbar layout ([fa250ba](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fa250ba42ee3cf7b7a643db84ba11b8ffc43c43c))
+
 ## [14.5.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.4.0...v14.5.0) (2026-06-23)
 
 
