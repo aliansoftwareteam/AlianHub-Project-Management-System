@@ -856,9 +856,13 @@ function startTaskTour(key) {
 .ai-generated-task-div{
     border: 1px solid #DFE1E6;
 }
-/* Hide the per-sprint "Suggest Tasks" AI CTA in the list view */
+/* Hide the per-sprint "Suggest Tasks" AI CTA in the list view.
+   !important is required: the element also carries the `d-flex` utility
+   (display: flex), which has the same specificity (one class, no !important).
+   In the production CSS bundle `.d-flex` lands later and re-shows the button,
+   even though the component style wins in dev hot-reload. */
 .suggest-tasks-cta{
-    display: none;
+    display: none !important;
 }
 
 </style>
