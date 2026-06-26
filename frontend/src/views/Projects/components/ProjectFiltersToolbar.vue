@@ -380,20 +380,13 @@ const groupIcon = require('@/assets/images/peopleGray.png');
     line-height: 1;
 }
 
-/* Keep the filter/action row on a single line (desktop). The global .mr-1
-   gap is 16px (1rem); with ~6 action buttons that was wide enough that adding
-   the "AI Assist" pill pushed the whole action group onto a second line.
-   Tighten the gaps to 8px, and stop the wrapper from wrapping the action group
-   below the search — the group already scrolls horizontally (overflow:auto)
-   when space is tight, so it stays on one line instead of dropping down. */
+/* Tighten the gaps between the desktop action buttons so the row is less
+   crowded — the global .mr-1 gap is 16px (1rem); 8px reads better. This is
+   spacing only: we deliberately do NOT force the row onto a single line. An
+   earlier attempt used flex-wrap:nowrap + a scrollable (flex:1 / min-width:0)
+   action group, which HID the buttons that didn't fit on screens narrower than
+   a full desktop. Leaving the group free to wrap keeps every option visible. */
 @media (min-width: 768px) {
-    .task-filtersearchassignee-wrapper {
-        flex-wrap: nowrap !important;
-    }
-    .task-filter-assignee {
-        flex: 1 1 0%;
-        min-width: 0;
-    }
     .task-filter-assignee > :deep(.mr-1) {
         margin-right: 8px;
     }
