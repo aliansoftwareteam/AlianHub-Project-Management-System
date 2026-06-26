@@ -63,9 +63,6 @@
                 <span :class="{'notification-tick': totalMentions > 0}" class="blinking"></span>
             </div>
             <div class="position-re" :class="{'mr-2' : clientWidth > 1440, 'mr-1' : clientWidth<=1440}" v-if="rules && Object.keys(rules).length">
-                <img src="@/assets/images/svg/sticky_note_icon.svg" class="cursor-pointer" id="stickies_driver" :title="$t('Stickies.title')" @click="stickiesVisible = true">
-            </div>
-            <div class="position-re" :class="{'mr-2' : clientWidth > 1440, 'mr-1' : clientWidth<=1440}" v-if="rules && Object.keys(rules).length">
                 <img src="@/assets/images/svg/notepad_icon.svg" class="cursor-pointer" id="notepad_driver" :title="$t('Notepad.title')" @click="notepadVisible = true">
             </div>
             <div class="position-re" :class="{'mr-2' : clientWidth > 1440, 'mr-1' : clientWidth<=1440}" v-if="rules && Object.keys(rules).length">
@@ -108,8 +105,6 @@
                 v{{version}}
             </span>
         </div>
-
-        <StickiesPanel v-model="stickiesVisible" />
 
         <NotepadPanel v-model="notepadVisible" />
 
@@ -354,7 +349,6 @@ import { useCustomComposable, useGetterFunctions } from "@/composable/index.js";
 import NavLinks from "@/components/organisms/NavLinks/NavLinks.vue";
 import WasabiIamgeCompp from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue"
 import Sidebar from "@/components/molecules/Sidebar/Sidebar.vue";
-import StickiesPanel from "@/components/molecules/Stickies/StickiesPanel.vue";
 import NotepadPanel from "@/components/molecules/Notepad/NotepadPanel.vue";
 import ClipsPanel from "@/components/molecules/Clips/ClipsPanel.vue";
 import ClipRecorder from "@/components/molecules/ClipRecorder/ClipRecorder.vue";
@@ -460,7 +454,6 @@ const visible = ref(false);
 const showNotification = ref(0);
 const notificationVisible = ref(false);
 const tourVisible = ref(false);
-const stickiesVisible = ref(false);
 const notepadVisible = ref(false);
 const clipsVisible = ref(false);
 const myCounts = computed(() => getters["users/myCounts"]?.data || {})

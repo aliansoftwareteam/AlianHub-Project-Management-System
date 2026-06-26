@@ -6,7 +6,18 @@
         </div> -->
         <div class="overflow-auto style-scroll mobile__bg--withPadding mt-10px">
             <div class="w-100 d-flex align-items-center justify-content-between">
-                <span :class="{'font-size-16 font-weight-600' : clientWidth <= 767 , 'font-size-14 font-weight-700' : clientWidth > 767 }" class="font-weight-700 font-size-14">{{$t('ProjectDetails.subtask')}}</span>
+                <div class="d-flex align-items-center">
+                    <span :class="{'font-size-16 font-weight-600' : clientWidth <= 767 , 'font-size-14 font-weight-700' : clientWidth > 767 }" class="font-weight-700 font-size-14">{{$t('ProjectDetails.subtask')}}</span>
+                    <!-- Subtask completion badge (AHE-3776): % of subtasks done, with a
+                         mini progress bar and done/total count, right above the list. -->
+                    <SubtaskProgressBadge
+                        v-if="subtaskCompletion && subtaskCompletion.total"
+                        :completed="subtaskCompletion.completed"
+                        :total="subtaskCompletion.total"
+                        variant="bar"
+                        class="ml-10px"
+                    />
+                </div>
                 <div class="d-flex align-items-center">
                     <div class="d-flex align-items-center" @click="sugestSubTask()" v-if="checkApps('AI',project) && checkPermission('task.sub_task_create',project?.isGlobalPermission) === true">
                         <img :src="aiIcon" class="mr-3px" />
@@ -92,6 +103,7 @@ import {computed,defineProps, inject, nextTick, ref,watch} from "vue";
 import SubTaskItem from "@/components/molecules/SubTaskItem/SubTaskItem.vue"
 import CreateTask from "@/components/atom/CreateTask/CreateTask.vue"
 import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp'
+import SubtaskProgressBadge from '@/components/atom/SubtaskProgressBadge/SubtaskProgressBadge.vue'
 import { useCustomComposable } from "@/composable";
 import { useToast } from "vue-toast-notification";
 import taskClass from "@/utils/TaskOperations"
@@ -136,6 +148,8 @@ const skip = ref(0);
 const limit = ref(35);
 const clientWidth = inject("$clientWidth");
 const project = inject("selectedProject");
+// Provided by TaskDetail.vue — { total, completed } for the subtask % badge.
+const subtaskCompletion = inject('subtaskCompletion', null);
 const subTasksList = ref([]);
 const isSpinner = ref(false);
 const isSpinnerSuggest = ref(false);

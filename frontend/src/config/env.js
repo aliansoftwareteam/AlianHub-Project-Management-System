@@ -41,6 +41,9 @@ module.exports.AI_PROJECT_PLAN = "/api/v1/ai/project/plan";
 module.exports.AI_PROJECT_CLARIFY = "/api/v1/ai/project/clarify";
 module.exports.AI_PROJECT_EXECUTE = "/api/v1/ai/project/execute";
 module.exports.AI_PROJECT_EVENTS = "/api/v1/ai-progress";
+// AHE-3777 — AI task generation into an EXISTING project. projectId is a
+// path segment: `${AI_PROJECT_TASKS_BASE}/${projectId}/tasks/plan|execute`.
+module.exports.AI_PROJECT_TASKS_BASE = "/api/v1/ai/project";
 // "Write with AI" for the task/project description editor (Modules/AI)
 module.exports.AI_WRITE_DESCRIPTION = "/api/v1/ai/description";
 module.exports.WASABI_UPLOAD_FILE = "/api/v1/wasabi/uploadFile";

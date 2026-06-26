@@ -30,8 +30,8 @@
             </div>
         </div>
         <div class="timesheet__wrapper page-content" :class="{'pointer-event-none': isSpinner}">
-            <div class="page_top_data  d-flex align-items-center justify-content-between" :class="clientWidth <= 1200 ? 'flex-wrap flex-column align-items-start' : ''">
-                <div class="d-flex" :style="[{width : clientWidth <=1200 ? '100%' : 'calc(100% - 253px)'}]" :class="clientWidth <=767 ? 'flex-column' : ''"> 
+            <div class="page_top_data ut-top d-flex align-items-center justify-content-between" :class="clientWidth <= 1200 ? 'flex-wrap flex-column align-items-start' : ''">
+                <div class="d-flex" :style="clientWidth <= 1200 ? {width:'100%'} : {flex:'1 1 auto', minWidth:'0'}" :class="clientWidth <=767 ? 'flex-column' : ''">
                     <RangePickerComp 
                         class="rangeComp"
                         :class="{'disabled': isSpinner}"
@@ -136,43 +136,46 @@
                         </div>
                     </div>
                 </div>
-                <div class="d-flex align-items-center">
-                    <span class="d-flex align-items-center" :class=" clientWidth <= 1200 ? 'm-0 pt-10px' : 'ml-1 '">
-                    <div class="circlegreen mr-6px"></div>
-                    <span class="font-size-14 GunPowder font-weight-400">{{$t('UserTimesheet.tracked_time')}}</span>
-                </span>
-                <span class="d-flex align-items-center" :class=" clientWidth <=1200 ? 'm-0 pt-10px ml-1' : 'ml-1'">
-                    <div class="circlePurple mr-6px"></div>
-                    <span class="font-size-14 GunPowder font-weight-400">{{ $t('UserTimesheet.manual_time') }}</span>
-                </span>
-                <BillableSummary
-                    class="ml-2"
-                    :period-start="dateRange.startDate"
-                    :period-end="dateRange.endDate"
-                    :user-ids="billableUserIds"
-                />
-                <TimesheetApproval
-                    class="ml-2"
-                    :period-start="dateRange.startDate"
-                    :period-end="dateRange.endDate"
-                    :current-user-id="currentUserId"
-                    :current-user-name="currentUserRef?.Employee_Name || ''"
-                    :role-type="companyUserDetail?.roleType"
-                />
-                <TimesheetExport
-                    class="ml-2"
-                    :period-start="dateRange.startDate"
-                    :period-end="dateRange.endDate"
-                    :user-ids="billableUserIds"
-                    :project-ids="exportProjectIds"
-                />
-                <TimesheetInvoice
-                    class="ml-2"
-                    :period-start="dateRange.startDate"
-                    :period-end="dateRange.endDate"
-                    :user-ids="billableUserIds"
-                />
-            </div>
+                <div class="ut-toolbar d-flex align-items-center">
+                    <div class="ut-legends d-flex align-items-center">
+                        <span class="d-flex align-items-center">
+                            <div class="circlegreen mr-6px"></div>
+                            <span class="font-size-14 GunPowder font-weight-400">{{$t('UserTimesheet.tracked_time')}}</span>
+                        </span>
+                        <span class="d-flex align-items-center">
+                            <div class="circlePurple mr-6px"></div>
+                            <span class="font-size-14 GunPowder font-weight-400">{{ $t('UserTimesheet.manual_time') }}</span>
+                        </span>
+                    </div>
+                    <!-- <span class="ut-divider"></span> -->
+                    <BillableSummary
+                        :period-start="dateRange.startDate"
+                        :period-end="dateRange.endDate"
+                        :user-ids="billableUserIds"
+                    />
+                    <span class="ut-divider"></span>
+                    <TimesheetApproval
+                        :period-start="dateRange.startDate"
+                        :period-end="dateRange.endDate"
+                        :current-user-id="currentUserId"
+                        :current-user-name="currentUserRef?.Employee_Name || ''"
+                        :role-type="companyUserDetail?.roleType"
+                    />
+                    <span class="ut-divider"></span>
+                    <div class="ut-actions d-flex align-items-center">
+                        <TimesheetExport
+                            :period-start="dateRange.startDate"
+                            :period-end="dateRange.endDate"
+                            :user-ids="billableUserIds"
+                            :project-ids="exportProjectIds"
+                        />
+                        <TimesheetInvoice
+                            :period-start="dateRange.startDate"
+                            :period-end="dateRange.endDate"
+                            :user-ids="billableUserIds"
+                        />
+                    </div>
+                </div>
             </div>
             
             <TimesheetView v-if="!isSpinner" :filterType="filterType" :checkedFilter="checkedFilter" v-model="dateColumns" :usersArray="usersArray" :activeWeekObj="activeWeekObj" :tableStyle="tableStyle" @update:getSubItemView="getProjectData" @update:getTaskData="getTaskDataFunction" :isNoRecordShow="(usersArray.length === 0 && !isSpinner) ? true : false"/>
@@ -978,6 +981,28 @@ span.chipusername_wrapper span.user_name {
   height: 10px;
   background-color: #7367F0;
   border-radius: 50%;
+}
+/* ── User-timesheet header toolbar ──────────────────────────────────────
+   The right side accumulated several controls (tracked/manual legend,
+   billable totals, approval, export, invoice) and got crammed into a narrow
+   fixed column. Lay them out as a wrapping, evenly-spaced toolbar with
+   subtle dividers between the logical groups, and let it drop to its own
+   row when space is tight. */
+.ut-top { flex-wrap: wrap; row-gap: 10px; }
+.ut-toolbar {
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px 14px;
+}
+.ut-legends { gap: 14px; }
+.ut-actions { gap: 10px; }
+.ut-divider {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 1px;
+  height: 22px;
+  background: #e3e6ec;
 }
 span.timesheet_user_filter button.dot-btn {
   min-width: 60px;

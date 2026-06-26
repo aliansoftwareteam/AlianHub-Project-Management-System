@@ -58,7 +58,6 @@ const SCHEMA_TYPE = {
     WEBHOOKS: "webhooks",
     WEBHOOK_LOGS: "webhookLogs",
     RECENTVISITS: "recentVisits",
-    STICKIES: "stickies",
     API_TOKENS: "apiTokens",
     API_ACTIVITY_LOGS: "apiActivityLogs",
     EXPORT_JOBS: "exportJobs",
