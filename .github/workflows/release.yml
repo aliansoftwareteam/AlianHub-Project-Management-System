@@ -7,9 +7,12 @@ name: Release
 #   1. Scan new Conventional Commits since the last release
 #   2. Open (or update) a Release PR that bumps the version in
 #      package.json and appends the new CHANGELOG.md section
-#   3. When the Release PR is merged, automatically:
-#      - Create the git tag (e.g. v14.1.0)
-#      - Create the matching GitHub Release with changelog as the body
+#   3. When that Release PR is merged (manifest version bumped), a
+#      deterministic step below cuts the git tag + GitHub Release from the
+#      manifest version. release-please's OWN tagging is unreliable for this
+#      single-package manifest repo (it writes a componentless release block
+#      but looks for it WITH a component → "Expected 1, found 0" → never
+#      tags), so we don't rely on it. See the step comment for details.
 #
 # Workflow → maintainer relationship:
 #   • You merge feature PRs to staging (everyday work)
@@ -43,9 +46,66 @@ jobs:
     name: Cut release
     runs-on: ubuntu-latest
     steps:
-      - name: Run release-please
+      - name: Run release-please (opens / updates the release PR)
+        id: release
         uses: googleapis/release-please-action@v4
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Deterministic tagging ─────────────────────────────────────────
+      # release-please's own tagging is unreliable here (single-package
+      # manifest repo): it writes a componentless release block but then
+      # looks for it WITH a component, logs "Expected 1 releases, only found
+      # 0", and never tags. So we cut the tag + GitHub Release ourselves from
+      # the manifest version. Idempotent — no-op when the version is already
+      # tagged, so it only fires right after a release PR merges.
+      - name: Checkout (for manifest + CHANGELOG)
+        uses: actions/checkout@v4
+
+      - name: Cut tag + GitHub Release when the manifest version is untagged
+        env:
+          # A PAT (if set) makes the created Release trigger docker.yml; falls
+          # back to GITHUB_TOKEN so tagging works even without a PAT configured.
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_PAT || github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="$(jq -r '."."' .release-please-manifest.json)"
+          TAG="v${VERSION}"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists — nothing to cut."
+            exit 0
+          fi
+
+          echo "Cutting $TAG from $GITHUB_SHA"
+
+          # Extract this version's CHANGELOG section, de-duplicating
+          # release-please's merge-commit double-entries (same description,
+          # different commit link) so the notes are clean.
+          awk -v ver="$VERSION" '
+            index($0, "## [" ver "]") == 1 { cap = 1; print; next }
+            cap && index($0, "## [") == 1 { exit }
+            cap {
+              if ($0 ~ /^\* /) { k = $0; sub(/ \(\[.*$/, "", k); if (seen[k]++) next }
+              print
+            }
+          ' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+
+          if [ -s "$RUNNER_TEMP/notes.md" ]; then
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "AlianHub $TAG" --notes-file "$RUNNER_TEMP/notes.md" --latest
+          else
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "AlianHub $TAG" --generate-notes --latest
+          fi
+
+          # Flip the merged release PR's label so the NEXT release isn't
+          # blocked by "untagged, merged release PRs outstanding".
+          gh label create "autorelease: tagged" --color ededed --force >/dev/null 2>&1 || true
+          PR="$(gh pr list --state merged --head release-please--branches--main --json number,labels --limit 10 --jq 'map(select(any(.labels[]; .name == "autorelease: pending"))) | (first | .number) // empty' 2>/dev/null || true)"
+          if [ -n "${PR:-}" ]; then
+            gh pr edit "$PR" --add-label "autorelease: tagged" --remove-label "autorelease: pending" || true
+            echo "Relabeled release PR #$PR → tagged."
+          fi
+
+          echo "✅ Cut $TAG"
