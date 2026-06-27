@@ -11,7 +11,6 @@
   "packages": {
     ".": {
       "release-type": "node",
-      "package-name": "alianhub",
       "changelog-path": "CHANGELOG.md"
     }
   },
