@@ -66,6 +66,15 @@
                         <button type="button" class="aitc__chip" @click="requirements = 'Marketing launch campaign: landing page, email sequence, social content calendar and analytics setup.'">Marketing campaign</button>
                     </div>
 
+                    <!-- Advanced (optional): extra things AI can create when needed -->
+                    <div v-if="mode !== 'sprints'" class="aitc__advanced">
+                        <span class="aitc__advanced-label">Advanced (optional)</span>
+                        <label class="aitc__opt">
+                            <input type="checkbox" v-model="features.subtasks" />
+                            <span>Break tasks into sub-tasks</span>
+                        </label>
+                    </div>
+
                     <div v-if="error" class="aitc__error">{{ error }}</div>
 
                     <div class="aitc__actions">
@@ -97,22 +106,32 @@
                                     <span>{{ sprint.sprintName }}</span>
                                     <span class="aitc__count">{{ (sprint.tasks || []).length }}</span>
                                 </div>
-                                <label v-for="(task, ti) in (sprint.tasks || [])" :key="ti" class="aitc__task" :class="{ 'aitc__task--off': !task.__selected }">
-                                    <input type="checkbox" v-model="task.__selected" />
-                                    <span class="aitc__task-name" :title="task.TaskName">{{ task.TaskName }}</span>
-                                    <span class="aitc__pri" :class="`aitc__pri--${String(task.priority || 'Medium').toLowerCase()}`">{{ task.priority || 'Medium' }}</span>
-                                </label>
+                                <div v-for="(task, ti) in (sprint.tasks || [])" :key="ti">
+                                    <label class="aitc__task" :class="{ 'aitc__task--off': !task.__selected }">
+                                        <input type="checkbox" v-model="task.__selected" />
+                                        <span class="aitc__task-name" :title="task.TaskName">{{ task.TaskName }}</span>
+                                        <span class="aitc__pri" :class="`aitc__pri--${String(task.priority || 'Medium').toLowerCase()}`">{{ task.priority || 'Medium' }}</span>
+                                    </label>
+                                    <div v-if="task.subtasks && task.subtasks.length" class="aitc__subs" :class="{ 'aitc__subs--off': !task.__selected }">
+                                        <div v-for="(st, sti) in task.subtasks" :key="sti" class="aitc__sub">↳ {{ st.TaskName }}</div>
+                                    </div>
+                                </div>
                             </div>
                         </template>
 
                         <!-- tasks: flat list into the chosen sprint -->
                         <template v-else-if="mode === 'tasks'">
                             <div class="aitc__sprint-name"><span>Adding to: {{ targetSprintName || 'sprint' }}</span></div>
-                            <label v-for="(task, ti) in (plan.tasks || [])" :key="ti" class="aitc__task" :class="{ 'aitc__task--off': !task.__selected }">
-                                <input type="checkbox" v-model="task.__selected" />
-                                <span class="aitc__task-name" :title="task.TaskName">{{ task.TaskName }}</span>
-                                <span class="aitc__pri" :class="`aitc__pri--${String(task.priority || 'Medium').toLowerCase()}`">{{ task.priority || 'Medium' }}</span>
-                            </label>
+                            <div v-for="(task, ti) in (plan.tasks || [])" :key="ti">
+                                <label class="aitc__task" :class="{ 'aitc__task--off': !task.__selected }">
+                                    <input type="checkbox" v-model="task.__selected" />
+                                    <span class="aitc__task-name" :title="task.TaskName">{{ task.TaskName }}</span>
+                                    <span class="aitc__pri" :class="`aitc__pri--${String(task.priority || 'Medium').toLowerCase()}`">{{ task.priority || 'Medium' }}</span>
+                                </label>
+                                <div v-if="task.subtasks && task.subtasks.length" class="aitc__subs" :class="{ 'aitc__subs--off': !task.__selected }">
+                                    <div v-for="(st, sti) in task.subtasks" :key="sti" class="aitc__sub">↳ {{ st.TaskName }}</div>
+                                </div>
+                            </div>
                         </template>
 
                         <!-- sprints: names only -->
@@ -165,6 +184,8 @@ const requirements = ref('');
 const plan = ref({ sprints: [] });
 const progressMsg = ref('');
 const error = ref('');
+// Optional capabilities (AI-Assist "Advanced" section). Off by default.
+const features = ref({ subtasks: false });
 
 const targetSprintName = computed(() => {
     const s = (props.sprints || []).find((x) => String(x.id) === String(targetSprintId.value));
@@ -223,6 +244,7 @@ function reset() {
     plan.value = { sprints: [] };
     progressMsg.value = '';
     error.value = '';
+    features.value = { subtasks: false };
 }
 
 // Fresh state each time the modal opens (and picks up the latest active sprint).
@@ -266,6 +288,7 @@ async function generate() {
             additionalRequirements: requirements.value.trim(),
             mode: mode.value,
             targetSprintName: mode.value === 'tasks' ? targetSprintName.value : '',
+            features: features.value,
         });
         const p = res && res.plan;
         if (!planHasContent(p)) {
@@ -431,6 +454,17 @@ function successMessage(totals) {
     background: #fff; font-family: inherit; cursor: pointer;
 }
 .aitc__select:focus { outline: none; border-color: #7C5CFF; }
+
+/* Advanced (optional) section */
+.aitc__advanced { margin-top: 14px; padding-top: 12px; border-top: 1px solid #eef0f5; }
+.aitc__advanced-label { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #9aa1b1; margin-bottom: 8px; }
+.aitc__opt { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #3a4255; cursor: pointer; }
+.aitc__opt input { accent-color: #6a5cff; width: 15px; height: 15px; }
+
+/* Sub-tasks in the preview */
+.aitc__subs { margin: 0 0 4px 30px; }
+.aitc__subs--off { opacity: 0.5; }
+.aitc__sub { font-size: 12px; color: #6b7488; padding: 2px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Textarea with gradient focus ring */
 .aitc__textarea-wrap {

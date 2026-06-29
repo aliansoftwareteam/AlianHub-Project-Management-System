@@ -584,10 +584,10 @@ function applyEdits(plan, edits) {
 // EXISTING project via orchestrator.executeTasksIntoProject. Mirrors
 // callLlmForPlan / generatePlanForJob / exports.plan / exports.execute.
 
-async function callLlmForTasksPlan({ project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName }) {
+async function callLlmForTasksPlan({ project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features }) {
     const provider = getProvider();
     const systemPrompt = buildTasksSystemPrompt();
-    const userMessage = buildTasksUserMessage({ project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName });
+    const userMessage = buildTasksUserMessage({ project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features });
     const ResponseSchema = tasksResponseSchemaForMode(mode);
     const maxTokens = Number(process.env.LLM_MAX_TOKENS_PLAN) || 32000;
 
@@ -654,7 +654,7 @@ async function callLlmForTasksPlan({ project, additionalRequirements, briefText,
     return { result: validated.value, tokens: usedTokens, model: (provider && provider.name) || 'unknown' };
 }
 
-async function generateTasksPlanForJob({ jobId, uid, companyId, projectId, additionalRequirements, briefText, clarifications, mode, targetSprintName }) {
+async function generateTasksPlanForJob({ jobId, uid, companyId, projectId, additionalRequirements, briefText, clarifications, mode, targetSprintName, features }) {
     const emit = (payload) => sseEmitter.emit(jobId, payload);
     try {
         emit({ event: 'progress', phase: 'plan', step: 'context', status: 'started' });
@@ -673,7 +673,7 @@ async function generateTasksPlanForJob({ jobId, uid, companyId, projectId, addit
 
         emit({ event: 'progress', phase: 'plan', step: 'ai', status: 'started' });
         const { result, tokens, model } = await callLlmForTasksPlan({
-            project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName,
+            project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features,
         });
 
         let plan = result.plan;
@@ -748,13 +748,14 @@ exports.tasksPlan = async (req, res) => {
         const clarifications = sanitizeClarifications(req.body && req.body.clarifications);
         const mode = normalizeTasksMode(req.body && req.body.mode);
         const targetSprintName = String((req.body && req.body.targetSprintName) || '').trim().slice(0, 80);
+        const features = (req.body && typeof req.body.features === 'object' && req.body.features) || {};
 
         const jobId = token();
         res.send({ status: true, jobId, queued: true });
 
         setTimeout(() => {
             generateTasksPlanForJob({
-                jobId, uid, companyId, projectId, additionalRequirements, briefText, clarifications, mode, targetSprintName,
+                jobId, uid, companyId, projectId, additionalRequirements, briefText, clarifications, mode, targetSprintName, features,
             }).catch((error) => {
                 logger.error(`AIPG tasks-plan job outer error: ${error && error.message ? error.message : error}`);
                 sseEmitter.emit(jobId, {

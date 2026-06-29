@@ -92,6 +92,18 @@ const DescriptionBlock = z.discriminatedUnion('type', [
     ListBlock,
 ]);
 
+// Sub-task (AI-Assist "Break tasks into sub-tasks"). Lightweight on purpose —
+// just a name + optional priority; it is created under its parent task and
+// needs no 5-block description.
+const SubTaskSchema = z.object({
+    TaskName: z.string().min(2).max(200),
+    // Sub-tasks get a real (but short) description — a paragraph, optionally a
+    // brief steps list — not the full task "What to do / Acceptance criteria"
+    // 5-block skeleton. min(1) so a sub-task is never created description-less.
+    descriptionBlocks: z.array(DescriptionBlock).min(1).max(20),
+    priority: z.enum(['Low', 'Medium', 'High', 'Urgent']).optional(),
+});
+
 const TaskSchema = z.object({
     TaskName: z.string().min(2).max(200),
     descriptionBlocks: z.array(DescriptionBlock).min(5).max(20),
@@ -101,6 +113,8 @@ const TaskSchema = z.object({
     AssigneeUserId: z.array(z.string()).default([]),
     priority: z.enum(['Low', 'Medium', 'High', 'Urgent']),
     estimatedHours: z.number().nonnegative().nullable().optional(),
+    // Optional sub-tasks created under this task (AI-Assist).
+    subtasks: z.array(SubTaskSchema).max(20).optional(),
 }).superRefine((task, ctx) => {
     // Verify the 5-block skeleton:
     //   [0] paragraph (context)

@@ -278,7 +278,7 @@ function buildTasksSystemPrompt() {
  * @param {Array}  [args.members]
  * @param {Array}  [args.clarifications]
  */
-function buildTasksUserMessage({ project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName }) {
+function buildTasksUserMessage({ project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features }) {
     const sections = [];
     const p = project || {};
 
@@ -314,6 +314,13 @@ function buildTasksUserMessage({ project, additionalRequirements, briefText, mem
         }));
         sections.push(
             `Available members (use these ids exactly in AssigneeUserId, otherwise leave it empty):\n${JSON.stringify(slim, null, 2)}`,
+        );
+    }
+
+    // Optional sub-tasks (AI-Assist "Break tasks into sub-tasks").
+    if (features && features.subtasks && mode !== 'sprints') {
+        sections.push(
+            'SUB-TASKS: for any task large enough to warrant breaking down, add an optional "subtasks" array on that task — each entry is { "TaskName": "...", "descriptionBlocks": [ ... ], "priority": "Low|Medium|High" }. Give each sub-task a SHORT description in "descriptionBlocks": at least one paragraph explaining what it involves (a brief ordered list of steps is welcome). It does NOT need the full "What to do" / "Acceptance criteria" skeleton that top-level tasks use. Only add sub-tasks where they genuinely help; omit the array for simple tasks. Never nest sub-tasks under sub-tasks.',
         );
     }
 

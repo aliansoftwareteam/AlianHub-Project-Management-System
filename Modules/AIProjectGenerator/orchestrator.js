@@ -645,7 +645,7 @@ function normalizePriority(raw) {
     return norm || 'MEDIUM';
 }
 
-function buildTaskDoc({ task, projectDoc, sprintDoc, statusByName, taskTypeByKey, creatorUid }) {
+function buildTaskDoc({ task, projectDoc, sprintDoc, statusByName, taskTypeByKey, creatorUid, parentTaskId, subTaskCount }) {
     const id = new mongoose.Types.ObjectId();
     const taskType = taskTypeByKey.get(String(task.TaskTypeKey || '')) || projectDoc.taskTypeCounts[0];
 
@@ -686,7 +686,7 @@ function buildTaskDoc({ task, projectDoc, sprintDoc, statusByName, taskTypeByKey
         dueDateDeadLine: [],
         TaskType: taskType ? (taskType.value || taskType.name || 'task') : 'task',
         TaskTypeKey: taskType ? taskType.key : 0,
-        ParentTaskId: '',
+        ParentTaskId: parentTaskId ? String(parentTaskId) : '',
         ProjectID: projectDoc._id,
         CompanyId: projectDoc.CompanyId,
         status: {
@@ -696,7 +696,8 @@ function buildTaskDoc({ task, projectDoc, sprintDoc, statusByName, taskTypeByKey
         },
         statusType: statusDetails.type,
         statusKey: statusDetails.key,
-        isParentTask: true,
+        isParentTask: !parentTaskId,
+        subTasks: parentTaskId ? 0 : (subTaskCount || 0),
         Task_Leader: taskLeader,
         Task_Priority: normalizePriority(task.priority),
         deletedStatusKey: 0,
@@ -741,14 +742,28 @@ async function reserveTaskKeyRange({ companyId, projectId, count, taskTypeIncrem
 async function createTasksForSprint({ companyId, projectDoc, sprintDoc, tasks, statusByName, taskTypeByKey, creatorUid, userData }) {
     if (!tasks || tasks.length === 0) return [];
 
-    const docs = tasks.map((t) => buildTaskDoc({
-        task: t,
-        projectDoc,
-        sprintDoc,
-        statusByName,
-        taskTypeByKey,
-        creatorUid,
-    }));
+    // Build each top-level task, then its optional sub-tasks (which reference
+    // the parent's generated _id). The parent carries a denormalized `subTasks`
+    // count — set at build time — so the sub-task badge is correct without a
+    // follow-up $inc.
+    const parentDocs = [];
+    const subtaskDocs = [];
+    for (const t of tasks) {
+        const subs = Array.isArray(t.subtasks) ? t.subtasks : [];
+        const parentDoc = buildTaskDoc({
+            task: t, projectDoc, sprintDoc, statusByName, taskTypeByKey, creatorUid,
+            subTaskCount: subs.length,
+        });
+        parentDocs.push(parentDoc);
+        for (const st of subs) {
+            subtaskDocs.push(buildTaskDoc({
+                task: st, projectDoc, sprintDoc, statusByName, taskTypeByKey, creatorUid,
+                parentTaskId: parentDoc._id,
+            }));
+        }
+    }
+    const docs = [...parentDocs, ...subtaskDocs];
+
     const typeIncrements = {};
     for (const d of docs) {
         const k = String(d.TaskTypeKey);
@@ -770,11 +785,13 @@ async function createTasksForSprint({ companyId, projectDoc, sprintDoc, tasks, s
         data: [docs],
     }, 'insertMany');
 
+    // Sprint task count tracks TOP-LEVEL tasks only — sub-tasks are nested
+    // under their parent, not listed directly in the sprint.
     await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.SPRINTS,
         data: [
             { _id: sprintDoc._id },
-            { $inc: { tasks: docs.length } },
+            { $inc: { tasks: parentDocs.length } },
         ],
     }, 'updateOne').catch(() => {});
 
@@ -804,10 +821,10 @@ async function createTasksForSprint({ companyId, projectDoc, sprintDoc, tasks, s
     }
 
     // Estimates run in the background so the orchestrator's progress stream
-    // is not blocked by the per-task LLM calls. Each estimate persists its
-    // own `totalEstimatedTime` update, emits a follow-up socket event, and
-    // logs its own estimate activity-log entry.
-    fireTaskEstimatesInBackground(companyId, docs, userData);
+    // is not blocked by the per-task LLM calls. Only top-level tasks are
+    // estimated — sub-tasks are small, and estimating each would multiply the
+    // per-task LLM calls.
+    fireTaskEstimatesInBackground(companyId, parentDocs, userData);
 
     return docs;
 }
