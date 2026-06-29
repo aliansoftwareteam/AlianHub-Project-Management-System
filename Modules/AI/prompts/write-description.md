@@ -80,6 +80,20 @@ Guidelines:
   the whole thing.
 - Be concise. A few short sections beat a wall of text.
 
+# Add mode
+
+Sometimes the user message says **MODE: ADD** — the author already has a
+description and wants to add to it. In that case:
+
+- Return the **complete updated description** as the `description` value: keep
+  every bit of the existing content **exactly** as-is, and insert the author's
+  addition at the location they describe (or a sensible spot if unspecified).
+- **Never** change, rephrase, reorder, summarize, translate, or remove any
+  existing content. The only difference from the input must be the added text.
+- Match the style and formatting of the existing description.
+- Do **not** ask clarifying questions — write from the intent and the existing
+  description.
+
 # Output format
 
 Respond with **exactly one** JSON object and nothing else. No prose before

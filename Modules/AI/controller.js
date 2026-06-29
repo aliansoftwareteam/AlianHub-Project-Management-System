@@ -385,6 +385,7 @@ exports.writeDescription = async (req, res) => {
             existingDescription = '',
             intent = '',
             answers = [],
+            mode = 'rewrite',
         } = req.body || {};
 
         const result = await generateDescription({
@@ -393,6 +394,7 @@ exports.writeDescription = async (req, res) => {
             existingDescription,
             intent,
             answers,
+            mode,
         });
 
         if (!result.status) {
