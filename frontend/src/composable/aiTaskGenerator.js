@@ -13,11 +13,13 @@ import * as env from '@/config/env';
  */
 export function useAiTaskGenerator() {
 
-    async function generateTasks(projectId, { additionalRequirements, briefId, clarifications } = {}) {
+    async function generateTasks(projectId, { additionalRequirements, briefId, clarifications, mode, targetSprintName } = {}) {
         const res = await apiRequest('post', `${env.AI_PROJECT_TASKS_BASE}/${projectId}/tasks/plan`, {
             additionalRequirements: additionalRequirements || '',
             briefId: briefId || null,
             clarifications: Array.isArray(clarifications) && clarifications.length ? clarifications : null,
+            mode: mode || 'full',
+            targetSprintName: targetSprintName || '',
         });
         // Synchronous fallback if the server ever returns the plan inline.
         if (res.data && res.data.plan) return res.data;
@@ -49,10 +51,12 @@ export function useAiTaskGenerator() {
         });
     }
 
-    async function executeTasks(projectId, { plan, userName } = {}) {
+    async function executeTasks(projectId, { plan, userName, mode, targetSprintId } = {}) {
         const res = await apiRequest('post', `${env.AI_PROJECT_TASKS_BASE}/${projectId}/tasks/execute`, {
             plan,
             userName: userName || '',
+            mode: mode || 'full',
+            targetSprintId: targetSprintId || '',
         });
         return res.data;
     }

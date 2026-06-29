@@ -278,7 +278,7 @@ function buildTasksSystemPrompt() {
  * @param {Array}  [args.members]
  * @param {Array}  [args.clarifications]
  */
-function buildTasksUserMessage({ project, additionalRequirements, briefText, members, clarifications }) {
+function buildTasksUserMessage({ project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName }) {
     const sections = [];
     const p = project || {};
 
@@ -317,9 +317,27 @@ function buildTasksUserMessage({ project, additionalRequirements, briefText, mem
         );
     }
 
-    sections.push(
-        'Reminder: emit ONE JSON object only. needsClarification MUST be false. Include the full "plan" with "sprints" only — there is NO "project" block.',
-    );
+    // Mode-specific output contract — placed LAST (highest format-compliance)
+    // and authoritative over any shape taught earlier in the system prompt.
+    const m = (mode === 'tasks' || mode === 'sprints') ? mode : 'full';
+    if (m === 'tasks') {
+        const tgt = String(targetSprintName || '').trim();
+        sections.push(
+            'OUTPUT MODE — TASKS ONLY.\n'
+            + `The user is adding tasks to the existing sprint${tgt ? ` "${tgt}"` : ''} — do NOT create or name any sprint, and do not duplicate tasks the project may already have.\n`
+            + 'Return ONE JSON object: { "needsClarification": false, "plan": { "tasks": [ ...task objects... ] } } — a FLAT array under "plan.tasks", with NO "sprints" key. Each task uses the full task shape (including the 5-block description).',
+        );
+    } else if (m === 'sprints') {
+        sections.push(
+            'OUTPUT MODE — SPRINTS ONLY.\n'
+            + 'The user only wants sprint structure — NO tasks at all.\n'
+            + 'Return ONE JSON object: { "needsClarification": false, "plan": { "sprints": [ { "sprintName": "..." }, ... ] } } — each sprint has ONLY a "sprintName", and there is NO "tasks" key anywhere.',
+        );
+    } else {
+        sections.push(
+            'Reminder: emit ONE JSON object only. needsClarification MUST be false. Include the full "plan" with "sprints" (each sprint with its "tasks") — there is NO "project" block.',
+        );
+    }
 
     return sections.join('\n\n');
 }

@@ -263,6 +263,38 @@ const TasksResponseSchema = z.object({
     plan: TasksPlanSchema,
 });
 
+// ─── Tasks-only plan (flat list → an existing sprint) ──────────────────
+//
+// Mode "tasks": the user is adding tasks to ONE existing sprint, so there
+// are no sprints to create — just a flat list of tasks (same TaskSchema,
+// 5-block descriptions and all). The orchestrator places them into the
+// chosen sprint. 200 is a generous safety cap.
+const TasksOnlyPlanSchema = z.object({
+    tasks: z.array(TaskSchema).min(1).max(200),
+});
+
+const TasksOnlyResponseSchema = z.object({
+    needsClarification: z.literal(false),
+    plan: TasksOnlyPlanSchema,
+});
+
+// ─── Sprints-only plan (sprint names, no tasks) ────────────────────────
+//
+// Mode "sprints": the user only wants sprint structure created in the
+// project. Each entry is just a name — NO tasks.
+const SprintNameOnlySchema = z.object({
+    sprintName: z.string().min(1).max(80),
+});
+
+const SprintsOnlyPlanSchema = z.object({
+    sprints: z.array(SprintNameOnlySchema).min(1).max(50),
+});
+
+const SprintsOnlyResponseSchema = z.object({
+    needsClarification: z.literal(false),
+    plan: SprintsOnlyPlanSchema,
+});
+
 // ─── Clarifying questions schema ───────────────────────────────────────
 //
 // Validates the JSON output of the clarify LLM call (before plan
@@ -446,6 +478,12 @@ function sanitizeTaskPlanMemberIds(plan, allowedIds) {
             }
         }
     }
+    // Tasks-only plan carries a flat `tasks` array (no sprints).
+    if (Array.isArray(plan && plan.tasks)) {
+        for (const task of plan.tasks) {
+            task.AssigneeUserId = filterIds(task.AssigneeUserId, `task:${task.TaskName}`);
+        }
+    }
     return { plan, removed };
 }
 
@@ -479,6 +517,10 @@ module.exports = {
     ClarifyQuestionsSchema,
     TasksPlanSchema,
     TasksResponseSchema,
+    TasksOnlyPlanSchema,
+    TasksOnlyResponseSchema,
+    SprintsOnlyPlanSchema,
+    SprintsOnlyResponseSchema,
     sanitizeMemberIds,
     sanitizeTaskPlanMemberIds,
     tryParseJson,

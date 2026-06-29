@@ -1080,6 +1080,19 @@ async function loadProjectForTasks(companyId, projectId) {
     return (Array.isArray(rows) && rows[0]) || null;
 }
 
+// Load a single sprint by id (company-scoped, non-deleted) from the SPRINTS
+// collection — the source of truth — rather than the project doc's
+// denormalized `sprintsObj`, which a freshly-loaded project doc may not carry.
+async function loadSprintForTasks(companyId, sprintId) {
+    let oid;
+    try { oid = new mongoose.Types.ObjectId(String(sprintId)); } catch (_e) { return null; }
+    const rows = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.SPRINTS,
+        data: [{ _id: oid, deletedStatusKey: { $ne: 1 } }],
+    }, 'find').catch(() => []);
+    return (Array.isArray(rows) && rows[0]) || null;
+}
+
 async function rollbackTasks({ companyId, tracker }) {
     try {
         if (tracker.tasks.length) {
@@ -1110,9 +1123,12 @@ async function rollbackTasks({ companyId, tracker }) {
  * (which handle task-key reservation, socket emits, history, and background
  * AI time-estimates) against the loaded project doc.
  */
-async function executeTasksIntoProject({ tasksPlan, projectId, companyId, uid, userData, jobId }) {
+async function executeTasksIntoProject({ tasksPlan, projectId, companyId, uid, userData, jobId, mode, targetSprintId }) {
     const tracker = { sprints: [], tasks: [] };
     const emit = (payload) => sseEmitter.emit(jobId, payload);
+    // 'full' (sprints + tasks), 'sprints' (sprints only), 'tasks' (tasks into
+    // an existing sprint). Anything else falls back to the original 'full'.
+    const m = (mode === 'tasks' || mode === 'sprints') ? mode : 'full';
     try {
         emit({ event: 'progress', step: 'project', status: 'started' });
         const projectDoc = await withTimeout(loadProjectForTasks(companyId, projectId), 45000, 'loadProjectForTasks');
@@ -1125,9 +1141,39 @@ async function executeTasksIntoProject({ tasksPlan, projectId, companyId, uid, u
         const taskStatusByName = new Map(projectDoc.taskStatusData.map((s) => [String(s.name).toLowerCase(), { name: s.name, key: s.key, type: s.type }]));
         const taskTypeByKey = new Map((projectDoc.taskTypeCounts || []).map((t) => [String(t.key), t]));
 
-        const sprints = Array.isArray(tasksPlan.sprints) ? tasksPlan.sprints : [];
+        // ── Mode: TASKS ONLY → into an EXISTING sprint ──
+        // No sprint is created; we resolve the target sprint from the project
+        // doc's sprintsObj ({ <sprintId>: { name } }) so we never touch a
+        // pre-existing sprint's identity, only append tasks to it.
+        if (m === 'tasks') {
+            // Resolve the target sprint from the SPRINTS collection (source of
+            // truth). The project doc's denormalized `sprintsObj` can be empty on
+            // a freshly-loaded doc, which is why the earlier id lookup missed.
+            const sprintRow = await withTimeout(loadSprintForTasks(companyId, targetSprintId), 45000, 'loadSprintForTasks');
+            if (!sprintRow) throw new Error('Target sprint not found in this project');
+            // Defensive: keep the tasks in the project they were requested for.
+            const sprintProjectId = String(sprintRow.projectId || sprintRow.ProjectID || sprintRow.projectID || '');
+            if (sprintProjectId && sprintProjectId !== String(projectDoc._id)) {
+                throw new Error('Target sprint is not in this project');
+            }
+            const sprintDoc = { _id: sprintRow._id, name: sprintRow.name || sprintRow.sprintName || 'Sprint' };
+            const tasks = Array.isArray(tasksPlan.tasks) ? tasksPlan.tasks : [];
 
-        // Sprints (sequential) — every plan sprint is created fresh.
+            emit({ event: 'progress', step: 'tasks', status: 'started', total: tasks.length });
+            const created = await createTasksForSprint({
+                companyId, projectDoc, sprintDoc, tasks,
+                statusByName: taskStatusByName, taskTypeByKey, creatorUid: uid, userData,
+            });
+            for (const t of created) tracker.tasks.push(t._id.toString());
+            emit({ event: 'progress', step: 'tasks', status: 'progress', completed: created.length, total: tasks.length });
+
+            try { removeCache('UserProjectData:', true); } catch (_e) { /* ignore */ }
+            emit({ event: 'complete', projectId: String(projectDoc._id), totals: { sprints: 0, tasks: tracker.tasks.length } });
+            return { ok: true, projectId: String(projectDoc._id), totals: { sprints: 0, tasks: tracker.tasks.length } };
+        }
+
+        // ── Modes: FULL and SPRINTS ONLY → create new sprints ──
+        const sprints = Array.isArray(tasksPlan.sprints) ? tasksPlan.sprints : [];
         emit({ event: 'progress', step: 'sprint', status: 'started', total: sprints.length });
         const sprintRecords = [];
         for (const sprint of sprints) {
@@ -1144,7 +1190,14 @@ async function executeTasksIntoProject({ tasksPlan, projectId, companyId, uid, u
         }
         emit({ event: 'progress', step: 'sprint', status: 'done', completed: tracker.sprints.length });
 
-        // Tasks (bulk per sprint).
+        // Sprints-only: stop here — no tasks at all.
+        if (m === 'sprints') {
+            try { removeCache('UserProjectData:', true); } catch (_e) { /* ignore */ }
+            emit({ event: 'complete', projectId: String(projectDoc._id), totals: { sprints: tracker.sprints.length, tasks: 0 } });
+            return { ok: true, projectId: String(projectDoc._id), totals: { sprints: tracker.sprints.length, tasks: 0 } };
+        }
+
+        // Full: tasks (bulk per sprint).
         const totalTasks = sprints.reduce((acc, s) => acc + (s.tasks || []).length, 0);
         let completed = 0;
         emit({ event: 'progress', step: 'tasks', status: 'started', total: totalTasks });

@@ -1,10 +1,13 @@
 <template>
     <!--
-        AI Task Creator (AHE-3777) — generates sprints + tasks into an EXISTING
-        project from the team's requirements, with a review-before-create step.
-        Self-contained: pass `projectId` + v-model the visibility. Teleported to
-        body so the overlay isn't trapped by the list's scroll/transform
-        containers.
+        AI Task Creator (AHE-3777) — generates work into an EXISTING project from
+        the team's requirements, with a review-before-create step. Three modes:
+          • full    — sprints + tasks (default)
+          • tasks   — a flat list of tasks added to a chosen existing sprint
+          • sprints — sprint names only, no tasks
+        Self-contained: pass `projectId` (+ `sprints` / `activeSprintId` for the
+        tasks-mode picker) and v-model the visibility. Teleported to body so the
+        overlay isn't trapped by the list's scroll/transform containers.
     -->
     <Teleport to="body">
         <div v-if="modelValue" class="aitc__overlay" @click.self="close()">
@@ -15,7 +18,7 @@
                         <span class="aitc__badge" aria-hidden="true">✨</span>
                         <div>
                             <div class="aitc__title">Plan with AI</div>
-                            <div class="aitc__subtitle">Drafts the sprints and detailed tasks for this project from your requirements — you review before anything is created.</div>
+                            <div class="aitc__subtitle">Draft sprints and tasks for this project from your requirements — you review before anything is created.</div>
                         </div>
                     </div>
                     <button class="aitc__close" @click="close()" aria-label="Close">&#10005;</button>
@@ -23,17 +26,39 @@
 
                 <!-- STEP: input -->
                 <div v-if="step === 'input'" class="aitc__body">
-                    <label class="aitc__field-label">What should this project include?</label>
+                    <!-- What should AI create? -->
+                    <div class="aitc__modes">
+                        <button type="button" class="aitc__mode" :class="{ 'aitc__mode--on': mode === 'full' }" @click="mode = 'full'">Sprints + tasks</button>
+                        <button
+                            type="button"
+                            class="aitc__mode"
+                            :class="{ 'aitc__mode--on': mode === 'tasks' }"
+                            :disabled="!sprints.length"
+                            :title="!sprints.length ? 'This project has no sprints yet — create a sprint first' : ''"
+                            @click="mode = 'tasks'"
+                        >Tasks only</button>
+                        <button type="button" class="aitc__mode" :class="{ 'aitc__mode--on': mode === 'sprints' }" @click="mode = 'sprints'">Sprints only</button>
+                    </div>
+
+                    <!-- Target sprint (tasks-only mode) -->
+                    <div v-if="mode === 'tasks'" class="aitc__sprint-pick">
+                        <label class="aitc__field-label">Add tasks to sprint</label>
+                        <select v-model="targetSprintId" class="aitc__select">
+                            <option v-for="s in sprints" :key="s.id" :value="s.id">{{ s.name }}</option>
+                        </select>
+                    </div>
+
+                    <label class="aitc__field-label">{{ inputLabel }}</label>
                     <div class="aitc__textarea-wrap">
                         <textarea
                             v-model="requirements"
                             class="aitc__textarea"
                             rows="5"
-                            placeholder="e.g. Build a customer onboarding flow — signup, email verification, profile setup, and a welcome dashboard. Node + Vue."
+                            :placeholder="inputPlaceholder"
                         ></textarea>
                     </div>
 
-                    <div class="aitc__chips">
+                    <div v-if="mode === 'full'" class="aitc__chips">
                         <span class="aitc__chips-label">Try:</span>
                         <button type="button" class="aitc__chip" @click="requirements = 'Build a Shopify clothing store: home, collection, product, cart and checkout pages, plus store policies and theme setup.'">Shopify store</button>
                         <button type="button" class="aitc__chip" @click="requirements = 'Mobile app MVP: onboarding, signup/login, home feed, profile and settings — design + build per screen, with the supporting API endpoints.'">Mobile app MVP</button>
@@ -45,8 +70,8 @@
 
                     <div class="aitc__actions">
                         <button class="aitc__btn aitc__btn--ghost" @click="close()">Cancel</button>
-                        <button class="aitc__btn aitc__btn--ai" :disabled="requirements.trim().length < 3" @click="generate()">
-                            <span aria-hidden="true">✨</span> Generate plan
+                        <button class="aitc__btn aitc__btn--ai" :disabled="!canGenerate" @click="generate()">
+                            <span aria-hidden="true">✨</span> {{ generateLabel }}
                         </button>
                     </div>
                 </div>
@@ -54,40 +79,61 @@
                 <!-- STEP: generating -->
                 <div v-else-if="step === 'generating'" class="aitc__body aitc__center">
                     <div class="aitc__orb" aria-hidden="true"></div>
-                    <p class="aitc__status">{{ progressMsg || 'Generating plan…' }}</p>
+                    <p class="aitc__status">{{ progressMsg || 'Generating…' }}</p>
                     <p class="aitc__sub">This can take up to a minute for a detailed plan.</p>
                 </div>
 
                 <!-- STEP: preview -->
                 <div v-else-if="step === 'preview'" class="aitc__body">
                     <div class="aitc__preview-head">
-                        <span class="aitc__preview-hint">Review the plan — uncheck anything you don't want.</span>
+                        <span class="aitc__preview-hint">Review — uncheck anything you don't want.</span>
                         <span class="aitc__selected-pill">{{ selectedCount }} selected</span>
                     </div>
                     <div class="aitc__plan style-scroll">
-                        <div v-for="(sprint, si) in plan.sprints" :key="si" class="aitc__sprint">
-                            <div class="aitc__sprint-name">
-                                <span>{{ sprint.sprintName }}</span>
-                                <span class="aitc__count">{{ sprint.tasks.length }}</span>
+                        <!-- full: sprints, each with its tasks -->
+                        <template v-if="mode === 'full'">
+                            <div v-for="(sprint, si) in (plan.sprints || [])" :key="si" class="aitc__sprint">
+                                <div class="aitc__sprint-name">
+                                    <span>{{ sprint.sprintName }}</span>
+                                    <span class="aitc__count">{{ (sprint.tasks || []).length }}</span>
+                                </div>
+                                <label v-for="(task, ti) in (sprint.tasks || [])" :key="ti" class="aitc__task" :class="{ 'aitc__task--off': !task.__selected }">
+                                    <input type="checkbox" v-model="task.__selected" />
+                                    <span class="aitc__task-name" :title="task.TaskName">{{ task.TaskName }}</span>
+                                    <span class="aitc__pri" :class="`aitc__pri--${String(task.priority || 'Medium').toLowerCase()}`">{{ task.priority || 'Medium' }}</span>
+                                </label>
                             </div>
-                            <label v-for="(task, ti) in sprint.tasks" :key="ti" class="aitc__task" :class="{ 'aitc__task--off': !task.__selected }">
+                        </template>
+
+                        <!-- tasks: flat list into the chosen sprint -->
+                        <template v-else-if="mode === 'tasks'">
+                            <div class="aitc__sprint-name"><span>Adding to: {{ targetSprintName || 'sprint' }}</span></div>
+                            <label v-for="(task, ti) in (plan.tasks || [])" :key="ti" class="aitc__task" :class="{ 'aitc__task--off': !task.__selected }">
                                 <input type="checkbox" v-model="task.__selected" />
                                 <span class="aitc__task-name" :title="task.TaskName">{{ task.TaskName }}</span>
                                 <span class="aitc__pri" :class="`aitc__pri--${String(task.priority || 'Medium').toLowerCase()}`">{{ task.priority || 'Medium' }}</span>
                             </label>
-                        </div>
+                        </template>
+
+                        <!-- sprints: names only -->
+                        <template v-else>
+                            <label v-for="(sprint, si) in (plan.sprints || [])" :key="si" class="aitc__task" :class="{ 'aitc__task--off': !sprint.__selected }">
+                                <input type="checkbox" v-model="sprint.__selected" />
+                                <span class="aitc__task-name" :title="sprint.sprintName">{{ sprint.sprintName }}</span>
+                            </label>
+                        </template>
                     </div>
                     <div v-if="error" class="aitc__error">{{ error }}</div>
                     <div class="aitc__actions">
                         <button class="aitc__btn aitc__btn--ghost" @click="step = 'input'">Back</button>
-                        <button class="aitc__btn aitc__btn--ai" :disabled="selectedCount === 0" @click="create()">Create {{ selectedCount }} task{{ selectedCount === 1 ? '' : 's' }}</button>
+                        <button class="aitc__btn aitc__btn--ai" :disabled="selectedCount === 0" @click="create()">{{ createLabel }}</button>
                     </div>
                 </div>
 
                 <!-- STEP: creating -->
                 <div v-else-if="step === 'creating'" class="aitc__body aitc__center">
                     <div class="aitc__orb" aria-hidden="true"></div>
-                    <p class="aitc__status">{{ progressMsg || 'Creating your plan…' }}</p>
+                    <p class="aitc__status">{{ progressMsg || 'Creating…' }}</p>
                 </div>
             </div>
         </div>
@@ -95,13 +141,17 @@
 </template>
 
 <script setup>
-import { ref, computed, defineProps, defineEmits } from 'vue';
+import { ref, computed, watch, defineProps, defineEmits } from 'vue';
 import { useToast } from 'vue-toast-notification';
 import { useAiTaskGenerator } from '@/composable/aiTaskGenerator';
 
 const props = defineProps({
     modelValue: { type: Boolean, default: false },
     projectId: { type: String, required: true },
+    // For tasks-only mode: the project's sprints [{ id, name }] + which to
+    // default the picker to. Both optional — empty disables tasks-only mode.
+    sprints: { type: Array, default: () => [] },
+    activeSprintId: { type: String, default: '' },
 });
 const emit = defineEmits(['update:modelValue', 'done']);
 
@@ -109,26 +159,76 @@ const $toast = useToast();
 const { generateTasks, executeTasks, subscribeToProgress } = useAiTaskGenerator();
 
 const step = ref('input');          // input | generating | preview | creating
+const mode = ref('full');           // full | tasks | sprints
+const targetSprintId = ref('');
 const requirements = ref('');
 const plan = ref({ sprints: [] });
 const progressMsg = ref('');
 const error = ref('');
 
+const targetSprintName = computed(() => {
+    const s = (props.sprints || []).find((x) => String(x.id) === String(targetSprintId.value));
+    return s ? s.name : '';
+});
+
 const selectedCount = computed(() => {
     let n = 0;
-    for (const s of (plan.value.sprints || [])) {
-        for (const t of (s.tasks || [])) if (t.__selected) n += 1;
+    if (mode.value === 'tasks') {
+        for (const t of (plan.value.tasks || [])) if (t.__selected) n += 1;
+    } else if (mode.value === 'sprints') {
+        for (const s of (plan.value.sprints || [])) if (s.__selected) n += 1;
+    } else {
+        for (const s of (plan.value.sprints || [])) {
+            for (const t of (s.tasks || [])) if (t.__selected) n += 1;
+        }
     }
     return n;
 });
 
+const inputLabel = computed(() => {
+    if (mode.value === 'tasks') return 'What tasks should I add?';
+    if (mode.value === 'sprints') return 'What sprints should I create?';
+    return 'What should this project include?';
+});
+
+const inputPlaceholder = computed(() => {
+    if (mode.value === 'tasks') return 'e.g. Add the auth API endpoints — login, signup, refresh, logout — each with validation and tests.';
+    if (mode.value === 'sprints') return 'e.g. Break this project into delivery phases: setup, core features, polish, and launch.';
+    return 'e.g. Build a customer onboarding flow — signup, email verification, profile setup, and a welcome dashboard. Node + Vue.';
+});
+
+const generateLabel = computed(() => {
+    if (mode.value === 'tasks') return 'Generate tasks';
+    if (mode.value === 'sprints') return 'Generate sprints';
+    return 'Generate plan';
+});
+
+const createLabel = computed(() => {
+    const n = selectedCount.value;
+    if (mode.value === 'sprints') return `Create ${n} sprint${n === 1 ? '' : 's'}`;
+    return `Create ${n} task${n === 1 ? '' : 's'}`;
+});
+
+const canGenerate = computed(() => {
+    if (requirements.value.trim().length < 3) return false;
+    if (mode.value === 'tasks' && !targetSprintId.value) return false;
+    return true;
+});
+
 function reset() {
     step.value = 'input';
+    mode.value = 'full';
+    targetSprintId.value = props.activeSprintId || (props.sprints[0] && props.sprints[0].id) || '';
     requirements.value = '';
     plan.value = { sprints: [] };
     progressMsg.value = '';
     error.value = '';
 }
+
+// Fresh state each time the modal opens (and picks up the latest active sprint).
+watch(() => props.modelValue, (open) => {
+    if (open) reset();
+});
 
 function close() {
     // Don't allow closing mid-flight so we don't orphan an in-progress run.
@@ -137,51 +237,90 @@ function close() {
     emit('update:modelValue', false);
 }
 
-async function generate() {
-    if (requirements.value.trim().length < 3) return;
-    error.value = '';
-    progressMsg.value = 'Generating plan…';
-    step.value = 'generating';
-    try {
-        const res = await generateTasks(props.projectId, { additionalRequirements: requirements.value.trim() });
-        const p = res && res.plan;
-        if (!p || !Array.isArray(p.sprints) || !p.sprints.length) {
-            throw new Error('The AI did not return any tasks. Try rephrasing your requirements.');
-        }
-        for (const s of p.sprints) {
+// Mark every generated item selected by default, per the active mode.
+function selectAll(p) {
+    if (mode.value === 'tasks') {
+        for (const t of (p.tasks || [])) t.__selected = true;
+    } else if (mode.value === 'sprints') {
+        for (const s of (p.sprints || [])) s.__selected = true;
+    } else {
+        for (const s of (p.sprints || [])) {
             for (const t of (s.tasks || [])) t.__selected = true;
         }
+    }
+}
+
+function planHasContent(p) {
+    if (!p) return false;
+    if (mode.value === 'tasks') return Array.isArray(p.tasks) && p.tasks.length > 0;
+    return Array.isArray(p.sprints) && p.sprints.length > 0;
+}
+
+async function generate() {
+    if (!canGenerate.value) return;
+    error.value = '';
+    progressMsg.value = `${generateLabel.value}…`;
+    step.value = 'generating';
+    try {
+        const res = await generateTasks(props.projectId, {
+            additionalRequirements: requirements.value.trim(),
+            mode: mode.value,
+            targetSprintName: mode.value === 'tasks' ? targetSprintName.value : '',
+        });
+        const p = res && res.plan;
+        if (!planHasContent(p)) {
+            throw new Error('The AI did not return anything. Try rephrasing your requirements.');
+        }
+        selectAll(p);
         plan.value = p;
         step.value = 'preview';
     } catch (e) {
-        error.value = (e && e.message) || 'Task generation failed. Please try again.';
+        error.value = (e && e.message) || 'Generation failed. Please try again.';
         step.value = 'input';
     }
 }
 
-// Build a clean plan with only the checked tasks (and only sprints that
-// still have tasks). Strips the UI-only __selected flag.
+// Build a clean plan with only the checked items, stripping the UI-only
+// __selected flag. Shape depends on mode (flat tasks / sprint names / full).
 function buildSelectedPlan() {
+    const strip = (t) => { const rest = { ...t }; delete rest.__selected; return rest; };
+    if (mode.value === 'tasks') {
+        return { tasks: (plan.value.tasks || []).filter((t) => t.__selected).map(strip) };
+    }
+    if (mode.value === 'sprints') {
+        return {
+            sprints: (plan.value.sprints || [])
+                .filter((s) => s.__selected)
+                .map((s) => ({ sprintName: s.sprintName })),
+        };
+    }
     const sprints = [];
     for (const s of (plan.value.sprints || [])) {
-        const tasks = (s.tasks || [])
-            .filter((t) => t.__selected)
-            .map((t) => { const rest = { ...t }; delete rest.__selected; return rest; });
+        const tasks = (s.tasks || []).filter((t) => t.__selected).map(strip);
         if (tasks.length) sprints.push({ sprintName: s.sprintName, tasks });
     }
     return { sprints };
 }
 
+function payloadHasContent(payload) {
+    if (mode.value === 'tasks') return (payload.tasks || []).length > 0;
+    return (payload.sprints || []).length > 0;
+}
+
 async function create() {
     const payload = buildSelectedPlan();
-    if (!payload.sprints.length) return;
+    if (!payloadHasContent(payload)) return;
     error.value = '';
-    progressMsg.value = 'Creating your plan…';
+    progressMsg.value = 'Creating…';
     step.value = 'creating';
     try {
-        const res = await executeTasks(props.projectId, { plan: payload });
+        const res = await executeTasks(props.projectId, {
+            plan: payload,
+            mode: mode.value,
+            targetSprintId: mode.value === 'tasks' ? targetSprintId.value : '',
+        });
         if (!res || !res.status || !res.jobId) {
-            throw new Error((res && res.statusText) || 'Could not start task creation.');
+            throw new Error((res && res.statusText) || 'Could not start creation.');
         }
         subscribeToProgress(res.jobId, (raw) => {
             let pl = raw;
@@ -192,19 +331,27 @@ async function create() {
                 else if (pl.step === 'tasks') progressMsg.value = `Creating tasks… ${pl.completed || 0}/${pl.total || 0}`;
             } else if (pl.event === 'complete') {
                 const totals = pl.totals || {};
-                $toast.success(`Created ${totals.tasks || 0} task${totals.tasks === 1 ? '' : 's'} in ${totals.sprints || 0} sprint${totals.sprints === 1 ? '' : 's'} with AI`, { position: 'top-right' });
+                $toast.success(successMessage(totals), { position: 'top-right' });
                 emit('done', totals);
                 reset();
                 emit('update:modelValue', false);
             } else if (pl.event === 'error') {
-                error.value = pl.error || 'Task creation failed. Please try again.';
+                error.value = pl.error || 'Creation failed. Please try again.';
                 step.value = 'preview';
             }
         });
     } catch (e) {
-        error.value = (e && e.message) || 'Task creation failed. Please try again.';
+        error.value = (e && e.message) || 'Creation failed. Please try again.';
         step.value = 'preview';
     }
+}
+
+function successMessage(totals) {
+    const t = totals.tasks || 0;
+    const s = totals.sprints || 0;
+    if (mode.value === 'sprints') return `Created ${s} sprint${s === 1 ? '' : 's'} with AI`;
+    if (mode.value === 'tasks') return `Created ${t} task${t === 1 ? '' : 's'} with AI`;
+    return `Created ${t} task${t === 1 ? '' : 's'} in ${s} sprint${s === 1 ? '' : 's'} with AI`;
 }
 </script>
 
@@ -260,6 +407,30 @@ async function create() {
 .aitc__body { display: flex; flex-direction: column; min-height: 0; }
 .aitc__center { align-items: center; justify-content: center; padding: 42px 0; text-align: center; }
 .aitc__field-label { font-size: 13px; font-weight: 600; color: #3a4255; margin-bottom: 8px; }
+
+/* Mode selector */
+.aitc__modes { display: flex; gap: 6px; margin-bottom: 14px; }
+.aitc__mode {
+    flex: 1 1 0;
+    border: 1px solid #e3e6ef; background: #f7f8fb; color: #4a5266;
+    font-size: 12.5px; font-weight: 600;
+    border-radius: 9px; padding: 8px 6px; cursor: pointer;
+    font-family: inherit;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.aitc__mode:hover:not(:disabled) { border-color: #7C5CFF; color: #6a5cff; }
+.aitc__mode--on { border-color: #7C5CFF; color: #6a5cff; background: #f3f1ff; }
+.aitc__mode:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Sprint picker (tasks-only mode) */
+.aitc__sprint-pick { margin-bottom: 14px; }
+.aitc__select {
+    width: 100%; box-sizing: border-box;
+    border: 1px solid #e0e3ec; border-radius: 9px;
+    padding: 9px 12px; font-size: 13.5px; color: #1c2434;
+    background: #fff; font-family: inherit; cursor: pointer;
+}
+.aitc__select:focus { outline: none; border-color: #7C5CFF; }
 
 /* Textarea with gradient focus ring */
 .aitc__textarea-wrap {

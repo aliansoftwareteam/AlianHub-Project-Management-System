@@ -8,7 +8,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const multer = require('multer');
 
 const { getProvider, isAnyProviderConfigured } = require('./llmProvider');
-const { PlanSchema, ClarifyResponseSchema, TasksPlanSchema, TasksResponseSchema, sanitizeMemberIds, sanitizeTaskPlanMemberIds, tryParseJson } = require('./schemaValidator');
+const { PlanSchema, ClarifyResponseSchema, TasksPlanSchema, TasksResponseSchema, TasksOnlyPlanSchema, TasksOnlyResponseSchema, SprintsOnlyPlanSchema, SprintsOnlyResponseSchema, sanitizeMemberIds, sanitizeTaskPlanMemberIds, tryParseJson } = require('./schemaValidator');
 const { buildSystemPrompt, buildUserMessage, buildRepairPrompt, buildTasksSystemPrompt, buildTasksUserMessage } = require('./promptBuilder');
 const { briefUpload, extractFromFile, safeUnlink, MAX_BRIEF_BYTES } = require('./briefExtractor');
 const sseEmitter = require('./sseEmitter');
@@ -19,6 +19,24 @@ const { normalizePlanColors } = orchestrator;
 const PLAN_TTL_SECONDS = 15 * 60;        // 15 min
 const BRIEF_TTL_SECONDS = 30 * 60;       // 30 min
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
+
+// AI task-creation modes (AHE-3777 enhancement):
+//   'full'    — sprints + tasks (original behavior)
+//   'tasks'   — a flat list of tasks appended to an existing sprint
+//   'sprints' — sprint names only, no tasks
+function normalizeTasksMode(raw) {
+    return (raw === 'tasks' || raw === 'sprints') ? raw : 'full';
+}
+function tasksPlanSchemaForMode(mode) {
+    if (mode === 'tasks') return TasksOnlyPlanSchema;
+    if (mode === 'sprints') return SprintsOnlyPlanSchema;
+    return TasksPlanSchema;
+}
+function tasksResponseSchemaForMode(mode) {
+    if (mode === 'tasks') return TasksOnlyResponseSchema;
+    if (mode === 'sprints') return SprintsOnlyResponseSchema;
+    return TasksResponseSchema;
+}
 
 function token() {
     return crypto.randomBytes(12).toString('hex');
@@ -566,10 +584,11 @@ function applyEdits(plan, edits) {
 // EXISTING project via orchestrator.executeTasksIntoProject. Mirrors
 // callLlmForPlan / generatePlanForJob / exports.plan / exports.execute.
 
-async function callLlmForTasksPlan({ project, additionalRequirements, briefText, members, clarifications }) {
+async function callLlmForTasksPlan({ project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName }) {
     const provider = getProvider();
     const systemPrompt = buildTasksSystemPrompt();
-    const userMessage = buildTasksUserMessage({ project, additionalRequirements, briefText, members, clarifications });
+    const userMessage = buildTasksUserMessage({ project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName });
+    const ResponseSchema = tasksResponseSchemaForMode(mode);
     const maxTokens = Number(process.env.LLM_MAX_TOKENS_PLAN) || 32000;
 
     const firstAttempt = await provider.chat({
@@ -591,7 +610,7 @@ async function callLlmForTasksPlan({ project, additionalRequirements, briefText,
     const tryValidate = (raw) => {
         const parsed = tryParseJson(raw);
         if (!parsed.ok) return { ok: false, error: `JSON parse failed: ${parsed.error}` };
-        const result = TasksResponseSchema.safeParse(parsed.value);
+        const result = ResponseSchema.safeParse(parsed.value);
         if (!result.success) {
             const issues = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n');
             return { ok: false, error: issues };
@@ -635,7 +654,7 @@ async function callLlmForTasksPlan({ project, additionalRequirements, briefText,
     return { result: validated.value, tokens: usedTokens, model: (provider && provider.name) || 'unknown' };
 }
 
-async function generateTasksPlanForJob({ jobId, uid, companyId, projectId, additionalRequirements, briefText, clarifications }) {
+async function generateTasksPlanForJob({ jobId, uid, companyId, projectId, additionalRequirements, briefText, clarifications, mode, targetSprintName }) {
     const emit = (payload) => sseEmitter.emit(jobId, payload);
     try {
         emit({ event: 'progress', phase: 'plan', step: 'context', status: 'started' });
@@ -654,19 +673,23 @@ async function generateTasksPlanForJob({ jobId, uid, companyId, projectId, addit
 
         emit({ event: 'progress', phase: 'plan', step: 'ai', status: 'started' });
         const { result, tokens, model } = await callLlmForTasksPlan({
-            project, additionalRequirements, briefText, members, clarifications,
+            project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName,
         });
 
         let plan = result.plan;
-        if (!plan || !Array.isArray(plan.sprints)) {
-            throw new Error('The AI did not return any tasks. Please try again.');
+        const hasContent = plan && (
+            (Array.isArray(plan.sprints) && plan.sprints.length)
+            || (Array.isArray(plan.tasks) && plan.tasks.length)
+        );
+        if (!hasContent) {
+            throw new Error('The AI did not return anything to create. Please try again.');
         }
         try {
             const allowed = new Set(members.map((m) => String(m.id)));
             plan = sanitizeTaskPlanMemberIds(plan, allowed).plan;
         } catch (_e) { /* leave as-is */ }
 
-        const reCheck = TasksPlanSchema.safeParse(plan);
+        const reCheck = tasksPlanSchemaForMode(mode).safeParse(plan);
         if (!reCheck.success) {
             const issues = reCheck.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n');
             throw new Error(`Plan failed final validation: ${issues}`);
@@ -723,13 +746,15 @@ exports.tasksPlan = async (req, res) => {
             if (stash && stash.companyId === companyId) briefText = stash.text;
         }
         const clarifications = sanitizeClarifications(req.body && req.body.clarifications);
+        const mode = normalizeTasksMode(req.body && req.body.mode);
+        const targetSprintName = String((req.body && req.body.targetSprintName) || '').trim().slice(0, 80);
 
         const jobId = token();
         res.send({ status: true, jobId, queued: true });
 
         setTimeout(() => {
             generateTasksPlanForJob({
-                jobId, uid, companyId, projectId, additionalRequirements, briefText, clarifications,
+                jobId, uid, companyId, projectId, additionalRequirements, briefText, clarifications, mode, targetSprintName,
             }).catch((error) => {
                 logger.error(`AIPG tasks-plan job outer error: ${error && error.message ? error.message : error}`);
                 sseEmitter.emit(jobId, {
@@ -757,11 +782,19 @@ exports.tasksExecute = async (req, res) => {
         const projectId = String((req.params && req.params.projectId) || '').trim();
         if (!OBJECT_ID_PATTERN.test(projectId)) return sendError(res, 400, 'Valid projectId required');
 
+        const mode = normalizeTasksMode(req.body && req.body.mode);
+        const targetSprintId = String((req.body && req.body.targetSprintId) || '').trim();
+        // Tasks-only mode appends into an existing sprint — that target is required.
+        if (mode === 'tasks' && !OBJECT_ID_PATTERN.test(targetSprintId)) {
+            return sendError(res, 400, 'targetSprintId required for tasks mode');
+        }
+
         let plan = req.body && req.body.plan;
         if (!plan || typeof plan !== 'object') return sendError(res, 400, 'plan required in request body');
 
-        // Never trust a client-supplied plan — re-validate server-side.
-        const reCheck = TasksPlanSchema.safeParse(plan);
+        // Never trust a client-supplied plan — re-validate server-side with the
+        // schema for the requested mode.
+        const reCheck = tasksPlanSchemaForMode(mode).safeParse(plan);
         if (!reCheck.success) {
             const issues = reCheck.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n');
             return sendError(res, 400, `Plan failed validation: ${issues}`);
@@ -787,7 +820,7 @@ exports.tasksExecute = async (req, res) => {
         res.send({ status: true, jobId });
 
         setTimeout(() => {
-            orchestrator.executeTasksIntoProject({ tasksPlan: plan, projectId, companyId, uid: String(uid), userData, jobId })
+            orchestrator.executeTasksIntoProject({ tasksPlan: plan, projectId, companyId, uid: String(uid), userData, jobId, mode, targetSprintId })
                 .catch((e) => {
                     logger.error(`AIPG tasksExecute error: ${e && e.message ? e.message : e}`);
                 });
