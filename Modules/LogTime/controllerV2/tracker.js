@@ -353,7 +353,11 @@ exports.endTimeTracker = (req, res) => {
             }
             MongoDbCrudOpration(req.body.companyId, obj, "findOneAndUpdate")
                 .then((resUp) => {
-                    const dt = response.CreatedAt;
+                    // Activity-log date = the day of the logged session. `response.CreatedAt`
+                    // is not a field on the timesheet (Mongoose stores lowercase `createdAt`),
+                    // so it was undefined → "DATE_undefined". Use the session start in epoch ms,
+                    // matching the adjacent TIMESTAMP_ placeholders and the manual-log path.
+                    const dt = response.LogStartTime * 1000;
                     function convertTimestampToTime(timestamp) {
                         const dateTime = DateTime.fromSeconds(timestamp);
                         const formattedTime = dateTime.toFormat('hh:mm a');
