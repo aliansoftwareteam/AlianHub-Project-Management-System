@@ -12,15 +12,22 @@
 
             <!-- STEP 1 — INPUT -->
             <div v-if="step === 'input'" class="aiwd-body">
+                <!-- When a description already exists, offer a clear, plain
+                     choice: the safe non-destructive "Add" (default) or
+                     "Rewrite" (replace). Empty descriptions skip this. -->
+                <div v-if="hasExisting" class="aiwd-modes">
+                    <button type="button" class="aiwd-mode" :class="{ 'aiwd-mode-active': mode === 'add' }" @click="mode = 'add'">{{ $t('AI.ai_desc_mode_add') }}</button>
+                    <button type="button" class="aiwd-mode" :class="{ 'aiwd-mode-active': mode === 'rewrite' }" @click="mode = 'rewrite'">{{ $t('AI.ai_desc_mode_rewrite') }}</button>
+                </div>
                 <textarea
                     v-model="intent"
                     class="aiwd-textarea"
                     rows="3"
-                    :placeholder="$t('AI.ai_desc_intent_placeholder')"
+                    :placeholder="placeholderText"
                     @keydown.meta.enter.prevent="generate()"
                     @keydown.ctrl.enter.prevent="generate()"
                 ></textarea>
-                <p class="aiwd-hint">{{ $t('AI.ai_desc_intent_hint') }}</p>
+                <p class="aiwd-hint">{{ hintText }}</p>
             </div>
 
             <!-- STEP 2 — CLARIFY -->
@@ -72,7 +79,7 @@
                         {{ $t('AI.ai_regenerate') }}
                     </button>
                     <button type="button" class="btn-primary aiwd-btn" :disabled="loading" @click="useThis()">
-                        {{ $t('AI.ai_use_this') }}
+                        {{ applyLabel }}
                     </button>
                 </template>
             </div>
@@ -107,6 +114,21 @@ const generatedMarkdown = ref('');
 const loading = ref(false);
 const errorMsg = ref('');
 
+// 'add' = append the generated snippet to the existing description (safe
+// default when one exists); 'rewrite' = replace the whole description. Set on
+// open based on whether a description already exists.
+const mode = ref('rewrite');
+const hasExisting = computed(() => (props.existingDescription || '').trim().length > 0);
+const placeholderText = computed(() => (mode.value === 'add'
+    ? t('AI.ai_desc_add_placeholder')
+    : t('AI.ai_desc_intent_placeholder')));
+const hintText = computed(() => (mode.value === 'add'
+    ? t('AI.ai_desc_add_hint')
+    : t('AI.ai_desc_intent_hint')));
+const applyLabel = computed(() => (mode.value === 'add'
+    ? t('AI.ai_desc_mode_add')
+    : t('AI.ai_use_this')));
+
 const previewHtml = computed(() => {
     try {
         return md.render(generatedMarkdown.value || '');
@@ -125,6 +147,7 @@ watch(() => props.modelValue, (open) => {
         generatedMarkdown.value = '';
         loading.value = false;
         errorMsg.value = '';
+        mode.value = hasExisting.value ? 'add' : 'rewrite';
     }
 });
 
@@ -150,6 +173,7 @@ async function generate() {
             existingDescription: props.existingDescription || '',
             intent: (intent.value || '').trim(),
             answers,
+            mode: mode.value,
         };
 
         const res = await apiRequest('post', env.AI_WRITE_DESCRIPTION, body);
@@ -193,7 +217,9 @@ function regenerate() {
 // save, then close. Never auto-applies — only on this explicit click.
 function useThis() {
     if (!generatedMarkdown.value) return;
-    emit('apply', generatedMarkdown.value);
+    // The preview already shows the FULL final description (for both Add and
+    // Rewrite), so the parent just applies it.
+    emit('apply', { text: generatedMarkdown.value });
     close();
 }
 </script>
@@ -242,6 +268,25 @@ function useThis() {
 }
 .aiwd-close:hover { color: #1f1f1f; }
 .aiwd-body { margin-bottom: 12px; }
+.aiwd-modes {
+    display: inline-flex;
+    margin-bottom: 10px;
+    border: 1px solid #d7d7d7;
+    border-radius: 6px;
+    overflow: hidden;
+}
+.aiwd-mode {
+    border: none;
+    background: #ffffff;
+    color: #6b6b6b;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 14px;
+    cursor: pointer;
+    font-family: 'Roboto', sans-serif;
+}
+.aiwd-mode + .aiwd-mode { border-left: 1px solid #d7d7d7; }
+.aiwd-mode-active { background: #2f3990; color: #ffffff; }
 .aiwd-textarea,
 .aiwd-input {
     width: 100%;

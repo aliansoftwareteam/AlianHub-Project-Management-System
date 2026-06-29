@@ -39,7 +39,7 @@ const REQUEST_TIMEOUT_MS = 120_000;
 // existing description / intent can't blow the prompt budget.
 const TITLE_CHAR_CAP = 500;
 const INTENT_CHAR_CAP = 2000;
-const EXISTING_DESC_CHAR_CAP = 4000;
+const EXISTING_DESC_CHAR_CAP = 20000;
 const ANSWER_CHAR_CAP = 1000;
 const MAX_QUESTIONS = 3;
 
@@ -78,12 +78,34 @@ function normalizeAnswers(answers) {
     return out;
 }
 
-function buildUserMessage({ title, taskType, existingDescription, intent, answers }) {
+function buildUserMessage({ title, taskType, existingDescription, intent, answers, mode }) {
     const cleanTitle = clampStr(title, TITLE_CHAR_CAP) || '(no title provided)';
     const cleanType = clampStr(taskType, 100) || 'task';
     const cleanIntent = clampStr(intent, INTENT_CHAR_CAP);
     const cleanExisting = clampStr(existingDescription, EXISTING_DESC_CHAR_CAP);
     const cleanAnswers = normalizeAnswers(answers);
+
+    // ADD mode: the author already has a description and wants to add to it.
+    // The model returns the COMPLETE updated description — the existing content
+    // kept verbatim, with the addition inserted wherever the author asked. The
+    // frontend then replaces with it (the user reviews the full result in the
+    // preview first). Only meaningful when an existing description is present.
+    if (mode === 'add' && cleanExisting) {
+        return [
+            `Item type: ${cleanType}`,
+            `Title: ${cleanTitle}`,
+            '',
+            'MODE: ADD — the author already has a description and wants to add to it.',
+            "Return the COMPLETE updated description: keep ALL of the existing content EXACTLY as-is — every word, line, list item, heading and bit of formatting — and insert the author's addition at the location they describe. If they don't state a location, place it at the most sensible spot.",
+            'Do NOT change, rephrase, reorder, summarize, translate, or remove ANY existing content — the only difference from the existing description must be the added text. Do NOT ask clarifying questions.',
+            '',
+            'What to add (and where, if stated):',
+            cleanIntent || '(not specified — add a sensible, useful addition based on the title and the existing description)',
+            '',
+            'Existing description (reproduce it verbatim, with the addition inserted in the right place):',
+            cleanExisting,
+        ].join('\n');
+    }
 
     const lines = [
         `Item type: ${cleanType}`,
@@ -186,9 +208,9 @@ async function callProvider(input) {
         // Mid temperature: descriptions read better with a little variation
         // than a calibrated number would, but we still want it grounded.
         temperature: 0.5,
-        // A description + optional questions is small; this is plenty for
-        // non-thinking models and leaves headroom for thinking ones.
-        maxTokens: 4096,
+        // ADD mode reproduces the whole description plus the addition, so allow
+        // room for a long description to come back in full.
+        maxTokens: 8192,
     });
     const result = await Promise.race([
         chatPromise,
@@ -219,6 +241,14 @@ async function generateDescription(params = {}) {
             || typeof providerFactory.isAnyProviderConfigured !== 'function'
             || !providerFactory.isAnyProviderConfigured()) {
             return { status: false, reason: 'no LLM provider configured' };
+        }
+        // ADD mode reproduces the whole description with the addition inserted,
+        // so refuse rather than silently truncate (and lose) a description that
+        // exceeds the input cap. Rewrite and manual editing still work.
+        if (params.mode === 'add'
+            && typeof params.existingDescription === 'string'
+            && params.existingDescription.length > EXISTING_DESC_CHAR_CAP) {
+            return { status: false, reason: 'This description is too long for Add mode — use Rewrite, or add the text manually.' };
         }
         const result = await callProvider(params);
         if (!result) {
