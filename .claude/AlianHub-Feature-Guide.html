@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AlianHub Features Guide</title>
+<style>
+  *, *::before, *::after { box-sizing:border-box; }
+  :root {
+    --ground:#F7F8FB; --surface:#FFFFFF; --ink:#151A24; --muted:#5C6473;
+    --hair:#E6E9F0; --hair-soft:#EEF0F6; --accent:#2E59D0; --accent-tint:#EAF0FD; --accent-ink:#1E3F9E;
+    --pill:#EEF1F6; --pill-ink:#3F4757;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SFMono-Regular","Cascadia Mono","Segoe UI Mono",Menlo,Consolas,monospace;
+  }
+  html { scroll-behavior:smooth; }
+  body { margin:0; background:var(--ground); color:var(--ink); font-family:var(--sans);
+         font-size:16px; line-height:1.62; -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:1080px; margin:0 auto; padding:0 24px; }
+  .layout { display:grid; grid-template-columns:228px minmax(0,1fr); gap:56px; align-items:start; }
+
+  /* ── Masthead (light, with a faint accent dot-grid) ── */
+  .masthead { grid-column:1 / -1; position:relative; padding:62px 0 30px; border-bottom:1px solid var(--hair); }
+  .masthead::before { content:""; position:absolute; inset:0; pointer-events:none;
+    background-image:radial-gradient(rgba(46,89,208,.06) 1px, transparent 1.5px); background-size:22px 22px;
+    -webkit-mask-image:linear-gradient(180deg,#000,transparent 78%); mask-image:linear-gradient(180deg,#000,transparent 78%); }
+  .masthead > * { position:relative; }
+  .eyebrow { font-family:var(--mono); font-size:.72rem; letter-spacing:.15em; text-transform:uppercase; color:var(--accent); }
+  .masthead h1 { font-size:clamp(2.1rem,4.6vw,3rem); line-height:1.06; font-weight:820; letter-spacing:-.025em;
+                 text-wrap:balance; margin:.5rem 0 0; max-width:17ch; }
+  .masthead .sub { color:var(--muted); font-size:1.08rem; margin:.9rem 0 0; max-width:62ch; }
+  .meta { display:flex; flex-wrap:wrap; gap:10px; margin-top:22px; font-family:var(--mono); font-size:.74rem; }
+  .meta span { background:var(--surface); border:1px solid var(--hair); border-radius:999px; padding:5px 12px;
+               color:var(--pill-ink); letter-spacing:.02em; box-shadow:0 1px 2px rgba(21,33,59,.04); }
+  .meta span b { color:var(--ink); font-weight:600; }
+
+  /* ── Left sticky TOC ── */
+  .toc { position:sticky; top:24px; }
+  .toc .toc-label { font-family:var(--mono); font-size:.68rem; letter-spacing:.14em; text-transform:uppercase;
+                    color:var(--muted); margin:0 0 12px; padding-left:13px; }
+  .toc ol { list-style:none; margin:0; padding:0; }
+  .toc a { display:block; text-decoration:none; color:var(--muted); font-size:.9rem; padding:7px 0 7px 13px;
+           border-left:2px solid var(--hair); transition:color .15s, border-color .15s; }
+  .toc a:hover { color:var(--ink); }
+  .toc a.active { color:var(--accent); border-left-color:var(--accent); font-weight:600; }
+  .toc a .n { font-family:var(--mono); font-size:.7rem; color:var(--muted); margin-right:7px; }
+  .toc a.active .n { color:var(--accent); }
+
+  /* ── Sections ── */
+  main { padding-top:38px; padding-bottom:48px; }
+  .sec { padding:18px 0 34px; scroll-margin-top:24px; }
+  .sec + .sec { border-top:1px solid var(--hair); }
+  .sec-eyebrow { font-family:var(--mono); font-size:.7rem; letter-spacing:.12em; text-transform:uppercase;
+                 color:var(--muted); display:flex; gap:10px; align-items:baseline; }
+  .sec-eyebrow .cnt { color:var(--accent); }
+  .sec h2 { font-size:1.55rem; font-weight:780; letter-spacing:-.018em; margin:.4rem 0 0; text-wrap:balance; }
+  .sec .lead { color:var(--muted); margin:.5rem 0 0; max-width:60ch; }
+
+  /* ── Feature cards (modern), single column ── */
+  .features { margin-top:24px; display:flex; flex-direction:column; gap:16px; max-width:740px; }
+  .feat { background:var(--surface); border:1px solid var(--hair); border-radius:14px; padding:22px 22px 8px;
+          transition:box-shadow .16s ease, border-color .16s ease, transform .16s ease; }
+  .feat:hover { border-color:#D3DCF2; box-shadow:0 14px 32px -22px rgba(21,33,59,.45); transform:translateY(-2px); }
+  .feat-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+  .feat-head h3 { font-size:1.08rem; font-weight:700; margin:0; letter-spacing:-.01em; }
+  .ver { flex:none; font-family:var(--mono); font-size:.67rem; color:var(--pill-ink); background:var(--pill);
+         border-radius:6px; padding:3px 8px; letter-spacing:.02em; }
+  .use { margin:.5rem 0 0; font-size:.95rem; color:#2A313D; }
+  .facets { display:grid; grid-template-columns:max-content 1fr; gap:7px 14px; margin:15px 0 0; padding:15px 0 18px;
+            border-top:1px solid var(--hair-soft); }
+  .facets dt { font-family:var(--mono); font-size:.63rem; letter-spacing:.09em; text-transform:uppercase;
+               color:var(--accent); padding-top:3px; white-space:nowrap; }
+  .facets dd { margin:0; font-size:.875rem; color:var(--muted); line-height:1.5; }
+  .facets dd b { color:var(--ink); font-weight:600; }
+  .facets .how { color:#2C3340; }
+
+  footer { grid-column:1 / -1; border-top:1px solid var(--hair); margin-top:8px; padding:26px 0 64px;
+           color:var(--muted); font-size:.85rem; }
+  footer strong { color:var(--ink); }
+
+  a:focus-visible, .toc a:focus-visible { outline:2px solid var(--accent); outline-offset:3px; border-radius:4px; }
+
+  @media (max-width:880px) {
+    .layout { grid-template-columns:1fr; gap:0; }
+    .toc { position:sticky; top:0; z-index:5; margin:0 -24px 6px; padding:10px 24px;
+           background:rgba(247,248,251,.94); backdrop-filter:blur(8px); border-bottom:1px solid var(--hair); }
+    .toc .toc-label { display:none; }
+    .toc ol { display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch; }
+    .toc a { white-space:nowrap; border-left:0; border-bottom:2px solid transparent; padding:6px 10px; }
+    .toc a.active { border-left:0; border-bottom-color:var(--accent); }
+    .masthead { padding-top:42px; }
+    main { padding-top:10px; }
+    .features { max-width:none; }
+    .facets { grid-template-columns:1fr; gap:2px 0; }
+    .facets dt { padding-top:9px; }
+    .facets dt:first-child { padding-top:0; }
+  }
+  @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } * { transition:none !important; } }
+</style>
+</head>
+<body>
+
+<div class="wrap layout">
+
+  <header class="masthead">
+    <h1>AlianHub Features Guide</h1>
+    <p class="sub">A capability-by-capability guide to the features shipped across three releases — each with what it's for, where to find it, how to use it, and why it helps.</p>
+    <div class="meta">
+      <span><b>52</b> features</span>
+      <span><b>8</b> capability areas</span>
+      <span>v14.4.0 → <b>v14.6.0</b></span>
+    </div>
+  </header>
+
+  <aside class="toc" aria-label="Sections">
+    <p class="toc-label">On this page</p>
+    <nav>
+      <ol>
+        <li><a href="#ai"><span class="n">01</span>AI &amp; Smart Assistance</a></li>
+        <li><a href="#views"><span class="n">02</span>Project Views</a></li>
+        <li><a href="#reports"><span class="n">03</span>Reports &amp; Dashboards</a></li>
+        <li><a href="#automation"><span class="n">04</span>Automation &amp; Integrations</a></li>
+        <li><a href="#time"><span class="n">05</span>Time &amp; Timesheets</a></li>
+        <li><a href="#admin"><span class="n">06</span>Admin, Security &amp; Access</a></li>
+        <li><a href="#collab"><span class="n">07</span>Collaboration</a></li>
+        <li><a href="#tasks"><span class="n">08</span>Tasks, Fields &amp; Sharing</a></li>
+      </ol>
+    </nav>
+  </aside>
+
+  <main>
+    <section class="sec" id="ai">
+      <p class="sec-eyebrow">AI &amp; Smart Assistance <span class="cnt">3 features</span></p>
+      <h2>Plan, write, and estimate with AI</h2>
+      <p class="lead">AI woven through planning, writing, and estimation — not a bolt-on.</p>
+      <div class="features">
+        <article class="feat">
+          <div class="feat-head"><h3>AI Assist — plan a project</h3><span class="ver">14.6.0</span></div>
+          <p class="use">Generate a whole set of sprints and tasks for an existing project from a short prompt.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Inside any project — the <b>AI Assist</b> action on the board.</dd>
+            <dt>How</dt><dd class="how">Open the project → <b>AI Assist</b> → describe the work → review the proposed sprints &amp; tasks → <b>Accept</b> to create them live.</dd>
+            <dt>Benefit</dt><dd>Turns a blank project into a structured, ready-to-work plan in seconds.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Write with AI</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Generate, clarify, or rewrite task and project descriptions.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">The description field of any <b>task or project</b>.</dd>
+            <dt>How</dt><dd class="how">In the description → <b>Write with AI</b> → generate or clarify → preview → <b>Apply</b>.</dd>
+            <dt>Benefit</dt><dd>Clear, consistent descriptions instead of a blank box.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Grounded AI time estimates</h3><span class="ver">14.5.0</span></div>
+          <p class="use">AI time estimates calibrated on your team's real historical data.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">When estimating time on a task.</dd>
+            <dt>How</dt><dd class="how">Request an AI estimate → it factors in past actuals and calibrates automatically.</dd>
+            <dt>Benefit</dt><dd>Estimates that sharpen over time instead of generic guesses.</dd>
+          </dl>
+        </article>
+      </div>
+    </section>
+
+    <section class="sec" id="views">
+      <p class="sec-eyebrow">Project Views <span class="cnt">5 features</span></p>
+      <h2>Five ways to see the same project</h2>
+      <p class="lead">Switch visualization from the project's view switcher — same data, a different lens.</p>
+      <div class="features">
+        <article class="feat">
+          <div class="feat-head"><h3>Timeline / Gantt</h3><span class="ver">14.4.0</span></div>
+          <p class="use">Schedule work on a horizontal timeline with durations and dependencies.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Project → <b>View switcher</b> → <b>Timeline</b>.</dd>
+            <dt>How</dt><dd class="how">Switch to Timeline → drag task bars to set dates → link tasks for dependencies; pairs with recurring tasks.</dd>
+            <dt>Benefit</dt><dd>See the schedule and what blocks what at a glance.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Mind Map</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Explore tasks and sub-tasks as an expandable node graph.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Project → <b>View switcher</b> → <b>Mind Map</b>.</dd>
+            <dt>How</dt><dd class="how">Switch to Mind Map → expand/collapse nodes to drill into sub-tasks.</dd>
+            <dt>Benefit</dt><dd>Understand structure and hierarchy visually.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Whiteboard</h3><span class="ver">14.5.0</span></div>
+          <p class="use">A freeform canvas for brainstorming and visual planning.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Project → <b>View switcher</b> → <b>Whiteboard</b>.</dd>
+            <dt>How</dt><dd class="how">Switch to Whiteboard → add and arrange elements freely.</dd>
+            <dt>Benefit</dt><dd>Think visually without leaving the project.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Canvas / dynamic layout</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Arrange tasks in flexible, custom layouts not tied to a fixed board.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Project → <b>View switcher</b> → <b>Canvas</b>.</dd>
+            <dt>How</dt><dd class="how">Switch to Canvas → position tasks spatially to suit the work.</dd>
+            <dt>Benefit</dt><dd>Organize work the way you think about it.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Map</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Plot location-based tasks on an offline SVG map.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Project → <b>View switcher</b> → <b>Map</b>.</dd>
+            <dt>How</dt><dd class="how">Switch to Map → tasks with a location appear as pins.</dd>
+            <dt>Benefit</dt><dd>See field or location-based work geographically.</dd>
+          </dl>
+        </article>
+      </div>
+    </section>
+
+    <section class="sec" id="reports">
+      <p class="sec-eyebrow">Reports &amp; Dashboards <span class="cnt">10 features</span></p>
+      <h2>Build, schedule, export, and share reporting</h2>
+      <p class="lead">A full reporting suite, from a drag-together builder to public sharing — under the Reports / Dashboards area.</p>
+      <div class="features">
+        <article class="feat">
+          <div class="feat-head"><h3>Custom report builder</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Build your own reports by choosing metrics, filters, and grouping.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Reports → <b>New report</b>.</dd>
+            <dt>How</dt><dd class="how">Pick a data source → choose metrics → add filters &amp; grouping → <b>Save</b>.</dd>
+            <dt>Benefit</dt><dd>Answer your own questions without waiting on a developer.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Portfolio rollup</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Roll status and progress up across many projects into one view.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Reports → <b>Portfolio</b>.</dd>
+            <dt>How</dt><dd class="how">Select the projects → read the combined status and progress.</dd>
+            <dt>Benefit</dt><dd>A leadership-level view across the whole portfolio.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Dashboard cards</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Three new card types to compose at-a-glance dashboards.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Dashboard → <b>Add card</b>.</dd>
+            <dt>How</dt><dd class="how">Add a card → pick one of the new types → configure it.</dd>
+            <dt>Benefit</dt><dd>Richer, more informative dashboards.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Estimate-vs-actual variance</h3><span class="ver">14.5.0</span></div>
+          <p class="use">See exactly where estimates drifted from time actually spent.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Reports → <b>Estimate vs Actual</b>.</dd>
+            <dt>How</dt><dd class="how">Pick a project/period → read the variance per task.</dd>
+            <dt>Benefit</dt><dd>Improve future estimates using real data.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Agile reports</h3><span class="ver">14.4.0</span></div>
+          <p class="use">Burndown, velocity, and cumulative-flow (CFD) charts.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Reports → <b>Agile</b>.</dd>
+            <dt>How</dt><dd class="how">Choose the chart → pick the sprint/range → <b>Export PDF</b> (branded).</dd>
+            <dt>Benefit</dt><dd>Standard agile metrics, plus share-ready PDFs.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Capacity planning</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Compare team capacity against assigned load.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Reports → <b>Capacity</b>.</dd>
+            <dt>How</dt><dd class="how">Select a team and period → spot over- or under-allocation.</dd>
+            <dt>Benefit</dt><dd>Balance workload before anyone burns out.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Reusable report templates</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Save a report's configuration as a template and duplicate it.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Any report → <b>Save as template</b>.</dd>
+            <dt>How</dt><dd class="how">Configure a report → Save as template → duplicate when needed.</dd>
+            <dt>Benefit</dt><dd>Standardize reporting and stop rebuilding.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Scheduled / emailed reports</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Reports that run on a schedule and email themselves.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">A report → <b>Schedule</b>.</dd>
+            <dt>How</dt><dd class="how">Open a report → set a schedule → add recipients.</dd>
+            <dt>Benefit</dt><dd>Stakeholders get the numbers automatically.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Export to CSV &amp; Excel</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Download any report as CSV or XLSX.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Any report → <b>Export</b>.</dd>
+            <dt>How</dt><dd class="how">Open a report → Export → choose CSV or Excel.</dd>
+            <dt>Benefit</dt><dd>Take the data into spreadsheets or BI tools.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Share via public link</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Publish a read-only report link for stakeholders.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">A report → <b>Share</b>.</dd>
+            <dt>How</dt><dd class="how">Open a report → Share → copy the public link.</dd>
+            <dt>Benefit</dt><dd>Share results outside the workspace, safely.</dd>
+          </dl>
+        </article>
+      </div>
+    </section>
+
+    <section class="sec" id="automation">
+      <p class="sec-eyebrow">Automation &amp; Integrations <span class="cnt">9 features</span></p>
+      <h2>Connect your stack and automate the busywork</h2>
+      <p class="lead">Managed from one Integrations hub under <b>Settings → Integrations</b>.</p>
+      <div class="features">
+        <article class="feat">
+          <div class="feat-head"><h3>Integrations hub</h3><span class="ver">14.5.0</span></div>
+          <p class="use">One registry to browse, connect, and manage every integration.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how"><b>Settings → Integrations</b>.</dd>
+            <dt>How</dt><dd class="how">Open the hub → connect or manage any integration from one place.</dd>
+            <dt>Benefit</dt><dd>Central control of everything connected.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Integrations marketplace</h3><span class="ver">14.5.0</span></div>
+          <p class="use">A catalog to discover and enable available integrations.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Settings → Integrations → <b>Marketplace</b>.</dd>
+            <dt>How</dt><dd class="how">Browse the catalog → enable the ones you need.</dd>
+            <dt>Benefit</dt><dd>Find and add integrations without hunting through docs.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Automation builder</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Create "when this happens, do that" rules.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Settings → Integrations → <b>Automations</b>.</dd>
+            <dt>How</dt><dd class="how">Create a rule → set the trigger → set the action.</dd>
+            <dt>Benefit</dt><dd>Eliminate repetitive manual steps.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Email-to-task</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Turn incoming emails into tasks automatically.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Settings → Integrations → <b>Email-to-task</b>.</dd>
+            <dt>How</dt><dd class="how">Get the inbound address → email or forward to it → a task is created.</dd>
+            <dt>Benefit</dt><dd>Capture work straight from your inbox.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Calendar feed (iCal)</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Subscribe to your tasks and deadlines from any calendar app.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Settings → Integrations → <b>Calendar feed</b>.</dd>
+            <dt>How</dt><dd class="how">Copy the iCal URL → subscribe in Google/Outlook/Apple Calendar.</dd>
+            <dt>Benefit</dt><dd>Deadlines live alongside the rest of your calendar.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Slack slash-command bot</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Create and manage tasks from Slack.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Settings → Integrations → <b>Slack</b>.</dd>
+            <dt>How</dt><dd class="how">Connect Slack → use the slash command in any channel.</dd>
+            <dt>Benefit</dt><dd>Capture work without leaving the conversation.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Custom iframe apps</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Embed your own tools or pages as apps inside AlianHub.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Settings → Integrations → <b>Custom apps</b>.</dd>
+            <dt>How</dt><dd class="how">Add an app → point it at your URL → it embeds in the workspace.</dd>
+            <dt>Benefit</dt><dd>Bring external tools into one place.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Outgoing webhooks</h3><span class="ver">14.4.0</span></div>
+          <p class="use">Notify external systems when events happen.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Settings → Integrations → <b>Webhooks</b>.</dd>
+            <dt>How</dt><dd class="how">Add a webhook → set the target URL → choose which events fire it.</dd>
+            <dt>Benefit</dt><dd>Connect AlianHub to anything that can listen.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Importers</h3><span class="ver">14.4.0</span></div>
+          <p class="use">Bring existing work in from other tools.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Settings → <b>Import</b> (Asana, Monday.com, Trello, CSV).</dd>
+            <dt>How</dt><dd class="how">Choose the source → connect or upload → map fields → import.</dd>
+            <dt>Benefit</dt><dd>Migrate without re-keying everything by hand.</dd>
+          </dl>
+        </article>
+      </div>
+    </section>
+
+    <section class="sec" id="time">
+      <p class="sec-eyebrow">Time &amp; Timesheets <span class="cnt">8 features</span></p>
+      <h2>Track, approve, bill, and pay</h2>
+      <p class="lead">An end-to-end time module, from the stopwatch to the invoice.</p>
+      <div class="features">
+        <article class="feat">
+          <div class="feat-head"><h3>Timesheet approvals</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Submit, review, and approve timesheets.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Timesheets → <b>Approvals</b>.</dd>
+            <dt>How</dt><dd class="how">A member submits → an approver reviews → approve or reject.</dd>
+            <dt>Benefit</dt><dd>Clean, signed-off time records to bill and pay from.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Billable flag &amp; summary</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Mark entries billable and read billable summaries.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">On each time entry, and the Timesheets summary.</dd>
+            <dt>How</dt><dd class="how">Toggle <b>Billable</b> on entries → read the billable-vs-non-billable summary.</dd>
+            <dt>Benefit</dt><dd>Separate client-billable time from internal time.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Rates &amp; invoicing</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Apply billing rates and generate invoices from logged time.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Timesheets → <b>Billing / Invoices</b>.</dd>
+            <dt>How</dt><dd class="how">Set rates → select a period → generate the invoice.</dd>
+            <dt>Benefit</dt><dd>Bill straight from tracked time, no spreadsheet round-trip.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Locked approved periods</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Entries lock once their period is approved.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Timesheets (automatic on approval).</dd>
+            <dt>How</dt><dd class="how">Approve a period → its entries lock against further edits.</dd>
+            <dt>Benefit</dt><dd>Protects approved and billed records.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Payroll CSV export</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Export time data for payroll.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Timesheets → <b>Export</b>.</dd>
+            <dt>How</dt><dd class="how">Pick the period → Export CSV.</dd>
+            <dt>Benefit</dt><dd>Hand payroll clean, ready-to-process data.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Idle-time auto-pause</h3><span class="ver">14.5.0</span></div>
+          <p class="use">The tracker pauses itself when you go idle.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">The time tracker.</dd>
+            <dt>How</dt><dd class="how">Start the timer → it auto-pauses after detecting idle time.</dd>
+            <dt>Benefit</dt><dd>Accurate logs without inflated timers.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Daily entry reminders</h3><span class="ver">14.5.0</span></div>
+          <p class="use">A daily nudge to fill in time entries.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Notifications (per-user).</dd>
+            <dt>How</dt><dd class="how">Enable reminders → a prompt fires each day to log time.</dd>
+            <dt>Benefit</dt><dd>Nothing slips through unlogged.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Story points</h3><span class="ver">14.4.0</span></div>
+          <p class="use">Estimate tasks in story points on a configurable scale.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">On a task's estimation fields.</dd>
+            <dt>How</dt><dd class="how">Set story points on a task using your chosen scale.</dd>
+            <dt>Benefit</dt><dd>Agile sizing alongside time-based estimates.</dd>
+          </dl>
+        </article>
+      </div>
+    </section>
+
+    <section class="sec" id="admin">
+      <p class="sec-eyebrow">Admin, Security &amp; Access <span class="cnt">6 features</span></p>
+      <h2>Enterprise-grade access and security</h2>
+      <p class="lead">Controls for larger teams and compliance, under <b>Settings → Admin</b>.</p>
+      <div class="features">
+        <article class="feat">
+          <div class="feat-head"><h3>Enterprise SSO</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Single sign-on over SAML and OIDC.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Settings → Admin → <b>SSO</b>.</dd>
+            <dt>How</dt><dd class="how">An admin configures the identity provider → users sign in via SSO.</dd>
+            <dt>Benefit</dt><dd>One secure, centrally-controlled login.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>SCIM provisioning</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Auto-provision and de-provision users via SCIM 2.0.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Settings → Admin → <b>SCIM</b> (paired with SSO).</dd>
+            <dt>How</dt><dd class="how">Connect your identity provider via SCIM → users sync automatically.</dd>
+            <dt>Benefit</dt><dd>Onboarding/offboarding without manual user admin.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Audit logs</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Tamper-evident logging of activity, with retention.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Settings → <b>Audit logs</b>.</dd>
+            <dt>How</dt><dd class="how">Open Audit logs → filter by user, action, or date.</dd>
+            <dt>Benefit</dt><dd>Accountability and a compliance-ready record.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Guest role &amp; scoped access</h3><span class="ver">14.5.0</span></div>
+          <p class="use">A guest role limited to assigned projects, tasks, and comments.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Member / role management.</dd>
+            <dt>How</dt><dd class="how">Assign the <b>Guest</b> role → scope which projects they can see.</dd>
+            <dt>Benefit</dt><dd>Safely involve clients and contractors.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Offline mode</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Keep working offline; changes sync on reconnect.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">App-wide (automatic).</dd>
+            <dt>How</dt><dd class="how">Keep working when the connection drops → changes sync when you're back online.</dd>
+            <dt>Benefit</dt><dd>No lost work on a flaky connection.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Time-off / PTO</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Track leave, with capacity reduced during time off.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">The PTO / time-off section.</dd>
+            <dt>How</dt><dd class="how">Request and approve time off → team capacity adjusts during leave.</dd>
+            <dt>Benefit</dt><dd>Realistic planning that accounts for who's away.</dd>
+          </dl>
+        </article>
+      </div>
+    </section>
+
+    <section class="sec" id="collab">
+      <p class="sec-eyebrow">Collaboration <span class="cnt">5 features</span></p>
+      <h2>Capture, remind, and document together</h2>
+      <p class="lead">Lightweight tools that keep context attached to the work.</p>
+      <div class="features">
+        <article class="feat">
+          <div class="feat-head"><h3>Clips — screen &amp; voice</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Record screen/voice clips and attach them to tasks.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">The global clip recorder; the <b>My Clips</b> library.</dd>
+            <dt>How</dt><dd class="how">Start a clip → record (minimize-to-background supported) → attach to a task or save to My Clips.</dd>
+            <dt>Benefit</dt><dd>Explain something in 30 seconds instead of a wall of text.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Reminders</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Personal task reminders that fire on a schedule.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">On a task → <b>Reminder</b>.</dd>
+            <dt>How</dt><dd class="how">Set a reminder on a task → it notifies you at the chosen time.</dd>
+            <dt>Benefit</dt><dd>Never forget a follow-up.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Notepad</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Personal notes you can convert into tasks.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">The <b>Notepad</b>.</dd>
+            <dt>How</dt><dd class="how">Jot a note → convert it to a task once it's actionable.</dd>
+            <dt>Benefit</dt><dd>Capture ideas now, organize later.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Pages with live task chips</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Embed live, status-aware task chips inside docs.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how"><b>Pages</b>.</dd>
+            <dt>How</dt><dd class="how">Insert a task chip in a page → it shows the task's live status.</dd>
+            <dt>Benefit</dt><dd>Docs that stay in sync with the work.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>@mention notifications</h3><span class="ver">14.4.0</span></div>
+          <p class="use">Notify people when you @mention them.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Comments and descriptions.</dd>
+            <dt>How</dt><dd class="how">Type <b>@</b> and pick a person → they get an action-aware alert.</dd>
+            <dt>Benefit</dt><dd>Pull the right people in at the right moment.</dd>
+          </dl>
+        </article>
+      </div>
+    </section>
+
+    <section class="sec" id="tasks">
+      <p class="sec-eyebrow">Tasks, Fields &amp; Sharing <span class="cnt">6 features</span></p>
+      <h2>Richer task data and safer sharing</h2>
+      <p class="lead">More expressive tasks, and tighter control over what leaves the workspace.</p>
+      <div class="features">
+        <article class="feat">
+          <div class="feat-head"><h3>Formula &amp; rollup fields</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Computed custom fields: formulas over fields, and rollups from sub-tasks.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">Custom field setup.</dd>
+            <dt>How</dt><dd class="how">Add a field → choose <b>Formula</b> or <b>Rollup</b> → configure the expression or aggregation.</dd>
+            <dt>Benefit</dt><dd>Live calculations on tasks — no exporting to a spreadsheet.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Subtask completion badge</h3><span class="ver">14.6.0</span></div>
+          <p class="use">Parent tasks show the percentage of sub-tasks completed.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">On any parent task (automatic).</dd>
+            <dt>How</dt><dd class="how">Add sub-tasks → the parent shows a completion-% badge as they're closed.</dd>
+            <dt>Benefit</dt><dd>Progress at a glance, without tallying sub-tasks.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Epics</h3><span class="ver">14.4.0</span></div>
+          <p class="use">Epics with dates, owner, priority, progress, and blocked-task warnings.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">The <b>Epics</b> area.</dd>
+            <dt>How</dt><dd class="how">Create an epic → set its fields → group related tasks under it.</dd>
+            <dt>Benefit</dt><dd>Track big initiatives above the task level.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Recurring tasks</h3><span class="ver">14.4.0</span></div>
+          <p class="use">Tasks that regenerate automatically on a schedule.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">A task → <b>Recurrence</b>.</dd>
+            <dt>How</dt><dd class="how">Set a recurrence rule → new instances generate automatically.</dd>
+            <dt>Benefit</dt><dd>Automate routine, repeating work.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Move sprints to folders</h3><span class="ver">14.5.0</span></div>
+          <p class="use">Re-group sprints into folders without drag-and-drop.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how">The sprint menu.</dd>
+            <dt>How</dt><dd class="how">Open a sprint's menu → <b>Move to folder</b> → pick the folder (re-groups live).</dd>
+            <dt>Benefit</dt><dd>Organize many sprints quickly, even on touch.</dd>
+          </dl>
+        </article>
+        <article class="feat">
+          <div class="feat-head"><h3>Hardened public links</h3><span class="ver">14.4.0</span></div>
+          <p class="use">Secure, read-only public links.</p>
+          <dl class="facets">
+            <dt>Where</dt><dd class="how"><b>Share</b> → public link settings.</dd>
+            <dt>How</dt><dd class="how">Create a link → set expiry and a password → hard-revoke any time (rate-limited).</dd>
+            <dt>Benefit</dt><dd>Share externally while keeping full control.</dd>
+          </dl>
+        </article>
+      </div>
+    </section>
+
+    <footer>
+      Coverage: v14.4.0 → v14.6.0 · features only. For the full change history including fixes, see the project <strong>CHANGELOG</strong>.
+    </footer>
+  </main>
+</div>
+
+<script>
+  (function () {
+    var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));
+    var byId = {};
+    links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+    var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+    if (!('IntersectionObserver' in window)) return;
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) {
+          links.forEach(function (l) { l.classList.remove('active'); });
+          var a = byId[e.target.id];
+          if (a) { a.classList.add('active'); }
+        }
+      });
+    }, { rootMargin: '-12% 0px -70% 0px', threshold: 0 });
+    secs.forEach(function (s) { io.observe(s); });
+  })();
+</script>
+</body>
+</html>
