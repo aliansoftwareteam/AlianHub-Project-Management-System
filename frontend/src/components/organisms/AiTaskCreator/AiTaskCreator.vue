@@ -322,8 +322,16 @@ async function generate() {
 // __selected flag. Shape depends on mode (flat tasks / sprint names / full).
 function buildSelectedPlan() {
     const strip = (t) => { const rest = { ...t }; delete rest.__selected; return rest; };
+    // Plan-level extras (links / epics / custom fields) must ride along to the
+    // backend — it skips any that reference unselected tasks. Previously these
+    // were dropped here, so they were generated + previewed but never created.
+    const extras = {};
+    if (Array.isArray(plan.value.links) && plan.value.links.length) extras.links = plan.value.links;
+    if (Array.isArray(plan.value.epics) && plan.value.epics.length) extras.epics = plan.value.epics;
+    if (Array.isArray(plan.value.customFields) && plan.value.customFields.length) extras.customFields = plan.value.customFields;
+
     if (mode.value === 'tasks') {
-        return { tasks: (plan.value.tasks || []).filter((t) => t.__selected).map(strip) };
+        return { tasks: (plan.value.tasks || []).filter((t) => t.__selected).map(strip), ...extras };
     }
     if (mode.value === 'sprints') {
         return {
@@ -337,7 +345,7 @@ function buildSelectedPlan() {
         const tasks = (s.tasks || []).filter((t) => t.__selected).map(strip);
         if (tasks.length) sprints.push({ sprintName: s.sprintName, tasks });
     }
-    return { sprints };
+    return { sprints, ...extras };
 }
 
 function payloadHasContent(payload) {

@@ -367,6 +367,17 @@ function buildTasksUserMessage({ project, additionalRequirements, briefText, mem
         );
     }
 
+    // Final, authoritative reminder: the per-mode contract above only describes
+    // tasks/sprints, so the model tends to drop the requested plan-level arrays.
+    // Spell out that they are required siblings inside "plan".
+    const planExtras = [];
+    if (features && features.links && mode !== 'sprints') planExtras.push('"links"');
+    if (features && features.epics && mode !== 'sprints') planExtras.push('"epics"');
+    if (features && features.customFields && mode !== 'sprints') planExtras.push('"customFields"');
+    if (planExtras.length) {
+        sections.push(`DO NOT FORGET: inside "plan", you MUST also include these sibling array(s) described earlier — ${planExtras.join(', ')} — in addition to the tasks/sprints. They are required; do not omit them.`);
+    }
+
     return sections.join('\n\n');
 }
 
