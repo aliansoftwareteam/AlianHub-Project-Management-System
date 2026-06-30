@@ -81,30 +81,39 @@ cd AlianHub-Project-Management-System
 npm run setup
 ```
 
-That's it. **No technical knowledge required.** `npm run setup` will:
+That's it. `npm run setup` will:
 
 1. Install all dependencies (root, frontend, wizard) in parallel
 2. Generate a `.env` file with secure random secrets
 3. Build the installation wizard UI
-4. Start the backend and frontend dev server
-5. **Auto-complete the installation wizard** — connects to MongoDB, sets up storage, skips optional services (Firebase / AI / SMTP), initializes the database, and creates an admin account
-6. Open `http://localhost:8080` in your browser
+4. Start the server (the same entry production uses)
+5. Open `http://localhost:4000` in your browser
+
+On a fresh system the server serves the **installation wizard**. Complete it
+yourself — connect MongoDB, choose storage, skip or configure optional services
+(Firebase / AI / SMTP), and create **your own** company and admin account.
+Nothing is created automatically.
 
 When it's done, you'll see this in your terminal:
 
 ```
-──────────────────────────────────────────────────────────
-  ✓  AlianHub is ready!
-──────────────────────────────────────────────────────────
+────────────────────────────────────────────────────────────
+  ✓  Server running — finish installation in your browser
+────────────────────────────────────────────────────────────
 
-  URL:       http://localhost:8080
-  Email:     admin@admin.local
-  Password:  admin123
-
-  API:       http://localhost:4000
-  Stop:      Ctrl+C in this terminal
-──────────────────────────────────────────────────────────
+  URL:   http://localhost:4000
+  The wizard guides you to connect MongoDB, choose storage, and create
+  your own company and admin account.
+  When it finishes, the app rebuilds and the server stops (same as
+  production). Run `npm start` again, then sign in.
+  Stop:  Ctrl+C
+────────────────────────────────────────────────────────────
 ```
+
+The wizard's final step rebuilds the frontend and the server exits — the same
+flow production relies on, where a process manager (e.g. pm2) restarts the app.
+Locally there's no process manager, so just run **`npm start`** again, open
+`http://localhost:4000`, and **log in with the account you created**.
 
 **Prerequisite:** MongoDB running locally on `mongodb://localhost:27017`. If you don't have it: `docker run -d -p 27017:27017 mongo:7` or download from [mongodb.com](https://www.mongodb.com/try/download/community).
 
@@ -112,21 +121,12 @@ When it's done, you'll see this in your terminal:
 
 | Command | What it does |
 |---------|--------------|
-| `npm run setup` | Full setup — install, configure, start, auto-complete wizard, open browser |
-| `npm run dev` | Fast restart — skips install, just starts the services |
+| `npm run setup` | Install deps, prepare `.env`, build the wizard UI, and start the server |
+| `npm run dev` | Same as setup but skips dependency install |
 | `npm run setup:reset` | Wipe `node_modules` and reinstall everything |
-| `npm run setup -- --manual` | Skip auto-setup — open the interactive wizard instead |
 | `npm run setup -- --no-open` | Start without auto-opening a browser |
 
-### Custom admin credentials
-
-```bash
-SETUP_ADMIN_EMAIL=you@example.com SETUP_ADMIN_PASSWORD=secret npm run setup
-```
-
-Other env-var overrides: `SETUP_ADMIN_FIRST`, `SETUP_ADMIN_LAST`, `SETUP_COMPANY`, `SETUP_PHONE`, `SETUP_COUNTRY`, `SETUP_CITY`, `SETUP_STATE`.
-
-> **Manual setup still works.** Everything above is an additive convenience layer. All existing scripts (`npm start`, `npm run nodemon`, `npm run basic-install`, etc.) and the original interactive wizard are unchanged. If `npm run setup` ever fails it falls back automatically to the wizard UI so you can finish manually.
+> All existing scripts (`npm start`, `npm run nodemon`, `npm run basic-install`) are unchanged. For active development with hot-reload, run the backend (`npm run nodemon`) and the frontend dev server (`cd frontend && npm run serve`) separately once the system is installed.
 
 ---
 
