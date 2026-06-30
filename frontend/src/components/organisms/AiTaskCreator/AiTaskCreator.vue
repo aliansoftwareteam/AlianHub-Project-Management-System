@@ -81,10 +81,13 @@
                             <input type="checkbox" v-model="features.epics" />
                             <span>Organize into epics</span>
                         </label>
+                        <!-- Temporarily hidden until the custom-field render is fixed; backend support stays in place and re-enables by uncommenting.
                         <label class="aitc__opt">
                             <input type="checkbox" v-model="features.customFields" />
                             <span>Add custom fields</span>
                         </label>
+                        -->
+
                     </div>
 
                     <div v-if="error" class="aitc__error">{{ error }}</div>
