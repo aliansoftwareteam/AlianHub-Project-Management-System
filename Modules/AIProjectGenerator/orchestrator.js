@@ -758,9 +758,13 @@ async function createTasksForSprint({ companyId, projectDoc, sprintDoc, tasks, s
             fieldMap,
         });
         parentDocs.push(parentDoc);
-        // Map the plan's temp `ref` to the real _id so links can be resolved
-        // after insert. Only top-level tasks are link targets.
-        if (refMap && t.ref) refMap.set(String(t.ref), parentDoc._id);
+        // Map BOTH the plan's temp `ref` AND the task name to the real _id, so
+        // links resolve whether the model referenced tasks by ref or by name
+        // (it reliably uses names; the abstract ref is often omitted). Top-level.
+        if (refMap) {
+            if (t.ref) refMap.set(String(t.ref), parentDoc._id);
+            if (t.TaskName) refMap.set(String(t.TaskName).trim().toLowerCase(), parentDoc._id);
+        }
         for (const st of subs) {
             subtaskDocs.push(buildTaskDoc({
                 task: st, projectDoc, sprintDoc, statusByName, taskTypeByKey, creatorUid,
@@ -1184,6 +1188,7 @@ async function applyCustomFields({ companyId, customFields, projectId, creatorUi
     let insertCustomFieldPromise;
     try { ({ insertCustomFieldPromise } = require('../CustomField/controller')); } catch (_e) { return map; }
     if (typeof insertCustomFieldPromise !== 'function') return map;
+    logger.info(`[AIPG] applyCustomFields: ${customFields.length} field(s) requested`);
     let templates = [];
     try { templates = require('../../utils/Tempates/customFields').defaultCustomFields || []; } catch (_e) { templates = []; }
     const optionColors = ['#FF5C5C', '#FFB020', '#3ECf8E', '#4D7CFF', '#C44BFF', '#00B8D9', '#8993A4'];
@@ -1230,6 +1235,7 @@ async function applyCustomFields({ companyId, customFields, projectId, creatorUi
             logger.error(`AI custom-field create error (${f.title}): ${err && err.message ? err.message : err}`);
         }
     }
+    logger.info(`[AIPG] applyCustomFields: created ${map.size} field def(s)`);
     return map;
 }
 
@@ -1288,11 +1294,14 @@ async function applyTaskLinks({ companyId, links, refMap, userData }) {
     let taskMongo;
     try { ({ taskMongo } = require('../Tasks/helpers/task_class_Mongo')); } catch (_e) { return 0; }
     if (!taskMongo || typeof taskMongo.addTaskRelation !== 'function') return 0;
+    logger.info(`[AIPG] applyTaskLinks: ${links.length} link(s) requested, refMap has ${refMap.size} entries`);
+    // Resolve a link endpoint by ref first, then by (lowercased) task name.
+    const resolveId = (k) => (k == null ? undefined : (refMap.get(String(k)) || refMap.get(String(k).trim().toLowerCase())));
     let made = 0;
     const seen = new Set();
     for (const link of links) {
-        const fromId = link && refMap.get(String(link.from));
-        const toId = link && refMap.get(String(link.to));
+        const fromId = link && resolveId(link.from);
+        const toId = link && resolveId(link.to);
         if (!fromId || !toId || String(fromId) === String(toId)) continue;
         const dedupeKey = `${fromId}|${toId}`;
         if (seen.has(dedupeKey)) continue;

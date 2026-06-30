@@ -327,7 +327,7 @@ function buildTasksUserMessage({ project, additionalRequirements, briefText, mem
     // Optional task links (AI-Assist "Link related tasks").
     if (features && features.links && mode !== 'sprints') {
         sections.push(
-            'TASK LINKS: give every task a unique short "ref" (e.g. "t1", "t2"). Then include a plan-level "links" array (a sibling of "tasks"/"sprints" inside "plan") for GENUINE dependencies between tasks — each entry is { "from": "<ref>", "to": "<ref>", "type": "blocks|blocked_by|relates_to|duplicates|duplicated_by" }. Use "blocks" when the "from" task must finish before the "to" task can start. Only link tasks with a real relationship; include no links (or omit the array) if there are none. Never link a task to itself.',
+            'TASK LINKS: include a plan-level "links" array (a sibling of "tasks"/"sprints" inside "plan") for GENUINE dependencies between tasks — each entry is { "from": "<exact TaskName>", "to": "<exact TaskName>", "type": "blocks|blocked_by|relates_to|duplicates|duplicated_by" }. Reference each task by its EXACT TaskName exactly as written in the plan (not an index or abbreviation). Use "blocks" when the "from" task must finish before the "to" task can start. Only link tasks with a real relationship; omit the array if there are none. Never link a task to itself.',
         );
     }
 
