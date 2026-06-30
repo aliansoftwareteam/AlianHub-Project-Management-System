@@ -278,7 +278,7 @@ function buildTasksSystemPrompt() {
  * @param {Array}  [args.members]
  * @param {Array}  [args.clarifications]
  */
-function buildTasksUserMessage({ project, additionalRequirements, briefText, members, clarifications }) {
+function buildTasksUserMessage({ project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features }) {
     const sections = [];
     const p = project || {};
 
@@ -317,9 +317,66 @@ function buildTasksUserMessage({ project, additionalRequirements, briefText, mem
         );
     }
 
-    sections.push(
-        'Reminder: emit ONE JSON object only. needsClarification MUST be false. Include the full "plan" with "sprints" only — there is NO "project" block.',
-    );
+    // Optional sub-tasks (AI-Assist "Break tasks into sub-tasks").
+    if (features && features.subtasks && mode !== 'sprints') {
+        sections.push(
+            'SUB-TASKS: for any task large enough to warrant breaking down, add an optional "subtasks" array on that task — each entry is { "TaskName": "...", "descriptionBlocks": [ ... ], "priority": "Low|Medium|High" }. Give each sub-task a SHORT description in "descriptionBlocks": at least one paragraph explaining what it involves (a brief ordered list of steps is welcome). It does NOT need the full "What to do" / "Acceptance criteria" skeleton that top-level tasks use. Only add sub-tasks where they genuinely help; omit the array for simple tasks. Never nest sub-tasks under sub-tasks.',
+        );
+    }
+
+    // Optional task links (AI-Assist "Link related tasks").
+    if (features && features.links && mode !== 'sprints') {
+        sections.push(
+            'TASK LINKS: include a plan-level "links" array (a sibling of "tasks"/"sprints" inside "plan") for GENUINE dependencies between tasks — each entry is { "from": "<exact TaskName>", "to": "<exact TaskName>", "type": "blocks|blocked_by|relates_to|duplicates|duplicated_by" }. Reference each task by its EXACT TaskName exactly as written in the plan (not an index or abbreviation). Use "blocks" when the "from" task must finish before the "to" task can start. Only link tasks with a real relationship; omit the array if there are none. Never link a task to itself.',
+        );
+    }
+
+    // Optional epics (AI-Assist "Organize into epics").
+    if (features && features.epics && mode !== 'sprints') {
+        sections.push(
+            'EPICS: include a plan-level "epics" array (a sibling of "tasks"/"sprints" inside "plan") — each entry is { "ref": "<unique short id, e.g. e1>", "name": "<epic name>", "color": "#RRGGBB" (optional) }. Group related tasks under an epic by setting that task\'s "epicRef" to the epic\'s "ref". Create epics only where tasks genuinely group into themes; leave a task\'s "epicRef" unset if it fits no epic, and do NOT create empty epics.',
+        );
+    }
+
+    // Optional custom fields (AI-Assist "Add custom fields").
+    if (features && features.customFields && mode !== 'sprints') {
+        sections.push(
+            'CUSTOM FIELDS: include a plan-level "customFields" array (a sibling of "tasks"/"sprints") — each entry is { "ref": "<unique short id, e.g. f1>", "title": "<field name>", "type": "text|number|date|dropdown|checkbox|money|email|phone|textarea", "options": ["..."] (ONLY for type "dropdown") }. Then set values per task via that task\'s "fieldValues": [ { "fieldRef": "<a field ref>", "value": <string|number|boolean; for dropdown use one of that field\'s option strings, for date use YYYY-MM-DD> } ]. Define only fields that add real value — keep it to 1-3 fields. Leave a task\'s "fieldValues" off when none apply.',
+        );
+    }
+
+    // Mode-specific output contract — placed LAST (highest format-compliance)
+    // and authoritative over any shape taught earlier in the system prompt.
+    const m = (mode === 'tasks' || mode === 'sprints') ? mode : 'full';
+    if (m === 'tasks') {
+        const tgt = String(targetSprintName || '').trim();
+        sections.push(
+            'OUTPUT MODE — TASKS ONLY.\n'
+            + `The user is adding tasks to the existing sprint${tgt ? ` "${tgt}"` : ''} — do NOT create or name any sprint, and do not duplicate tasks the project may already have.\n`
+            + 'Return ONE JSON object: { "needsClarification": false, "plan": { "tasks": [ ...task objects... ] } } — a FLAT array under "plan.tasks", with NO "sprints" key. Each task uses the full task shape (including the 5-block description).',
+        );
+    } else if (m === 'sprints') {
+        sections.push(
+            'OUTPUT MODE — SPRINTS ONLY.\n'
+            + 'The user only wants sprint structure — NO tasks at all.\n'
+            + 'Return ONE JSON object: { "needsClarification": false, "plan": { "sprints": [ { "sprintName": "..." }, ... ] } } — each sprint has ONLY a "sprintName", and there is NO "tasks" key anywhere.',
+        );
+    } else {
+        sections.push(
+            'Reminder: emit ONE JSON object only. needsClarification MUST be false. Include the full "plan" with "sprints" (each sprint with its "tasks") — there is NO "project" block.',
+        );
+    }
+
+    // Final, authoritative reminder: the per-mode contract above only describes
+    // tasks/sprints, so the model tends to drop the requested plan-level arrays.
+    // Spell out that they are required siblings inside "plan".
+    const planExtras = [];
+    if (features && features.links && mode !== 'sprints') planExtras.push('"links"');
+    if (features && features.epics && mode !== 'sprints') planExtras.push('"epics"');
+    if (features && features.customFields && mode !== 'sprints') planExtras.push('"customFields"');
+    if (planExtras.length) {
+        sections.push(`DO NOT FORGET: inside "plan", you MUST also include these sibling array(s) described earlier — ${planExtras.join(', ')} — in addition to the tasks/sprints. They are required; do not omit them.`);
+    }
 
     return sections.join('\n\n');
 }
