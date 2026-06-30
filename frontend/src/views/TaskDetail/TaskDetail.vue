@@ -185,19 +185,63 @@
         return getters["projectData/gettaskDetailData"];
     })
 
-    // Subtask completion (AHE-3776): how many of this parent's loaded subtasks
-    // are done (statusType 'close'), used by the progress badge in the task
-    // header and the subtask section. Derived from the same reactive `subTasks`
-    // the detail view already loads, so it stays live — getQueryFun() reloads
-    // the subtasks on every subtask socket update. Only non-deleted subtasks
-    // count; a task with no subtasks yields total 0 and the badge hides itself.
+    // Subtask completion (AHE-3776): how many of this parent's subtasks are done
+    // (statusType 'close'), used by the progress badge in the task header and the
+    // subtask section. The detail view loads at most `subTaskLimit` (35) subtasks,
+    // so a parent with more than that (e.g. 50) would otherwise report only the
+    // loaded slice ("0/35") and a misleading %. We therefore use:
+    //   • the live loaded list when it covers the whole set (the common case), or
+    //   • an accurate done/total count fetched via the /task/find aggregate when
+    //     there are more subtasks than were loaded (paginated parents).
+    // Only non-deleted subtasks count; a task with no subtasks yields total 0 and
+    // the badge hides itself. Stays live: getQueryFun() reloads the subtasks and
+    // refetches the count on every subtask socket update.
+    const fetchedSubtaskCount = ref(null);
+
     const subtaskCompletion = computed(() => {
         const list = Array.isArray(subTasks.value) ? subTasks.value : [];
         const valid = list.filter((s) => s && (s.deletedStatusKey === 0 || s.deletedStatusKey === undefined));
-        const total = valid.length;
-        const completed = valid.filter((s) => (s?.status?.type || s?.statusType) === 'close').length;
-        return { total, completed };
+        const loadedTotal = valid.length;
+        const loadedCompleted = valid.filter((s) => (s?.status?.type || s?.statusType) === 'close').length;
+
+        // The parent's stored subtask count is the true total; the loaded slice
+        // may be smaller when paginated. Trust whichever total is largest.
+        const fetched = fetchedSubtaskCount.value;
+        const trueTotal = Math.max(loadedTotal, Number(task.value?.subTasks) || 0, (fetched && fetched.total) || 0);
+        if (loadedTotal >= trueTotal) {
+            return { total: loadedTotal, completed: loadedCompleted };
+        }
+        if (fetched && fetched.total) {
+            return fetched;
+        }
+        // Accurate count still loading — keep the correct denominator meanwhile.
+        return { total: trueTotal, completed: loadedCompleted };
     });
+
+    // Accurate done/total count across ALL of this parent's subtasks (not just the
+    // loaded slice), via the existing /task/find aggregate — mirrors the list-row
+    // badge in Task.vue (fetchSubtaskProgress). Only runs when the loaded slice may
+    // be incomplete; best-effort, any failure leaves the live loaded value in place.
+    function fetchSubtaskCount() {
+        const parentId = task.value?._id;
+        if (!parentId) { fetchedSubtaskCount.value = null; return; }
+        const totalCount = Number(task.value?.subTasks) || 0;
+        const loaded = Array.isArray(subTasks.value) ? subTasks.value.length : 0;
+        const mayBeIncomplete = totalCount > subTaskLimit.value || (totalCount === 0 && loaded >= subTaskLimit.value);
+        if (!mayBeIncomplete) { fetchedSubtaskCount.value = null; return; }
+        const findQuery = [
+            { $match: { ParentTaskId: String(parentId), deletedStatusKey: { $in: [0, undefined] } } },
+            { $group: { _id: null, total: { $sum: 1 }, completed: { $sum: { $cond: [{ $eq: ['$statusType', 'close'] }, 1, 0] } } } },
+        ];
+        apiRequest('post', `${env.TASK}/find`, { findQuery })
+            .then((response) => {
+                const row = response?.data && response.data[0];
+                if (row) fetchedSubtaskCount.value = { total: Number(row.total) || 0, completed: Number(row.completed) || 0 };
+            })
+            .catch((error) => {
+                console.error('ERROR in fetchSubtaskCount: ', error);
+            });
+    }
 
     const currentUserId = inject("$userId");
     const user = getUser(currentUserId.value);
@@ -566,6 +610,7 @@
                         task.value = response[0].tasks[0] || {};
                         subTasks.value = response[0].subtasks || [];
                         commit('projectData/setTaskDetailData',{isSubTaskData: true, data: subTasks.value});
+                        fetchSubtaskCount();   // accurate %/count when subtasks exceed the loaded slice
 
                         if(!projectData.value?.isGlobalPermission && !(getters["settings/projectRules"] && Object.keys(getters["settings/projectRules"])?.length > 0)) {
                             dispatch("settings/setProjectRules", {pid: props.projectId})
