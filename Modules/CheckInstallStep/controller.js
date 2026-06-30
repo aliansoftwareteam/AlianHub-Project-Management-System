@@ -418,10 +418,14 @@ exports.checkSMTPConnection = async (bodyData, cb) => {
  */
 exports.checkTokenConnection = (req, cb) => {
     try {
+        // Open-source build: there is no license/token to validate. This step is a
+        // no-op kept only to preserve the install-step numbering. Previously this
+        // referenced an undeclared `response`, throwing a ReferenceError that flipped
+        // step 1 to "error" during setup.
         cb({
             status: true,
             statusText: "Token Connected",
-            data: response?.data || response,
+            data: null,
         });
 
     } catch (error) {
