@@ -1,16 +1,20 @@
 #!/usr/bin/env node
 /**
- * AlianHub Developer Setup
+ * AlianHub Setup
  *
- * One command, zero technical knowledge required:
- *   npm run setup              → installs deps, configures, starts, auto-completes wizard, opens browser
- *   npm run dev                → fast restart (skip install)
+ * Mirrors the production first-run flow locally — no dummy account, no auto-fill:
+ *   npm run setup              → installs deps, prepares .env, starts the server
+ *   npm run dev                → start without reinstalling deps (--skip-install)
  *   npm run setup -- --force   → wipe node_modules and reinstall
  *   npm run setup -- --no-open → don't auto-open a browser
- *   npm run setup -- --manual  → skip auto-setup; open the interactive wizard UI instead
  *
- * Custom admin credentials (optional):
- *   SETUP_ADMIN_EMAIL=you@you.com SETUP_ADMIN_PASSWORD=mypw npm run setup
+ * On a fresh system the server serves the installation wizard. You complete it
+ * yourself — connecting MongoDB, choosing storage, and creating your OWN company
+ * and admin account. Exactly like production: nothing is created automatically.
+ *
+ * The wizard's final step rebuilds the frontend and the process exits — the same
+ * behaviour production relies on (pm2 then restarts the app). Locally there is no
+ * process manager, so just run `npm start` again afterwards and sign in.
  *
  * All existing scripts (npm start, npm run nodemon, npm run basic-install) are untouched.
  */
@@ -18,7 +22,6 @@
 
 const { spawn, exec } = require('child_process');
 const http = require('http');
-const net = require('net');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -37,21 +40,6 @@ const argv         = process.argv.slice(2);
 const SKIP_INSTALL = argv.includes('--skip-install');
 const FORCE        = argv.includes('--force');
 const NO_OPEN      = argv.includes('--no-open');
-const MANUAL       = argv.includes('--manual'); // skip auto-setup, open wizard manually
-
-// ─── Defaults ────────────────────────────────────────────────────────────────
-const DEFAULT_ADMIN = {
-  firstName:     process.env.SETUP_ADMIN_FIRST    || 'Admin',
-  lastName:      process.env.SETUP_ADMIN_LAST     || 'User',
-  email:         process.env.SETUP_ADMIN_EMAIL    || 'admin@admin.local',
-  password:      process.env.SETUP_ADMIN_PASSWORD || 'admin123',
-  companyName:   process.env.SETUP_COMPANY        || 'My Company',
-  phoneNumber:   process.env.SETUP_PHONE          || '0000000000',
-  country:       process.env.SETUP_COUNTRY        || 'United States',
-  city:          process.env.SETUP_CITY           || 'San Francisco',
-  state:         process.env.SETUP_STATE          || 'California',
-  countryCodeObj: { name: 'United States', dialCode: '+1', isoCode: 'US' },
-};
 
 // ─── ANSI helpers ─────────────────────────────────────────────────────────────
 const R      = '\x1b[0m';
@@ -64,7 +52,6 @@ const RED    = '\x1b[31m';
 
 const tag   = (label, color) => `${color}${BOLD}[${label}]${R}`;
 const tick  = msg => console.log(`${GREEN}✓${R}  ${msg}`);
-const dash  = msg => console.log(`${DIM}-  ${msg}${R}`);
 const warn  = msg => console.log(`${YELLOW}⚠${R}  ${msg}`);
 const fatal = msg => { console.error(`${RED}✗${R}  ${msg}`); process.exit(1); };
 const step  = msg => console.log(`\n${BOLD}▶ ${msg}${R}`);
@@ -77,7 +64,6 @@ function cleanupChildren() {
 }
 process.on('SIGINT',  () => { process.stdout.write('\n'); cleanupChildren(); process.exit(0); });
 process.on('SIGTERM', () => { cleanupChildren(); process.exit(0); });
-// Don't orphan backend/frontend children if the orchestrator itself crashes.
 process.on('uncaughtException', err => {
   console.error(`${RED}✗${R}  Setup script crashed: ${err && err.stack || err}`);
   cleanupChildren();
@@ -148,9 +134,9 @@ function isDistValid(dir) {
 async function buildWizard() {
   if (SKIP_INSTALL) return;
   if (!fs.existsSync(INSTALL_DIR)) return;
-  // Only skip if a real built dist exists somewhere. The wizard UI is served
-  // from installation/dist; if frontend/dist is already built we skip too
-  // (full setup already completed; user can go straight to the app).
+  // Skip only if a real built dist already exists. The wizard UI is served from
+  // installation/dist; if the main app (frontend/dist) is already built the
+  // system is set up and the wizard isn't needed.
   if (isDistValid(INSTALL_DIST) || isDistValid(FRONTEND_DIST)) return;
 
   step('Building installation wizard UI (one-time, ~1 min)');
@@ -163,7 +149,7 @@ async function buildWizard() {
       d.toString().split('\n').forEach(l => l.trim() && process.stderr.write(`${DIM}${tag('wizard', YELLOW)} ${l}\n${R}`))
     );
     child.on('close', code => {
-      if (code !== 0) warn('Wizard UI build failed — wizard may not be visible if auto-setup falls back.');
+      if (code !== 0) warn('Wizard UI build failed — the wizard may not display until it is built.');
       else tick('Installation wizard UI built');
       resolve();
     });
@@ -171,11 +157,14 @@ async function buildWizard() {
 }
 
 // ─── Stage 3 : Bootstrap .env ────────────────────────────────────────────────
+// Ensures a valid .env exists so the server can boot (random secrets, a local
+// MongoDB default, server-side storage). This is environment scaffolding only —
+// the operator still connects MongoDB, chooses storage, and creates their
+// account in the wizard, exactly as in production.
 function bootstrapEnv() {
   step('Environment');
   if (fs.existsSync(ENV_PATH)) {
     tick('.env already exists — skipping bootstrap');
-    // Defensive: ensure critical keys are present (APIURL/WEBURL/PORT) — patch in-place if missing
     patchMissingEnvKeys();
     return;
   }
@@ -192,11 +181,11 @@ function bootstrapEnv() {
 
   fs.writeFileSync(ENV_PATH, src, 'utf8');
   tick('.env created (secrets auto-generated; STORAGE_TYPE=server for local dev)');
-  info('Wasabi / Firebase / AI / SMTP can be configured later via the admin UI.');
+  info('Wasabi / Firebase / AI / SMTP can be configured in the wizard or later via the admin UI.');
 }
 
 // Defensive: an existing .env created by an older bootstrap (or hand-edited)
-// might be missing keys the backend reads at module-load time. We append any
+// might be missing keys the backend reads at module-load time. Append any
 // missing critical keys so the backend doesn't crash on startup.
 function patchMissingEnvKeys() {
   const required = {
@@ -221,7 +210,7 @@ function patchMissingEnvKeys() {
   info(`.env was missing ${missing.length} required key(s) — added defaults: ${missing.map(s => s.split('=')[0]).join(', ')}`);
 }
 
-// ─── Stage 4 : Spawn backend + frontend ──────────────────────────────────────
+// ─── Stage 4 : Start the server (same entry production uses) ──────────────────
 function spawnService(cmd, args, cwd, label, color) {
   const child = spawn(cmd, args, { cwd, shell: true });
   const prefix = `${tag(label, color)} `;
@@ -231,19 +220,24 @@ function spawnService(cmd, args, cwd, label, color) {
   child.stderr.on('data', d =>
     d.toString().split('\n').forEach(l => l.trim() && process.stderr.write(`${prefix}${l}\n`))
   );
-  child.on('close', code => {
-    if (code != null && code !== 0) {
-      console.log(`${prefix}process exited (code ${code})`);
-    }
-  });
   children.push(child);
   return child;
 }
 
-function startServices() {
-  step('Starting backend and frontend');
-  spawnService('npm', ['run', 'nodemon'], ROOT,        'API', GREEN);
-  spawnService('npm', ['run', 'serve'],  FRONTEND_DIR, 'WEB', CYAN);
+function startServer(apiPort) {
+  step('Starting the server');
+  const child = spawnService('npm', ['start'], ROOT, 'SERVER', GREEN);
+  child.on('close', code => {
+    // The installation wizard's final step rebuilds the frontend and calls
+    // process.exit() — the same flow production uses, where pm2 then restarts
+    // the app. We deliberately do NOT auto-respawn: a recursive restart wrapper
+    // previously exhausted the process table and took staging down (see
+    // server.js). Just tell the operator how to bring the app back up.
+    console.log(`\n${YELLOW}${BOLD}Server stopped${R}${DIM} (exit ${code}).${R}`);
+    console.log(`${DIM}  If you just finished the installation wizard, this is expected — the app was rebuilt.${R}`);
+    console.log(`${DIM}  Start it again:  ${R}${CYAN}npm start${R}${DIM}   then open ${R}${CYAN}http://localhost:${apiPort}${R}${DIM} and sign in.${R}\n`);
+  });
+  return child;
 }
 
 // ─── Stage 5 : Wait helpers ───────────────────────────────────────────────────
@@ -263,21 +257,17 @@ function poll(url, intervalMs = 1500, timeoutMs = 120_000) {
   });
 }
 
-// ─── Stage 6 : HTTP helpers for headless wizard ──────────────────────────────
-function fetchJson(url, { method = 'GET', body = null } = {}, { timeoutMs = 30_000 } = {}) {
+// ─── Stage 6 : Install-state probe ───────────────────────────────────────────
+function fetchJson(url, { timeoutMs = 10_000 } = {}) {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
-    const payload = body ? JSON.stringify(body) : null;
     const req = http.request({
       hostname: u.hostname,
       port:     u.port,
       path:     u.pathname + u.search,
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(payload ? { 'Content-Length': Buffer.byteLength(payload) } : {}),
-      },
-      timeout: timeoutMs,
+      method:   'GET',
+      headers:  { 'Content-Type': 'application/json' },
+      timeout:  timeoutMs,
     }, res => {
       let raw = '';
       res.on('data', chunk => raw += chunk);
@@ -288,46 +278,13 @@ function fetchJson(url, { method = 'GET', body = null } = {}, { timeoutMs = 30_0
       });
     });
     req.on('error', reject);
-    req.on('timeout', () => req.destroy(new Error(`Timeout: ${method} ${url}`)));
-    if (payload) req.write(payload);
+    req.on('timeout', () => req.destroy(new Error(`Timeout: GET ${url}`)));
     req.end();
   });
 }
 
-// ─── Stage 6b : MongoDB probe (with retry) ───────────────────────────────────
-function probeMongoOnce(host, port) {
-  return new Promise(resolve => {
-    const s = new net.Socket();
-    s.setTimeout(2000);
-    s.once('connect', () => { s.destroy(); resolve(true); });
-    s.once('error',   () => resolve(false));
-    s.once('timeout', () => { s.destroy(); resolve(false); });
-    s.connect(port, host);
-  });
-}
-async function probeMongo(url) {
-  // Only probe plain mongodb:// URLs; mongodb+srv:// requires DNS SRV lookup.
-  const m = url && url.match(/^mongodb:\/\/(?:[^@\/]+@)?([^:\/?]+)(?::(\d+))?/);
-  if (!m) return true; // SRV or unrecognised → don't block; let wizard try
-  const host = m[1];
-  const port = parseInt(m[2] || '27017', 10);
-  // Retry up to 3 times with a 2s delay — handles a still-starting `docker run`
-  // container or a Windows service that takes a moment to come up.
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    if (await probeMongoOnce(host, port)) return true;
-    if (attempt < 3) await new Promise(r => setTimeout(r, 2000));
-  }
-  return false;
-}
-
-function readEnvValue(key) {
-  if (!fs.existsSync(ENV_PATH)) return null;
-  const content = fs.readFileSync(ENV_PATH, 'utf8');
-  const m = content.match(new RegExp(`^${key}=["']?([^"'\\n]+)["']?`, 'm'));
-  return m ? m[1] : null;
-}
-
-// ─── Stage 7 : Headless wizard auto-completion ───────────────────────────────
+// Best-effort: has installation finished already? Used only to tailor the
+// console banner (wizard vs. ready-to-sign-in). Any failure → treat as not done.
 async function isInstallationComplete(apiPort) {
   try {
     const { body } = await fetchJson(`http://localhost:${apiPort}/api/v1/installstep/get`);
@@ -340,95 +297,7 @@ async function isInstallationComplete(apiPort) {
   }
 }
 
-async function wizardStep(apiPort, body, timeoutMs = 60_000) {
-  const { statusCode, body: resp } = await fetchJson(
-    `http://localhost:${apiPort}/api/v1/checkinstallstep`,
-    { method: 'POST', body },
-    { timeoutMs },
-  );
-  if (statusCode >= 400 || resp?.status === false) {
-    const err = resp?.error || resp?.message || `HTTP ${statusCode}`;
-    throw new Error(typeof err === 'string' ? err : JSON.stringify(err));
-  }
-  return resp;
-}
-
-async function autoCompleteWizard(apiPort) {
-  if (MANUAL) {
-    info('--manual flag set — skipping auto-setup. The wizard UI will open instead.');
-    return { mode: 'manual' };
-  }
-
-  // Already done?
-  if (await isInstallationComplete(apiPort)) {
-    return { mode: 'already-done' };
-  }
-
-  // Probe MongoDB
-  const mongoUrl = readEnvValue('MONGODB_URL') || 'mongodb://localhost:27017';
-  const mongoOk = await probeMongo(mongoUrl);
-  if (!mongoOk) {
-    warn(`MongoDB doesn't appear to be running at ${mongoUrl}.`);
-    info('Install & start MongoDB locally, then re-run `npm run setup`. Quick options:');
-    info('  • Docker:   docker run -d -p 27017:27017 --name mongo mongo:7');
-    info('  • Windows:  https://www.mongodb.com/try/download/community');
-    info('Opening the wizard UI so you can enter a different MongoDB URL manually…');
-    return { mode: 'no-mongo' };
-  }
-
-  step('Auto-configuring AlianHub (no input required)');
-
-  try {
-    await wizardStep(apiPort, { step: 1 });
-    tick('Step 1/8  Token verified');
-
-    await wizardStep(apiPort, { step: 2, mongodbUrl: mongoUrl });
-    tick(`Step 2/8  MongoDB connected (${mongoUrl})`);
-
-    await wizardStep(apiPort, { step: 3, chooseStorage: 'default' });
-    tick('Step 3/8  Storage set to local server');
-
-    await wizardStep(apiPort, { step: 4, isDoItLater: true });
-    dash('Step 4/8  Firebase skipped (configure later if you need push notifications)');
-
-    await wizardStep(apiPort, { step: 5, isDoItLater: true });
-    dash('Step 5/8  AI skipped (configure later in Settings)');
-
-    await wizardStep(apiPort, { step: 6, isDoItLater: true });
-    dash('Step 6/8  SMTP skipped (configure later in Settings)');
-
-    info('Saving configuration and initializing database (10-15s)…');
-    await wizardStep(apiPort, { step: 7 }, 90_000);
-    tick('Step 7/8  Configuration saved + database initialized');
-
-    info('Creating your admin account and company (10s)…');
-    const { statusCode, body } = await fetchJson(
-      `http://localhost:${apiPort}/api/v1/installstep/createUserAndCompany`,
-      { method: 'POST', body: DEFAULT_ADMIN },
-      { timeoutMs: 90_000 },
-    );
-    if (statusCode === 420) {
-      tick('Step 8/8  Admin account already exists');
-      return { mode: 'partial-already-done' };
-    }
-    if (statusCode >= 400) {
-      // The controller's error paths use both `message` and `error` depending on
-      // which branch fails — check both, and stringify objects for visibility.
-      const raw = body?.message || body?.error || `HTTP ${statusCode}`;
-      throw new Error(typeof raw === 'string' ? raw : JSON.stringify(raw));
-    }
-    tick(`Step 8/8  Admin account created (${DEFAULT_ADMIN.email})`);
-
-    return { mode: 'completed', credentials: { email: DEFAULT_ADMIN.email, password: DEFAULT_ADMIN.password } };
-  } catch (e) {
-    const msg = (e && e.message) || String(e);
-    warn(`Auto-setup hit a snag: ${msg}`);
-    info('Falling back to the interactive wizard so you can complete the missing step.');
-    return { mode: 'failed', error: msg };
-  }
-}
-
-// ─── Stage 8 : Open browser ───────────────────────────────────────────────────
+// ─── Stage 7 : Open browser ───────────────────────────────────────────────────
 function openBrowser(url) {
   if (NO_OPEN) {
     info(`Browser launch skipped (--no-open). Visit: ${CYAN}${url}${R}`);
@@ -443,27 +312,13 @@ function openBrowser(url) {
   });
 }
 
-// ─── Stage 9 : Print credentials banner ───────────────────────────────────────
-// Flexible — gracefully handles long custom emails / passwords without breaking
-// alignment, because there's no fixed-width box to maintain.
-function printReadyBanner(apiPort, creds) {
-  const bar = '─'.repeat(58);
-  console.log(`\n${GREEN}${bar}${R}`);
-  console.log(`  ${GREEN}${BOLD}✓  AlianHub is ready!${R}`);
-  console.log(`${GREEN}${bar}${R}\n`);
-  console.log(`  URL:       ${CYAN}${BOLD}http://localhost:8080${R}`);
-  if (creds) {
-    console.log(`  Email:     ${BOLD}${creds.email}${R}`);
-    console.log(`  Password:  ${BOLD}${creds.password}${R}`);
-  }
-  console.log('');
-  console.log(`  API:       ${DIM}http://localhost:${apiPort}${R}`);
-  console.log(`  Stop:      ${DIM}Ctrl+C in this terminal${R}`);
-  console.log(`  Logs:      ${DIM}[API] and [WEB] streaming above${R}`);
-  console.log(`${GREEN}${bar}${R}\n`);
-}
-
 // ─── Utility : read PORT from .env ────────────────────────────────────────────
+function readEnvValue(key) {
+  if (!fs.existsSync(ENV_PATH)) return null;
+  const content = fs.readFileSync(ENV_PATH, 'utf8');
+  const m = content.match(new RegExp(`^${key}=["']?([^"'\\n]+)["']?`, 'm'));
+  return m ? m[1] : null;
+}
 function readApiPort() {
   const v = readEnvValue('PORT');
   return v ? parseInt(v, 10) : 4000;
@@ -471,8 +326,8 @@ function readApiPort() {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
-  console.log(`\n${BOLD}${CYAN}◆ AlianHub Developer Setup${R}`);
-  console.log(`${DIM}  One command — installs, configures, starts, and opens the app.${R}\n`);
+  console.log(`\n${BOLD}${CYAN}◆ AlianHub Setup${R}`);
+  console.log(`${DIM}  Installs, prepares the environment, and starts the server.${R}\n`);
 
   checkNode();
 
@@ -481,58 +336,38 @@ async function main() {
   bootstrapEnv();
 
   const apiPort = readApiPort();
-  startServices();
+  startServer(apiPort);
 
-  // Wait for backend first so we can talk to the wizard API while the frontend builds.
-  step('Waiting for backend');
+  step('Waiting for the server');
   try {
-    await poll(`http://localhost:${apiPort}/health`, 1500, 90_000);
-    tick(`Backend ready → http://localhost:${apiPort}`);
+    await poll(`http://localhost:${apiPort}/health`, 1500, 120_000);
+    tick(`Server ready → http://localhost:${apiPort}`);
   } catch (e) {
-    fatal(`Backend never came up: ${e.message}. Scroll up for [API] errors.`);
+    fatal(`Server never came up: ${e.message}. Scroll up for [SERVER] errors.`);
   }
 
-  // Auto-complete the wizard while the Vue dev server is still compiling.
-  const autoResult = await autoCompleteWizard(apiPort);
+  const url = `http://localhost:${apiPort}`;
+  const installed = await isInstallationComplete(apiPort);
+  openBrowser(url);
 
-  // Wait for the frontend dev server (Vue first compile ~30–60s).
-  step('Waiting for frontend (first compile takes ~30-60s)');
-  try {
-    await poll('http://localhost:8080', 2000, 180_000);
-    tick('Frontend ready → http://localhost:8080');
-  } catch (e) {
-    warn(`Frontend dev server not responding yet. You can still visit http://localhost:8080 once it finishes compiling.`);
+  const bar = '─'.repeat(60);
+  console.log(`\n${GREEN}${bar}${R}`);
+  if (installed) {
+    console.log(`  ${GREEN}${BOLD}✓  AlianHub is ready${R}`);
+    console.log(`${GREEN}${bar}${R}\n`);
+    console.log(`  URL:   ${CYAN}${BOLD}${url}${R}`);
+    console.log(`  ${DIM}Log in with the account you created during installation.${R}`);
+  } else {
+    console.log(`  ${GREEN}${BOLD}✓  Server running — finish installation in your browser${R}`);
+    console.log(`${GREEN}${bar}${R}\n`);
+    console.log(`  URL:   ${CYAN}${BOLD}${url}${R}`);
+    console.log(`  ${DIM}The wizard guides you to connect MongoDB, choose storage, and create${R}`);
+    console.log(`  ${DIM}your own company and admin account.${R}`);
+    console.log(`  ${DIM}When it finishes, the app rebuilds and the server stops (same as${R}`);
+    console.log(`  ${DIM}production). Run ${R}${CYAN}npm start${R}${DIM} again, then sign in.${R}`);
   }
-
-  // Decide where to send the user based on the auto-setup outcome.
-  switch (autoResult.mode) {
-    case 'completed':
-      openBrowser('http://localhost:8080');
-      printReadyBanner(apiPort, autoResult.credentials);
-      break;
-
-    case 'already-done':
-    case 'partial-already-done':
-      step('Setup already complete — opening login page');
-      openBrowser('http://localhost:8080');
-      printReadyBanner(apiPort, null);
-      info('Log in with the credentials you created previously.');
-      break;
-
-    case 'no-mongo':
-    case 'failed':
-    case 'manual':
-    default: {
-      const wizardUrl = fs.existsSync(INSTALL_DIST) ? `http://localhost:${apiPort}` : 'http://localhost:8080';
-      step('Opening installation wizard');
-      openBrowser(wizardUrl);
-      console.log(`\n${YELLOW}${BOLD}Manual setup needed.${R}`);
-      console.log(`${DIM}  Wizard:  ${wizardUrl}${R}`);
-      console.log(`${DIM}  App:     http://localhost:8080 (after wizard completes)${R}`);
-      console.log(`${DIM}  Stop:    Ctrl+C${R}\n`);
-      break;
-    }
-  }
+  console.log(`  ${DIM}Stop:  Ctrl+C${R}`);
+  console.log(`${GREEN}${bar}${R}\n`);
 }
 
 main().catch(e => fatal(e.message || String(e)));
