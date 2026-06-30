@@ -324,6 +324,27 @@ function buildTasksUserMessage({ project, additionalRequirements, briefText, mem
         );
     }
 
+    // Optional task links (AI-Assist "Link related tasks").
+    if (features && features.links && mode !== 'sprints') {
+        sections.push(
+            'TASK LINKS: give every task a unique short "ref" (e.g. "t1", "t2"). Then include a plan-level "links" array (a sibling of "tasks"/"sprints" inside "plan") for GENUINE dependencies between tasks — each entry is { "from": "<ref>", "to": "<ref>", "type": "blocks|blocked_by|relates_to|duplicates|duplicated_by" }. Use "blocks" when the "from" task must finish before the "to" task can start. Only link tasks with a real relationship; include no links (or omit the array) if there are none. Never link a task to itself.',
+        );
+    }
+
+    // Optional epics (AI-Assist "Organize into epics").
+    if (features && features.epics && mode !== 'sprints') {
+        sections.push(
+            'EPICS: include a plan-level "epics" array (a sibling of "tasks"/"sprints" inside "plan") — each entry is { "ref": "<unique short id, e.g. e1>", "name": "<epic name>", "color": "#RRGGBB" (optional) }. Group related tasks under an epic by setting that task\'s "epicRef" to the epic\'s "ref". Create epics only where tasks genuinely group into themes; leave a task\'s "epicRef" unset if it fits no epic, and do NOT create empty epics.',
+        );
+    }
+
+    // Optional custom fields (AI-Assist "Add custom fields").
+    if (features && features.customFields && mode !== 'sprints') {
+        sections.push(
+            'CUSTOM FIELDS: include a plan-level "customFields" array (a sibling of "tasks"/"sprints") — each entry is { "ref": "<unique short id, e.g. f1>", "title": "<field name>", "type": "text|number|date|dropdown|checkbox|money|email|phone|textarea", "options": ["..."] (ONLY for type "dropdown") }. Then set values per task via that task\'s "fieldValues": [ { "fieldRef": "<a field ref>", "value": <string|number|boolean; for dropdown use one of that field\'s option strings, for date use YYYY-MM-DD> } ]. Define only fields that add real value — keep it to 1-3 fields. Leave a task\'s "fieldValues" off when none apply.',
+        );
+    }
+
     // Mode-specific output contract — placed LAST (highest format-compliance)
     // and authoritative over any shape taught earlier in the system prompt.
     const m = (mode === 'tasks' || mode === 'sprints') ? mode : 'full';

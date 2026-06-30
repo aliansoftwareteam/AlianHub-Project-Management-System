@@ -645,7 +645,7 @@ function normalizePriority(raw) {
     return norm || 'MEDIUM';
 }
 
-function buildTaskDoc({ task, projectDoc, sprintDoc, statusByName, taskTypeByKey, creatorUid, parentTaskId, subTaskCount }) {
+function buildTaskDoc({ task, projectDoc, sprintDoc, statusByName, taskTypeByKey, creatorUid, parentTaskId, subTaskCount, epicId, fieldMap }) {
     const id = new mongoose.Types.ObjectId();
     const taskType = taskTypeByKey.get(String(task.TaskTypeKey || '')) || projectDoc.taskTypeCounts[0];
 
@@ -698,6 +698,7 @@ function buildTaskDoc({ task, projectDoc, sprintDoc, statusByName, taskTypeByKey
         statusKey: statusDetails.key,
         isParentTask: !parentTaskId,
         subTasks: parentTaskId ? 0 : (subTaskCount || 0),
+        ...(epicId ? { epicId } : {}),
         Task_Leader: taskLeader,
         Task_Priority: normalizePriority(task.priority),
         deletedStatusKey: 0,
@@ -717,7 +718,7 @@ function buildTaskDoc({ task, projectDoc, sprintDoc, statusByName, taskTypeByKey
         tagsArray: [],
         favouriteTasks: [],
         queueListArray: [],
-        customField: {},
+        customField: buildCustomFieldValues(task, fieldMap),
     };
 }
 
@@ -739,7 +740,7 @@ async function reserveTaskKeyRange({ companyId, projectId, count, taskTypeIncrem
     return { newLastTaskId: lastTaskId, startKey: lastTaskId - count + 1 };
 }
 
-async function createTasksForSprint({ companyId, projectDoc, sprintDoc, tasks, statusByName, taskTypeByKey, creatorUid, userData }) {
+async function createTasksForSprint({ companyId, projectDoc, sprintDoc, tasks, statusByName, taskTypeByKey, creatorUid, userData, refMap, epicMap, fieldMap }) {
     if (!tasks || tasks.length === 0) return [];
 
     // Build each top-level task, then its optional sub-tasks (which reference
@@ -753,8 +754,13 @@ async function createTasksForSprint({ companyId, projectDoc, sprintDoc, tasks, s
         const parentDoc = buildTaskDoc({
             task: t, projectDoc, sprintDoc, statusByName, taskTypeByKey, creatorUid,
             subTaskCount: subs.length,
+            epicId: (epicMap && t.epicRef) ? epicMap.get(String(t.epicRef)) : undefined,
+            fieldMap,
         });
         parentDocs.push(parentDoc);
+        // Map the plan's temp `ref` to the real _id so links can be resolved
+        // after insert. Only top-level tasks are link targets.
+        if (refMap && t.ref) refMap.set(String(t.ref), parentDoc._id);
         for (const st of subs) {
             subtaskDocs.push(buildTaskDoc({
                 task: st, projectDoc, sprintDoc, statusByName, taskTypeByKey, creatorUid,
@@ -1140,12 +1146,182 @@ async function rollbackTasks({ companyId, tracker }) {
  * (which handle task-key reservation, socket emits, history, and background
  * AI time-estimates) against the loaded project doc.
  */
+// Build the task doc's `customField` map from the plan task's fieldValues,
+// resolving each fieldRef -> { fieldId, type, optionMap } and coercing the value
+// per field type. Returns {} when nothing applies.
+function buildCustomFieldValues(task, fieldMap) {
+    const out = {};
+    if (!fieldMap || !task || !Array.isArray(task.fieldValues)) return out;
+    for (const fv of task.fieldValues) {
+        const def = fv && fieldMap.get(String(fv.fieldRef));
+        if (!def) continue;
+        const fid = String(def.fieldId);
+        let value = fv.value;
+        if (def.type === 'dropdown') {
+            const v = value == null ? '' : String(value);
+            const optId = def.optionMap && (def.optionMap.get(v) || def.optionMap.get(v.toLowerCase()));
+            value = optId ? [optId] : [];
+        } else if (def.type === 'number' || def.type === 'money') {
+            value = Number(value);
+            if (Number.isNaN(value)) continue;
+        } else if (def.type === 'checkbox') {
+            value = value === true || value === 'true' || value === 'yes' || value === 1;
+        } else {
+            value = value == null ? '' : String(value);
+        }
+        out[fid] = { fieldValue: value, _id: fid };
+    }
+    return out;
+}
+
+// Create the plan's custom-field definitions in the project and return a
+// Map(ref -> { fieldId, type, optionMap }) so task values can be set. Reuses
+// CustomField/controller.insertCustomFieldPromise with the per-type template
+// defaults. Best-effort; a failed field is logged and skipped.
+async function applyCustomFields({ companyId, customFields, projectId, creatorUid }) {
+    const map = new Map();
+    if (!Array.isArray(customFields) || !customFields.length) return map;
+    let insertCustomFieldPromise;
+    try { ({ insertCustomFieldPromise } = require('../CustomField/controller')); } catch (_e) { return map; }
+    if (typeof insertCustomFieldPromise !== 'function') return map;
+    let templates = [];
+    try { templates = require('../../utils/Tempates/customFields').defaultCustomFields || []; } catch (_e) { templates = []; }
+    const optionColors = ['#FF5C5C', '#FFB020', '#3ECf8E', '#4D7CFF', '#C44BFF', '#00B8D9', '#8993A4'];
+    for (const f of customFields) {
+        if (!f || !f.ref || !f.title || !f.type) continue;
+        const tmpl = templates.find((t) => t.cfType === f.type) || templates.find((t) => t.cfType === 'text') || {};
+        const def = {
+            fieldTitle: String(f.title).trim().slice(0, 80),
+            fieldPlaceholder: '',
+            fieldDescription: tmpl.cfDescrption || '',
+            fieldType: f.type,
+            fieldImage: tmpl.cfIcon || 'CustomFieldText',
+            fieldImageGrey: tmpl.cfIconGrey || 'CustomFieldTextGrey',
+            fieldPrimaryColor: tmpl.cfPrimaryColor || '#6473E8',
+            fieldBackgroundColor: tmpl.cfBackgroundColor || '#E0E2FF',
+            global: false,
+            projectId: [projectId],
+            type: 'task',
+            isDelete: false,
+            userId: String(creatorUid || ''),
+            fieldRequired: [],
+            fieldMinimum: '',
+            fieldMaximum: '',
+            fieldHide: [],
+            fieldValidation: '',
+            fieldEntryLimits: [],
+        };
+        let optionMap = null;
+        if (f.type === 'dropdown' && Array.isArray(f.options) && f.options.length) {
+            optionMap = new Map();
+            def.fieldOptions = f.options.slice(0, 30).map((opt, i) => {
+                const val = String(opt).slice(0, 80);
+                const id = Math.random().toString(36).slice(2, 8);
+                optionMap.set(val, id);
+                optionMap.set(val.toLowerCase(), id);
+                return { id, color: optionColors[i % optionColors.length], value: val, label: val, selected: false };
+            });
+        }
+        try {
+            const created = await insertCustomFieldPromise(def, 'save', companyId);
+            const fid = created && (created._id || (created.data && created.data._id));
+            if (fid) map.set(String(f.ref), { fieldId: String(fid), type: f.type, optionMap });
+        } catch (err) {
+            logger.error(`AI custom-field create error (${f.title}): ${err && err.message ? err.message : err}`);
+        }
+    }
+    return map;
+}
+
+// Count how many plan tasks reference each epic ref, so each created epic gets
+// an accurate taskCount without a follow-up recount.
+function countTasksByEpicRef(tasksPlan) {
+    const counts = {};
+    const bump = (t) => { if (t && t.epicRef) counts[String(t.epicRef)] = (counts[String(t.epicRef)] || 0) + 1; };
+    if (Array.isArray(tasksPlan && tasksPlan.tasks)) tasksPlan.tasks.forEach(bump);
+    if (Array.isArray(tasksPlan && tasksPlan.sprints)) tasksPlan.sprints.forEach((s) => (s.tasks || []).forEach(bump));
+    return counts;
+}
+
+// Create the plan's epics in the project and return a Map(ref -> epic _id) so
+// tasks can be assigned via epicId. Best-effort; a failed epic is logged and
+// skipped. Each epic's taskCount is set from the plan up front.
+async function applyEpics({ companyId, epics, projectId, userData, tasksPlan }) {
+    const map = new Map();
+    if (!Array.isArray(epics) || !epics.length) return map;
+    const counts = countTasksByEpicRef(tasksPlan);
+    for (const e of epics) {
+        if (!e || !e.name || !e.ref) continue;
+        try {
+            const created = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.EPICS,
+                data: {
+                    name: String(e.name).trim().slice(0, 120),
+                    description: '',
+                    ProjectID: new mongoose.Types.ObjectId(String(projectId)),
+                    color: (typeof e.color === 'string' && e.color) || '#7b68ee',
+                    status: 'open',
+                    priority: 'medium',
+                    ownerUserId: userData && userData.id ? String(userData.id) : '',
+                    startDate: null,
+                    dueDate: null,
+                    createdBy: userData && userData.id ? String(userData.id) : '',
+                    taskCount: counts[String(e.ref)] || 0,
+                    completedCount: 0,
+                    deletedStatusKey: 0,
+                },
+            }, 'save');
+            if (created && created._id) map.set(String(e.ref), created._id);
+        } catch (err) {
+            logger.error(`AI epic-create error (${e.name}): ${err && err.message ? err.message : err}`);
+        }
+    }
+    return map;
+}
+
+// Create the plan's task links after all tasks exist, resolving each link's
+// from/to `ref` to a real task id via refMap. Best-effort: a failed link is
+// logged and skipped, never blocking the run. Returns the count created.
+// taskMongo is required lazily to avoid a circular require at module load.
+async function applyTaskLinks({ companyId, links, refMap, userData }) {
+    if (!Array.isArray(links) || !links.length || !refMap || !refMap.size) return 0;
+    let taskMongo;
+    try { ({ taskMongo } = require('../Tasks/helpers/task_class_Mongo')); } catch (_e) { return 0; }
+    if (!taskMongo || typeof taskMongo.addTaskRelation !== 'function') return 0;
+    let made = 0;
+    const seen = new Set();
+    for (const link of links) {
+        const fromId = link && refMap.get(String(link.from));
+        const toId = link && refMap.get(String(link.to));
+        if (!fromId || !toId || String(fromId) === String(toId)) continue;
+        const dedupeKey = `${fromId}|${toId}`;
+        if (seen.has(dedupeKey)) continue;
+        seen.add(dedupeKey);
+        try {
+            const res = await taskMongo.addTaskRelation({
+                companyId,
+                taskId: String(fromId),
+                relatedTaskId: String(toId),
+                type: link.type || 'relates_to',
+                userData,
+            });
+            if (res && res.status) made += 1;
+        } catch (e) {
+            logger.error(`AI task-link error (${link.from}->${link.to}): ${e && e.message ? e.message : e}`);
+        }
+    }
+    return made;
+}
+
 async function executeTasksIntoProject({ tasksPlan, projectId, companyId, uid, userData, jobId, mode, targetSprintId }) {
     const tracker = { sprints: [], tasks: [] };
     const emit = (payload) => sseEmitter.emit(jobId, payload);
     // 'full' (sprints + tasks), 'sprints' (sprints only), 'tasks' (tasks into
     // an existing sprint). Anything else falls back to the original 'full'.
     const m = (mode === 'tasks' || mode === 'sprints') ? mode : 'full';
+    // Maps each plan task's temp `ref` to its created _id, so plan.links can be
+    // resolved to real task ids after insert.
+    const refMap = new Map();
     try {
         emit({ event: 'progress', step: 'project', status: 'started' });
         const projectDoc = await withTimeout(loadProjectForTasks(companyId, projectId), 45000, 'loadProjectForTasks');
@@ -1157,6 +1333,12 @@ async function executeTasksIntoProject({ tasksPlan, projectId, companyId, uid, u
 
         const taskStatusByName = new Map(projectDoc.taskStatusData.map((s) => [String(s.name).toLowerCase(), { name: s.name, key: s.key, type: s.type }]));
         const taskTypeByKey = new Map((projectDoc.taskTypeCounts || []).map((t) => [String(t.key), t]));
+
+        // Create epics up front (best-effort) so tasks can be assigned to them
+        // at build time via epicId. Empty/disabled → empty map (no-op).
+        const epicMap = await applyEpics({ companyId, epics: tasksPlan.epics, projectId: projectDoc._id, userData, tasksPlan });
+        // Create custom-field definitions up front so task values can be set.
+        const fieldMap = await applyCustomFields({ companyId, customFields: tasksPlan.customFields, projectId: projectDoc._id, creatorUid: uid });
 
         // ── Mode: TASKS ONLY → into an EXISTING sprint ──
         // No sprint is created; we resolve the target sprint from the project
@@ -1179,14 +1361,16 @@ async function executeTasksIntoProject({ tasksPlan, projectId, companyId, uid, u
             emit({ event: 'progress', step: 'tasks', status: 'started', total: tasks.length });
             const created = await createTasksForSprint({
                 companyId, projectDoc, sprintDoc, tasks,
-                statusByName: taskStatusByName, taskTypeByKey, creatorUid: uid, userData,
+                statusByName: taskStatusByName, taskTypeByKey, creatorUid: uid, userData, refMap, epicMap, fieldMap,
             });
             for (const t of created) tracker.tasks.push(t._id.toString());
             emit({ event: 'progress', step: 'tasks', status: 'progress', completed: created.length, total: tasks.length });
 
+            const links = await applyTaskLinks({ companyId, links: tasksPlan.links, refMap, userData });
+
             try { removeCache('UserProjectData:', true); } catch (_e) { /* ignore */ }
-            emit({ event: 'complete', projectId: String(projectDoc._id), totals: { sprints: 0, tasks: tracker.tasks.length } });
-            return { ok: true, projectId: String(projectDoc._id), totals: { sprints: 0, tasks: tracker.tasks.length } };
+            emit({ event: 'complete', projectId: String(projectDoc._id), totals: { sprints: 0, tasks: tracker.tasks.length, links } });
+            return { ok: true, projectId: String(projectDoc._id), totals: { sprints: 0, tasks: tracker.tasks.length, links } };
         }
 
         // ── Modes: FULL and SPRINTS ONLY → create new sprints ──
@@ -1228,20 +1412,25 @@ async function executeTasksIntoProject({ tasksPlan, projectId, companyId, uid, u
                 taskTypeByKey,
                 creatorUid: uid,
                 userData,
+                refMap,
+                epicMap,
+                fieldMap,
             });
             for (const t of created) tracker.tasks.push(t._id.toString());
             completed += created.length;
             emit({ event: 'progress', step: 'tasks', status: 'progress', completed, total: totalTasks });
         }
 
+        const links = await applyTaskLinks({ companyId, links: tasksPlan.links, refMap, userData });
+
         try { removeCache('UserProjectData:', true); } catch (_e) { /* ignore */ }
 
         emit({
             event: 'complete',
             projectId: String(projectDoc._id),
-            totals: { sprints: tracker.sprints.length, tasks: tracker.tasks.length },
+            totals: { sprints: tracker.sprints.length, tasks: tracker.tasks.length, links },
         });
-        return { ok: true, projectId: String(projectDoc._id), totals: { sprints: tracker.sprints.length, tasks: tracker.tasks.length } };
+        return { ok: true, projectId: String(projectDoc._id), totals: { sprints: tracker.sprints.length, tasks: tracker.tasks.length, links } };
     } catch (error) {
         logger.error(`[AIPG-tasks][${jobId}] orchestrator catch: ${error && error.message ? error.message : error}${error && error.stack ? '\n' + error.stack : ''}`);
         await rollbackTasks({ companyId, tracker });

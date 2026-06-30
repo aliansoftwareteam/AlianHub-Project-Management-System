@@ -106,6 +106,18 @@ const SubTaskSchema = z.object({
 
 const TaskSchema = z.object({
     TaskName: z.string().min(2).max(200),
+    // Optional temp id the model assigns so links can reference this task
+    // before real _ids exist. Never persisted to the task doc.
+    ref: z.string().min(1).max(60).optional(),
+    // Optional epic this task belongs to (AI-Assist "Organize into epics"),
+    // referencing a plan epic's `ref`.
+    epicRef: z.string().min(1).max(60).optional(),
+    // Optional custom-field values (AI-Assist "Add custom fields"), each
+    // referencing a plan field's `ref`.
+    fieldValues: z.array(z.object({
+        fieldRef: z.string().min(1).max(60),
+        value: z.union([z.string(), z.number(), z.boolean()]),
+    })).max(50).optional(),
     descriptionBlocks: z.array(DescriptionBlock).min(5).max(20),
     TaskTypeKey: z.union([z.number(), z.string()]).optional(),
     status: z.string().min(1).max(40),
@@ -263,8 +275,36 @@ const ClarifyResponseSchema = z.object({
 // orchestrator forces new tasks into the project's first status column and
 // falls back to its first task type, so task.status / TaskTypeKey are
 // advisory; we only enforce structure + the total-task safety cap here.
+// A dependency link between two tasks, by their plan `ref`s (AI-Assist "Link
+// related tasks"). Resolved to real task ids after creation.
+const LinkSchema = z.object({
+    from: z.string().min(1).max(60),
+    to: z.string().min(1).max(60),
+    type: z.enum(['blocks', 'blocked_by', 'duplicates', 'duplicated_by', 'relates_to']).default('relates_to'),
+});
+
+// An epic to create in the project (AI-Assist "Organize into epics"). Tasks
+// reference it by `ref` via their `epicRef`. Resolved to a real epic id.
+const EpicSchema = z.object({
+    ref: z.string().min(1).max(60),
+    name: z.string().min(1).max(120),
+    color: z.string().regex(HEX_COLOR).optional(),
+});
+
+// A custom field to create in the project (AI-Assist "Add custom fields").
+// Tasks set values via fieldValues -> fieldRef. Resolved to a real field id.
+const CustomFieldSchema = z.object({
+    ref: z.string().min(1).max(60),
+    title: z.string().min(1).max(80),
+    type: z.enum(['text', 'textarea', 'number', 'date', 'money', 'email', 'phone', 'checkbox', 'dropdown']),
+    options: z.array(z.string().min(1).max(80)).max(30).optional(),
+});
+
 const TasksPlanSchema = z.object({
     sprints: z.array(SprintSchema).min(1).max(200),
+    links: z.array(LinkSchema).max(500).optional(),
+    epics: z.array(EpicSchema).max(50).optional(),
+    customFields: z.array(CustomFieldSchema).max(30).optional(),
 }).superRefine((plan, ctx) => {
     const total = plan.sprints.reduce((acc, s) => acc + s.tasks.length, 0);
     if (total > 2000) {
@@ -285,6 +325,9 @@ const TasksResponseSchema = z.object({
 // chosen sprint. 200 is a generous safety cap.
 const TasksOnlyPlanSchema = z.object({
     tasks: z.array(TaskSchema).min(1).max(200),
+    links: z.array(LinkSchema).max(500).optional(),
+    epics: z.array(EpicSchema).max(50).optional(),
+    customFields: z.array(CustomFieldSchema).max(30).optional(),
 });
 
 const TasksOnlyResponseSchema = z.object({

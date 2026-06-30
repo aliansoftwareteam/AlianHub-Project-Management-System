@@ -73,6 +73,18 @@
                             <input type="checkbox" v-model="features.subtasks" />
                             <span>Break tasks into sub-tasks</span>
                         </label>
+                        <label class="aitc__opt">
+                            <input type="checkbox" v-model="features.links" />
+                            <span>Link related tasks</span>
+                        </label>
+                        <label class="aitc__opt">
+                            <input type="checkbox" v-model="features.epics" />
+                            <span>Organize into epics</span>
+                        </label>
+                        <label class="aitc__opt">
+                            <input type="checkbox" v-model="features.customFields" />
+                            <span>Add custom fields</span>
+                        </label>
                     </div>
 
                     <div v-if="error" class="aitc__error">{{ error }}</div>
@@ -98,6 +110,9 @@
                         <span class="aitc__preview-hint">Review — uncheck anything you don't want.</span>
                         <span class="aitc__selected-pill">{{ selectedCount }} selected</span>
                     </div>
+                    <div v-if="plan.links && plan.links.length" class="aitc__links-note">🔗 {{ plan.links.length }} task link{{ plan.links.length === 1 ? '' : 's' }} will be created</div>
+                    <div v-if="plan.epics && plan.epics.length" class="aitc__links-note">📁 {{ plan.epics.length }} epic{{ plan.epics.length === 1 ? '' : 's' }} will be created</div>
+                    <div v-if="plan.customFields && plan.customFields.length" class="aitc__links-note">🏷️ {{ plan.customFields.length }} custom field{{ plan.customFields.length === 1 ? '' : 's' }} will be created</div>
                     <div class="aitc__plan style-scroll">
                         <!-- full: sprints, each with its tasks -->
                         <template v-if="mode === 'full'">
@@ -185,7 +200,7 @@ const plan = ref({ sprints: [] });
 const progressMsg = ref('');
 const error = ref('');
 // Optional capabilities (AI-Assist "Advanced" section). Off by default.
-const features = ref({ subtasks: false });
+const features = ref({ subtasks: false, links: false, epics: false, customFields: false });
 
 const targetSprintName = computed(() => {
     const s = (props.sprints || []).find((x) => String(x.id) === String(targetSprintId.value));
@@ -244,7 +259,7 @@ function reset() {
     plan.value = { sprints: [] };
     progressMsg.value = '';
     error.value = '';
-    features.value = { subtasks: false };
+    features.value = { subtasks: false, links: false, epics: false, customFields: false };
 }
 
 // Fresh state each time the modal opens (and picks up the latest active sprint).
@@ -528,6 +543,7 @@ function successMessage(totals) {
 .aitc__preview-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .aitc__preview-hint { font-size: 13px; color: #6b7488; }
 .aitc__selected-pill { font-size: 12px; font-weight: 600; color: #6a5cff; background: #f3f1ff; border-radius: 999px; padding: 3px 11px; }
+.aitc__links-note { font-size: 12px; color: #6b7488; margin: -4px 0 8px; }
 .aitc__plan { overflow-y: auto; max-height: 48vh; border: 1px solid #ecedf3; border-radius: 12px; padding: 6px; }
 .aitc__sprint { margin-bottom: 6px; }
 .aitc__sprint-name {
