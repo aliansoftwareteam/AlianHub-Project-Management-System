@@ -16,6 +16,34 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.7.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.6.1...v14.7.0) (2026-07-01)
+
+
+### 🚀 Features
+
+* **ai-assist:** add AI-generated sub-tasks (Advanced toggle) ([8851f3f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8851f3fc3a3503e26cbd3d6f4f103ec3bc5c0df3))
+* **ai-assist:** add task links, epics, and custom fields (Advanced toggles) ([7283a10](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7283a10f1b7758faf75aa5c76ac6bccdc4279326))
+* **ai-assist:** add Tasks-only and Sprints-only modes to Plan with AI ([a46093b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a46093b77ff223b65c8755f1a08c5a8a21c9a31a))
+* **ai-assist:** create modes + sub-tasks, links & epics for Plan with AI ([fa576af](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fa576af7cd04abe6cda6a3ae74343b081638fcd5))
+* **ai:** "Add to description" mode for Write with AI ([b22f9b8](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b22f9b862c31262f408fbb5163d76c5a4a7c267d))
+* **ai:** add "Add to description" mode to Write with AI ([c87e735](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c87e735224dd44cf4722dfd662558601605036b7))
+* **installer:** dynamic first-run setup, no default user ([ed178f5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ed178f5a6d4ff03c5b9a573d0c669c6bc905d95e))
+* **installer:** dynamic first-run setup, no default user ([d4af596](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d4af596620ff991618b687558ffde764f51ea84c))
+
+
+### 🐛 Bug Fixes
+
+* **ai-assist:** persist AI-generated links/epics/custom-fields ([ca4fbbe](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ca4fbbec61fde57edc7cc583a8755cdf396c2d00))
+* **ai-assist:** resolve task links by TaskName (+ diagnostics) ([ce1154c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ce1154c0a9fa963a08f9f7346a9284f4a5cc9200))
+* **installer:** remove License Key step from setup wizard ([05b70a2](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/05b70a24620d30b6a63509a026032b9ffbb496d9))
+* **installer:** remove License Key step from setup wizard ([4bf0b00](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4bf0b00d8c7124887f45e1e956c2fe3e8fdb11aa))
+* **logtime:** show real date in tracked-time activity log (was DATE_undefined) ([bc5cafd](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bc5cafd02d600e5e3964260ba6233769844475be))
+* **logtime:** tracked-time activity log showed DATE_undefined ([5a3b6a0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5a3b6a09f4f33efd1e81c39265d717a4ed887bdf))
+* **projects:** align empty-state CTA buttons into a consistent pair ([2bc7c82](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2bc7c82df56c19663195b79427dd4523dfce86f9))
+* **projects:** align empty-state CTA buttons into a consistent pair ([6fce7b9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6fce7b904776b89129d2456ac85592505a757e98))
+* **task-detail:** accurate subtask progress % for parents with &gt;35 subtasks ([87b0ef0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/87b0ef02ff4327fe981f7de9f85fb84cadde7c29))
+* **task-detail:** accurate subtask progress % for parents with &gt;35 subtasks ([1da89cf](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1da89cf8a74f8ae311093c924ec0333cfcc0d435))
+
 ## [14.6.1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.6.0...v14.6.1) (2026-06-27)
 
 
