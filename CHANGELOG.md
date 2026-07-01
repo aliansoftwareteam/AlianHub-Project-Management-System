@@ -21,7 +21,6 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ### 🐛 Bug Fixes
 
-* release-please auto-tagging and duplicate docker builds ([fc75180](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fc751808aab7ec66781907cc40499d7a57f325ac))
 * release-please auto-tagging and duplicate docker builds ([10920f7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/10920f7424d58ce0483f0486c3304423c10395d5))
 
 ## [14.6.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.5.0...v14.6.0) (2026-06-26)

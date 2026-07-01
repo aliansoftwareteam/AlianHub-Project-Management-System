@@ -6,7 +6,6 @@ const logger = require('../../Config/loggerConfig.js');
 const { default: mongoose } = require("mongoose");
 const { emitListener } = require("./eventController.js");
 const createUserRef = require("../Auth/controller/createUser.js");
-const sendMailRef = require("../Auth/controller/sendVerificationMail.js")
 const { dbCollections } = require("../../Config/collections.js");
 // const { installSteps, envVar } = require("./controller.js");
 const mainCtr = require("./controller.js");
@@ -400,19 +399,40 @@ exports.createUserAndCompany = (req,res) => {
                         isProductOwner: true
                     }
                     createUserRef.addUserMongodbV2(userObj).then((respo)=>{
-                        sendMailRef.sendVerificationEmailPromise(respo.statusText._id,respo.statusText.Employee_Email).catch((error)=>{
-                            logger.error(error.statusText);
-                        })
-                        emitListener(req.body?.eventId, {step: 1});
-                        exports.createCompanyFromAPIFunction(respo.statusText._id,req.body).then(()=>{
-                            mainCtr.installSteps[7].status = "done";
-                            serviceFun.writeFile(installStepsFilePath, JSON.stringify({installSteps: mainCtr.installSteps, envVar: mainCtr.envVar}, null, 4), () => {
-                                res.status(200).json({message: "user and company create successfully"})
-                            });
+                        const ownerId = respo.statusText._id;
+                        // The first owner is created by the trusted installer (the
+                        // operator running setup), so mark the account email-verified
+                        // immediately — same as the OAuth signup paths. Without this,
+                        // login is hard-blocked by the "Email is not verified" gate
+                        // (Auth/controller/authHelpers.js#generateTokenV2Fun) and, since
+                        // SMTP is usually skipped during install, no verification email
+                        // is ever sent — locking the operator out of the account they
+                        // just created. Scoped to the installer flow only; the public
+                        // /api/v2/createUser signup still requires verification.
+                        const verifyOwnerObj = {
+                            type: dbCollections.USERS,
+                            data: [
+                                { _id: ownerId },
+                                { $set: { isEmailVerified: true, verificationToken: "" } },
+                            ],
+                        };
+                        MongoDbCrudOpration('global', verifyOwnerObj, 'findOneAndUpdate').then(()=>{
+                            emitListener(req.body?.eventId, {step: 1});
+                            exports.createCompanyFromAPIFunction(ownerId,req.body).then(()=>{
+                                mainCtr.installSteps[7].status = "done";
+                                serviceFun.writeFile(installStepsFilePath, JSON.stringify({installSteps: mainCtr.installSteps, envVar: mainCtr.envVar}, null, 4), () => {
+                                    res.status(200).json({message: "user and company create successfully"})
+                                });
+                            }).catch((error)=>{
+                                mainCtr.installSteps[7].status = "error";
+                                serviceFun.writeFile(installStepsFilePath, JSON.stringify({installSteps: mainCtr.installSteps, envVar: mainCtr.envVar}, null, 4), () => {
+                                    res.status(400).json({message: error});
+                                });
+                            })
                         }).catch((error)=>{
                             mainCtr.installSteps[7].status = "error";
                             serviceFun.writeFile(installStepsFilePath, JSON.stringify({installSteps: mainCtr.installSteps, envVar: mainCtr.envVar}, null, 4), () => {
-                                res.status(400).json({message: error});
+                                res.status(400).json({message: error?.message || error});
                             });
                         })
                     }).catch((error)=>{

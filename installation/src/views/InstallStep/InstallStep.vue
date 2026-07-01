@@ -18,12 +18,6 @@
                         <p class="text-center">Please Wait a moment</p>
                         <h2 class="text-center">All Step is Done</h2>
                     </div>
-                    <div v-if="mainStep && mainStep === 1 && mainStep !== 100">
-                        <h1 class="blue title text-center">Verification Your Domain</h1>
-                        <div v-if="stepDesc[`step${mainStep}Desc`][0].subStep === 1" >
-                            <DomainVerify @complete="domainVerifySubmit"></DomainVerify>
-                        </div>
-                    </div>
                     <div v-if="mainStep && mainStep === 2 && mainStep !== 100">
                         <h1 class="blue title text-center">Verification Your MongoDb</h1>
                         <div v-if="stepDesc[`step${mainStep}Desc`][0].subStep === 1" >
@@ -90,7 +84,6 @@
     import { apiRequest } from "../../services";
     import {useToast} from 'vue-toast-notification';
     import CreateUserAndCompany from "./CreateUserAndCompany.vue";
-    import DomainVerify from "./DomainVerify.vue";
     import MongoDBVerify from "./MongoDBVerify.vue";
     import StorageVerify from "./StorageVerify.vue";
     import FirebaseVerify from "./FirebaseVerify.vue";
@@ -173,8 +166,7 @@
 
         // SMTP STEP And CREATE COMPANY
         if (
-            (bData.step === 1 && stepDesc.value.step1Desc[0].subStep === 1) || 
-            (bData.step === 2 && stepDesc.value.step2Desc[0].subStep === 1) || 
+            (bData.step === 2 && stepDesc.value.step2Desc[0].subStep === 1) ||
             // (bData.step === 3 && stepDesc.value.step3Desc[0].subStep === 1) ||
             (bData.step === 3 && stepDesc.value.step3Desc[0].subStep === 1) ||
             (bData.step === 4 && stepDesc.value.step4Desc[0].subStep === 1) ||
@@ -309,12 +301,6 @@
         stepDesc.value.step9Desc[0].subStep = 2;
         stepDesc.value.step9Desc[0].status = "inprogress";
         startCallingSteps(stepData.value.data[8]);
-    }
-    function domainVerifySubmit(data) {
-        mainStep.value = 1;
-        stepDesc.value.step1Desc[0].subStep = 2;
-        stepDesc.value.step1Desc[0].status = "inprogress";
-        startCallingSteps(stepData.value.data[0], data);
     }
     function mongoDbVerifySubmit(data) {
         mainStep.value = 2;

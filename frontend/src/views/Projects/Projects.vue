@@ -310,7 +310,7 @@
                                 @defaultMonth="defaultMonth"
                             />
                             <!-- AI Assist (AHE-3777): project-level AI task generation, opened from the toolbar. -->
-                            <AiTaskCreator v-if="projectData && projectData._id" v-model="showAiTaskCreator" :projectId="String(projectData._id)" @done="onAiTasksCreated" />
+                            <AiTaskCreator v-if="projectData && projectData._id" v-model="showAiTaskCreator" :projectId="String(projectData._id)" :sprints="aiSprints" :activeSprintId="aiActiveSprintId" @done="onAiTasksCreated" />
                             <component
                                 v-if="(clientWidth <= 767 && isVisible == true && isRuleData == false) || (clientWidth > 767 && isRuleData == false)"
                                 :class="[{'showProjectDetailRight':activeTab !== 'ProjectListView' && activeTab !== 'Calendar' && activeTab != 'EmbedViewItem' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports' && activeTab !== 'GanttView' && activeTab !== 'RecurringTasks' && activeTab !== 'TimelineView' && activeTab !== 'MindMapView' && activeTab !== 'WhiteboardView' && activeTab !== 'CanvasView' && activeTab !== 'MapView'}]"
@@ -523,6 +523,21 @@ const currentVideoUrl = ref(0);
 const openAiSidebar = ref(false);
 const showDriverSidebar = ref(false);
 const showAiTaskCreator = ref(false);
+// Sprints for the "Plan with AI" tasks-only picker: [{ id, name }] from the
+// project's sprint map (non-deleted). Active default = the sprint being viewed
+// (route param), else the first.
+const aiSprints = computed(() => {
+    const obj = projectData.value && projectData.value.sprintsObj;
+    if (!obj) return [];
+    return Object.values(obj)
+        .filter((s) => s && s.id && (s.deletedStatusKey === 0 || s.deletedStatusKey === undefined))
+        .map((s) => ({ id: String(s.id), name: s.name || 'Sprint' }));
+});
+const aiActiveSprintId = computed(() => {
+    const rid = route.params && route.params.sprintId;
+    if (rid && aiSprints.value.some((s) => s.id === String(rid))) return String(rid);
+    return aiSprints.value.length ? aiSprints.value[0].id : '';
+});
 const skipWatcher = ref(false);
 const socket = inject('$socket');
 

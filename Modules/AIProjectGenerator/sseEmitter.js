@@ -7,14 +7,35 @@ eventEmitter.setMaxListeners(200);
 
 const COMPLETE_EVENT = '__COMPLETE__';
 
+// Buffer events emitted before any subscriber attaches, then replay them when
+// one connects. Without this, a job that finishes faster than the client's
+// EventSource can connect (e.g. the quick tasks-only execute) loses its
+// terminal 'complete'/'error' event and the UI spins forever. Buffers are
+// bounded and dropped after a TTL if nobody ever connects.
+const buffers = new Map();          // jobId -> payload[]
+const BUFFER_TTL_MS = 120000;
+const MAX_BUFFERED = 500;
+
 /**
- * Emit a progress payload to whoever is listening on `jobId`.
+ * Emit a progress payload to whoever is listening on `jobId`. If no subscriber
+ * has connected yet, the payload is buffered and replayed on connect.
  * @param {string} jobId
  * @param {object} payload
  */
 function emit(jobId, payload) {
     if (!jobId) return;
-    eventEmitter.emit(jobId, payload);
+    if (eventEmitter.listenerCount(jobId) > 0) {
+        eventEmitter.emit(jobId, payload);
+        return;
+    }
+    let buf = buffers.get(jobId);
+    if (!buf) {
+        buf = [];
+        buffers.set(jobId, buf);
+        const t = setTimeout(() => buffers.delete(jobId), BUFFER_TTL_MS);
+        if (t && typeof t.unref === 'function') t.unref();
+    }
+    if (buf.length < MAX_BUFFERED) buf.push(payload);
 }
 
 /**
@@ -61,6 +82,14 @@ function handleEvents(req, res) {
             clearInterval(hb);
             cleanup();
         });
+
+        // Replay anything emitted before this subscriber connected (fast jobs).
+        // Synchronous, so no fresh emit can interleave between attach and flush.
+        const pending = buffers.get(jobId);
+        if (pending && pending.length) {
+            buffers.delete(jobId);
+            for (const p of pending) onPayload(p);
+        }
     } catch (error) {
         try { res.status(500).send({ status: false, statusText: error.message }); } catch (_e) { /* ignore */ }
     }

@@ -92,8 +92,32 @@ const DescriptionBlock = z.discriminatedUnion('type', [
     ListBlock,
 ]);
 
+// Sub-task (AI-Assist "Break tasks into sub-tasks"). Lightweight on purpose —
+// just a name + optional priority; it is created under its parent task and
+// needs no 5-block description.
+const SubTaskSchema = z.object({
+    TaskName: z.string().min(2).max(200),
+    // Sub-tasks get a real (but short) description — a paragraph, optionally a
+    // brief steps list — not the full task "What to do / Acceptance criteria"
+    // 5-block skeleton. min(1) so a sub-task is never created description-less.
+    descriptionBlocks: z.array(DescriptionBlock).min(1).max(20),
+    priority: z.enum(['Low', 'Medium', 'High', 'Urgent']).optional(),
+});
+
 const TaskSchema = z.object({
     TaskName: z.string().min(2).max(200),
+    // Optional temp id the model assigns so links can reference this task
+    // before real _ids exist. Never persisted to the task doc.
+    ref: z.string().min(1).max(60).optional(),
+    // Optional epic this task belongs to (AI-Assist "Organize into epics"),
+    // referencing a plan epic's `ref`.
+    epicRef: z.string().min(1).max(60).optional(),
+    // Optional custom-field values (AI-Assist "Add custom fields"), each
+    // referencing a plan field's `ref`.
+    fieldValues: z.array(z.object({
+        fieldRef: z.string().min(1).max(60),
+        value: z.union([z.string(), z.number(), z.boolean()]),
+    })).max(50).optional(),
     descriptionBlocks: z.array(DescriptionBlock).min(5).max(20),
     TaskTypeKey: z.union([z.number(), z.string()]).optional(),
     status: z.string().min(1).max(40),
@@ -101,6 +125,8 @@ const TaskSchema = z.object({
     AssigneeUserId: z.array(z.string()).default([]),
     priority: z.enum(['Low', 'Medium', 'High', 'Urgent']),
     estimatedHours: z.number().nonnegative().nullable().optional(),
+    // Optional sub-tasks created under this task (AI-Assist).
+    subtasks: z.array(SubTaskSchema).max(20).optional(),
 }).superRefine((task, ctx) => {
     // Verify the 5-block skeleton:
     //   [0] paragraph (context)
@@ -249,8 +275,36 @@ const ClarifyResponseSchema = z.object({
 // orchestrator forces new tasks into the project's first status column and
 // falls back to its first task type, so task.status / TaskTypeKey are
 // advisory; we only enforce structure + the total-task safety cap here.
+// A dependency link between two tasks, by their plan `ref`s (AI-Assist "Link
+// related tasks"). Resolved to real task ids after creation.
+const LinkSchema = z.object({
+    from: z.string().min(1).max(60),
+    to: z.string().min(1).max(60),
+    type: z.enum(['blocks', 'blocked_by', 'duplicates', 'duplicated_by', 'relates_to']).default('relates_to'),
+});
+
+// An epic to create in the project (AI-Assist "Organize into epics"). Tasks
+// reference it by `ref` via their `epicRef`. Resolved to a real epic id.
+const EpicSchema = z.object({
+    ref: z.string().min(1).max(60),
+    name: z.string().min(1).max(120),
+    color: z.string().regex(HEX_COLOR).optional(),
+});
+
+// A custom field to create in the project (AI-Assist "Add custom fields").
+// Tasks set values via fieldValues -> fieldRef. Resolved to a real field id.
+const CustomFieldSchema = z.object({
+    ref: z.string().min(1).max(60),
+    title: z.string().min(1).max(80),
+    type: z.enum(['text', 'textarea', 'number', 'date', 'money', 'email', 'phone', 'checkbox', 'dropdown']),
+    options: z.array(z.string().min(1).max(80)).max(30).optional(),
+});
+
 const TasksPlanSchema = z.object({
     sprints: z.array(SprintSchema).min(1).max(200),
+    links: z.array(LinkSchema).max(500).optional(),
+    epics: z.array(EpicSchema).max(50).optional(),
+    customFields: z.array(CustomFieldSchema).max(30).optional(),
 }).superRefine((plan, ctx) => {
     const total = plan.sprints.reduce((acc, s) => acc + s.tasks.length, 0);
     if (total > 2000) {
@@ -261,6 +315,41 @@ const TasksPlanSchema = z.object({
 const TasksResponseSchema = z.object({
     needsClarification: z.literal(false),
     plan: TasksPlanSchema,
+});
+
+// ─── Tasks-only plan (flat list → an existing sprint) ──────────────────
+//
+// Mode "tasks": the user is adding tasks to ONE existing sprint, so there
+// are no sprints to create — just a flat list of tasks (same TaskSchema,
+// 5-block descriptions and all). The orchestrator places them into the
+// chosen sprint. 200 is a generous safety cap.
+const TasksOnlyPlanSchema = z.object({
+    tasks: z.array(TaskSchema).min(1).max(200),
+    links: z.array(LinkSchema).max(500).optional(),
+    epics: z.array(EpicSchema).max(50).optional(),
+    customFields: z.array(CustomFieldSchema).max(30).optional(),
+});
+
+const TasksOnlyResponseSchema = z.object({
+    needsClarification: z.literal(false),
+    plan: TasksOnlyPlanSchema,
+});
+
+// ─── Sprints-only plan (sprint names, no tasks) ────────────────────────
+//
+// Mode "sprints": the user only wants sprint structure created in the
+// project. Each entry is just a name — NO tasks.
+const SprintNameOnlySchema = z.object({
+    sprintName: z.string().min(1).max(80),
+});
+
+const SprintsOnlyPlanSchema = z.object({
+    sprints: z.array(SprintNameOnlySchema).min(1).max(50),
+});
+
+const SprintsOnlyResponseSchema = z.object({
+    needsClarification: z.literal(false),
+    plan: SprintsOnlyPlanSchema,
 });
 
 // ─── Clarifying questions schema ───────────────────────────────────────
@@ -446,6 +535,12 @@ function sanitizeTaskPlanMemberIds(plan, allowedIds) {
             }
         }
     }
+    // Tasks-only plan carries a flat `tasks` array (no sprints).
+    if (Array.isArray(plan && plan.tasks)) {
+        for (const task of plan.tasks) {
+            task.AssigneeUserId = filterIds(task.AssigneeUserId, `task:${task.TaskName}`);
+        }
+    }
     return { plan, removed };
 }
 
@@ -479,6 +574,10 @@ module.exports = {
     ClarifyQuestionsSchema,
     TasksPlanSchema,
     TasksResponseSchema,
+    TasksOnlyPlanSchema,
+    TasksOnlyResponseSchema,
+    SprintsOnlyPlanSchema,
+    SprintsOnlyResponseSchema,
     sanitizeMemberIds,
     sanitizeTaskPlanMemberIds,
     tryParseJson,

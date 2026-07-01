@@ -160,7 +160,8 @@ const checkAiDescription = props.from === 'project' ? computed(() => checkPermis
 // Inputs handed to the lightweight "Write with AI" popover. Title + type come
 // from the task when editing a task, or the project name when from==='project'
 // (Description.vue is shared between both). Existing description is sent as
-// plain text so the model can rewrite/improve rather than start from scratch.
+// faithful Markdown (blocksToMarkdown) so the model can rewrite/improve — or, in
+// Add mode, reproduce it verbatim and insert — without losing its structure.
 const aiWriteTitle = computed(() => props.from === 'project'
     ? (props.projectData?.ProjectName || '')
     : (props.task?.TaskName || ''));
@@ -169,7 +170,7 @@ const aiWriteExistingDescription = computed(() => {
     const d = props.description;
     if (!d) return '';
     if (typeof d === 'string') return d;
-    if (Array.isArray(d.blocks)) return blocksToText(d.blocks);
+    if (Array.isArray(d.blocks)) return blocksToMarkdown(d.blocks);
     return '';
 });
 
@@ -349,15 +350,82 @@ function blocksToText(response = []) {
                 descText += x.data.link;
                 break;
             case "list":
-                descText += x.data.items.join(", ");
+                descText += (x.data.items || []).map((i) => (typeof i === "string" ? i : (i && i.content) || "")).join(", ");
                 break;
             case "checklist":
-                descText += x.data.items.map((x) => x.text).join(", ");
+                descText += (x.data.items || []).map((i) => (i && i.text) || "").join(", ");
                 break;
         }
         descText += "\n";
     })
     return descText;
+}
+
+// Faithful Markdown for the "Write with AI" model input. Unlike blocksToText
+// (a lossy comma-joined flatten kept only for the stored plain-text field),
+// this preserves headings and bullet structure so that — in Add mode, where the
+// model reproduces the existing description verbatim and inserts the new content
+// — it round-trips back through markdown -> blocks cleanly (no "[object Object]",
+// no collapsed lists). Covers the editor's tools; falls back to a block's text.
+function blocksToMarkdown(blocks = []) {
+    const inline = (html) => (html == null ? '' : String(html)
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/?(?:b|strong)>/gi, '**')
+        .replace(/<\/?(?:i|em)>/gi, '*')
+        .replace(/<code[^>]*>/gi, '`').replace(/<\/code>/gi, '`')
+        .replace(/<a\b[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/gi, '[$2]($1)')
+        .replace(/<[^>]+>/g, '')
+        .replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&')
+        .replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&quot;/gi, '"')
+        .trim());
+    // Nested-list items are objects ({ content, items }); render recursively.
+    const renderItems = (items, ordered, depth) => {
+        let out = '';
+        (items || []).forEach((it, i) => {
+            const indent = '  '.repeat(depth);
+            const marker = ordered ? `${i + 1}.` : '-';
+            const text = typeof it === 'string' ? inline(it) : inline(it && it.content);
+            out += `${indent}${marker} ${text}\n`;
+            if (it && Array.isArray(it.items) && it.items.length) {
+                out += renderItems(it.items, ordered, depth + 1);
+            }
+        });
+        return out;
+    };
+    let md = '';
+    (blocks || []).forEach((x) => {
+        const d = x.data || {};
+        switch (x.type) {
+            case 'header':
+                md += `${'#'.repeat(Math.min(Math.max(d.level || 2, 1), 6))} ${inline(d.text)}\n\n`;
+                break;
+            case 'paragraph':
+                md += `${inline(d.text)}\n\n`;
+                break;
+            case 'list':
+                md += `${renderItems(d.items, d.style === 'ordered', 0)}\n`;
+                break;
+            case 'checklist':
+                (d.items || []).forEach((it) => {
+                    md += `- [${it && it.checked ? 'x' : ' '}] ${inline(it && it.text)}\n`;
+                });
+                md += '\n';
+                break;
+            case 'quote':
+                md += `> ${inline(d.text)}\n\n`;
+                break;
+            case 'code':
+                md += '```\n' + (d.code || '') + '\n```\n\n';
+                break;
+            case 'warning':
+                md += `> **${inline(d.title)}**\n> ${inline(d.message)}\n\n`;
+                break;
+            default:
+                if (d.text) md += `${inline(d.text)}\n\n`;
+                break;
+        }
+    });
+    return md.trim();
 }
 
 const saveData = debounce(() => {
@@ -478,7 +546,13 @@ function openAiWriteDescription() {
 // content. The resulting editor change triggers the debounced onChange ->
 // saveData(), which persists it (task -> taskClass.updateDescription,
 // project -> updateProjectDescription).
-async function applyAiDescription(markdown = '') {
+// The popover hands back the FULL description to apply — for both "Add" (the
+// model inserts the new content into the existing text and returns the whole
+// thing) and "Rewrite". Either way this REPLACES via the path above; the user
+// has already reviewed the exact final result in the popover's preview, so
+// nothing is applied unseen.
+async function applyAiDescription(payload = '') {
+    const markdown = typeof payload === 'string' ? payload : (payload && payload.text) || '';
     if (!markdown || !editor.value || !converter.value) return;
     tempBlock.value = { blocks: [] };
     blockIndex.value = 1;
