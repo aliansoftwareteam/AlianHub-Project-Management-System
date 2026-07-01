@@ -16,6 +16,25 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.7.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.6.1...v14.7.0) (2026-07-01)
+
+
+### 🚀 Features
+
+* **ai-assist:** add Tasks-only and Sprints-only modes to Plan with AI ([a46093b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a46093b77ff223b65c8755f1a08c5a8a21c9a31a))
+* **ai-assist:** add AI-generated sub-tasks (Advanced toggle) ([8851f3f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8851f3fc3a3503e26cbd3d6f4f103ec3bc5c0df3))
+* **ai-assist:** add task links, epics, and custom fields (Advanced toggles) ([7283a10](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7283a10f1b7758faf75aa5c76ac6bccdc4279326))
+* **ai:** add "Add to description" mode to Write with AI ([c87e735](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c87e735224dd44cf4722dfd662558601605036b7))
+* **installer:** dynamic first-run setup, no default user ([d4af596](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d4af596620ff991618b687558ffde764f51ea84c))
+
+
+### 🐛 Bug Fixes
+
+* **installer:** remove License Key step from setup wizard ([4bf0b00](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4bf0b00d8c7124887f45e1e956c2fe3e8fdb11aa))
+* **logtime:** show real date in tracked-time activity log (was DATE_undefined) ([bc5cafd](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bc5cafd02d600e5e3964260ba6233769844475be))
+* **projects:** align empty-state CTA buttons into a consistent pair ([6fce7b9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6fce7b904776b89129d2456ac85592505a757e98))
+* **task-detail:** accurate subtask progress % for parents with &gt;35 subtasks ([1da89cf](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1da89cf8a74f8ae311093c924ec0333cfcc0d435))
+
 ## [14.6.1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.6.0...v14.6.1) (2026-06-27)
 
 
