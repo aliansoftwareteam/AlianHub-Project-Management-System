@@ -1966,5 +1966,74 @@
         "image": "EmployeeWorkloadReport",
         "cardType": "task",
         "backgroundColor": "#9a6b00"
+    },
+    {
+        "_id": "6a3800000000000000000401",
+        "name": "active_projects_card_title",
+        "description": "active_projects_card_description",
+        "permission": [],
+        "fields": [
+            { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "Active Projects", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false }
+        ],
+        "key": "ActiveProjectsCard",
+        "image": "Calculation",
+        "cardType": "project_progress",
+        "backgroundColor": "#0e7490"
+    },
+    {
+        "_id": "6a3800000000000000000402",
+        "name": "projects_by_type_card_title",
+        "description": "projects_by_type_card_description",
+        "permission": [],
+        "fields": [
+            { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "Projects by Type", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false }
+        ],
+        "key": "ProjectsByTypeCard",
+        "image": "BarChart",
+        "cardType": "project_progress",
+        "backgroundColor": "#0e7490"
+    },
+    {
+        "_id": "6a3800000000000000000403",
+        "name": "running_projects_card_title",
+        "description": "running_projects_card_description",
+        "permission": [],
+        "fields": [
+            { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "Running Projects", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false }
+        ],
+        "key": "RunningProjectsCard",
+        "image": "Calculation",
+        "cardType": "project_progress",
+        "backgroundColor": "#0e7490"
+    },
+    {
+        "_id": "6a3800000000000000000404",
+        "name": "live_work_card_title",
+        "description": "live_work_card_description",
+        "permission": [],
+        "fields": [
+            { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "Active Time Trackers", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false }
+        ],
+        "key": "LiveWorkTableCard",
+        "image": "TaskList",
+        "cardType": "project_progress",
+        "backgroundColor": "#0e7490"
+    },
+    {
+        "_id": "6a3800000000000000000405",
+        "name": "users_by_category_card_title",
+        "description": "users_by_category_card_description",
+        "permission": [],
+        "fields": [
+            { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "Work by Category", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false },
+            { "label": "location", "groupBy": "data", "type": "dropdown", "name": "projectId", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
+            { "label": "show_assignees", "groupBy": "data", "type": "dropdown", "name": "AssigneeUserId", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
+            { "label": "include_subtasks", "groupBy": "data", "type": "radio", "name": "isParentTask", "value": true, "placeHolder": "", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
+            { "label": "category_template", "groupBy": "data", "type": "category_map", "name": "categoryMap", "value": {}, "placeHolder": "", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false }
+        ],
+        "key": "UsersByCategoryCard",
+        "image": "BarChart",
+        "cardType": "project_progress",
+        "backgroundColor": "#0e7490"
     }
 ]
