@@ -1968,72 +1968,213 @@
         "backgroundColor": "#9a6b00"
     },
     {
-        "_id": "6a3800000000000000000401",
-        "name": "active_projects_card_title",
-        "description": "active_projects_card_description",
+        "_id": "6a3700000000000000000401",
+        "name": "project_pulse_card_title",
+        "description": "project_pulse_card_description",
         "permission": [],
         "fields": [
-            { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "Active Projects", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false }
+            { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "Project Pulse", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false },
+            {
+                "label": "timerange",
+                "groupBy": "data",
+                "type": "dropdown",
+                "name": "timerange",
+                "value": 1,
+                "placeHolder": "select",
+                "options": [
+                    { "id": 1, "name": "today" },
+                    { "id": 2, "name": "yesterday" },
+                    { "id": 3, "name": "this_week" },
+                    { "id": 4, "name": "last_week" },
+                    { "id": 5, "name": "this_month" },
+                    { "id": 6, "name": "last_month" },
+                    { "id": 7, "name": "this_year" },
+                    { "id": 8, "name": "last_30_days" }
+                ],
+                "rules": "",
+                "info": "",
+                "hidden": false,
+                "disabled": false
+            }
         ],
-        "key": "ActiveProjectsCard",
-        "image": "Calculation",
-        "cardType": "project_progress",
-        "backgroundColor": "#0e7490"
+        "key": "ProjectPulseCard",
+        "image": "PieChartWorkload",
+        "cardType": "resource_utilization",
+        "backgroundColor": "#0d9488"
     },
     {
-        "_id": "6a3800000000000000000402",
-        "name": "projects_by_type_card_title",
-        "description": "projects_by_type_card_description",
+        "_id": "6a3700000000000000000402",
+        "name": "live_work_table_card_title",
+        "description": "live_work_table_card_description",
         "permission": [],
         "fields": [
-            { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "Projects by Type", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false }
-        ],
-        "key": "ProjectsByTypeCard",
-        "image": "BarChart",
-        "cardType": "project_progress",
-        "backgroundColor": "#0e7490"
-    },
-    {
-        "_id": "6a3800000000000000000403",
-        "name": "running_projects_card_title",
-        "description": "running_projects_card_description",
-        "permission": [],
-        "fields": [
-            { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "Running Projects", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false }
-        ],
-        "key": "RunningProjectsCard",
-        "image": "Calculation",
-        "cardType": "project_progress",
-        "backgroundColor": "#0e7490"
-    },
-    {
-        "_id": "6a3800000000000000000404",
-        "name": "live_work_card_title",
-        "description": "live_work_card_description",
-        "permission": [],
-        "fields": [
-            { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "Active Time Trackers", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false }
-        ],
-        "key": "LiveWorkTableCard",
-        "image": "TaskList",
-        "cardType": "project_progress",
-        "backgroundColor": "#0e7490"
-    },
-    {
-        "_id": "6a3800000000000000000405",
-        "name": "users_by_category_card_title",
-        "description": "users_by_category_card_description",
-        "permission": [],
-        "fields": [
-            { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "Work by Category", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false },
+            { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "Live Work", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false },
             { "label": "location", "groupBy": "data", "type": "dropdown", "name": "projectId", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
             { "label": "show_assignees", "groupBy": "data", "type": "dropdown", "name": "AssigneeUserId", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
             { "label": "include_subtasks", "groupBy": "data", "type": "radio", "name": "isParentTask", "value": true, "placeHolder": "", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
-            { "label": "category_template", "groupBy": "data", "type": "category_map", "name": "categoryMap", "value": {}, "placeHolder": "", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false }
+            { "label": "add_filter", "type": "filter", "name": "filter", "value": [], "placeHolder": "filter", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false, "groupBy": "filter" }
         ],
-        "key": "UsersByCategoryCard",
+        "key": "LiveWorkTableCard",
+        "image": "TaskList",
+        "cardType": "resource_utilization",
+        "backgroundColor": "#0891b2"
+    },
+    {
+        "_id": "6a3700000000000000000403",
+        "name": "free_resources_card_title",
+        "description": "free_resources_card_description",
+        "permission": [],
+        "fields": [
+            { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "Free Resources", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false },
+            { "label": "show_assignees", "groupBy": "data", "type": "dropdown", "name": "AssigneeUserId", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
+            { "label": "location", "groupBy": "data", "type": "dropdown", "name": "projectId", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
+            {
+                "label": "free_threshold_hours",
+                "groupBy": "data",
+                "type": "text",
+                "name": "freeThresholdHours",
+                "value": "3",
+                "placeHolder": "3",
+                "options": [],
+                "rules": "",
+                "info": "",
+                "hidden": false,
+                "disabled": false
+            },
+            {
+                "label": "logged_threshold_hours",
+                "groupBy": "data",
+                "type": "text",
+                "name": "loggedThresholdHours",
+                "value": "0",
+                "placeHolder": "0",
+                "options": [],
+                "rules": "",
+                "info": "",
+                "hidden": false,
+                "disabled": false
+            },
+            { "label": "add_filter", "type": "filter", "name": "filter", "value": [], "placeHolder": "filter", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false, "groupBy": "filter" }
+        ],
+        "key": "FreeResourcesCard",
+        "image": "BatteryChartWorkload",
+        "cardType": "resource_utilization",
+        "backgroundColor": "#d97706"
+    },
+    {
+        "_id": "6a3700000000000000000404",
+        "name": "worked_tasks_table_card_title",
+        "description": "worked_tasks_table_card_description",
+        "permission": [],
+        "fields": [
+            { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "Worked Tasks", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false },
+            { "label": "location", "groupBy": "data", "type": "dropdown", "name": "projectId", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
+            { "label": "show_assignees", "groupBy": "data", "type": "dropdown", "name": "AssigneeUserId", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
+            { "label": "status", "groupBy": "data", "type": "dropdown", "name": "statusArray", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
+            {
+                "label": "timerange",
+                "groupBy": "data",
+                "type": "dropdown",
+                "name": "timerange",
+                "value": 3,
+                "placeHolder": "select",
+                "options": [
+                    { "id": 1, "name": "today" },
+                    { "id": 2, "name": "yesterday" },
+                    { "id": 3, "name": "this_week" },
+                    { "id": 4, "name": "last_week" },
+                    { "id": 5, "name": "this_month" },
+                    { "id": 6, "name": "last_month" },
+                    { "id": 7, "name": "this_year" },
+                    { "id": 8, "name": "last_30_days" }
+                ],
+                "rules": "",
+                "info": "",
+                "hidden": false,
+                "disabled": false
+            },
+            { "label": "include_subtasks", "groupBy": "data", "type": "radio", "name": "isParentTask", "value": true, "placeHolder": "", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
+            { "label": "add_filter", "type": "filter", "name": "filter", "value": [], "placeHolder": "filter", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false, "groupBy": "filter" }
+        ],
+        "key": "WorkedTasksTableCard",
+        "image": "BarChartWorkload",
+        "cardType": "resource_utilization",
+        "backgroundColor": "#4f46e5"
+    },
+    {
+        "_id": "6a3700000000000000000405",
+        "name": "team_category_breakdown_card_title",
+        "description": "team_category_breakdown_card_description",
+        "permission": [],
+        "fields": [
+            { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "Team Effort Breakdown", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false },
+            { "label": "location", "groupBy": "data", "type": "dropdown", "name": "projectId", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
+            { "label": "show_assignees", "groupBy": "data", "type": "dropdown", "name": "AssigneeUserId", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
+            {
+                "label": "timerange",
+                "groupBy": "data",
+                "type": "dropdown",
+                "name": "timerange",
+                "value": 3,
+                "placeHolder": "select",
+                "options": [
+                    { "id": 1, "name": "today" },
+                    { "id": 2, "name": "yesterday" },
+                    { "id": 3, "name": "this_week" },
+                    { "id": 4, "name": "last_week" },
+                    { "id": 5, "name": "this_month" },
+                    { "id": 6, "name": "last_month" },
+                    { "id": 7, "name": "this_year" },
+                    { "id": 8, "name": "last_30_days" }
+                ],
+                "rules": "",
+                "info": "",
+                "hidden": false,
+                "disabled": false
+            },
+            { "label": "add_filter", "type": "filter", "name": "filter", "value": [], "placeHolder": "filter", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false, "groupBy": "filter" }
+        ],
+        "key": "TeamCategoryBreakdownCard",
+        "image": "BatteryChart",
+        "cardType": "resource_utilization",
+        "backgroundColor": "#7c3aed"
+    },
+    {
+        "_id": "6a3700000000000000000406",
+        "name": "team_logged_vs_eta_card_title",
+        "description": "team_logged_vs_eta_card_description",
+        "permission": [],
+        "fields": [
+            { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "Team Logged vs ETA", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false },
+            { "label": "location", "groupBy": "data", "type": "dropdown", "name": "projectId", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
+            { "label": "show_assignees", "groupBy": "data", "type": "dropdown", "name": "AssigneeUserId", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
+            {
+                "label": "timerange",
+                "groupBy": "data",
+                "type": "dropdown",
+                "name": "timerange",
+                "value": 3,
+                "placeHolder": "select",
+                "options": [
+                    { "id": 1, "name": "today" },
+                    { "id": 2, "name": "yesterday" },
+                    { "id": 3, "name": "this_week" },
+                    { "id": 4, "name": "last_week" },
+                    { "id": 5, "name": "this_month" },
+                    { "id": 6, "name": "last_month" },
+                    { "id": 7, "name": "this_year" },
+                    { "id": 8, "name": "last_30_days" }
+                ],
+                "rules": "",
+                "info": "",
+                "hidden": false,
+                "disabled": false
+            },
+            { "label": "add_filter", "type": "filter", "name": "filter", "value": [], "placeHolder": "filter", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false, "groupBy": "filter" }
+        ],
+        "key": "TeamLoggedVsEtaCard",
         "image": "BarChart",
-        "cardType": "project_progress",
-        "backgroundColor": "#0e7490"
+        "cardType": "resource_utilization",
+        "backgroundColor": "#0ea5e9"
     }
 ]
