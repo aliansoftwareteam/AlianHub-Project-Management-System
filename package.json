@@ -72,11 +72,11 @@
     "node-schedule": "2.1.1",
     "nodemailer": "6.9.16",
     "openid-client": "^5.7.0",
-    "samlify": "^2.8.10",
     "otplib": "^12.0.1",
     "pdf-parse": "^2.4.5",
     "pdfmake": "^0.2.7",
     "qrcode": "^1.5.4",
+    "samlify": "^2.8.10",
     "sharp": "^0.34.5",
     "socket.io": "4.8.1",
     "swagger-jsdoc": "6.2.8",
@@ -101,14 +101,17 @@
     "setup": "node scripts/dev.js",
     "dev": "node scripts/dev.js --skip-install",
     "setup:reset": "node scripts/dev.js --force",
-    "lint:commits": "commitlint --from ${BASE_BRANCH:-origin/staging} --to HEAD --verbose"
+    "lint:commits": "commitlint --from ${BASE_BRANCH:-origin/staging} --to HEAD --verbose",
+    "prepare": "husky"
   },
   "author": "Alian Software <https://alianhub.com>",
   "license": "AGPL-3.0-or-later",
   "devDependencies": {
     "@commitlint/cli": "^19.5.0",
     "@commitlint/config-conventional": "^19.5.0",
+    "husky": "^9.1.7",
     "jest": "^30.4.2",
+    "lint-staged": "^16.4.0",
     "nodemon": "^3.1.0"
   }
 }
