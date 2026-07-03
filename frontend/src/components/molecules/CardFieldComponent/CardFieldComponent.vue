@@ -93,8 +93,16 @@
                         @dismiss="dismissNewProject"
                     />
                 </template>
+                <!-- Work-by-Category card: category → task-type template editor.
+                     Writes the map into the form object so it saves through the
+                     standard card-config submit path (no separate modal). -->
+                <CategoryTaskTypeMapper
+                    v-if="componentId === 'UsersByCategoryCard' && formObj.categoryMap"
+                    :modelValue="formObj.categoryMap.value || {}"
+                    @update:modelValue="updateCategoryMap"
+                />
             </div>
-            <div v-if="cardType !== 'time_tracking' && componentId !== 'QueueListComp' && componentId !== 'EmployeeWorkloadReportCard'">
+            <div v-if="cardType !== 'time_tracking' && componentId !== 'QueueListComp' && componentId !== 'EmployeeWorkloadReportCard' && fieldArray.some(e => e.groupBy === 'filter')">
                 <div class="custom-field card-advanced-filter">
                     <h3 class="group_by_card">{{$t('Filters.filter')}}</h3>
                     <template v-for="(field, index) in fieldArray.filter(e => e.groupBy === 'filter')" :key="index">
@@ -130,6 +138,7 @@ import ToggleFieldComponent from "@/components/templates/Dashboard/ToggleFieldCo
 import TextInputFieldComponent from "@/components/templates/Dashboard/TextInputFieldComponent.vue";
 import HomeTaskFilter from '@/components/molecules/TaskFilter/HomeTaskFilter.vue'
 import RecentlyAddedProjects from '@/components/molecules/RecentlyAddedProjects/RecentlyAddedProjects.vue';
+import CategoryTaskTypeMapper from '@/components/molecules/CategoryTaskTypeMapper/CategoryTaskTypeMapper.vue';
 
 const { t } = useI18n();
 const store = useStore();
@@ -509,6 +518,11 @@ const handleTabCheck = () => {
 
 const handleFormUpdate = (updatedFormObj) => {
     formObj.value = updatedFormObj
+};
+// Work-by-Category card — persist the category→task-type map from the embedded
+// mapper into the form object (emitted through the normal submit path).
+const updateCategoryMap = (val) => {
+    if (formObj.value.categoryMap) formObj.value.categoryMap.value = val;
 };
 const updateData = (val,field) => {
     if(field?.label === 'show_assignees'){

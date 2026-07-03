@@ -180,21 +180,21 @@
         },{
             label: "SSO",
             to: {name: "SsoSettings"},
-            icon: require("@/assets/images/svg/workspaceSecurity.svg"),
+            icon: require("@/assets/images/svg/ssoKey.svg"),
             permissions:['settings.settings_security_permissions'],
-            activeIcon: require("@/assets/images/svg/workspaceSecurityActive.svg")
+            activeIcon: require("@/assets/images/svg/ssoKeyActive.svg")
         },{
             label: "SCIM",
             to: {name: "ScimSettings"},
-            icon: require("@/assets/images/svg/workspaceSecurity.svg"),
+            icon: require("@/assets/images/svg/scimUsers.svg"),
             permissions:['settings.settings_security_permissions'],
-            activeIcon: require("@/assets/images/svg/workspaceSecurityActive.svg")
+            activeIcon: require("@/assets/images/svg/scimUsersActive.svg")
         },{
             label: "Audit Log",
             to: {name: "AuditLog"},
-            icon: require("@/assets/images/svg/workspaceSecurity.svg"),
+            icon: require("@/assets/images/svg/auditDoc.svg"),
             permissions:['settings.settings_security_permissions'],
-            activeIcon: require("@/assets/images/svg/workspaceSecurityActive.svg")
+            activeIcon: require("@/assets/images/svg/auditDocActive.svg")
         },{
             label: "Time Off",
             to: {name: "TimeOff"},
@@ -223,15 +223,15 @@
         },{
             label: "Two-Factor Authentication",
             to: {name: "twoFactorAuth"},
-            icon: require("@/assets/images/svg/WorkspaceSettingsInactive.svg"),
+            icon: require("@/assets/images/svg/twoFactorLock.svg"),
             isVisible:true,
-            activeIcon: require("@/assets/images/svg/WorkspaceSettings.svg")
+            activeIcon: require("@/assets/images/svg/twoFactorLockActive.svg")
         },{
             label: "Integrations",
             to: {name: "Integrations"},
-            icon: require("@/assets/images/svg/WorkspaceSettingsInactive.svg"),
+            icon: require("@/assets/images/svg/integrationPuzzle.svg"),
             isVisible:true,
-            activeIcon: require("@/assets/images/svg/WorkspaceSettings.svg")
+            activeIcon: require("@/assets/images/svg/integrationPuzzleActive.svg")
         },{
             label: "Company",
             to: {name: "Company"},

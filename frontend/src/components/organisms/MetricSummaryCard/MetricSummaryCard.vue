@@ -1,6 +1,6 @@
 <template>
     <div class="msc">
-        <div v-if="loading" class="msc-msg">…</div>
+        <CardSkeleton v-if="loading" :rows="mode === 'number' ? 2 : 4" />
         <template v-else-if="mode === 'number'">
             <div class="msc-number">{{ totalValue }}</div>
             <div class="msc-number-label">{{ $t('dashboardCard.total_tasks_card_title') }}</div>
@@ -26,6 +26,7 @@ export default { name: 'MetricSummaryCard' };
 import { ref, computed, watch, onMounted } from 'vue';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import CardSkeleton from '@/components/atom/CardSkeleton/CardSkeleton.vue';
 
 // REP-03 — a self-contained dashboard card. It fetches its OWN data from the
 // REP-02 report engine (POST /reports/custom/run), so it needs no backend
