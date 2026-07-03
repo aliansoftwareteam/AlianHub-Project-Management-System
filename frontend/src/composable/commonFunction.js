@@ -691,6 +691,37 @@ export const getCardsComponentsSize = (key) => {
                 "minH": 10,
                 "maxH": 22
             };
+        case 'LiveWorkTableCard':
+            // AHE-3789 Live Work — a 4-column table (user / task / project /
+            // memo), so give it more room + height, closer to the workload table.
+            return {
+                "minW": 4,
+                "maxW": 12,
+                "minH": 6,
+                "maxH": 20
+            };
+        case 'UsersByCategoryCard':
+            // AHE-3789 Work-by-Category — a summary bar + a per-user × category
+            // table. Needs width for the category columns and height for rows.
+            return {
+                "minW": 4,
+                "maxW": 12,
+                "minH": 8,
+                "maxH": 22
+            };
+        case 'ActiveProjectsCard':
+        case 'ProjectsByTypeCard':
+        case 'RunningProjectsCard':
+            // AHE-3789 project-progress cards — allow shrinking to the same
+            // narrow minimum as the other small cards. The header stays intact
+            // at this width because the title ellipsizes and the period
+            // dropdown shrinks (see DashBoardCard.vue).
+            return {
+                "minW": 2,
+                "maxW": 12,
+                "minH": 4,
+                "maxH": 18
+            };
         default:
             return {
                 "minW": 3,

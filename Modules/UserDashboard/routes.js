@@ -9,4 +9,7 @@ exports.init = (app) => {
     // caller's request body. POST (not GET) because the filter
     // payload is structured.
     app.post('/api/v1/dashboard/employee-workload', ctrl.getEmployeeWorkloadReport);
+    // AHE-3789 — project-progress & resource cards (running projects,
+    // live work, users-by-task-type). Additive, read-only, companyId-scoped.
+    app.post('/api/v1/dashboard/project-metrics', ctrl.getProjectProgressMetric);
 }

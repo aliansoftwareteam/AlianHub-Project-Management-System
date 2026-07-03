@@ -578,3 +578,315 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
         });
     }
 };
+
+/**
+ * AHE-3789 — Project-progress & resource dashboard cards.
+ *
+ * One read-only, companyId-scoped endpoint serving the project-progress
+ * metrics. It is purely additive (a new route + handler) and reads the same
+ * collections the Employee Workload report already reads, so it cannot affect
+ * any existing dashboard data path.
+ *
+ *   metric: 'active_projects'   → count of active projects (company-wide)
+ *   metric: 'projects_by_type'  → active projects grouped by ProjectType
+ *   metric: 'running_projects'  → count of active projects that had logged
+ *                                 time within the date range
+ *   metric: 'live_work'         → users with a tracker running RIGHT NOW
+ *                                 (startTimeTracker within the last 10 min) +
+ *                                 the task/project and the tracker memo
+ *                                 (LogDescription) of what they're working on
+ *   metric: 'users_by_category' → per user, the COUNT of distinct tasks they
+ *                                 logged time on in the window, bucketed into a
+ *                                 caller-supplied category→task-type template
+ *                                 (via the task's TaskType); unmapped types are
+ *                                 ignored (no "uncategorized" bucket)
+ *
+ * Role visibility mirrors getEmployeeWorkloadReport: roleType 1/2
+ * (Owner/Admin/Manager) see everyone; everyone else sees only themselves.
+ */
+exports.getProjectProgressMetric = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        if (!companyId) {
+            return res.status(400).json({ status: false, message: "companyId header required" });
+        }
+
+        const payload = req.body || {};
+        const metric = String(payload.metric || "");
+        const dateFrom = payload.dateFrom ? new Date(payload.dateFrom) : null;
+        const dateTo = payload.dateTo ? new Date(payload.dateTo) : null;
+        const dateFromSec = dateFrom ? Math.floor(dateFrom.getTime() / 1000) : null;
+        const dateToSec = dateTo ? Math.floor(dateTo.getTime() / 1000) : null;
+
+        // Role-based visibility — non-admins are scoped to their own logs.
+        const callerUserId = String(payload.callerUserId || "");
+        const callerRoleType = Number(payload.callerRoleType || 3);
+        const restrictToSelf = !(callerRoleType === 1 || callerRoleType === 2);
+        const userScope = () => (restrictToSelf && callerUserId ? { Loggeduser: callerUserId } : {});
+        const objIds = (arr) => [...new Set((arr || []).filter(Boolean).map(String))]
+            .filter((id) => mongoose.Types.ObjectId.isValid(id))
+            .map((id) => new mongoose.Types.ObjectId(id));
+
+        const rangeTsFilter = () => {
+            const f = { ...userScope() };
+            if (dateFromSec != null || dateToSec != null) {
+                f.LogStartTime = {};
+                if (dateFromSec != null) f.LogStartTime.$gte = dateFromSec;
+                if (dateToSec != null) f.LogStartTime.$lte = dateToSec;
+            }
+            return f;
+        };
+
+        // Active project criteria — matches the app's "active" definition:
+        // not closed, not deleted. Counted COMPANY-WIDE (no viewer scope).
+        const activeProjectFilter = {
+            statusType: { $ne: "close" },
+            deletedStatusKey: { $in: [0, null] },
+        };
+
+        // ── metric: active projects (company-wide count) ──
+        if (metric === "active_projects") {
+            const projects = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.PROJECTS, data: [activeProjectFilter, { _id: 1 }],
+            }, "find").catch(() => []);
+            return res.status(200).json({ status: true, data: { count: (projects || []).length } });
+        }
+
+        // ── metric: active projects grouped by type (company-wide) ──
+        if (metric === "projects_by_type") {
+            const projects = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.PROJECTS, data: [activeProjectFilter, { ProjectType: 1 }],
+            }, "find").catch(() => []);
+            const counts = {};
+            (projects || []).forEach((p) => {
+                const raw = (p.ProjectType && String(p.ProjectType).trim()) || "unspecified";
+                counts[raw] = (counts[raw] || 0) + 1;
+            });
+            const rows = Object.entries(counts).map(([key, value]) => ({ key, value })).sort((a, b) => b.value - a.value);
+            return res.status(200).json({ status: true, data: { rows } });
+        }
+
+        // ── metric 1: running/working projects (active + logged in range) ──
+        if (metric === "running_projects") {
+            const tlogs = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.TIMESHEET, data: [rangeTsFilter(), { TicketID: 1 }],
+            }, "find").catch(() => []);
+            const taskIds = objIds((tlogs || []).map((t) => t.TicketID));
+            let count = 0;
+            if (taskIds.length) {
+                const tasks = await MongoDbCrudOpration(companyId, {
+                    type: SCHEMA_TYPE.TASKS, data: [{ _id: { $in: taskIds }, deletedStatusKey: 0 }, { ProjectID: 1 }],
+                }, "find").catch(() => []);
+                const pids = objIds((tasks || []).map((t) => t.ProjectID));
+                if (pids.length) {
+                    const projects = await MongoDbCrudOpration(companyId, {
+                        type: SCHEMA_TYPE.PROJECTS, data: [{ _id: { $in: pids } }, { statusType: 1, deletedStatusKey: 1 }],
+                    }, "find").catch(() => []);
+                    count = (projects || []).filter((p) => p.statusType !== "close" && !p.deletedStatusKey).length;
+                }
+            }
+            return res.status(200).json({ status: true, data: { count } });
+        }
+
+        // ── metric: live work — who is tracking right now, on what, and the
+        // tracker memo (LogDescription) they entered describing the work. ──
+        if (metric === "live_work") {
+            const RUNNING_WINDOW_SEC = 10 * 60; // matches the app's 10-min "is running" rule
+            const nowSec = Math.floor(Date.now() / 1000);
+            const activeLogs = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.TIMESHEET,
+                data: [{ ...userScope(), startTimeTracker: { $gte: nowSec - RUNNING_WINDOW_SEC } }, { Loggeduser: 1, TicketID: 1, startTimeTracker: 1, LogDescription: 1 }],
+            }, "find").catch(() => []);
+            // Dedup by user|task, keeping the latest tracker (and its memo).
+            const pairMap = {};
+            (activeLogs || []).forEach((ts) => {
+                if (!ts.Loggeduser || !ts.TicketID) return;
+                const key = `${ts.Loggeduser}|${ts.TicketID}`;
+                if (!pairMap[key] || (ts.startTimeTracker || 0) > pairMap[key].startTimeTracker) {
+                    pairMap[key] = {
+                        userId: String(ts.Loggeduser),
+                        taskId: String(ts.TicketID),
+                        startTimeTracker: ts.startTimeTracker || 0,
+                        memo: (ts.LogDescription && String(ts.LogDescription).trim()) || "",
+                    };
+                }
+            });
+            const pairs = Object.values(pairMap);
+            const taskMap = {}, projMap = {}, userMap = {};
+            const taskIds = objIds(pairs.map((p) => p.taskId));
+            if (taskIds.length) {
+                const tasks = await MongoDbCrudOpration(companyId, {
+                    type: SCHEMA_TYPE.TASKS, data: [{ _id: { $in: taskIds } }, { TaskName: 1, TaskKey: 1, ProjectID: 1, sprintArray: 1 }],
+                }, "find").catch(() => []);
+                (tasks || []).forEach((t) => { taskMap[String(t._id)] = t; });
+                const pids = objIds(Object.values(taskMap).map((t) => t.ProjectID));
+                if (pids.length) {
+                    const projects = await MongoDbCrudOpration(companyId, {
+                        type: SCHEMA_TYPE.PROJECTS, data: [{ _id: { $in: pids } }, { ProjectName: 1, ProjectCode: 1 }],
+                    }, "find").catch(() => []);
+                    (projects || []).forEach((p) => { projMap[String(p._id)] = p; });
+                }
+            }
+            const userIds = objIds(pairs.map((p) => p.userId));
+            if (userIds.length) {
+                const users = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
+                    type: SCHEMA_TYPE.USERS, data: [{ _id: { $in: userIds } }, { Employee_Name: 1, Employee_FName: 1, Employee_LName: 1, Employee_profileImage: 1 }],
+                }, "find").catch(() => []);
+                (users || []).forEach((u) => { userMap[String(u._id)] = u; });
+            }
+            const rows = pairs.map((p) => {
+                const t = taskMap[p.taskId] || {};
+                const u = userMap[p.userId] || {};
+                const proj = projMap[String(t.ProjectID)] || {};
+                return {
+                    userId: p.userId,
+                    userName: u.Employee_Name || `${u.Employee_FName || ""} ${u.Employee_LName || ""}`.trim() || "—",
+                    avatar: u.Employee_profileImage || "",
+                    taskId: p.taskId,
+                    taskName: t.TaskName || "—",
+                    taskKey: t.TaskKey || "",
+                    projectId: t.ProjectID ? String(t.ProjectID) : "",
+                    sprintId: (t.sprintArray && t.sprintArray.id) || "",
+                    projectName: proj.ProjectName || "",
+                    memo: p.memo,
+                    startTimeTracker: p.startTimeTracker,
+                };
+            }).sort((a, b) => (b.startTimeTracker || 0) - (a.startTimeTracker || 0));
+            return res.status(200).json({ status: true, data: { rows, count: rows.length } });
+        }
+
+        // ── metric: users' task count grouped by work category ──
+        // The caller supplies a category→task-type template
+        // (categoryMap: { "Development": ["Bug","Task"], "QA": [...] }). For each
+        // user we count the DISTINCT tasks they logged time on in the window and
+        // bucket them by category via the task's TaskType. Types not mapped to
+        // any category are ignored (no "uncategorized" bucket).
+        if (metric === "users_by_category") {
+            const rawMap = (payload.categoryMap && typeof payload.categoryMap === "object" && !Array.isArray(payload.categoryMap))
+                ? payload.categoryMap : {};
+            // Column order follows the template's key order, but only
+            // categories that actually have ≥1 task type mapped become columns.
+            const categories = Object.keys(rawMap)
+                .filter((c) => c && String(c).trim() && Array.isArray(rawMap[c]) && rawMap[c].length);
+            // Reverse lookup: normalized task-type name → category. A type maps
+            // to at most one category (last assignment wins).
+            const typeToCat = {};
+            categories.forEach((cat) => {
+                (rawMap[cat] || []).forEach((tp) => {
+                    const norm = String(tp || "").trim().toLowerCase();
+                    if (norm) typeToCat[norm] = cat;
+                });
+            });
+
+            const includeSubtasks = payload.includeSubtasks === undefined ? true : !!payload.includeSubtasks;
+            const projectIds = objIds(payload.projectIds);
+            // User filter is a plain string-id match on Loggeduser (mirrors the
+            // workload report). Non-admins are already pinned to themselves by
+            // userScope(), so this explicit filter only applies for admins.
+            const userIdStrs = [...new Set((payload.userIds || []).filter(Boolean).map(String))]
+                .filter((id) => mongoose.Types.ObjectId.isValid(id));
+
+            const tsFilter = rangeTsFilter();
+            if (!restrictToSelf && userIdStrs.length) {
+                tsFilter.Loggeduser = { $in: userIdStrs };
+            }
+            const tlogs = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.TIMESHEET,
+                data: [tsFilter, { Loggeduser: 1, TicketID: 1 }],
+            }, "find").catch(() => []);
+
+            // Distinct (user, task) pairs the user logged time on in the window.
+            const userTaskPairs = new Set(); // `${uid}|${tid}`
+            const taskIdSet = new Set();
+            (tlogs || []).forEach((ts) => {
+                if (!ts.Loggeduser || !ts.TicketID) return;
+                userTaskPairs.add(`${ts.Loggeduser}|${ts.TicketID}`);
+                taskIdSet.add(String(ts.TicketID));
+            });
+
+            // Fetch the touched tasks + apply the task-level filters. Tasks that
+            // don't survive the filters drop out of the tally entirely.
+            const taskMap = {};
+            const tIds = objIds([...taskIdSet]);
+            if (tIds.length) {
+                const taskFilter = { _id: { $in: tIds }, deletedStatusKey: 0 };
+                if (projectIds.length) taskFilter.ProjectID = { $in: projectIds };
+                if (includeSubtasks === false) taskFilter.isParentTask = true;
+                const tasks = await MongoDbCrudOpration(companyId, {
+                    type: SCHEMA_TYPE.TASKS,
+                    data: [taskFilter, { TaskType: 1 }],
+                }, "find").catch(() => []);
+                (tasks || []).forEach((t) => { taskMap[String(t._id)] = t; });
+            }
+
+            // Count DISTINCT tasks per user per category (each user|task pair =
+            // one task). Only tasks whose TaskType is mapped to a category are
+            // counted; unmapped types are ignored (no "uncategorized").
+            const byUser = {}; // uid → { total, cats:{} }
+            userTaskPairs.forEach((key) => {
+                const sep = key.indexOf("|");
+                const uid = key.slice(0, sep);
+                const tid = key.slice(sep + 1);
+                const t = taskMap[tid];
+                if (!t) return; // filtered out (project / subtask / deleted)
+                const cat = typeToCat[String(t.TaskType || "").trim().toLowerCase()];
+                if (!cat) return; // unmapped type → ignored
+                if (!byUser[uid]) byUser[uid] = { total: 0, cats: {} };
+                byUser[uid].cats[cat] = (byUser[uid].cats[cat] || 0) + 1;
+                byUser[uid].total += 1;
+            });
+
+            // Join user names / avatars.
+            const uids = objIds(Object.keys(byUser));
+            const userMap = {};
+            if (uids.length) {
+                const users = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
+                    type: SCHEMA_TYPE.USERS,
+                    data: [{ _id: { $in: uids } }, { Employee_Name: 1, Employee_FName: 1, Employee_LName: 1, Employee_profileImage: 1 }],
+                }, "find").catch(() => []);
+                (users || []).forEach((u) => { userMap[String(u._id)] = u; });
+            }
+
+            const rows = Object.keys(byUser).map((uid) => {
+                const b = byUser[uid];
+                const u = userMap[uid] || {};
+                const cats = {};
+                categories.forEach((c) => { cats[c] = b.cats[c] || 0; });
+                return {
+                    userId: uid,
+                    userName: u.Employee_Name || `${u.Employee_FName || ""} ${u.Employee_LName || ""}`.trim() || "—",
+                    avatar: u.Employee_profileImage || "",
+                    categories: cats,
+                    total: b.total,
+                };
+            }).filter((r) => r.total > 0).sort((a, b) => b.total - a.total);
+
+            const byCategory = {};
+            categories.forEach((c) => { byCategory[c] = 0; });
+            let grand = 0;
+            rows.forEach((r) => {
+                categories.forEach((c) => { byCategory[c] += r.categories[c]; });
+                grand += r.total;
+            });
+
+            return res.status(200).json({
+                status: true,
+                data: {
+                    categories,
+                    rows,
+                    totals: { byCategory, grand },
+                    userCount: rows.length,
+                },
+            });
+        }
+
+        return res.status(400).json({ status: false, message: "Unknown metric" });
+    } catch (error) {
+        logger.error(`getProjectProgressMetric error: ${error && error.message ? error.message : error}`);
+        return res.status(500).json({
+            status: false,
+            message: "An error occurred while building project-progress metrics.",
+            error: error && error.message ? error.message : String(error),
+        });
+    }
+};
