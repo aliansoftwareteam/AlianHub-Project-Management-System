@@ -16,6 +16,32 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.8.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.7.0...v14.8.0) (2026-07-03)
+
+
+### 🚀 Features
+
+* **dashboard:** add Project Progress cards (AHE-3789) ([49b8f5c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/49b8f5cb0ebb4d84e83081b0b0e2069994c00a06))
+* **dashboard:** add resource-utilization cards ([9156045](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9156045a5089be347220aabf45c530857df15369))
+* **dashboard:** on-leave card, project drill-downs, global date range ([e945234](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e945234e05ba2b545842b511c38204fabc0ff65f))
+* **dashboard:** tracker logged columns and on-leave ticket links ([afc32cc](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/afc32cc8ca8ecb48187bf5c3429007bba3863730))
+* **settings:** distinct nav icons for security and integration menus ([d50aca7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d50aca7e9139fd2b67a904b2e91a988bab34db17))
+
+
+### 🐛 Bug Fixes
+
+* **dashboard:** resolve CodeRabbit PR [#328](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/issues/328) findings ([d8c888a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d8c888a46abc34b5668c81f039f8f71b0e8dd39f))
+* force lf line endings on husky hooks via gitattributes ([e7568d1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e7568d15346c09e99be78ad0cd48fad5c29b798d))
+* **mail:** harden Nodemailer transport + accurate errors (CodeRabbit [#328](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/issues/328)) ([7d8b44e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7d8b44e75be6bce2022bf6a90d84343e8db91f41))
+* rename LiveWorkTableCard to ActiveWorkTableCard to avoid key collision ([4ba6297](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4ba62978a1fe1a733cd024664c4b6f86dde9715d))
+* skip husky setup when devDependencies are omitted ([52c184f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/52c184f1e9001ff4356b27ef7b9fe0a511923880))
+* use npx to resolve frontend eslint in lint-staged on windows ([fda8faf](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fda8fafa71b100201180f4a89c0783e242c8af1e))
+
+
+### ♻️ Refactors
+
+* **service:** use nodemailer SMTP transport in service.js ([a34c55b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a34c55b03da9386e251189a25920ffcae9121a5e))
+
 ## [14.7.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.6.1...v14.7.0) (2026-07-01)
 
 
