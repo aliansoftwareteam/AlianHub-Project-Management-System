@@ -63,13 +63,16 @@ const props = defineProps({
 
 const userId = inject('$userId');
 const { getters } = useStore();
-const teamsArr = getters['settings/teams'] || [];
 
 const employees = ref([]);
 const loading = ref(false);
 
 // Planned threshold: free when planned hours fall UNDER this (default 3h).
-const thresholdHours = computed(() => Number(props.cardData?.freeThresholdHours) || 3);
+const thresholdHours = computed(() => {
+    // Explicit 0 is a valid threshold — only fall back to 3 when it's unset.
+    const v = props.cardData?.freeThresholdHours;
+    return v === undefined || v === null || v === '' ? 3 : Number(v);
+});
 const thresholdMin = computed(() => thresholdHours.value * 60);
 // Logged threshold: free when logged hours are AT OR BELOW this (default 0h,
 // i.e. nothing logged). Number(...)||0 keeps 0 as a valid configured value.
@@ -101,7 +104,8 @@ const load = async () => {
     loading.value = true;
     try {
         const { dateFrom, dateTo } = resolveIsoRange(1); // today
-        const employeeIds = teamIdToUserId(props.cardData?.AssigneeUserId || [], teamsArr);
+        // Read teams fresh — the store may populate after this card mounts.
+        const employeeIds = teamIdToUserId(props.cardData?.AssigneeUserId || [], getters['settings/teams'] || []);
         const payload = {
             employeeIds: Array.isArray(employeeIds) ? employeeIds : [],
             projectIds: props.cardData?.projectId || [],

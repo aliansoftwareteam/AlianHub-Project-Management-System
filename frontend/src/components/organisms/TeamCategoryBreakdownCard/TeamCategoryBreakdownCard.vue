@@ -71,7 +71,6 @@ const props = defineProps({
 
 const userId = inject('$userId');
 const { getters } = useStore();
-const teamsArr = getters['settings/teams'] || [];
 
 const teams = ref([]);
 const loading = ref(false);
@@ -95,7 +94,8 @@ const load = async () => {
     loading.value = true;
     try {
         const { dateFrom, dateTo } = resolveCardRange(timerange.value, globalRange && globalRange.value);
-        const employeeIds = teamIdToUserId(props.cardData?.AssigneeUserId || [], teamsArr);
+        // Read teams fresh — the store may populate after this card mounts.
+        const employeeIds = teamIdToUserId(props.cardData?.AssigneeUserId || [], getters['settings/teams'] || []);
         const payload = {
             dimension: dimension.value,
             employeeIds: Array.isArray(employeeIds) ? employeeIds : [],
