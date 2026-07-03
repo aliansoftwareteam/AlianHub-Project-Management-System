@@ -16,4 +16,7 @@ exports.init = (app) => {
     app.post('/api/v1/dashboard/team-tasktype-breakdown', ctrl.getTeamTaskTypeBreakdown);
     // TeamLoggedVsEtaCard — per-team logged vs estimated.
     app.post('/api/v1/dashboard/team-logged-vs-eta', ctrl.getTeamLoggedVsEta);
+    // AHE-3789 — project-progress & resource cards (running projects,
+    // live work, users-by-task-type). Additive, read-only, companyId-scoped.
+    app.post('/api/v1/dashboard/project-metrics', ctrl.getProjectProgressMetric);
 }
