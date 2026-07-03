@@ -20,15 +20,20 @@
 // always routes to the AI inbox for a human decision (money / production /
 // deletes), by design, forever.
 //
-// NOTE: real AlianHub mutations (comment / status / assign / create / deploy)
-// are wired in a later increment with their exact schemas + socket emit +
-// cache invalidation. Until then their handlers throw AI_ACTION_NOT_IMPLEMENTED
-// so nothing runs half-wired. The gating / audit / inbox pipeline around them
-// is fully functional now (see `log_note`, which works end to end).
+// The comment / status / assign actions are WIRED to AlianHub's own write paths
+// (see ./handlers.js) — they behave exactly like a human's edit: same
+// collections, same Socket.io events, same history/notifications. Creating a
+// task and deploys/deletes stay intentionally manual (see manualOnly).
 
-const notImplemented = (key) => () => {
-    const err = new Error(`AI action "${key}" is registered but its handler is not wired yet`);
-    err.code = 'AI_ACTION_NOT_IMPLEMENTED';
+const handlers = require('./handlers');
+
+// Intentionally human-only actions stay registered (so they're visible +
+// auditable) but refuse to auto-run: creating a task needs a target sprint/type
+// the agent shouldn't invent, and deploys / deletes are gated to a human by
+// design.
+const manualOnly = (key, why) => () => {
+    const err = new Error(`"${key}" is intentionally manual — ${why}`);
+    err.code = 'AI_ACTION_MANUAL_ONLY';
     throw err;
 };
 
@@ -52,7 +57,7 @@ const ACTIONS = {
         riskLevel: 'low',
         minAutonomyToAutoRun: 2,
         requiredPermission: 'task.comment',
-        handler: notImplemented('post_task_comment'),
+        handler: handlers.postTaskComment,
     },
     nudge_stale_task: {
         label: 'Nudge a stale task (reminder comment)',
@@ -60,7 +65,7 @@ const ACTIONS = {
         riskLevel: 'low',
         minAutonomyToAutoRun: 2,
         requiredPermission: 'task.comment',
-        handler: notImplemented('nudge_stale_task'),
+        handler: handlers.nudgeStaleTask,
     },
     set_task_status: {
         label: 'Change a task status',
@@ -68,7 +73,7 @@ const ACTIONS = {
         riskLevel: 'medium',
         minAutonomyToAutoRun: 2,
         requiredPermission: 'task.update',
-        handler: notImplemented('set_task_status'),
+        handler: handlers.setTaskStatus,
     },
     assign_task: {
         label: 'Assign a task to a user',
@@ -76,7 +81,7 @@ const ACTIONS = {
         riskLevel: 'medium',
         minAutonomyToAutoRun: 2,
         requiredPermission: 'task.assign',
-        handler: notImplemented('assign_task'),
+        handler: handlers.assignTask,
     },
 
     // ── Plan-stage actions (medium risk) ──
@@ -86,7 +91,18 @@ const ACTIONS = {
         riskLevel: 'medium',
         minAutonomyToAutoRun: 3,
         requiredPermission: 'task.create',
-        handler: notImplemented('create_task'),
+        handler: manualOnly('create_task', 'creating a task needs a target sprint + type the agent should not invent — use the UI or a dedicated flow'),
+    },
+
+    // ── Autonomous development (Phase B) — handed to the self-hosted runner ──
+    develop_task: {
+        label: 'Develop a task (write code + open a PR)',
+        category: 'develop',
+        riskLevel: 'critical',
+        minAutonomyToAutoRun: 99,   // NEVER auto — always human-approved, then queued for the runner
+        requiredPermission: 'task.develop',
+        deferToRunner: true,        // the self-hosted dev runner executes this, not the dispatcher
+        handler: manualOnly('develop_task', 'handled by the self-hosted dev runner after approval — never runs inline'),
     },
 
     // ── Ship-stage (high risk) ──
@@ -96,7 +112,7 @@ const ACTIONS = {
         riskLevel: 'high',
         minAutonomyToAutoRun: 4,
         requiredPermission: 'deploy.staging',
-        handler: notImplemented('trigger_staging_deploy'),
+        handler: manualOnly('trigger_staging_deploy', 'deploys run from CI, not the agent'),
     },
 
     // ── Never-auto actions (critical) — always require a human, even at L4 ──
@@ -106,7 +122,7 @@ const ACTIONS = {
         riskLevel: 'critical',
         minAutonomyToAutoRun: 99,
         requiredPermission: 'deploy.production',
-        handler: notImplemented('trigger_production_deploy'),
+        handler: manualOnly('trigger_production_deploy', 'production deploys are human-only by design'),
     },
     delete_entity: {
         label: 'Delete a task / project',
@@ -114,7 +130,7 @@ const ACTIONS = {
         riskLevel: 'critical',
         minAutonomyToAutoRun: 99,
         requiredPermission: 'entity.delete',
-        handler: notImplemented('delete_entity'),
+        handler: manualOnly('delete_entity', 'deletions are human-only by design'),
     },
 };
 
@@ -131,6 +147,7 @@ const listActions = () => Object.keys(ACTIONS).map((key) => {
         minAutonomyToAutoRun: a.minAutonomyToAutoRun,
         requiredPermission: a.requiredPermission || null,
         neverAuto: a.minAutonomyToAutoRun >= 99,
+        deferToRunner: !!a.deferToRunner,
     };
 });
 

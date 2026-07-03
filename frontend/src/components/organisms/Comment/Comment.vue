@@ -309,7 +309,7 @@ function previewImageFun() {
 
 async function processUrl(message) {
     if (message.type !== "video" || message.type !== "audio" || message.type !== "image") {
-        let properUrl = message.downloadURL || message.mediaURL;
+        let properUrl = message.downloadURL || message.mediaURL || "";
 
         if (!properUrl.includes("http")) {
 

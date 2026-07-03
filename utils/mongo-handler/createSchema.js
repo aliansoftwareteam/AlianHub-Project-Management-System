@@ -155,12 +155,12 @@ const integrationConnectionsSchema = new Schema(schema.integrationConnections, {
 integrationConnectionsSchema.index({ type: 1, deletedStatusKey: 1 });
 // AI Brain (AHE-3792) — autonomous project-manager agent.
 const aiBrainSettingsSchema = new Schema(schema.aiBrainSettings, {strict: true, timestamps: true});
-aiBrainSettingsSchema.index({ key: 1 });
+aiBrainSettingsSchema.index({ companyId: 1, key: 1 });
 const aiAuditLogSchema = new Schema(schema.aiAuditLog, {strict: true, timestamps: true});
-aiAuditLogSchema.index({ createdAt: -1 });
-aiAuditLogSchema.index({ projectId: 1, status: 1 });
+aiAuditLogSchema.index({ companyId: 1, createdAt: -1 });
+aiAuditLogSchema.index({ companyId: 1, status: 1 });
 const aiInboxSchema = new Schema(schema.aiInbox, {strict: true, timestamps: true});
-aiInboxSchema.index({ status: 1, deletedStatusKey: 1 });
+aiInboxSchema.index({ companyId: 1, status: 1, deletedStatusKey: 1 });
 // Global search: one combined text index per collection.
 taskSchema.index({ TaskName: 'text', rawDescription: 'text' });
 projectsSchema.index({ ProjectName: 'text' });

@@ -23,6 +23,7 @@
                     <router-view/>
                     <TourCom ref="mainTour"/>
                 </div>
+                <AiBrainWidget />
 			</template>
 			<div v-else-if="!companyId?.length && $route.name === 'Create_Company'" class="d-flex align-items-center justify-content-center lds-roller h-100dvh">
 				<router-view/>
@@ -74,6 +75,7 @@ import { computed, defineComponent, onMounted, provide, ref, watch, inject} from
 // COMPONENTS
 import TourCom from "@/components/organisms/Tour/TourComponet.vue"
 import HeaderComponent from '@/components/organisms/Header/Header.vue'
+import AiBrainWidget from '@/components/organisms/AiBrainWidget/AiBrainWidget.vue'
 import AdvanceSearchModal from '@/components/atom/Modal/Modal.vue'
 import Modal from "@/components/atom/Modal/Modal.vue"
 import MainSearchComponent from '@/components/molecules/AdvanceSearch/MainComponent.vue'

@@ -3015,17 +3015,24 @@ const schema = {
     // ── AI Brain (AHE-3792) — autonomous project-manager agent ──
     // Per-company autonomy config (singleton row, key:'default').
     aiBrainSettings: {
+        companyId: { type: String, required: false },
         key: { type: String, default: 'default', required: false },
         autonomyLevel: { type: Number, default: 0, required: false },
         killSwitch: { type: Boolean, default: false, required: false },
         spendCapUSD: { type: Number, default: 0, required: false },
         dailyActionLimit: { type: Number, default: 0, required: false },
         allowedActions: { type: Array, default: [], required: false },
+        // Phase B — per-project "work location" bindings for the dev runner:
+        // { [projectId]: { gitUrl, branch, localPath, updatedBy } }
+        repos: { type: Object, default: {}, required: false },
+        // Phase B — shared secret the self-hosted dev runner authenticates with.
+        runnerToken: { type: String, required: false },
         updatedBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
     // Append-only audit trail — every AI decision + action ("AI did X because Y").
     aiAuditLog: {
+        companyId: { type: String, required: false },
         actionKey: { type: String, required: false },
         status: { type: String, default: 'logged', required: false },
         reason: { type: String, required: false },
@@ -3043,6 +3050,7 @@ const schema = {
     },
     // AI inbox — approval queue: propose -> approve/decline -> execute.
     aiInbox: {
+        companyId: { type: String, required: false },
         actionKey: { type: String, required: true },
         params: { type: Object, default: {}, required: false },
         reason: { type: String, required: false },
