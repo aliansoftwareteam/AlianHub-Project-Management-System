@@ -49,7 +49,7 @@ All additive — no existing card, endpoint, or data path was modified.
 | PPC-08 | Role — member | Non-admin views the activity cards | Reflects only **their** activity (role-scoped). | ⬜ |
 | PPC-09 | Header UI | All cards | Refresh re-fetches; skeleton while loading; period dropdown (Running Projects, Work by Category) sits before the gear; cards resize narrow without the header breaking. | ⬜ |
 | PPC-10 | Regression | Existing cards + add/edit/remove/drag | Work as before; **no console errors**. | ⬜ |
-| PPC-11 | Boot integrity | Restart backend; `GET /api/v1/cardcomponent` | Returns **24** cards; no JSON parse error. | ⬜ |
+| PPC-11 | Boot integrity | Restart backend; `GET /api/v1/cardcomponent` | Returns **31** cards; no JSON parse error. | ⬜ |
 | PPC-12 | Multi-tenant | Second company | Each card shows only the current company's data. | ⬜ |
 | WBC-01 | Work by Category — first add | Add the card | Shows a **"Set up categories"** prompt pointing to the **⚙ settings** (no template yet). | ⬜ |
 | WBC-02 | Settings — template | Card **settings (⚙)** → **Category template** → pick **Development**, tick 2 task types; pick **QA**, tick 1 → **Save** | Table columns appear per non-empty category; each ticked type belongs to exactly **one** category (re-ticking moves it). Template **persists** after reload. | ⬜ |

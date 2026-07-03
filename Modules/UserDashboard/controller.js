@@ -34,6 +34,27 @@ function resolveVisibleUserIds(payload = {}) {
     return self ? [self] : [];
 }
 
+// SECURITY: resolve the caller's real role for this company from the DB, never
+// from the request body. These routes are JWT-protected (req.uid is the
+// verified user; the companyid header is checked against the token audience),
+// but roleType isn't in the token — so look it up in company_users. Fails
+// closed to the most-restricted role (3) when absent, so a forged
+// callerRoleType in the body can never widen the visibility scope.
+async function resolveCallerRoleType(companyId, uid) {
+    if (!uid) return 3;
+    try {
+        const row = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.COMPANY_USERS,
+            data: [{ userId: String(uid), isDelete: { $ne: true } }, { roleType: 1 }],
+        }, "findOne");
+        const rt = Number(row && row.roleType);
+        return Number.isFinite(rt) && rt > 0 ? rt : 3;
+    } catch (e) {
+        logger.error(`resolveCallerRoleType error (company=${companyId}, uid=${uid}): ${e.message || e}`);
+        return 3;
+    }
+}
+
 /**
  * This endpoint is used to get user user dashboard template
  * @param {*} req 
@@ -219,6 +240,12 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
         }
 
         const payload = req.body || {};
+        // SECURITY (CodeRabbit): derive caller identity + role from the
+        // authenticated session, never the request body. req.uid is the verified
+        // JWT user; the role is resolved server-side. A forged
+        // callerUserId/callerRoleType in the body can no longer widen scope.
+        payload.callerUserId = String(req.uid || "");
+        payload.callerRoleType = await resolveCallerRoleType(companyId, req.uid);
         // All thresholds come from the caller's card config — no
         // fallback constants here. If they're missing we just skip
         // the badge calculation and return 'normal' for everyone.
@@ -802,6 +829,12 @@ exports.getTeamTaskTypeBreakdown = async (req, res) => {
             return res.status(400).json({ status: false, message: "companyId header required" });
         }
         const payload = req.body || {};
+        // SECURITY (CodeRabbit): derive caller identity + role from the
+        // authenticated session, never the request body. req.uid is the verified
+        // JWT user; the role is resolved server-side. A forged
+        // callerUserId/callerRoleType in the body can no longer widen scope.
+        payload.callerUserId = String(req.uid || "");
+        payload.callerRoleType = await resolveCallerRoleType(companyId, req.uid);
         const dimension = ["type", "effort_nature", "work_category", "billable"].includes(payload.dimension)
             ? payload.dimension : "type";
         const { fromSec, toSec, dateFrom, dateTo } = getDayOrRangeBounds(payload);
@@ -942,6 +975,12 @@ exports.getTeamLoggedVsEta = async (req, res) => {
             return res.status(400).json({ status: false, message: "companyId header required" });
         }
         const payload = req.body || {};
+        // SECURITY (CodeRabbit): derive caller identity + role from the
+        // authenticated session, never the request body. req.uid is the verified
+        // JWT user; the role is resolved server-side. A forged
+        // callerUserId/callerRoleType in the body can no longer widen scope.
+        payload.callerUserId = String(req.uid || "");
+        payload.callerRoleType = await resolveCallerRoleType(companyId, req.uid);
         const { fromSec, toSec } = getDayOrRangeBounds(payload);
         const visibleUserIds = resolveVisibleUserIds(payload);
         if (Array.isArray(visibleUserIds) && !visibleUserIds.length) {
@@ -1074,6 +1113,12 @@ exports.getProjectProgressMetric = async (req, res) => {
         }
 
         const payload = req.body || {};
+        // SECURITY (CodeRabbit): derive caller identity + role from the
+        // authenticated session, never the request body. req.uid is the verified
+        // JWT user; the role is resolved server-side. A forged
+        // callerUserId/callerRoleType in the body can no longer widen scope.
+        payload.callerUserId = String(req.uid || "");
+        payload.callerRoleType = await resolveCallerRoleType(companyId, req.uid);
         const metric = String(payload.metric || "");
         const dateFrom = payload.dateFrom ? new Date(payload.dateFrom) : null;
         const dateTo = payload.dateTo ? new Date(payload.dateTo) : null;
@@ -1448,6 +1493,12 @@ exports.getOnLeaveBoard = async (req, res) => {
         }
 
         const payload = req.body || {};
+        // SECURITY (CodeRabbit): derive caller identity + role from the
+        // authenticated session, never the request body. req.uid is the verified
+        // JWT user; the role is resolved server-side. A forged
+        // callerUserId/callerRoleType in the body can no longer widen scope.
+        payload.callerUserId = String(req.uid || "");
+        payload.callerRoleType = await resolveCallerRoleType(companyId, req.uid);
         const projectIds = (Array.isArray(payload.projectIds) ? payload.projectIds : [])
             .filter((id) => mongoose.Types.ObjectId.isValid(String(id)))
             .map((id) => new mongoose.Types.ObjectId(String(id)));
