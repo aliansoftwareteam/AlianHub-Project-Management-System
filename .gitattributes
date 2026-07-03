@@ -1,0 +1,3 @@
+# Git hooks are executed by sh — CRLF line endings break them on Windows
+# ("husky - command not found"), so force LF regardless of core.autocrlf.
+.husky/* text eol=lf

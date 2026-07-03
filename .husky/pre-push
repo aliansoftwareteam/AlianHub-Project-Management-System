@@ -1,0 +1,29 @@
+# Validate the branch name before pushing — mirrors
+# .github/workflows/branch-name.yml so the failure happens locally
+# instead of on the PR. Keep the patterns in sync with that workflow
+# and BRANCHING.md § Topic branches.
+
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+STANDARD='^(feat|fix|hotfix|refactor|chore|docs|perf|test|ci|build|style)/[a-z0-9]+(-[a-z0-9.]+)*$'
+RELEASE='^release/v[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.-]+)?$'
+BACKPORT='^hotfix-backport/[a-z0-9]+(-[a-z0-9.]+)*$'
+BOT='^(dependabot|renovate)/.+$'
+LONG_RUNNING='^(staging|main)$'
+
+for pattern in "$STANDARD" "$RELEASE" "$BACKPORT" "$BOT" "$LONG_RUNNING"; do
+    if echo "$BRANCH" | grep -Eq "$pattern"; then
+        exit 0
+    fi
+done
+
+echo "❌ Branch name '$BRANCH' does not follow the convention."
+echo ""
+echo "Expected: <type>/<short-kebab-case-description>"
+echo "Allowed types: feat, fix, hotfix, refactor, chore, docs, perf, test, ci, build, style"
+echo ""
+echo "Examples:  feat/employee-workload-report   fix/login-validation-error"
+echo ""
+echo "See BRANCHING.md (§ Topic branches). CI enforces this on every PR"
+echo "(.github/workflows/branch-name.yml), so pushing would fail there anyway."
+exit 1
