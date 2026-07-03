@@ -102,7 +102,7 @@
                     @update:modelValue="updateCategoryMap"
                 />
             </div>
-            <div v-if="cardType !== 'time_tracking' && componentId !== 'QueueListComp' && componentId !== 'EmployeeWorkloadReportCard'">
+            <div v-if="cardType !== 'time_tracking' && componentId !== 'QueueListComp' && componentId !== 'EmployeeWorkloadReportCard' && fieldArray.some(e => e.groupBy === 'filter')">
                 <div class="custom-field card-advanced-filter">
                     <h3 class="group_by_card">{{$t('Filters.filter')}}</h3>
                     <template v-for="(field, index) in fieldArray.filter(e => e.groupBy === 'filter')" :key="index">

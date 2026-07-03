@@ -6,6 +6,23 @@ const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const dashboardTemplate = require("../../utils/dashboardTemplate.json");
 const cardComponent = require("../../utils/cardComponent.json");
+const {
+    getDayOrRangeBounds,
+    buildUserTeamMap,
+    getLoggedAndTasksInRange,
+    getUserNameMap,
+    getSprintTypeMap,
+} = require("./helpers/resourceHelpers");
+
+// Shared role-visibility resolver for the resource cards. Mirrors
+// getEmployeeWorkloadReport: roleType 1/2 → all users (null = no
+// restriction); everyone else → only themselves.
+function resolveVisibleUserIds(payload = {}) {
+    const roleType = Number(payload.callerRoleType || 3);
+    if (roleType === 1 || roleType === 2) return null;
+    const self = String(payload.callerUserId || "");
+    return self ? [self] : [];
+}
 
 /**
  * This endpoint is used to get user user dashboard template
@@ -220,6 +237,9 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
             // "Current" mode — restrict the report to employees with a
             // running tracker right now (who is working on what live).
             currentOnly: payload.currentOnly === true,
+            // Advanced "Add filter" builder → Mongo match on task fields
+            // (buildFilterQuery on the client). Merged into the task query.
+            taskMatch: (payload.taskMatch && typeof payload.taskMatch === "object") ? payload.taskMatch : null,
             activeWithinMinutes: Number(payload.activeWithinMinutes) || null,
             idleAfterMinutes: Number(payload.idleAfterMinutes) || null,
             overloadCapacityMinutesPerDay: Number(payload.overloadCapacityMinutesPerDay) || null,
@@ -315,6 +335,7 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
 
         // 2. Logged hours in range (per user, per task) from timesheets.
         const loggedByUserTask = {};   // `${uid}|${tid}` → logged minutes in range
+        const lastLogByUserTask = {};  // `${uid}|${tid}` → { desc, start } latest work comment
         {
             const tsFilter = { Loggeduser: { $in: employeeIdStrs } };
             if (dateFromSec != null || dateToSec != null) {
@@ -324,12 +345,20 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
             }
             const tlogs = await MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.TIMESHEET,
-                data: [tsFilter, { Loggeduser: 1, TicketID: 1, LogTimeDuration: 1 }],
+                data: [tsFilter, { Loggeduser: 1, TicketID: 1, LogTimeDuration: 1, LogDescription: 1, LogStartTime: 1 }],
             }, "find").catch(() => []);
             (tlogs || []).forEach((ts) => {
                 if (!ts.TicketID) return;
                 const key = `${ts.Loggeduser}|${ts.TicketID}`;
                 loggedByUserTask[key] = (loggedByUserTask[key] || 0) + (Number(ts.LogTimeDuration) || 0);
+                // Keep the most recent non-empty work comment for this user+task.
+                const desc = (ts.LogDescription || "").trim();
+                if (desc) {
+                    const start = Number(ts.LogStartTime) || 0;
+                    if (!lastLogByUserTask[key] || start >= lastLogByUserTask[key].start) {
+                        lastLogByUserTask[key] = { desc, start };
+                    }
+                }
             });
         }
 
@@ -358,6 +387,7 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
         const RUNNING_WINDOW_SEC = 10 * 60; // matches frontend's 10-min rule
         const nowSec = Math.floor(Date.now() / 1000);
         const activeTrackerPairs = new Set();
+        const activeTrackerDesc = {}; // `${uid}|${tid}` → running entry's work comment
         {
             const activeFilter = {
                 Loggeduser: { $in: employeeIdStrs },
@@ -365,11 +395,14 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
             };
             const activeLogs = await MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.TIMESHEET,
-                data: [activeFilter, { Loggeduser: 1, TicketID: 1 }],
+                data: [activeFilter, { Loggeduser: 1, TicketID: 1, LogDescription: 1 }],
             }, "find").catch(() => []);
             (activeLogs || []).forEach((ts) => {
                 if (!ts.Loggeduser || !ts.TicketID) return;
-                activeTrackerPairs.add(`${ts.Loggeduser}|${ts.TicketID}`);
+                const key = `${ts.Loggeduser}|${ts.TicketID}`;
+                activeTrackerPairs.add(key);
+                const desc = (ts.LogDescription || "").trim();
+                if (desc) activeTrackerDesc[key] = desc;
             });
         }
 
@@ -418,6 +451,19 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
                     { aiTaskCategoryManual: { $exists: false }, aiTaskCategory: cfg.taskType },
                 ];
             }
+            // Merge the advanced filter match. Fold into $and so it can't
+            // clobber the taskType $or above (buildFilterQuery may also emit $or).
+            if (cfg.taskMatch) {
+                const extra = cfg.taskMatch;
+                const andParts = [];
+                if (taskFilter.$or) { andParts.push({ $or: taskFilter.$or }); delete taskFilter.$or; }
+                if (Array.isArray(extra.$and)) andParts.push(...extra.$and);
+                if (Array.isArray(extra.$or)) andParts.push({ $or: extra.$or });
+                Object.keys(extra).forEach((k) => {
+                    if (k !== "$and" && k !== "$or") taskFilter[k] = extra[k];
+                });
+                if (andParts.length) taskFilter.$and = (taskFilter.$and || []).concat(andParts);
+            }
             const tasks = await MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.TASKS,
                 data: [
@@ -459,6 +505,45 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
             if (cfg.currentOnly && !activeTrackerPairs.has(key)) return; // not live
             if (!pairsByUser[uid]) pairsByUser[uid] = new Set();
             pairsByUser[uid].add(tid);
+        });
+
+        // ─── Approved/pending PTO overlapping the window (cards #7/#10) ──
+        // Approved PTO is what actually removes capacity ("free today" and
+        // on-leave); pending is surfaced for display only. Overlap rule:
+        // entry.startDate <= rangeEnd AND entry.endDate >= rangeStart.
+        const ptoByUser = {}; // uid → { approved:bool, pending:bool, type }
+        if (cfg.dateFrom && cfg.dateTo) {
+            const ptoRows = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.PTO_ENTRIES,
+                data: [
+                    {
+                        deletedStatusKey: 0,
+                        userId: { $in: employeeIdStrs },
+                        status: { $in: ["approved", "pending"] },
+                        startDate: { $lte: cfg.dateTo },
+                        endDate: { $gte: cfg.dateFrom },
+                    },
+                    { userId: 1, status: 1, type: 1 },
+                ],
+            }, "find").catch(() => []);
+            (ptoRows || []).forEach((p) => {
+                const uid = String(p.userId);
+                if (!ptoByUser[uid]) ptoByUser[uid] = { approved: false, pending: false, type: null };
+                if (p.status === "approved") ptoByUser[uid].approved = true;
+                if (p.status === "pending") ptoByUser[uid].pending = true;
+                if (!ptoByUser[uid].type) ptoByUser[uid].type = p.type || null;
+            });
+        }
+
+        // Full-range logged time per user across ALL their filtered tasks —
+        // computed independently of the currentOnly live-task restriction so a
+        // live-work view can show each person's total logged for the day, not
+        // just the task they're tracking right now.
+        const rangeLoggedByUser = {};
+        Object.keys(loggedByUserTask).forEach((key) => {
+            const [uid, tid] = key.split("|");
+            if (!taskMap[tid]) return; // only tasks that passed the filters
+            rangeLoggedByUser[uid] = (rangeLoggedByUser[uid] || 0) + loggedByUserTask[key];
         });
 
         // ─── Build per-employee rows ──────────────────────────────
@@ -512,6 +597,11 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
                     // Currently-running tracker flag — drives the "Running"
                     // badge in the UI.
                     isTracking: activeTrackerPairs.has(`${uidStr}|${tid}`),
+                    // Work comment from the timesheet: prefer the running entry's
+                    // note, else the latest logged note for this user+task.
+                    logDescription: activeTrackerDesc[`${uidStr}|${tid}`]
+                        || (lastLogByUserTask[`${uidStr}|${tid}`] && lastLogByUserTask[`${uidStr}|${tid}`].desc)
+                        || "",
                 };
             };
 
@@ -547,6 +637,11 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
                 assignedTaskCount: tids.length,
                 projectCount: projectIdsForUser.size,
                 overdueCount,
+                // Total logged for the whole window (all filtered tasks), even
+                // when currentOnly narrows `tasks` to the live one(s).
+                dayLoggedMinutes: rangeLoggedByUser[uidStr] || 0,
+                // PTO status for the window — drives FreeResources/OnLeave cards.
+                onLeave: ptoByUser[uidStr] || { approved: false, pending: false, type: null },
                 tasks: taskDetails,
             };
             workloadByEmployee.push({ employeeId: uidStr, name: row.name, loggedMinutes: row.loggedMinutes });
@@ -574,6 +669,345 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
         return res.status(500).json({
             status: false,
             message: "An error occurred while building the workload report.",
+            error: error && error.message ? error.message : String(error),
+        });
+    }
+};
+
+/**
+ * Project Utilization Summary — backs the ProjectPulseCard (screenshot
+ * metrics #1-#3):
+ *   1. Active Projects   — projects whose statusType is not 'close'
+ *   2. Working Projects  — distinct projects with a timesheet in the window
+ *                          (defaults to today; respects dateFrom/dateTo)
+ *   3. Type mix          — active projects grouped by ProjectType
+ *                          (In House / Fixed / Hourly / …)
+ *
+ * Company-scoped and read-only. Not user-specific, so no role gate is
+ * needed — an admin/management widget over company-wide project state.
+ */
+exports.getProjectUtilizationSummary = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        if (!companyId) {
+            return res.status(400).json({ status: false, message: "companyId header required" });
+        }
+
+        const { fromSec, toSec } = getDayOrRangeBounds(req.body || {});
+
+        // 1 + 3 — active projects and their ProjectType mix.
+        const activeProjects = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.PROJECTS,
+            data: [
+                { statusType: { $nin: ["close"] }, deletedStatusKey: 0 },
+                { ProjectType: 1, ProjectName: 1 },
+            ],
+        }, "find").catch(() => []);
+
+        // "In House" is not a ProjectType — it's a naming convention: the
+        // project name is prefixed with "IH" (e.g. "IH - Foo", "IH Foo",
+        // "IH_Foo"). The negative lookahead (?![A-Za-z]) accepts any
+        // separator/space/digit/end after "IH" but rejects real words like
+        // "IHelp".
+        const IH_PREFIX = /^\s*IH(?![A-Za-z])/i;
+        const typeCounts = {};
+        (activeProjects || []).forEach((p) => {
+            const key = IH_PREFIX.test(p.ProjectName || "")
+                ? "In House"
+                : (p.ProjectType || "Unspecified");
+            typeCounts[key] = (typeCounts[key] || 0) + 1;
+        });
+        const typeMix = Object.keys(typeCounts).map((type) => ({ type, count: typeCounts[type] }));
+
+        // 2 — distinct projects worked (a timesheet logged) in the window.
+        const timelogs = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TIMESHEET,
+            data: [
+                { LogStartTime: { $gte: fromSec, $lte: toSec } },
+                { ProjectId: 1 },
+            ],
+        }, "find").catch(() => []);
+
+        const workingProjectIds = new Set();
+        (timelogs || []).forEach((ts) => {
+            if (ts.ProjectId) workingProjectIds.add(String(ts.ProjectId));
+        });
+
+        return res.status(200).json({
+            status: true,
+            data: {
+                activeProjects: (activeProjects || []).length,
+                workingProjects: workingProjectIds.size,
+                typeMix,
+            },
+        });
+    } catch (error) {
+        logger.error(`getProjectUtilizationSummary error: ${error && error.message ? error.message : error}`);
+        return res.status(500).json({
+            status: false,
+            message: "An error occurred while building the project utilization summary.",
+            error: error && error.message ? error.message : String(error),
+        });
+    }
+};
+
+/**
+ * Team Effort Breakdown (screenshot metric #5, generalized). Sums logged
+ * minutes and rolls users into their teams (teams_management; a user in
+ * multiple teams counts under each, none → "Unassigned"), bucketed by a
+ * selectable DIMENSION:
+ *   - "type"          → task type (Task / Design / Bid …)   [default]
+ *   - "effort_nature" → Rework (Bug/Revision) / Backlog (backlog sprint) /
+ *                       New (created in range, from the task _id timestamp) /
+ *                       In-flight
+ *   - "work_category" → Actual / Learning / Uncategorized (aiTaskCategory)
+ *   - "billable"      → Billable / Non-billable (timesheet.billable)
+ *
+ * Response:
+ *   { dimension, teams: [{ teamId, name, color, totalMinutes,
+ *       buckets: [{ label, minutes, users: [{ userId, name, minutes }] }] }] }
+ */
+exports.getTeamTaskTypeBreakdown = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        if (!companyId) {
+            return res.status(400).json({ status: false, message: "companyId header required" });
+        }
+        const payload = req.body || {};
+        const dimension = ["type", "effort_nature", "work_category", "billable"].includes(payload.dimension)
+            ? payload.dimension : "type";
+        const { fromSec, toSec, dateFrom, dateTo } = getDayOrRangeBounds(payload);
+        const visibleUserIds = resolveVisibleUserIds(payload);
+        if (Array.isArray(visibleUserIds) && !visibleUserIds.length) {
+            return res.status(200).json({ status: true, data: { dimension, teams: [] } });
+        }
+        const projectIds = Array.isArray(payload.projectIds) ? payload.projectIds
+            : Array.isArray(payload.projectId) ? payload.projectId : [];
+        const statusKeys = Array.isArray(payload.statusKeys) ? payload.statusKeys
+            : Array.isArray(payload.statusKey) ? payload.statusKey : [];
+        const taskMatch = (payload.taskMatch && typeof payload.taskMatch === "object") ? payload.taskMatch : null;
+
+        const { map: userTeamMap } = await buildUserTeamMap(companyId);
+        const UNASSIGNED = { teamId: "unassigned", name: "Unassigned", color: null };
+        const agg = {};       // teamId → bucketLabel → uid → minutes
+        const teamMeta = {};
+        const userIdsInvolved = new Set();
+        const addLogged = (uid, bucket, minutes) => {
+            if (!minutes) return;
+            userIdsInvolved.add(uid);
+            const teams = (userTeamMap[uid] && userTeamMap[uid].length) ? userTeamMap[uid] : [UNASSIGNED];
+            teams.forEach((team) => {
+                teamMeta[team.teamId] = { name: team.name, color: team.color };
+                if (!agg[team.teamId]) agg[team.teamId] = {};
+                if (!agg[team.teamId][bucket]) agg[team.teamId][bucket] = {};
+                agg[team.teamId][bucket][uid] = (agg[team.teamId][bucket][uid] || 0) + minutes;
+            });
+        };
+
+        if (dimension === "billable") {
+            // Timesheet-level split (billable lives on the timesheet, not the
+            // task). Applies project + user filters; status/advanced filters
+            // don't apply here (no task join).
+            const tsFilter = { LogStartTime: { $gte: fromSec, $lte: toSec } };
+            if (Array.isArray(visibleUserIds)) tsFilter.Loggeduser = { $in: visibleUserIds.map(String) };
+            if (projectIds.length) tsFilter.ProjectId = { $in: projectIds.map(String) };
+            const tlogs = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.TIMESHEET,
+                data: [tsFilter, { Loggeduser: 1, LogTimeDuration: 1, billable: 1 }],
+            }, "find").catch(() => []);
+            (tlogs || []).forEach((ts) => {
+                if (!ts.Loggeduser) return;
+                const bucket = ts.billable === false ? "Non-billable" : "Billable";
+                addLogged(String(ts.Loggeduser), bucket, Number(ts.LogTimeDuration) || 0);
+            });
+        } else {
+            const { loggedByUserTask, taskMap } = await getLoggedAndTasksInRange(companyId, {
+                fromSec, toSec, projectIds, statusKeys, visibleUserIds, taskMatch,
+            });
+
+            let sprintTypeMap = {};
+            if (dimension === "effort_nature") {
+                sprintTypeMap = await getSprintTypeMap(
+                    companyId,
+                    Object.values(taskMap).map((t) => t.sprintId).filter(Boolean),
+                );
+            }
+            const REWORK = /bug|revision|rework|defect/i;
+            const bucketFor = (task, tid) => {
+                if (dimension === "work_category") {
+                    const c = String(task.aiTaskCategoryManual || task.aiTaskCategory || "").toLowerCase();
+                    if (c === "actual") return "Actual";
+                    if (c === "learning") return "Learning";
+                    return "Uncategorized";
+                }
+                if (dimension === "effort_nature") {
+                    if (REWORK.test(task.TaskType || "")) return "Rework";
+                    if ((sprintTypeMap[String(task.sprintId)] || "").includes("backlog")) return "Backlog";
+                    let createdMs = 0;
+                    try { createdMs = new mongoose.Types.ObjectId(tid).getTimestamp().getTime(); } catch (e) { createdMs = 0; }
+                    if (createdMs && dateFrom && dateTo && createdMs >= dateFrom.getTime() && createdMs <= dateTo.getTime()) return "New";
+                    return "In-flight";
+                }
+                return task.TaskType || "Unspecified"; // dimension === "type"
+            };
+
+            Object.keys(loggedByUserTask).forEach((key) => {
+                const [uid, tid] = key.split("|");
+                const task = taskMap[tid];
+                if (!task) return;
+                addLogged(uid, bucketFor(task, tid), loggedByUserTask[key]);
+            });
+        }
+
+        const nameMap = await getUserNameMap(Array.from(userIdsInvolved));
+
+        const teams = Object.keys(agg).map((teamId) => {
+            let teamTotal = 0;
+            const buckets = Object.keys(agg[teamId]).map((label) => {
+                const usersObj = agg[teamId][label];
+                const users = Object.keys(usersObj).map((uid) => ({
+                    userId: uid, name: nameMap[uid] || "—", minutes: usersObj[uid],
+                })).sort((a, b) => b.minutes - a.minutes);
+                const minutes = users.reduce((s, u) => s + u.minutes, 0);
+                teamTotal += minutes;
+                return { label, minutes, users };
+            }).sort((a, b) => b.minutes - a.minutes);
+            return {
+                teamId,
+                name: teamMeta[teamId] ? teamMeta[teamId].name : teamId,
+                color: teamMeta[teamId] ? teamMeta[teamId].color : null,
+                totalMinutes: teamTotal,
+                buckets,
+            };
+        }).sort((a, b) => b.totalMinutes - a.totalMinutes);
+
+        return res.status(200).json({ status: true, data: { dimension, teams } });
+    } catch (error) {
+        logger.error(`getTeamTaskTypeBreakdown error: ${error && error.message ? error.message : error}`);
+        return res.status(500).json({
+            status: false,
+            message: "An error occurred while building the team effort breakdown.",
+            error: error && error.message ? error.message : String(error),
+        });
+    }
+};
+
+/**
+ * Team-wise Time Logged vs ETA (screenshot metric #6), as a drill-down:
+ *   Team → User → Task, each level carrying loggedMinutes + etaMinutes.
+ *     - task.etaMinutes  = the task's totalEstimatedTime (shared estimate)
+ *     - task.loggedMinutes = that user's logged time on the task in the window
+ *     - user totals       = Σ of their tasks
+ *     - team totals        = Σ member logged; ETA deduped across the team so a
+ *                            task worked by two members isn't counted twice.
+ *
+ * Response: { teams: [{ teamId, name, color, loggedMinutes, etaMinutes,
+ *                        users: [{ userId, name, loggedMinutes, etaMinutes,
+ *                                  tasks: [{ taskId, taskName, taskKey,
+ *                                            projectName, loggedMinutes,
+ *                                            etaMinutes }] }] }] }
+ */
+exports.getTeamLoggedVsEta = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        if (!companyId) {
+            return res.status(400).json({ status: false, message: "companyId header required" });
+        }
+        const payload = req.body || {};
+        const { fromSec, toSec } = getDayOrRangeBounds(payload);
+        const visibleUserIds = resolveVisibleUserIds(payload);
+        if (Array.isArray(visibleUserIds) && !visibleUserIds.length) {
+            return res.status(200).json({ status: true, data: { teams: [] } });
+        }
+
+        const { loggedByUserTask, taskMap, userIds } = await getLoggedAndTasksInRange(companyId, {
+            fromSec, toSec,
+            projectIds: Array.isArray(payload.projectIds) ? payload.projectIds
+                : Array.isArray(payload.projectId) ? payload.projectId : [],
+            statusKeys: Array.isArray(payload.statusKeys) ? payload.statusKeys
+                : Array.isArray(payload.statusKey) ? payload.statusKey : [],
+            visibleUserIds,
+            taskMatch: (payload.taskMatch && typeof payload.taskMatch === "object") ? payload.taskMatch : null,
+        });
+
+        const [{ map: userTeamMap }, nameMap] = await Promise.all([
+            buildUserTeamMap(companyId),
+            getUserNameMap(Array.from(userIds)),
+        ]);
+
+        // Project-name lookup for the task rows.
+        const projectIdSet = new Set(Object.values(taskMap).map((t) => String(t.ProjectID)));
+        const projectsMap = {};
+        if (projectIdSet.size) {
+            const projects = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.PROJECTS,
+                data: [
+                    { _id: { $in: Array.from(projectIdSet).filter((id) => mongoose.Types.ObjectId.isValid(id)).map((id) => new mongoose.Types.ObjectId(id)) } },
+                    { ProjectName: 1 },
+                ],
+            }, "find").catch(() => []);
+            (projects || []).forEach((p) => { projectsMap[String(p._id)] = p.ProjectName || ""; });
+        }
+
+        const UNASSIGNED = { teamId: "unassigned", name: "Unassigned", color: null };
+        // teamId → { meta, users: { uid → { tasks: { tid → row } } } }
+        const agg = {};
+        const teamMeta = {};
+
+        Object.keys(loggedByUserTask).forEach((key) => {
+            const [uid, tid] = key.split("|");
+            const task = taskMap[tid];
+            if (!task) return;
+            const logged = loggedByUserTask[key];
+            const eta = Number(task.totalEstimatedTime) || 0;
+            const teams = (userTeamMap[uid] && userTeamMap[uid].length) ? userTeamMap[uid] : [UNASSIGNED];
+            teams.forEach((team) => {
+                teamMeta[team.teamId] = { name: team.name, color: team.color };
+                if (!agg[team.teamId]) agg[team.teamId] = {};
+                if (!agg[team.teamId][uid]) agg[team.teamId][uid] = {};
+                agg[team.teamId][uid][tid] = {
+                    taskId: tid,
+                    taskName: task.TaskName || "",
+                    taskKey: task.TaskKey || "",
+                    projectName: projectsMap[String(task.ProjectID)] || "",
+                    loggedMinutes: logged,
+                    etaMinutes: eta,
+                };
+            });
+        });
+
+        const teams = Object.keys(agg).map((teamId) => {
+            const users = Object.keys(agg[teamId]).map((uid) => {
+                const tasks = Object.values(agg[teamId][uid]).sort((a, b) => b.loggedMinutes - a.loggedMinutes);
+                const loggedMinutes = tasks.reduce((s, t) => s + t.loggedMinutes, 0);
+                const etaMinutes = tasks.reduce((s, t) => s + t.etaMinutes, 0);
+                return { userId: uid, name: nameMap[uid] || "—", loggedMinutes, etaMinutes, tasks };
+            }).sort((a, b) => b.loggedMinutes - a.loggedMinutes);
+
+            const loggedMinutes = users.reduce((s, u) => s + u.loggedMinutes, 0);
+            // Dedupe ETA across the team (a task worked by 2 members counts once).
+            const seenTasks = new Set();
+            let etaMinutes = 0;
+            users.forEach((u) => u.tasks.forEach((t) => {
+                if (!seenTasks.has(t.taskId)) { seenTasks.add(t.taskId); etaMinutes += t.etaMinutes; }
+            }));
+
+            return {
+                teamId,
+                name: teamMeta[teamId] ? teamMeta[teamId].name : teamId,
+                color: teamMeta[teamId] ? teamMeta[teamId].color : null,
+                loggedMinutes,
+                etaMinutes,
+                users,
+            };
+        }).sort((a, b) => b.loggedMinutes - a.loggedMinutes);
+
+        return res.status(200).json({ status: true, data: { teams } });
+    } catch (error) {
+        logger.error(`getTeamLoggedVsEta error: ${error && error.message ? error.message : error}`);
+        return res.status(500).json({
+            status: false,
+            message: "An error occurred while building the team logged-vs-ETA report.",
             error: error && error.message ? error.message : String(error),
         });
     }

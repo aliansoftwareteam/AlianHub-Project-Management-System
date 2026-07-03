@@ -1,105 +1,108 @@
 {
-	"name": "alian-hub-v3",
-	"version": "8.36.0",
-	"private": true,
-	"license": "AGPL-3.0-or-later",
-	"author": "Alian Software <https://alianhub.com>",
-	"scripts": {
-		"serve": "vue-cli-service serve",
-		"build": "vue-cli-service build",
-		"lint": "vue-cli-service lint",
-		"build-report": "vue-cli-service build --report"
-	},
-	"dependencies": {
-		"@chargebee/chargebee-js-vue-wrapper": "0.3.2",
-		"@editorjs/checklist": "1.6.0",
-		"@editorjs/code": "2.9.3",
-		"@editorjs/editorjs": "2.30.7",
-		"@editorjs/embed": "2.7.6",
-		"@editorjs/header": "2.8.8",
-		"@editorjs/inline-code": "1.5.1",
-		"@editorjs/marker": "1.4.0",
-		"@editorjs/nested-list": "1.4.3",
-		"@editorjs/table": "2.4.3",
-		"@formkit/pro": "^0.117.7",
-		"@formkit/themes": "^0.18.5",
-		"@formkit/validation": "^0.18.5",
-		"@formkit/vue": "^0.18.5",
-		"@fortawesome/fontawesome-svg-core": "6.7.1",
-		"@fortawesome/free-brands-svg-icons": "6.7.1",
-		"@fortawesome/free-regular-svg-icons": "6.7.1",
-		"@fortawesome/free-solid-svg-icons": "6.7.1",
-		"@fortawesome/vue-fontawesome": "3.0.8",
-		"@fullcalendar/core": "6.1.15",
-		"@fullcalendar/daygrid": "6.1.15",
-		"@fullcalendar/interaction": "6.1.15",
-		"@fullcalendar/timegrid": "6.1.15",
-		"@fullcalendar/vue3": "6.1.15",
-		"@vuepic/vue-datepicker": "^10.0.0",
-		"apexcharts": "^4.4.0",
-		"axios": "^1.12.2",
-		"chart.js": "^4.4.7",
-		"country-state-city": "3.2.1",
-		"d3": "^7.9.0",
-		"detectrtc": "1.4.1",
-		"dhtmlx-gantt": "^8.0.0",
-		"driver.js": "1.3.1",
-		"firebase": "10.14.1",
-		"grid-layout-plus": "^1.0.6",
-		"highcharts": "^12.1.2",
-		"js-cookie": "^3.0.5",
-		"jszip": "^3.10.1",
-		"markdown-it": "14.1.0",
-		"mic-recorder-to-mp3": "2.2.2",
-		"moment": "2.30.1",
-		"phone": "^3.1.58",
-		"socket.io-client": "4.8.1",
-		"sweetalert2": "11.15.0",
-		"v-calendar": "3.1.2",
-		"vue": "3.5.13",
-		"vue-advanced-cropper": "2.8.9",
-		"vue-i18n": "9.14.2",
-		"vue-pdf-embed": "^2.1.2",
-		"vue-router": "4.5.0",
-		"vue-toast-notification": "3.1.3",
-		"vue3-apexcharts": "^1.8.0",
-		"vue3-editor": "0.1.1",
-		"vue3-timepicker": "1.0.0-beta.2",
-		"vuedraggable": "4.1.0",
-		"vuex": "4.1.0",
-		"xlsx": "^0.18.5"
-	},
-	"devDependencies": {
-		"@babel/core": "^7.12.16",
-		"@babel/eslint-parser": "^7.12.16",
-		"@vue/cli-plugin-babel": "~5.0.0",
-		"@vue/cli-plugin-eslint": "~5.0.0",
-		"@vue/cli-plugin-router": "~5.0.0",
-		"@vue/cli-plugin-vuex": "~5.0.0",
-		"@vue/cli-service": "~5.0.0",
-		"eslint": "^8.40.0",
-		"eslint-plugin-vue": "^9.11.1"
-	},
-	"eslintConfig": {
-		"root": true,
-		"env": {
-			"node": true
-		},
-		"extends": [
-			"plugin:vue/vue3-essential",
-			"eslint:recommended"
-		],
-		"parserOptions": {
-			"parser": "@babel/eslint-parser"
-		},
-		"rules": {
-			"vue/require-toggle-inside-transition": "off"
-		}
-	},
-	"browserslist": [
-		"> 1%",
-		"last 2 versions",
-		"not dead",
-		"not ie 11"
-	]
+  "name": "alian-hub-v3",
+  "version": "8.36.0",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "author": "Alian Software <https://alianhub.com>",
+  "scripts": {
+    "serve": "vue-cli-service serve",
+    "build": "vue-cli-service build",
+    "lint": "vue-cli-service lint",
+    "build-report": "vue-cli-service build --report"
+  },
+  "dependencies": {
+    "@chargebee/chargebee-js-vue-wrapper": "0.3.2",
+    "@editorjs/checklist": "1.6.0",
+    "@editorjs/code": "2.9.3",
+    "@editorjs/editorjs": "2.30.7",
+    "@editorjs/embed": "2.7.6",
+    "@editorjs/header": "2.8.8",
+    "@editorjs/inline-code": "1.5.1",
+    "@editorjs/marker": "1.4.0",
+    "@editorjs/nested-list": "1.4.3",
+    "@editorjs/table": "2.4.3",
+    "@formkit/pro": "^0.117.7",
+    "@formkit/themes": "^0.18.5",
+    "@formkit/validation": "^0.18.5",
+    "@formkit/vue": "^0.18.5",
+    "@fortawesome/fontawesome-svg-core": "6.7.1",
+    "@fortawesome/free-brands-svg-icons": "6.7.1",
+    "@fortawesome/free-regular-svg-icons": "6.7.1",
+    "@fortawesome/free-solid-svg-icons": "6.7.1",
+    "@fortawesome/vue-fontawesome": "3.0.8",
+    "@fullcalendar/core": "6.1.15",
+    "@fullcalendar/daygrid": "6.1.15",
+    "@fullcalendar/interaction": "6.1.15",
+    "@fullcalendar/timegrid": "6.1.15",
+    "@fullcalendar/vue3": "6.1.15",
+    "@vuepic/vue-datepicker": "^10.0.0",
+    "apexcharts": "^4.4.0",
+    "axios": "^1.12.2",
+    "chart.js": "^4.4.7",
+    "country-state-city": "3.2.1",
+    "d3": "^7.9.0",
+    "detectrtc": "1.4.1",
+    "dhtmlx-gantt": "^8.0.0",
+    "driver.js": "1.3.1",
+    "firebase": "10.14.1",
+    "grid-layout-plus": "^1.0.6",
+    "highcharts": "^12.1.2",
+    "js-cookie": "^3.0.5",
+    "jszip": "^3.10.1",
+    "markdown-it": "14.1.0",
+    "mic-recorder-to-mp3": "2.2.2",
+    "moment": "2.30.1",
+    "phone": "^3.1.58",
+    "socket.io-client": "4.8.1",
+    "sweetalert2": "11.15.0",
+    "v-calendar": "3.1.2",
+    "vue": "3.5.13",
+    "vue-advanced-cropper": "2.8.9",
+    "vue-i18n": "9.14.2",
+    "vue-pdf-embed": "^2.1.2",
+    "vue-router": "4.5.0",
+    "vue-toast-notification": "3.1.3",
+    "vue3-apexcharts": "^1.8.0",
+    "vue3-editor": "0.1.1",
+    "vue3-timepicker": "1.0.0-beta.2",
+    "vuedraggable": "4.1.0",
+    "vuex": "4.1.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.12.16",
+    "@babel/eslint-parser": "^7.12.16",
+    "@vue/cli-plugin-babel": "~5.0.0",
+    "@vue/cli-plugin-eslint": "~5.0.0",
+    "@vue/cli-plugin-router": "~5.0.0",
+    "@vue/cli-plugin-vuex": "~5.0.0",
+    "@vue/cli-service": "~5.0.0",
+    "eslint": "^8.40.0",
+    "eslint-plugin-vue": "^9.11.1"
+  },
+  "eslintConfig": {
+    "root": true,
+    "env": {
+      "node": true
+    },
+    "extends": [
+      "plugin:vue/vue3-essential",
+      "eslint:recommended"
+    ],
+    "parserOptions": {
+      "parser": "@babel/eslint-parser"
+    },
+    "rules": {
+      "vue/require-toggle-inside-transition": "off"
+    }
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead",
+    "not ie 11"
+  ],
+  "lint-staged": {
+    "*.{js,vue}": "npx eslint --fix"
+  }
 }

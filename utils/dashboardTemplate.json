@@ -1409,7 +1409,164 @@
         "title": "Template 4 Me Mode",
         "isDeleted": false,
         "permission": [],
-        "isDefault": true,
+        "isDefault": false,
         "description": "Template 4 Me Mode"
+    },
+    {
+        "_id": "6a3700000000000000000501",
+        "cards": [
+            {
+                "componentId": "ProjectPulseCard",
+                "cardId": "6a3700000000000000000401",
+                "uid": "510000001",
+                "config": {
+                    "cardData": {
+                        "fieldName": "Project Pulse",
+                        "timerange": 1
+                    },
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "w": 4,
+                        "h": 8,
+                        "minW": 3,
+                        "maxW": 12,
+                        "minH": 5,
+                        "maxH": 18
+                    },
+                    "filterData": []
+                }
+            },
+            {
+                "componentId": "TeamLoggedVsEtaCard",
+                "cardId": "6a3700000000000000000406",
+                "uid": "510000002",
+                "config": {
+                    "cardData": {
+                        "fieldName": "Team Logged vs ETA",
+                        "projectId": [],
+                        "AssigneeUserId": [],
+                        "timerange": 3
+                    },
+                    "position": {
+                        "x": 4,
+                        "y": 0,
+                        "w": 4,
+                        "h": 8,
+                        "minW": 3,
+                        "maxW": 12,
+                        "minH": 5,
+                        "maxH": 18
+                    },
+                    "filterData": []
+                }
+            },
+            {
+                "componentId": "ActiveWorkTableCard",
+                "cardId": "6a3700000000000000000402",
+                "uid": "510000004",
+                "config": {
+                    "cardData": {
+                        "fieldName": "Live Work",
+                        "projectId": [],
+                        "AssigneeUserId": [],
+                        "isParentTask": true
+                    },
+                    "position": {
+                        "x": 0,
+                        "y": 8,
+                        "w": 6,
+                        "h": 9,
+                        "minW": 3,
+                        "maxW": 12,
+                        "minH": 5,
+                        "maxH": 18
+                    },
+                    "filterData": []
+                }
+            },
+            {
+                "componentId": "FreeResourcesCard",
+                "cardId": "6a3700000000000000000403",
+                "uid": "510000005",
+                "config": {
+                    "cardData": {
+                        "fieldName": "Free Resources",
+                        "AssigneeUserId": [],
+                        "projectId": [],
+                        "freeThresholdHours": 7
+                    },
+                    "position": {
+                        "x": 6,
+                        "y": 8,
+                        "w": 6,
+                        "h": 9,
+                        "minW": 3,
+                        "maxW": 12,
+                        "minH": 5,
+                        "maxH": 18
+                    },
+                    "filterData": []
+                }
+            },
+            {
+                "componentId": "TeamCategoryBreakdownCard",
+                "cardId": "6a3700000000000000000405",
+                "uid": "510000006",
+                "config": {
+                    "cardData": {
+                        "fieldName": "Team Effort Breakdown",
+                        "projectId": [],
+                        "AssigneeUserId": [],
+                        "timerange": 3,
+                        "dimension": "type"
+                    },
+                    "position": {
+                        "x": 0,
+                        "y": 17,
+                        "w": 12,
+                        "h": 10,
+                        "minW": 3,
+                        "maxW": 12,
+                        "minH": 5,
+                        "maxH": 18
+                    },
+                    "filterData": []
+                }
+            },
+            {
+                "componentId": "WorkedTasksTableCard",
+                "cardId": "6a3700000000000000000404",
+                "uid": "510000007",
+                "config": {
+                    "cardData": {
+                        "fieldName": "Worked Tasks",
+                        "projectId": [],
+                        "AssigneeUserId": [],
+                        "statusArray": [],
+                        "timerange": 3,
+                        "isParentTask": true
+                    },
+                    "position": {
+                        "x": 0,
+                        "y": 27,
+                        "w": 12,
+                        "h": 12,
+                        "minW": 3,
+                        "maxW": 12,
+                        "minH": 5,
+                        "maxH": 18
+                    },
+                    "filterData": []
+                }
+            }
+        ],
+        "createdAt": "2026-07-02T00:00:00.000Z",
+        "updatedAt": "2026-07-02T00:00:00.000Z",
+        "title": "Resource Utilization",
+        "isDeleted": false,
+        "permission": [],
+        "isDefault": true,
+        "description": "Resource utilization & consumption — projects, live work, capacity, teams and leave."
     }
 ]

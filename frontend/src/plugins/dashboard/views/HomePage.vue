@@ -174,6 +174,12 @@
     import TimeEstimatedWorkloadComp from "@/components/atom/Dashboard/TimeEstimatedWorkloadComp.vue"
     import EmployeeWorkloadReportCard from "@/components/organisms/EmployeeWorkloadReportCard/EmployeeWorkloadReportCard.vue";
     import MetricSummaryCard from "@/components/organisms/MetricSummaryCard/MetricSummaryCard.vue";
+    import ProjectPulseCard from "@/components/organisms/ProjectPulseCard/ProjectPulseCard.vue";
+    import ActiveWorkTableCard from "@/components/organisms/ActiveWorkTableCard/ActiveWorkTableCard.vue";
+    import FreeResourcesCard from "@/components/organisms/FreeResourcesCard/FreeResourcesCard.vue";
+    import WorkedTasksTableCard from "@/components/organisms/WorkedTasksTableCard/WorkedTasksTableCard.vue";
+    import TeamCategoryBreakdownCard from "@/components/organisms/TeamCategoryBreakdownCard/TeamCategoryBreakdownCard.vue";
+    import TeamLoggedVsEtaCard from "@/components/organisms/TeamLoggedVsEtaCard/TeamLoggedVsEtaCard.vue";
     import ProjectMetricsCard from "@/components/organisms/ProjectMetricsCard/ProjectMetricsCard.vue";
     import ProjectResourceCard from "@/components/organisms/ProjectResourceCard/ProjectResourceCard.vue";
     import LiveWorkCard from "@/components/organisms/LiveWorkCard/LiveWorkCard.vue";
@@ -338,6 +344,18 @@
             case 'TasksByProjectCard':
             case 'TotalTasksCard':
                 return MetricSummaryCard;
+            case 'ProjectPulseCard':
+                return ProjectPulseCard;
+            case 'ActiveWorkTableCard':
+                return ActiveWorkTableCard;
+            case 'FreeResourcesCard':
+                return FreeResourcesCard;
+            case 'WorkedTasksTableCard':
+                return WorkedTasksTableCard;
+            case 'TeamCategoryBreakdownCard':
+                return TeamCategoryBreakdownCard;
+            case 'TeamLoggedVsEtaCard':
+                return TeamLoggedVsEtaCard;
             case 'ActiveProjectsCard':
             case 'ProjectsByTypeCard':
                 return ProjectMetricsCard;
