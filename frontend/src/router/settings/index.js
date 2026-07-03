@@ -58,6 +58,15 @@ export default [
                 component: () => import(/* webpackChunkName: ScimSettings */ '@/views/Settings/Scim/ScimSettings.vue')
             },
             {
+                path: "ai-brain",
+                name: "AiBrainSettings",
+                meta: {
+                    title: "AI Brain",
+                    requiresAuth: true
+                },
+                component: () => import(/* webpackChunkName: AiBrainSettings */ '@/views/Settings/AiBrain/AiBrainSettings.vue')
+            },
+            {
                 path: "time-off",
                 name: "TimeOff",
                 meta: {

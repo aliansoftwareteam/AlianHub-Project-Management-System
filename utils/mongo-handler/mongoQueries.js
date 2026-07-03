@@ -83,7 +83,10 @@ const {
     emailInboxesSchema,
     calendarFeedsSchema,
     automationRulesSchema,
-    integrationConnectionsSchema
+    integrationConnectionsSchema,
+    aiBrainSettingsSchema,
+    aiAuditLogSchema,
+    aiInboxSchema
 } = require('./createSchema');
 
 
@@ -255,6 +258,12 @@ exports.checkType = (type) => {
             return automationRulesSchema
         case SCHEMA_TYPE.INTEGRATION_CONNECTIONS:
             return integrationConnectionsSchema
+        case SCHEMA_TYPE.AI_BRAIN_SETTINGS:
+            return aiBrainSettingsSchema
+        case SCHEMA_TYPE.AI_AUDIT_LOG:
+            return aiAuditLogSchema
+        case SCHEMA_TYPE.AI_INBOX:
+            return aiInboxSchema
         default:
             return ""
     }
@@ -429,6 +438,12 @@ exports.tableType = (type) => {
                 return `${dbCollections.AUTOMATION_RULES}`
         case SCHEMA_TYPE.INTEGRATION_CONNECTIONS:
                 return `${dbCollections.INTEGRATION_CONNECTIONS}`
+        case SCHEMA_TYPE.AI_BRAIN_SETTINGS:
+                return `${dbCollections.AI_BRAIN_SETTINGS}`
+        case SCHEMA_TYPE.AI_AUDIT_LOG:
+                return `${dbCollections.AI_AUDIT_LOG}`
+        case SCHEMA_TYPE.AI_INBOX:
+                return `${dbCollections.AI_INBOX}`
         default:
             return ""
     }

@@ -196,6 +196,12 @@
             permissions:['settings.settings_security_permissions'],
             activeIcon: require("@/assets/images/svg/auditDocActive.svg")
         },{
+            label: "AI Brain",
+            to: {name: "AiBrainSettings"},
+            icon: require("@/assets/images/svg/aiBrain.svg"),
+            permissions:['settings.settings_security_permissions'],
+            activeIcon: require("@/assets/images/svg/aiBrainActive.svg")
+        },{
             label: "Time Off",
             to: {name: "TimeOff"},
             icon: require("@/assets/images/svg/WorkspaceSettingsInactive.svg"),

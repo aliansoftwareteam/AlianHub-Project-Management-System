@@ -3011,6 +3011,52 @@ const schema = {
             type: Boolean,
             required: true
         }
+    },
+    // ── AI Brain (AHE-3792) — autonomous project-manager agent ──
+    // Per-company autonomy config (singleton row, key:'default').
+    aiBrainSettings: {
+        key: { type: String, default: 'default', required: false },
+        autonomyLevel: { type: Number, default: 0, required: false },
+        killSwitch: { type: Boolean, default: false, required: false },
+        spendCapUSD: { type: Number, default: 0, required: false },
+        dailyActionLimit: { type: Number, default: 0, required: false },
+        allowedActions: { type: Array, default: [], required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // Append-only audit trail — every AI decision + action ("AI did X because Y").
+    aiAuditLog: {
+        actionKey: { type: String, required: false },
+        status: { type: String, default: 'logged', required: false },
+        reason: { type: String, required: false },
+        params: { type: Object, default: {}, required: false },
+        result: { type: Object, default: {}, required: false },
+        projectId: { type: String, required: false },
+        taskId: { type: String, required: false },
+        skill: { type: String, required: false },
+        actorType: { type: String, default: 'ai', required: false },
+        actorUserId: { type: String, required: false },
+        autonomyLevel: { type: Number, required: false },
+        inboxId: { type: String, required: false },
+        error: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // AI inbox — approval queue: propose -> approve/decline -> execute.
+    aiInbox: {
+        actionKey: { type: String, required: true },
+        params: { type: Object, default: {}, required: false },
+        reason: { type: String, required: false },
+        projectId: { type: String, required: false },
+        taskId: { type: String, required: false },
+        skill: { type: String, required: false },
+        riskLevel: { type: String, default: 'low', required: false },
+        status: { type: String, default: 'pending', required: false },
+        proposedBy: { type: String, default: 'ai', required: false },
+        decidedBy: { type: String, required: false },
+        decidedAt: { type: Date, required: false },
+        result: { type: Object, default: {}, required: false },
+        error: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
     }
 }
 

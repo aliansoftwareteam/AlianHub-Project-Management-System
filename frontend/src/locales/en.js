@@ -1722,6 +1722,7 @@ export default {
         SSO: "SSO",
         "Audit Log": "Audit Log",
         SCIM: "SCIM",
+        "AI Brain": "AI Brain",
         "Time Off": "Time Off",
         Upgrade: "Upgrade",
         "Custom Field Manager": "Custom Field Manager",
