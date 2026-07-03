@@ -602,7 +602,7 @@ export const getTimeRange = (range) => {
 export const getCardsComponentsSize = (key) => {
     switch (key) {
         case 'ProjectPulseCard':
-        case 'LiveWorkTableCard':
+        case 'ActiveWorkTableCard':
         case 'FreeResourcesCard':
         case 'WorkedTasksTableCard':
         case 'TeamCategoryBreakdownCard':

@@ -39,7 +39,7 @@
 </template>
 
 <script>
-export default { name: 'LiveWorkTableCard' };
+export default { name: 'ActiveWorkTableCard' };
 </script>
 
 <script setup>
@@ -112,7 +112,7 @@ const load = async () => {
         });
         rows.value = flat;
     } catch (e) {
-        console.error('LiveWorkTableCard fetch error:', e);
+        console.error('ActiveWorkTableCard fetch error:', e);
         rows.value = [];
     } finally {
         loading.value = false;

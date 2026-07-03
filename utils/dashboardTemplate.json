@@ -1462,7 +1462,7 @@
                 }
             },
             {
-                "componentId": "LiveWorkTableCard",
+                "componentId": "ActiveWorkTableCard",
                 "cardId": "6a3700000000000000000402",
                 "uid": "510000004",
                 "config": {
