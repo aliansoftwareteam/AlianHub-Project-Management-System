@@ -2,6 +2,11 @@ const nodemailer = require("nodemailer");
 const config =  require('../Config/config.js');
 const logger = require("../Config/loggerConfig.js");
 
+// TLS certificate validation is ON by default. Only disable it (e.g. a
+// self-signed SMTP cert in a controlled environment) via an explicit env
+// opt-in — never silently, since disabling it exposes SMTP traffic to MITM.
+const allowSelfSigned = String(process.env.NODEMAILER_ALLOW_SELF_SIGNED || "").toLowerCase() === "true";
+
 
 /**
  * Send mail via email
@@ -23,7 +28,7 @@ exports.SendEmail = async (subject, html, toMail, isHtml, cb) => {
                 pass: config.NODEMAILER_EMAIL_PASSWORD, // generated ethereal password
             },
             tls: {
-                rejectUnauthorized: false
+                rejectUnauthorized: !allowSelfSigned
             }
         });
 
@@ -36,7 +41,7 @@ exports.SendEmail = async (subject, html, toMail, isHtml, cb) => {
             if (err) {
                 cb({
                     status:false,
-                    error: err,
+                    error: err.message ? err.message : err,
                 })
             } else {
                 cb({
@@ -74,7 +79,7 @@ exports.SendNotificationEmail = async (subject, html, toMail, isHtml, cb) => {
                 pass: config.NODEMAILER_EMAIL_PASSWORD, // generated ethereal password
             },
             tls: {
-                rejectUnauthorized: false
+                rejectUnauthorized: !allowSelfSigned
             }
         });
 
@@ -87,7 +92,7 @@ exports.SendNotificationEmail = async (subject, html, toMail, isHtml, cb) => {
             if (err) {
                 cb({
                     status:false,
-                    error: err,
+                    error: err.message ? err.message : err,
                 })
             } else {
                 cb({
@@ -97,7 +102,7 @@ exports.SendNotificationEmail = async (subject, html, toMail, isHtml, cb) => {
             }
         });
     } catch(error) {
-        logger.error(`Send Verify Email Catch Error: ${error.messge}`);
+        logger.error(`Send Verify Email Catch Error: ${error.message}`);
         cb({
             status: false,
             error: error.message
@@ -124,7 +129,7 @@ exports.sendAttachMail = (subject, html, toMail,attachMents, cb) => {
             pass: config.NODEMAILER_EMAIL_PASSWORD, // generated ethereal password
         },
         tls: {
-            rejectUnauthorized: false
+            rejectUnauthorized: !allowSelfSigned
         }
     });
     transporter.sendMail({
