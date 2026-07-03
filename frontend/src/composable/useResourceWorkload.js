@@ -4,6 +4,25 @@
 import { getTimeRange } from '@/composable/commonFunction';
 
 /**
+ * timerange id meaning "Auto — follow the dashboard's global date range".
+ * Cards store it in cardData.timerange like the 1–8 preset ids.
+ */
+export const AUTO_RANGE_ID = 0;
+
+/**
+ * Resolve a card timerange into ISO { dateFrom, dateTo }, honouring Auto
+ * mode: id 0 defers to the dashboard-level range (provided by HomePage via
+ * inject('dashboardGlobalRange')); any other id resolves the preset. Falls
+ * back to the preset resolver when no global range is available.
+ */
+export function resolveCardRange(timerangeId, globalRange) {
+    if (Number(timerangeId) === AUTO_RANGE_ID && globalRange && globalRange.dateFrom && globalRange.dateTo) {
+        return { dateFrom: globalRange.dateFrom, dateTo: globalRange.dateTo };
+    }
+    return resolveIsoRange(timerangeId);
+}
+
+/**
  * Resolve a card-catalog timerange id (1=today … 8=last_30_days) into the
  * ISO { dateFrom, dateTo } the /employee-workload + resource endpoints expect.
  * Reuses commonFunction.getTimeRange (Unix-seconds) and converts to ISO.

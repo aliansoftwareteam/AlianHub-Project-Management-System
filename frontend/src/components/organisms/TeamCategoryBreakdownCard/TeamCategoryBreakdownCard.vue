@@ -1,9 +1,8 @@
 <template>
     <div class="tcb">
-        <div v-if="loading && !teams.length" class="tcb-msg">…</div>
+        <CardSkeleton v-if="loading && !teams.length" :rows="5" />
         <template v-else>
             <div class="tcb-head">
-                <span class="tcb-period">{{ periodLabel }}</span>
                 <span class="tcb-dim-box" title="Group logged time by">
                     <select v-model="dimension" class="tcb-dim" @change="load">
                         <option value="type">{{ $t('dashboardCard.dim_type') }}</option>
@@ -53,7 +52,8 @@ import { useStore } from 'vuex';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { teamIdToUserId, buildFilterQuery } from '@/composable/commonFunction';
-import { resolveIsoRange, formatMinutes } from '@/composable/useResourceWorkload';
+import { resolveCardRange, formatMinutes } from '@/composable/useResourceWorkload';
+import CardSkeleton from '@/components/atom/CardSkeleton/CardSkeleton.vue';
 
 // Resource Utilization card #5 — "Team Effort Breakdown". Logged time grouped
 // Team → Bucket → User, where the bucket dimension is chosen inline:
@@ -82,16 +82,19 @@ const toggle = (key) => { expanded[key] = !expanded[key]; };
 const dimension = ref(['type', 'effort_nature', 'work_category', 'billable'].includes(props.cardData?.dimension)
     ? props.cardData.dimension : 'type');
 
-const timerange = computed(() => Number(props.cardData?.timerange) || 3);
-const PERIOD_LABELS = { 1: 'Today', 2: 'Yesterday', 3: 'This Week', 4: 'Last Week', 5: 'This Month', 6: 'Last Month', 7: 'This Year', 8: 'Last 30 Days' };
-const periodLabel = computed(() => PERIOD_LABELS[timerange.value] || 'This Week');
+// Period lives in the card-header dropdown; 0 = Auto → dashboard range.
+const globalRange = inject('dashboardGlobalRange', null);
+const timerange = computed(() => {
+    const v = Number(props.cardData?.timerange);
+    return Number.isFinite(v) && v >= 0 && v <= 8 ? v : 3;
+});
 
 const pct = (v, total) => (total > 0 ? Math.round((v / total) * 100) : 0);
 
 const load = async () => {
     loading.value = true;
     try {
-        const { dateFrom, dateTo } = resolveIsoRange(timerange.value);
+        const { dateFrom, dateTo } = resolveCardRange(timerange.value, globalRange && globalRange.value);
         const employeeIds = teamIdToUserId(props.cardData?.AssigneeUserId || [], teamsArr);
         const payload = {
             dimension: dimension.value,
@@ -122,14 +125,15 @@ const load = async () => {
 watch(() => props.refreshTrigger, load);
 watch(() => props.cardData, load, { deep: true });
 watch(() => props.filterData, load, { deep: true });
+// Auto mode — track the dashboard-level range.
+watch(() => globalRange && globalRange.value, () => { if (timerange.value === 0) load(); }, { deep: true });
 onMounted(load);
 </script>
 
 <style scoped>
 .tcb { height: 100%; width: 100%; padding: 8px 10px; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
 .tcb-msg { color: #9aa0b4; font-size: 12px; padding: 10px 0; }
-.tcb-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 11px; }
-.tcb-period { font-weight: 600; color: #0d9488; }
+.tcb-head { display: flex; justify-content: flex-end; align-items: center; gap: 8px; font-size: 11px; }
 .tcb-dim-box { display: inline-flex; align-items: center; }
 .tcb-dim { font-size: 11px; color: #3a3f52; border: 1px solid #e5e7eb; border-radius: 6px; padding: 2px 6px; background: #fff; cursor: pointer; }
 .tcb-team { border-bottom: 1px solid #f1f2f7; }

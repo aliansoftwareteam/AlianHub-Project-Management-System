@@ -1,10 +1,7 @@
 <template>
     <div class="wtt">
-        <div v-if="loading && !rows.length" class="wtt-msg">…</div>
+        <CardSkeleton v-if="loading && !rows.length" :rows="5" />
         <template v-else>
-            <div class="wtt-head">
-                <span class="wtt-period">{{ periodLabel }}</span>
-            </div>
             <div v-if="!rows.length" class="wtt-msg">{{ $t('dashboardCard.no_data_available') }}</div>
             <div v-else class="wtt-table-wrap">
                 <table class="wtt-table">
@@ -46,7 +43,8 @@ import { useStore } from 'vuex';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { teamIdToUserId, buildFilterQuery } from '@/composable/commonFunction';
-import { resolveIsoRange, bucketForStatus } from '@/composable/useResourceWorkload';
+import { resolveCardRange, bucketForStatus } from '@/composable/useResourceWorkload';
+import CardSkeleton from '@/components/atom/CardSkeleton/CardSkeleton.vue';
 
 // Resource Utilization card #11 — "Table of worked tasks, date-range wise".
 // Reuses employee-workload for the selected range; splits each user×project's
@@ -69,19 +67,19 @@ const teamsArr = getters['settings/teams'] || [];
 const rows = ref([]);
 const loading = ref(false);
 
-const timerange = computed(() => Number(props.cardData?.timerange) || 3); // default this week
-const PERIOD_LABELS = {
-    1: 'Today', 2: 'Yesterday', 3: 'This Week', 4: 'Last Week',
-    5: 'This Month', 6: 'Last Month', 7: 'This Year', 8: 'Last 30 Days',
-};
-const periodLabel = computed(() => PERIOD_LABELS[timerange.value] || 'This Week');
+// Period lives in the card-header dropdown; 0 = Auto → dashboard range.
+const globalRange = inject('dashboardGlobalRange', null);
+const timerange = computed(() => {
+    const v = Number(props.cardData?.timerange);
+    return Number.isFinite(v) && v >= 0 && v <= 8 ? v : 3; // default this week
+});
 
 const dash = (v) => (v ? v : '—');
 
 const load = async () => {
     loading.value = true;
     try {
-        const { dateFrom, dateTo } = resolveIsoRange(timerange.value);
+        const { dateFrom, dateTo } = resolveCardRange(timerange.value, globalRange && globalRange.value);
         const employeeIds = teamIdToUserId(props.cardData?.AssigneeUserId || [], teamsArr);
         const payload = {
             employeeIds: Array.isArray(employeeIds) ? employeeIds : [],
@@ -136,14 +134,14 @@ const load = async () => {
 watch(() => props.refreshTrigger, load);
 watch(() => props.cardData, load, { deep: true });
 watch(() => props.filterData, load, { deep: true });
+// Auto mode — track the dashboard-level range.
+watch(() => globalRange && globalRange.value, () => { if (timerange.value === 0) load(); }, { deep: true });
 onMounted(load);
 </script>
 
 <style scoped>
 .wtt { height: 100%; width: 100%; padding: 8px 10px; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
 .wtt-msg { color: #9aa0b4; font-size: 12px; padding: 10px 0; }
-.wtt-head { font-size: 11px; color: #6b7280; }
-.wtt-period { font-weight: 600; color: #0d9488; }
 .wtt-table-wrap { overflow: auto; }
 .wtt-table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
 .wtt-table th { text-align: left; color: #6b7280; font-weight: 600; padding: 4px 6px; border-bottom: 1px solid #eef0f6; position: sticky; top: 0; background: #fff; }

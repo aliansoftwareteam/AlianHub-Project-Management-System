@@ -11,7 +11,10 @@
         <template v-else>
             <!-- Header: total users tracking + search by user name -->
             <div class="lwc-head">
-                <span class="lwc-count"><span class="lwc-dot"></span>{{ userCount }} {{ userCount === 1 ? 'user' : 'users' }} tracking</span>
+                <span class="lwc-count">
+                    <span class="lwc-dot"></span>{{ userCount }} {{ userCount === 1 ? 'user' : 'users' }} tracking
+                    <span class="lwc-proj-count">· {{ projectCount }} {{ projectCount === 1 ? 'project' : 'projects' }}</span>
+                </span>
                 <input v-model="search" class="lwc-search" type="text" placeholder="Search user…" />
             </div>
             <div v-if="!filteredRows.length" class="lwc-msg">No users match “{{ search }}”.</div>
@@ -98,6 +101,8 @@ const search = ref('');
 
 const rows = computed(() => (Array.isArray(data.value.rows) ? data.value.rows : []));
 const userCount = computed(() => new Set(rows.value.map((r) => r.userId)).size);
+// Distinct projects currently being worked on (rows carry the task's project).
+const projectCount = computed(() => new Set(rows.value.map((r) => r.projectId).filter(Boolean)).size);
 const filteredRows = computed(() => {
     const q = search.value.trim().toLowerCase();
     if (!q) return rows.value;
@@ -152,6 +157,7 @@ onMounted(load);
 /* Header: count + search */
 .lwc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; flex-shrink: 0; }
 .lwc-count { font-size: 12px; font-weight: 600; color: #4A5061; display: inline-flex; align-items: center; white-space: nowrap; }
+.lwc-proj-count { font-weight: 500; color: #6b7280; margin-left: 5px; }
 .lwc-search { font-size: 12px; color: #3a3f52; border: 1px solid #E5E7EB; border-radius: 6px; padding: 3px 8px; max-width: 160px; min-width: 0; outline: none; transition: border-color 0.15s ease, box-shadow 0.15s ease; }
 .lwc-search:focus { border-color: #2F3990; box-shadow: 0 0 0 2px rgba(47, 57, 144, 0.12); }
 
