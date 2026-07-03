@@ -14,6 +14,16 @@ const {
     getSprintTypeMap,
 } = require("./helpers/resourceHelpers");
 
+// Resolve a project's current status to its display name + colour from the
+// project's own status palette (projectStatusData: [{ value, name,
+// textColor, … }]) — per-project, since projects created from different
+// templates carry different status sets. Used by the drill-down modals.
+function projectStatusMeta(p) {
+    const meta = (Array.isArray(p.projectStatusData) ? p.projectStatusData : [])
+        .find((s) => s && String(s.value || "").toLowerCase() === String(p.status || "").toLowerCase()) || {};
+    return { statusName: meta.name || "", statusColor: meta.textColor || "" };
+}
+
 // Shared role-visibility resolver for the resource cards. Mirrors
 // getEmployeeWorkloadReport: roleType 1/2 → all users (null = no
 // restriction); everyone else → only themselves.
@@ -694,13 +704,20 @@ exports.getProjectUtilizationSummary = async (req, res) => {
         }
 
         const { fromSec, toSec } = getDayOrRangeBounds(req.body || {});
+        // Drill-down mode — the card's count/bar was clicked and the modal
+        // needs the per-project rows behind each number, not just totals.
+        const includeProjects = req.body && req.body.includeProjects === true;
 
-        // 1 + 3 — active projects and their ProjectType mix.
+        // 1 + 3 — active projects and their ProjectType mix. Drill-down also
+        // needs each project's status + its per-project status palette
+        // (projectStatusData) so the modal can render the status in colour.
         const activeProjects = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PROJECTS,
             data: [
                 { statusType: { $nin: ["close"] }, deletedStatusKey: 0 },
-                { ProjectType: 1, ProjectName: 1 },
+                includeProjects
+                    ? { ProjectType: 1, ProjectName: 1, status: 1, statusType: 1, projectStatusData: 1 }
+                    : { ProjectType: 1, ProjectName: 1 },
             ],
         }, "find").catch(() => []);
 
@@ -710,11 +727,12 @@ exports.getProjectUtilizationSummary = async (req, res) => {
         // separator/space/digit/end after "IH" but rejects real words like
         // "IHelp".
         const IH_PREFIX = /^\s*IH(?![A-Za-z])/i;
+        const typeOf = (p) => (IH_PREFIX.test(p.ProjectName || "")
+            ? "In House"
+            : (p.ProjectType || "Unspecified"));
         const typeCounts = {};
         (activeProjects || []).forEach((p) => {
-            const key = IH_PREFIX.test(p.ProjectName || "")
-                ? "In House"
-                : (p.ProjectType || "Unspecified");
+            const key = typeOf(p);
             typeCounts[key] = (typeCounts[key] || 0) + 1;
         });
         const typeMix = Object.keys(typeCounts).map((type) => ({ type, count: typeCounts[type] }));
@@ -733,14 +751,24 @@ exports.getProjectUtilizationSummary = async (req, res) => {
             if (ts.ProjectId) workingProjectIds.add(String(ts.ProjectId));
         });
 
-        return res.status(200).json({
-            status: true,
-            data: {
-                activeProjects: (activeProjects || []).length,
-                workingProjects: workingProjectIds.size,
-                typeMix,
-            },
-        });
+        const data = {
+            activeProjects: (activeProjects || []).length,
+            workingProjects: workingProjectIds.size,
+            typeMix,
+        };
+        if (includeProjects) {
+            data.projects = (activeProjects || []).map((p) => ({
+                _id: String(p._id),
+                name: p.ProjectName || "—",
+                type: typeOf(p),
+                status: p.status || "",
+                statusType: p.statusType || "",
+                ...projectStatusMeta(p),
+                isWorking: workingProjectIds.has(String(p._id)),
+            })).sort((a, b) => a.name.localeCompare(b.name));
+        }
+
+        return res.status(200).json({ status: true, data });
     } catch (error) {
         logger.error(`getProjectUtilizationSummary error: ${error && error.message ? error.message : error}`);
         return res.status(500).json({
@@ -1078,18 +1106,40 @@ exports.getProjectProgressMetric = async (req, res) => {
             deletedStatusKey: { $in: [0, null] },
         };
 
+        // Drill-down mode — clicking a count/bar opens a modal listing the
+        // projects behind the number, so the project rows come back too.
+        const includeProjects = payload.includeProjects === true;
+        // "In House" derivation — same naming convention as the utilization
+        // summary: an active project whose name starts with the "IH" marker.
+        const IH_PREFIX = /^\s*IH(?![A-Za-z])/i;
+        const projectRow = (p) => ({
+            _id: String(p._id),
+            name: p.ProjectName || "—",
+            type: IH_PREFIX.test(p.ProjectName || "") ? "In House" : (p.ProjectType || "Unspecified"),
+            status: p.status || "",
+            statusType: p.statusType || "",
+            ...projectStatusMeta(p),
+        });
+        const PROJECT_LIST_FIELDS = { ProjectName: 1, ProjectType: 1, status: 1, statusType: 1, projectStatusData: 1 };
+
         // ── metric: active projects (company-wide count) ──
         if (metric === "active_projects") {
             const projects = await MongoDbCrudOpration(companyId, {
-                type: SCHEMA_TYPE.PROJECTS, data: [activeProjectFilter, { _id: 1 }],
+                type: SCHEMA_TYPE.PROJECTS,
+                data: [activeProjectFilter, includeProjects ? PROJECT_LIST_FIELDS : { _id: 1 }],
             }, "find").catch(() => []);
-            return res.status(200).json({ status: true, data: { count: (projects || []).length } });
+            const data = { count: (projects || []).length };
+            if (includeProjects) {
+                data.projects = (projects || []).map(projectRow).sort((a, b) => a.name.localeCompare(b.name));
+            }
+            return res.status(200).json({ status: true, data });
         }
 
         // ── metric: active projects grouped by type (company-wide) ──
         if (metric === "projects_by_type") {
             const projects = await MongoDbCrudOpration(companyId, {
-                type: SCHEMA_TYPE.PROJECTS, data: [activeProjectFilter, { ProjectType: 1 }],
+                type: SCHEMA_TYPE.PROJECTS,
+                data: [activeProjectFilter, includeProjects ? PROJECT_LIST_FIELDS : { ProjectType: 1 }],
             }, "find").catch(() => []);
             const counts = {};
             (projects || []).forEach((p) => {
@@ -1097,7 +1147,16 @@ exports.getProjectProgressMetric = async (req, res) => {
                 counts[raw] = (counts[raw] || 0) + 1;
             });
             const rows = Object.entries(counts).map(([key, value]) => ({ key, value })).sort((a, b) => b.value - a.value);
-            return res.status(200).json({ status: true, data: { rows } });
+            const data = { rows };
+            if (includeProjects) {
+                // Keep the raw ProjectType as the modal's filter key so it
+                // matches the bar rows (no In-House derivation here).
+                data.projects = (projects || []).map((p) => ({
+                    ...projectRow(p),
+                    type: (p.ProjectType && String(p.ProjectType).trim()) || "unspecified",
+                })).sort((a, b) => a.name.localeCompare(b.name));
+            }
+            return res.status(200).json({ status: true, data });
         }
 
         // ── metric 1: running/working projects (active + logged in range) ──
@@ -1106,7 +1165,7 @@ exports.getProjectProgressMetric = async (req, res) => {
                 type: SCHEMA_TYPE.TIMESHEET, data: [rangeTsFilter(), { TicketID: 1 }],
             }, "find").catch(() => []);
             const taskIds = objIds((tlogs || []).map((t) => t.TicketID));
-            let count = 0;
+            let running = [];
             if (taskIds.length) {
                 const tasks = await MongoDbCrudOpration(companyId, {
                     type: SCHEMA_TYPE.TASKS, data: [{ _id: { $in: taskIds }, deletedStatusKey: 0 }, { ProjectID: 1 }],
@@ -1114,12 +1173,17 @@ exports.getProjectProgressMetric = async (req, res) => {
                 const pids = objIds((tasks || []).map((t) => t.ProjectID));
                 if (pids.length) {
                     const projects = await MongoDbCrudOpration(companyId, {
-                        type: SCHEMA_TYPE.PROJECTS, data: [{ _id: { $in: pids } }, { statusType: 1, deletedStatusKey: 1 }],
+                        type: SCHEMA_TYPE.PROJECTS,
+                        data: [{ _id: { $in: pids } }, { ...PROJECT_LIST_FIELDS, deletedStatusKey: 1 }],
                     }, "find").catch(() => []);
-                    count = (projects || []).filter((p) => p.statusType !== "close" && !p.deletedStatusKey).length;
+                    running = (projects || []).filter((p) => p.statusType !== "close" && !p.deletedStatusKey);
                 }
             }
-            return res.status(200).json({ status: true, data: { count } });
+            const data = { count: running.length };
+            if (includeProjects) {
+                data.projects = running.map(projectRow).sort((a, b) => a.name.localeCompare(b.name));
+            }
+            return res.status(200).json({ status: true, data });
         }
 
         // ── metric: live work — who is tracking right now, on what, and the
@@ -1146,6 +1210,38 @@ exports.getProjectProgressMetric = async (req, res) => {
                 }
             });
             const pairs = Object.values(pairMap);
+
+            // Logged minutes TODAY — per user|task ("this task") and per user
+            // (day total), mirroring the Active Work table's columns. Sums the
+            // recorded LogTimeDuration; the currently running tracker adds up
+            // once it is stopped/synced (same convention as employee-workload).
+            const loggedByUserTask = {};
+            const loggedByUser = {};
+            if (pairs.length) {
+                const dayStart = new Date();
+                dayStart.setHours(0, 0, 0, 0);
+                const todaysLogs = await MongoDbCrudOpration(companyId, {
+                    type: SCHEMA_TYPE.TIMESHEET,
+                    data: [
+                        {
+                            Loggeduser: { $in: [...new Set(pairs.map((p) => p.userId))] },
+                            LogStartTime: { $gte: Math.floor(dayStart.getTime() / 1000), $lte: nowSec },
+                        },
+                        { Loggeduser: 1, TicketID: 1, LogTimeDuration: 1 },
+                    ],
+                }, "find").catch(() => []);
+                (todaysLogs || []).forEach((ts) => {
+                    if (!ts.Loggeduser) return;
+                    const uid = String(ts.Loggeduser);
+                    const mins = Number(ts.LogTimeDuration) || 0;
+                    loggedByUser[uid] = (loggedByUser[uid] || 0) + mins;
+                    if (ts.TicketID) {
+                        const key = `${uid}|${ts.TicketID}`;
+                        loggedByUserTask[key] = (loggedByUserTask[key] || 0) + mins;
+                    }
+                });
+            }
+
             const taskMap = {}, projMap = {}, userMap = {};
             const taskIds = objIds(pairs.map((p) => p.taskId));
             if (taskIds.length) {
@@ -1184,6 +1280,8 @@ exports.getProjectProgressMetric = async (req, res) => {
                     projectName: proj.ProjectName || "",
                     memo: p.memo,
                     startTimeTracker: p.startTimeTracker,
+                    taskLoggedMinutes: loggedByUserTask[`${p.userId}|${p.taskId}`] || 0,
+                    dayLoggedMinutes: loggedByUser[p.userId] || 0,
                 };
             }).sort((a, b) => (b.startTimeTracker || 0) - (a.startTimeTracker || 0));
             return res.status(200).json({ status: true, data: { rows, count: rows.length } });
@@ -1320,6 +1418,142 @@ exports.getProjectProgressMetric = async (req, res) => {
         return res.status(500).json({
             status: false,
             message: "An error occurred while building project-progress metrics.",
+            error: error && error.message ? error.message : String(error),
+        });
+    }
+};
+
+/**
+ * On Leave board — backs the OnLeaveCard. Leaves are managed as ordinary
+ * tasks ("leave tickets") inside a designated project (e.g. Support / HR):
+ * the card config picks that project (projectIds) plus the status(es) that
+ * mean the leave is approved (statusKeys). A ticket counts for the window
+ * when its startDate–DueDate period overlaps [dateFrom, dateTo].
+ *
+ * The person on leave is the ticket's FIRST assignee (the applicant, by the
+ * HR workflow convention; later assignees are the approvers).
+ *
+ * Returns the ticket rows plus the AB/PR headcounts:
+ *   absent  (AB) — distinct applicants with an overlapping approved ticket
+ *   present (PR) — active company members minus the absent ones
+ *
+ * Company-scoped and read-only. Like the utilization summary, this is a
+ * team-visibility widget, so no role gate: everyone sees who is on leave.
+ */
+exports.getOnLeaveBoard = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        if (!companyId) {
+            return res.status(400).json({ status: false, message: "companyId header required" });
+        }
+
+        const payload = req.body || {};
+        const projectIds = (Array.isArray(payload.projectIds) ? payload.projectIds : [])
+            .filter((id) => mongoose.Types.ObjectId.isValid(String(id)))
+            .map((id) => new mongoose.Types.ObjectId(String(id)));
+        if (!projectIds.length) {
+            return res.status(200).json({
+                status: true,
+                data: { rows: [], stats: { absent: 0, present: 0, totalUsers: 0, tickets: 0 } },
+            });
+        }
+        const statusKeys = (Array.isArray(payload.statusKeys) ? payload.statusKeys : [])
+            .map(Number).filter((n) => !Number.isNaN(n));
+
+        const { dateFrom, dateTo } = getDayOrRangeBounds(payload);
+
+        // Leave-period overlap on the ticket's startDate/DueDate (Date fields):
+        // starts in the window, ends in the window, or spans it entirely.
+        // Tickets with neither date can't be placed on a timeline → excluded.
+        const taskFilter = {
+            ProjectID: { $in: projectIds },
+            deletedStatusKey: 0,
+            $or: [
+                { startDate: { $gte: dateFrom, $lte: dateTo } },
+                { DueDate: { $gte: dateFrom, $lte: dateTo } },
+                { startDate: { $lte: dateFrom }, DueDate: { $gte: dateTo } },
+            ],
+        };
+        if (statusKeys.length) taskFilter.statusKey = { $in: statusKeys };
+
+        const tickets = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS,
+            data: [taskFilter, {
+                TaskName: 1, TaskKey: 1, AssigneeUserId: 1,
+                startDate: 1, DueDate: 1, statusKey: 1, ProjectID: 1, sprintArray: 1,
+            }],
+        }, "find").catch(() => []);
+
+        // AssigneeUserId entries are usually plain id strings; tolerate object
+        // shapes the same way buildUserTeamMap does.
+        const extractId = (entry) => {
+            if (entry == null) return "";
+            if (typeof entry === "object") return String(entry.userId || entry._id || entry.id || "");
+            return String(entry);
+        };
+
+        const absentIds = new Set();
+        const rows = (tickets || []).map((t) => {
+            const applicantId = extractId((t.AssigneeUserId || [])[0]);
+            if (applicantId) absentIds.add(applicantId);
+            return {
+                taskId: String(t._id),
+                taskName: t.TaskName || "—",
+                taskKey: t.TaskKey || "",
+                projectId: t.ProjectID ? String(t.ProjectID) : "",
+                sprintId: (t.sprintArray && t.sprintArray.id) || "",
+                userId: applicantId,
+                startDate: t.startDate || null,
+                dueDate: t.DueDate || null,
+                statusKey: t.statusKey,
+            };
+        }).sort((a, b) => new Date(a.startDate || a.dueDate || 0) - new Date(b.startDate || b.dueDate || 0));
+
+        // Join applicant names/avatars (global users collection).
+        const uids = [...absentIds]
+            .filter((id) => mongoose.Types.ObjectId.isValid(id))
+            .map((id) => new mongoose.Types.ObjectId(id));
+        const userMap = {};
+        if (uids.length) {
+            const users = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
+                type: SCHEMA_TYPE.USERS,
+                data: [{ _id: { $in: uids } }, { Employee_Name: 1, Employee_FName: 1, Employee_LName: 1, Employee_profileImage: 1 }],
+            }, "find").catch(() => []);
+            (users || []).forEach((u) => { userMap[String(u._id)] = u; });
+        }
+        rows.forEach((r) => {
+            const u = userMap[r.userId] || {};
+            r.userName = u.Employee_Name || `${u.Employee_FName || ""} ${u.Employee_LName || ""}`.trim() || "—";
+            r.avatar = u.Employee_profileImage || "";
+        });
+
+        // PR headcount base — active members of this company (same query the
+        // workload report uses to enumerate the team).
+        const members = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
+            type: SCHEMA_TYPE.USERS,
+            data: [{ isActive: true, AssignCompany: companyId }, { _id: 1 }],
+        }, "find").catch(() => []);
+        const totalUsers = (members || []).length;
+        const memberIdSet = new Set((members || []).map((m) => String(m._id)));
+        const absent = [...absentIds].filter((id) => memberIdSet.has(id)).length;
+
+        return res.status(200).json({
+            status: true,
+            data: {
+                rows,
+                stats: {
+                    absent,
+                    present: Math.max(totalUsers - absent, 0),
+                    totalUsers,
+                    tickets: rows.length,
+                },
+            },
+        });
+    } catch (error) {
+        logger.error(`getOnLeaveBoard error: ${error && error.message ? error.message : error}`);
+        return res.status(500).json({
+            status: false,
+            message: "An error occurred while building the on-leave board.",
             error: error && error.message ? error.message : String(error),
         });
     }

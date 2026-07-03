@@ -1,15 +1,15 @@
 <template>
     <div class="ppc">
-        <div v-if="loading" class="ppc-msg">…</div>
+        <CardSkeleton v-if="loading" :counters="2" :rows="4" />
         <template v-else>
             <div class="ppc-counters">
-                <div class="ppc-counter">
+                <div class="ppc-counter ppc-clickable" role="button" :title="$t('dashboardCard.plm_click_hint')" @click="openDrill('active')">
                     <div class="ppc-num">{{ data.activeProjects }}</div>
                     <div class="ppc-num-label">{{ $t('dashboardCard.active_projects') }}</div>
                 </div>
-                <div class="ppc-counter">
+                <div class="ppc-counter ppc-clickable" role="button" :title="$t('dashboardCard.plm_click_hint')" @click="openDrill('working')">
                     <div class="ppc-num ppc-num-accent">{{ data.workingProjects }}</div>
-                    <div class="ppc-num-label">{{ $t('dashboardCard.working_projects') }} · {{ periodLabel }}</div>
+                    <div class="ppc-num-label">{{ $t('dashboardCard.working_projects') }}</div>
                 </div>
             </div>
 
@@ -17,13 +17,22 @@
                 <div class="ppc-mix-title">{{ $t('dashboardCard.project_type_mix') }}</div>
                 <div v-if="!data.typeMix.length" class="ppc-msg">{{ $t('dashboardCard.no_data_available') }}</div>
                 <div v-else class="ppc-bars">
-                    <div v-for="row in data.typeMix" :key="row.type" class="ppc-bar-row">
+                    <div v-for="row in data.typeMix" :key="row.type" class="ppc-bar-row ppc-clickable" role="button" :title="$t('dashboardCard.plm_click_hint')" @click="openDrill(row.type)">
                         <span class="ppc-label" :title="row.type">{{ row.type }}</span>
                         <div class="ppc-track"><div class="ppc-fill" :style="{ width: pct(row.count) + '%' }"></div></div>
                         <span class="ppc-val">{{ row.count }}</span>
                     </div>
                 </div>
             </div>
+
+            <ProjectListModal
+                :modelValue="drillOpen"
+                :title="drillTitle"
+                :projects="drillProjects"
+                :loading="drillLoading"
+                :showWorked="true"
+                @close="drillOpen = false"
+            />
         </template>
     </div>
 </template>
@@ -33,14 +42,18 @@ export default { name: 'ProjectPulseCard' };
 </script>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, computed, watch, onMounted, inject } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import ProjectListModal from '@/components/molecules/ProjectListModal/ProjectListModal.vue';
+import CardSkeleton from '@/components/atom/CardSkeleton/CardSkeleton.vue';
 
 // Resource Utilization card #1-3. Self-fetching from
 // POST /api/v1/dashboard/project-utilization-summary. The `timerange`
 // config drives ONLY the "working projects" window; active count and
-// type mix are point-in-time company state.
+// type mix are point-in-time company state. Clicking a counter or a
+// type bar opens a drill-down modal listing the projects behind it.
 const props = defineProps({
     cardUID: { type: [String, Number], default: '' },
     componentId: { type: String, default: '' },
@@ -52,21 +65,27 @@ const props = defineProps({
     taskStatusArray: { type: [Array, Object], default: () => ({}) },
 });
 
+const { t } = useI18n();
+const globalRange = inject('dashboardGlobalRange', null);
+
 const data = ref({ activeProjects: 0, workingProjects: 0, typeMix: [] });
 const loading = ref(false);
 
 const maxVal = computed(() => data.value.typeMix.reduce((m, r) => Math.max(m, r.count || 0), 0) || 1);
 const pct = (v) => Math.round(((v || 0) / maxVal.value) * 100);
 
-const timerange = computed(() => Number(props.cardData?.timerange) || 1);
-const PERIOD_LABELS = {
-    1: 'Today', 2: 'Yesterday', 3: 'This Week', 4: 'Last Week',
-    5: 'This Month', 6: 'Last Month', 7: 'This Year', 8: 'Last 30 Days',
-};
-const periodLabel = computed(() => PERIOD_LABELS[timerange.value] || 'Today');
+// 0 = Auto → follow the dashboard's global date range (period lives in the
+// card-header dropdown now; the old in-card label is gone).
+const timerange = computed(() => {
+    const v = Number(props.cardData?.timerange);
+    return Number.isFinite(v) && v >= 0 && v <= 8 ? v : 1;
+});
 
 // Compact date-range resolver (ids match the card catalog convention).
 function resolveDateRange(value) {
+    if (Number(value) === 0 && globalRange && globalRange.value && globalRange.value.dateFrom) {
+        return { dateFrom: globalRange.value.dateFrom, dateTo: globalRange.value.dateTo };
+    }
     const now = new Date();
     const start = new Date(now);
     const end = new Date(now);
@@ -133,8 +152,44 @@ const load = async () => {
     }
 };
 
+// ─── Drill-down modal (which projects make up a clicked number) ───
+const drillOpen = ref(false);
+const drillLoading = ref(false);
+const drillFilter = ref('active'); // 'active' | 'working' | a type-mix label
+const allDrillProjects = ref([]);
+
+const drillTitle = computed(() => {
+    if (drillFilter.value === 'active') return t('dashboardCard.active_projects');
+    if (drillFilter.value === 'working') return t('dashboardCard.working_projects');
+    return `${t('dashboardCard.project_type_mix')} · ${drillFilter.value}`;
+});
+const drillProjects = computed(() => {
+    if (drillFilter.value === 'active') return allDrillProjects.value;
+    if (drillFilter.value === 'working') return allDrillProjects.value.filter((p) => p.isWorking);
+    return allDrillProjects.value.filter((p) => p.type === drillFilter.value);
+});
+
+const openDrill = async (filter) => {
+    drillFilter.value = filter;
+    drillOpen.value = true;
+    drillLoading.value = true;
+    try {
+        const { dateFrom, dateTo } = resolveDateRange(timerange.value);
+        const res = await apiRequest('post', `${env.PROJECT_UTILIZATION_SUMMARY}`, { dateFrom, dateTo, includeProjects: true });
+        const body = res && res.data;
+        allDrillProjects.value = (body && body.status && body.data.projects) || [];
+    } catch (e) {
+        console.error('ProjectPulseCard drill-down fetch error:', e);
+        allDrillProjects.value = [];
+    } finally {
+        drillLoading.value = false;
+    }
+};
+
 watch(() => props.refreshTrigger, load);
 watch(() => props.cardData, load, { deep: true });
+// Auto mode — track the dashboard-level range.
+watch(() => globalRange && globalRange.value, () => { if (timerange.value === 0) load(); }, { deep: true });
 onMounted(load);
 </script>
 
@@ -143,6 +198,10 @@ onMounted(load);
 .ppc-msg { color: #9aa0b4; font-size: 12px; padding: 8px 0; }
 .ppc-counters { display: flex; gap: 12px; }
 .ppc-counter { flex: 1; background: #f5f7fb; border-radius: 8px; padding: 10px; text-align: center; }
+.ppc-clickable { cursor: pointer; transition: box-shadow 0.15s ease, background-color 0.15s ease; }
+.ppc-counter.ppc-clickable:hover { background: #eef2fb; box-shadow: 0 0 0 1px #dbe2f5 inset; }
+.ppc-bar-row.ppc-clickable { border-radius: 4px; }
+.ppc-bar-row.ppc-clickable:hover { background: #f5f7fb; }
 .ppc-num { font-size: 32px; font-weight: 700; color: #0f766e; line-height: 1.1; }
 .ppc-num-accent { color: #0d9488; }
 .ppc-num-label { font-size: 11px; color: #6b7280; margin-top: 2px; }

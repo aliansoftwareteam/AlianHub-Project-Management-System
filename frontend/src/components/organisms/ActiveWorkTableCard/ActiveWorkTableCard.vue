@@ -1,6 +1,6 @@
 <template>
     <div class="lwt">
-        <div v-if="loading && !rows.length" class="lwt-msg">…</div>
+        <CardSkeleton v-if="loading && !rows.length" :rows="5" />
         <template v-else>
             <div class="lwt-head">
                 <span class="lwt-count">{{ rows.length }} {{ rows.length === 1 ? 'person' : 'people' }} working now</span>
@@ -49,6 +49,7 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { teamIdToUserId, buildFilterQuery } from '@/composable/commonFunction';
 import { resolveIsoRange, formatMinutes } from '@/composable/useResourceWorkload';
+import CardSkeleton from '@/components/atom/CardSkeleton/CardSkeleton.vue';
 
 // Resource Utilization card #4 — the "Live Work Table". Reuses the
 // employee-workload resolver in `currentOnly` mode (employees with a tracker

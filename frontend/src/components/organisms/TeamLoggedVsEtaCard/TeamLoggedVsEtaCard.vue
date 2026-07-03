@@ -1,9 +1,8 @@
 <template>
     <div class="tle">
-        <div v-if="loading && !teams.length" class="tle-msg">…</div>
+        <CardSkeleton v-if="loading && !teams.length" :rows="5" />
         <template v-else>
             <div class="tle-head">
-                <span class="tle-period">{{ periodLabel }}</span>
                 <span class="tle-hint">{{ $t('dashboardCard.tle_pct_hint') }}</span>
             </div>
             <div v-if="!teams.length" class="tle-msg">{{ $t('dashboardCard.no_data_available') }}</div>
@@ -73,7 +72,8 @@ import { useStore } from 'vuex';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { teamIdToUserId, buildFilterQuery } from '@/composable/commonFunction';
-import { resolveIsoRange, formatMinutes } from '@/composable/useResourceWorkload';
+import { resolveCardRange, formatMinutes } from '@/composable/useResourceWorkload';
+import CardSkeleton from '@/components/atom/CardSkeleton/CardSkeleton.vue';
 
 // Resource Utilization card #6 — per-team logged vs estimate (ETA),
 // drill-down: Team → User → Task, in an aligned table layout.
@@ -97,9 +97,12 @@ const loading = ref(false);
 const expanded = reactive({});
 const toggle = (key) => { expanded[key] = !expanded[key]; };
 
-const timerange = computed(() => Number(props.cardData?.timerange) || 3);
-const PERIOD_LABELS = { 1: 'Today', 2: 'Yesterday', 3: 'This Week', 4: 'Last Week', 5: 'This Month', 6: 'Last Month', 7: 'This Year', 8: 'Last 30 Days' };
-const periodLabel = computed(() => PERIOD_LABELS[timerange.value] || 'This Week');
+// Period lives in the card-header dropdown; 0 = Auto → dashboard range.
+const globalRange = inject('dashboardGlobalRange', null);
+const timerange = computed(() => {
+    const v = Number(props.cardData?.timerange);
+    return Number.isFinite(v) && v >= 0 && v <= 8 ? v : 3;
+});
 
 // Ratio + over-budget flag work on any node with logged/eta minutes.
 const ratio = (n) => (n.etaMinutes > 0 ? Math.round((n.loggedMinutes / n.etaMinutes) * 100) + '%' : '—');
@@ -108,7 +111,7 @@ const overClass = (n) => (n.etaMinutes > 0 && n.loggedMinutes > n.etaMinutes ? '
 const load = async () => {
     loading.value = true;
     try {
-        const { dateFrom, dateTo } = resolveIsoRange(timerange.value);
+        const { dateFrom, dateTo } = resolveCardRange(timerange.value, globalRange && globalRange.value);
         const employeeIds = teamIdToUserId(props.cardData?.AssigneeUserId || [], teamsArr);
         const payload = {
             employeeIds: Array.isArray(employeeIds) ? employeeIds : [],
@@ -138,14 +141,15 @@ const load = async () => {
 watch(() => props.refreshTrigger, load);
 watch(() => props.cardData, load, { deep: true });
 watch(() => props.filterData, load, { deep: true });
+// Auto mode — track the dashboard-level range.
+watch(() => globalRange && globalRange.value, () => { if (timerange.value === 0) load(); }, { deep: true });
 onMounted(load);
 </script>
 
 <style scoped>
 .tle { height: 100%; width: 100%; padding: 8px 10px; overflow: hidden; display: flex; flex-direction: column; gap: 6px; }
 .tle-msg { color: #9aa0b4; font-size: 12px; padding: 10px 0; }
-.tle-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 11px; }
-.tle-period { font-weight: 600; color: #0d9488; }
+.tle-head { display: flex; justify-content: flex-end; align-items: center; gap: 8px; font-size: 11px; }
 .tle-hint { color: #9aa0b4; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Table: a shared 4-column grid so every level's numbers line up. Hierarchy

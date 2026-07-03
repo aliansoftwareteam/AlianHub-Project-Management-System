@@ -1,5 +1,21 @@
 <template>
     <div class="w-100">
+        <!-- Dashboard-level date range — cards whose period is set to "Auto"
+             follow this window; the rest keep their own selection. Reuses the
+             app's standard range picker (CalenderCompo, as in the timesheets). -->
+        <div class="dashboard-range-bar">
+            <span class="dashboard-range-label">{{ $t('dashboardCard.dashboard_range') }}</span>
+            <CalenderCompo
+                class="dashboard-range-picker"
+                :range="true"
+                :preSelectable="false"
+                :hideClearButton="true"
+                position="left"
+                :modelValue="globalRangeModel"
+                @update:modelValue="setGlobalRange"
+            />
+            <span class="dashboard-range-hint">{{ $t('dashboardCard.dashboard_range_hint') }}</span>
+        </div>
         <template v-if="layout && layout.length">
             <div v-if="clientWidth > 768">
                 <GridLayout
@@ -158,6 +174,7 @@
     import FeatureCard from '@/components/atom/FeatureCard/FeatureCard.vue';
     import DashBoardCard from '@/components/molecules/DashBoardCard/DashBoardCard.vue';
     import CardFieldComponent from '@/components/molecules/CardFieldComponent/CardFieldComponent.vue';
+    import CalenderCompo from '@/components/atom/CalenderCompo/CalenderCompo.vue';
 
     //Charts
     import { useStore } from 'vuex';
@@ -184,6 +201,7 @@
     import ProjectResourceCard from "@/components/organisms/ProjectResourceCard/ProjectResourceCard.vue";
     import LiveWorkCard from "@/components/organisms/LiveWorkCard/LiveWorkCard.vue";
     import UsersByCategoryCard from "@/components/organisms/UsersByCategoryCard/UsersByCategoryCard.vue";
+    import OnLeaveCard from "@/components/organisms/OnLeaveCard/OnLeaveCard.vue";
     import { useCustomComposable } from '@/composable';
     import { onBeforeRouteLeave } from 'vue-router';
     import { abortAllRequests } from "@/services";
@@ -365,6 +383,8 @@
                 return LiveWorkCard;
             case 'UsersByCategoryCard':
                 return UsersByCategoryCard;
+            case 'OnLeaveCard':
+                return OnLeaveCard;
             default:
                 return null;
         }
@@ -711,23 +731,74 @@
             currentLayout.value = response.data?.data;
         }
     }
-    // AHE-3789 — cards that get the header refresh icon (reload latest data).
+    // Cards that get the header refresh icon (reload latest data) — every
+    // self-fetching card we've added reacts to the refreshTrigger prop.
     const isRefreshable = (cid) => [
         'EmployeeWorkloadReportCard', 'ActiveProjectsCard', 'ProjectsByTypeCard',
-        'RunningProjectsCard', 'LiveWorkTableCard', 'UsersByCategoryCard',
+        'RunningProjectsCard', 'LiveWorkTableCard', 'UsersByCategoryCard', 'OnLeaveCard',
+        'ProjectPulseCard', 'ActiveWorkTableCard', 'FreeResourcesCard',
+        'WorkedTasksTableCard', 'TeamCategoryBreakdownCard', 'TeamLoggedVsEtaCard',
+        'TasksByStatusCard', 'TasksByProjectCard', 'TotalTasksCard',
     ].includes(cid);
+
+    // ── Dashboard-level date range ──────────────────────────────────
+    // Provided to every card; a card whose period is "Auto" (timerange 0)
+    // resolves its window from here and re-fetches when it changes.
+    // Persisted per user in localStorage.
+    const rangeStoreKey = () => `dashboardGlobalRange_${(userId && userId.value) || ''}`;
+    const defaultGlobalRange = () => {
+        const now = new Date();
+        const day = now.getDay() === 0 ? 6 : now.getDay() - 1; // Mon-based week
+        const start = new Date(now); start.setDate(now.getDate() - day); start.setHours(0, 0, 0, 0);
+        const end = new Date(now); end.setHours(23, 59, 59, 999);
+        return { dateFrom: start.toISOString(), dateTo: end.toISOString() };
+    };
+    const globalRange = ref(defaultGlobalRange());
+    try {
+        const saved = JSON.parse(localStorage.getItem(rangeStoreKey()) || 'null');
+        if (saved && saved.dateFrom && saved.dateTo) globalRange.value = saved;
+    } catch (e) { /* corrupted entry — keep the default week */ }
+    provide('dashboardGlobalRange', globalRange);
+
+    // CalenderCompo (range mode) works with a [startDate, endDate] pair.
+    const globalRangeModel = computed(() => [
+        new Date(globalRange.value.dateFrom),
+        new Date(globalRange.value.dateTo),
+    ]);
+    const setGlobalRange = (range) => {
+        if (!Array.isArray(range) || !range[0] || !range[1]) return;
+        const from = new Date(range[0]);
+        from.setHours(0, 0, 0, 0);
+        const to = new Date(range[1]);
+        to.setHours(23, 59, 59, 999);
+        globalRange.value = { dateFrom: from.toISOString(), dateTo: to.toISOString() };
+        try { localStorage.setItem(rangeStoreKey(), JSON.stringify(globalRange.value)); } catch (e) { /* storage full/blocked */ }
+    };
 
     // AHE-3789 — inline header time-period selector for the activity cards
     // (moved out of the settings modal). The selection is stored in the card's
     // own cardData.timerange, so it persists and the card re-fetches on change.
-    const PROJECT_PERIOD_CARDS = ['RunningProjectsCard', 'UsersByCategoryCard'];
+    // Id 0 = "Auto" → the card follows the dashboard-level range above.
+    const PROJECT_PERIOD_CARDS = [
+        'RunningProjectsCard', 'UsersByCategoryCard', 'ProjectPulseCard',
+        'WorkedTasksTableCard', 'TeamCategoryBreakdownCard', 'TeamLoggedVsEtaCard', 'OnLeaveCard',
+    ];
     const PROJECT_PERIOD_OPTIONS = [
+        { id: 0, label: 'Auto' },
         { id: 1, label: 'Today' }, { id: 2, label: 'Yesterday' }, { id: 3, label: 'This Week' }, { id: 4, label: 'Last Week' },
         { id: 5, label: 'This Month' }, { id: 6, label: 'Last Month' }, { id: 7, label: 'This Year' }, { id: 8, label: 'Last 30 Days' },
     ];
-    const PROJECT_PERIOD_DEFAULT = { RunningProjectsCard: 1, UsersByCategoryCard: 3 };
+    const PROJECT_PERIOD_DEFAULT = {
+        RunningProjectsCard: 1, UsersByCategoryCard: 3, ProjectPulseCard: 1,
+        WorkedTasksTableCard: 3, TeamCategoryBreakdownCard: 3, TeamLoggedVsEtaCard: 3, OnLeaveCard: 1,
+    };
     const periodOptionsFor = (cid) => (PROJECT_PERIOD_CARDS.includes(cid) ? PROJECT_PERIOD_OPTIONS : []);
-    const periodValueFor = (item) => (item && item.cardData && item.cardData.timerange) || PROJECT_PERIOD_DEFAULT[item && item.componentId] || 1;
+    const periodValueFor = (item) => {
+        // NOTE: can't use `|| default` — 0 (Auto) is a valid saved value.
+        const v = Number(item && item.cardData && item.cardData.timerange);
+        if (Number.isFinite(v) && v >= 0 && v <= 8) return v;
+        return PROJECT_PERIOD_DEFAULT[item && item.componentId] || 1;
+    };
     const handlePeriodChange = async (item, val) => {
         const idx = layout.value.findIndex((e) => e.i === item.i);
         if (idx < 0) return;
@@ -751,6 +822,42 @@
     defineExpose({ handleToggle });
 </script>
 <style>
+    .dashboard-range-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px 4px 10px;
+        flex-wrap: wrap;
+    }
+    .dashboard-range-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #3a3f52;
+    }
+    .dashboard-range-picker {
+        min-width: 210px;
+        max-width: 260px;
+    }
+    .dashboard-range-picker .dp__input {
+        font-size: 12px;
+        color: #3a3f52;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding-top: 4px;
+        padding-bottom: 4px;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .dashboard-range-picker .dp__input:hover {
+        border-color: #c7ccd9;
+    }
+    .dashboard-range-picker .dp__input:focus {
+        border-color: #2F3990;
+        box-shadow: 0 0 0 2px rgba(47, 57, 144, 0.12);
+    }
+    .dashboard-range-hint {
+        font-size: 11px;
+        color: #9aa0b4;
+    }
     .center_no_record_found {
         position: absolute;
         top: 50%;

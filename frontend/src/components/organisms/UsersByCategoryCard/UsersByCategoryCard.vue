@@ -153,7 +153,13 @@ const cfg = computed(() => {
 });
 const isConfigured = computed(() =>
     Object.values(cfg.value.categoryMap || {}).some((a) => Array.isArray(a) && a.length));
-const timerange = ref(Number(props.cardData?.timerange) || DEFAULT_TIMERANGE);
+// 0 = Auto → follow the dashboard's global date range.
+const normalizeTimerange = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 && n <= 8 ? n : DEFAULT_TIMERANGE;
+};
+const timerange = ref(normalizeTimerange(props.cardData?.timerange));
+const globalRange = inject('dashboardGlobalRange', null);
 
 // ─── Report data ────────────────────────────────────────────────
 function emptyReport() {
@@ -205,6 +211,9 @@ const sortedRows = computed(() => {
 
 // ─── Helpers ─────────────────────────────────────────────────────
 function resolveDateRange(value) {
+    if (Number(value) === 0 && globalRange && globalRange.value && globalRange.value.dateFrom) {
+        return { dateFrom: globalRange.value.dateFrom, dateTo: globalRange.value.dateTo };
+    }
     const now = new Date();
     const start = new Date(now);
     const end = new Date(now);
@@ -265,9 +274,11 @@ watch(() => props.refreshTrigger, load);
 // Re-fetch whenever the saved config changes (edit-card save) or the chrome
 // period changes.
 watch(() => props.cardData, (cd) => {
-    if (cd && cd.timerange) timerange.value = Number(cd.timerange);
+    if (cd && cd.timerange !== undefined) timerange.value = normalizeTimerange(cd.timerange);
     load();
 }, { deep: true });
+// Auto mode — track the dashboard-level range.
+watch(() => globalRange && globalRange.value, () => { if (timerange.value === 0) load(); }, { deep: true });
 </script>
 
 <style scoped>

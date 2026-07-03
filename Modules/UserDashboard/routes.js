@@ -19,4 +19,7 @@ exports.init = (app) => {
     // AHE-3789 — project-progress & resource cards (running projects,
     // live work, users-by-task-type). Additive, read-only, companyId-scoped.
     app.post('/api/v1/dashboard/project-metrics', ctrl.getProjectProgressMetric);
+    // OnLeaveCard — approved leave tickets from the configured HR project
+    // that overlap the selected window, plus AB/PR headcounts.
+    app.post('/api/v1/dashboard/on-leave', ctrl.getOnLeaveBoard);
 }

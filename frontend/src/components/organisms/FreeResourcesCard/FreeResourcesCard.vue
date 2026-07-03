@@ -1,6 +1,6 @@
 <template>
     <div class="frc">
-        <div v-if="loading && !freeRows.length" class="frc-msg">…</div>
+        <CardSkeleton v-if="loading && !freeRows.length" :rows="5" />
         <template v-else>
             <div class="frc-head">
                 <span class="frc-count">{{ freeRows.length }} free / under-utilised</span>
@@ -42,6 +42,7 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { teamIdToUserId, buildFilterQuery } from '@/composable/commonFunction';
 import { resolveIsoRange, formatMinutes } from '@/composable/useResourceWorkload';
+import CardSkeleton from '@/components/atom/CardSkeleton/CardSkeleton.vue';
 
 // Resource Utilization card #7 — "Free or in-training resources".
 // Reuses employee-workload for TODAY, then flags a user free when they are
