@@ -229,6 +229,10 @@ module.exports.LOGOUT = '/api/v2/logout';
 module.exports.GENERATEMONGOID = '/api/v1/generateMongoId';
 module.exports.DASHBOARD= '/api/v1/dashboard'
 module.exports.CARDCOMPONENT= '/api/v1/cardcomponent'
+// Resource Utilization & Consumption dashboard cards.
+module.exports.PROJECT_UTILIZATION_SUMMARY = '/api/v1/dashboard/project-utilization-summary'
+module.exports.TEAM_TASKTYPE_BREAKDOWN = '/api/v1/dashboard/team-tasktype-breakdown'
+module.exports.TEAM_LOGGED_VS_ETA = '/api/v1/dashboard/team-logged-vs-eta'
 module.exports.API_TIME_FORCASTING_REPORT ='/api/v1/report/time-forcasting';
 module.exports.CUSTOME_MODALS = '/api/v1/customeModals'
 module.exports.API_OAUTH_GITHUB = '/api/v1/github';

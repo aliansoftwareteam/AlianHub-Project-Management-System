@@ -601,6 +601,18 @@ export const getTimeRange = (range) => {
 
 export const getCardsComponentsSize = (key) => {
     switch (key) {
+        case 'ProjectPulseCard':
+        case 'LiveWorkTableCard':
+        case 'FreeResourcesCard':
+        case 'WorkedTasksTableCard':
+        case 'TeamCategoryBreakdownCard':
+        case 'TeamLoggedVsEtaCard':
+            return {
+                "minW": 3,
+                "maxW": 12,
+                "minH": 5,
+                "maxH": 18
+            };
         case 'QueueListComp':
             return {
                 "minW": 3,

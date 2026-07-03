@@ -168,6 +168,12 @@
     import TimeEstimatedWorkloadComp from "@/components/atom/Dashboard/TimeEstimatedWorkloadComp.vue"
     import EmployeeWorkloadReportCard from "@/components/organisms/EmployeeWorkloadReportCard/EmployeeWorkloadReportCard.vue";
     import MetricSummaryCard from "@/components/organisms/MetricSummaryCard/MetricSummaryCard.vue";
+    import ProjectPulseCard from "@/components/organisms/ProjectPulseCard/ProjectPulseCard.vue";
+    import LiveWorkTableCard from "@/components/organisms/LiveWorkTableCard/LiveWorkTableCard.vue";
+    import FreeResourcesCard from "@/components/organisms/FreeResourcesCard/FreeResourcesCard.vue";
+    import WorkedTasksTableCard from "@/components/organisms/WorkedTasksTableCard/WorkedTasksTableCard.vue";
+    import TeamCategoryBreakdownCard from "@/components/organisms/TeamCategoryBreakdownCard/TeamCategoryBreakdownCard.vue";
+    import TeamLoggedVsEtaCard from "@/components/organisms/TeamLoggedVsEtaCard/TeamLoggedVsEtaCard.vue";
     import { useCustomComposable } from '@/composable';
     import { onBeforeRouteLeave } from 'vue-router';
     import { abortAllRequests } from "@/services";
@@ -328,6 +334,18 @@
             case 'TasksByProjectCard':
             case 'TotalTasksCard':
                 return MetricSummaryCard;
+            case 'ProjectPulseCard':
+                return ProjectPulseCard;
+            case 'LiveWorkTableCard':
+                return LiveWorkTableCard;
+            case 'FreeResourcesCard':
+                return FreeResourcesCard;
+            case 'WorkedTasksTableCard':
+                return WorkedTasksTableCard;
+            case 'TeamCategoryBreakdownCard':
+                return TeamCategoryBreakdownCard;
+            case 'TeamLoggedVsEtaCard':
+                return TeamLoggedVsEtaCard;
             default:
                 return null;
         }
