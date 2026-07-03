@@ -103,6 +103,6 @@
     "not ie 11"
   ],
   "lint-staged": {
-    "*.{js,vue}": "eslint --fix"
+    "*.{js,vue}": "npx eslint --fix"
   }
 }
