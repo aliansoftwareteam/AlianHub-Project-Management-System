@@ -35,7 +35,10 @@
                         <DashBoardCard
                             :title="item?.cardData?.fieldName"
                             :id="item.i"
-                            :showRefresh="item.componentId === 'EmployeeWorkloadReportCard'"
+                            :showRefresh="isRefreshable(item.componentId)"
+                            :periodOptions="periodOptionsFor(item.componentId)"
+                            :periodValue="periodValueFor(item)"
+                            @period-change="(val) => handlePeriodChange(item, val)"
                             @delete-card="handleRemoveCard(item.i)"
                             @edit-card="handleEditCardSettings(item.componentId,item.cardData,item.i,item.filterData)"
                             @refresh-card="handleRefreshCard(item.i)">
@@ -60,7 +63,10 @@
                     <DashBoardCard
                         :title="item?.cardData?.fieldName"
                         :id="item.i"
-                        :showRefresh="item.componentId === 'EmployeeWorkloadReportCard'"
+                        :showRefresh="isRefreshable(item.componentId)"
+                        :periodOptions="periodOptionsFor(item.componentId)"
+                        :periodValue="periodValueFor(item)"
+                        @period-change="(val) => handlePeriodChange(item, val)"
                         @delete-card="handleRemoveCard(item.i)"
                         @edit-card="handleEditCardSettings(item.componentId,item.cardData,item.i,item.filterData)"
                         @refresh-card="handleRefreshCard(item.i)">
@@ -174,6 +180,10 @@
     import WorkedTasksTableCard from "@/components/organisms/WorkedTasksTableCard/WorkedTasksTableCard.vue";
     import TeamCategoryBreakdownCard from "@/components/organisms/TeamCategoryBreakdownCard/TeamCategoryBreakdownCard.vue";
     import TeamLoggedVsEtaCard from "@/components/organisms/TeamLoggedVsEtaCard/TeamLoggedVsEtaCard.vue";
+    import ProjectMetricsCard from "@/components/organisms/ProjectMetricsCard/ProjectMetricsCard.vue";
+    import ProjectResourceCard from "@/components/organisms/ProjectResourceCard/ProjectResourceCard.vue";
+    import LiveWorkCard from "@/components/organisms/LiveWorkCard/LiveWorkCard.vue";
+    import UsersByCategoryCard from "@/components/organisms/UsersByCategoryCard/UsersByCategoryCard.vue";
     import { useCustomComposable } from '@/composable';
     import { onBeforeRouteLeave } from 'vue-router';
     import { abortAllRequests } from "@/services";
@@ -346,6 +356,15 @@
                 return TeamCategoryBreakdownCard;
             case 'TeamLoggedVsEtaCard':
                 return TeamLoggedVsEtaCard;
+            case 'ActiveProjectsCard':
+            case 'ProjectsByTypeCard':
+                return ProjectMetricsCard;
+            case 'RunningProjectsCard':
+                return ProjectResourceCard;
+            case 'LiveWorkTableCard':
+                return LiveWorkCard;
+            case 'UsersByCategoryCard':
+                return UsersByCategoryCard;
             default:
                 return null;
         }
@@ -692,6 +711,43 @@
             currentLayout.value = response.data?.data;
         }
     }
+    // AHE-3789 — cards that get the header refresh icon (reload latest data).
+    const isRefreshable = (cid) => [
+        'EmployeeWorkloadReportCard', 'ActiveProjectsCard', 'ProjectsByTypeCard',
+        'RunningProjectsCard', 'LiveWorkTableCard', 'UsersByCategoryCard',
+    ].includes(cid);
+
+    // AHE-3789 — inline header time-period selector for the activity cards
+    // (moved out of the settings modal). The selection is stored in the card's
+    // own cardData.timerange, so it persists and the card re-fetches on change.
+    const PROJECT_PERIOD_CARDS = ['RunningProjectsCard', 'UsersByCategoryCard'];
+    const PROJECT_PERIOD_OPTIONS = [
+        { id: 1, label: 'Today' }, { id: 2, label: 'Yesterday' }, { id: 3, label: 'This Week' }, { id: 4, label: 'Last Week' },
+        { id: 5, label: 'This Month' }, { id: 6, label: 'Last Month' }, { id: 7, label: 'This Year' }, { id: 8, label: 'Last 30 Days' },
+    ];
+    const PROJECT_PERIOD_DEFAULT = { RunningProjectsCard: 1, UsersByCategoryCard: 3 };
+    const periodOptionsFor = (cid) => (PROJECT_PERIOD_CARDS.includes(cid) ? PROJECT_PERIOD_OPTIONS : []);
+    const periodValueFor = (item) => (item && item.cardData && item.cardData.timerange) || PROJECT_PERIOD_DEFAULT[item && item.componentId] || 1;
+    const handlePeriodChange = async (item, val) => {
+        const idx = layout.value.findIndex((e) => e.i === item.i);
+        if (idx < 0) return;
+        const updateObject = { ...(layout.value[idx].cardData || {}), timerange: Number(val) };
+        layout.value[idx] = { ...layout.value[idx], cardData: updateObject };
+        try {
+            await apiRequest('post', `${env.DASHBOARD}`, {
+                queryObject: [
+                    { userId: userId.value, templateId: currentLayout.value.templateId, 'cards.uid': item.i },
+                    { $set: { 'cards.$.config.cardData': updateObject } },
+                    { new: true, useFindAndModify: false },
+                ],
+                method: 'findOneAndUpdate',
+                userId: userId.value,
+            });
+        } catch (e) {
+            console.error('Failed to persist card period change', e);
+        }
+    };
+
     defineExpose({ handleToggle });
 </script>
 <style>
