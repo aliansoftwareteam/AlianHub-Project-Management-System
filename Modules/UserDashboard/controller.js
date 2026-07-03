@@ -1210,6 +1210,38 @@ exports.getProjectProgressMetric = async (req, res) => {
                 }
             });
             const pairs = Object.values(pairMap);
+
+            // Logged minutes TODAY — per user|task ("this task") and per user
+            // (day total), mirroring the Active Work table's columns. Sums the
+            // recorded LogTimeDuration; the currently running tracker adds up
+            // once it is stopped/synced (same convention as employee-workload).
+            const loggedByUserTask = {};
+            const loggedByUser = {};
+            if (pairs.length) {
+                const dayStart = new Date();
+                dayStart.setHours(0, 0, 0, 0);
+                const todaysLogs = await MongoDbCrudOpration(companyId, {
+                    type: SCHEMA_TYPE.TIMESHEET,
+                    data: [
+                        {
+                            Loggeduser: { $in: [...new Set(pairs.map((p) => p.userId))] },
+                            LogStartTime: { $gte: Math.floor(dayStart.getTime() / 1000), $lte: nowSec },
+                        },
+                        { Loggeduser: 1, TicketID: 1, LogTimeDuration: 1 },
+                    ],
+                }, "find").catch(() => []);
+                (todaysLogs || []).forEach((ts) => {
+                    if (!ts.Loggeduser) return;
+                    const uid = String(ts.Loggeduser);
+                    const mins = Number(ts.LogTimeDuration) || 0;
+                    loggedByUser[uid] = (loggedByUser[uid] || 0) + mins;
+                    if (ts.TicketID) {
+                        const key = `${uid}|${ts.TicketID}`;
+                        loggedByUserTask[key] = (loggedByUserTask[key] || 0) + mins;
+                    }
+                });
+            }
+
             const taskMap = {}, projMap = {}, userMap = {};
             const taskIds = objIds(pairs.map((p) => p.taskId));
             if (taskIds.length) {
@@ -1248,6 +1280,8 @@ exports.getProjectProgressMetric = async (req, res) => {
                     projectName: proj.ProjectName || "",
                     memo: p.memo,
                     startTimeTracker: p.startTimeTracker,
+                    taskLoggedMinutes: loggedByUserTask[`${p.userId}|${p.taskId}`] || 0,
+                    dayLoggedMinutes: loggedByUser[p.userId] || 0,
                 };
             }).sort((a, b) => (b.startTimeTracker || 0) - (a.startTimeTracker || 0));
             return res.status(200).json({ status: true, data: { rows, count: rows.length } });
@@ -1446,7 +1480,7 @@ exports.getOnLeaveBoard = async (req, res) => {
             type: SCHEMA_TYPE.TASKS,
             data: [taskFilter, {
                 TaskName: 1, TaskKey: 1, AssigneeUserId: 1,
-                startDate: 1, DueDate: 1, statusKey: 1, ProjectID: 1,
+                startDate: 1, DueDate: 1, statusKey: 1, ProjectID: 1, sprintArray: 1,
             }],
         }, "find").catch(() => []);
 
@@ -1467,6 +1501,7 @@ exports.getOnLeaveBoard = async (req, res) => {
                 taskName: t.TaskName || "—",
                 taskKey: t.TaskKey || "",
                 projectId: t.ProjectID ? String(t.ProjectID) : "",
+                sprintId: (t.sprintArray && t.sprintArray.id) || "",
                 userId: applicantId,
                 startDate: t.startDate || null,
                 dueDate: t.DueDate || null,

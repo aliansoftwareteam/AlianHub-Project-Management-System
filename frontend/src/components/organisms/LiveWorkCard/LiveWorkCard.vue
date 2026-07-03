@@ -26,6 +26,8 @@
                             <th class="lwc-th-task">Task</th>
                             <th class="lwc-th-proj">Project</th>
                             <th class="lwc-th-memo">Working on</th>
+                            <th class="lwc-th-num">{{ $t('dashboardCard.lwt_task_logged') }}</th>
+                            <th class="lwc-th-num">{{ $t('dashboardCard.lwt_logged_today') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -46,6 +48,8 @@
                             </td>
                             <td class="lwc-td-proj" :title="r.projectName">{{ r.projectName || '—' }}</td>
                             <td class="lwc-td-memo" :title="r.memo">{{ r.memo || '—' }}</td>
+                            <td class="lwc-td-num">{{ formatMinutes(r.taskLoggedMinutes) }}</td>
+                            <td class="lwc-td-num lwc-td-day">{{ formatMinutes(r.dayLoggedMinutes) }}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -75,6 +79,7 @@ export default { name: 'LiveWorkCard' };
 import { ref, computed, watch, onMounted, inject, provide } from 'vue';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import { formatMinutes } from '@/composable/useResourceWorkload';
 import TaskDetail from '@/views/TaskDetail/TaskDetail.vue';
 
 // AHE-3789 — Live Work card. Who has a tracker running RIGHT NOW
@@ -174,6 +179,8 @@ onMounted(load);
 .lwc-task-link b { color: #0e7490; }
 .lwc-td-proj { color: #6B7280; }
 .lwc-td-memo { color: #4A5061; }
+.lwc-th-num, .lwc-td-num { text-align: right; white-space: nowrap; }
+.lwc-td-day { font-weight: 600; color: #0f766e; }
 .lwc-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #16a34a; margin-right: 6px; vertical-align: middle; box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.5); animation: lwc-pulse 1.8s infinite; }
 @keyframes lwc-pulse { 0% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.5); } 70% { box-shadow: 0 0 0 6px rgba(22, 163, 74, 0); } 100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); } }
 

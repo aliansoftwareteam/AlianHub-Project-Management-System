@@ -43,8 +43,10 @@
                                     <span>{{ r.userName }}</span>
                                 </div>
                             </td>
-                            <td class="olc-ticket" :title="r.taskName">
-                                <span v-if="r.taskKey" class="olc-key">{{ r.taskKey }}</span>{{ r.taskName }}
+                            <td class="olc-ticket" :title="(r.taskKey ? r.taskKey + ' ' : '') + r.taskName">
+                                <span class="olc-task-link" @click.stop="openTaskDetail(r)" @mousedown.stop>
+                                    <b v-if="r.taskKey">{{ r.taskKey }}</b> {{ r.taskName }}
+                                </span>
                             </td>
                             <td class="olc-dates">{{ periodOf(r) }}</td>
                             <td>
@@ -55,6 +57,19 @@
                 </table>
             </div>
         </template>
+
+        <!-- Task detail sidebar — opened by clicking a leave ticket (same
+             pattern as the Active Time Trackers card). -->
+        <TaskDetail
+            v-if="isTaskDetail"
+            :companyId="companyId"
+            :projectId="detailProjectId"
+            :sprintId="detailSprintId"
+            :taskId="detailTaskId"
+            :isTaskDetailSideBar="isTaskDetail"
+            @toggleTaskDetail="toggleTaskDetail"
+            :zIndex="7"
+        />
     </div>
 </template>
 
@@ -63,13 +78,14 @@ export default { name: 'OnLeaveCard' };
 </script>
 
 <script setup>
-import { ref, computed, watch, onMounted, inject } from 'vue';
+import { ref, computed, watch, onMounted, inject, provide } from 'vue';
 import { useStore } from 'vuex';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { resolveCardRange } from '@/composable/useResourceWorkload';
 import UserProfile from '@/components/atom/UserProfile/UserProfile.vue';
 import CardSkeleton from '@/components/atom/CardSkeleton/CardSkeleton.vue';
+import TaskDetail from '@/views/TaskDetail/TaskDetail.vue';
 
 // On Leave card — leaves are tracked as tickets in a designated project
 // (picked in the card settings) with an "approved" status (also picked
@@ -150,6 +166,28 @@ const load = async () => {
     }
 };
 
+// ─── Task-detail sidebar (same pattern as the Active Time Trackers card) ───
+const companyId = inject('$companyId', ref(''));
+const isTaskDetail = ref(false);
+const detailProjectId = ref('');
+const detailSprintId = ref('');
+const detailTaskId = ref('');
+function openTaskDetail(r) {
+    if (!r || !r.taskId || !r.projectId) return;
+    detailProjectId.value = r.projectId;
+    detailSprintId.value = r.sprintId || '';
+    detailTaskId.value = r.taskId;
+    isTaskDetail.value = true;
+}
+function toggleTaskDetail(_task, close = false) {
+    isTaskDetail.value = false;
+    if (close === true) return;
+    detailProjectId.value = '';
+    detailSprintId.value = '';
+    detailTaskId.value = '';
+}
+provide('toggleTaskDetail', toggleTaskDetail);
+
 watch(() => props.refreshTrigger, load);
 watch(() => props.cardData, load, { deep: true });
 // In Auto mode, re-fetch whenever the dashboard-level range moves.
@@ -173,7 +211,9 @@ onMounted(load);
 .olc-user { font-weight: 600; }
 .olc-user-cell { display: flex; align-items: center; gap: 6px; }
 .olc-ticket { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
-.olc-key { color: #9aa0b4; font-size: 11px; margin-right: 5px; }
+.olc-task-link { color: #0e7490; cursor: pointer; }
+.olc-task-link:hover { text-decoration: underline; }
+.olc-task-link b { color: #0e7490; font-size: 11px; }
 .olc-dates { color: #6b7280; }
 .olc-status { display: inline-block; padding: 1px 8px; border-radius: 10px; background: #f3f4f6; font-size: 11px; }
 </style>
