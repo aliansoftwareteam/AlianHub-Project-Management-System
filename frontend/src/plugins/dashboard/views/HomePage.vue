@@ -175,7 +175,7 @@
     import EmployeeWorkloadReportCard from "@/components/organisms/EmployeeWorkloadReportCard/EmployeeWorkloadReportCard.vue";
     import MetricSummaryCard from "@/components/organisms/MetricSummaryCard/MetricSummaryCard.vue";
     import ProjectPulseCard from "@/components/organisms/ProjectPulseCard/ProjectPulseCard.vue";
-    import LiveWorkTableCard from "@/components/organisms/LiveWorkTableCard/LiveWorkTableCard.vue";
+    import ActiveWorkTableCard from "@/components/organisms/ActiveWorkTableCard/ActiveWorkTableCard.vue";
     import FreeResourcesCard from "@/components/organisms/FreeResourcesCard/FreeResourcesCard.vue";
     import WorkedTasksTableCard from "@/components/organisms/WorkedTasksTableCard/WorkedTasksTableCard.vue";
     import TeamCategoryBreakdownCard from "@/components/organisms/TeamCategoryBreakdownCard/TeamCategoryBreakdownCard.vue";
@@ -346,8 +346,8 @@
                 return MetricSummaryCard;
             case 'ProjectPulseCard':
                 return ProjectPulseCard;
-            case 'LiveWorkTableCard':
-                return LiveWorkTableCard;
+            case 'ActiveWorkTableCard':
+                return ActiveWorkTableCard;
             case 'FreeResourcesCard':
                 return FreeResourcesCard;
             case 'WorkedTasksTableCard':

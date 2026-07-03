@@ -2014,7 +2014,7 @@
             { "label": "include_subtasks", "groupBy": "data", "type": "radio", "name": "isParentTask", "value": true, "placeHolder": "", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
             { "label": "add_filter", "type": "filter", "name": "filter", "value": [], "placeHolder": "filter", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false, "groupBy": "filter" }
         ],
-        "key": "LiveWorkTableCard",
+        "key": "ActiveWorkTableCard",
         "image": "TaskList",
         "cardType": "resource_utilization",
         "backgroundColor": "#0891b2"
