@@ -130,6 +130,15 @@ export default [
                 component: () => import(/* webpackChunkName: Two Factor Auth */ '@/views/Settings/TwoFactorAuth/TwoFactorAuth.vue')
             },
             {
+                path: "api-tokens",
+                name: "ApiTokens",
+                meta: {
+                    title: "API Tokens",
+                    requiresAuth: true
+                },
+                component: () => import(/* webpackChunkName: ApiTokens */ '@/views/Settings/ApiTokens/ApiTokens.vue')
+            },
+            {
                 path: "integrations",
                 name: "Integrations",
                 meta: {
