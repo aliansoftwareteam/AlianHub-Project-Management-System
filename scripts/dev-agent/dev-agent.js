@@ -406,9 +406,11 @@ async function handleMessage(cfg, msg) {
     // activities so the tab has a real-time view of what Claude Code is doing.
     const activityLog = [];
     let lastPost = 0;
+    let progressWarned = false;
+    const warnOnce = (m) => { if (!progressWarned) { progressWarned = true; console.log(`   (⚠ live progress not reaching the tab: ${m})`); } };
     const onProgress = (line) => {
         console.log(`   ${line}`);
-        if (!workingId) return;
+        if (!workingId) { warnOnce('no working-message id from the reply'); return; }
         activityLog.push(line);
         while (activityLog.length > 6) activityLog.shift();
         const now = Date.now();
@@ -416,7 +418,7 @@ async function handleMessage(cfg, msg) {
         lastPost = now;
         api(cfg, 'POST', '/api/v2/dev-agent/progress', {
             messageId: workingId, text: `⚙️ Working…\n${activityLog.map((l) => `• ${l}`).join('\n')}`,
-        }).catch(() => {});
+        }).catch((e) => warnOnce(`${e.message} — restart the AlianHub backend so /api/v2/dev-agent/progress exists`));
     };
     try {
         const task = await fetchTask(cfg, msg.taskId);
