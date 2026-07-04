@@ -69,8 +69,13 @@ function parseArgs(argv) {
 function findOnPath(cmd) {
     if (cmd.includes('\\') || cmd.includes('/')) return fs.existsSync(cmd) ? cmd : null;
     const isWin = process.platform === 'win32';
-    const exts = isWin ? ['', ...(process.env.PATHEXT || '.EXE;.CMD;.BAT').split(';').filter(Boolean)] : [''];
-    for (const dir of (process.env.PATH || '').split(path.delimiter).filter(Boolean)) {
+    // Prefer real executables (.EXE/.CMD/.BAT) over an extension-less unix shim
+    // (Windows can't spawn the latter), so put '' last.
+    const exts = isWin ? [...(process.env.PATHEXT || '.EXE;.CMD;.BAT').split(';').filter(Boolean), ''] : [''];
+    // Search PATH, plus the Node install dir and %APPDATA%\npm: npm global shims
+    // live alongside node.exe, and Node's own dir doesn't depend on PATH being set.
+    const extra = isWin ? [path.dirname(process.execPath), path.join(process.env.APPDATA || '', 'npm')] : [];
+    for (const dir of [...(process.env.PATH || '').split(path.delimiter), ...extra].filter(Boolean)) {
         for (const ext of exts) {
             const p = path.join(dir, cmd + ext);
             try { if (fs.existsSync(p) && fs.statSync(p).isFile()) return p; } catch (e) { /* ignore */ }
