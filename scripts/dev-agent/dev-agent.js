@@ -5,28 +5,27 @@
  * The bridge between a task's "Development" chat in AlianHub and Claude Code on
  * your machine. The user chats instructions in the task's Development tab; this
  * runner (poll mode) picks them up, develops with Claude Code, and replies in
- * the same chat with the PR — then iterates on follow-up messages.
+ * the same chat — then iterates on follow-up messages.
  *
- *   poll pending chat → resolve repo → branch → `claude -p` → commit → push →
- *   open (or update) the PR → reply in the chat
+ * It works freely with whatever the developer points it at:
+ *   • a git URL         → cloned into the workspace, develop → push → open/update a PR
+ *   • a local git repo  → develop on a branch → push → open/update a PR (if it has a remote)
+ *   • a plain/empty folder → the agent just builds there; you open & test it locally
  *
  * The "agent" is just this script + Claude Code (the actual developer). It talks
  * to AlianHub over its REST API with a Personal API Token — nothing special on
  * the server. Runs on YOUR machine (where Claude Code, git and gh live).
  *
  * Modes:
- *   node dev-agent.js --poll [--interval <ms>]        watch the Development chats (recommended)
+ *   node dev-agent.js --poll [--interval <ms>]              watch the Development chats (recommended)
  *   node dev-agent.js --task <id> [--repo|--git] [--base]   one-shot, for testing
- *
- * Repo comes from the chat message (a git URL → cloned into the workspace, or a
- * local path → used as-is). One-shot takes it from --repo/--git or config.json.
  *
  * Config (env, or config.json next to this file):
  *   ALIANHUB_URL, ALIANHUB_PAT, ALIANHUB_COMPANY_ID, ALIANHUB_USER_ID (optional),
  *   ALIANHUB_WORKSPACE (where URL clones go; default ./workspace),
  *   and an optional "repos" map: { "<projectId|projectCode>": { gitUrl?, localPath?, base? } }
  *
- * Prereqs on this machine: Node 18+, the `claude` CLI (logged in), `git`, `gh` (authed).
+ * Prereqs on this machine: Node 18+, the `claude` CLI (logged in), `git`, `gh` (authed, for PRs).
  */
 
 const { spawnSync } = require('child_process');
@@ -100,39 +99,47 @@ const slug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').re
 
 const isGitUrl = (s) => /^(https?:\/\/|git@|ssh:\/\/)/i.test(String(s || '').trim());
 
-// A repo location string ("https://…" or a local path) → resolveRepo() args.
+// A repo location string ("https://…" or a local path) → resolveWorkdir() args.
 function repoArgsFromLocation(location, base) {
     const loc = String(location || '').trim();
     return { repo: isGitUrl(loc) ? '' : loc, git: isGitUrl(loc) ? loc : '', base };
 }
 
-// Resolve the working repo: an existing local clone (localPath), else a git URL
-// cloned into the workspace (reused + pulled next time). Sources, in priority:
-// CLI/message args → config.repos[projectId|projectCode].
-function resolveRepo(cfg, projectId, projectCode, args) {
+// Resolve the working directory — the agent works freely with whatever it's given:
+//   • a git URL       → clone into the workspace (reuse + pull next time), pushable;
+//   • a local path    → use as-is, CREATED if missing, git repo or not.
+// Returns { dir, base, pushable } where pushable === the repo has a git remote.
+// Sources, in priority: CLI/message args → config.repos[projectId|projectCode].
+function resolveWorkdir(cfg, projectId, projectCode, args) {
     const perProject = cfg.repos[projectId] || cfg.repos[projectCode] || {};
     const localPath = args.repo || perProject.localPath || '';
     const gitUrl = args.git || perProject.gitUrl || '';
     const base = args.base || perProject.base || 'main';
 
+    // Prefer an explicit local path (a folder the developer chose to work in).
     if (localPath) {
-        const p = path.resolve(localPath);
-        if (fs.existsSync(path.join(p, '.git'))) { console.log(`📁  Local clone: ${p}`); return { repo: p, base }; }
-        if (!gitUrl) throw new Error(`localPath "${p}" is not a git repo, and no git URL was given.`);
+        const dir = path.resolve(localPath);
+        if (!fs.existsSync(dir)) { fs.mkdirSync(dir, { recursive: true }); console.log(`📁  Created folder: ${dir}`); }
+        else { console.log(`📁  Local folder: ${dir}`); }
+        let pushable = false;
+        if (run('git', ['rev-parse', '--is-inside-work-tree'], dir, { capture: true, allowFail: true }) === 'true') {
+            pushable = !!run('git', ['remote'], dir, { capture: true, allowFail: true }).trim();
+        }
+        return { dir, base, pushable };
     }
     if (gitUrl) {
         const name = slug((gitUrl.split('/').pop() || 'repo').replace(/\.git$/i, ''));
-        const dest = path.join(cfg.workspace, name);
-        if (fs.existsSync(path.join(dest, '.git'))) {
-            console.log(`📁  Workspace clone: ${dest}`);
+        const dir = path.join(cfg.workspace, name);
+        if (fs.existsSync(path.join(dir, '.git'))) {
+            console.log(`📁  Workspace clone: ${dir}`);
         } else {
             fs.mkdirSync(cfg.workspace, { recursive: true });
-            console.log(`📥  Cloning ${gitUrl} → ${dest} …`);
-            run('git', ['clone', gitUrl, dest], cfg.workspace);
+            console.log(`📥  Cloning ${gitUrl} → ${dir} …`);
+            run('git', ['clone', gitUrl, dir], cfg.workspace);
         }
-        return { repo: dest, base };
+        return { dir, base, pushable: true };
     }
-    throw new Error('No repository given. Set one in the task\'s Development tab (git URL or local path).');
+    throw new Error('No repository or folder given. In the Development tab, enter a git URL or a local folder path.');
 }
 
 async function fetchTask(cfg, taskId) {
@@ -140,57 +147,70 @@ async function fetchTask(cfg, taskId) {
     return (res && res.data) || res || {};
 }
 
-function buildPrompt(taskKey, taskName, description, instruction) {
+function buildPrompt(taskKey, taskName, description, instruction, pushable) {
     return [
         `You are developing AlianHub task ${taskKey}: ${taskName}.`,
         description ? `\nTask description / acceptance criteria:\n${description}` : '',
         `\nThe user's instruction for this turn:\n${instruction}`,
         '',
-        'Implement it in this repository following the existing code conventions.',
-        'Keep the change focused on this instruction. Run relevant tests or a build if quick.',
-        'Do NOT commit or push — the runner handles git.',
+        pushable
+            ? 'Implement it in this repository following the existing code conventions. Keep the change focused. Run relevant tests or a build if quick. Do NOT commit or push — the runner handles git.'
+            : 'This is a local working folder (it may be empty). Build what is asked directly here — create/scaffold whatever files are needed. Run relevant setup/tests if quick. Do NOT worry about git; the developer will test locally.',
     ].join('\n');
 }
 
-// Develop ONE turn on the task's branch: continue the branch if it already
-// exists (so follow-up messages iterate on the same PR), else branch fresh off
-// the base. Returns { prUrl, note }.
-async function developTurn(cfg, { repo, base, taskKey, taskName, description, instruction }) {
-    const branch = `ai/${slug(taskKey)}`;
-    console.log(`\n🌿  ${repo}\n    ${taskKey} → branch "${branch}" (base "${base}")`);
-    run('git', ['fetch', 'origin'], repo, { allowFail: true });
-    const remote = run('git', ['rev-parse', '--verify', '--quiet', `origin/${branch}`], repo, { capture: true, allowFail: true });
-    if (remote) {
-        run('git', ['checkout', '-B', branch, `origin/${branch}`], repo); // continue prior work
-    } else {
-        run('git', ['checkout', base], repo);
-        run('git', ['pull', '--ff-only', 'origin', base], repo, { allowFail: true });
-        run('git', ['checkout', '-B', branch], repo);                     // fresh
+// Develop ONE turn. If the target is pushable (has a git remote), work on the
+// task branch and open/update a PR. Otherwise just build in the folder and let
+// the developer test locally. Returns { prUrl, note }.
+async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, description, instruction }) {
+    const prompt = buildPrompt(taskKey, taskName, description, instruction, pushable);
+
+    if (pushable) {
+        const branch = `ai/${slug(taskKey)}`;
+        console.log(`\n🌿  ${dir}\n    ${taskKey} → branch "${branch}" (base "${base}")`);
+        run('git', ['fetch', 'origin'], dir, { allowFail: true });
+        const remoteBranch = run('git', ['rev-parse', '--verify', '--quiet', `origin/${branch}`], dir, { capture: true, allowFail: true });
+        if (remoteBranch) {
+            run('git', ['checkout', '-B', branch, `origin/${branch}`], dir); // continue prior work
+        } else {
+            run('git', ['checkout', base], dir);
+            run('git', ['pull', '--ff-only', 'origin', base], dir, { allowFail: true });
+            run('git', ['checkout', '-B', branch], dir);                     // fresh
+        }
+
+        console.log('\n🤖  Claude Code …\n');
+        run('claude', ['-p', prompt, '--permission-mode', 'acceptEdits'], dir);
+
+        if (run('git', ['status', '--porcelain'], dir, { capture: true })) {
+            run('git', ['add', '-A'], dir);
+            run('git', ['commit', '-m', `${taskKey}: ${String(instruction).slice(0, 60)}\n\nvia AlianHub AI dev-agent (Claude Code)`], dir);
+        }
+        const ahead = run('git', ['rev-list', '--count', `origin/${base}..HEAD`], dir, { capture: true, allowFail: true });
+        if (!ahead || ahead === '0') return { prUrl: '', note: 'No code changes were needed.' };
+
+        run('git', ['push', '-u', 'origin', branch], dir);
+        let prUrl = run('gh', ['pr', 'view', branch, '--json', 'url', '-q', '.url'], dir, { capture: true, allowFail: true });
+        if (!prUrl) {
+            prUrl = run('gh', ['pr', 'create', '--base', base, '--head', branch,
+                '--title', `${taskKey}: ${taskName}`,
+                '--body', `Implements **${taskKey} — ${taskName}** via the AlianHub AI dev-agent (Claude Code).\n\n_Please review before merging._`],
+            dir, { capture: true });
+        }
+        return { prUrl, note: '' };
     }
 
-    const before = run('git', ['rev-parse', 'HEAD'], repo, { capture: true, allowFail: true });
-    console.log('\n🤖  Claude Code …\n');
-    run('claude', ['-p', buildPrompt(taskKey, taskName, description, instruction), '--permission-mode', 'acceptEdits'], repo);
+    // Local folder — no remote. Build freely; the developer tests locally.
+    console.log(`\n🤖  Claude Code (local folder — building in place) …\n`);
+    run('claude', ['-p', prompt, '--permission-mode', 'acceptEdits'], dir);
 
-    if (run('git', ['status', '--porcelain'], repo, { capture: true })) {
-        run('git', ['add', '-A'], repo);
-        run('git', ['commit', '-m', `${taskKey}: ${String(instruction).slice(0, 60)}\n\nvia AlianHub AI dev-agent (Claude Code)`], repo);
+    // Best-effort snapshot if it's already a git repo (so the change is tracked).
+    let committed = false;
+    if (fs.existsSync(path.join(dir, '.git')) && run('git', ['status', '--porcelain'], dir, { capture: true, allowFail: true })) {
+        run('git', ['add', '-A'], dir, { allowFail: true });
+        run('git', ['commit', '-m', `${taskKey}: ${String(instruction).slice(0, 60)}`], dir, { allowFail: true });
+        committed = true;
     }
-    const after = run('git', ['rev-parse', 'HEAD'], repo, { capture: true, allowFail: true });
-    const newCommit = before && after && before !== after;
-
-    const ahead = run('git', ['rev-list', '--count', `origin/${base}..HEAD`], repo, { capture: true, allowFail: true });
-    if (!ahead || ahead === '0') return { prUrl: '', note: 'No code changes were needed.' };
-
-    run('git', ['push', '-u', 'origin', branch], repo);
-    let prUrl = run('gh', ['pr', 'view', branch, '--json', 'url', '-q', '.url'], repo, { capture: true, allowFail: true });
-    if (!prUrl) {
-        prUrl = run('gh', ['pr', 'create', '--base', base, '--head', branch,
-            '--title', `${taskKey}: ${taskName}`,
-            '--body', `Implements **${taskKey} — ${taskName}** via the AlianHub AI dev-agent (Claude Code).\n\n_Please review before merging._`],
-        repo, { capture: true });
-    }
-    return { prUrl, note: newCommit ? '' : 'No new changes this turn.' };
+    return { prUrl: '', note: `Work is ready in ${dir} — open & test it locally${committed ? ' (committed to your local repo)' : ''}. Point me at a git URL or add a remote when you want a PR.` };
 }
 
 // ── poll mode: watch Development chats and develop each new instruction ────
@@ -210,12 +230,12 @@ async function handleMessage(cfg, msg) {
         const task = await fetchTask(cfg, msg.taskId);
         const taskKey = task.TaskKey || msg.taskId;
         const projectCode = taskKey.includes('-') ? taskKey.split('-')[0] : '';
-        const { repo, base } = resolveRepo(cfg, String(task.ProjectID || ''), projectCode, repoArgsFromLocation(msg.repo, msg.base));
+        const { dir, base, pushable } = resolveWorkdir(cfg, String(task.ProjectID || ''), projectCode, repoArgsFromLocation(msg.repo, msg.base));
         const { prUrl, note } = await developTurn(cfg, {
-            repo, base, taskKey, taskName: task.TaskName || '(untitled task)',
+            dir, base, pushable, taskKey, taskName: task.TaskName || '(untitled task)',
             description: task.description || task.rawDescription || '', instruction: msg.text,
         });
-        const text = prUrl ? `✅ Done. PR: ${prUrl}${note ? ` (${note})` : ''}` : `✅ ${note || 'Done.'}`;
+        const text = prUrl ? `✅ Done. PR: ${prUrl}` : `✅ ${note || 'Done.'}`;
         await reply(cfg, msg, { status: 'done', text, prUrl });
         console.log(`  ✓ ${prUrl || note}`);
     } catch (e) {
@@ -258,9 +278,9 @@ async function main() {
     const task = await fetchTask(cfg, args.task);
     const taskKey = task.TaskKey || args.task;
     const projectCode = taskKey.includes('-') ? taskKey.split('-')[0] : '';
-    const { repo, base } = resolveRepo(cfg, String(task.ProjectID || ''), projectCode, args);
+    const { dir, base, pushable } = resolveWorkdir(cfg, String(task.ProjectID || ''), projectCode, args);
     const { prUrl, note } = await developTurn(cfg, {
-        repo, base, taskKey, taskName: task.TaskName || '(untitled task)',
+        dir, base, pushable, taskKey, taskName: task.TaskName || '(untitled task)',
         description: task.description || task.rawDescription || '',
         instruction: task.description || task.rawDescription || 'Implement this task.',
     });
