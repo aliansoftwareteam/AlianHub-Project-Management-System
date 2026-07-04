@@ -135,15 +135,21 @@ function run(cmd, cmdArgs, cwd, { capture = false, allowFail = false, input } = 
 
 // ── AlianHub REST (PAT auth) ──────────────────────────────────────────────
 async function api(cfg, method, endpoint, body) {
-    const res = await fetch(`${cfg.url}${endpoint}`, {
-        method,
-        headers: {
-            'Content-Type': 'application/json',
-            authorization: `Bearer ${cfg.pat}`,
-            companyid: cfg.companyId,
-        },
-        body: body ? JSON.stringify(body) : undefined,
-    });
+    let res;
+    try {
+        res = await fetch(`${cfg.url}${endpoint}`, {
+            method,
+            headers: {
+                'Content-Type': 'application/json',
+                authorization: `Bearer ${cfg.pat}`,
+                companyid: cfg.companyId,
+            },
+            body: body ? JSON.stringify(body) : undefined,
+        });
+    } catch (e) {
+        const cause = e && e.cause ? (e.cause.code || e.cause.message) : (e && e.message);
+        throw new Error(`connection to ${cfg.url} failed (${cause}) — is AlianHub running?`);
+    }
     const text = await res.text();
     let json;
     try { json = JSON.parse(text); } catch (e) { json = text; }
@@ -293,12 +299,22 @@ async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, descri
 
 // ── poll mode: watch Development chats and develop each new instruction ────
 async function reply(cfg, msg, { status, text, prUrl }) {
-    try {
-        await api(cfg, 'POST', '/api/v2/dev-agent/reply', {
-            taskId: msg.taskId, projectId: msg.projectId, sprintId: msg.sprintId,
-            parentId: msg._id, status, text, prUrl: prUrl || '',
-        });
-    } catch (e) { console.error(`  reply failed: ${e.message}`); }
+    const body = {
+        taskId: msg.taskId, projectId: msg.projectId, sprintId: msg.sprintId,
+        parentId: msg._id, status, text, prUrl: prUrl || '',
+    };
+    // Retry: the work is done, so a transient blip (e.g. the dev server
+    // restarting during a long build) must not lose the result.
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+        try { await api(cfg, 'POST', '/api/v2/dev-agent/reply', body); return true; }
+        catch (e) {
+            if (attempt === 5) { console.error(`  reply failed after ${attempt} attempts: ${e.message}`); return false; }
+            console.log(`  reply attempt ${attempt} failed (${e.message}); retrying in ${2 * attempt}s…`);
+            // eslint-disable-next-line no-await-in-loop
+            await sleep(2000 * attempt);
+        }
+    }
+    return false;
 }
 
 async function handleMessage(cfg, msg) {
