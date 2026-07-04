@@ -78,6 +78,18 @@ node dev-agent.js --task <taskId> --repo "E:/repos/my-project"
 - The repository is chosen **per conversation** (temporary) — nothing is persisted.
 - If Claude Code produces no changes, the runner says so and opens no PR.
 
+## Troubleshooting
+
+- **`Not logged in · Please run /login`** — the `claude` CLI the runner uses isn't
+  authenticated (this is separate from the Claude desktop app). Run `claude` in a
+  terminal once and `/login` — it uses your subscription, no API key needed. The
+  runner's startup line shows which `claude` it found.
+- **`claude: spawnSync claude ENOENT`** — the CLI isn't visible on the runner's
+  PATH. The runner also looks next to `node.exe` and in `%APPDATA%\npm`; if it
+  still can't find it, set the full path in config.json → `"claudeBin"`.
+- **workspace not trusted** — handled by `--dangerously-skip-permissions`; if it
+  ever still blocks, open that folder in Claude Code once and accept the trust dialog.
+
 ## Roadmap
 
 - **Live updates** — the chat currently polls every few seconds; wire it to the
