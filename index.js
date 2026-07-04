@@ -236,6 +236,7 @@ function initializeControllers() {
     require('./Modules/Epics/init').init(app);
     require('./Modules/ExportJobs/init').init(app);
     require('./Modules/ApiTokens/init').init(app);
+    require('./Modules/DevAgent/init').init(app);
     require('./Modules/Pages/init').init(app);
     require('./Modules/PublicShares/init').init(app);
     require('./Modules/Importers/init').init(app);

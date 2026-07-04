@@ -85,6 +85,7 @@ const SCHEMA_TYPE = {
     CALENDAR_FEEDS: "calendar_feeds",
     AUTOMATION_RULES: "automation_rules",
     INTEGRATION_CONNECTIONS: "integration_connections",
+    DEV_MESSAGES: "dev_messages",
 }
 
 module.exports = {

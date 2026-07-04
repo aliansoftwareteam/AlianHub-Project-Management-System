@@ -622,6 +622,22 @@ const schema = {
         connectedAt: { type: Date, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // AI dev-agent → per-task "Development" chat. Ephemeral conversation:
+    // user instructions + agent replies. The repo location travels on the
+    // message (temporary), nothing persisted as a binding. Managed by Modules/DevAgent.
+    devMessages: {
+        taskId: { type: String, required: true },
+        projectId: { type: String, default: '', required: false },
+        sprintId: { type: String, default: '', required: false },
+        role: { type: String, default: 'user', required: false },   // user | agent | system
+        text: { type: String, default: '', required: false },
+        repo: { type: String, default: '', required: false },        // git URL or local path
+        base: { type: String, default: 'main', required: false },
+        status: { type: String, default: '', required: false },      // pending | working | done | error
+        prUrl: { type: String, default: '', required: false },
+        parentId: { type: String, default: '', required: false },    // agent reply → the user message it answers
+        userId: { type: String, default: '', required: false },
+    },
     // Wiki pages (Editor.js blocks; versioned) — managed by Modules/Pages
     pages: {
         title: { type: String, required: true },

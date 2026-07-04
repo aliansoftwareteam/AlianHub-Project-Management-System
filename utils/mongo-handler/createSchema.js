@@ -153,6 +153,9 @@ const automationRulesSchema = new Schema(schema.automationRules, {strict: true, 
 automationRulesSchema.index({ deletedStatusKey: 1 });
 const integrationConnectionsSchema = new Schema(schema.integrationConnections, {strict: true, timestamps: true});
 integrationConnectionsSchema.index({ type: 1, deletedStatusKey: 1 });
+const devMessagesSchema = new Schema(schema.devMessages, {strict: true, timestamps: true});
+devMessagesSchema.index({ taskId: 1, createdAt: 1 });
+devMessagesSchema.index({ role: 1, status: 1, createdAt: 1 });
 // Global search: one combined text index per collection.
 taskSchema.index({ TaskName: 'text', rawDescription: 'text' });
 projectsSchema.index({ ProjectName: 'text' });
@@ -247,6 +250,7 @@ module.exports = {
     calendarFeedsSchema,
     automationRulesSchema,
     integrationConnectionsSchema,
+    devMessagesSchema,
     historySchema,
     userIdSchema, 
     usersSchema,

@@ -83,7 +83,8 @@ const {
     emailInboxesSchema,
     calendarFeedsSchema,
     automationRulesSchema,
-    integrationConnectionsSchema
+    integrationConnectionsSchema,
+    devMessagesSchema
 } = require('./createSchema');
 
 
@@ -255,6 +256,8 @@ exports.checkType = (type) => {
             return automationRulesSchema
         case SCHEMA_TYPE.INTEGRATION_CONNECTIONS:
             return integrationConnectionsSchema
+        case SCHEMA_TYPE.DEV_MESSAGES:
+            return devMessagesSchema
         default:
             return ""
     }
@@ -429,6 +432,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.AUTOMATION_RULES}`
         case SCHEMA_TYPE.INTEGRATION_CONNECTIONS:
                 return `${dbCollections.INTEGRATION_CONNECTIONS}`
+        case SCHEMA_TYPE.DEV_MESSAGES:
+                return `${dbCollections.DEV_MESSAGES}`
         default:
             return ""
     }
