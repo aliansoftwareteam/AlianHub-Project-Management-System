@@ -113,7 +113,10 @@ function resolveExe(cmd) {
 function run(cmd, cmdArgs, cwd, { capture = false, allowFail = false, input } = {}) {
     const { exe, viaCmd } = resolveExe(cmd);
     const file = viaCmd ? (process.env.ComSpec || 'cmd.exe') : exe;
-    const args = viaCmd ? ['/d', '/s', '/c', exe, ...cmdArgs] : cmdArgs;
+    // No `/s`: it strips the quotes around a space-containing exe path
+    // ("C:\Program Files\…\claude.cmd") and cmd then splits on the space.
+    // Without it, cmd preserves the quoted path (our cmdArgs carry no quotes).
+    const args = viaCmd ? ['/d', '/c', exe, ...cmdArgs] : cmdArgs;
     const r = spawnSync(file, args, {
         cwd,
         input,
@@ -231,7 +234,7 @@ async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, descri
         }
 
         console.log('\n🤖  Claude Code …\n');
-        run(cfg.claudeBin, ['-p', '--permission-mode', 'acceptEdits'], dir, { input: prompt });
+        run(cfg.claudeBin, ['-p', '--dangerously-skip-permissions'], dir, { input: prompt });
 
         if (run('git', ['status', '--porcelain'], dir, { capture: true })) {
             run('git', ['add', '-A'], dir);
@@ -253,7 +256,7 @@ async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, descri
 
     // Local folder — no remote. Build freely; the developer tests locally.
     console.log(`\n🤖  Claude Code (local folder — building in place) …\n`);
-    run('claude', ['-p', prompt, '--permission-mode', 'acceptEdits'], dir);
+    run(cfg.claudeBin, ['-p', '--dangerously-skip-permissions'], dir, { input: prompt });
 
     // Best-effort snapshot if it's already a git repo (so the change is tracked).
     let committed = false;
