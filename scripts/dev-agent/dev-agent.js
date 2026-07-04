@@ -425,6 +425,7 @@ async function handleMessage(cfg, msg) {
         const taskKey = task.TaskKey || msg.taskId;
         const projectCode = taskKey.includes('-') ? taskKey.split('-')[0] : '';
         const { dir, base, pushable } = resolveWorkdir(cfg, String(task.ProjectID || ''), projectCode, repoArgsFromLocation(msg.repo, msg.base));
+        onProgress(`📁 ${pushable ? 'repository' : 'local folder'}: ${dir}`); // immediate first update so the tab changes right away
         const { prUrl, note } = await developTurn(cfg, {
             dir, base, pushable, taskKey, taskName: task.TaskName || '(untitled task)',
             description: task.description || task.rawDescription || '', instruction: msg.text,
