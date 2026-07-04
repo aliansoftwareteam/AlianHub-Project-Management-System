@@ -71,6 +71,17 @@ node dev-agent.js --task <taskId> --repo "E:/repos/my-project"
 5. It replies in the Development chat: **✅ Done. PR: …**
 6. You test, then type the next change — the agent iterates on the same branch.
 
+## Shared task memory
+
+The agent keeps a per-task log at **`.alianhub/tasks/<TaskKey>.md`** inside the
+repo. Before each turn it reads that file for prior context; after each turn it
+updates it (what was done, key decisions, what remains) and commits it with the
+code. Because the memory lives in the repo, any developer who continues the task
+later — on a **different machine or Claude account** — gets the full history from
+a `git pull`/clone. No external store, no per-machine state. (For a local folder
+with no remote, the file is written locally and becomes shared once you use a git
+URL / add a remote.)
+
 ## Safety
 
 - Code execution happens **on your machine**, never on the AlianHub server.

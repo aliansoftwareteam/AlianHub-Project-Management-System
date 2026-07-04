@@ -209,15 +209,29 @@ async function fetchTask(cfg, taskId) {
     return (res && res.data) || res || {};
 }
 
-function buildPrompt(taskKey, taskName, description, instruction, pushable) {
+// The per-task shared memory lives IN the repo (.alianhub/tasks/<TaskKey>.md) so
+// it travels between developers — anyone picking up the task, on any machine or
+// Claude account, gets the full history from a git pull/clone. No external store.
+const contextRel = (taskKey) => `.alianhub/tasks/${String(taskKey).replace(/[^A-Za-z0-9._-]/g, '_')}.md`;
+function readContext(dir, taskKey) {
+    try {
+        const f = path.join(dir, ...contextRel(taskKey).split('/'));
+        return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').slice(0, 12000) : '';
+    } catch (e) { return ''; }
+}
+
+function buildPrompt(taskKey, taskName, description, instruction, pushable, contextPath, contextText) {
     return [
         `You are developing AlianHub task ${taskKey}: ${taskName}.`,
         description ? `\nTask description / acceptance criteria:\n${description}` : '',
+        contextText ? `\nPrior development context for this task (from ${contextPath}, written on earlier turns — possibly by other developers on other machines). Read it and continue from where it left off; do NOT redo work already done:\n${contextText}` : '',
         `\nThe user's instruction for this turn:\n${instruction}`,
         '',
         pushable
             ? 'Implement it in this repository following the existing code conventions. Keep the change focused. Run relevant tests or a build if quick. Do NOT commit or push — the runner handles git.'
             : 'This is a local working folder (it may be empty). Build what is asked directly here — create/scaffold whatever files are needed. Run relevant setup/tests if quick. Do NOT worry about git; the developer will test locally.',
+        '',
+        `SHARED TASK MEMORY — before you finish, create or update "${contextPath}" in this repo. Keep it concise and CUMULATIVE so any developer (different machine / Claude account) who continues this task later has the full picture. Append a new dated section covering: what you did this turn, key decisions/assumptions, current state, and what remains (TODO). It is committed with your changes.`,
     ].join('\n');
 }
 
@@ -246,8 +260,8 @@ function ensureTrusted(dir) {
 // task branch and open/update a PR. Otherwise just build in the folder and let
 // the developer test locally. Returns { prUrl, note }.
 async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, description, instruction }) {
-    const prompt = buildPrompt(taskKey, taskName, description, instruction, pushable);
     ensureTrusted(dir);
+    const ctxPath = contextRel(taskKey);
 
     if (pushable) {
         const branch = `ai/${slug(taskKey)}`;
@@ -262,6 +276,7 @@ async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, descri
             run('git', ['checkout', '-B', branch], dir);                     // fresh
         }
 
+        const prompt = buildPrompt(taskKey, taskName, description, instruction, pushable, ctxPath, readContext(dir, taskKey));
         console.log('\n🤖  Claude Code …\n');
         run(cfg.claudeBin, ['-p', '--dangerously-skip-permissions'], dir, { input: prompt });
 
@@ -284,6 +299,7 @@ async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, descri
     }
 
     // Local folder — no remote. Build freely; the developer tests locally.
+    const prompt = buildPrompt(taskKey, taskName, description, instruction, pushable, ctxPath, readContext(dir, taskKey));
     console.log(`\n🤖  Claude Code (local folder — building in place) …\n`);
     run(cfg.claudeBin, ['-p', '--dangerously-skip-permissions'], dir, { input: prompt });
 
