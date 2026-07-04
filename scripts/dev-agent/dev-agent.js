@@ -62,17 +62,45 @@ function parseArgs(argv) {
     return a;
 }
 
-// ── shell helper (arg arrays → no cross-platform quoting issues) ──────────
-function run(cmd, cmdArgs, cwd, { capture = false, allowFail = false } = {}) {
-    const r = spawnSync(cmd, cmdArgs, {
+// Resolve a command to a real executable on Windows: npm shims like `claude`
+// are `claude.cmd`, which CreateProcess won't find as bare `claude` (it only
+// appends `.exe`), and Node refuses to spawn a `.cmd` without a shell. Prefer a
+// real `.exe`; otherwise run the `.cmd`/`.bat` through cmd.exe. No-op elsewhere.
+const _exeCache = {};
+function resolveExe(cmd) {
+    if (process.platform !== 'win32') return { exe: cmd, viaCmd: false };
+    if (_exeCache[cmd] !== undefined) return _exeCache[cmd];
+    let exe = cmd; let viaCmd = false;
+    try {
+        const w = spawnSync('where', [cmd], { encoding: 'utf8', windowsHide: true });
+        if (w.status === 0 && w.stdout) {
+            const lines = w.stdout.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+            const pick = lines.find((l) => /\.exe$/i.test(l)) || lines.find((l) => /\.(cmd|bat)$/i.test(l)) || lines[0];
+            if (pick) { exe = pick; viaCmd = /\.(cmd|bat)$/i.test(pick); }
+        }
+    } catch (e) { /* fall back to the bare name */ }
+    _exeCache[cmd] = { exe, viaCmd };
+    return _exeCache[cmd];
+}
+
+// ── run a command with an arg array (no shell → no quoting headaches). ─────
+// `input` (optional) is written to the child's stdin — used to hand Claude the
+// prompt, which avoids quoting a large multi-line arg (esp. on Windows).
+function run(cmd, cmdArgs, cwd, { capture = false, allowFail = false, input } = {}) {
+    const { exe, viaCmd } = resolveExe(cmd);
+    const file = viaCmd ? (process.env.ComSpec || 'cmd.exe') : exe;
+    const args = viaCmd ? ['/d', '/s', '/c', exe, ...cmdArgs] : cmdArgs;
+    const r = spawnSync(file, args, {
         cwd,
-        stdio: capture ? ['inherit', 'pipe', 'pipe'] : 'inherit',
+        input,
+        stdio: [input !== undefined ? 'pipe' : 'inherit', capture ? 'pipe' : 'inherit', 'pipe'],
         encoding: 'utf8',
         shell: false,
+        windowsHide: true,
     });
     if (r.error) { if (allowFail) return ''; throw new Error(`${cmd}: ${r.error.message}`); }
     if (r.status !== 0 && !allowFail) {
-        throw new Error(`\`${cmd} ${cmdArgs.join(' ')}\` failed (exit ${r.status})${r.stderr ? `\n${r.stderr}` : ''}`);
+        throw new Error(`\`${cmd} ${cmdArgs.join(' ')}\` failed (exit ${r.status})${r.stderr ? `\n${String(r.stderr).trim()}` : ''}`);
     }
     return (r.stdout || '').trim();
 }
@@ -179,7 +207,7 @@ async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, descri
         }
 
         console.log('\n🤖  Claude Code …\n');
-        run('claude', ['-p', prompt, '--permission-mode', 'acceptEdits'], dir);
+        run('claude', ['-p', '--permission-mode', 'acceptEdits'], dir, { input: prompt });
 
         if (run('git', ['status', '--porcelain'], dir, { capture: true })) {
             run('git', ['add', '-A'], dir);
