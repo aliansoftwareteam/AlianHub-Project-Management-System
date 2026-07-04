@@ -60,6 +60,8 @@ function parseArgs(argv) {
         else if (k === '--repo') a.repo = argv[++i];
         else if (k === '--git') a.git = argv[++i];
         else if (k === '--base') a.base = argv[++i];
+        else if (k === '--pair') a.pair = argv[++i];
+        else if (k === '--url') a.url = argv[++i];
     }
     return a;
 }
@@ -372,6 +374,36 @@ async function pollLoop(cfg, intervalMs) {
     }
 }
 
+// Zero-config onboarding: exchange the one-time code (from AlianHub → Development
+// tab → "Connect this computer") for a fresh PAT and write config.json. No manual
+// url / token / companyId entry.
+async function pairAndSaveConfig(urlArg, code) {
+    const url = String(urlArg || '').replace(/\/+$/, '');
+    if (!url) throw new Error('Pairing needs the AlianHub URL — use the full command shown in the Development tab (it includes --url).');
+    console.log(`\n🔗  Pairing with ${url} …`);
+    let res;
+    try {
+        res = await fetch(`${url}/api/v2/dev-pair`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code }),
+        });
+    } catch (e) {
+        const cause = e && e.cause ? (e.cause.code || e.cause.message) : (e && e.message);
+        throw new Error(`could not reach ${url} (${cause}) — check the URL / that AlianHub is running.`);
+    }
+    const body = await res.text().then((t) => { try { return JSON.parse(t); } catch (e) { return {}; } });
+    if (!res.ok || !body.status || !body.data || !body.data.token) {
+        throw new Error((body && body.statusText) || `pairing failed (HTTP ${res.status}).`);
+    }
+    const cfgPath = path.join(__dirname, 'config.json');
+    const existing = fs.existsSync(cfgPath) ? JSON.parse(fs.readFileSync(cfgPath, 'utf8')) : {};
+    fs.writeFileSync(cfgPath, JSON.stringify({
+        ...existing, url, pat: body.data.token, companyId: body.data.companyId, userId: body.data.userId || '',
+    }, null, 2));
+    console.log(`✅  Paired — saved ${cfgPath}. Watching for Development-chat tasks…`);
+}
+
 function preflight(cfg) {
     const r = resolveExe(cfg.claudeBin);
     if (r.found) { console.log(`🧠  Claude Code: ${r.exe}${r.viaCmd ? ' (via cmd.exe)' : ''}`); return; }
@@ -383,8 +415,18 @@ function preflight(cfg) {
 async function main() {
     const cfg = loadConfig();
     const args = parseArgs(process.argv);
+
+    // --pair: onboard this machine, then start polling with the saved config.
+    if (args.pair) {
+        await pairAndSaveConfig(args.url || cfg.url, args.pair);
+        const fresh = loadConfig();
+        preflight(fresh);
+        await pollLoop(fresh, args.interval || 5000);
+        return;
+    }
+
     if (!cfg.url || !cfg.pat || !cfg.companyId) {
-        throw new Error('Missing config — set ALIANHUB_URL, ALIANHUB_PAT and ALIANHUB_COMPANY_ID (env or config.json).');
+        throw new Error('Not configured. Run the pair command from AlianHub → Development tab → "Connect this computer" (or set ALIANHUB_URL / ALIANHUB_PAT / ALIANHUB_COMPANY_ID).');
     }
     preflight(cfg);
 
