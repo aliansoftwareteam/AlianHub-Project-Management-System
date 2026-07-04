@@ -558,6 +558,7 @@ export default {
         Comments: "Comments",
         activity_log: "Activity Log",
         time_log: "Time Log",
+        development: "Development",
         mentions: "Mentions",
         Notifications: "Notifications",
         no_data_found: "No Data Found",
