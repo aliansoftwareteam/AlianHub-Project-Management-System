@@ -31,6 +31,7 @@
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -214,11 +215,33 @@ function buildPrompt(taskKey, taskName, description, instruction, pushable) {
     ].join('\n');
 }
 
+// Headless Claude Code refuses to run in an untrusted folder (even with
+// --dangerously-skip-permissions). Pre-mark the target folder trusted in
+// ~/.claude.json — exactly what the "workspace not trusted" message suggests —
+// so the agent can work in a fresh folder the user pointed it at. Keys can be
+// stored back- or forward-slashed, so set both. Best-effort; never fatal.
+function ensureTrusted(dir) {
+    try {
+        const cfgFile = path.join(os.homedir(), '.claude.json');
+        if (!fs.existsSync(cfgFile)) return;
+        const j = JSON.parse(fs.readFileSync(cfgFile, 'utf8'));
+        if (!j.projects || typeof j.projects !== 'object') j.projects = {};
+        const abs = path.resolve(dir);
+        let changed = false;
+        for (const key of [abs, abs.replace(/\\/g, '/')]) {
+            if (!j.projects[key] || typeof j.projects[key] !== 'object') j.projects[key] = {};
+            if (j.projects[key].hasTrustDialogAccepted !== true) { j.projects[key].hasTrustDialogAccepted = true; changed = true; }
+        }
+        if (changed) { fs.writeFileSync(cfgFile, JSON.stringify(j, null, 2)); console.log(`🔓  Trusted workspace: ${abs}`); }
+    } catch (e) { console.log(`  (couldn't pre-trust ${dir}: ${e.message})`); }
+}
+
 // Develop ONE turn. If the target is pushable (has a git remote), work on the
 // task branch and open/update a PR. Otherwise just build in the folder and let
 // the developer test locally. Returns { prUrl, note }.
 async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, description, instruction }) {
     const prompt = buildPrompt(taskKey, taskName, description, instruction, pushable);
+    ensureTrusted(dir);
 
     if (pushable) {
         const branch = `ai/${slug(taskKey)}`;
