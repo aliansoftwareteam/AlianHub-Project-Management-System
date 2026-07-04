@@ -39,6 +39,7 @@ demand (or uses a local clone if you give it a path).
    | `pat` | a Personal API Token (`ahp_…`) — create one in AlianHub → Settings → **API Tokens** (needs **read + write** scope) |
    | `companyId` | your company id (the 24-hex in the app URL) |
    | `userId` | *(optional)* user id to attribute the agent's replies to |
+   | `claudeBin` | *(optional)* full path to the `claude` CLI if it isn't on PATH, e.g. `C:/Users/you/AppData/Roaming/npm/claude.cmd` |
    | `workspace` | *(optional)* folder where git-URL clones are stored (default `./workspace`) |
    | `repos` | *(optional)* fallback repo per project — `{ "<projectId|projectCode>": { gitUrl?, localPath?, base? } }` |
 

@@ -45,6 +45,7 @@ function loadConfig() {
         userId: process.env.ALIANHUB_USER_ID || file.userId || '',
         workspace: path.resolve(process.env.ALIANHUB_WORKSPACE || file.workspace || path.join(__dirname, 'workspace')),
         repos: file.repos || {},
+        claudeBin: process.env.ALIANHUB_CLAUDE_BIN || file.claudeBin || 'claude',
     };
 }
 
@@ -62,25 +63,43 @@ function parseArgs(argv) {
     return a;
 }
 
-// Resolve a command to a real executable on Windows: npm shims like `claude`
-// are `claude.cmd`, which CreateProcess won't find as bare `claude` (it only
-// appends `.exe`), and Node refuses to spawn a `.cmd` without a shell. Prefer a
-// real `.exe`; otherwise run the `.cmd`/`.bat` through cmd.exe. No-op elsewhere.
+// Find an executable the way the OS would, but robustly: scan PATH with PATHEXT
+// so Windows npm shims (`claude` → `claude.cmd`) resolve even though Node's
+// bare-name spawn only auto-appends `.exe`. An absolute path is returned as-is.
+function findOnPath(cmd) {
+    if (cmd.includes('\\') || cmd.includes('/')) return fs.existsSync(cmd) ? cmd : null;
+    const isWin = process.platform === 'win32';
+    const exts = isWin ? ['', ...(process.env.PATHEXT || '.EXE;.CMD;.BAT').split(';').filter(Boolean)] : [''];
+    for (const dir of (process.env.PATH || '').split(path.delimiter).filter(Boolean)) {
+        for (const ext of exts) {
+            const p = path.join(dir, cmd + ext);
+            try { if (fs.existsSync(p) && fs.statSync(p).isFile()) return p; } catch (e) { /* ignore */ }
+        }
+    }
+    return null;
+}
+
+// Resolve a command to a concrete executable. On Windows a `.cmd`/`.bat` shim
+// (e.g. claude.cmd) must be run through cmd.exe — Node won't spawn it directly.
 const _exeCache = {};
 function resolveExe(cmd) {
-    if (process.platform !== 'win32') return { exe: cmd, viaCmd: false };
-    if (_exeCache[cmd] !== undefined) return _exeCache[cmd];
-    let exe = cmd; let viaCmd = false;
-    try {
-        const w = spawnSync('where', [cmd], { encoding: 'utf8', windowsHide: true });
-        if (w.status === 0 && w.stdout) {
-            const lines = w.stdout.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
-            const pick = lines.find((l) => /\.exe$/i.test(l)) || lines.find((l) => /\.(cmd|bat)$/i.test(l)) || lines[0];
-            if (pick) { exe = pick; viaCmd = /\.(cmd|bat)$/i.test(pick); }
+    if (_exeCache[cmd]) return _exeCache[cmd];
+    let result = { exe: cmd, viaCmd: false, found: process.platform !== 'win32' };
+    if (process.platform === 'win32') {
+        let found = findOnPath(cmd);
+        if (!found) {
+            try {
+                const w = spawnSync('where', [cmd], { encoding: 'utf8', windowsHide: true });
+                if (w.status === 0 && w.stdout) {
+                    const lines = w.stdout.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+                    found = lines.find((l) => /\.exe$/i.test(l)) || lines.find((l) => /\.(cmd|bat)$/i.test(l)) || lines[0];
+                }
+            } catch (e) { /* not found */ }
         }
-    } catch (e) { /* fall back to the bare name */ }
-    _exeCache[cmd] = { exe, viaCmd };
-    return _exeCache[cmd];
+        if (found) result = { exe: found, viaCmd: /\.(cmd|bat)$/i.test(found), found: true };
+    }
+    _exeCache[cmd] = result;
+    return result;
 }
 
 // ── run a command with an arg array (no shell → no quoting headaches). ─────
@@ -207,7 +226,7 @@ async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, descri
         }
 
         console.log('\n🤖  Claude Code …\n');
-        run('claude', ['-p', '--permission-mode', 'acceptEdits'], dir, { input: prompt });
+        run(cfg.claudeBin, ['-p', '--permission-mode', 'acceptEdits'], dir, { input: prompt });
 
         if (run('git', ['status', '--porcelain'], dir, { capture: true })) {
             run('git', ['add', '-A'], dir);
@@ -290,12 +309,21 @@ async function pollLoop(cfg, intervalMs) {
     }
 }
 
+function preflight(cfg) {
+    const r = resolveExe(cfg.claudeBin);
+    if (r.found) { console.log(`🧠  Claude Code: ${r.exe}${r.viaCmd ? ' (via cmd.exe)' : ''}`); return; }
+    console.log(`\n⚠️  Could not find the Claude Code CLI ("${cfg.claudeBin}") on PATH.`);
+    console.log('   • Check that `claude` runs in THIS terminal:  where claude');
+    console.log('   • Or set the full path in config.json →  "claudeBin": "C:\\\\path\\\\to\\\\claude.cmd"\n');
+}
+
 async function main() {
     const cfg = loadConfig();
     const args = parseArgs(process.argv);
     if (!cfg.url || !cfg.pat || !cfg.companyId) {
         throw new Error('Missing config — set ALIANHUB_URL, ALIANHUB_PAT and ALIANHUB_COMPANY_ID (env or config.json).');
     }
+    preflight(cfg);
 
     if (args.poll) { await pollLoop(cfg, args.interval || 5000); return; }
 
