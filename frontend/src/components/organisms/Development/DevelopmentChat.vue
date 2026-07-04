@@ -1,5 +1,19 @@
 <template>
     <div class="dev-chat">
+        <!-- one-time machine setup (zero-config onboarding) -->
+        <div class="dev-connect">
+            <button class="dev-connect-toggle" @click="showConnect = !showConnect">{{ showConnect ? '▾' : '▸' }} Connect this computer <span class="dev-connect-sub">(one-time — run the AI dev-agent on your machine)</span></button>
+            <div v-if="showConnect" class="dev-connect-body">
+                <p class="dev-connect-hint">Generate a command, run it once in a terminal on your machine, and the agent configures itself — no token or config to fill in.</p>
+                <button class="dev-connect-gen" :disabled="pairing" @click="generatePairing">{{ pairing ? 'Generating…' : 'Generate connect command' }}</button>
+                <div v-if="connectCmd" class="dev-connect-cmd">
+                    <code>{{ connectCmd }}</code>
+                    <button class="dev-btn-copy" @click="copyConnect">{{ connectCopied ? 'Copied ✓' : 'Copy' }}</button>
+                </div>
+                <div v-if="connectErr" class="dev-err">{{ connectErr }}</div>
+            </div>
+        </div>
+
         <!-- repo bar: temporary, per-conversation (not persisted) -->
         <div class="dev-repo">
             <input v-model="repo" type="text" class="dev-repo-input" placeholder="Repository — git URL or local path (e.g. https://github.com/org/x.git)" />
@@ -52,6 +66,32 @@ const sending = ref(false);
 const err = ref('');
 const listEl = ref(null);
 let timer = null;
+
+// one-time "connect this computer" pairing (zero-config onboarding)
+const showConnect = ref(false);
+const pairing = ref(false);
+const connectCmd = ref('');
+const connectCopied = ref(false);
+const connectErr = ref('');
+
+const generatePairing = async () => {
+    if (pairing.value) return;
+    pairing.value = true; connectErr.value = ''; connectCmd.value = '';
+    try {
+        const body = (await apiRequest('post', `${BASE}/pair`, {}))?.data;
+        if (body && body.status && body.data && body.data.code) {
+            connectCmd.value = `node scripts/dev-agent/dev-agent.js --pair ${body.data.code} --url ${window.location.origin}`;
+        } else {
+            connectErr.value = (body && (body.statusText || body.message)) || 'Failed to generate a code';
+        }
+    } catch (e) {
+        connectErr.value = (e && e.response && e.response.data && (e.response.data.statusText || e.response.data.message)) || (e && e.message) || 'Failed';
+    } finally { pairing.value = false; }
+};
+
+const copyConnect = async () => {
+    try { await navigator.clipboard.writeText(connectCmd.value); connectCopied.value = true; setTimeout(() => { connectCopied.value = false; }, 2000); } catch (e) { /* select manually */ }
+};
 
 const statusLabel = (s) => ({ pending: '⏳ queued', working: '⚙️ working…', done: '✓ done', error: '⚠️ error' }[s] || s);
 
@@ -126,4 +166,14 @@ onBeforeUnmount(() => { if (timer) clearInterval(timer); });
 .dev-send:disabled { opacity: .5; cursor: default; }
 .dev-hint { font-size: 12px; color: #9aa0b4; padding: 0 2px 6px; }
 .dev-err { font-size: 12px; color: #c0392b; padding: 0 2px 6px; }
+.dev-connect { border: 1px solid #e6e7ee; border-radius: 8px; margin-bottom: 10px; background: #fafbff; }
+.dev-connect-toggle { width: 100%; text-align: left; background: none; border: none; padding: 9px 12px; font-size: 13px; font-weight: 600; color: #2f3a8f; cursor: pointer; font-family: inherit; }
+.dev-connect-sub { font-weight: 400; color: #9aa0b4; }
+.dev-connect-body { padding: 0 12px 12px; }
+.dev-connect-hint { font-size: 12px; color: #6b7280; line-height: 1.5; margin: 0 0 10px; }
+.dev-connect-gen { background: #2f3a8f; color: #fff; border: none; border-radius: 7px; padding: 7px 14px; font-size: 13px; cursor: pointer; }
+.dev-connect-gen:disabled { opacity: .55; cursor: default; }
+.dev-connect-cmd { display: flex; align-items: center; gap: 8px; margin-top: 10px; background: #fff; border: 1px solid #d7d9e6; border-radius: 6px; padding: 8px 10px; }
+.dev-connect-cmd code { flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #23305f; word-break: break-all; }
+.dev-btn-copy { background: #fff; color: #2f3a8f; border: 1px solid #cdd2e6; border-radius: 6px; padding: 5px 12px; font-size: 12px; cursor: pointer; white-space: nowrap; }
 </style>
