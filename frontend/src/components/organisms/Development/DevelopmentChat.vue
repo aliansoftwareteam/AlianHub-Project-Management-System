@@ -33,10 +33,13 @@
             </div>
             <div v-for="m in messages" :key="m._id" class="dev-msg" :class="m.role === 'user' ? 'is-user' : 'is-agent'">
                 <div class="dev-bubble">
-                    <div class="dev-text">{{ m.text }}</div>
+                    <div class="dev-text"><span v-if="isWorking(m)" class="dev-spinner"></span>{{ m.text }}</div>
                     <a v-if="m.prUrl" :href="m.prUrl" target="_blank" rel="noopener" class="dev-pr">🔗 {{ m.prUrl }}</a>
                     <span v-if="m.role === 'user' && m.status" class="dev-status" :class="'st-' + m.status">{{ statusLabel(m.status) }}</span>
                 </div>
+            </div>
+            <div v-if="awaitingAgent" class="dev-msg is-agent">
+                <div class="dev-bubble"><span class="dev-spinner"></span>Starting…</div>
             </div>
         </div>
 
@@ -51,7 +54,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, nextTick, defineProps } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, defineProps } from 'vue';
 import { apiRequest } from '@/services';
 
 const props = defineProps({
@@ -102,6 +105,18 @@ const copyConnect = async () => {
 };
 
 const statusLabel = (s) => ({ pending: '⏳ queued', working: '⚙️ working…', done: '✓ done', error: '⚠️ error' }[s] || s);
+
+// running-state indicators
+const activeParents = computed(() => {
+    const s = new Set();
+    for (const m of messages.value) { if (m.role === 'user' && (m.status === 'pending' || m.status === 'working')) s.add(m._id); }
+    return s;
+});
+const isWorking = (m) => m.role === 'agent' && !!m.parentId && activeParents.value.has(m.parentId);
+const awaitingAgent = computed(() => {
+    const last = messages.value[messages.value.length - 1];
+    return !!(last && last.role === 'user' && (last.status === 'pending' || last.status === 'working'));
+});
 
 const scrollDown = () => { nextTick(() => { if (listEl.value) listEl.value.scrollTop = listEl.value.scrollHeight; }); };
 
@@ -188,4 +203,6 @@ onBeforeUnmount(() => { if (timer) clearInterval(timer); });
 .dev-connect-step a { color: #2f3a8f; }
 .dev-connect-note { font-size: 12px; color: #9aa0b4; line-height: 1.5; margin-top: 10px; }
 .dev-connect-note code { background: #eef0f6; padding: 1px 5px; border-radius: 4px; }
+.dev-spinner { display: inline-block; width: 9px; height: 9px; margin-right: 7px; border-radius: 50%; background: #c0392b; vertical-align: middle; animation: dev-pulse 1s ease-in-out infinite; }
+@keyframes dev-pulse { 0%, 100% { opacity: .25; transform: scale(.7); } 50% { opacity: 1; transform: scale(1.2); } }
 </style>

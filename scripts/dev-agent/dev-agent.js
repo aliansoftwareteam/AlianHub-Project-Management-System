@@ -28,7 +28,7 @@
  * Prereqs on this machine: Node 18+, the `claude` CLI (logged in), `git`, `gh` (authed, for PRs).
  */
 
-const { spawnSync } = require('child_process');
+const { spawnSync, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -147,6 +147,54 @@ function run(cmd, cmdArgs, cwd, { capture = false, allowFail = false, input } = 
         throw new Error(`\`${cmd} ${cmdArgs.join(' ')}\` failed (exit ${r.status})${r.stderr ? `\n${String(r.stderr).trim()}` : ''}`);
     }
     return (r.stdout || '').trim();
+}
+
+// Run Claude Code headless with streaming JSON events so we can surface a live
+// activity feed. Resolves on success, rejects on non-zero exit. `onEvent` gets
+// each parsed stream-json event (system / assistant / tool_use / result).
+function runClaude(cfg, dir, prompt, onEvent) {
+    return new Promise((resolve, reject) => {
+        const { exe, viaCmd } = resolveExe(cfg.claudeBin);
+        const file = viaCmd ? (process.env.ComSpec || 'cmd.exe') : exe;
+        const claudeArgs = ['-p', '--dangerously-skip-permissions', '--output-format', 'stream-json', '--verbose'];
+        const child = spawn(file, viaCmd ? ['/d', '/c', exe, ...claudeArgs] : claudeArgs, { cwd: dir, shell: false, windowsHide: true });
+        let stderr = ''; let buf = '';
+        child.stdout.on('data', (chunk) => {
+            buf += chunk.toString();
+            let nl;
+            while ((nl = buf.indexOf('\n')) >= 0) {
+                const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
+                if (line) { try { onEvent(JSON.parse(line)); } catch (e) { /* non-JSON line */ } }
+            }
+        });
+        child.stderr.on('data', (c) => { stderr += c.toString(); });
+        child.on('error', reject);
+        child.on('close', (code) => {
+            if (code === 0) resolve();
+            else reject(new Error(`claude exited ${code}${stderr ? `\n${stderr.trim().slice(0, 300)}` : ''}`));
+        });
+        child.stdin.write(prompt);
+        child.stdin.end();
+    });
+}
+
+// Turn a stream-json event into a short human activity line (or null to skip).
+function activityLine(ev) {
+    if (!ev || ev.type !== 'assistant' || !ev.message) return null;
+    const blocks = ev.message.content || [];
+    for (const b of blocks) {
+        if (b && b.type === 'tool_use') {
+            const inp = b.input || {};
+            const file = String(inp.file_path || inp.path || inp.notebook_path || '').split(/[\\/]/).pop();
+            if (b.name === 'Bash') return `▶ ${String(inp.command || '').replace(/\s+/g, ' ').slice(0, 70)}`;
+            if (/^(Edit|MultiEdit|Write|NotebookEdit)$/.test(b.name)) return `✏️ ${b.name} ${file}`;
+            if (b.name === 'Read') return `👀 read ${file}`;
+            if (b.name === 'Grep' || b.name === 'Glob') return `🔎 ${b.name} ${String(inp.pattern || '')}`.slice(0, 70);
+            return `🔧 ${b.name}`;
+        }
+    }
+    const txt = blocks.filter((b) => b && b.type === 'text').map((b) => b.text).join(' ').replace(/\s+/g, ' ').trim();
+    return txt ? `💬 ${txt.slice(0, 80)}` : null;
 }
 
 // ── AlianHub REST (PAT auth) ──────────────────────────────────────────────
@@ -275,9 +323,10 @@ function ensureTrusted(dir) {
 // Develop ONE turn. If the target is pushable (has a git remote), work on the
 // task branch and open/update a PR. Otherwise just build in the folder and let
 // the developer test locally. Returns { prUrl, note }.
-async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, description, instruction }) {
+async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, description, instruction, onProgress }) {
     ensureTrusted(dir);
     const ctxPath = contextRel(taskKey);
+    const onEvent = (ev) => { const line = activityLine(ev); if (!line) return; if (onProgress) onProgress(line); else console.log(`   ${line}`); };
 
     if (pushable) {
         const branch = `ai/${slug(taskKey)}`;
@@ -294,7 +343,7 @@ async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, descri
 
         const prompt = buildPrompt(taskKey, taskName, description, instruction, pushable, ctxPath, readContext(dir, taskKey));
         console.log('\n🤖  Claude Code …\n');
-        run(cfg.claudeBin, ['-p', '--dangerously-skip-permissions'], dir, { input: prompt });
+        await runClaude(cfg, dir, prompt, onEvent);
 
         if (run('git', ['status', '--porcelain'], dir, { capture: true })) {
             run('git', ['add', '-A'], dir);
@@ -317,7 +366,7 @@ async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, descri
     // Local folder — no remote. Build freely; the developer tests locally.
     const prompt = buildPrompt(taskKey, taskName, description, instruction, pushable, ctxPath, readContext(dir, taskKey));
     console.log(`\n🤖  Claude Code (local folder — building in place) …\n`);
-    run(cfg.claudeBin, ['-p', '--dangerously-skip-permissions'], dir, { input: prompt });
+    await runClaude(cfg, dir, prompt, onEvent);
 
     // Best-effort snapshot if it's already a git repo (so the change is tracked).
     let committed = false;
@@ -338,20 +387,37 @@ async function reply(cfg, msg, { status, text, prUrl }) {
     // Retry: the work is done, so a transient blip (e.g. the dev server
     // restarting during a long build) must not lose the result.
     for (let attempt = 1; attempt <= 5; attempt += 1) {
-        try { await api(cfg, 'POST', '/api/v2/dev-agent/reply', body); return true; }
+        try { const r = await api(cfg, 'POST', '/api/v2/dev-agent/reply', body); return (r && r.data) || null; }
         catch (e) {
-            if (attempt === 5) { console.error(`  reply failed after ${attempt} attempts: ${e.message}`); return false; }
+            if (attempt === 5) { console.error(`  reply failed after ${attempt} attempts: ${e.message}`); return null; }
             console.log(`  reply attempt ${attempt} failed (${e.message}); retrying in ${2 * attempt}s…`);
             // eslint-disable-next-line no-await-in-loop
             await sleep(2000 * attempt);
         }
     }
-    return false;
+    return null;
 }
 
 async function handleMessage(cfg, msg) {
     console.log(`\n▶  task ${msg.taskId}: "${String(msg.text).slice(0, 70)}"`);
-    await reply(cfg, msg, { status: 'working', text: '⚙️ Working on it…' });
+    const working = await reply(cfg, msg, { status: 'working', text: '⚙️ Working on it…' });
+    const workingId = working && working._id;
+    // Throttled live progress — keep the "working" message showing the last few
+    // activities so the tab has a real-time view of what Claude Code is doing.
+    const activityLog = [];
+    let lastPost = 0;
+    const onProgress = (line) => {
+        console.log(`   ${line}`);
+        if (!workingId) return;
+        activityLog.push(line);
+        while (activityLog.length > 6) activityLog.shift();
+        const now = Date.now();
+        if (now - lastPost < 2500) return;
+        lastPost = now;
+        api(cfg, 'POST', '/api/v2/dev-agent/progress', {
+            messageId: workingId, text: `⚙️ Working…\n${activityLog.map((l) => `• ${l}`).join('\n')}`,
+        }).catch(() => {});
+    };
     try {
         const task = await fetchTask(cfg, msg.taskId);
         const taskKey = task.TaskKey || msg.taskId;

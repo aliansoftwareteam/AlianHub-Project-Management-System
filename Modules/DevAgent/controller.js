@@ -137,6 +137,25 @@ exports.postReply = async (req, res) => {
     }
 };
 
+/* POST /api/v2/dev-agent/progress  body: { messageId, text } — the runner updates
+   the live "working" message with its current activity, for a real-time view. */
+exports.updateProgress = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'] || '';
+        const b = req.body || {};
+        const messageId = String(b.messageId || '').trim();
+        if (!companyId || !messageId) return res.send({ status: false, statusText: 'companyId and messageId are required.' });
+        await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.DEV_MESSAGES,
+            data: [{ _id: messageId }, { $set: { text: String(b.text || '') } }, {}],
+        }, 'updateOne');
+        return res.send({ status: true });
+    } catch (error) {
+        logger.error(`ERROR in dev-agent updateProgress: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
 /* POST /api/v2/dev-agent/pair  (JWT) — the signed-in developer authorizes their
    machine. Returns a short, single-use code; the runner exchanges it (public)
    for a fresh PAT, so nothing has to be configured by hand. */
