@@ -1,4 +1,6 @@
 const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const logger = require("../../Config/loggerConfig");
@@ -186,5 +188,21 @@ exports.exchangePairing = async (req, res) => {
     } catch (error) {
         logger.error(`ERROR in dev-agent exchangePairing: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
+    }
+};
+
+/* GET /api/v2/dev-agent-runner.js  (PUBLIC) — serves the self-contained runner
+   so a developer can download it and run it anywhere, for any project, without
+   cloning this repo. No secrets in the file (auth comes from pairing at runtime). */
+exports.serveRunner = (req, res) => {
+    try {
+        const file = path.join(__dirname, '..', '..', 'scripts', 'dev-agent', 'dev-agent.js');
+        const src = fs.readFileSync(file, 'utf8');
+        res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+        res.setHeader('Content-Disposition', 'attachment; filename="dev-agent.js"');
+        return res.send(src);
+    } catch (error) {
+        logger.error(`ERROR serving dev-agent runner: ${error.message}`);
+        return res.status(500).send('// dev-agent runner is unavailable on this server');
     }
 };

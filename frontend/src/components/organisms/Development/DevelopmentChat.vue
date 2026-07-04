@@ -4,12 +4,17 @@
         <div class="dev-connect">
             <button class="dev-connect-toggle" @click="showConnect = !showConnect">{{ showConnect ? '▾' : '▸' }} Connect this computer <span class="dev-connect-sub">(one-time — run the AI dev-agent on your machine)</span></button>
             <div v-if="showConnect" class="dev-connect-body">
-                <p class="dev-connect-hint">Generate a command, run it once in a terminal on your machine, and the agent configures itself — no token or config to fill in.</p>
+                <p class="dev-connect-hint">Works for <b>any project</b> — you don't need to clone this repo. Do this once per machine:</p>
                 <button class="dev-connect-gen" :disabled="pairing" @click="generatePairing">{{ pairing ? 'Generating…' : 'Generate connect command' }}</button>
-                <div v-if="connectCmd" class="dev-connect-cmd">
-                    <code>{{ connectCmd }}</code>
-                    <button class="dev-btn-copy" @click="copyConnect">{{ connectCopied ? 'Copied ✓' : 'Copy' }}</button>
-                </div>
+                <template v-if="connectCmd">
+                    <div class="dev-connect-step"><b>1.</b> <a :href="runnerUrl" download="dev-agent.js">Download dev-agent.js</a> into any folder (once).</div>
+                    <div class="dev-connect-step"><b>2.</b> In that folder, run:</div>
+                    <div class="dev-connect-cmd">
+                        <code>{{ connectCmd }}</code>
+                        <button class="dev-btn-copy" @click="copyConnect">{{ connectCopied ? 'Copied ✓' : 'Copy' }}</button>
+                    </div>
+                    <div class="dev-connect-note">Needs Node 18+, the <code>claude</code> CLI (logged in) and <code>gh</code> on that machine. The agent then builds whatever repo/URL you set below.</div>
+                </template>
                 <div v-if="connectErr" class="dev-err">{{ connectErr }}</div>
             </div>
         </div>
@@ -71,6 +76,7 @@ let timer = null;
 const showConnect = ref(false);
 const pairing = ref(false);
 const connectCmd = ref('');
+const runnerUrl = ref('');
 const connectCopied = ref(false);
 const connectErr = ref('');
 
@@ -80,7 +86,9 @@ const generatePairing = async () => {
     try {
         const body = (await apiRequest('post', `${BASE}/pair`, {}))?.data;
         if (body && body.status && body.data && body.data.code) {
-            connectCmd.value = `node scripts/dev-agent/dev-agent.js --pair ${body.data.code} --url ${window.location.origin}`;
+            const origin = window.location.origin;
+            runnerUrl.value = `${origin}/api/v2/dev-agent-runner.js`;
+            connectCmd.value = `node dev-agent.js --pair ${body.data.code} --url ${origin}`;
         } else {
             connectErr.value = (body && (body.statusText || body.message)) || 'Failed to generate a code';
         }
@@ -176,4 +184,8 @@ onBeforeUnmount(() => { if (timer) clearInterval(timer); });
 .dev-connect-cmd { display: flex; align-items: center; gap: 8px; margin-top: 10px; background: #fff; border: 1px solid #d7d9e6; border-radius: 6px; padding: 8px 10px; }
 .dev-connect-cmd code { flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #23305f; word-break: break-all; }
 .dev-btn-copy { background: #fff; color: #2f3a8f; border: 1px solid #cdd2e6; border-radius: 6px; padding: 5px 12px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.dev-connect-step { font-size: 13px; color: #3a3f52; margin-top: 10px; }
+.dev-connect-step a { color: #2f3a8f; }
+.dev-connect-note { font-size: 12px; color: #9aa0b4; line-height: 1.5; margin-top: 10px; }
+.dev-connect-note code { background: #eef0f6; padding: 1px 5px; border-radius: 4px; }
 </style>
