@@ -1,16 +1,18 @@
 # AlianHub AI dev-agent (runner)
 
-A lean, self-hosted runner that turns an **AlianHub task into a pull request** by
-driving **Claude Code**. The "agent" is just this script + Claude Code — Claude
-Code is the actual developer; the script fetches the task, runs it in the repo,
-and reports the PR back.
+The bridge between a task's **Development** chat in AlianHub and **Claude Code**
+on your machine. Open a task → **Development** tab → chat instructions (like
+talking to Claude). This runner picks them up, develops with Claude Code, opens
+a PR, and replies in the same chat — then iterates on your follow-up messages.
 
-It runs on **your machine** (where Claude Code, git and gh live) and talks to
-AlianHub over its existing REST API with a Personal API Token — nothing special
-is installed on the server.
+The "agent" is just this script + Claude Code (the actual developer). It talks
+to AlianHub over its REST API with a Personal API Token — nothing special runs
+on the server. It runs on **your machine**, where Claude Code, git and gh live.
 
 ```
-fetch task → resolve repo → branch → `claude -p` in the repo → commit → push → open PR → comment the PR link on the task
+Development chat  ──►  runner (poll)  ──►  Claude Code develops  ──►  push + PR  ──►  reply in the chat
+        ▲                                                                                    │
+        └──────────────────────────── you review / test / ask for changes ◄─────────────────┘
 ```
 
 ## Prerequisites (on this machine)
@@ -19,12 +21,13 @@ fetch task → resolve repo → branch → `claude -p` in the repo → commit �
 - **Claude Code CLI** (`claude`) — installed and logged in
 - **git**
 - **GitHub CLI** (`gh`) — authenticated (`gh auth login`)
-- The project's repo — **either** an existing local clone **or** a git URL the
-  agent can clone (see below). You don't have to clone it yourself.
+
+You do NOT need the repo cloned in advance — the agent clones a git URL on
+demand (or uses a local clone if you give it a path).
 
 ## Setup
 
-1. Copy the config template and fill it in (or use env vars instead):
+1. Copy the config template and fill it in (or use env vars):
    ```bash
    cp config.example.json config.json
    ```
@@ -33,69 +36,49 @@ fetch task → resolve repo → branch → `claude -p` in the repo → commit �
    | key | what |
    |-----|------|
    | `url` | your AlianHub URL, e.g. `http://localhost:4000` |
-   | `pat` | a Personal API Token (`ahp_…`) — create one in AlianHub → Settings → **API Tokens** (needs **write** scope) |
+   | `pat` | a Personal API Token (`ahp_…`) — create one in AlianHub → Settings → **API Tokens** (needs **read + write** scope) |
    | `companyId` | your company id (the 24-hex in the app URL) |
-   | `userId` | *(optional)* user id to attribute the PR comment to (later: the AI bot user) |
-   | `workspace` | *(optional)* folder where URL clones are stored (default `./workspace`) |
-   | `repos` | *(optional)* per-project repo map — see **Repo location** |
+   | `userId` | *(optional)* user id to attribute the agent's replies to |
+   | `workspace` | *(optional)* folder where git-URL clones are stored (default `./workspace`) |
+   | `repos` | *(optional)* fallback repo per project — `{ "<projectId|projectCode>": { gitUrl?, localPath?, base? } }` |
 
-   Or set `ALIANHUB_URL`, `ALIANHUB_PAT`, `ALIANHUB_COMPANY_ID`, `ALIANHUB_USER_ID`, `ALIANHUB_WORKSPACE` as environment variables.
-
-## Repo location (dynamic)
-
-You don't need the repo cloned in advance. The agent resolves it in this order:
-
-1. **Existing local clone** — if a `localPath` is given (and it's a git repo), it's used as-is.
-2. **Clone from URL** — otherwise a `gitUrl` is cloned into the `workspace`
-   (and reused + pulled on later runs).
-
-Configure it **once per project** in `config.json` `"repos"`, keyed by the
-project code (e.g. `UMM`) or the project id:
-
-```json
-"repos": {
-  "UMM":  { "gitUrl": "https://github.com/your-org/user-management.git", "base": "main" },
-  "PORTAL": { "localPath": "E:/repos/portal", "base": "staging" }
-}
-```
-
-Then you just run `--task <id>` and the agent picks the right repo. You can also
-override per-run on the CLI with `--repo` / `--git`.
+   Env equivalents: `ALIANHUB_URL`, `ALIANHUB_PAT`, `ALIANHUB_COMPANY_ID`, `ALIANHUB_USER_ID`, `ALIANHUB_WORKSPACE`.
 
 ## Run
 
+**Poll mode (recommended)** — start it once and leave it running; it watches
+every task's Development chat:
 ```bash
-# project already configured in "repos":
-node dev-agent.js --task <taskId>
-
-# or supply the repo directly for a one-off:
-node dev-agent.js --task <taskId> --repo "E:/repos/user-management"      # existing clone
-node dev-agent.js --task <taskId> --git  https://github.com/org/repo.git  # clone-from URL
+node dev-agent.js --poll [--interval 5000]
 ```
 
-- `--task` — the task's id (the 24-hex from the task URL/API)
-- `--repo` — path to an existing local clone (overrides config)
-- `--git` — a git URL to clone (overrides config)
-- `--base` — base branch to branch off and target the PR (default `main`)
+**One-shot (testing)** — develop a single task once from the CLI:
+```bash
+node dev-agent.js --task <taskId> --git https://github.com/org/repo.git --base main
+node dev-agent.js --task <taskId> --repo "E:/repos/my-project"
+```
 
-## What it does
+## How it works
 
-1. Fetches the task from AlianHub (title + description = the spec).
-2. Resolves the repo — existing local clone, or clone-from-URL into the workspace.
-3. Creates a fresh branch `ai/<task-key>` off the base.
-4. Runs `claude -p "<task spec>"` in the repo — Claude Code writes the code and runs tests.
-5. Commits the changes and pushes the branch.
-6. Opens a PR with `gh`.
-7. Posts the PR link back as a comment on the task.
+1. **You** open a task → **Development** tab → set the repository (git URL or a
+   local path + base branch) and type an instruction (e.g. "Implement this task").
+2. The runner (poll) picks up the instruction, resolves the repo (clones the URL
+   into the workspace, or uses your local clone), and creates/continues the
+   branch `ai/<task-key>`.
+3. It runs `claude -p "<task + your instruction>"` — Claude Code writes the code.
+4. It commits, pushes, and opens a PR (follow-up messages update the same PR).
+5. It replies in the Development chat: **✅ Done. PR: …**
+6. You test, then type the next change — the agent iterates on the same branch.
 
 ## Safety
 
 - Code execution happens **on your machine**, never on the AlianHub server.
 - Every change lands as a **PR you review and merge** — the agent never merges.
-- If Claude Code produces no changes, the runner stops without opening a PR.
+- The repository is chosen **per conversation** (temporary) — nothing is persisted.
+- If Claude Code produces no changes, the runner says so and opens no PR.
 
 ## Roadmap
 
-- **AI Bot user** — assign a task to a bot user in AlianHub instead of passing `--task` on the CLI.
-- **Poll mode** — the runner watches for tasks assigned to the bot (and approved) and develops them automatically.
-- **Repo binding in AlianHub** — store each project's repo (local path or URL) in the app UI, so config isn't hand-edited.
+- **Live updates** — the chat currently polls every few seconds; wire it to the
+  existing Socket.io pipeline for instant replies.
+- **AI Bot user** — assign a task to a bot user to auto-start a Development chat.
