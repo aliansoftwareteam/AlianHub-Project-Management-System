@@ -35,6 +35,20 @@ const os = require('os');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Node's fetch resolves `localhost` to IPv6 (::1) first on Windows, but many dev
+// servers bind IPv4 only → ECONNREFUSED (the browser silently tries both). Retry
+// once on 127.0.0.1 so a localhost URL just works.
+async function httpFetch(url, opts) {
+    try {
+        return await fetch(url, opts);
+    } catch (e) {
+        if (/^https?:\/\/localhost([:/]|$)/i.test(url)) {
+            return fetch(url.replace('//localhost', '//127.0.0.1'), opts);
+        }
+        throw e;
+    }
+}
+
 // ── config ──────────────────────────────────────────────────────────────
 function loadConfig() {
     const cfgPath = path.join(__dirname, 'config.json');
@@ -139,7 +153,7 @@ function run(cmd, cmdArgs, cwd, { capture = false, allowFail = false, input } = 
 async function api(cfg, method, endpoint, body) {
     let res;
     try {
-        res = await fetch(`${cfg.url}${endpoint}`, {
+        res = await httpFetch(`${cfg.url}${endpoint}`, {
             method,
             headers: {
                 'Content-Type': 'application/json',
@@ -383,7 +397,7 @@ async function pairAndSaveConfig(urlArg, code) {
     console.log(`\n🔗  Pairing with ${url} …`);
     let res;
     try {
-        res = await fetch(`${url}/api/v2/dev-pair`, {
+        res = await httpFetch(`${url}/api/v2/dev-pair`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ code }),
