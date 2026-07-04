@@ -86,6 +86,7 @@ const SCHEMA_TYPE = {
     AUTOMATION_RULES: "automation_rules",
     INTEGRATION_CONNECTIONS: "integration_connections",
     DEV_MESSAGES: "dev_messages",
+    DEV_PAIRINGS: "dev_pairings",
 }
 
 module.exports = {

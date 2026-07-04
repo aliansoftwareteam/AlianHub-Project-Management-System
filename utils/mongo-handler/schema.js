@@ -638,6 +638,15 @@ const schema = {
         parentId: { type: String, default: '', required: false },    // agent reply → the user message it answers
         userId: { type: String, default: '', required: false },
     },
+    // AI dev-agent → device pairing (short-lived, single-use). Stored in the
+    // GLOBAL db so the public exchange endpoint can resolve a code without a
+    // company context. Managed by Modules/DevAgent.
+    devPairings: {
+        code: { type: String, required: true },
+        companyId: { type: String, default: '', required: false },
+        userId: { type: String, default: '', required: false },
+        used: { type: Boolean, default: false, required: false },
+    },
     // Wiki pages (Editor.js blocks; versioned) — managed by Modules/Pages
     pages: {
         title: { type: String, required: true },

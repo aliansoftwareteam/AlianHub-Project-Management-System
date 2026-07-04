@@ -87,6 +87,7 @@ const dbCollections = {
     AUTOMATION_RULES: "automation_rules",
     INTEGRATION_CONNECTIONS: "integration_connections",
     DEV_MESSAGES: "dev_messages",
+    DEV_PAIRINGS: "dev_pairings",
 }
 
 /** DOCUMENT ID'S NAME WHICH IS USED IN THE "SETTINGS" COLLECTION NAME **/

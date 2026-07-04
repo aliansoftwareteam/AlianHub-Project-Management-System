@@ -1,6 +1,8 @@
+const crypto = require("crypto");
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const logger = require("../../Config/loggerConfig");
+const { generateToken, hashToken, tokenPrefixOf } = require("../ApiTokens/helpers/apiTokenRules");
 
 // AI dev-agent → per-task "Development" conversation. A simple chat thread:
 // the user gives instructions (like chatting with Claude), a local Claude Code
@@ -129,6 +131,60 @@ exports.postReply = async (req, res) => {
         return res.send({ status: true, statusText: 'Reply posted.', data: mask(saved) });
     } catch (error) {
         logger.error(`ERROR in dev-agent postReply: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+/* POST /api/v2/dev-agent/pair  (JWT) — the signed-in developer authorizes their
+   machine. Returns a short, single-use code; the runner exchanges it (public)
+   for a fresh PAT, so nothing has to be configured by hand. */
+exports.generatePairing = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'] || '';
+        const userId = String(req.uid || '');
+        if (!companyId || !userId) {
+            return res.send({ status: false, statusText: 'companyId and a signed-in user are required.' });
+        }
+        const code = `${crypto.randomBytes(2).toString('hex')}-${crypto.randomBytes(2).toString('hex')}`.toUpperCase();
+        await MongoDbCrudOpration('global', {
+            type: SCHEMA_TYPE.DEV_PAIRINGS,
+            data: { code, companyId, userId, used: false },
+        }, 'save');
+        return res.send({ status: true, statusText: 'Pairing code created.', data: { code } });
+    } catch (error) {
+        logger.error(`ERROR in dev-agent generatePairing: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+/* POST /api/v2/dev-pair  (PUBLIC) — the runner exchanges a pairing code for a
+   fresh PAT + its company/user. Single-use, expires in 15 minutes. The code is
+   an unguessable secret that only a signed-in user could have generated. */
+exports.exchangePairing = async (req, res) => {
+    try {
+        const code = String((req.body || {}).code || '').trim().toUpperCase();
+        if (!code) return res.send({ status: false, statusText: 'A pairing code is required.' });
+        const pairing = await MongoDbCrudOpration('global', {
+            type: SCHEMA_TYPE.DEV_PAIRINGS,
+            data: [{ code }],
+        }, 'findOne');
+        if (!pairing || pairing.used) return res.send({ status: false, statusText: 'Invalid or already-used code — generate a new one.' });
+        if (Date.now() - new Date(pairing.createdAt).getTime() > 15 * 60 * 1000) {
+            return res.send({ status: false, statusText: 'Code expired — generate a new one.' });
+        }
+        // Burn the code first (single-use), then mint the token.
+        await MongoDbCrudOpration('global', {
+            type: SCHEMA_TYPE.DEV_PAIRINGS,
+            data: [{ code }, { $set: { used: true } }, {}],
+        }, 'updateOne');
+        const rawToken = generateToken();
+        await MongoDbCrudOpration(pairing.companyId, {
+            type: SCHEMA_TYPE.API_TOKENS,
+            data: { name: 'dev-agent (paired)', tokenHash: hashToken(rawToken), prefix: tokenPrefixOf(rawToken), scopes: ['read', 'write'], userId: pairing.userId, active: true },
+        }, 'save');
+        return res.send({ status: true, statusText: 'Paired.', data: { companyId: pairing.companyId, userId: pairing.userId, token: rawToken } });
+    } catch (error) {
+        logger.error(`ERROR in dev-agent exchangePairing: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
 };
