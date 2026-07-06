@@ -90,11 +90,52 @@ exports.listPending = async (req, res) => {
         if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
         const rows = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.DEV_MESSAGES,
-            data: [{ role: 'user', status: 'pending' }, null, { sort: { createdAt: 1 }, limit: 20 }],
+            data: [{ role: 'user', $or: [{ status: 'pending' }, { status: 'working', updatedAt: { $lt: new Date(Date.now() - 4 * 60 * 1000) } }] }, null, { sort: { createdAt: 1 }, limit: 20 }],
         }, 'find');
         return res.send({ status: true, statusText: 'Pending fetched.', data: (rows || []).map(mask) });
     } catch (error) {
         logger.error(`ERROR in dev-agent listPending: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+/* POST /api/v2/dev-agent/claim  body: { messageId } — atomically claim a task so
+   two runners can't both process it. Grabs a 'pending' task, or a 'working' one
+   gone stale (its runner died — no heartbeat for a few minutes). */
+exports.claimMessage = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'] || '';
+        const messageId = String((req.body || {}).messageId || '').trim();
+        if (!companyId || !messageId) return res.send({ status: false, statusText: 'companyId and messageId are required.' });
+        const r = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.DEV_MESSAGES,
+            data: [
+                { _id: messageId, role: 'user', $or: [{ status: 'pending' }, { status: 'working', updatedAt: { $lt: new Date(Date.now() - 4 * 60 * 1000) } }] },
+                { $set: { status: 'working' } },
+                {},
+            ],
+        }, 'updateOne');
+        return res.send({ status: true, claimed: !!(r && r.matchedCount) });
+    } catch (error) {
+        logger.error(`ERROR in dev-agent claimMessage: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+/* POST /api/v2/dev-agent/heartbeat  body: { messageId } — keep-alive so a genuinely
+   long task isn't seen as stale and re-claimed by another runner. */
+exports.heartbeat = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'] || '';
+        const messageId = String((req.body || {}).messageId || '').trim();
+        if (!companyId || !messageId) return res.send({ status: false, statusText: 'companyId and messageId are required.' });
+        await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.DEV_MESSAGES,
+            data: [{ _id: messageId, role: 'user' }, { $set: { status: 'working' } }, {}],
+        }, 'updateOne');
+        return res.send({ status: true });
+    } catch (error) {
+        logger.error(`ERROR in dev-agent heartbeat: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
 };

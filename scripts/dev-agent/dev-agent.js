@@ -399,7 +399,15 @@ async function reply(cfg, msg, { status, text, prUrl }) {
 }
 
 async function handleMessage(cfg, msg) {
+    // Atomic claim so two runners can't both take the same task (also recovers a
+    // task whose previous runner died). Skip if another runner already has it.
+    try {
+        const c = await api(cfg, 'POST', '/api/v2/dev-agent/claim', { messageId: msg._id });
+        if (!c || !c.claimed) return;
+    } catch (e) { /* older backend without /claim — proceed best-effort */ }
     console.log(`\n▶  task ${msg.taskId}: "${String(msg.text).slice(0, 70)}"`);
+    // Keep-alive so a genuinely long task isn't re-claimed as stale by another runner.
+    const hb = setInterval(() => { api(cfg, 'POST', '/api/v2/dev-agent/heartbeat', { messageId: msg._id }).catch(() => {}); }, 60000);
     const working = await reply(cfg, msg, { status: 'working', text: '⚙️ Working on it…' });
     const workingId = working && working._id;
     // Throttled live progress — keep the "working" message showing the last few
@@ -436,6 +444,8 @@ async function handleMessage(cfg, msg) {
     } catch (e) {
         await reply(cfg, msg, { status: 'error', text: `⚠️ ${e.message}` });
         console.error(`  ✗ ${e.message}`);
+    } finally {
+        clearInterval(hb);
     }
 }
 
