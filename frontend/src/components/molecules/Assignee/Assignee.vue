@@ -62,6 +62,7 @@
 // PACKAGES
 import { defineComponent, defineProps, defineEmits, ref, computed ,inject} from "vue";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
+import { useAiBot, AI_BOT_EMAIL } from "@/composable/useAiBot";
 import { useStore } from 'vuex';
 
 // COMPONENTS
@@ -75,6 +76,7 @@ import { useI18n } from "vue-i18n";
 const {getUser, getTeam} = useGetterFunctions();
 const {makeUniqueId} = useCustomComposable();
 const { getters } = useStore();
+const { aiBotEnabled } = useAiBot(); // per-user AI Bot visibility (local, not in the DB)
 
 const addUserIcon = require("@/assets/images/svg/Assign_white.svg")
 const clientWidth = inject("$clientWidth");
@@ -153,7 +155,13 @@ const designations = computed(() => {
     return getters['settings/designations'];
 });
 const companyUsers = computed(() => {
-    return getters['settings/companyUsers'].filter(user => (user.isDelete === false || props.allowGhost));
+    return getters['settings/companyUsers'].filter((user) => {
+        if (!(user.isDelete === false || props.allowGhost)) return false;
+        // The AI Bot is a shared user; only show it in the picker for developers who
+        // turned it on (per-user, local). Everyone else never sees it here.
+        if (user.userEmail === AI_BOT_EMAIL && !aiBotEnabled.value) return false;
+        return true;
+    });
 });
 
 const detailedUsers = computed(() => {

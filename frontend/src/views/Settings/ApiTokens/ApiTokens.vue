@@ -5,13 +5,13 @@
             <div class="tok-head">
                 <div>
                     <h3 class="m-0">AI Bot developer</h3>
-                    <p class="tok-sub">Enable an assignable "AI Bot" user. Assign it to any task and the dev-agent auto-develops it (using the repo you last set in that task's Development tab) — through the same Development-chat pipeline. It stays out of the Members list; disable it any time to remove it from the assignee picker.</p>
+                    <p class="tok-sub">Enable an assignable "AI Bot" user. Assign it to any task and the dev-agent auto-develops it (using the repo you last set in that task's Development tab) — through the same Development-chat pipeline. Enabling shows it in <b>your</b> assignee picker only — other members won't see it, and it never appears in the Members list.</p>
                 </div>
             </div>
             <div class="tok-actions">
-                <button v-if="!botEnabled" class="tok-btn" :disabled="botLoading" @click="enableBot">{{ botLoading ? 'Enabling…' : 'Enable AI Bot' }}</button>
-                <button v-else class="tok-btn-del" :disabled="botLoading" @click="disableBot">{{ botLoading ? 'Disabling…' : 'Disable AI Bot' }}</button>
-                <span v-if="botEnabled && !botMsg" class="tok-msg ok">✓ Enabled — assignable on any task</span>
+                <button v-if="!aiBotEnabled" class="tok-btn" :disabled="botLoading" @click="enableBot">{{ botLoading ? 'Enabling…' : 'Enable AI Bot' }}</button>
+                <button v-else class="tok-btn-del" :disabled="botLoading" @click="disableBot">Disable AI Bot</button>
+                <span v-if="aiBotEnabled && !botMsg" class="tok-msg ok">✓ Enabled for you — assignable on tasks</span>
                 <span v-if="botMsg" class="tok-msg" :class="botMsgType">{{ botMsg }}</span>
             </div>
         </div>
@@ -83,6 +83,7 @@
 <script setup>
 import { ref, reactive, onMounted, inject } from 'vue';
 import { apiRequest } from '@/services';
+import { useAiBot } from '@/composable/useAiBot';
 
 const BASE = '/api/v2/api-tokens';
 const userIdRef = inject('$userId', ref(''));
@@ -98,7 +99,7 @@ const revoking = ref('');
 const msg = ref('');
 const msgType = ref('');
 const botLoading = ref(false);
-const botEnabled = ref(false);
+const { aiBotEnabled, setAiBotEnabled } = useAiBot(); // per-user, local (not in the DB)
 const botMsg = ref('');
 const botMsgType = ref('');
 
@@ -150,12 +151,15 @@ const revoke = async (t) => {
     } catch (e) { /* keep list */ } finally { revoking.value = ''; }
 };
 
+// Enabling is per-user + local: we flip a local flag so the bot shows in THIS
+// developer's picker only. The one server call just ensures the shared bot user
+// exists (idempotent) so task assignments resolve for everyone.
 const enableBot = async () => {
     if (botLoading.value) return;
     botLoading.value = true; botMsg.value = '';
     try {
         const body = (await apiRequest('post', '/api/v2/dev-agent/bot', {}))?.data;
-        if (body && body.status) { botEnabled.value = true; botMsg.value = 'AI Bot enabled — assign it to a task to auto-develop.'; botMsgType.value = 'ok'; }
+        if (body && body.status) { setAiBotEnabled(true); botMsg.value = 'AI Bot enabled for you — assign it to a task to auto-develop.'; botMsgType.value = 'ok'; }
         else { botMsg.value = (body && (body.statusText || body.message)) || 'Failed to enable'; botMsgType.value = 'err'; }
     } catch (e) {
         botMsg.value = (e && e.response && e.response.data && (e.response.data.statusText || e.response.data.message)) || (e && e.message) || 'Failed';
@@ -163,27 +167,13 @@ const enableBot = async () => {
     } finally { botLoading.value = false; }
 };
 
-const disableBot = async () => {
-    if (botLoading.value) return;
-    botLoading.value = true; botMsg.value = '';
-    try {
-        const body = (await apiRequest('delete', '/api/v2/dev-agent/bot'))?.data;
-        if (body && body.status) { botEnabled.value = false; botMsg.value = 'AI Bot disabled.'; botMsgType.value = 'ok'; }
-        else { botMsg.value = (body && (body.statusText || body.message)) || 'Failed to disable'; botMsgType.value = 'err'; }
-    } catch (e) {
-        botMsg.value = (e && e.response && e.response.data && (e.response.data.statusText || e.response.data.message)) || (e && e.message) || 'Failed';
-        botMsgType.value = 'err';
-    } finally { botLoading.value = false; }
+// Disabling is purely local — just hide it from THIS developer's picker.
+const disableBot = () => {
+    setAiBotEnabled(false);
+    botMsg.value = 'AI Bot hidden from your picker.'; botMsgType.value = 'ok';
 };
 
-const loadBotStatus = async () => {
-    try {
-        const body = (await apiRequest('get', '/api/v2/dev-agent/bot'))?.data;
-        botEnabled.value = !!(body && body.status && body.data && body.data.enabled);
-    } catch (e) { /* leave disabled */ }
-};
-
-onMounted(() => { loadTokens(); loadBotStatus(); });
+onMounted(loadTokens);
 </script>
 
 <style scoped>

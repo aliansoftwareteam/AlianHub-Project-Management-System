@@ -63,30 +63,10 @@ async function ensureBotUser(companyId) {
     return { botUserId, name: 'AI Bot' };
 }
 
-// Is the AI Bot currently enabled (assignable) in this company? Enabled === its
-// company_users membership exists and isn't soft-deleted.
-async function getBotStatus(companyId) {
-    const botUserId = await getBotUserId();
-    if (!botUserId) return { enabled: false };
-    const m = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMPANY_USERS, data: [{ userId: botUserId }] }, 'findOne');
-    return { enabled: !!(m && m.isDelete !== true) };
-}
-
-// Disable the bot: soft-delete its company_users membership so it drops out of the
-// assignee picker (Assignee.vue filters isDelete === false). Fully reversible via
-// ensureBotUser. The global user + its AssignCompany stay, so tasks already assigned
-// to the bot still resolve its name — nothing is hard-deleted.
-async function disableBotUser(companyId) {
-    const botUserId = await getBotUserId();
-    if (botUserId) {
-        await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.COMPANY_USERS,
-            data: [{ userId: botUserId }, { $set: { isDelete: true, status: 3 } }, {}],
-        }, 'updateOne');
-        removeCache(`company_users:${companyId}`);
-    }
-    return { botUserId: botUserId || '', enabled: false };
-}
+// Enable/disable is PER-USER and lives on the client (a local flag → the assignee
+// picker shows the bot only for developers who turned it on; see the frontend
+// composable useAiBot). Nothing per-user is stored here, so there is no server-side
+// disable — the shared membership just stays assignable-eligible (isDelete:false).
 
 // Enqueue a Development-chat instruction for a task (repo left blank → the runner
 // resolves it from its local config.repos).
@@ -113,4 +93,4 @@ async function onAssigneeAdded(companyId, addedUserId, taskData, projectData) {
     } catch (e) { logger.error(`ERROR in dev-agent onAssigneeAdded: ${e.message}`); }
 }
 
-module.exports = { BOT_EMAIL, getBotUserId, ensureBotUser, enqueueForTask, onAssigneeAdded, getBotStatus, disableBotUser };
+module.exports = { BOT_EMAIL, getBotUserId, ensureBotUser, enqueueForTask, onAssigneeAdded };

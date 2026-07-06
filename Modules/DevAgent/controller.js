@@ -273,35 +273,9 @@ exports.ensureBot = async (req, res) => {
         const companyId = req.headers['companyid'] || '';
         if (!companyId || !req.uid) return res.send({ status: false, statusText: 'companyId and a signed-in user are required.' });
         const info = await bot.ensureBotUser(companyId);
-        return res.send({ status: true, statusText: 'AI Bot is ready — assign it to a task to auto-develop.', data: { ...info, enabled: true } });
+        return res.send({ status: true, statusText: 'AI Bot is ready — assign it to a task to auto-develop.', data: info });
     } catch (error) {
         logger.error(`ERROR in dev-agent ensureBot: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
-    }
-};
-
-/* GET /api/v2/dev-agent/bot  (JWT) — is the AI Bot enabled (assignable) in this company? */
-exports.botStatus = async (req, res) => {
-    try {
-        const companyId = req.headers['companyid'] || '';
-        if (!companyId || !req.uid) return res.send({ status: false, statusText: 'companyId and a signed-in user are required.' });
-        const info = await bot.getBotStatus(companyId);
-        return res.send({ status: true, data: info });
-    } catch (error) {
-        logger.error(`ERROR in dev-agent botStatus: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
-    }
-};
-
-/* DELETE /api/v2/dev-agent/bot  (JWT) — disable the AI Bot (drops it from the assignee picker). */
-exports.disableBot = async (req, res) => {
-    try {
-        const companyId = req.headers['companyid'] || '';
-        if (!companyId || !req.uid) return res.send({ status: false, statusText: 'companyId and a signed-in user are required.' });
-        const info = await bot.disableBotUser(companyId);
-        return res.send({ status: true, statusText: 'AI Bot disabled — it no longer appears on the assignee picker.', data: info });
-    } catch (error) {
-        logger.error(`ERROR in dev-agent disableBot: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
 };

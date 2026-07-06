@@ -11,9 +11,7 @@ exports.init = (app) => {
     app.post('/api/v2/dev-agent/progress', ctrl.updateProgress); // runner live progress (PAT)
 
     // Device pairing — zero-config onboarding.
-    app.post('/api/v2/dev-agent/bot', ctrl.ensureBot);         // JWT: create/ensure (enable) the assignable AI Bot user
-    app.get('/api/v2/dev-agent/bot', ctrl.botStatus);          // JWT: is the AI Bot enabled?
-    app.delete('/api/v2/dev-agent/bot', ctrl.disableBot);      // JWT: disable the AI Bot (soft — drops it from the picker)
+    app.post('/api/v2/dev-agent/bot', ctrl.ensureBot);         // JWT: ensure the shared AI Bot user exists (per-user visibility is client-side)
     app.post('/api/v2/dev-agent/pair', ctrl.generatePairing);  // JWT: signed-in dev authorizes this machine
     app.post('/api/v2/dev-pair', ctrl.exchangePairing);        // PUBLIC: runner exchanges the code → fresh PAT
     app.get('/api/v2/dev-agent-runner.js', ctrl.serveRunner);  // PUBLIC: download the standalone runner
