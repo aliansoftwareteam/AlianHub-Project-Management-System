@@ -74,6 +74,14 @@ all new backend reads are companyId-scoped and read-only.
 | FLT-02 | Filter "Is Not" — shared | Task list / project filter using the same builder | "Is Not" works there too (applyFilter honours `:!=` → `$nin`); existing "Is" filters unchanged — no regression. | ⬜ |
 | FRC-02 | Free Resources — Assignee filter is person-level | Add filter Assignee **Is Not** X (and separately **Is** Y) on the Free Resources card | X is dropped from the list / only Y is kept — **and** every remaining row is still genuinely under threshold. Busy users never appear (their workload is NOT zeroed by the assignee filter). Non-assignee filter rows still scope tasks as before. | ✅ |
 | FRC-03 | Free Resources rules (unit) | `npx jest tests/free-resource-rules.test.js` | 17 green — assignee row split, include/exclude resolution (+team expansion), person-filter pass/drop, and the free/busy predicate (strict planned `<`, inclusive logged `<=`, busy-never-free). | ✅ |
+| EXP-01 | Export | Home header → gear (Dashboard options) → Export dashboard | Downloads `alianhub-dashboard-<date>.json` containing `{type:'alianhub-dashboard', version, cards:[…]}` — one entry per placed card with its componentId, config.cardData, position, filterData. | ⬜ |
+| EXP-02 | Export empty | Export with an empty dashboard | Toast "no cards to export"; no file. | ⬜ |
+| EXP-03 | Import replace | Gear → Import dashboard → pick an exported file → **Replace** | Confirm modal shows current vs incoming counts + Cancel/Merge/Replace. Replace swaps the dashboard for the file's cards+layout (DB `$set`); persists on reload. | ⬜ |
+| EXP-03b | Import merge | Import a file → **Merge (append)** | The file's cards are ADDED below the existing ones (existing kept; appended cards shifted past the current bottom, vertical-compact tidies gaps); combined set persists in DB; toast "N cards added". | ⬜ |
+| EXP-04 | Import cancel | Import → Cancel in the confirm modal | Nothing changes (no DB write). | ⬜ |
+| EXP-05 | Import invalid | Import a non-JSON / wrong-shape file | Toast "not a valid AlianHub dashboard export"; dashboard untouched. | ⬜ |
+| EXP-06 | Import sanitize | Import a file containing an unknown/foreign componentId | Unknown cards skipped (toast notes "N skipped"); only resolvable cards are added; uids regenerated so none collide. | ⬜ |
+| EXP-07 | Cross-user share | User A exports; user B imports the file | B's dashboard matches A's layout; A's dashboard is unaffected (share is file-based, receiver-initiated). | ⬜ |
 | REG-01 | Regression | Existing cards, add/edit/remove/drag, refresh icons | Behave as before; `GET /api/v1/cardcomponent` returns 32 cards; no JSON parse error; no console errors. | ⬜ |
 | REG-02 | Multi-tenant | Second company | On-leave rows/headcounts and drill-down lists show only that company's data. | ⬜ |
 
