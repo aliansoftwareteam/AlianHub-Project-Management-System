@@ -189,7 +189,7 @@ function activityLine(ev) {
         if (b && b.type === 'tool_use') {
             const inp = b.input || {};
             const file = String(inp.file_path || inp.path || inp.notebook_path || '').split(/[\\/]/).pop();
-            if (b.name === 'Bash') return `▶ ${String(inp.command || '').replace(/\s+/g, ' ').slice(0, 70)}`;
+            if (b.name === 'Bash') return `▶ ${String(inp.command || '').replace(/\s+/g, ' ').slice(0, 100)}`;
             if (/^(Edit|MultiEdit|Write|NotebookEdit)$/.test(b.name)) return `✏️ ${b.name} ${file}`;
             if (b.name === 'Read') return `👀 read ${file}`;
             if (b.name === 'Grep' || b.name === 'Glob') return `🔎 ${b.name} ${String(inp.pattern || '')}`.slice(0, 70);
@@ -197,7 +197,7 @@ function activityLine(ev) {
         }
     }
     const txt = blocks.filter((b) => b && b.type === 'text').map((b) => b.text).join(' ').replace(/\s+/g, ' ').trim();
-    return txt ? `💬 ${txt.slice(0, 80)}` : null;
+    return txt ? `💬 ${txt.slice(0, 120)}` : null;
 }
 
 // ── AlianHub REST (PAT auth) ──────────────────────────────────────────────
@@ -427,24 +427,42 @@ async function handleMessage(cfg, msg) {
     const hb = setInterval(() => { api(cfg, 'POST', '/api/v2/dev-agent/heartbeat', { messageId: msg._id }).catch(() => {}); }, 60000);
     const working = await reply(cfg, msg, { status: 'working', text: '⚙️ Working on it…' });
     const workingId = working && working._id;
-    // Throttled live progress — keep the "working" message showing the last few
-    // activities so the tab has a real-time view of what Claude Code is doing.
+    // Live progress — accumulate the FULL activity transcript on the "working"
+    // message so the Development tab shows the same step-by-step history as the
+    // terminal (not just the last few lines). Throttled to limit writes, with a
+    // guaranteed final flush so the tail of the log always lands (a fast task used
+    // to finish inside the throttle window and only ever show its first line).
     const activityLog = [];
+    const RENDER_LINES = 120; // recent steps rendered in the bubble
+    const KEEP_LINES = 220;   // steps retained in memory (bounds the message doc)
     let lastPost = 0;
     let progressWarned = false;
     const warnOnce = (m) => { if (!progressWarned) { progressWarned = true; console.log(`   (⚠ live progress not reaching the tab: ${m})`); } };
+    const renderProgress = (done) => {
+        const n = activityLog.length;
+        const shown = activityLog.slice(-RENDER_LINES);
+        const hidden = n - shown.length;
+        const header = done ? `🧾 Activity — ${n} step${n === 1 ? '' : 's'}` : `⚙️ Working… · ${n} step${n === 1 ? '' : 's'}`;
+        const more = hidden > 0 ? `  … (${hidden} earlier step${hidden === 1 ? '' : 's'})\n` : '';
+        return `${header}\n${more}${shown.map((l) => `• ${l}`).join('\n')}`;
+    };
+    const postProgress = (done) => {
+        if (!workingId) return Promise.resolve();
+        return api(cfg, 'POST', '/api/v2/dev-agent/progress', { messageId: workingId, text: renderProgress(done) })
+            .catch((e) => warnOnce(`${e.message} — restart the AlianHub backend so /api/v2/dev-agent/progress exists`));
+    };
     const onProgress = (line) => {
         console.log(`   ${line}`);
         if (!workingId) { warnOnce('no working-message id from the reply'); return; }
         activityLog.push(line);
-        while (activityLog.length > 6) activityLog.shift();
+        if (activityLog.length > KEEP_LINES) activityLog.splice(0, activityLog.length - KEEP_LINES);
         const now = Date.now();
-        if (now - lastPost < 2500) return;
+        if (now - lastPost < 2000) return; // throttle the live edits
         lastPost = now;
-        api(cfg, 'POST', '/api/v2/dev-agent/progress', {
-            messageId: workingId, text: `⚙️ Working…\n${activityLog.map((l) => `• ${l}`).join('\n')}`,
-        }).catch((e) => warnOnce(`${e.message} — restart the AlianHub backend so /api/v2/dev-agent/progress exists`));
+        postProgress(false);
     };
+    // Land the complete transcript at the end (covers lines the throttle skipped).
+    const flushProgress = () => postProgress(true);
     try {
         const task = await fetchTask(cfg, msg.taskId);
         const taskKey = task.TaskKey || msg.taskId;
@@ -470,6 +488,7 @@ async function handleMessage(cfg, msg) {
         await reply(cfg, msg, { status: 'error', text: `⚠️ ${e.message}` });
         console.error(`  ✗ ${e.message}`);
     } finally {
+        await flushProgress(); // ensure the full step-by-step log is visible in the tab
         clearInterval(hb);
     }
 }
