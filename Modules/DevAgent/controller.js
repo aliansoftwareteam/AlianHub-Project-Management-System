@@ -12,12 +12,6 @@ const { generateToken, hashToken, tokenPrefixOf } = require("../ApiTokens/helper
 // Ephemeral — the repo location travels on the conversation, nothing persisted
 // as a project binding. Company-scoped (company = the Mongo database).
 
-const actingUserId = (req) => {
-    if (req.uid) return String(req.uid);
-    const u = req.body && req.body.userData;
-    return u && (u.id || u._id) ? String(u.id || u._id) : '';
-};
-
 const mask = (d) => ({
     _id: d._id,
     taskId: d.taskId,
@@ -54,7 +48,7 @@ exports.postMessage = async (req, res) => {
             repo: String(b.repo || '').trim(),
             base: String(b.base || 'main').trim() || 'main',
             status: 'pending',
-            userId: actingUserId(req),
+            userId: String(req.uid || ''), // derive from the JWT/PAT, never the body
         };
         const saved = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.DEV_MESSAGES, data: doc }, 'save');
         return res.send({ status: true, statusText: 'Message sent.', data: mask(saved) });
@@ -129,9 +123,10 @@ exports.heartbeat = async (req, res) => {
         const companyId = req.headers['companyid'] || '';
         const messageId = String((req.body || {}).messageId || '').trim();
         if (!companyId || !messageId) return res.send({ status: false, statusText: 'companyId and messageId are required.' });
+        // Only touch a still-'working' task — never resurrect one already done/error.
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.DEV_MESSAGES,
-            data: [{ _id: messageId, role: 'user' }, { $set: { status: 'working' } }, {}],
+            data: [{ _id: messageId, role: 'user', status: 'working' }, { $set: { status: 'working' } }, {}],
         }, 'updateOne');
         return res.send({ status: true });
     } catch (error) {
@@ -154,10 +149,11 @@ exports.postReply = async (req, res) => {
         }
         const parentId = String(b.parentId || '').trim();
         const parentStatus = String(b.status || '').trim();
-        if (parentId && parentStatus) {
+        // Only a valid status, and only on the matching user message of THIS task.
+        if (parentId && ['working', 'done', 'error'].includes(parentStatus)) {
             await MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.DEV_MESSAGES,
-                data: [{ _id: parentId }, { $set: { status: parentStatus } }, {}],
+                data: [{ _id: parentId, taskId, role: 'user' }, { $set: { status: parentStatus } }, {}],
             }, 'updateOne');
         }
         const doc = {
@@ -186,9 +182,10 @@ exports.updateProgress = async (req, res) => {
         const b = req.body || {};
         const messageId = String(b.messageId || '').trim();
         if (!companyId || !messageId) return res.send({ status: false, statusText: 'companyId and messageId are required.' });
+        // Progress only ever updates the agent's own 'working' message.
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.DEV_MESSAGES,
-            data: [{ _id: messageId }, { $set: { text: String(b.text || '') } }, {}],
+            data: [{ _id: messageId, role: 'agent' }, { $set: { text: String(b.text || '') } }, {}],
         }, 'updateOne');
         return res.send({ status: true });
     } catch (error) {
@@ -207,7 +204,7 @@ exports.generatePairing = async (req, res) => {
         if (!companyId || !userId) {
             return res.send({ status: false, statusText: 'companyId and a signed-in user are required.' });
         }
-        const code = `${crypto.randomBytes(2).toString('hex')}-${crypto.randomBytes(2).toString('hex')}`.toUpperCase();
+        const code = crypto.randomBytes(16).toString('hex').toUpperCase(); // 128-bit, unguessable
         await MongoDbCrudOpration('global', {
             type: SCHEMA_TYPE.DEV_PAIRINGS,
             data: { code, companyId, userId, used: false },
@@ -234,11 +231,12 @@ exports.exchangePairing = async (req, res) => {
         if (Date.now() - new Date(pairing.createdAt).getTime() > 15 * 60 * 1000) {
             return res.send({ status: false, statusText: 'Code expired — generate a new one.' });
         }
-        // Burn the code first (single-use), then mint the token.
-        await MongoDbCrudOpration('global', {
+        // Atomically burn the code (single-use). Mint only if THIS request won the race.
+        const burn = await MongoDbCrudOpration('global', {
             type: SCHEMA_TYPE.DEV_PAIRINGS,
-            data: [{ code }, { $set: { used: true } }, {}],
+            data: [{ code, used: false }, { $set: { used: true } }, {}],
         }, 'updateOne');
+        if (!burn || !burn.matchedCount) return res.send({ status: false, statusText: 'Code already used — generate a new one.' });
         const rawToken = generateToken();
         await MongoDbCrudOpration(pairing.companyId, {
             type: SCHEMA_TYPE.API_TOKENS,

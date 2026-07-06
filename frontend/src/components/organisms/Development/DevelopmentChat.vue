@@ -101,7 +101,8 @@ const generatePairing = async () => {
 };
 
 const copyConnect = async () => {
-    try { await navigator.clipboard.writeText(connectCmd.value); connectCopied.value = true; setTimeout(() => { connectCopied.value = false; }, 2000); } catch (e) { /* select manually */ }
+    try { await navigator.clipboard.writeText(connectCmd.value); connectCopied.value = true; setTimeout(() => { connectCopied.value = false; }, 2000); }
+    catch (e) { connectErr.value = 'Copy failed (clipboard needs HTTPS) — select the command above and copy it manually.'; }
 };
 
 const statusLabel = (s) => ({ pending: '⏳ queued', working: '⚙️ working…', done: '✓ done', error: '⚠️ error' }[s] || s);
@@ -126,14 +127,19 @@ const load = async (initial) => {
     try {
         const body = (await apiRequest('get', `${BASE}/messages?taskId=${encodeURIComponent(props.taskId)}`))?.data;
         const rows = (body && body.status && Array.isArray(body.data)) ? body.data : [];
-        const grew = rows.length > messages.value.length;
+        const prev = messages.value;
+        const prevTail = prev[prev.length - 1];
+        const newTail = rows[rows.length - 1];
+        // follow the conversation when a row is added OR the tail's text changed
+        // (live progress edits the "working" message in place — no new row).
+        const changed = rows.length !== prev.length || (!!newTail && !!prevTail && (newTail._id !== prevTail._id || newTail.text !== prevTail.text));
         messages.value = rows;
-        // seed the repo field from the newest message that carried one
-        if (!repo.value) {
+        // seed the repo field ONCE (first load), so a later poll can't re-fill it while the user edits.
+        if (initial && !repo.value) {
             const withRepo = [...rows].reverse().find((r) => r.repo);
             if (withRepo) { repo.value = withRepo.repo; base.value = withRepo.base || 'main'; }
         }
-        if (grew || initial) scrollDown();
+        if (changed || initial) scrollDown();
     } catch (e) { /* keep showing what we have */ } finally { if (initial) loading.value = false; }
 };
 

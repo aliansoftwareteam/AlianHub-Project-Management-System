@@ -42,7 +42,10 @@ async function httpFetch(url, opts) {
     try {
         return await fetch(url, opts);
     } catch (e) {
-        if (/^https?:\/\/localhost([:/]|$)/i.test(url)) {
+        // Only fall back for a genuine "nothing listened" (localhost → ::1 refused).
+        // Never retry a post-send failure — it would re-send a non-idempotent POST.
+        const code = e && e.cause && e.cause.code;
+        if ((code === 'ECONNREFUSED' || code === 'ENOTFOUND') && /^https?:\/\/localhost([:/]|$)/i.test(url)) {
             return fetch(url.replace('//localhost', '//127.0.0.1'), opts);
         }
         throw e;
@@ -153,12 +156,15 @@ function run(cmd, cmdArgs, cwd, { capture = false, allowFail = false, input } = 
 // activity feed. Resolves on success, rejects on non-zero exit. `onEvent` gets
 // each parsed stream-json event (system / assistant / tool_use / result).
 function runClaude(cfg, dir, prompt, onEvent) {
+    const TIMEOUT_MS = 30 * 60 * 1000; // watchdog: a hung Claude must not wedge the poller forever
     return new Promise((resolve, reject) => {
         const { exe, viaCmd } = resolveExe(cfg.claudeBin);
         const file = viaCmd ? (process.env.ComSpec || 'cmd.exe') : exe;
         const claudeArgs = ['-p', '--dangerously-skip-permissions', '--output-format', 'stream-json', '--verbose'];
         const child = spawn(file, viaCmd ? ['/d', '/c', exe, ...claudeArgs] : claudeArgs, { cwd: dir, shell: false, windowsHide: true });
-        let stderr = ''; let buf = '';
+        let stderr = ''; let buf = ''; let settled = false;
+        const finish = (err) => { if (settled) return; settled = true; clearTimeout(timer); if (err) reject(err); else resolve(); };
+        const timer = setTimeout(() => { try { child.kill(); } catch (e) { /* ignore */ } finish(new Error(`claude timed out after ${TIMEOUT_MS / 60000} min`)); }, TIMEOUT_MS);
         child.stdout.on('data', (chunk) => {
             buf += chunk.toString();
             let nl;
@@ -168,13 +174,10 @@ function runClaude(cfg, dir, prompt, onEvent) {
             }
         });
         child.stderr.on('data', (c) => { stderr += c.toString(); });
-        child.on('error', reject);
-        child.on('close', (code) => {
-            if (code === 0) resolve();
-            else reject(new Error(`claude exited ${code}${stderr ? `\n${stderr.trim().slice(0, 300)}` : ''}`));
-        });
-        child.stdin.write(prompt);
-        child.stdin.end();
+        child.on('error', finish);
+        child.stdin.on('error', () => {}); // ignore EPIPE if the child already exited (else it throws + kills the runner)
+        child.on('close', (code) => finish(code === 0 ? null : new Error(`claude exited ${code}${stderr ? `\n${stderr.trim().slice(0, 300)}` : ''}`)));
+        try { child.stdin.write(prompt); child.stdin.end(); } catch (e) { /* 'error'/'close' will settle */ }
     });
 }
 
@@ -316,7 +319,12 @@ function ensureTrusted(dir) {
             if (!j.projects[key] || typeof j.projects[key] !== 'object') j.projects[key] = {};
             if (j.projects[key].hasTrustDialogAccepted !== true) { j.projects[key].hasTrustDialogAccepted = true; changed = true; }
         }
-        if (changed) { fs.writeFileSync(cfgFile, JSON.stringify(j, null, 2)); console.log(`🔓  Trusted workspace: ${abs}`); }
+        if (changed) {
+            const tmp = `${cfgFile}.dev-agent.tmp`;
+            fs.writeFileSync(tmp, JSON.stringify(j, null, 2));
+            fs.renameSync(tmp, cfgFile); // atomic — never leave a truncated ~/.claude.json
+            console.log(`🔓  Trusted workspace: ${abs}`);
+        }
     } catch (e) { console.log(`  (couldn't pre-trust ${dir}: ${e.message})`); }
 }
 
@@ -332,6 +340,10 @@ async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, descri
         const branch = `ai/${slug(taskKey)}`;
         console.log(`\n🌿  ${dir}\n    ${taskKey} → branch "${branch}" (base "${base}")`);
         run('git', ['fetch', 'origin'], dir, { allowFail: true });
+        // Never sweep the developer's uncommitted work into the AI's branch/PR.
+        if (run('git', ['status', '--porcelain'], dir, { capture: true, allowFail: true })) {
+            throw new Error('the repo has uncommitted changes — commit or stash them first, then resend.');
+        }
         const remoteBranch = run('git', ['rev-parse', '--verify', '--quiet', `origin/${branch}`], dir, { capture: true, allowFail: true });
         if (remoteBranch) {
             run('git', ['checkout', '-B', branch, `origin/${branch}`], dir); // continue prior work
@@ -404,7 +416,12 @@ async function handleMessage(cfg, msg) {
     try {
         const c = await api(cfg, 'POST', '/api/v2/dev-agent/claim', { messageId: msg._id });
         if (!c || !c.claimed) return;
-    } catch (e) { /* older backend without /claim — proceed best-effort */ }
+    } catch (e) {
+        // 404 = older backend without /claim → proceed best-effort. Any other error
+        // (500 / network / already-claimed) → skip, so we never double-process a task
+        // the backend may have handed to another runner.
+        if (!/→\s*404/.test(e.message || '')) return;
+    }
     console.log(`\n▶  task ${msg.taskId}: "${String(msg.text).slice(0, 70)}"`);
     // Keep-alive so a genuinely long task isn't re-claimed as stale by another runner.
     const hb = setInterval(() => { api(cfg, 'POST', '/api/v2/dev-agent/heartbeat', { messageId: msg._id }).catch(() => {}); }, 60000);
@@ -493,7 +510,7 @@ async function pairAndSaveConfig(urlArg, code) {
     const existing = fs.existsSync(cfgPath) ? JSON.parse(fs.readFileSync(cfgPath, 'utf8')) : {};
     fs.writeFileSync(cfgPath, JSON.stringify({
         ...existing, url, pat: body.data.token, companyId: body.data.companyId, userId: body.data.userId || '',
-    }, null, 2));
+    }, null, 2), { mode: 0o600 }); // contains the PAT — restrict perms
     console.log(`✅  Paired — saved ${cfgPath}. Watching for Development-chat tasks…`);
 }
 
