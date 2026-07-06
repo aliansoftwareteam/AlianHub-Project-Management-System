@@ -268,7 +268,7 @@ function resolveWorkdir(cfg, projectId, projectCode, args) {
         }
         return { dir, base, pushable: true };
     }
-    throw new Error('No repository or folder given. In the Development tab, enter a git URL or a local folder path.');
+    throw new Error('No repository set for this task — set it once in the Development tab (send a message with the repo), or add the project to config.json "repos".');
 }
 
 async function fetchTask(cfg, taskId) {
@@ -449,6 +449,14 @@ async function handleMessage(cfg, msg) {
         const task = await fetchTask(cfg, msg.taskId);
         const taskKey = task.TaskKey || msg.taskId;
         const projectCode = taskKey.includes('-') ? taskKey.split('-')[0] : '';
+        // A bot-assigned job carries no repo — inherit the task's last-used repo (set in the Development tab).
+        if (!String(msg.repo || '').trim()) {
+            try {
+                const hist = await api(cfg, 'GET', `/api/v2/dev-agent/messages?taskId=${encodeURIComponent(msg.taskId)}`);
+                const withRepo = [...((hist && hist.data) || [])].reverse().find((m) => m.repo);
+                if (withRepo) { msg.repo = withRepo.repo; msg.base = withRepo.base || msg.base; }
+            } catch (e) { /* fall back to config.repos */ }
+        }
         const { dir, base, pushable } = resolveWorkdir(cfg, String(task.ProjectID || ''), projectCode, repoArgsFromLocation(msg.repo, msg.base));
         onProgress(`📁 ${pushable ? 'repository' : 'local folder'}: ${dir}`); // immediate first update so the tab changes right away
         const { prUrl, note } = await developTurn(cfg, {
