@@ -71,6 +71,19 @@ node dev-agent.js --task <taskId> --repo "E:/repos/my-project"
 5. It replies in the Development chat: **✅ Done. PR: …**
 6. You test, then type the next change — the agent iterates on the same branch.
 
+## AI Bot — assign a task to auto-develop
+
+Instead of chatting, you can let a task develop itself. In AlianHub → **Settings →
+API Tokens → Enable AI Bot**, then **assign the "AI Bot" user** to any task. That
+auto-enqueues a Development job (the task's title + description become the
+instruction) and this runner develops it exactly like a chat turn, replying on
+the task's Development tab with the PR.
+
+Nothing repo-related is stored in AlianHub, so for the bot flow the runner takes
+the repo from its local **`config.json` `repos`** map (keyed by project code or
+id). If the task's project isn't configured there, the agent replies with a clear
+"no repository" message — set it in `repos` and re-assign.
+
 ## Shared task memory
 
 The agent keeps a per-task log at **`.alianhub/tasks/<TaskKey>.md`** inside the
