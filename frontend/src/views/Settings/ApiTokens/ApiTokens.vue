@@ -5,7 +5,7 @@
             <div class="tok-head">
                 <div>
                     <h3 class="m-0">AI Bot developer</h3>
-                    <p class="tok-sub">Enable an assignable "AI Bot" user. Assign it to any task and the dev-agent auto-develops it (using the repo you last set in that task's Development tab) — through the same Development-chat pipeline. Disable it any time to remove it from the assignee picker.</p>
+                    <p class="tok-sub">Enable an assignable "AI Bot" user. Assign it to any task and the dev-agent auto-develops it (using the repo you last set in that task's Development tab) — through the same Development-chat pipeline. It stays out of the Members list; disable it any time to remove it from the assignee picker.</p>
                 </div>
             </div>
             <div class="tok-actions">

@@ -4,7 +4,9 @@ const { removeCache } = require("../../utils/commonFunctions");
 const logger = require("../../Config/loggerConfig");
 
 // The "AI Bot" is a normal global user with a fixed email, made assignable in a
-// company via a company_users membership. Assigning it to a task enqueues a
+// company via a company_users membership (marked status:3 — hidden from the Members
+// list, which filters status !== 3, but still assignable in the task picker, which
+// filters only isDelete === false). Assigning it to a task enqueues a
 // Development-chat job (see the hook in Tasks/helpers/taskMongo/updateAssignment.js),
 // which the same runner pipeline (pending → claim → develop → reply) then handles.
 // The repo comes from the runner's local config.repos — nothing is persisted here.
@@ -39,21 +41,25 @@ async function ensureBotUser(companyId) {
     const botUserId = String(u._id);
     cachedBotId = botUserId;
 
+    // The bot needs a company_users membership to be assignable (the task assignee
+    // picker is company_users-driven — a store-only user can't appear in it). We keep
+    // it OUT of the Members module by marking it status:3 — the Members list filters
+    // status !== 3, while the assignee picker filters only isDelete === false. So:
+    // status:3 = hidden from Members (always); isDelete = the enable/disable toggle.
     const existing = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMPANY_USERS, data: [{ userId: botUserId }] }, 'findOne');
     if (!existing) {
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.COMPANY_USERS,
-            data: { companyId: String(companyId), userId: botUserId, userEmail: BOT_EMAIL, roleType: 3, status: 2, designation: 0, isDelete: false },
+            data: { companyId: String(companyId), userId: botUserId, userEmail: BOT_EMAIL, roleType: 3, status: 3, designation: 0, isDelete: false },
         }, 'save');
-        removeCache(`company_users:${companyId}`); // so the assignee picker shows it right away
-    } else if (existing.isDelete === true) {
-        // Re-enable a previously disabled bot (the assignee picker filters isDelete === false).
+    } else {
+        // (Re)enable + keep it hidden from Members (also migrates an older status:2 row).
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.COMPANY_USERS,
-            data: [{ userId: botUserId }, { $set: { isDelete: false, status: 2 } }, {}],
+            data: [{ userId: botUserId }, { $set: { isDelete: false, status: 3 } }, {}],
         }, 'updateOne');
-        removeCache(`company_users:${companyId}`);
     }
+    removeCache(`company_users:${companyId}`); // refresh the assignee picker right away
     return { botUserId, name: 'AI Bot' };
 }
 
@@ -75,7 +81,7 @@ async function disableBotUser(companyId) {
     if (botUserId) {
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.COMPANY_USERS,
-            data: [{ userId: botUserId }, { $set: { isDelete: true } }, {}],
+            data: [{ userId: botUserId }, { $set: { isDelete: true, status: 3 } }, {}],
         }, 'updateOne');
         removeCache(`company_users:${companyId}`);
     }
