@@ -46,8 +46,40 @@ async function ensureBotUser(companyId) {
             data: { companyId: String(companyId), userId: botUserId, userEmail: BOT_EMAIL, roleType: 3, status: 2, designation: 0, isDelete: false },
         }, 'save');
         removeCache(`company_users:${companyId}`); // so the assignee picker shows it right away
+    } else if (existing.isDelete === true) {
+        // Re-enable a previously disabled bot (the assignee picker filters isDelete === false).
+        await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.COMPANY_USERS,
+            data: [{ userId: botUserId }, { $set: { isDelete: false, status: 2 } }, {}],
+        }, 'updateOne');
+        removeCache(`company_users:${companyId}`);
     }
     return { botUserId, name: 'AI Bot' };
+}
+
+// Is the AI Bot currently enabled (assignable) in this company? Enabled === its
+// company_users membership exists and isn't soft-deleted.
+async function getBotStatus(companyId) {
+    const botUserId = await getBotUserId();
+    if (!botUserId) return { enabled: false };
+    const m = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMPANY_USERS, data: [{ userId: botUserId }] }, 'findOne');
+    return { enabled: !!(m && m.isDelete !== true) };
+}
+
+// Disable the bot: soft-delete its company_users membership so it drops out of the
+// assignee picker (Assignee.vue filters isDelete === false). Fully reversible via
+// ensureBotUser. The global user + its AssignCompany stay, so tasks already assigned
+// to the bot still resolve its name — nothing is hard-deleted.
+async function disableBotUser(companyId) {
+    const botUserId = await getBotUserId();
+    if (botUserId) {
+        await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.COMPANY_USERS,
+            data: [{ userId: botUserId }, { $set: { isDelete: true } }, {}],
+        }, 'updateOne');
+        removeCache(`company_users:${companyId}`);
+    }
+    return { botUserId: botUserId || '', enabled: false };
 }
 
 // Enqueue a Development-chat instruction for a task (repo left blank → the runner
@@ -75,4 +107,4 @@ async function onAssigneeAdded(companyId, addedUserId, taskData, projectData) {
     } catch (e) { logger.error(`ERROR in dev-agent onAssigneeAdded: ${e.message}`); }
 }
 
-module.exports = { BOT_EMAIL, getBotUserId, ensureBotUser, enqueueForTask, onAssigneeAdded };
+module.exports = { BOT_EMAIL, getBotUserId, ensureBotUser, enqueueForTask, onAssigneeAdded, getBotStatus, disableBotUser };
