@@ -479,7 +479,7 @@ async function handleMessage(cfg, msg) {
         onProgress(`📁 ${pushable ? 'repository' : 'local folder'}: ${dir}`); // immediate first update so the tab changes right away
         const { prUrl, note } = await developTurn(cfg, {
             dir, base, pushable, taskKey, taskName: task.TaskName || '(untitled task)',
-            description: task.description || task.rawDescription || '', instruction: msg.text,
+            description: task.description || task.rawDescription || '', instruction: msg.text, onProgress,
         });
         const text = prUrl ? `✅ Done. PR: ${prUrl}` : `✅ ${note || 'Done.'}`;
         await reply(cfg, msg, { status: 'done', text, prUrl });
