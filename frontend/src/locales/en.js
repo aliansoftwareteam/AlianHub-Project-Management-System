@@ -1735,6 +1735,7 @@ export default {
         "Two-Factor Authentication": "Two-Factor Authentication",
         "Integrations": "Integrations",
         "API Tokens": "API Tokens",
+        "AI Developer": "AI Developer",
     },
     Sso: {
         title: "Single Sign-On (SSO)",

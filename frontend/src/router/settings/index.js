@@ -133,7 +133,7 @@ export default [
                 path: "api-tokens",
                 name: "ApiTokens",
                 meta: {
-                    title: "API Tokens",
+                    title: "AI Developer",
                     requiresAuth: true
                 },
                 component: () => import(/* webpackChunkName: ApiTokens */ '@/views/Settings/ApiTokens/ApiTokens.vue')
