@@ -9,7 +9,19 @@
                 <button class="text-capitalize outline-primary mr-10-px d-flex align-items-center" @click="toggleDashboardLock()">
                     <img :src="companyUser.dashboardLocked ? unlockImage : lockImage" alt="lock" class="mr-5px" />{{ companyUser.dashboardLocked ? $t('Home.unlock') : $t('Home.lock') }}
                 </button>
-                <button class="text-capitalize outline-primary" @click="addItem">{{ $t(`dashboardCard.add_card`) }}</button>
+                <button class="text-capitalize outline-primary mr-10-px" @click="addItem">{{ $t(`dashboardCard.add_card`) }}</button>
+                <div class="position-re dashboard__settings">
+                    <button class="outline-primary dashboard__settings-btn" :title="$t('dashboardCard.dashboard_settings')" @click.stop="dashMenuOpen = !dashMenuOpen">
+                        <img :src="settingIcon" alt="settings" />
+                    </button>
+                    <template v-if="dashMenuOpen">
+                        <div class="dashboard__settings-overlay" @click="dashMenuOpen = false"></div>
+                        <div class="dashboard__settings-menu">
+                            <div class="dashboard__settings-item" @click="onExportDashboard">{{ $t('dashboardCard.export_dashboard') }}</div>
+                            <div class="dashboard__settings-item" @click="onImportDashboard">{{ $t('dashboardCard.import_dashboard') }}</div>
+                        </div>
+                    </template>
+                </div>
             </div>
         </div>
         <div class="d-flex main_component-wrapper" :class="[{'flex-column' : clientWidth <= 991}]">
@@ -66,6 +78,7 @@ const projectsGetter = computed(() => getters["projectData/onlyActiveProjects"])
 const accessDeniedImage = require("@/assets/images/access_denied_img.png");
 const lockImage = require("@/assets/images/lock.png");
 const unlockImage = require("@/assets/images/unlock.png");
+const settingIcon = require("@/assets/images/svg/Setting_icon.svg");
 
 const userId = inject("$userId");
 const companyId = inject("$companyId");
@@ -297,6 +310,16 @@ const addItem = () => {
     myRefsss.value.handleToggle();
 };
 
+const dashMenuOpen = ref(false);
+const onExportDashboard = () => {
+    dashMenuOpen.value = false;
+    myRefsss.value.exportDashboard();
+};
+const onImportDashboard = () => {
+    dashMenuOpen.value = false;
+    myRefsss.value.triggerImport();
+};
+
 const dragFunction = (value) => {
     isDrag.value = value;
 }
@@ -312,4 +335,32 @@ provide('showLoader', ref(false));
 provide('progress', ref(0));
 </script>
 <style scoped src="../css/style.css">
+</style>
+<style scoped>
+.dashboard__settings { display: inline-block; }
+.dashboard__settings-btn { display: inline-flex; align-items: center; justify-content: center; padding: 6px 8px; }
+.dashboard__settings-btn img { height: 16px; width: 16px; }
+.dashboard__settings-overlay { position: fixed; inset: 0; z-index: 20; }
+.dashboard__settings-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    z-index: 21;
+    min-width: 180px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+    padding: 4px;
+    overflow: hidden;
+}
+.dashboard__settings-item {
+    padding: 8px 12px;
+    font-size: 13px;
+    color: #3a3f52;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.dashboard__settings-item:hover { background: #f5f7fb; color: #2F3990; }
 </style>
