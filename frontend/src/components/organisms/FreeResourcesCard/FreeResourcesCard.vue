@@ -42,6 +42,7 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { teamIdToUserId, buildFilterQuery } from '@/composable/commonFunction';
 import { resolveIsoRange, formatMinutes } from '@/composable/useResourceWorkload';
+import { resolveAssigneeFilter, passesAssigneeFilter, isFree } from '@/composable/freeResourceRules';
 import CardSkeleton from '@/components/atom/CardSkeleton/CardSkeleton.vue';
 
 // Resource Utilization card #7 — "Free or in-training resources".
@@ -67,6 +68,15 @@ const { getters } = useStore();
 const employees = ref([]);
 const loading = ref(false);
 
+const filterRows = () => (Array.isArray(props.filterData) ? props.filterData : Object.values(props.filterData || {}))
+    .filter((r) => r && r.name && r.comparisonsData && r.comparisonsData.length);
+
+// Assignee is a PERSON filter here, not a task filter: as a task filter it
+// would zero co-assignees' workload and mark busy people free.
+const isAssigneeRow = (r) => r.name.value === 'AssigneeUserId';
+const assigneeUserFilter = computed(() =>
+    resolveAssigneeFilter(filterRows(), (ids) => teamIdToUserId(ids, getters['settings/teams'] || [])));
+
 // Planned threshold: free when planned hours fall UNDER this (default 3h).
 const thresholdHours = computed(() => {
     // Explicit 0 is a valid threshold — only fall back to 3 when it's unset.
@@ -80,17 +90,14 @@ const loggedThresholdHours = computed(() => Number(props.cardData?.loggedThresho
 const loggedThresholdMin = computed(() => loggedThresholdHours.value * 60);
 
 const freeRows = computed(() => {
+    const filter = assigneeUserFilter.value;
     return (employees.value || [])
         .filter((e) => !(e.onLeave && e.onLeave.approved))
+        .filter((e) => passesAssigneeFilter(e._id, filter))
         .map((e) => {
             const planned = Number(e.plannedMinutes) || 0;
             const logged = Number(e.loggedMinutes) || 0;
-            const underPlanned = planned < thresholdMin.value;
-            const underLogged = logged <= loggedThresholdMin.value;
-            // Free ONLY when BOTH are true — the user has neither meaningful
-            // planned work nor logged work. Having either one drops them off
-            // the list.
-            const free = underPlanned && underLogged;
+            const free = isFree(planned, logged, thresholdMin.value, loggedThresholdMin.value);
             const plannedPart = planned === 0 ? 'no plan' : `under ${thresholdHours.value}h planned`;
             const loggedPart = loggedThresholdMin.value === 0 ? 'nothing logged' : `≤ ${loggedThresholdHours.value}h logged`;
             const reason = free ? `${plannedPart} · ${loggedPart}` : '';
@@ -115,9 +122,9 @@ const load = async () => {
             currentOnly: false,
             callerUserId: userId && userId.value ? String(userId.value) : '',
             callerRoleType: props.companyUserDetail?.roleType || 3,
-            // Advanced "Add filter" builder → task-field match (buildFilterQuery).
+            // Assignee rows are handled at the person level, so exclude them here.
             taskMatch: (() => {
-                const fd = Array.isArray(props.filterData) ? props.filterData : Object.values(props.filterData || {});
+                const fd = filterRows().filter((r) => !isAssigneeRow(r));
                 return fd.length ? buildFilterQuery(fd, userId && userId.value ? String(userId.value) : '') : null;
             })(),
         };
