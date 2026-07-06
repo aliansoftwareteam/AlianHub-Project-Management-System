@@ -30,6 +30,20 @@ describe('🔔 TIME REMINDERS - Rules', () => {
             expect(usersNeedingReminder({})).toEqual([]);
             expect(usersNeedingReminder()).toEqual([]);
         });
+        test('restricts to allowedUserIds when provided', () => {
+            const r = usersNeedingReminder({ users: USERS, loggedUserIds: [], allowedUserIds: ['u2'] });
+            expect(r.map((u) => u._id)).toEqual(['u2']); // u1 not selected, u3 has no email
+        });
+        test('empty allowedUserIds reminds no one', () => {
+            expect(usersNeedingReminder({ users: USERS, loggedUserIds: [], allowedUserIds: [] })).toEqual([]);
+        });
+        test('null/absent allowedUserIds keeps legacy everyone behaviour', () => {
+            expect(usersNeedingReminder({ users: USERS, loggedUserIds: [], allowedUserIds: null }).map((u) => u._id)).toEqual(['u1', 'u2']);
+        });
+        test('allowed but already-logged users are still excluded', () => {
+            const r = usersNeedingReminder({ users: USERS, loggedUserIds: ['u2'], allowedUserIds: ['u1', 'u2'] });
+            expect(r.map((u) => u._id)).toEqual(['u1']); // u2 logged today
+        });
     });
 
     describe('message', () => {

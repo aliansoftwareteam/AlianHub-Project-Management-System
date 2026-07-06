@@ -15,6 +15,8 @@ exports.init = (app) => {
     app.post('/api/v1/timesheet/billable-summary', billablectrl.getBillableSummary);
     app.post('/api/v1/timesheet/export-csv', csvctrl.exportTimesheetCsv);
     app.post('/api/v1/timesheet/send-reminders', reminderctrl.triggerReminders);
+    app.get('/api/v1/timesheet/reminder-settings', reminderctrl.getReminderSettings);
+    app.put('/api/v1/timesheet/reminder-settings', reminderctrl.updateReminderSettings);
     app.post('/api/v1/timesheet/rates', billingctrl.setRate);
     app.get('/api/v1/timesheet/rates', billingctrl.listRates);
     app.post('/api/v1/timesheet/generate-invoice', billingctrl.generateInvoice);
