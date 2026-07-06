@@ -241,9 +241,23 @@ const totalHours = computed(() => {
     .padStart(2, "0")}m`;
 });
 
+function isDescriptionEmpty() {
+    // Description is rich text, so strip tags/entities and check the plain text.
+    const raw = props.task?.description ?? '';
+    const plainText = raw
+        .replace(/<[^>]*>/g, '')
+        .replace(/&nbsp;/g, ' ')
+        .trim();
+    return plainText.length === 0;
+}
+
 function showEtaSidebar() {
     if(!props.permission) {
         $toast.error(t(`Toast.Access denied`), {position: 'top-right'})
+        return;
+    }
+    if(isDescriptionEmpty()) {
+        $toast.error(t(`Toast.Description_required_for_estimate`), {position: 'top-right'})
         return;
     }
     let assigneePermissionCheck = companyUser.value.roleType !== 1 && companyUser.value.roleType !== 2 && props.permission !== 2 ? props.task?.AssigneeUserId?.length && props.task.AssigneeUserId.includes(userId.value) : props.task?.AssigneeUserId?.length;
