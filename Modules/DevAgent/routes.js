@@ -11,6 +11,7 @@ exports.init = (app) => {
     app.post('/api/v2/dev-agent/progress', ctrl.updateProgress); // runner live progress (PAT)
 
     // Device pairing — zero-config onboarding.
+    app.post('/api/v2/dev-agent/bot', ctrl.ensureBot);         // JWT: create/ensure the assignable AI Bot user
     app.post('/api/v2/dev-agent/pair', ctrl.generatePairing);  // JWT: signed-in dev authorizes this machine
     app.post('/api/v2/dev-pair', ctrl.exchangePairing);        // PUBLIC: runner exchanges the code → fresh PAT
     app.get('/api/v2/dev-agent-runner.js', ctrl.serveRunner);  // PUBLIC: download the standalone runner

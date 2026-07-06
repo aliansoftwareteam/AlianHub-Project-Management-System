@@ -1,5 +1,19 @@
 <template>
     <div class="tok">
+        <!-- AI Bot developer -->
+        <div class="tok-card">
+            <div class="tok-head">
+                <div>
+                    <h3 class="m-0">AI Bot developer</h3>
+                    <p class="tok-sub">Enable an assignable "AI Bot" user. Assign it to any task and the dev-agent auto-develops it (using the repo set in your runner's config) — through the same Development-chat pipeline.</p>
+                </div>
+            </div>
+            <div class="tok-actions">
+                <button class="tok-btn" :disabled="botLoading" @click="enableBot">{{ botLoading ? 'Enabling…' : 'Enable AI Bot' }}</button>
+                <span v-if="botMsg" class="tok-msg" :class="botMsgType">{{ botMsg }}</span>
+            </div>
+        </div>
+
         <!-- Create -->
         <div class="tok-card">
             <div class="tok-head">
@@ -81,6 +95,9 @@ const copied = ref(false);
 const revoking = ref('');
 const msg = ref('');
 const msgType = ref('');
+const botLoading = ref(false);
+const botMsg = ref('');
+const botMsgType = ref('');
 
 const tid = (t) => String((t && (t.id || t._id)) || '');
 const fmt = (d) => { if (!d) return '—'; try { return new Date(d).toLocaleDateString(); } catch (e) { return String(d); } };
@@ -128,6 +145,19 @@ const revoke = async (t) => {
         await apiRequest('delete', `${BASE}/${tid(t)}`);
         await loadTokens();
     } catch (e) { /* keep list */ } finally { revoking.value = ''; }
+};
+
+const enableBot = async () => {
+    if (botLoading.value) return;
+    botLoading.value = true; botMsg.value = '';
+    try {
+        const body = (await apiRequest('post', '/api/v2/dev-agent/bot', {}))?.data;
+        if (body && body.status) { botMsg.value = 'AI Bot enabled — assign it to a task to auto-develop.'; botMsgType.value = 'ok'; }
+        else { botMsg.value = (body && (body.statusText || body.message)) || 'Failed to enable'; botMsgType.value = 'err'; }
+    } catch (e) {
+        botMsg.value = (e && e.response && e.response.data && (e.response.data.statusText || e.response.data.message)) || (e && e.message) || 'Failed';
+        botMsgType.value = 'err';
+    } finally { botLoading.value = false; }
 };
 
 onMounted(loadTokens);

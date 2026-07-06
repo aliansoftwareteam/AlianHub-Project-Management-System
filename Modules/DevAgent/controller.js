@@ -5,6 +5,7 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const logger = require("../../Config/loggerConfig");
 const { generateToken, hashToken, tokenPrefixOf } = require("../ApiTokens/helpers/apiTokenRules");
+const bot = require("./bot");
 
 // AI dev-agent → per-task "Development" conversation. A simple chat thread:
 // the user gives instructions (like chatting with Claude), a local Claude Code
@@ -262,5 +263,19 @@ exports.serveRunner = (req, res) => {
     } catch (error) {
         logger.error(`ERROR serving dev-agent runner: ${error.message}`);
         return res.status(500).send('// dev-agent runner is unavailable on this server');
+    }
+};
+
+/* POST /api/v2/dev-agent/bot  (JWT) — create/ensure the assignable "AI Bot" user
+   for this company. Assigning it to a task then auto-enqueues a Development job. */
+exports.ensureBot = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'] || '';
+        if (!companyId || !req.uid) return res.send({ status: false, statusText: 'companyId and a signed-in user are required.' });
+        const info = await bot.ensureBotUser(companyId);
+        return res.send({ status: true, statusText: 'AI Bot is ready — assign it to a task to auto-develop.', data: info });
+    } catch (error) {
+        logger.error(`ERROR in dev-agent ensureBot: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
     }
 };
