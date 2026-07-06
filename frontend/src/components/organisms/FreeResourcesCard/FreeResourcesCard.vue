@@ -68,17 +68,12 @@ const { getters } = useStore();
 const employees = ref([]);
 const loading = ref(false);
 
-// Normalize the advanced filter into an array of rows.
 const filterRows = () => (Array.isArray(props.filterData) ? props.filterData : Object.values(props.filterData || {}))
     .filter((r) => r && r.name && r.comparisonsData && r.comparisonsData.length);
 
-// The Assignee filter on THIS card is a PERSON filter, not a task filter:
-// applying it to the task query would strip busy people's tasks and make
-// them look free. So we split it out — assignee rows drive a user-level
-// include/exclude on the result, and only the remaining rows become the
-// task match sent to the backend. Logic lives in freeResourceRules (tested).
+// Assignee is a PERSON filter here, not a task filter: as a task filter it
+// would zero co-assignees' workload and mark busy people free.
 const isAssigneeRow = (r) => r.name.value === 'AssigneeUserId';
-// Read teams fresh — the store may populate after this card mounts.
 const assigneeUserFilter = computed(() =>
     resolveAssigneeFilter(filterRows(), (ids) => teamIdToUserId(ids, getters['settings/teams'] || [])));
 
@@ -98,16 +93,10 @@ const freeRows = computed(() => {
     const filter = assigneeUserFilter.value;
     return (employees.value || [])
         .filter((e) => !(e.onLeave && e.onLeave.approved))
-        // Person-level Assignee filter: drop excluded users; when an include
-        // list is set, keep only those. Threshold is still judged on each
-        // user's real workload, so busy people never leak in.
         .filter((e) => passesAssigneeFilter(e._id, filter))
         .map((e) => {
             const planned = Number(e.plannedMinutes) || 0;
             const logged = Number(e.loggedMinutes) || 0;
-            // Free ONLY when BOTH planned and logged are under their
-            // thresholds — the user has neither meaningful planned nor logged
-            // work. Having either one drops them off the list.
             const free = isFree(planned, logged, thresholdMin.value, loggedThresholdMin.value);
             const plannedPart = planned === 0 ? 'no plan' : `under ${thresholdHours.value}h planned`;
             const loggedPart = loggedThresholdMin.value === 0 ? 'nothing logged' : `≤ ${loggedThresholdHours.value}h logged`;
@@ -133,10 +122,7 @@ const load = async () => {
             currentOnly: false,
             callerUserId: userId && userId.value ? String(userId.value) : '',
             callerRoleType: props.companyUserDetail?.roleType || 3,
-            // Advanced "Add filter" builder → task-field match. Assignee rows
-            // are handled at the person level (see assigneeUserFilter), so they
-            // are EXCLUDED here — sending them as a task filter would zero out
-            // busy users' workload and wrongly mark them free.
+            // Assignee rows are handled at the person level, so exclude them here.
             taskMatch: (() => {
                 const fd = filterRows().filter((r) => !isAssigneeRow(r));
                 return fd.length ? buildFilterQuery(fd, userId && userId.value ? String(userId.value) : '') : null;
