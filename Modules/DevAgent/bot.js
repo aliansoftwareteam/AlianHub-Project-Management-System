@@ -26,8 +26,15 @@ async function ensureBotUser(companyId) {
     if (!u) {
         u = await MongoDbCrudOpration('global', {
             type: SCHEMA_TYPE.USERS,
-            data: { Employee_FName: 'AI', Employee_LName: 'Bot', Employee_Name: 'AI Bot', Employee_Email: BOT_EMAIL, isEmailVerified: true, isActive: true },
+            data: { Employee_FName: 'AI', Employee_LName: 'Bot', Employee_Name: 'AI Bot', Employee_Email: BOT_EMAIL, isEmailVerified: true, isActive: true, AssignCompany: [String(companyId)] },
         }, 'save');
+    } else {
+        // Link this company so the bot appears in the members / assignee-picker
+        // profile store (frontend fetches global users by AssignCompany).
+        await MongoDbCrudOpration('global', {
+            type: SCHEMA_TYPE.USERS,
+            data: [{ _id: String(u._id) }, { $addToSet: { AssignCompany: String(companyId) } }, {}],
+        }, 'updateOne');
     }
     const botUserId = String(u._id);
     cachedBotId = botUserId;
