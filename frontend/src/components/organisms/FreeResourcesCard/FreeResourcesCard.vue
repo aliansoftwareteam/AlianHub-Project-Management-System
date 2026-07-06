@@ -42,7 +42,7 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { teamIdToUserId, buildFilterQuery } from '@/composable/commonFunction';
 import { resolveIsoRange, formatMinutes } from '@/composable/useResourceWorkload';
-import { resolveAssigneeFilter, passesAssigneeFilter, isFree } from '@/composable/freeResourceRules';
+import { ASSIGNEE_FIELD, resolveAssigneeFilter, passesAssigneeFilter, isFree } from '@/composable/freeResourceRules';
 import CardSkeleton from '@/components/atom/CardSkeleton/CardSkeleton.vue';
 
 // Resource Utilization card #7 — "Free or in-training resources".
@@ -73,7 +73,7 @@ const filterRows = () => (Array.isArray(props.filterData) ? props.filterData : O
 
 // Assignee is a PERSON filter here, not a task filter: as a task filter it
 // would zero co-assignees' workload and mark busy people free.
-const isAssigneeRow = (r) => r.name.value === 'AssigneeUserId';
+const isAssigneeRow = (r) => r.name.value === ASSIGNEE_FIELD;
 const assigneeUserFilter = computed(() =>
     resolveAssigneeFilter(filterRows(), (ids) => teamIdToUserId(ids, getters['settings/teams'] || [])));
 
