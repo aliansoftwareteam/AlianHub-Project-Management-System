@@ -1063,6 +1063,16 @@ const schema = {
             type: Map,
             required: false
         },
+        // Per-company opt-in policy for the daily "log your time" reminder email.
+        // Map shape:
+        //   enabled: Boolean (default false — no reminder until an owner enables it)
+        //   userIds: [String] (global users _id; ONLY these members are emailed)
+        //   enabledAt: Date
+        //   enabledBy: String (userId)
+        timeReminderSettings: {
+            type: Map,
+            required: false
+        },
         availableUser: {
             type: Number,
         },
