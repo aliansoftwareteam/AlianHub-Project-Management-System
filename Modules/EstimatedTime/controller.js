@@ -4,7 +4,7 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const { replaceObjectKey } = require("../Auth/helper");
 const socketEmitter = require("../../event/socketEventEmitter");
-const { estimateAndPersist: estimateTaskTimeWithAI } = require("./aiTaskEstimator");
+const { estimateAndPersist: estimateTaskTimeWithAI, _internal: aiEstimatorInternal } = require("./aiTaskEstimator");
 // BUG fix (found via MCP integration 2026-06-12): updateEstimatedTime called
 // `exports.updateRemainingTime`, which was never defined in this module —
 // every Task Planning save threw "not a function" AFTER persisting the row,
@@ -123,6 +123,19 @@ exports.generateAiEstimate = async (req, res) => {
         const taskDoc = (typeof taskDocRaw.toObject === 'function')
             ? taskDocRaw.toObject()
             : taskDocRaw;
+
+        // A description is required for a meaningful AI estimate. Check the
+        // CANONICAL DB state (the client's task can be stale — descriptions save
+        // async over the socket), using the same extraction the estimator uses.
+        // This gates only the AI trigger; manual estimate/planning is untouched.
+        // Fail OPEN: if the extractor helper is ever unavailable, skip the gate
+        // (never wrongly block a valid estimate) rather than failing closed.
+        const descForEstimate = (aiEstimatorInternal && typeof aiEstimatorInternal.extractDescription === 'function')
+            ? aiEstimatorInternal.extractDescription(taskDoc)
+            : null;
+        if (descForEstimate !== null && !String(descForEstimate).trim()) {
+            return res.status(200).json({ status: false, statusText: 'Please add a task description before generating an AI estimate' });
+        }
 
         // Subtask rollup (richer input): if this is a parent task, attach its
         // subtasks' titles so the model accounts for the work they represent.
