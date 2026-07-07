@@ -5,6 +5,7 @@ const { handleBucketSizeUpdateCron } = require(`./common-storage/common-${proces
 const aiRef = require("./Modules/AI/controller")
 const screenshotRetention = require("./Modules/ScreenshotRetention/helper");
 const autoArchive = require("./Modules/projectSetting/autoArchive");
+const projectClose = require("./Modules/projectClose/helper");
 const recurringTasks = require("./Modules/RecurringTasks/controller");
 const reminders = require("./Modules/Reminders/controller");
 const timeReminders = require("./Modules/TimeSheet/controller/timeReminders");
@@ -56,6 +57,19 @@ schedule.scheduleJob({ rule: '0 1 * * *', tz: CRON_TZ }, async () => {
         await autoArchive.runAutoArchiveForAllCompanies();
     } catch (err) {
         logger.error(`[Cron] autoArchive failed: ${err && err.message ? err.message : err}`);
+    }
+})
+
+// Auto-close inactive projects (AHE-3798) — daily at 03:00 UTC (off-peak).
+// For every company with `autoCloseProjects.enabled`, closes projects with no
+// logged time AND no task activity for `inactiveMonths` months (reversible —
+// sets the project's close-type status, never deletes).
+schedule.scheduleJob({ rule: '0 3 * * *', tz: CRON_TZ }, async () => {
+    logger.info(`[Cron] projectClose.runAutoCloseForAllCompanies`);
+    try {
+        await projectClose.runAutoCloseForAllCompanies();
+    } catch (err) {
+        logger.error(`[Cron] projectClose failed: ${err && err.message ? err.message : err}`);
     }
 })
 

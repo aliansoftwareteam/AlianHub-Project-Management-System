@@ -79,7 +79,8 @@ const userId = inject('$userId');
 // Owner gate — mirrors the BillingHistoryTab convention. Component
 // renders nothing for non-owners (the <template v-if="isOwner"> above).
 const companyUser = computed(() => getters['settings/companyUserDetail'] || {});
-const isOwner = computed(() => Number(companyUser.value && companyUser.value.roleType) === 1);
+// Owner (1) or Admin (2) — both can manage this company setting.
+const isOwner = computed(() => [1, 2].includes(Number(companyUser.value && companyUser.value.roleType)));
 
 const policy = ref({
     enabled: false,
