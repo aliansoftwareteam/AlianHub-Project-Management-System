@@ -7,9 +7,6 @@ name: Docker
 # Triggers:
 #   • release.published   — when release-please cuts a tagged release,
 #                            push `vX.Y.Z`, `X.Y.Z`, `X.Y`, `X`, `latest`
-#   • push to main        — push `edge` and `main-<sha>` (rolling main)
-#   • pull_request        — build-only (no push) to verify the image
-#                            still builds on every change
 #   • workflow_dispatch   — manual trigger from the Actions UI
 #
 # Pushing to Docker Hub:
@@ -19,8 +16,18 @@ name: Docker
 #   and uncomment the "Login to Docker Hub" and Docker Hub tag lines
 #   in the metadata-action `images:` block below.
 #
-# Multi-arch:
-#   Built for linux/amd64 and linux/arm64.
+# Multi-arch (linux/amd64 + linux/arm64) — native runners, no QEMU:
+#   Each architecture is built on its OWN native runner (amd64 on
+#   ubuntu-latest, arm64 on ubuntu-24.04-arm) and pushed BY DIGEST. The
+#   final `merge` job stitches the per-arch digests into a single manifest
+#   list and applies the version/latest tags. This replaces the previous
+#   single-runner QEMU-emulation build, whose arm64 leg crashed during
+#   `npm ci` (qemu: uncaught target signal 4 — illegal instruction —
+#   exit 132) on QEMU v10.x. Building on native hardware removes the
+#   emulation layer entirely.
+#
+#   Note: ubuntu-24.04-arm is a GitHub-hosted Arm64 runner (free for
+#   public repositories; requires a runner-enabled plan for private ones).
 #
 # See also: BRANCHING.md § Release workflow
 # ─────────────────────────────────────────────────────────────────────
@@ -50,16 +57,45 @@ env:
   IMAGE_NAME: aliansoftwareteam/alianhub
 
 jobs:
-  build-and-push:
-    name: Build & push image
-    runs-on: ubuntu-latest
+  # ── Build each architecture on its own native runner, push by digest ──
+  #    No QEMU: amd64 → ubuntu-latest, arm64 → ubuntu-24.04-arm.
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up QEMU (multi-arch emulation)
-        uses: docker/setup-qemu-action@v3
+      # `linux/amd64` → `linux-amd64` for use in the per-arch artifact name.
+      # matrix.platform is read via env (not string-interpolated into the
+      # script) to keep the step injection-safe.
+      - name: Normalise platform name
+        run: echo "PLATFORM_PAIR=${PLATFORM//\//-}" >> "$GITHUB_ENV"
+        env:
+          PLATFORM: ${{ matrix.platform }}
+
+      - name: Extract image labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}
+          labels: |
+            org.opencontainers.image.title=AlianHub
+            org.opencontainers.image.description=Self-hosted, open-source project management system
+            org.opencontainers.image.url=https://alianhub.com
+            org.opencontainers.image.documentation=https://help.alianhub.com
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.licenses=AGPL-3.0-or-later
+            org.opencontainers.image.vendor=Alian Software
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -72,13 +108,55 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # ── Uncomment after adding Docker Hub secrets ───────────────
-      # - name: Log in to Docker Hub
-      #   if: github.event_name != 'pull_request'
-      #   uses: docker/login-action@v3
-      #   with:
-      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
-      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # Build for the single matrix platform and push BY DIGEST (no tag).
+      # The merge job below combines the two digests into the tagged
+      # manifest list.
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
+          provenance: false   # avoid the unsigned-attestation noise on ghcr
+          outputs: type=image,name=${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
+
+      - name: Export digest
+        if: github.event_name != 'pull_request'
+        run: |
+          mkdir -p "${{ runner.temp }}/digests"
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ env.PLATFORM_PAIR }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # ── Stitch the per-arch digests into one manifest list + apply tags ──
+  merge:
+    name: Merge manifest & push tags
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.event_name != 'pull_request'
+
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Extract image metadata (tags + labels)
         id: meta
@@ -100,24 +178,23 @@ jobs:
             type=sha,prefix=main-,enable=${{ github.ref == 'refs/heads/main' }}
             # `latest` only for stable release tags (not pre-releases)
             type=raw,value=latest,enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
-          labels: |
-            org.opencontainers.image.title=AlianHub
-            org.opencontainers.image.description=Self-hosted, open-source project management system
-            org.opencontainers.image.url=https://alianhub.com
-            org.opencontainers.image.documentation=https://help.alianhub.com
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.licenses=AGPL-3.0-or-later
-            org.opencontainers.image.vendor=Alian Software
 
-      - name: Build and push image
-        uses: docker/build-push-action@v6
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          context: .
-          file: ./Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          provenance: false   # avoid the unsigned-attestation noise on ghcr
+          registry: ${{ env.REGISTRY_GHCR }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Build the manifest list from the per-arch digests and push it under
+      # every computed tag in one shot.
+      - name: Create manifest list and push
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+
+      - name: Inspect the published image
+        run: |
+          docker buildx imagetools inspect ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
