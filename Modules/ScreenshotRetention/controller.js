@@ -23,8 +23,6 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const logger = require('../../Config/loggerConfig');
 
-const ROLE_TYPE_COMPANY_OWNER = 1;
-
 // ----- Common helpers ---------------------------------------------------
 
 function getCallerContext(req) {
@@ -52,7 +50,8 @@ async function isCompanyOwner(companyId, userId) {
             ]
         };
         const record = await MongoDbCrudOpration(companyId, query, 'findOne');
-        return !!record && Number(record.roleType) === ROLE_TYPE_COMPANY_OWNER;
+        // Owner (1) or Admin (2) may manage this setting.
+        return !!record && [1, 2].includes(Number(record.roleType));
     } catch (err) {
         logger.error(`[ScreenshotRetention] role check failed companyId=${companyId} userId=${userId} ${err && err.message}`);
         return false;
@@ -109,7 +108,7 @@ exports.previewDeletion = async (req, res) => {
         if (!userId) return sendErr(res, 401, 'authentication required');
 
         const ownerOk = await isCompanyOwner(companyId, userId);
-        if (!ownerOk) return sendErr(res, 403, 'Only the company owner can preview screenshot retention');
+        if (!ownerOk) return sendErr(res, 403, 'Only an owner or admin can preview screenshot retention');
 
         const requested = Number(req.query && req.query.maxAgeMonths);
         const maxAgeMonths = helper.VALID_MAX_AGE_MONTHS.includes(requested)
@@ -148,7 +147,7 @@ exports.updateSettings = async (req, res) => {
         if (!userId) return sendErr(res, 401, 'authentication required');
 
         const ownerOk = await isCompanyOwner(companyId, userId);
-        if (!ownerOk) return sendErr(res, 403, 'Only the company owner can change screenshot retention');
+        if (!ownerOk) return sendErr(res, 403, 'Only an owner or admin can change screenshot retention');
 
         const body = req.body || {};
         const patch = {};
