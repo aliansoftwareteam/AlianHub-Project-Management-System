@@ -233,6 +233,12 @@ module.exports.CARDCOMPONENT= '/api/v1/cardcomponent'
 module.exports.PROJECT_UTILIZATION_SUMMARY = '/api/v1/dashboard/project-utilization-summary'
 module.exports.TEAM_TASKTYPE_BREAKDOWN = '/api/v1/dashboard/team-tasktype-breakdown'
 module.exports.TEAM_LOGGED_VS_ETA = '/api/v1/dashboard/team-logged-vs-eta'
+// Member self-view dashboard cards.
+module.exports.MY_NEXT_TASKS = '/api/v1/dashboard/my-next-tasks'
+module.exports.MY_LEAVE = '/api/v1/dashboard/my-leave'
+module.exports.MY_ACHIEVEMENTS = '/api/v1/dashboard/my-achievements'
+module.exports.MY_DUE_SOON = '/api/v1/dashboard/my-due-soon'
+module.exports.MY_TIME = '/api/v1/dashboard/my-time'
 module.exports.API_TIME_FORCASTING_REPORT ='/api/v1/report/time-forcasting';
 module.exports.CUSTOME_MODALS = '/api/v1/customeModals'
 module.exports.API_OAUTH_GITHUB = '/api/v1/github';
