@@ -199,9 +199,9 @@ async function runAutoCloseForCompany(companyId, inactiveMonths) {
             {
                 statusType: { $ne: 'close' },
                 deletedStatusKey: { $in: [0, undefined] },
-                Created_At: { $lt: cutoff },
+                createdAt: { $lt: cutoff },
             },
-            '_id ProjectName status statusType projectStatusData Created_At',
+            '_id ProjectName status statusType projectStatusData createdAt',
         ],
     }, 'find').catch((error) => {
         logger.error(`${LOG_PREFIX} could not list projects for company ${companyId}: ${error.message}`);
