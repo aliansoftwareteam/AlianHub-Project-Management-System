@@ -2399,7 +2399,6 @@ export default {
         No_assignee_found: "No assignee found",
         No_due_date_found: "No due date found",
         No_self_assignee_found: "No self assignee found",
-        Description_required_for_estimate: "A detailed description is mandatory to generate an accurate estimate time",
         Estimated_time_updated_successfully:
             "Task Planning updated successfully",
         Description_updated_successfully: "Description updated successfully",
