@@ -112,6 +112,12 @@ function computeCutoff(inactiveMonths) {
  * Has this project seen ANY activity since `cutoff`? Activity = a logged time
  * entry OR a created/updated task. Either signal short-circuits to `true`.
  * TimeSheet.LogStartTime is epoch SECONDS; tasks.updatedAt is a Date.
+ *
+ * IMPORTANT: a query failure is NOT swallowed here — it propagates to the
+ * caller (runAutoCloseForCompany), whose `.catch(() => true)` fail-safe then
+ * treats the project as active and skips closing it. If we caught the error
+ * here and returned `false`, a transient DB hiccup would read as "no activity"
+ * and wrongly auto-close an active project.
  */
 async function projectHasActivitySince(companyId, projectId, cutoff) {
     const cutoffSec = Math.floor(cutoff.getTime() / 1000);
@@ -119,13 +125,13 @@ async function projectHasActivitySince(companyId, projectId, cutoff) {
     const loggedTime = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TIMESHEET,
         data: [{ ProjectId: String(projectId), LogStartTime: { $gte: cutoffSec } }, { _id: 1 }],
-    }, 'findOne').catch(() => null);
+    }, 'findOne');
     if (loggedTime) return true;
 
     const touchedTask = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS,
         data: [{ ProjectID: new mongoose.Types.ObjectId(projectId), updatedAt: { $gte: cutoff }, deletedStatusKey: { $in: [0, undefined] } }, { _id: 1 }],
-    }, 'findOne').catch(() => null);
+    }, 'findOne');
     if (touchedTask) return true;
 
     return false;
