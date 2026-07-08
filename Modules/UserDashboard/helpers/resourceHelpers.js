@@ -164,9 +164,10 @@ async function getLoggedAndTasksInRange(companyId, opts = {}) {
         // into a Mongo match (buildFilterQuery) on task fields ($and/$or) and
         // sends it as taskMatch. Merge it into the task query so the card's
         // Filters section actually narrows results.
-        if (taskMatch && typeof taskMatch === "object" && Object.keys(taskMatch).length) {
-            Object.assign(taskFilter, taskMatch);
-        }
+        // Merge the client's advanced-filter match SAFELY — only its $and/$or clauses, never
+        // a blanket key-copy (which would let a client override deletedStatusKey / inject
+        // Mongo operators). Same hardening as applyTaskMatch.
+        applyTaskMatch(taskFilter, taskMatch);
         const tasks = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
             data: [taskFilter, {
@@ -224,6 +225,25 @@ async function getSprintTypeMap(companyId, sprintIds = []) {
     return map;
 }
 
+/**
+ * Merge a client-built task match (from buildFilterQuery — may carry $and/$or)
+ * into an existing task filter WITHOUT clobbering a base $or (e.g. the
+ * self-scope `$or:[{AssigneeUserId},{Task_Leader}]`). Everything is folded into
+ * $and so multiple $or groups coexist. Mutates and returns the filter.
+ */
+function applyTaskMatch(taskFilter, taskMatch) {
+    if (!taskMatch || typeof taskMatch !== "object" || !Object.keys(taskMatch).length) return taskFilter;
+    const andParts = [];
+    if (taskFilter.$or) { andParts.push({ $or: taskFilter.$or }); delete taskFilter.$or; }
+    if (Array.isArray(taskMatch.$and)) andParts.push(...taskMatch.$and);
+    if (Array.isArray(taskMatch.$or)) andParts.push({ $or: taskMatch.$or });
+    // SECURITY: only merge the client match's $and/$or scoping clauses. Never blanket-copy
+    // other keys — a client could override base fields (deletedStatusKey / statusType) or
+    // inject Mongo operators ($where / $expr) → filter bypass + NoSQL injection.
+    if (andParts.length) taskFilter.$and = (taskFilter.$and || []).concat(andParts);
+    return taskFilter;
+}
+
 module.exports = {
     getDayOrRangeBounds,
     buildUserTeamMap,
@@ -232,4 +252,5 @@ module.exports = {
     getLoggedAndTasksInRange,
     getUserNameMap,
     getSprintTypeMap,
+    applyTaskMatch,
 };

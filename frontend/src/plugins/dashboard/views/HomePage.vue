@@ -227,6 +227,11 @@
     import LiveWorkCard from "@/components/organisms/LiveWorkCard/LiveWorkCard.vue";
     import UsersByCategoryCard from "@/components/organisms/UsersByCategoryCard/UsersByCategoryCard.vue";
     import OnLeaveCard from "@/components/organisms/OnLeaveCard/OnLeaveCard.vue";
+    import NextUpCard from "@/components/organisms/NextUpCard/NextUpCard.vue";
+    import MyAchievementsCard from "@/components/organisms/MyAchievementsCard/MyAchievementsCard.vue";
+    import MyLeaveCard from "@/components/organisms/MyLeaveCard/MyLeaveCard.vue";
+    import DueSoonCard from "@/components/organisms/DueSoonCard/DueSoonCard.vue";
+    import MyTimeCard from "@/components/organisms/MyTimeCard/MyTimeCard.vue";
     import { useCustomComposable } from '@/composable';
     import { onBeforeRouteLeave } from 'vue-router';
     import { abortAllRequests } from "@/services";
@@ -410,6 +415,16 @@
                 return UsersByCategoryCard;
             case 'OnLeaveCard':
                 return OnLeaveCard;
+            case 'NextUpCard':
+                return NextUpCard;
+            case 'MyAchievementsCard':
+                return MyAchievementsCard;
+            case 'MyLeaveCard':
+                return MyLeaveCard;
+            case 'DueSoonCard':
+                return DueSoonCard;
+            case 'MyTimeCard':
+                return MyTimeCard;
             default:
                 return null;
         }
@@ -764,6 +779,7 @@
         'ProjectPulseCard', 'ActiveWorkTableCard', 'FreeResourcesCard',
         'WorkedTasksTableCard', 'TeamCategoryBreakdownCard', 'TeamLoggedVsEtaCard',
         'TasksByStatusCard', 'TasksByProjectCard', 'TotalTasksCard',
+        'NextUpCard', 'MyAchievementsCard', 'MyLeaveCard', 'DueSoonCard', 'MyTimeCard',
     ].includes(cid);
 
     // ── Dashboard-level date range ──────────────────────────────────
@@ -807,6 +823,7 @@
     const PROJECT_PERIOD_CARDS = [
         'RunningProjectsCard', 'UsersByCategoryCard', 'ProjectPulseCard',
         'WorkedTasksTableCard', 'TeamCategoryBreakdownCard', 'TeamLoggedVsEtaCard', 'OnLeaveCard',
+        'MyAchievementsCard', 'MyTimeCard',
     ];
     const PROJECT_PERIOD_OPTIONS = [
         { id: 0, label: 'Auto' },
@@ -816,6 +833,7 @@
     const PROJECT_PERIOD_DEFAULT = {
         RunningProjectsCard: 1, UsersByCategoryCard: 3, ProjectPulseCard: 1,
         WorkedTasksTableCard: 3, TeamCategoryBreakdownCard: 3, TeamLoggedVsEtaCard: 3, OnLeaveCard: 1,
+        MyAchievementsCard: 5, MyTimeCard: 3,
     };
     const periodOptionsFor = (cid) => (PROJECT_PERIOD_CARDS.includes(cid) ? PROJECT_PERIOD_OPTIONS : []);
     const periodValueFor = (item) => {

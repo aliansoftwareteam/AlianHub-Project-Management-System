@@ -96,6 +96,11 @@ const PROJECT_TASKS_SYSTEM = composeSystem([
     ['project-plan', 'special-sprints-guidance.md'],
     ['project-plan', 'task-guidance.md'],
     'member-rule.md',
+    // Few-shot worked example (tasks-shaped: sprints + tasks, NO project
+    // block, uses the given statuses/types) — mirrors the depth the
+    // project-plan stage gets from its own examples.md, which this stage
+    // previously lacked. Placed right before the schema, same as project-plan.
+    ['project-tasks', 'examples.md'],
     ['project-tasks', 'schema.md'],
     'output-format.md',
 ]);
@@ -320,7 +325,7 @@ function buildTasksUserMessage({ project, additionalRequirements, briefText, mem
     // Optional sub-tasks (AI-Assist "Break tasks into sub-tasks").
     if (features && features.subtasks && mode !== 'sprints') {
         sections.push(
-            'SUB-TASKS: for any task large enough to warrant breaking down, add an optional "subtasks" array on that task — each entry is { "TaskName": "...", "descriptionBlocks": [ ... ], "priority": "Low|Medium|High" }. Give each sub-task a SHORT description in "descriptionBlocks": at least one paragraph explaining what it involves (a brief ordered list of steps is welcome). It does NOT need the full "What to do" / "Acceptance criteria" skeleton that top-level tasks use. Only add sub-tasks where they genuinely help; omit the array for simple tasks. Never nest sub-tasks under sub-tasks.',
+            'SUB-TASKS (the user explicitly turned this on — you MUST use them): break the larger, multi-step tasks down with a "subtasks" array on those tasks — each entry is { "TaskName": "...", "descriptionBlocks": [ ... ], "priority": "Low|Medium|High" }. Give each sub-task a SHORT description in "descriptionBlocks": at least one paragraph explaining what it involves (a brief ordered list of steps is welcome); it does NOT need the full "What to do" / "Acceptance criteria" skeleton that top-level tasks use. A plan where NO task has sub-tasks is WRONG when this feature is on — every large or multi-part task MUST carry 2–5 sub-tasks; only genuinely single-step tasks may stay flat. Never nest sub-tasks under sub-tasks.',
         );
     }
 
@@ -334,7 +339,7 @@ function buildTasksUserMessage({ project, additionalRequirements, briefText, mem
     // Optional epics (AI-Assist "Organize into epics").
     if (features && features.epics && mode !== 'sprints') {
         sections.push(
-            'EPICS: include a plan-level "epics" array (a sibling of "tasks"/"sprints" inside "plan") — each entry is { "ref": "<unique short id, e.g. e1>", "name": "<epic name>", "color": "#RRGGBB" (optional) }. Group related tasks under an epic by setting that task\'s "epicRef" to the epic\'s "ref". Create epics only where tasks genuinely group into themes; leave a task\'s "epicRef" unset if it fits no epic, and do NOT create empty epics.',
+            'EPICS: include a plan-level "epics" array (a sibling of "tasks"/"sprints" inside "plan") — each entry is { "ref": "<unique short id, e.g. e1>", "name": "<epic name>", "color": "#RRGGBB" (optional) }. Then — THIS is the step models skip — set each task\'s "epicRef" (a field ON the task, next to "TaskName") to the "ref" of the epic it belongs to. An "epics" array is useless unless tasks point at it: EVERY epic you define MUST be referenced by at least one task\'s "epicRef", and most tasks should carry one. Only leave "epicRef" unset on a task that genuinely fits no theme, and never define an epic that no task references.',
         );
     }
 
