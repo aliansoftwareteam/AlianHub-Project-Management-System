@@ -795,13 +795,16 @@ async function createTasksForSprint({ companyId, projectDoc, sprintDoc, tasks, s
         data: [docs],
     }, 'insertMany');
 
-    // Sprint task count tracks TOP-LEVEL tasks only — sub-tasks are nested
-    // under their parent, not listed directly in the sprint.
+    // Sprint task count = EVERY task, parent AND sub-task, each counting 1 —
+    // matching manual creation (Tasks/.../create.js does `$inc { tasks: 1 }` for
+    // every task, parent or sub) and the archive math (removing a parent decrements
+    // by subTasks+1). Counting only parents here undercounted AI-created sprints
+    // and misled the user, so use the full doc count (parents + sub-tasks).
     await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.SPRINTS,
         data: [
             { _id: sprintDoc._id },
-            { $inc: { tasks: parentDocs.length } },
+            { $inc: { tasks: docs.length } },
         ],
     }, 'updateOne').catch(() => {});
 
