@@ -15,6 +15,22 @@
                 <span v-if="botMsg" class="tok-msg" :class="botMsgType">{{ botMsg }}</span>
             </div>
         </div>
+
+        <!-- Connect this computer (one-time per machine) — shown only once the AI Bot is enabled for this user -->
+        <div v-if="aiBotEnabled" class="tok-card">
+            <div class="tok-head">
+                <div>
+                    <h3 class="m-0">Connect this computer</h3>
+                    <p class="tok-sub">One-time setup per machine. Click <b>Connect Computer</b>, then open the file it downloads — the AI dev-agent installs and starts itself, then develops the tasks you assign it (or run from a task's Development tab) right here in the background. Needs Node 18+, the <code>claude</code> CLI (logged in) and <code>gh</code> on this machine.</p>
+                </div>
+            </div>
+            <div class="tok-actions">
+                <button class="tok-btn" :disabled="connecting" @click="connectComputer()">{{ connecting ? 'Preparing…' : '⚡ Connect Computer' }}</button>
+                <span class="tok-os">or&nbsp;<a href="#" @click.prevent="connectComputer('win')">Windows</a> · <a href="#" @click.prevent="connectComputer('mac')">macOS</a> · <a href="#" @click.prevent="connectComputer('linux')">Linux</a></span>
+                <span v-if="connectMsg" class="tok-msg" :class="connectMsgType">{{ connectMsg }}</span>
+            </div>
+            <p v-if="downloaded" class="tok-note">Downloaded <b>{{ downloadedName }}</b> — open / double-click it to finish. Keep that window running; it develops your assigned tasks in the background. (Your OS may ask you to allow it the first time — choose Open / Run anyway.)</p>
+        </div>
     </div>
 </template>
 
@@ -49,6 +65,48 @@ const disableBot = () => {
     setAiBotEnabled(false);
     botMsg.value = 'AI Bot hidden from your picker.'; botMsgType.value = 'ok';
 };
+
+// ── Connect this computer (one-time) ──────────────────────────────────
+// One click: mint a fresh pairing code, then download a pre-filled launcher
+// (.cmd on Windows, .command/.sh on macOS/Linux) for the detected OS. The
+// developer just opens the file — it fetches the runner and starts the paired
+// agent (`--pair` both pairs and begins polling). The launcher endpoint is
+// public; the single-use pairing code is the secret.
+const connecting = ref(false);
+const connectMsg = ref('');
+const connectMsgType = ref('');
+const downloaded = ref(false);
+const downloadedName = ref('');
+
+const detectOs = () => {
+    const ua = `${navigator.userAgent || ''} ${navigator.platform || ''}`;
+    if (/Win/i.test(ua)) return 'win';
+    if (/Mac/i.test(ua)) return 'mac';
+    return 'linux';
+};
+
+const connectComputer = async (osArg) => {
+    if (connecting.value) return;
+    connecting.value = true; connectMsg.value = ''; downloaded.value = false;
+    try {
+        const body = (await apiRequest('post', '/api/v2/dev-agent/pair', {}))?.data;
+        if (!(body && body.status && body.data && body.data.code)) {
+            connectMsg.value = (body && (body.statusText || body.message)) || 'Could not start pairing';
+            connectMsgType.value = 'err';
+            return;
+        }
+        const os = osArg || detectOs();
+        const origin = window.location.origin;
+        const url = `${origin}/api/v2/dev-agent-launcher?code=${encodeURIComponent(body.data.code)}&os=${os}&base=${encodeURIComponent(origin)}`;
+        const name = os === 'win' ? 'connect-alianhub.cmd' : (os === 'mac' ? 'connect-alianhub.command' : 'connect-alianhub.sh');
+        const a = document.createElement('a');
+        a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+        downloaded.value = true; downloadedName.value = name;
+    } catch (e) {
+        connectMsg.value = (e && e.response && e.response.data && (e.response.data.statusText || e.response.data.message)) || (e && e.message) || 'Failed';
+        connectMsgType.value = 'err';
+    } finally { connecting.value = false; }
+};
 </script>
 
 <style scoped>
@@ -64,4 +122,9 @@ const disableBot = () => {
 .tok-msg { font-size: 13px; }
 .tok-msg.ok { color: #1c7a43; }
 .tok-msg.err { color: #c0392b; }
+.tok-os { font-size: 12px; color: #9aa0b4; }
+.tok-os a { color: #2f3a8f; cursor: pointer; text-decoration: none; }
+.tok-os a:hover { text-decoration: underline; }
+.tok-note { font-size: 12px; color: #6b7280; line-height: 1.5; margin: 12px 0 0; background: #f6f8ff; border: 1px solid #e6e9f5; border-radius: 7px; padding: 9px 11px; }
+.tok-sub code { background: #eef0f6; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
 </style>

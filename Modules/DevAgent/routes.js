@@ -15,4 +15,5 @@ exports.init = (app) => {
     app.post('/api/v2/dev-agent/pair', ctrl.generatePairing);  // JWT: signed-in dev authorizes this machine
     app.post('/api/v2/dev-pair', ctrl.exchangePairing);        // PUBLIC: runner exchanges the code → fresh PAT
     app.get('/api/v2/dev-agent-runner.js', ctrl.serveRunner);  // PUBLIC: download the standalone runner
+    app.get('/api/v2/dev-agent-launcher', ctrl.serveLauncher); // PUBLIC: download a pre-filled one-click "Connect Computer" launcher
 };

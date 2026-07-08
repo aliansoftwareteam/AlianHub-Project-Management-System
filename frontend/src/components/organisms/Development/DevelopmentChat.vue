@@ -1,35 +1,18 @@
 <template>
     <div class="dev-chat">
-        <!-- one-time machine setup (zero-config onboarding) -->
-        <div class="dev-connect">
-            <button class="dev-connect-toggle" @click="showConnect = !showConnect">{{ showConnect ? '▾' : '▸' }} Connect this computer <span class="dev-connect-sub">(one-time — run the AI dev-agent on your machine)</span></button>
-            <div v-if="showConnect" class="dev-connect-body">
-                <p class="dev-connect-hint">Works for <b>any project</b> — you don't need to clone this repo. Do this once per machine:</p>
-                <button class="dev-connect-gen" :disabled="pairing" @click="generatePairing">{{ pairing ? 'Generating…' : 'Generate connect command' }}</button>
-                <template v-if="connectCmd">
-                    <div class="dev-connect-step"><b>1.</b> <a :href="runnerUrl" download="dev-agent.js">Download dev-agent.js</a> into any folder (once).</div>
-                    <div class="dev-connect-step"><b>2.</b> In that folder, run:</div>
-                    <div class="dev-connect-cmd">
-                        <code>{{ connectCmd }}</code>
-                        <button class="dev-btn-copy" @click="copyConnect">{{ connectCopied ? 'Copied ✓' : 'Copy' }}</button>
-                    </div>
-                    <div class="dev-connect-note">Needs Node 18+, the <code>claude</code> CLI (logged in) and <code>gh</code> on that machine. The agent then builds whatever repo/URL you set below.</div>
-                </template>
-                <div v-if="connectErr" class="dev-err">{{ connectErr }}</div>
-            </div>
-        </div>
-
         <!-- repo bar: temporary, per-conversation (not persisted) -->
         <div class="dev-repo">
             <input v-model="repo" type="text" class="dev-repo-input" placeholder="Repository — git URL or local path (e.g. https://github.com/org/x.git)" />
-            <input v-model="base" type="text" class="dev-repo-base" placeholder="main" title="Base branch" />
+            <input v-model="base" type="text" class="dev-repo-base" placeholder="main" title="Base branch — for a git repo, the AI checks this out, branches its work from it, and opens the PR against it. Ignored for a plain local folder." />
         </div>
+        <div class="dev-repo-hint">Branch = the base the AI starts from and opens its PR against — used only for a git repo (a plain local folder ignores it).</div>
 
         <!-- conversation -->
         <div ref="listEl" class="dev-messages">
             <div v-if="!messages.length && !loading" class="dev-empty">
                 <div class="dev-empty-icon">🤖</div>
-                <p>Tell the AI what to build for this task. It develops on your machine (Claude Code) and opens a PR — then chat here to iterate. Set the repository above to start.</p>
+                <p>Tell the AI what to build for this task. It develops on a connected computer (Claude Code) and opens a PR — then chat here to iterate. Set the repository above to start.</p>
+                <p class="dev-empty-hint">First time? Connect your computer once in <b>Settings → AI Developer</b>.</p>
             </div>
             <div v-for="m in messages" :key="m._id" class="dev-msg" :class="m.role === 'user' ? 'is-user' : 'is-agent'">
                 <div class="dev-bubble">
@@ -74,36 +57,6 @@ const sending = ref(false);
 const err = ref('');
 const listEl = ref(null);
 let timer = null;
-
-// one-time "connect this computer" pairing (zero-config onboarding)
-const showConnect = ref(false);
-const pairing = ref(false);
-const connectCmd = ref('');
-const runnerUrl = ref('');
-const connectCopied = ref(false);
-const connectErr = ref('');
-
-const generatePairing = async () => {
-    if (pairing.value) return;
-    pairing.value = true; connectErr.value = ''; connectCmd.value = '';
-    try {
-        const body = (await apiRequest('post', `${BASE}/pair`, {}))?.data;
-        if (body && body.status && body.data && body.data.code) {
-            const origin = window.location.origin;
-            runnerUrl.value = `${origin}/api/v2/dev-agent-runner.js`;
-            connectCmd.value = `node dev-agent.js --pair ${body.data.code} --url ${origin}`;
-        } else {
-            connectErr.value = (body && (body.statusText || body.message)) || 'Failed to generate a code';
-        }
-    } catch (e) {
-        connectErr.value = (e && e.response && e.response.data && (e.response.data.statusText || e.response.data.message)) || (e && e.message) || 'Failed';
-    } finally { pairing.value = false; }
-};
-
-const copyConnect = async () => {
-    try { await navigator.clipboard.writeText(connectCmd.value); connectCopied.value = true; setTimeout(() => { connectCopied.value = false; }, 2000); }
-    catch (e) { connectErr.value = 'Copy failed (clipboard needs HTTPS) — select the command above and copy it manually.'; }
-};
 
 const statusLabel = (s) => ({ pending: '⏳ queued', working: '⚙️ working…', done: '✓ done', error: '⚠️ error' }[s] || s);
 
@@ -173,6 +126,7 @@ onBeforeUnmount(() => { if (timer) clearInterval(timer); });
 .dev-repo { display: flex; gap: 8px; padding: 10px 2px 12px; }
 .dev-repo-input { flex: 1; border: 1px solid #d7d9e6; border-radius: 7px; padding: 8px 12px; font-size: 13px; color: #3a3f52; }
 .dev-repo-base { width: 110px; border: 1px solid #d7d9e6; border-radius: 7px; padding: 8px 12px; font-size: 13px; color: #3a3f52; }
+.dev-repo-hint { font-size: 11px; color: #9aa0b4; padding: 0 2px 8px; line-height: 1.45; }
 .dev-messages { flex: 1; overflow-y: auto; padding: 8px 2px; display: flex; flex-direction: column; gap: 10px; }
 .dev-empty { text-align: center; color: #9aa0b4; margin: auto; max-width: 420px; padding: 24px; }
 .dev-empty-icon { font-size: 34px; margin-bottom: 10px; }
@@ -195,20 +149,7 @@ onBeforeUnmount(() => { if (timer) clearInterval(timer); });
 .dev-send:disabled { opacity: .5; cursor: default; }
 .dev-hint { font-size: 12px; color: #9aa0b4; padding: 0 2px 6px; }
 .dev-err { font-size: 12px; color: #c0392b; padding: 0 2px 6px; }
-.dev-connect { border: 1px solid #e6e7ee; border-radius: 8px; margin-bottom: 10px; background: #fafbff; }
-.dev-connect-toggle { width: 100%; text-align: left; background: none; border: none; padding: 9px 12px; font-size: 13px; font-weight: 600; color: #2f3a8f; cursor: pointer; font-family: inherit; }
-.dev-connect-sub { font-weight: 400; color: #9aa0b4; }
-.dev-connect-body { padding: 0 12px 12px; }
-.dev-connect-hint { font-size: 12px; color: #6b7280; line-height: 1.5; margin: 0 0 10px; }
-.dev-connect-gen { background: #2f3a8f; color: #fff; border: none; border-radius: 7px; padding: 7px 14px; font-size: 13px; cursor: pointer; }
-.dev-connect-gen:disabled { opacity: .55; cursor: default; }
-.dev-connect-cmd { display: flex; align-items: center; gap: 8px; margin-top: 10px; background: #fff; border: 1px solid #d7d9e6; border-radius: 6px; padding: 8px 10px; }
-.dev-connect-cmd code { flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #23305f; word-break: break-all; }
-.dev-btn-copy { background: #fff; color: #2f3a8f; border: 1px solid #cdd2e6; border-radius: 6px; padding: 5px 12px; font-size: 12px; cursor: pointer; white-space: nowrap; }
-.dev-connect-step { font-size: 13px; color: #3a3f52; margin-top: 10px; }
-.dev-connect-step a { color: #2f3a8f; }
-.dev-connect-note { font-size: 12px; color: #9aa0b4; line-height: 1.5; margin-top: 10px; }
-.dev-connect-note code { background: #eef0f6; padding: 1px 5px; border-radius: 4px; }
+.dev-empty-hint { font-size: 12px; color: #9aa0b4; margin-top: 10px; }
 .dev-spinner { display: inline-block; width: 9px; height: 9px; margin-right: 7px; border-radius: 50%; background: #c0392b; vertical-align: middle; animation: dev-pulse 1s ease-in-out infinite; }
 @keyframes dev-pulse { 0%, 100% { opacity: .25; transform: scale(.7); } 50% { opacity: 1; transform: scale(1.2); } }
 </style>

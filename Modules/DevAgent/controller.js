@@ -29,6 +29,55 @@ const mask = (d) => ({
     createdAt: d.createdAt,
 });
 
+// ── Runner presence + "no connected computer" timeout ──────────────────
+// A pending job is only picked up if a runner is polling. With NO runner
+// connected it would sit 'pending' forever and the tab would spin "Starting…"
+// indefinitely (even after reload). Track the last time a runner polled and,
+// when none is online, fail long-pending jobs with a clear message so the UI
+// stops and tells the user to connect a computer. Presence is in-memory
+// (per-process): fine for a single app instance; a multi-instance deployment
+// would move this to a shared store (Redis/DB).
+const RUNNER_ONLINE_MS = 30 * 1000;   // a runner seen within this window = online
+const PENDING_GRACE_MS = 45 * 1000;   // give a fresh job this long to be claimed first
+const NO_RUNNER_TEXT = '⚠️ No connected computer is running the AI dev-agent, so this could not start. Open Settings → AI Developer and click "Connect Computer", then re-assign the AI Bot (or resend your message).';
+const runnerSeen = new Map();          // companyId -> last-poll ms
+
+function markRunnerSeen(companyId) {
+    if (companyId) runnerSeen.set(String(companyId), Date.now());
+}
+function isRunnerOnline(companyId) {
+    return (Date.now() - (runnerSeen.get(String(companyId)) || 0)) < RUNNER_ONLINE_MS;
+}
+
+// If no runner is online, fail any user message that has been 'pending' past the
+// grace window (atomic flip → single winner) and post ONE explanatory agent
+// reply. Returns true if anything changed (caller re-fetches). Best-effort.
+// A live-but-busy runner keeps polling, so it stays "online" and its queued
+// jobs are never wrongly failed — only a truly absent runner triggers this.
+async function failStalePendingIfNoRunner(companyId, rows) {
+    if (isRunnerOnline(companyId)) return false;
+    const now = Date.now();
+    const stale = (rows || []).filter((r) => r && r.role === 'user' && r.status === 'pending'
+        && r.createdAt && (now - new Date(r.createdAt).getTime()) > PENDING_GRACE_MS);
+    let changed = false;
+    for (const m of stale) {
+        // eslint-disable-next-line no-await-in-loop
+        const r = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.DEV_MESSAGES,
+            data: [{ _id: m._id, role: 'user', status: 'pending' }, { $set: { status: 'error' } }, {}],
+        }, 'updateOne').catch(() => null);
+        if (r && r.matchedCount) {
+            changed = true;
+            // eslint-disable-next-line no-await-in-loop
+            await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.DEV_MESSAGES,
+                data: { taskId: m.taskId, projectId: m.projectId || '', sprintId: m.sprintId || '', role: 'agent', text: NO_RUNNER_TEXT, parentId: String(m._id), userId: '' },
+            }, 'save').catch(() => {});
+        }
+    }
+    return changed;
+}
+
 /* POST /api/v2/dev-agent/message  body: { taskId, projectId?, sprintId?, text, repo?, base? }
    A user instruction (JWT). Queued as 'pending' for the runner to pick up. */
 exports.postMessage = async (req, res) => {
@@ -67,10 +116,14 @@ exports.listMessages = async (req, res) => {
         if (!companyId || !taskId) {
             return res.send({ status: false, statusText: 'companyId and taskId are required.' });
         }
-        const rows = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.DEV_MESSAGES,
-            data: [{ taskId }, null, { sort: { createdAt: 1 } }],
-        }, 'find');
+        const query = { type: SCHEMA_TYPE.DEV_MESSAGES, data: [{ taskId }, null, { sort: { createdAt: 1 } }] };
+        let rows = await MongoDbCrudOpration(companyId, query, 'find');
+        // Stop the "Starting…" spinner from hanging forever when no runner is
+        // connected: fail long-pending jobs + explain. Persisted, so it also
+        // resolves on reload. Re-fetch only when something actually changed.
+        if (await failStalePendingIfNoRunner(companyId, rows)) {
+            rows = await MongoDbCrudOpration(companyId, query, 'find');
+        }
         return res.send({ status: true, statusText: 'Conversation fetched.', data: (rows || []).map(mask) });
     } catch (error) {
         logger.error(`ERROR in dev-agent listMessages: ${error.message}`);
@@ -83,6 +136,7 @@ exports.listPending = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
         if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        markRunnerSeen(companyId); // a runner is polling → mark it online (presence)
         const rows = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.DEV_MESSAGES,
             data: [{ role: 'user', $or: [{ status: 'pending' }, { status: 'working', updatedAt: { $lt: new Date(Date.now() - 4 * 60 * 1000) } }] }, null, { sort: { createdAt: 1 }, limit: 20 }],
@@ -102,6 +156,7 @@ exports.claimMessage = async (req, res) => {
         const companyId = req.headers['companyid'] || '';
         const messageId = String((req.body || {}).messageId || '').trim();
         if (!companyId || !messageId) return res.send({ status: false, statusText: 'companyId and messageId are required.' });
+        markRunnerSeen(companyId); // claiming runner is online (presence)
         const r = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.DEV_MESSAGES,
             data: [
@@ -124,6 +179,7 @@ exports.heartbeat = async (req, res) => {
         const companyId = req.headers['companyid'] || '';
         const messageId = String((req.body || {}).messageId || '').trim();
         if (!companyId || !messageId) return res.send({ status: false, statusText: 'companyId and messageId are required.' });
+        markRunnerSeen(companyId); // heartbeating runner is online (presence)
         // Only touch a still-'working' task — never resurrect one already done/error.
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.DEV_MESSAGES,
@@ -263,6 +319,67 @@ exports.serveRunner = (req, res) => {
     } catch (error) {
         logger.error(`ERROR serving dev-agent runner: ${error.message}`);
         return res.status(500).send('// dev-agent runner is unavailable on this server');
+    }
+};
+
+/* GET /api/v2/dev-agent-launcher?code=<code>&os=<win|mac|linux>&base=<origin>  (PUBLIC)
+   One-click "Connect Computer": serves a ready-to-run launcher pre-filled with the
+   pairing code + this server's URL. The developer just opens the downloaded file —
+   it fetches the runner into ~/.alianhub and starts the paired agent (`--pair` both
+   pairs AND begins polling). `code` and `base` are templated into a shell script, so
+   both are STRICTLY validated (exact 32-hex code; clean http(s) origin) — anything
+   else is rejected, so there is no shell-injection surface. */
+exports.serveLauncher = (req, res) => {
+    try {
+        const code = String((req.query && req.query.code) || '').trim().toUpperCase();
+        const os = String((req.query && req.query.os) || 'win').trim().toLowerCase();
+        // Pairing codes are exactly 32 hex chars (crypto.randomBytes(16) hex upper).
+        if (!/^[0-9A-F]{32}$/.test(code)) return res.status(400).send('Invalid pairing code');
+        // Base origin: prefer the browser-supplied public origin (validated to a
+        // clean http(s) origin), else reconstruct from the request headers.
+        let base = String((req.query && req.query.base) || '').trim();
+        if (!/^https?:\/\/[A-Za-z0-9.\-:]+$/.test(base)) {
+            const proto = String(req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0];
+            base = `${proto}://${req.get('host')}`;
+        }
+        base = base.replace(/\/+$/, '');
+        const runnerUrl = `${base}/api/v2/dev-agent-runner.js`;
+
+        let filename; let contentType; let script;
+        if (os === 'mac' || os === 'linux') {
+            filename = os === 'mac' ? 'connect-alianhub.command' : 'connect-alianhub.sh';
+            contentType = 'text/x-shellscript; charset=utf-8';
+            script = [
+                '#!/usr/bin/env bash',
+                'set -e',
+                'echo "Setting up the AlianHub AI dev-agent..."',
+                'DIR="$HOME/.alianhub"; mkdir -p "$DIR"',
+                'if ! command -v node >/dev/null 2>&1; then echo "Node.js 18+ is required - install it from https://nodejs.org, then open this file again."; read -n 1 -s -r; exit 1; fi',
+                `curl -fsSL "${runnerUrl}" -o "$DIR/dev-agent.js"`,
+                `exec node "$DIR/dev-agent.js" --pair ${code} --url ${base}`,
+                '',
+            ].join('\n');
+        } else {
+            filename = 'connect-alianhub.cmd';
+            contentType = 'application/octet-stream';
+            script = [
+                '@echo off',
+                'echo Setting up the AlianHub AI dev-agent...',
+                'set "DIR=%USERPROFILE%\\.alianhub"',
+                'if not exist "%DIR%" mkdir "%DIR%"',
+                'where node >nul 2>nul || (echo Node.js 18+ is required - install it from https://nodejs.org, then run this file again. & pause & exit /b 1)',
+                `curl -fsSL "${runnerUrl}" -o "%DIR%\\dev-agent.js" || (echo Download failed - check your connection and try again. & pause & exit /b 1)`,
+                `node "%DIR%\\dev-agent.js" --pair ${code} --url ${base}`,
+                'pause',
+                '',
+            ].join('\r\n');
+        }
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        return res.send(script);
+    } catch (error) {
+        logger.error(`ERROR serving dev-agent launcher: ${error.message}`);
+        return res.status(500).send('dev-agent launcher is unavailable on this server');
     }
 };
 

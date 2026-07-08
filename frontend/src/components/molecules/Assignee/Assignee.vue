@@ -225,9 +225,15 @@ const detailedOptions = computed(() => {
     //     })
     // }
     userSortArray.value.forEach((x) => {
-        const designationKey = companyUsers.value.filter((y) => y.userId === x.id)?.[0]?.designation;
-        const designation = designations.value?.filter((x) => x.key === designationKey)[0]?.name;
-        x.designation = designation;
+        const cu = companyUsers.value.filter((y) => y.userId === x.id)?.[0];
+        // The AI Bot is an autonomous agent, not a real member — don't show it a
+        // human role/designation (it was resolving to "Owner"). Label it clearly.
+        if (cu?.userEmail === AI_BOT_EMAIL) {
+            x.designation = 'Autonomous';
+        } else {
+            const designationKey = cu?.designation;
+            x.designation = designations.value?.filter((d) => d.key === designationKey)[0]?.name;
+        }
         res.forEach((group) => {
             group.options.push(x);
         })

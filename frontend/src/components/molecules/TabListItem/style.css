@@ -13,6 +13,15 @@ li {
     flex-wrap: wrap;
 }
 
+/* Tab icons render at their SVG's intrinsic size. Cap the height so an
+   oversized icon (e.g. the Development puzzle, intrinsically 20px) matches
+   the others (~10px) instead of towering over them. Aspect ratio is kept
+   (width auto-scales) and the already-small icons stay untouched (≤ cap). */
+li img {
+    max-height: 12px;
+    width: auto;
+}
+
 li.active {
     background-color: #F4F5F7 !important;
     height: 47px !important;
