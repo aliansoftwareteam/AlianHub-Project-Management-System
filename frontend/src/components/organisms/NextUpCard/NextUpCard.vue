@@ -4,7 +4,7 @@
         <template v-else>
             <div v-if="!tasks.length" class="nu-msg">{{ $t('dashboardCard.next_up_empty') }}</div>
             <div v-else class="nu-list">
-                <div v-for="(t, i) in tasks" :key="t.taskId" class="nu-row" @click="openTaskDetail(t)">
+                <div v-for="(t, i) in tasks" :key="t.taskId" class="nu-row" role="button" tabindex="0" @click="openTaskDetail(t)" @keydown.enter="openTaskDetail(t)" @keydown.space.prevent="openTaskDetail(t)">
                     <span class="nu-rank">{{ i + 1 }}</span>
                     <div class="nu-main">
                         <div class="nu-title" :title="(t.taskKey ? t.taskKey + ' ' : '') + t.taskName">
@@ -45,7 +45,9 @@ import * as env from '@/config/env';
 import { buildFilterQuery } from '@/composable/commonFunction';
 import CardSkeleton from '@/components/atom/CardSkeleton/CardSkeleton.vue';
 import TaskDetail from '@/views/TaskDetail/TaskDetail.vue';
+import { useI18n } from 'vue-i18n';
 
+const { t: translate } = useI18n();
 // Member self-card — my open tasks ordered by due date then priority.
 // Self-scoped on the backend (caller = req.uid); no filters/range needed.
 const props = defineProps({
@@ -72,10 +74,10 @@ const dueLabel = (t) => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const day = new Date(d); day.setHours(0, 0, 0, 0);
     const diff = Math.round((day - today) / 86400000);
-    if (diff === 0) return 'Today';
-    if (diff === 1) return 'Tomorrow';
-    if (diff === -1) return 'Yesterday';
-    if (diff < 0) return `${Math.abs(diff)}d overdue`;
+    if (diff === 0) return translate('dashboardCard.Today');
+    if (diff === 1) return translate('dashboardCard.Tomorrow');
+    if (diff === -1) return translate('dashboardCard.Yesterday');
+    if (diff < 0) return translate('dashboardCard.overdue_days', { n: Math.abs(diff) });
     return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 };
 

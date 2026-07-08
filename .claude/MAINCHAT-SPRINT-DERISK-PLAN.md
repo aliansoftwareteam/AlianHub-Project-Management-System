@@ -2,7 +2,7 @@
 
 **Type:** Design spike (analysis only — no code changes in this document).
 **Ticket:** PRD **P1-1** ("shared-Sprint hot-document risk").
-**Related:** PRD **P0-1** (already merged — removed the *correctness* dependency on the shared Sprint's task count), [`.claude/SOCKET-PERFORMANCE-PLAN.md`](.claude/SOCKET-PERFORMANCE-PLAN.md) (#9 sprint-count caching, #6/#13 pool tuning).
+**Related:** PRD **P0-1** (already merged — removed the *correctness* dependency on the shared Sprint's task count), [`SOCKET-PERFORMANCE-PLAN.md`](SOCKET-PERFORMANCE-PLAN.md) (#9 sprint-count caching, #6/#13 pool tuning).
 
 > **Note on location:** Lives under `.claude/` alongside the repo's other design docs (e.g. `SOCKET-PERFORMANCE-PLAN.md`).
 
@@ -140,7 +140,7 @@ The narrowest fix: chats don't need a sprint task count, burndown, or plan cap, 
 - **Compares A and B (and C) on migration cost, read/write hot-path, blast radius, plan-gate interaction** — §2, §3.
 - **Recommendation with rationale + rough migration outline** — §4, §5.
 - **P0-1 already removed the correctness dependency; scoped as scaling/cleanliness, not urgent** — §1.5, callout in TL;DR, and §4 sequencing.
-- **Delivered as a committed markdown doc alongside `SOCKET-PERFORMANCE-PLAN.md`** — this file (committed at repo root pending relocation to `.claude/`; see the location note at the top).
+- **Delivered as a committed Markdown doc alongside `SOCKET-PERFORMANCE-PLAN.md`** — this file lives under `.claude/` alongside the repo's other design docs.
 
 ---
 

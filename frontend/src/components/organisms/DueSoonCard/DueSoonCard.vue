@@ -44,7 +44,9 @@ import * as env from '@/config/env';
 import { buildFilterQuery } from '@/composable/commonFunction';
 import CardSkeleton from '@/components/atom/CardSkeleton/CardSkeleton.vue';
 import TaskDetail from '@/views/TaskDetail/TaskDetail.vue';
+import { useI18n } from 'vue-i18n';
 
+const { t: translate } = useI18n();
 // Member self-card — my open tasks due within the next N days, soonest first.
 // Self-scoped on the backend (caller = req.uid).
 const props = defineProps({
@@ -67,8 +69,8 @@ const priorityRank = (p) => PRIORITY_RANK[String(p || '').toLowerCase()] ?? 2;
 
 const dueLabel = (t) => {
     if (t.daysUntil === null || t.daysUntil === undefined) return '—';
-    if (t.daysUntil === 0) return 'Today';
-    if (t.daysUntil === 1) return 'Tomorrow';
+    if (t.daysUntil === 0) return translate('dashboardCard.Today');
+    if (t.daysUntil === 1) return translate('dashboardCard.Tomorrow');
     return `${t.daysUntil}d`;
 };
 const dueClass = (t) => (t.daysUntil <= 0 ? 'ds-due-now' : t.daysUntil <= 2 ? 'ds-due-soon' : 'ds-due-later');

@@ -164,9 +164,10 @@ async function getLoggedAndTasksInRange(companyId, opts = {}) {
         // into a Mongo match (buildFilterQuery) on task fields ($and/$or) and
         // sends it as taskMatch. Merge it into the task query so the card's
         // Filters section actually narrows results.
-        if (taskMatch && typeof taskMatch === "object" && Object.keys(taskMatch).length) {
-            Object.assign(taskFilter, taskMatch);
-        }
+        // Merge the client's advanced-filter match SAFELY — only its $and/$or clauses, never
+        // a blanket key-copy (which would let a client override deletedStatusKey / inject
+        // Mongo operators). Same hardening as applyTaskMatch.
+        applyTaskMatch(taskFilter, taskMatch);
         const tasks = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
             data: [taskFilter, {
@@ -236,9 +237,9 @@ function applyTaskMatch(taskFilter, taskMatch) {
     if (taskFilter.$or) { andParts.push({ $or: taskFilter.$or }); delete taskFilter.$or; }
     if (Array.isArray(taskMatch.$and)) andParts.push(...taskMatch.$and);
     if (Array.isArray(taskMatch.$or)) andParts.push({ $or: taskMatch.$or });
-    Object.keys(taskMatch).forEach((k) => {
-        if (k !== "$and" && k !== "$or") taskFilter[k] = taskMatch[k];
-    });
+    // SECURITY: only merge the client match's $and/$or scoping clauses. Never blanket-copy
+    // other keys — a client could override base fields (deletedStatusKey / statusType) or
+    // inject Mongo operators ($where / $expr) → filter bypass + NoSQL injection.
     if (andParts.length) taskFilter.$and = (taskFilter.$and || []).concat(andParts);
     return taskFilter;
 }
