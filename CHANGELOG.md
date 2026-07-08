@@ -16,6 +16,30 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.10.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.9.0...v14.10.0) (2026-07-08)
+
+
+### 🚀 Features
+
+* **ai-assist:** richer task plans — few-shot examples + reliable sub-tasks/epics ([17e86de](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/17e86de96b051fa3000f77601fbdc730df0f49fc))
+* **ai-assist:** richer task plans — few-shot examples + reliable sub-tasks/epics ([1c67031](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1c670312214e0fc9ac777b35baa02ed9f7e9bb4a))
+* **dashboard:** member self-view cards + role-based template routing ([edf6761](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/edf6761d1f9dd7ef17986d43222da21d29230048))
+
+
+### 🐛 Bug Fixes
+
+* **ai-assist:** count sub-tasks in the sprint task count ([8884014](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/88840141bd44b1d0eed66ee781e849eea217dd88))
+* **ai-assist:** count sub-tasks in the sprint task count ([5cad5d4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5cad5d4001718fc73c0c91c52a045f79519711a2))
+* **dashboard:** harden taskMatch filtering + review polish ([1472f55](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1472f55656d684073abdfe98abfb418ec7247e9b))
+* **dashboard:** harden taskMatch filtering + review polish ([0787ffa](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0787ffad91ba1d663a0b4f39f0ae00728adb2c4c))
+* **docker:** build multi-arch on native runners instead of QEMU ([a21c2f3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a21c2f348d8bc75ff4419bc3a3016a5ee4b31e45))
+* **docker:** build multi-arch on native runners instead of QEMU ([eb06909](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/eb069095c9de5a170e35dc13625223c923d399de))
+
+
+### 📘 Documentation
+
+* design spike for de-risking the shared default Sprint (P1-1) ([713cc30](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/713cc3081c0ac21be8b7a09145bd13d50d3fddd1))
+
 ## [14.9.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.8.0...v14.9.0) (2026-07-07)
 
 
