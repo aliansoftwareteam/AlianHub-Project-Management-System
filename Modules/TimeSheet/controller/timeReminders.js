@@ -5,8 +5,6 @@ const { usersNeedingReminder, reminderSubject, reminderHtml } = require("../help
 const reminderSettings = require("../helpers/reminderSettings");
 const logger = require("../../../Config/loggerConfig");
 
-const ROLE_TYPE_COMPANY_OWNER = 1;
-
 // TIME-06 — time-entry reminders. A daily nudge (prod cron) to members who
 // haven't logged time today; the /send-reminders endpoint runs the same path
 // on demand for testing. Delivery is email via service.SendEmail (Resend/SMTP),
@@ -94,7 +92,8 @@ const isCompanyOwner = async (companyId, userId) => {
             type: SCHEMA_TYPE.COMPANY_USERS,
             data: [{ userId: String(userId) }, { _id: 1, roleType: 1 }],
         }, 'findOne');
-        return !!record && Number(record.roleType) === ROLE_TYPE_COMPANY_OWNER;
+        // Owner (1) or Admin (2) may manage this setting.
+        return !!record && [1, 2].includes(Number(record.roleType));
     } catch (err) {
         logger.error(`[timeReminders] role check failed companyId=${companyId} userId=${userId} ${err && err.message}`);
         return false;
@@ -139,7 +138,7 @@ exports.updateReminderSettings = async (req, res) => {
         if (!userId) return res.status(401).send({ status: false, statusText: 'authentication required.' });
 
         const ownerOk = await isCompanyOwner(companyId, userId);
-        if (!ownerOk) return res.status(403).send({ status: false, statusText: 'Only the company owner can change reminder settings.' });
+        if (!ownerOk) return res.status(403).send({ status: false, statusText: 'Only an owner or admin can change reminder settings.' });
 
         const body = req.body || {};
         const patch = {};
