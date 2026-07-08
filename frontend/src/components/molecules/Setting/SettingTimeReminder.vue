@@ -109,7 +109,8 @@ const { getCompanyUsers } = memberData();
 
 // Owner gate — mirrors SettingScreenshotRetention. Renders nothing otherwise.
 const companyUser = computed(() => getters['settings/companyUserDetail'] || {});
-const isOwner = computed(() => Number(companyUser.value && companyUser.value.roleType) === 1);
+// Owner (1) or Admin (2) — both can manage this company setting.
+const isOwner = computed(() => [1, 2].includes(Number(companyUser.value && companyUser.value.roleType)));
 
 const settings = ref({ enabled: false, userIds: [] });
 const selectedIds = ref([]);        // working copy of recipient ids (userId)

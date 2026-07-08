@@ -164,6 +164,31 @@
                 </div>
             </template>
         </AdvanceSearchModal>
+
+        <!-- Import dashboard: hidden picker + replace-confirmation -->
+        <input ref="importFileInput" type="file" accept="application/json,.json" class="d-none" @change="onImportFileChange" />
+        <AdvanceSearchModal
+            :modelValue="showImportConfirm"
+            :header="true"
+            :footer="true"
+            :closeIcon="false"
+            :showCloseIcon="false"
+            :closeOnBackdrop="false"
+            :styles="{ 'min-width': '440px', 'z-index': 12 }"
+            @close="showImportConfirm = false; pendingImport = null"
+        >
+            <template #header><h3 class="m-0">{{ $t('dashboardCard.import_confirm_title') }}</h3></template>
+            <template #body>
+                <span class="font-size-13">{{ $t('dashboardCard.import_confirm_body', { n: pendingImport ? pendingImport.cards.length : 0, m: layout.length }) }}</span>
+            </template>
+            <template #footer>
+                <div class="d-flex justify-content-end">
+                    <button class="outline-secondary" @click="showImportConfirm = false; pendingImport = null">{{ $t('Projects.cancel') }}</button>
+                    <button class="outline-primary ml-10px" @click="applyImport('merge')">{{ $t('dashboardCard.import_merge') }}</button>
+                    <button class="btn-primary ml-10px" @click="applyImport('replace')">{{ $t('dashboardCard.import_replace') }}</button>
+                </div>
+            </template>
+        </AdvanceSearchModal>
     </div>
 </template>
 <script setup>
@@ -819,7 +844,174 @@
         }
     };
 
-    defineExpose({ handleToggle });
+    // ── Export / Import dashboard (gear menu in the Home header) ──────
+    // File-based sharing: export the current cards + layout to a .json the
+    // user can hand to a teammate, who imports it onto their OWN dashboard
+    // (replace, with confirmation). Reuses the existing updateDashboard
+    // passthrough — no backend change.
+    const importFileInput = ref(null);
+    const showImportConfirm = ref(false);
+    const pendingImport = ref(null); // { cards, dropped }
+
+    const cardIdFor = (componentId) => cardComponent.value.find((c) => c.key === componentId)?._id || '';
+
+    const exportDashboard = () => {
+        try {
+            const cards = layout.value.map((item) => ({
+                componentId: item.componentId,
+                cardId: cardIdFor(item.componentId),
+                uid: item.i,
+                config: {
+                    cardData: item.cardData ?? {},
+                    position: { x: item.x, y: item.y, w: item.w, h: item.h, minW: item.minW, maxW: item.maxW, minH: item.minH, maxH: item.maxH },
+                    filterData: item.filterData ?? [],
+                },
+            }));
+            if (!cards.length) {
+                $toast.error(t('dashboardCard.export_empty'), { position: 'top-right' });
+                return;
+            }
+            const payload = { type: 'alianhub-dashboard', version: 1, exportedAt: new Date().toISOString(), cardCount: cards.length, cards };
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `alianhub-dashboard-${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            console.error('exportDashboard error', e);
+            $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
+        }
+    };
+
+    // Keep only cards whose componentId is a real, resolvable card in this
+    // build — a stale or foreign export can't inject unknown/invalid cards.
+    // uids are regenerated so they never collide within the target doc.
+    const sanitizeImportedCards = (parsed) => {
+        if (!parsed || parsed.type !== 'alianhub-dashboard' || !Array.isArray(parsed.cards)) return { cards: [], dropped: 0 };
+        const MAX_CARDS = 60;
+        let dropped = 0;
+        const cards = [];
+        parsed.cards.forEach((c) => {
+            const componentId = c && c.componentId;
+            const known = componentId && cardComponent.value.some((cc) => cc.key === componentId) && getComponent(componentId) !== null;
+            if (!known || cards.length >= MAX_CARDS) { dropped += 1; return; }
+            const size = getCardsComponentsSize(componentId) ?? { minW: 3, maxW: 12, minH: 5, maxH: 18 };
+            const pos = (c.config && c.config.position) || {};
+            cards.push({
+                componentId,
+                cardId: cardIdFor(componentId) || (c.cardId || ''),
+                uid: makeUniqueId(),
+                config: {
+                    cardData: (c.config && c.config.cardData) || {},
+                    position: {
+                        x: Number.isFinite(pos.x) ? pos.x : 0,
+                        y: Number.isFinite(pos.y) ? pos.y : 0,
+                        w: Number.isFinite(pos.w) ? pos.w : 3,
+                        h: Number.isFinite(pos.h) ? pos.h : 5,
+                        ...size,
+                    },
+                    filterData: Array.isArray(c.config && c.config.filterData) ? c.config.filterData : [],
+                },
+            });
+        });
+        return { cards, dropped };
+    };
+
+    const triggerImport = () => {
+        if (importFileInput.value) {
+            importFileInput.value.value = '';
+            importFileInput.value.click();
+        }
+    };
+    const onImportFileChange = (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            try {
+                const result = sanitizeImportedCards(JSON.parse(reader.result));
+                if (!result.cards.length) {
+                    $toast.error(t('dashboardCard.import_invalid'), { position: 'top-right' });
+                    return;
+                }
+                pendingImport.value = result;
+                showImportConfirm.value = true;
+            } catch (err) {
+                console.error('import parse error', err);
+                $toast.error(t('dashboardCard.import_invalid'), { position: 'top-right' });
+            }
+        };
+        reader.readAsText(file);
+    };
+
+    // Map a persisted card doc → the in-memory layout item shape.
+    const cardToLayoutItem = (e) => ({ ...e.config.position, ...(getCardsComponentsSize(e.componentId) ?? {}), i: e.uid, componentId: e.componentId, cardData: e.config.cardData, filterData: e.config.filterData });
+    // Map a current layout item → the persisted card doc shape.
+    const layoutItemToCard = (item) => ({
+        componentId: item.componentId,
+        cardId: cardIdFor(item.componentId),
+        uid: item.i,
+        config: {
+            cardData: item.cardData ?? {},
+            position: { x: item.x, y: item.y, w: item.w, h: item.h, minW: item.minW, maxW: item.maxW, minH: item.minH, maxH: item.maxH },
+            filterData: item.filterData ?? [],
+        },
+    });
+
+    // mode: 'replace' → swap the dashboard for the file's cards.
+    //       'merge'   → keep current cards and append the file's cards BELOW
+    //                   them (shifted past the current bottom; vertical-compact
+    //                   then tidies any gap). uids are already regenerated in
+    //                   sanitize, so appended cards can't collide.
+    const applyImport = async (mode = 'replace') => {
+        if (!pendingImport.value) return;
+        const dropped = pendingImport.value.dropped;
+        let cards;
+        if (mode === 'merge') {
+            const existing = layout.value.map(layoutItemToCard);
+            const baseY = layout.value.reduce((m, it) => Math.max(m, (it.y || 0) + (it.h || 0)), 0);
+            const appended = pendingImport.value.cards.map((c) => ({
+                ...c,
+                config: { ...c.config, position: { ...c.config.position, y: (c.config.position.y || 0) + baseY } },
+            }));
+            cards = [...existing, ...appended];
+        } else {
+            cards = pendingImport.value.cards;
+        }
+        try {
+            const response = await apiRequest('post', `${env.DASHBOARD}`, {
+                queryObject: [
+                    { userId: userId.value, templateId: currentLayout.value.templateId },
+                    { $set: { cards } },
+                    { new: true, useFindAndModify: false },
+                ],
+                method: 'findOneAndUpdate',
+                userId: userId.value,
+            });
+            if (response) {
+                currentLayout.value = response.data?.data || currentLayout.value;
+                layout.value = cards.map(cardToLayoutItem);
+                cards.forEach((e) => { refreshKeys[e.uid] = (refreshKeys[e.uid] || 0) + 1; });
+                const added = pendingImport.value.cards.length;
+                const msg = mode === 'merge'
+                    ? t('dashboardCard.import_merge_success', { n: added })
+                    : (dropped ? t('dashboardCard.import_success_dropped', { n: dropped }) : t('dashboardCard.import_success'));
+                $toast.success(msg, { position: 'top-right' });
+            }
+        } catch (e) {
+            console.error('applyImport error', e);
+            $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
+        } finally {
+            showImportConfirm.value = false;
+            pendingImport.value = null;
+        }
+    };
+
+    defineExpose({ handleToggle, exportDashboard, triggerImport });
 </script>
 <style>
     .dashboard-range-bar {

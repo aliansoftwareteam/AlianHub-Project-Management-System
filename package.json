@@ -1,6 +1,6 @@
 {
   "name": "alian-hub-v3",
-  "version": "14.8.0",
+  "version": "14.9.0",
   "description": "AlianHub — the open-source, self-hosted project management system. Multi-tenant, real-time, customizable. An open-source alternative to Jira, Asana, Monday, Linear, and ClickUp.",
   "keywords": [
     "project-management",
@@ -102,7 +102,7 @@
     "dev": "node scripts/dev.js --skip-install",
     "setup:reset": "node scripts/dev.js --force",
     "lint:commits": "commitlint --from ${BASE_BRANCH:-origin/staging} --to HEAD --verbose",
-    "prepare": "node .husky/install.mjs"
+    "prepare": "node .husky/install.mjs || true"
   },
   "author": "Alian Software <https://alianhub.com>",
   "license": "AGPL-3.0-or-later",

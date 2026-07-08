@@ -16,6 +16,25 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.9.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.8.0...v14.9.0) (2026-07-07)
+
+
+### 🚀 Features
+
+* **dashboard:** add "Is Not" filter operator and fix Free Resources exclusion ([2dc1d88](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2dc1d88183b9084e37abfb237a59da8e280d4b37))
+* **dashboard:** export/import dashboard layout via a settings menu ([81016b0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/81016b02a6e64e62ca5c37cebf8d666fd192359e))
+* **settings:** auto-close inactive projects (AHE-3798) + admin access to settings cards ([e9c219b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e9c219bc950a19a67fab72492b1afb45dc47c990))
+* **timesheet:** per-company opt-in settings for daily time-log reminder ([07a1726](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/07a17260b6f7577aac6e8dba1e174e70c5614f98))
+
+
+### 🐛 Bug Fixes
+
+* **auto-close:** query projects by createdAt, not the non-existent Created_At ([fc19e66](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fc19e66d597e06e545934e58b641c92f6cccb970))
+* **auto-close:** don't swallow activity-check errors ([29629b0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/29629b028792a2e9603ce03d4e183d6f02a34ea6))
+* **deploy:** husky prepare must not fail npm ci when .husky is absent ([df758b9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/df758b98ac103d37f9bf95cfa773e3f37e4850ea))
+* **estimate:** require a task description before generating an AI estimate ([54e91ac](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/54e91acd3cbf407d2002d309998a84f20653f63d))
+* address CodeRabbit review nits (mongoose require + shared ASSIGNEE_FIELD) ([ecb9ef2](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ecb9ef231739a6679b8f21ef8a37f8cab5573427))
+
 ## [14.8.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.7.0...v14.8.0) (2026-07-03)
 
 

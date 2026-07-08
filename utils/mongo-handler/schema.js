@@ -1088,6 +1088,16 @@ const schema = {
             type: Map,
             required: false
         },
+        // Per-company opt-in policy for auto-closing inactive projects (AHE-3798).
+        // Applied nightly by Modules/projectClose/helper.js. Map shape:
+        //   enabled: Boolean (default false)
+        //   inactiveMonths: Number (1 | 2 | 3 | 6) — quiet period before closing
+        //   enabledAt: Date, enabledBy: String (userId)
+        //   lastRunAt: Date, lastRunStats: { closedCount, durationMs }
+        autoCloseProjects: {
+            type: Map,
+            required: false
+        },
         // Per-company opt-in policy for the daily "log your time" reminder email.
         // Map shape:
         //   enabled: Boolean (default false — no reminder until an owner enables it)

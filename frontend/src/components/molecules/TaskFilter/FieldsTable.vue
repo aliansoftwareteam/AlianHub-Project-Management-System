@@ -510,7 +510,8 @@ const resetFields = (item) => {
     setTimeout(() => {
         if (arraykeys.includes(item.name.value)) {
             item.comparisonsData = [
-                { value: ':', name: "Is" }
+                { value: ':', name: "Is" },
+                { value: ':!=', name: "Not_Equals_To" }
             ]
             item.comparison = { value: ':', name: "Is" };
         } else if (dateKeys.includes(item.name.value)) {

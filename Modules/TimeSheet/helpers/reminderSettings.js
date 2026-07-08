@@ -17,7 +17,7 @@
  *   }
  */
 
-const { default: mongoose } = require('mongoose');
+const mongoose = require('mongoose');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 

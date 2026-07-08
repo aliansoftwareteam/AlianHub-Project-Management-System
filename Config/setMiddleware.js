@@ -18,6 +18,9 @@ const verifyJWTTokenWithCRoute = [
     // at the middleware layer to populate req.uid / req.aud).
     "/api/v1/screenshot-retention",
     "/api/v1/screenshot-retention/preview",
+    // Auto-close inactive projects (owner-only inside the controller; auth
+    // required here to populate req.uid / req.aud).
+    "/api/v1/project-close",
     "/api/v1/addmilestone",
     "/api/v1/updatemilestone",
     "/api/v1/deletemilestone",
