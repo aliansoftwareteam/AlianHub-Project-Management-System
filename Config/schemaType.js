@@ -87,6 +87,7 @@ const SCHEMA_TYPE = {
     INTEGRATION_CONNECTIONS: "integration_connections",
     DEV_MESSAGES: "dev_messages",
     DEV_PAIRINGS: "dev_pairings",
+    DEV_PROJECT_REPOS: "dev_project_repos",
 }
 
 module.exports = {

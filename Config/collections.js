@@ -88,6 +88,7 @@ const dbCollections = {
     INTEGRATION_CONNECTIONS: "integration_connections",
     DEV_MESSAGES: "dev_messages",
     DEV_PAIRINGS: "dev_pairings",
+    DEV_PROJECT_REPOS: "dev_project_repos",
 }
 
 /** DOCUMENT ID'S NAME WHICH IS USED IN THE "SETTINGS" COLLECTION NAME **/

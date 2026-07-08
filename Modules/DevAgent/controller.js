@@ -57,14 +57,14 @@ function isRunnerOnline(companyId) {
 async function failStalePendingIfNoRunner(companyId, rows) {
     if (isRunnerOnline(companyId)) return false;
     const now = Date.now();
-    const stale = (rows || []).filter((r) => r && r.role === 'user' && r.status === 'pending'
+    const stale = (rows || []).filter((r) => r && r.role === 'user' && (r.status === 'pending' || r.status === 'pending_pr')
         && r.createdAt && (now - new Date(r.createdAt).getTime()) > PENDING_GRACE_MS);
     let changed = false;
     for (const m of stale) {
         // eslint-disable-next-line no-await-in-loop
         const r = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.DEV_MESSAGES,
-            data: [{ _id: m._id, role: 'user', status: 'pending' }, { $set: { status: 'error' } }, {}],
+            data: [{ _id: m._id, role: 'user', status: m.status }, { $set: { status: 'error' } }, {}],
         }, 'updateOne').catch(() => null);
         if (r && r.matchedCount) {
             changed = true;
@@ -101,6 +101,12 @@ exports.postMessage = async (req, res) => {
             userId: String(req.uid || ''), // derive from the JWT/PAT, never the body
         };
         const saved = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.DEV_MESSAGES, data: doc }, 'save');
+        // Remember this repo for the whole project (every task + the AI Bot inherit it)
+        // and release any bot jobs that were parked waiting for a repo.
+        if (doc.repo) {
+            await saveProjectRepo(companyId, doc.projectId, doc.repo, doc.base, req.uid);
+            await resumeAwaitingRepo(companyId, doc.projectId, doc.repo, doc.base);
+        }
         return res.send({ status: true, statusText: 'Message sent.', data: mask(saved) });
     } catch (error) {
         logger.error(`ERROR in dev-agent postMessage: ${error.message}`);
@@ -139,7 +145,7 @@ exports.listPending = async (req, res) => {
         markRunnerSeen(companyId); // a runner is polling → mark it online (presence)
         const rows = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.DEV_MESSAGES,
-            data: [{ role: 'user', $or: [{ status: 'pending' }, { status: 'working', updatedAt: { $lt: new Date(Date.now() - 4 * 60 * 1000) } }] }, null, { sort: { createdAt: 1 }, limit: 20 }],
+            data: [{ role: 'user', $or: [{ status: 'pending' }, { status: 'pending_pr' }, { status: 'working', updatedAt: { $lt: new Date(Date.now() - 4 * 60 * 1000) } }] }, null, { sort: { createdAt: 1 }, limit: 20 }],
         }, 'find');
         return res.send({ status: true, statusText: 'Pending fetched.', data: (rows || []).map(mask) });
     } catch (error) {
@@ -160,7 +166,7 @@ exports.claimMessage = async (req, res) => {
         const r = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.DEV_MESSAGES,
             data: [
-                { _id: messageId, role: 'user', $or: [{ status: 'pending' }, { status: 'working', updatedAt: { $lt: new Date(Date.now() - 4 * 60 * 1000) } }] },
+                { _id: messageId, role: 'user', $or: [{ status: 'pending' }, { status: 'pending_pr' }, { status: 'working', updatedAt: { $lt: new Date(Date.now() - 4 * 60 * 1000) } }] },
                 { $set: { status: 'working' } },
                 {},
             ],
@@ -180,12 +186,21 @@ exports.heartbeat = async (req, res) => {
         const messageId = String((req.body || {}).messageId || '').trim();
         if (!companyId || !messageId) return res.send({ status: false, statusText: 'companyId and messageId are required.' });
         markRunnerSeen(companyId); // heartbeating runner is online (presence)
-        // Only touch a still-'working' task — never resurrect one already done/error.
+        // Stop requested (Point 3)? Tell the runner to abort its running job.
+        const doc = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.DEV_MESSAGES,
+            data: [{ _id: messageId, role: 'user' }, { _id: 1, status: 1 }],
+        }, 'findOne').catch(() => null);
+        if (doc && (doc.status === 'cancelling' || doc.status === 'cancelled')) {
+            return res.send({ status: true, cancel: true });
+        }
+        // Otherwise keep-alive: touch a still-'working' task so another runner doesn't
+        // re-claim it as stale — never resurrect one already done/error/cancelled.
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.DEV_MESSAGES,
             data: [{ _id: messageId, role: 'user', status: 'working' }, { $set: { status: 'working' } }, {}],
         }, 'updateOne');
-        return res.send({ status: true });
+        return res.send({ status: true, cancel: false });
     } catch (error) {
         logger.error(`ERROR in dev-agent heartbeat: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
@@ -207,7 +222,7 @@ exports.postReply = async (req, res) => {
         const parentId = String(b.parentId || '').trim();
         const parentStatus = String(b.status || '').trim();
         // Only a valid status, and only on the matching user message of THIS task.
-        if (parentId && ['working', 'done', 'error'].includes(parentStatus)) {
+        if (parentId && ['working', 'done', 'error', 'cancelled', 'awaiting_pr'].includes(parentStatus)) {
             await MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.DEV_MESSAGES,
                 data: [{ _id: parentId, taskId, role: 'user' }, { $set: { status: parentStatus } }, {}],
@@ -247,6 +262,130 @@ exports.updateProgress = async (req, res) => {
         return res.send({ status: true });
     } catch (error) {
         logger.error(`ERROR in dev-agent updateProgress: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+/* POST /api/v2/dev-agent/approve  body: { messageId }  (JWT)
+   Approve a gated bot job so the runner may develop it: awaiting_approval → pending.
+   (This same action will later also release an awaiting_pr job to create the PR.) */
+exports.approveJob = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'] || '';
+        const messageId = String((req.body || {}).messageId || '').trim();
+        if (!companyId || !messageId) return res.send({ status: false, statusText: 'companyId and messageId are required.' });
+        // Approve to START: awaiting_approval → pending (the runner then develops).
+        let r = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.DEV_MESSAGES,
+            data: [{ _id: messageId, role: 'user', status: 'awaiting_approval' }, { $set: { status: 'pending' } }, {}],
+        }, 'updateOne');
+        // Approve the PR STEP (Point 2): awaiting_pr → pending_pr (the runner opens the PR).
+        if (!(r && r.matchedCount)) {
+            r = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.DEV_MESSAGES,
+                data: [{ _id: messageId, role: 'user', status: 'awaiting_pr' }, { $set: { status: 'pending_pr' } }, {}],
+            }, 'updateOne');
+        }
+        return res.send({ status: true, approved: !!(r && r.matchedCount) });
+    } catch (error) {
+        logger.error(`ERROR in dev-agent approveJob: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+/* POST /api/v2/dev-agent/cancel  body: { messageId }  (JWT)
+   Cancel/stop a job. A not-yet-running job (awaiting_approval | pending) flips
+   straight to 'cancelled'. A 'working' job is marked 'cancelling' — the runner sees
+   that on its next heartbeat, aborts the run, and sets 'cancelled' (Point 3). */
+exports.cancelJob = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'] || '';
+        const messageId = String((req.body || {}).messageId || '').trim();
+        if (!companyId || !messageId) return res.send({ status: false, statusText: 'companyId and messageId are required.' });
+        // Not started yet → cancel outright.
+        const stopped = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.DEV_MESSAGES,
+            data: [{ _id: messageId, role: 'user', status: { $in: ['awaiting_approval', 'pending'] } }, { $set: { status: 'cancelled' } }, {}],
+        }, 'updateOne');
+        if (stopped && stopped.matchedCount) return res.send({ status: true, cancelled: true, state: 'cancelled' });
+        // Already running → signal the runner to abort (runner-side handling: Point 3).
+        const signalled = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.DEV_MESSAGES,
+            data: [{ _id: messageId, role: 'user', status: 'working' }, { $set: { status: 'cancelling' } }, {}],
+        }, 'updateOne');
+        return res.send({ status: true, cancelled: !!(signalled && signalled.matchedCount), state: (signalled && signalled.matchedCount) ? 'cancelling' : 'noop' });
+    } catch (error) {
+        logger.error(`ERROR in dev-agent cancelJob: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+// Persist a project's repo binding (company-scoped, one row per project). Once set
+// from any task's Development tab, every task in the project + the AI Bot resolve it.
+async function saveProjectRepo(companyId, projectId, repo, base, userId) {
+    const pid = String(projectId || '').trim();
+    const url = String(repo || '').trim();
+    if (!companyId || !pid || !url) return;
+    await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.DEV_PROJECT_REPOS,
+        data: [
+            { projectId: pid },
+            { $set: { projectId: pid, repo: url, base: String(base || 'main').trim() || 'main', updatedBy: String(userId || '') } },
+            { upsert: true },
+        ],
+    }, 'updateOne').catch(() => {});
+}
+
+// When a project's repo becomes known, release AI Bot jobs parked as 'awaiting_repo'
+// for that project: stamp the repo + move them to 'awaiting_approval' (Point 1) so
+// they show up for approval instead of sitting dead. Returns the count released.
+async function resumeAwaitingRepo(companyId, projectId, repo, base) {
+    if (!companyId || !String(projectId || '').trim() || !String(repo || '').trim()) return 0;
+    const r = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.DEV_MESSAGES,
+        data: [
+            { projectId: String(projectId), role: 'user', status: 'awaiting_repo' },
+            { $set: { repo: String(repo).trim(), base: String(base || 'main').trim() || 'main', status: 'awaiting_approval' } },
+            {},
+        ],
+    }, 'updateMany').catch(() => null);
+    return (r && (r.modifiedCount || r.nModified)) || 0;
+}
+
+/* GET /api/v2/dev-agent/project-repo?projectId=  (JWT) — a project's saved repo, so
+   the Development tab can pre-fill it in every task of that project. */
+exports.getProjectRepo = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'] || '';
+        const projectId = String((req.query || {}).projectId || '').trim();
+        if (!companyId || !projectId) return res.send({ status: false, statusText: 'companyId and projectId are required.' });
+        const row = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.DEV_PROJECT_REPOS,
+            data: [{ projectId }, { repo: 1, base: 1 }],
+        }, 'findOne').catch(() => null);
+        return res.send({ status: true, data: { repo: (row && row.repo) || '', base: (row && row.base) || 'main' } });
+    } catch (error) {
+        logger.error(`ERROR in dev-agent getProjectRepo: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+/* POST /api/v2/dev-agent/project-repo  body: { projectId, repo, base }  (JWT)
+   Save/replace a project's repo binding, then release any AI Bot jobs parked waiting
+   for a repo (awaiting_repo → awaiting_approval). */
+exports.setProjectRepo = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'] || '';
+        const b = req.body || {};
+        const projectId = String(b.projectId || '').trim();
+        const repo = String(b.repo || '').trim();
+        const base = String(b.base || 'main').trim() || 'main';
+        if (!companyId || !projectId || !repo) return res.send({ status: false, statusText: 'companyId, projectId and repo are required.' });
+        await saveProjectRepo(companyId, projectId, repo, base, req.uid);
+        const resumed = await resumeAwaitingRepo(companyId, projectId, repo, base);
+        return res.send({ status: true, statusText: 'Project repository saved.', data: { repo, base, resumed } });
+    } catch (error) {
+        logger.error(`ERROR in dev-agent setProjectRepo: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
 };

@@ -85,7 +85,8 @@ const {
     automationRulesSchema,
     integrationConnectionsSchema,
     devMessagesSchema,
-    devPairingsSchema
+    devPairingsSchema,
+    devProjectReposSchema
 } = require('./createSchema');
 
 
@@ -261,6 +262,8 @@ exports.checkType = (type) => {
             return devMessagesSchema
         case SCHEMA_TYPE.DEV_PAIRINGS:
             return devPairingsSchema
+        case SCHEMA_TYPE.DEV_PROJECT_REPOS:
+            return devProjectReposSchema
         default:
             return ""
     }
@@ -439,6 +442,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.DEV_MESSAGES}`
         case SCHEMA_TYPE.DEV_PAIRINGS:
                 return `${dbCollections.DEV_PAIRINGS}`
+        case SCHEMA_TYPE.DEV_PROJECT_REPOS:
+                return `${dbCollections.DEV_PROJECT_REPOS}`
         default:
             return ""
     }

@@ -2,10 +2,10 @@
     <div class="dev-chat">
         <!-- repo bar: temporary, per-conversation (not persisted) -->
         <div class="dev-repo">
-            <input v-model="repo" type="text" class="dev-repo-input" placeholder="Repository — git URL or local path (e.g. https://github.com/org/x.git)" />
-            <input v-model="base" type="text" class="dev-repo-base" placeholder="main" title="Base branch — for a git repo, the AI checks this out, branches its work from it, and opens the PR against it. Ignored for a plain local folder." />
+            <input v-model="repo" type="text" class="dev-repo-input" placeholder="Repository — git URL or local path (e.g. https://github.com/org/x.git)" @blur="saveProjectRepo" />
+            <input v-model="base" type="text" class="dev-repo-base" placeholder="main" title="Base branch — for a git repo, the AI checks this out, branches its work from it, and opens the PR against it. Ignored for a plain local folder." @blur="saveProjectRepo" />
         </div>
-        <div class="dev-repo-hint">Branch = the base the AI starts from and opens its PR against — used only for a git repo (a plain local folder ignores it).</div>
+        <div class="dev-repo-hint">Saved for the whole project — set it once and every task here (and the AI Bot) reuses it automatically. Branch = the base the AI branches from and opens its PR against (git repo only).</div>
 
         <!-- conversation -->
         <div ref="listEl" class="dev-messages">
@@ -19,6 +19,16 @@
                     <div class="dev-text"><span v-if="isWorking(m)" class="dev-spinner"></span>{{ m.text }}</div>
                     <a v-if="m.prUrl" :href="m.prUrl" target="_blank" rel="noopener" class="dev-pr">🔗 {{ m.prUrl }}</a>
                     <span v-if="m.role === 'user' && m.status" class="dev-status" :class="'st-' + m.status">{{ statusLabel(m.status) }}</span>
+                    <div v-if="m.role === 'user' && m.status === 'awaiting_approval'" class="dev-actions">
+                        <button class="dev-act dev-act--go" :disabled="acting" @click="approve(m)">✅ Approve &amp; start</button>
+                        <button class="dev-act dev-act--stop" :disabled="acting" @click="stopJob(m)">✕ Reject</button>
+                    </div>
+                    <div v-else-if="m.role === 'user' && (m.status === 'pending' || m.status === 'working')" class="dev-actions">
+                        <button class="dev-act dev-act--stop" :disabled="acting" @click="stopJob(m)">⏹ Stop</button>
+                    </div>
+                    <div v-else-if="m.role === 'user' && m.status === 'awaiting_pr'" class="dev-actions">
+                        <button class="dev-act dev-act--go" :disabled="acting" @click="approve(m)">🔀 Create PR</button>
+                    </div>
                 </div>
             </div>
             <div v-if="awaitingAgent" class="dev-msg is-agent">
@@ -55,24 +65,43 @@ const base = ref('main');
 const loading = ref(false);
 const sending = ref(false);
 const err = ref('');
+const acting = ref(false); // busy guard for approve / reject / stop actions
 const listEl = ref(null);
 let timer = null;
 
-const statusLabel = (s) => ({ pending: '⏳ queued', working: '⚙️ working…', done: '✓ done', error: '⚠️ error' }[s] || s);
+const statusLabel = (s) => ({ awaiting_repo: '📁 needs repo', awaiting_approval: '🟡 needs approval', pending: '⏳ queued', working: '⚙️ working…', awaiting_pr: '🔵 needs PR approval', pending_pr: '⏳ opening PR…', cancelling: '⏹ stopping…', cancelled: '⏹ cancelled', done: '✓ done', error: '⚠️ error' }[s] || s);
 
 // running-state indicators
 const activeParents = computed(() => {
     const s = new Set();
-    for (const m of messages.value) { if (m.role === 'user' && (m.status === 'pending' || m.status === 'working')) s.add(m._id); }
+    for (const m of messages.value) { if (m.role === 'user' && (m.status === 'pending' || m.status === 'working' || m.status === 'pending_pr')) s.add(m._id); }
     return s;
 });
 const isWorking = (m) => m.role === 'agent' && !!m.parentId && activeParents.value.has(m.parentId);
 const awaitingAgent = computed(() => {
     const last = messages.value[messages.value.length - 1];
-    return !!(last && last.role === 'user' && (last.status === 'pending' || last.status === 'working'));
+    return !!(last && last.role === 'user' && (last.status === 'pending' || last.status === 'working' || last.status === 'pending_pr'));
 });
 
 const scrollDown = () => { nextTick(() => { if (listEl.value) listEl.value.scrollTop = listEl.value.scrollHeight; }); };
+
+// The repo is remembered PER-PROJECT: pre-fill from the project's saved binding, and
+// persist it (on blur) so every task here + the AI Bot reuse it with no per-task setup.
+const loadProjectRepo = async () => {
+    if (!props.projectId || repo.value) return;
+    try {
+        const body = (await apiRequest('get', `${BASE}/project-repo?projectId=${encodeURIComponent(props.projectId)}`))?.data;
+        if (body && body.status && body.data && body.data.repo) { repo.value = body.data.repo; base.value = body.data.base || 'main'; }
+    } catch (e) { /* no binding yet */ }
+};
+const saveProjectRepo = async () => {
+    const url = repo.value.trim();
+    if (!props.projectId || !url) return;
+    try {
+        const body = (await apiRequest('post', `${BASE}/project-repo`, { projectId: props.projectId, repo: url, base: (base.value || 'main').trim() || 'main' }))?.data;
+        if (body && body.data && body.data.resumed) await load(); // a parked bot job just un-parked → refresh
+    } catch (e) { /* best-effort */ }
+};
 
 const load = async (initial) => {
     if (!props.taskId) return;
@@ -91,6 +120,7 @@ const load = async (initial) => {
         if (initial && !repo.value) {
             const withRepo = [...rows].reverse().find((r) => r.repo);
             if (withRepo) { repo.value = withRepo.repo; base.value = withRepo.base || 'main'; }
+            else { await loadProjectRepo(); } // else inherit the project's saved repo (set on another task)
         }
         if (changed || initial) scrollDown();
     } catch (e) { /* keep showing what we have */ } finally { if (initial) loading.value = false; }
@@ -116,6 +146,18 @@ const send = async () => {
         err.value = (e && e.response && e.response.data && (e.response.data.statusText || e.response.data.message)) || (e && e.message) || 'Failed';
     } finally { sending.value = false; }
 };
+
+// Approve a gated bot job (awaiting_approval → pending → the runner develops), or
+// reject/stop it. Both re-load so the tab reflects the new state right away.
+async function act(path, m) {
+    if (acting.value || !m || !m._id) return;
+    acting.value = true;
+    try { await apiRequest('post', `${BASE}/${path}`, { messageId: m._id }); await load(); }
+    catch (e) { err.value = (e && e.response && e.response.data && (e.response.data.statusText || e.response.data.message)) || (e && e.message) || 'Action failed'; }
+    finally { acting.value = false; }
+}
+const approve = (m) => act('approve', m);
+const stopJob = (m) => act('cancel', m);
 
 onMounted(() => { load(true); timer = setInterval(() => load(false), 3000); });
 onBeforeUnmount(() => { if (timer) clearInterval(timer); });
@@ -143,6 +185,16 @@ onBeforeUnmount(() => { if (timer) clearInterval(timer); });
 .dev-status.st-working { color: #b7791f; border-color: #e6d3a3; }
 .dev-status.st-done { color: #1c7a43; border-color: #bfe3cd; }
 .dev-status.st-error { color: #c0392b; border-color: #e6bcbc; }
+.dev-status.st-awaiting_approval { color: #b7791f; border-color: #e6d3a3; }
+.dev-status.st-awaiting_pr { color: #2563eb; border-color: #bcd0f5; }
+.dev-status.st-pending_pr { color: #b7791f; border-color: #e6d3a3; }
+.dev-status.st-cancelled, .dev-status.st-cancelling { color: #6b7280; border-color: #d7d9e6; }
+.dev-status.st-awaiting_repo { color: #6b7280; border-color: #d7d9e6; }
+.dev-actions { display: flex; gap: 8px; margin-top: 8px; }
+.dev-act { border: none; border-radius: 6px; padding: 5px 12px; font-size: 12px; cursor: pointer; font-family: inherit; }
+.dev-act:disabled { opacity: .5; cursor: default; }
+.dev-act--go { background: #2f3a8f; color: #fff; }
+.dev-act--stop { background: #fff; color: #c0392b; border: 1px solid #e6bcbc; }
 .dev-input { display: flex; gap: 8px; align-items: flex-end; padding: 10px 2px; border-top: 1px solid #eef0f6; }
 .dev-textarea { flex: 1; border: 1px solid #d7d9e6; border-radius: 8px; padding: 9px 12px; font-size: 13px; color: #3a3f52; resize: vertical; font-family: inherit; }
 .dev-send { background: #2f3a8f; color: #fff; border: none; border-radius: 8px; padding: 10px 20px; font-size: 13px; cursor: pointer; }

@@ -159,6 +159,8 @@ devMessagesSchema.index({ role: 1, status: 1, updatedAt: 1 });
 const devPairingsSchema = new Schema(schema.devPairings, {strict: true, timestamps: true});
 devPairingsSchema.index({ code: 1 }, { unique: true });
 devPairingsSchema.index({ createdAt: 1 }, { expireAfterSeconds: 3600 });
+const devProjectReposSchema = new Schema(schema.devProjectRepos, {strict: true, timestamps: true});
+devProjectReposSchema.index({ projectId: 1 }, { unique: true });
 // Global search: one combined text index per collection.
 taskSchema.index({ TaskName: 'text', rawDescription: 'text' });
 projectsSchema.index({ ProjectName: 'text' });
@@ -255,6 +257,7 @@ module.exports = {
     integrationConnectionsSchema,
     devMessagesSchema,
     devPairingsSchema,
+    devProjectReposSchema,
     historySchema,
     userIdSchema, 
     usersSchema,

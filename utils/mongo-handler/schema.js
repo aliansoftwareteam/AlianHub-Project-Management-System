@@ -647,6 +647,15 @@ const schema = {
         userId: { type: String, default: '', required: false },
         used: { type: Boolean, default: false, required: false },
     },
+    // AI dev-agent → per-PROJECT repo binding (company-scoped, one row per project).
+    // Set once from any task's Development tab; every task in that project + the AI
+    // Bot then resolve this repo automatically. Managed by Modules/DevAgent.
+    devProjectRepos: {
+        projectId: { type: String, required: true },
+        repo: { type: String, default: '', required: false },
+        base: { type: String, default: 'main', required: false },
+        updatedBy: { type: String, default: '', required: false },
+    },
     // Wiki pages (Editor.js blocks; versioned) — managed by Modules/Pages
     pages: {
         title: { type: String, required: true },

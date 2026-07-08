@@ -152,19 +152,39 @@ function run(cmd, cmdArgs, cwd, { capture = false, allowFail = false, input } = 
     return (r.stdout || '').trim();
 }
 
+// Kill a spawned child AND its descendants. On Windows child.kill() only kills the
+// cmd.exe wrapper, orphaning the real `claude` (node) process — so the work keeps
+// running after a Stop; taskkill /T /F kills the whole tree. POSIX gets SIGKILL.
+function killTree(child) {
+    if (!child) return;
+    try {
+        if (process.platform === 'win32') {
+            spawnSync('taskkill', ['/pid', String(child.pid), '/t', '/f'], { windowsHide: true });
+        } else {
+            child.kill('SIGKILL');
+        }
+    } catch (e) { try { child.kill(); } catch (_) { /* ignore */ } }
+}
+
 // Run Claude Code headless with streaming JSON events so we can surface a live
 // activity feed. Resolves on success, rejects on non-zero exit. `onEvent` gets
 // each parsed stream-json event (system / assistant / tool_use / result).
-function runClaude(cfg, dir, prompt, onEvent) {
+function runClaude(cfg, dir, prompt, onEvent, cancel) {
     const TIMEOUT_MS = 30 * 60 * 1000; // watchdog: a hung Claude must not wedge the poller forever
     return new Promise((resolve, reject) => {
         const { exe, viaCmd } = resolveExe(cfg.claudeBin);
         const file = viaCmd ? (process.env.ComSpec || 'cmd.exe') : exe;
         const claudeArgs = ['-p', '--dangerously-skip-permissions', '--output-format', 'stream-json', '--verbose'];
         const child = spawn(file, viaCmd ? ['/d', '/c', exe, ...claudeArgs] : claudeArgs, { cwd: dir, shell: false, windowsHide: true });
+        if (cancel) cancel.child = child; // expose the child so an emergency Stop can kill it mid-run (Point 3)
         let stderr = ''; let buf = ''; let settled = false;
-        const finish = (err) => { if (settled) return; settled = true; clearTimeout(timer); if (err) reject(err); else resolve(); };
-        const timer = setTimeout(() => { try { child.kill(); } catch (e) { /* ignore */ } finish(new Error(`claude timed out after ${TIMEOUT_MS / 60000} min`)); }, TIMEOUT_MS);
+        const finish = (err) => {
+            if (settled) return; settled = true; clearTimeout(timer);
+            if (cancel) cancel.child = null;
+            if (cancel && cancel.requested) return reject(new Error('__CANCELLED__')); // Stop won the race
+            if (err) reject(err); else resolve();
+        };
+        const timer = setTimeout(() => { try { killTree(child); } catch (e) { /* ignore */ } finish(new Error(`claude timed out after ${TIMEOUT_MS / 60000} min`)); }, TIMEOUT_MS);
         child.stdout.on('data', (chunk) => {
             buf += chunk.toString();
             let nl;
@@ -331,7 +351,7 @@ function ensureTrusted(dir) {
 // Develop ONE turn. If the target is pushable (has a git remote), work on the
 // task branch and open/update a PR. Otherwise just build in the folder and let
 // the developer test locally. Returns { prUrl, note }.
-async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, description, instruction, onProgress }) {
+async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, description, instruction, onProgress, cancel }) {
     ensureTrusted(dir);
     const ctxPath = contextRel(taskKey);
     const onEvent = (ev) => { const line = activityLine(ev); if (!line) return; if (onProgress) onProgress(line); else console.log(`   ${line}`); };
@@ -355,7 +375,7 @@ async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, descri
 
         const prompt = buildPrompt(taskKey, taskName, description, instruction, pushable, ctxPath, readContext(dir, taskKey));
         console.log('\n🤖  Claude Code …\n');
-        await runClaude(cfg, dir, prompt, onEvent);
+        await runClaude(cfg, dir, prompt, onEvent, cancel);
 
         if (run('git', ['status', '--porcelain'], dir, { capture: true })) {
             run('git', ['add', '-A'], dir);
@@ -364,21 +384,17 @@ async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, descri
         const ahead = run('git', ['rev-list', '--count', `origin/${base}..HEAD`], dir, { capture: true, allowFail: true });
         if (!ahead || ahead === '0') return { prUrl: '', note: 'No code changes were needed.' };
 
+        // PR gate (Point 2): push the branch (so it's ready to review, and a manual PR
+        // works too) but DON'T open the PR yet — hand back `pushed` so the caller can ask
+        // for approval. openPr (a 'pending_pr' job) opens the PR once the user approves.
         run('git', ['push', '-u', 'origin', branch], dir);
-        let prUrl = run('gh', ['pr', 'view', branch, '--json', 'url', '-q', '.url'], dir, { capture: true, allowFail: true });
-        if (!prUrl) {
-            prUrl = run('gh', ['pr', 'create', '--base', base, '--head', branch,
-                '--title', `${taskKey}: ${taskName}`,
-                '--body', `Implements **${taskKey} — ${taskName}** via the AlianHub AI dev-agent (Claude Code).\n\n_Please review before merging._`],
-            dir, { capture: true });
-        }
-        return { prUrl, note: '' };
+        return { prUrl: '', pushed: true, branch, note: '' };
     }
 
     // Local folder — no remote. Build freely; the developer tests locally.
     const prompt = buildPrompt(taskKey, taskName, description, instruction, pushable, ctxPath, readContext(dir, taskKey));
     console.log(`\n🤖  Claude Code (local folder — building in place) …\n`);
-    await runClaude(cfg, dir, prompt, onEvent);
+    await runClaude(cfg, dir, prompt, onEvent, cancel);
 
     // Best-effort snapshot if it's already a git repo (so the change is tracked).
     let committed = false;
@@ -388,6 +404,27 @@ async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, descri
         committed = true;
     }
     return { prUrl: '', note: `Work is ready in ${dir} — open & test it locally${committed ? ' (committed to your local repo)' : ''}. Point me at a git URL or add a remote when you want a PR.` };
+}
+
+// Open (or return an existing) PR for a task's already-developed branch. Used by the
+// PR-approval step (Point 2) — no Claude run, just a defensive push + gh pr create.
+function openPr(cfg, dir, base, taskKey, taskName) {
+    const branch = `ai/${slug(taskKey)}`;
+    run('git', ['fetch', 'origin'], dir, { allowFail: true });
+    if (!run('git', ['rev-parse', '--verify', '--quiet', `origin/${branch}`], dir, { capture: true, allowFail: true })) {
+        // Branch not on the remote yet — push the local one if it exists.
+        if (run('git', ['rev-parse', '--verify', '--quiet', branch], dir, { capture: true, allowFail: true })) {
+            run('git', ['push', '-u', 'origin', branch], dir, { allowFail: true });
+        }
+    }
+    let prUrl = run('gh', ['pr', 'view', branch, '--json', 'url', '-q', '.url'], dir, { capture: true, allowFail: true });
+    if (!prUrl) {
+        prUrl = run('gh', ['pr', 'create', '--base', base, '--head', branch,
+            '--title', `${taskKey}: ${taskName}`,
+            '--body', `Implements **${taskKey} — ${taskName}** via the AlianHub AI dev-agent (Claude Code).\n\n_Please review before merging._`],
+        dir, { capture: true });
+    }
+    return prUrl;
 }
 
 // ── poll mode: watch Development chats and develop each new instruction ────
@@ -424,7 +461,19 @@ async function handleMessage(cfg, msg) {
     }
     console.log(`\n▶  task ${msg.taskId}: "${String(msg.text).slice(0, 70)}"`);
     // Keep-alive so a genuinely long task isn't re-claimed as stale by another runner.
-    const hb = setInterval(() => { api(cfg, 'POST', '/api/v2/dev-agent/heartbeat', { messageId: msg._id }).catch(() => {}); }, 60000);
+    // Emergency-stop token (Point 3): the heartbeat doubles as a cancel poll. If the
+    // backend reports the job was stopped, kill the running Claude child at once.
+    const cancel = { requested: false, child: null };
+    const hb = setInterval(async () => {
+        try {
+            const r = await api(cfg, 'POST', '/api/v2/dev-agent/heartbeat', { messageId: msg._id });
+            if (r && r.cancel && !cancel.requested) {
+                cancel.requested = true;
+                console.log('  ⏹ stop requested — aborting…');
+                if (cancel.child) killTree(cancel.child);
+            }
+        } catch (e) { /* ignore */ }
+    }, 5000);
     const working = await reply(cfg, msg, { status: 'working', text: '⚙️ Working on it…' });
     const workingId = working && working._id;
     // Live progress — accumulate the FULL activity transcript on the "working"
@@ -477,16 +526,39 @@ async function handleMessage(cfg, msg) {
         }
         const { dir, base, pushable } = resolveWorkdir(cfg, String(task.ProjectID || ''), projectCode, repoArgsFromLocation(msg.repo, msg.base));
         onProgress(`📁 ${pushable ? 'repository' : 'local folder'}: ${dir}`); // immediate first update so the tab changes right away
-        const { prUrl, note } = await developTurn(cfg, {
-            dir, base, pushable, taskKey, taskName: task.TaskName || '(untitled task)',
-            description: task.description || task.rawDescription || '', instruction: msg.text, onProgress,
-        });
-        const text = prUrl ? `✅ Done. PR: ${prUrl}` : `✅ ${note || 'Done.'}`;
-        await reply(cfg, msg, { status: 'done', text, prUrl });
-        console.log(`  ✓ ${prUrl || note}`);
+        if (msg.status === 'pending_pr') {
+            // PR-approval step (Point 2): the code is already developed + pushed — just
+            // open the pull request for its branch. No Claude run.
+            onProgress('🔀 Opening the pull request…');
+            const prUrl = pushable ? openPr(cfg, dir, base, taskKey, task.TaskName || '(untitled task)') : '';
+            const text = prUrl
+                ? `✅ PR opened: ${prUrl}`
+                : (pushable ? '⚠️ Could not open the PR — check that the branch was pushed.' : 'This is a local folder — there is no remote to open a PR against.');
+            await reply(cfg, msg, { status: 'done', text, prUrl });
+            console.log(`  ✓ PR: ${prUrl}`);
+        } else {
+            const { prUrl, note, pushed, branch } = await developTurn(cfg, {
+                dir, base, pushable, taskKey, taskName: task.TaskName || '(untitled task)',
+                description: task.description || task.rawDescription || '', instruction: msg.text, onProgress, cancel,
+            });
+            if (pushable && pushed && !prUrl) {
+                // PR gate (Point 2): developed + pushed — wait for approval to open the PR.
+                await reply(cfg, msg, { status: 'awaiting_pr', text: `✅ Developed & pushed \`${branch}\`. Review it, then click **Create PR** to open the pull request — or open it yourself on GitHub.` });
+                console.log(`  ⏸ awaiting PR approval (${branch})`);
+            } else {
+                const text = prUrl ? `✅ Done. PR: ${prUrl}` : `✅ ${note || 'Done.'}`;
+                await reply(cfg, msg, { status: 'done', text, prUrl });
+                console.log(`  ✓ ${prUrl || note}`);
+            }
+        }
     } catch (e) {
-        await reply(cfg, msg, { status: 'error', text: `⚠️ ${e.message}` });
-        console.error(`  ✗ ${e.message}`);
+        if (cancel.requested || /__CANCELLED__/.test(e.message || '')) {
+            await reply(cfg, msg, { status: 'cancelled', text: '⏹ Stopped — cancelled by request.' });
+            console.log('  ⏹ cancelled');
+        } else {
+            await reply(cfg, msg, { status: 'error', text: `⚠️ ${e.message}` });
+            console.error(`  ✗ ${e.message}`);
+        }
     } finally {
         await flushProgress(); // ensure the full step-by-step log is visible in the tab
         clearInterval(hb);

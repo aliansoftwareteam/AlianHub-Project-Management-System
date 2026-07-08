@@ -87,24 +87,41 @@ async function enqueueForTask(companyId, taskData, projectData) {
     const sprintId = String(taskData.sprintId || '');
     const botUserId = await getBotUserId();
 
-    // The last repo used on this task, if any (newest message with a real repo).
+    // Resolve the repo: (1) the newest message on THIS task that carried one (a
+    // task-level override), else (2) the PROJECT's saved repo binding — set once from
+    // any task's Development tab — so assigning the bot to ANY task in the project just
+    // works, with no per-task setup.
     const priorRows = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.DEV_MESSAGES,
         data: [{ taskId, repo: { $nin: ['', null] } }, null, { sort: { createdAt: -1 }, limit: 1 }],
     }, 'find').catch(() => []);
     const prior = (priorRows || [])[0];
-    const repo = prior && prior.repo ? String(prior.repo).trim() : '';
-    const base = prior && prior.base ? String(prior.base).trim() : 'main';
+    let repo = prior && prior.repo ? String(prior.repo).trim() : '';
+    let base = prior && prior.base ? String(prior.base).trim() : 'main';
+    if (!repo && projectId) {
+        const pr = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.DEV_PROJECT_REPOS,
+            data: [{ projectId }, { repo: 1, base: 1 }],
+        }, 'findOne').catch(() => null);
+        if (pr && pr.repo) { repo = String(pr.repo).trim(); base = String(pr.base || 'main').trim() || 'main'; }
+    }
 
     if (!repo) {
-        // No repository set for this task yet — prompt (as the bot) instead of
-        // queuing a job that would only error. The developer sets the repo and
-        // sends, and the normal chat flow takes over from there.
+        // No repo known for this project yet — PARK the job as 'awaiting_repo' (the
+        // runner never claims it) and prompt once. The moment someone sets the repo
+        // (types it in the tab or sends a message) it flips to 'awaiting_approval' and
+        // proceeds automatically — no need to re-assign the bot.
+        const parkDesc = taskData.description || taskData.rawDescription || '';
+        const parkText = `Implement this task: ${taskData.TaskName || ''}${parkDesc ? `\n\n${parkDesc}` : ''}`.trim();
+        await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.DEV_MESSAGES,
+            data: { taskId, projectId, sprintId, role: 'user', text: parkText, repo: '', base: 'main', status: 'awaiting_repo', userId: botUserId },
+        }, 'save');
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.DEV_MESSAGES,
             data: {
                 taskId, projectId, sprintId, role: 'agent',
-                text: "👋 I'm assigned to this task, but no repository is set yet. Enter the repo (git URL or local path) in the box above and send me a message — then I'll start implementing.",
+                text: "👋 I'm assigned to this task. Set the repository once (git URL or local path) in the box above — I'll remember it for this whole project and start automatically.",
                 userId: botUserId,
             },
         }, 'save');
@@ -113,14 +130,57 @@ async function enqueueForTask(companyId, taskData, projectData) {
 
     const desc = taskData.description || taskData.rawDescription || '';
     const text = `Implement this task: ${taskData.TaskName || ''}${desc ? `\n\n${desc}` : ''}`.trim();
+
+    // Pre-flight (Point 4): surface open blockers + a missing description so the
+    // developer can decide before approving. Best-effort + extensible — add more
+    // checks to `warnings`. Reuses the Tasks module's READ-ONLY getOpenBlockers
+    // (no write there → isolation preserved); a failure never blocks assignment.
+    const warnings = await runPreflight(companyId, taskId, desc);
+    if (warnings.length) {
+        await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.DEV_MESSAGES,
+            data: {
+                taskId, projectId, sprintId, role: 'agent',
+                text: `⚠️ Pre-flight — please review before approving:\n• ${warnings.join('\n• ')}`,
+                userId: botUserId,
+            },
+        }, 'save');
+    }
+
+    // Gated (approval flow, Point 1): created as 'awaiting_approval', NOT 'pending'.
+    // The runner only ever claims 'pending', so nothing develops until the developer
+    // approves in the Development tab (Approve → 'pending'). A direct chat send stays
+    // 'pending' because sending is itself the explicit go-ahead.
     await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.DEV_MESSAGES,
         data: {
             taskId, projectId, sprintId,
-            role: 'user', text, repo, base, status: 'pending',
+            role: 'user', text, repo, base, status: 'awaiting_approval',
             userId: botUserId,
         },
     }, 'save');
+}
+
+// Pre-flight checks run before an AI Bot job is offered for approval. Returns a
+// list of human-readable warnings (empty = all clear). Extensible: add checks
+// here. Every check is best-effort — a failure returns no warning, never throws.
+async function runPreflight(companyId, taskId, desc) {
+    const warnings = [];
+    // 1) Open dependencies — is this task blocked by tasks that aren't closed yet?
+    try {
+        // Lazy require avoids any load-order coupling with the Tasks module.
+        // eslint-disable-next-line global-require
+        const relations = require('../Tasks/helpers/taskMongo/relations');
+        const res = await relations.getOpenBlockers({ companyId, taskId }).catch(() => null);
+        const blockers = (res && res.data) || [];
+        if (blockers.length) {
+            const keys = blockers.slice(0, 5).map((b) => (b.task && (b.task.TaskKey || b.task.TaskName)) || 'a task').join(', ');
+            warnings.push(`Blocked by ${blockers.length} open task(s): ${keys}${blockers.length > 5 ? ', …' : ''}.`);
+        }
+    } catch (e) { /* best-effort */ }
+    // 2) Description present — the AI needs something to work from.
+    if (!String(desc || '').trim()) warnings.push('No task description — the AI has little to work from.');
+    return warnings;
 }
 
 // Called from the assignment hook — enqueue only when the AI Bot itself was added.

@@ -9,6 +9,10 @@ exports.init = (app) => {
     app.post('/api/v2/dev-agent/heartbeat', ctrl.heartbeat);   // runner keep-alive (PAT)
     app.post('/api/v2/dev-agent/reply', ctrl.postReply);       // runner replies (PAT)
     app.post('/api/v2/dev-agent/progress', ctrl.updateProgress); // runner live progress (PAT)
+    app.post('/api/v2/dev-agent/approve', ctrl.approveJob);    // JWT: approve a gated bot job (awaiting_approval → pending)
+    app.post('/api/v2/dev-agent/cancel', ctrl.cancelJob);      // JWT: cancel/stop a job
+    app.get('/api/v2/dev-agent/project-repo', ctrl.getProjectRepo);  // JWT: a project's saved repo (tab pre-fill)
+    app.post('/api/v2/dev-agent/project-repo', ctrl.setProjectRepo); // JWT: save a project's repo (+ resume parked bot jobs)
 
     // Device pairing — zero-config onboarding.
     app.post('/api/v2/dev-agent/bot', ctrl.ensureBot);         // JWT: ensure the shared AI Bot user exists (per-user visibility is client-side)
