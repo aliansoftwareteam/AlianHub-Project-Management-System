@@ -12,7 +12,13 @@ const {
     getLoggedAndTasksInRange,
     getUserNameMap,
     getSprintTypeMap,
+    applyTaskMatch,
 } = require("./helpers/resourceHelpers");
+
+// Parse a client-built advanced-filter match from the request body.
+function bodyTaskMatch(body) {
+    return (body && body.taskMatch && typeof body.taskMatch === "object") ? body.taskMatch : null;
+}
 
 // Resolve a project's current status to its display name + colour from the
 // project's own status palette (projectStatusData: [{ value, name,
@@ -90,8 +96,15 @@ exports.getDashboard = async (req, res) => {
 
         try {
             const lanData = dashboardTemplate;
-            const defaultDashboard = lanData.find(e => e.isDefault && !e.isDeleted);
-            
+            // Role-based default: admins/managers (roleType 1/2) get the
+            // "management" template, everyone else the "member" template. Falls
+            // back to the isDefault template when no audience match exists.
+            const ownerRoleType = await resolveCallerRoleType(req.headers['companyid'], id);
+            const wantedAudience = (ownerRoleType === 1 || ownerRoleType === 2) ? 'management' : 'member';
+            const defaultDashboard =
+                lanData.find(e => !e.isDeleted && e.audience === wantedAudience)
+                || lanData.find(e => e.isDefault && !e.isDeleted);
+
             if (!defaultDashboard) {
                 return res.status(404).json({ status: false, message: "Default dashboard not found." });
             }
@@ -1605,6 +1618,390 @@ exports.getOnLeaveBoard = async (req, res) => {
         return res.status(500).json({
             status: false,
             message: "An error occurred while building the on-leave board.",
+            error: error && error.message ? error.message : String(error),
+        });
+    }
+};
+
+// Priority label → sort rank (lower = more urgent). Unknown priorities sort last.
+const MEMBER_PRIORITY_RANK = { urgent: 0, highest: 0, high: 1, medium: 2, normal: 2, low: 3, lowest: 4 };
+
+/**
+ * My Next Up (member self-card). The caller's open assigned tasks, ordered by
+ * due date (soonest first, undated last) then priority. Self-scoped: the member
+ * is req.uid (JWT), never the body — a member only ever sees their own work.
+ *
+ * Response: { tasks: [{ taskId, taskKey, taskName, projectId, projectName,
+ *                       sprintId, dueDate, priority, statusKey, status, overdue }] }
+ */
+exports.getMyNextTasks = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        if (!companyId) {
+            return res.status(400).json({ status: false, message: "companyId header required" });
+        }
+        const uid = String(req.uid || "");
+        if (!uid) return res.status(200).json({ status: true, data: { tasks: [] } });
+        const limit = Math.min(Number(req.body && req.body.limit) || 8, 25);
+
+        const nextFilter = applyTaskMatch({
+            deletedStatusKey: 0,
+            statusType: { $ne: "close" },
+            $or: [{ AssigneeUserId: uid }, { Task_Leader: uid }],
+        }, bodyTaskMatch(req.body));
+        const tasks = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS,
+            data: [
+                nextFilter,
+                { TaskName: 1, TaskKey: 1, DueDate: 1, Task_Priority: 1, ProjectID: 1, statusKey: 1, status: 1, sprintArray: 1 },
+            ],
+        }, "find").catch(() => []);
+
+        const projIds = [...new Set((tasks || []).map((t) => String(t.ProjectID)).filter(Boolean))];
+        const projectsMap = {};
+        if (projIds.length) {
+            const projects = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.PROJECTS,
+                data: [
+                    { _id: { $in: projIds.filter((id) => mongoose.Types.ObjectId.isValid(id)).map((id) => new mongoose.Types.ObjectId(id)) } },
+                    { ProjectName: 1 },
+                ],
+            }, "find").catch(() => []);
+            (projects || []).forEach((p) => { projectsMap[String(p._id)] = p.ProjectName || ""; });
+        }
+
+        const now = Date.now();
+        const rows = (tasks || []).map((t) => {
+            const dueMs = t.DueDate ? new Date(t.DueDate).getTime() : null;
+            return {
+                taskId: String(t._id),
+                taskKey: t.TaskKey || "",
+                taskName: t.TaskName || "—",
+                projectId: t.ProjectID ? String(t.ProjectID) : "",
+                projectName: projectsMap[String(t.ProjectID)] || "",
+                sprintId: (t.sprintArray && t.sprintArray.id) || "",
+                dueDate: t.DueDate || null,
+                priority: t.Task_Priority || "",
+                statusKey: t.statusKey,
+                status: t.status,
+                overdue: !!(dueMs && dueMs < now),
+                _due: dueMs,
+                _prank: MEMBER_PRIORITY_RANK[String(t.Task_Priority || "").toLowerCase()] ?? 9,
+            };
+        }).sort((a, b) => {
+            // Due date ascending, undated last; then priority rank.
+            if (a._due == null && b._due != null) return 1;
+            if (a._due != null && b._due == null) return -1;
+            if (a._due != null && b._due != null && a._due !== b._due) return a._due - b._due;
+            return a._prank - b._prank;
+        }).slice(0, limit).map(({ _due, _prank, ...r }) => r); // eslint-disable-line no-unused-vars
+
+        return res.status(200).json({ status: true, data: { tasks: rows } });
+    } catch (error) {
+        logger.error(`getMyNextTasks error: ${error && error.message ? error.message : error}`);
+        return res.status(500).json({
+            status: false,
+            message: "An error occurred while building the next-up list.",
+            error: error && error.message ? error.message : String(error),
+        });
+    }
+};
+
+/**
+ * My Achievements (member self-card). For the caller (req.uid) over the window:
+ * tasks they completed, split into within-estimate vs over-estimate, on-time %,
+ * and a current on-estimate streak.
+ *
+ * Completion is detected by `statusType === 'close'` with the task's `updatedAt`
+ * falling in the window (tasks carry no dedicated completedAt — updatedAt is the
+ * best available proxy; a task edited after closing can shift its date).
+ * On-estimate compares the task's total logged time vs its shared
+ * totalEstimatedTime.
+ *
+ * Response: { completedCount, onEstimate, overEstimate, onEstimateRate,
+ *             onTime, withDue, onTimeRate, currentStreak, recent: [...] }
+ */
+exports.getMyAchievements = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        if (!companyId) {
+            return res.status(400).json({ status: false, message: "companyId header required" });
+        }
+        const uid = String(req.uid || "");
+        const empty = { completedCount: 0, onEstimate: 0, overEstimate: 0, onEstimateRate: null, onTime: 0, withDue: 0, onTimeRate: null, currentStreak: 0, recent: [] };
+        if (!uid) return res.status(200).json({ status: true, data: empty });
+
+        const { dateFrom, dateTo } = getDayOrRangeBounds(req.body || {});
+
+        // Tasks the member completed in the window (updatedAt = completion proxy).
+        const achFilter = applyTaskMatch({
+            deletedStatusKey: 0,
+            statusType: "close",
+            $or: [{ AssigneeUserId: uid }, { Task_Leader: uid }],
+            updatedAt: { $gte: dateFrom, $lte: dateTo },
+        }, bodyTaskMatch(req.body));
+        const tasks = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS,
+            data: [
+                achFilter,
+                { TaskName: 1, TaskKey: 1, totalEstimatedTime: 1, DueDate: 1, updatedAt: 1, ProjectID: 1, sprintArray: 1 },
+            ],
+        }, "find").catch(() => []);
+
+        // Total logged per task (any user) → compared to the shared estimate.
+        const loggedByTask = {};
+        const taskIds = (tasks || []).map((t) => String(t._id));
+        if (taskIds.length) {
+            const tlogs = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.TIMESHEET,
+                data: [{ TicketID: { $in: taskIds } }, { TicketID: 1, LogTimeDuration: 1 }],
+            }, "find").catch(() => []);
+            (tlogs || []).forEach((ts) => {
+                if (!ts.TicketID) return;
+                loggedByTask[String(ts.TicketID)] = (loggedByTask[String(ts.TicketID)] || 0) + (Number(ts.LogTimeDuration) || 0);
+            });
+        }
+
+        let onEstimate = 0;
+        let overEstimate = 0;
+        let onTime = 0;
+        let withDue = 0;
+        const recent = (tasks || []).map((t) => {
+            const estimate = Number(t.totalEstimatedTime) || 0;
+            const logged = loggedByTask[String(t._id)] || 0;
+            const within = estimate > 0 ? logged <= estimate : null;
+            if (within === true) onEstimate += 1;
+            else if (within === false) overEstimate += 1;
+
+            let onTimeFlag = null;
+            if (t.DueDate) {
+                withDue += 1;
+                const doneMs = t.updatedAt ? new Date(t.updatedAt).getTime() : 0;
+                const dueEnd = new Date(t.DueDate); dueEnd.setHours(23, 59, 59, 999);
+                onTimeFlag = !!(doneMs && doneMs <= dueEnd.getTime());
+                if (onTimeFlag) onTime += 1;
+            }
+            return {
+                taskId: String(t._id),
+                taskKey: t.TaskKey || "",
+                taskName: t.TaskName || "—",
+                projectId: t.ProjectID ? String(t.ProjectID) : "",
+                sprintId: (t.sprintArray && t.sprintArray.id) || "",
+                logged,
+                estimate,
+                within,
+                onTime: onTimeFlag,
+                dueDate: t.DueDate || null,
+                completedAt: t.updatedAt || null,
+            };
+        }).sort((a, b) => new Date(b.completedAt || 0) - new Date(a.completedAt || 0));
+
+        const rated = onEstimate + overEstimate;
+        // Current streak — trailing consecutive on-estimate completions (most
+        // recent first); tasks with no estimate are skipped, an over-estimate breaks it.
+        let currentStreak = 0;
+        for (const r of recent) {
+            if (r.within === null) continue;
+            if (r.within) currentStreak += 1;
+            else break;
+        }
+
+        return res.status(200).json({
+            status: true,
+            data: {
+                completedCount: (tasks || []).length,
+                onEstimate,
+                overEstimate,
+                onEstimateRate: rated ? Math.round((onEstimate / rated) * 100) : null,
+                onTime,
+                withDue,
+                onTimeRate: withDue ? Math.round((onTime / withDue) * 100) : null,
+                currentStreak,
+                recent: recent.slice(0, 100),
+            },
+        });
+    } catch (error) {
+        logger.error(`getMyAchievements error: ${error && error.message ? error.message : error}`);
+        return res.status(500).json({
+            status: false,
+            message: "An error occurred while building achievements.",
+            error: error && error.message ? error.message : String(error),
+        });
+    }
+};
+
+/**
+ * My Leave (member self-card). The caller's own leave tickets in the configured
+ * leave project(s), across ALL statuses (so pending / approved / rejected are
+ * all visible) — "what's the status of my requests". Self-scoped (req.uid);
+ * status label/colour is resolved client-side from the status settings.
+ *
+ * Response: { configured, rows: [{ taskId, taskKey, taskName, projectId,
+ *             sprintId, startDate, dueDate, statusKey, statusType }] }
+ */
+exports.getMyLeave = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        if (!companyId) {
+            return res.status(400).json({ status: false, message: "companyId header required" });
+        }
+        const uid = String(req.uid || "");
+        const projectIds = (Array.isArray(req.body && req.body.projectIds) ? req.body.projectIds : [])
+            .filter((id) => mongoose.Types.ObjectId.isValid(String(id)))
+            .map((id) => new mongoose.Types.ObjectId(String(id)));
+        if (!uid || !projectIds.length) {
+            return res.status(200).json({ status: true, data: { configured: projectIds.length > 0, rows: [] } });
+        }
+
+        const leaveFilter = applyTaskMatch({
+            ProjectID: { $in: projectIds },
+            deletedStatusKey: 0,
+            $or: [{ AssigneeUserId: uid }, { Task_Leader: uid }],
+        }, bodyTaskMatch(req.body));
+        const tickets = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS,
+            data: [
+                leaveFilter,
+                { TaskName: 1, TaskKey: 1, startDate: 1, DueDate: 1, statusKey: 1, statusType: 1, ProjectID: 1, sprintArray: 1 },
+            ],
+        }, "find").catch(() => []);
+
+        const rows = (tickets || []).map((t) => ({
+            taskId: String(t._id),
+            taskKey: t.TaskKey || "",
+            taskName: t.TaskName || "—",
+            projectId: t.ProjectID ? String(t.ProjectID) : "",
+            sprintId: (t.sprintArray && t.sprintArray.id) || "",
+            startDate: t.startDate || null,
+            dueDate: t.DueDate || null,
+            statusKey: t.statusKey,
+            statusType: t.statusType,
+        })).sort((a, b) => new Date(b.startDate || b.dueDate || 0) - new Date(a.startDate || a.dueDate || 0))
+            .slice(0, 20);
+
+        return res.status(200).json({ status: true, data: { configured: true, rows } });
+    } catch (error) {
+        logger.error(`getMyLeave error: ${error && error.message ? error.message : error}`);
+        return res.status(500).json({
+            status: false,
+            message: "An error occurred while building my-leave.",
+            error: error && error.message ? error.message : String(error),
+        });
+    }
+};
+
+/**
+ * My Due Soon (member self-card). The caller's open tasks whose due date falls
+ * within the next N days (default 7), ordered soonest-first. Self-scoped
+ * (req.uid). Complements Next Up (priority order) and Overdue (past due).
+ *
+ * Response: { days, tasks: [{ taskId, taskKey, taskName, projectId, projectName,
+ *             sprintId, dueDate, priority, statusKey, status, daysUntil }] }
+ */
+exports.getMyDueSoon = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        if (!companyId) {
+            return res.status(400).json({ status: false, message: "companyId header required" });
+        }
+        const uid = String(req.uid || "");
+        if (!uid) return res.status(200).json({ status: true, data: { days: 7, tasks: [] } });
+        const days = Math.min(Math.max(Number(req.body && req.body.days) || 7, 1), 60);
+
+        const start = new Date(); start.setHours(0, 0, 0, 0);
+        const end = new Date(); end.setDate(end.getDate() + days); end.setHours(23, 59, 59, 999);
+
+        const filter = applyTaskMatch({
+            deletedStatusKey: 0,
+            statusType: { $ne: "close" },
+            $or: [{ AssigneeUserId: uid }, { Task_Leader: uid }],
+            DueDate: { $gte: start, $lte: end },
+        }, bodyTaskMatch(req.body));
+
+        const tasks = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS,
+            data: [filter, { TaskName: 1, TaskKey: 1, DueDate: 1, Task_Priority: 1, ProjectID: 1, statusKey: 1, status: 1, sprintArray: 1 }],
+        }, "find").catch(() => []);
+
+        const projIds = [...new Set((tasks || []).map((t) => String(t.ProjectID)).filter(Boolean))];
+        const projectsMap = {};
+        if (projIds.length) {
+            const projects = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.PROJECTS,
+                data: [
+                    { _id: { $in: projIds.filter((id) => mongoose.Types.ObjectId.isValid(id)).map((id) => new mongoose.Types.ObjectId(id)) } },
+                    { ProjectName: 1 },
+                ],
+            }, "find").catch(() => []);
+            (projects || []).forEach((p) => { projectsMap[String(p._id)] = p.ProjectName || ""; });
+        }
+
+        const todayMs = start.getTime();
+        const rows = (tasks || []).map((t) => {
+            const dueMs = t.DueDate ? new Date(t.DueDate).setHours(0, 0, 0, 0) : null;
+            return {
+                taskId: String(t._id),
+                taskKey: t.TaskKey || "",
+                taskName: t.TaskName || "—",
+                projectId: t.ProjectID ? String(t.ProjectID) : "",
+                projectName: projectsMap[String(t.ProjectID)] || "",
+                sprintId: (t.sprintArray && t.sprintArray.id) || "",
+                dueDate: t.DueDate || null,
+                priority: t.Task_Priority || "",
+                statusKey: t.statusKey,
+                status: t.status,
+                daysUntil: dueMs != null ? Math.round((dueMs - todayMs) / 86400000) : null,
+            };
+        }).sort((a, b) => new Date(a.dueDate || 0) - new Date(b.dueDate || 0)).slice(0, 15);
+
+        return res.status(200).json({ status: true, data: { days, tasks: rows } });
+    } catch (error) {
+        logger.error(`getMyDueSoon error: ${error && error.message ? error.message : error}`);
+        return res.status(500).json({
+            status: false,
+            message: "An error occurred while building due-soon.",
+            error: error && error.message ? error.message : String(error),
+        });
+    }
+};
+
+/**
+ * My Time (member self-card). The caller's planned hours (estimated_time) vs
+ * logged hours (timesheets) for the window. Self-scoped (req.uid).
+ *
+ * Response: { plannedMinutes, loggedMinutes }
+ */
+exports.getMyTime = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        if (!companyId) {
+            return res.status(400).json({ status: false, message: "companyId header required" });
+        }
+        const uid = String(req.uid || "");
+        if (!uid) return res.status(200).json({ status: true, data: { plannedMinutes: 0, loggedMinutes: 0 } });
+
+        const { dateFrom, dateTo, fromSec, toSec } = getDayOrRangeBounds(req.body || {});
+
+        const [ests, tlogs] = await Promise.all([
+            MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.ESTIMATES_TIME,
+                data: [{ UserId: uid, Date: { $gte: dateFrom, $lte: dateTo } }, { EstimatedTime: 1 }],
+            }, "find").catch(() => []),
+            MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.TIMESHEET,
+                data: [{ Loggeduser: uid, LogStartTime: { $gte: fromSec, $lte: toSec } }, { LogTimeDuration: 1 }],
+            }, "find").catch(() => []),
+        ]);
+
+        const plannedMinutes = (ests || []).reduce((s, e) => s + (Number(e.EstimatedTime) || 0), 0);
+        const loggedMinutes = (tlogs || []).reduce((s, t) => s + (Number(t.LogTimeDuration) || 0), 0);
+
+        return res.status(200).json({ status: true, data: { plannedMinutes, loggedMinutes } });
+    } catch (error) {
+        logger.error(`getMyTime error: ${error && error.message ? error.message : error}`);
+        return res.status(500).json({
+            status: false,
+            message: "An error occurred while building my-time.",
             error: error && error.message ? error.message : String(error),
         });
     }

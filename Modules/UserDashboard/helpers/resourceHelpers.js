@@ -224,6 +224,25 @@ async function getSprintTypeMap(companyId, sprintIds = []) {
     return map;
 }
 
+/**
+ * Merge a client-built task match (from buildFilterQuery — may carry $and/$or)
+ * into an existing task filter WITHOUT clobbering a base $or (e.g. the
+ * self-scope `$or:[{AssigneeUserId},{Task_Leader}]`). Everything is folded into
+ * $and so multiple $or groups coexist. Mutates and returns the filter.
+ */
+function applyTaskMatch(taskFilter, taskMatch) {
+    if (!taskMatch || typeof taskMatch !== "object" || !Object.keys(taskMatch).length) return taskFilter;
+    const andParts = [];
+    if (taskFilter.$or) { andParts.push({ $or: taskFilter.$or }); delete taskFilter.$or; }
+    if (Array.isArray(taskMatch.$and)) andParts.push(...taskMatch.$and);
+    if (Array.isArray(taskMatch.$or)) andParts.push({ $or: taskMatch.$or });
+    Object.keys(taskMatch).forEach((k) => {
+        if (k !== "$and" && k !== "$or") taskFilter[k] = taskMatch[k];
+    });
+    if (andParts.length) taskFilter.$and = (taskFilter.$and || []).concat(andParts);
+    return taskFilter;
+}
+
 module.exports = {
     getDayOrRangeBounds,
     buildUserTeamMap,
@@ -232,4 +251,5 @@ module.exports = {
     getLoggedAndTasksInRange,
     getUserNameMap,
     getSprintTypeMap,
+    applyTaskMatch,
 };
