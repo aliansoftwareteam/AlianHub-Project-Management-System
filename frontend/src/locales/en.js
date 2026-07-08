@@ -3285,6 +3285,7 @@ export default {
         Today: "Today",
         Yesterday: "Yesterday",
         Tomorrow: "Tomorrow",
+        overdue_days: "{n}d overdue",
         This_week: "This week",
         Next_week: "Next week",
         Next_seven_days: "Next 7 days",
