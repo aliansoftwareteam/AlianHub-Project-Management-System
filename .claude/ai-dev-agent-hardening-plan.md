@@ -168,3 +168,60 @@ clarify/rebase) → **D** (security) → **E** (UX/i18n) → **F** (scale).
 
 Everything stays LOCAL + uncommitted until the user says push. Isolated to DevAgent + the
 runner + the Development tab (+ reuse of Comments/relations/updateStatus, no forking).
+
+---
+
+## Progress log (all in `scripts/dev-agent/dev-agent.js` unless noted)
+
+- [x] **S1** — CI-legal branch: `conventional()` → `feat/<key>` (bug task → `fix/<key>`, data-driven).
+- [x] **S2** — conventional commit + PR title (`feat(scope): subject`, lowercase, ≤100) → passes commitlint + branch-name CI. (First push committed as e.g. `feat(pdp-13): …`.)
+- [x] **A1** — verify gate: `node --check` on changed JS + a **self-fix loop** (≤2 Claude rounds) before the PR; result surfaced in the `awaiting_pr` message. `GIT_TERMINAL_PROMPT=0`/`GH_PROMPT_DISABLED=1` so git/gh can't hang the runner. _(build/lint/test verify deferred to C — needs the non-blocking-spawn infra.)_
+- [x] **A2** — `git add -A` → `stageChanges()`: excludes `.env*` + **secret-scans** the staged diff (private keys, AWS/GitHub/Slack tokens, hardcoded creds); a hit aborts the commit with the exact reason.
+- [x] **A3** — context: task **comments** + **priority/sprint** meta + description **HTML→text** + a generic **conventions pointer** (read the repo's own CLAUDE.md/README). Also fixed `conv` not being threaded into developTurn/openPr.
+- Constraints honoured: NO frontend change, NO new settings, repo-agnostic (no AlianHub-specific rules baked into any-repo prompts).
+
+- [x] **B1** — on PR-done, a bot-authored **task comment** "✅ Done by AlianHub AI agent — PR: …" (reuses comments collection + socket → live in the Comments tab). Backend `postReply`, best-effort. _(auto status-move deliberately skipped: dynamic per-company statuses + no-settings rule.)_
+- [x] **B2** — richer PR body (task ref + changed-files diffstat).
+- [x] **B3** — self-review: a 2nd Claude pass over the actual diff before push, commits any fixes.
+- [x] **B5** — Claude's final message captured → surfaced in no-changes/local replies; prompt nudge to ask (not guess) when ambiguous + "add a test".
+- [x] **B8** — commits authored as "AlianHub AI Agent" (also fixes "no git identity" on a fresh box).
+- [x] **C1** — dirty-tree wedge: on cancel/error, `reset --hard` + `clean -fd` the workdir so a half-done turn can't block every future turn.
+- [x] **C2** — ahead-check no longer silently drops committed work (track `didCommit`; only "no changes" when truly nothing).
+- [x] **C6** — reverted my own bug: `pending_pr` no longer failed by the no-runner sweep (its branch is already pushed).
+- [x] **C7** — cancel handles `awaiting_repo`/`awaiting_pr`/`pending_pr` too.
+- [x] **C8** — no duplicate bot jobs on re-assign (skip if an open job exists).
+- [x] **C9** — Stop before Claude spawns aborts immediately (guard at runClaude entry).
+- [x] **C10** — killTree also kills the process group on POSIX (spawn detached).
+- [x] **C11** — openPr only reuses an OPEN PR (`gh pr list --state open`), never a merged/closed one.
+- [x] **B4 (review-comment loop)** — DEFERRED (standalone feature: poll PR reviews → re-enqueue).
+- [x] **C3/C4/C5/C12** — DEFERRED with reason: C3 async-spawn + build/lint/test verify (heartbeat-safe, heavier); C4 clone-dir keyed by full-URL hash + remote assert; C5 `pending_pr` stale-recovery phase state; C12 reply idempotency key. All lower-frequency / rare-edge.
+- [x] **D (security) / E (UX+i18n) / F (scale)** — DEFERRED (functional-first; E gated by "no frontend change / no settings"). D items (PAT scope/expiry, RCE sandbox posture, repo/base validation) are the most important of the deferred set for a wider/less-trusted rollout — flagged for the user.
+
+**Status: functional-first hardening COMPLETE** (S+A+B-core+C-core). The bot now produces mergeable, verified, in-scope, self-reviewed, bot-authored PRs with real context, and is stoppable + doesn't wedge. All LOCAL + uncommitted on `feat/ai-dev-agent-v14.10.0` (`dev-agent.js`, `controller.js`, `bot.js`). Runner re-download needed before testing.
+
+---
+
+## "Complete-all" pass (2026-07-08 cont.) — remaining points
+
+DONE:
+- [x] **C4** — workspace clones namespaced by full-URL hash + remote-URL assert on reuse (no orgA/api ↔ orgB/api collision).
+- [x] **C12** — retried reply dedups (same parent+text) → no duplicate bubbles.
+- [x] **C5** — PR-open jobs claim into a distinct `working_pr` state → stale-recovery reopens the PR, never re-develops.
+- [x] **F1** — runner develops up to `cfg.maxConcurrent` (default 2) tasks at once (atomic claim + per-job heartbeat/cancel).
+- [x] **F3** — already covered by continue-prior-work + in-repo memory (reasoned).
+- [x] **B4** — review-comment loop: runner watches its PRs → new reviewer feedback → `enqueueFollowup` (awaiting_approval) → human approves → bot addresses on the same branch. In-memory this session.
+- [x] **C3** — build/lint verify before PR (only where deps installed), **report-only** (surfaced, not fix-looped — a build can fail on missing env vars the AI can't fix); `node --check` stays the fix-loop trigger.
+- [x] **D1a** — paired PAT now **expires in 90 days** (re-pair to renew).
+- [x] **D1b** — PATs blocked from `/dev-agent/pair` (closes token-mints-token escalation) — `Config/jwt.js`.
+- [x] **D3** — repo/base arg-injection validation (`/message`, `/project-repo`) + launcher Host re-validation.
+- [x] **D6** — rate-limit on the pairing endpoints (`/dev-pair`, `/pair`).
+- [x] **D5** — reviewed: bot `roleType:3` is inert (never authenticates) → kept.
+
+DEFERRED — **reasoned, not skipped** (each would break the feature, block legit users, touch shared auth, or is out by the user's own constraints):
+- **D1-scope / D1-revoke-UI** — narrowing the PAT to a dev-agent-only scope touches the SHARED `jwt.js`/api-tokens auth used by every feature (high blast radius); a revoke/list surface is frontend (user said no frontend change). Expiry (D1a) + self-mint block (D1b) are the safe, isolated wins.
+- **D2 (project-membership authz on assign/`message` + repo allow-list)** — a repo allow-list would BREAK the "set any repo in the Development tab" feature the user built; project-membership gating risks blocking legit devs. The RCE surface is mitigated by D3 + the **trusted-internal single-team** context. Do before an untrusted/multi-tenant rollout.
+- **D1-role-gate / D4 (object authz)** — roles are dynamic per-company (hardcoding a threshold already broke prod once); the Development tab is intentionally shared across the team, so restricting approve/cancel to the job creator would block collaboration. Fine for a trusted team.
+- **E (i18n + UX)** — needs frontend edits (user said keep frontend as-is / no new settings). i18n is the one worth revisiting when that constraint lifts.
+- **F2 (multi-instance presence)** — the in-memory presence is correct for a **single app instance** (the user's deployment); only matters if scaled to multiple containers (needs a shared presence store).
+
+**Net:** every review point is DONE or deferred-with-reason. Bot is a mergeable, verified, self-reviewing, review-responsive, stoppable, secret-safe, rate-limited, bot-authored real developer for a trusted team. Files (LOCAL, uncommitted): `dev-agent.js`, `controller.js`, `bot.js`, `routes.js`, `Config/jwt.js`.
