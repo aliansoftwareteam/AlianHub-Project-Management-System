@@ -95,7 +95,9 @@ const invalidateMembershipCache = (uid, companyId) => {
 const PAT_READONLY_METHODS = ['GET', 'HEAD', 'OPTIONS'];
 // PATs must not manage tokens (no token-mints-token escalation). The
 // whoami endpoint is the one exception.
-const PAT_BLOCKED_PATH_PREFIX = '/api/v2/api-tokens';
+// PATs must not mint tokens, NOR pair a machine (pairing → mints another PAT → the same
+// token-mints-token escalation). Both prefixes are blocked for PAT-authenticated requests.
+const PAT_BLOCKED_PATH_PREFIXES = ['/api/v2/api-tokens', '/api/v2/dev-agent/pair'];
 const PAT_ALLOWED_EXCEPTIONS = ['/api/v2/api-tokens/me'];
 
 const verifyApiTokenRequest = async (req, res, next, companyId, rawToken) => {
@@ -104,7 +106,7 @@ const verifyApiTokenRequest = async (req, res, next, companyId, rawToken) => {
         const { verifyToken: verifyApiToken, logTokenActivity } = require('../Modules/ApiTokens/controller');
 
         const path = String(req.originalUrl || req.path || '').split('?')[0];
-        if (path.startsWith(PAT_BLOCKED_PATH_PREFIX) && !PAT_ALLOWED_EXCEPTIONS.includes(path)) {
+        if (PAT_BLOCKED_PATH_PREFIXES.some((p) => path.startsWith(p)) && !PAT_ALLOWED_EXCEPTIONS.includes(path)) {
             return res.status(403).json({
                 status: false,
                 error: 'API tokens cannot manage API tokens. Use the web app session instead.',

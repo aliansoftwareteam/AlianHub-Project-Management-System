@@ -57,14 +57,17 @@ function isRunnerOnline(companyId) {
 async function failStalePendingIfNoRunner(companyId, rows) {
     if (isRunnerOnline(companyId)) return false;
     const now = Date.now();
-    const stale = (rows || []).filter((r) => r && r.role === 'user' && (r.status === 'pending' || r.status === 'pending_pr')
+    // Only 'pending' (waiting to develop) is failed on "no runner". NOT 'pending_pr':
+    // its branch is already developed + pushed, so failing it would dead-end a done job
+    // (the fix is to open the PR, not re-develop). It simply waits for a runner. (C6)
+    const stale = (rows || []).filter((r) => r && r.role === 'user' && r.status === 'pending'
         && r.createdAt && (now - new Date(r.createdAt).getTime()) > PENDING_GRACE_MS);
     let changed = false;
     for (const m of stale) {
         // eslint-disable-next-line no-await-in-loop
         const r = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.DEV_MESSAGES,
-            data: [{ _id: m._id, role: 'user', status: m.status }, { $set: { status: 'error' } }, {}],
+            data: [{ _id: m._id, role: 'user', status: 'pending' }, { $set: { status: 'error' } }, {}],
         }, 'updateOne').catch(() => null);
         if (r && r.matchedCount) {
             changed = true;
@@ -89,14 +92,19 @@ exports.postMessage = async (req, res) => {
         if (!companyId || !taskId || !text) {
             return res.send({ status: false, statusText: 'companyId, taskId and text are required.' });
         }
+        const repo = String(b.repo || '').trim();
+        const base = String(b.base || 'main').trim() || 'main';
+        // Reject option-shaped / control-char values that could be mis-read as git/gh flags (D3).
+        if (repo && (repo.startsWith('-') || /[\n\r\0]/.test(repo))) return res.send({ status: false, statusText: 'Invalid repository value.' });
+        if (base.startsWith('-') || !/^[A-Za-z0-9._/-]+$/.test(base)) return res.send({ status: false, statusText: 'Invalid base branch.' });
         const doc = {
             taskId,
             projectId: String(b.projectId || ''),
             sprintId: String(b.sprintId || ''),
             role: 'user',
             text,
-            repo: String(b.repo || '').trim(),
-            base: String(b.base || 'main').trim() || 'main',
+            repo,
+            base,
             status: 'pending',
             userId: String(req.uid || ''), // derive from the JWT/PAT, never the body
         };
@@ -110,6 +118,38 @@ exports.postMessage = async (req, res) => {
         return res.send({ status: true, statusText: 'Message sent.', data: mask(saved) });
     } catch (error) {
         logger.error(`ERROR in dev-agent postMessage: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+/* POST /api/v2/dev-agent/enqueue  body: { taskId, projectId?, sprintId?, text, repo?, base? }  (PAT)
+   The runner queues a follow-up develop job — e.g. to address PR review feedback (B4).
+   Gated as 'awaiting_approval' so a human approves before the bot acts (consistent with
+   the bot-assign flow), and skipped if the task already has an open job. */
+exports.enqueueFollowup = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'] || '';
+        const b = req.body || {};
+        const taskId = String(b.taskId || '').trim();
+        const text = String(b.text || '').trim();
+        if (!companyId || !taskId || !text) return res.send({ status: false, statusText: 'companyId, taskId and text are required.' });
+        const repo = String(b.repo || '').trim();
+        const base = String(b.base || 'main').trim() || 'main';
+        if (repo && (repo.startsWith('-') || /[\n\r\0]/.test(repo))) return res.send({ status: false, statusText: 'Invalid repository value.' });
+        if (base.startsWith('-') || !/^[A-Za-z0-9._/-]+$/.test(base)) return res.send({ status: false, statusText: 'Invalid base branch.' });
+        const open = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.DEV_MESSAGES,
+            data: [{ taskId, role: 'user', status: { $in: ['awaiting_repo', 'awaiting_approval', 'pending', 'working', 'working_pr', 'cancelling', 'awaiting_pr', 'pending_pr'] } }, { _id: 1 }, {}],
+        }, 'findOne').catch(() => null);
+        if (open) return res.send({ status: true, statusText: 'A job is already open for this task.', data: null });
+        const botId = await require('./bot').getBotUserId().catch(() => '');
+        const saved = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.DEV_MESSAGES,
+            data: { taskId, projectId: String(b.projectId || ''), sprintId: String(b.sprintId || ''), role: 'user', text, repo, base, status: 'awaiting_approval', userId: botId || String(req.uid || '') },
+        }, 'save');
+        return res.send({ status: true, statusText: 'Follow-up queued for approval.', data: mask(saved) });
+    } catch (error) {
+        logger.error(`ERROR in dev-agent enqueueFollowup: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
 };
@@ -145,7 +185,7 @@ exports.listPending = async (req, res) => {
         markRunnerSeen(companyId); // a runner is polling → mark it online (presence)
         const rows = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.DEV_MESSAGES,
-            data: [{ role: 'user', $or: [{ status: 'pending' }, { status: 'pending_pr' }, { status: 'working', updatedAt: { $lt: new Date(Date.now() - 4 * 60 * 1000) } }] }, null, { sort: { createdAt: 1 }, limit: 20 }],
+            data: [{ role: 'user', $or: [{ status: 'pending' }, { status: 'pending_pr' }, { status: 'working', updatedAt: { $lt: new Date(Date.now() - 4 * 60 * 1000) } }, { status: 'working_pr', updatedAt: { $lt: new Date(Date.now() - 4 * 60 * 1000) } }] }, null, { sort: { createdAt: 1 }, limit: 20 }],
         }, 'find');
         return res.send({ status: true, statusText: 'Pending fetched.', data: (rows || []).map(mask) });
     } catch (error) {
@@ -163,14 +203,19 @@ exports.claimMessage = async (req, res) => {
         const messageId = String((req.body || {}).messageId || '').trim();
         if (!companyId || !messageId) return res.send({ status: false, statusText: 'companyId and messageId are required.' });
         markRunnerSeen(companyId); // claiming runner is online (presence)
-        const r = await MongoDbCrudOpration(companyId, {
+        const staleMs = new Date(Date.now() - 4 * 60 * 1000);
+        // PR-open jobs get a DISTINCT claimed state ('working_pr') so a stale-recovery still
+        // routes the runner to open-the-PR rather than re-develop from scratch (C5).
+        let r = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.DEV_MESSAGES,
-            data: [
-                { _id: messageId, role: 'user', $or: [{ status: 'pending' }, { status: 'pending_pr' }, { status: 'working', updatedAt: { $lt: new Date(Date.now() - 4 * 60 * 1000) } }] },
-                { $set: { status: 'working' } },
-                {},
-            ],
+            data: [{ _id: messageId, role: 'user', $or: [{ status: 'pending_pr' }, { status: 'working_pr', updatedAt: { $lt: staleMs } }] }, { $set: { status: 'working_pr' } }, {}],
         }, 'updateOne');
+        if (!(r && r.matchedCount)) {
+            r = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.DEV_MESSAGES,
+                data: [{ _id: messageId, role: 'user', $or: [{ status: 'pending' }, { status: 'working', updatedAt: { $lt: staleMs } }] }, { $set: { status: 'working' } }, {}],
+            }, 'updateOne');
+        }
         return res.send({ status: true, claimed: !!(r && r.matchedCount) });
     } catch (error) {
         logger.error(`ERROR in dev-agent claimMessage: ${error.message}`);
@@ -198,7 +243,7 @@ exports.heartbeat = async (req, res) => {
         // re-claim it as stale — never resurrect one already done/error/cancelled.
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.DEV_MESSAGES,
-            data: [{ _id: messageId, role: 'user', status: 'working' }, { $set: { status: 'working' } }, {}],
+            data: [{ _id: messageId, role: 'user', status: { $in: ['working', 'working_pr'] } }, { $set: { role: 'user' } }, {}],
         }, 'updateOne');
         return res.send({ status: true, cancel: false });
     } catch (error) {
@@ -221,6 +266,14 @@ exports.postReply = async (req, res) => {
         }
         const parentId = String(b.parentId || '').trim();
         const parentStatus = String(b.status || '').trim();
+        // Dedup a retried reply (the runner re-POSTs on a transient blip) — same parent + text (C12).
+        if (parentId) {
+            const dup = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.DEV_MESSAGES,
+                data: [{ taskId, parentId, role: 'agent', text }, { _id: 1 }, {}],
+            }, 'findOne').catch(() => null);
+            if (dup) return res.send({ status: true, statusText: 'Reply already recorded.', data: mask(dup) });
+        }
         // Only a valid status, and only on the matching user message of THIS task.
         if (parentId && ['working', 'done', 'error', 'cancelled', 'awaiting_pr'].includes(parentStatus)) {
             await MongoDbCrudOpration(companyId, {
@@ -239,6 +292,28 @@ exports.postReply = async (req, res) => {
             userId: String(req.uid || ''),
         };
         const saved = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.DEV_MESSAGES, data: doc }, 'save');
+        // B1: when a PR is opened (done + prUrl), drop a comment on the task thread so the
+        // work is visible on the TASK itself (not only in the Development tab), authored by
+        // the AI Bot. Reuses the comments collection + the same socket event the Comments UI
+        // listens on, so it renders live. Best-effort — never blocks the reply.
+        if (parentStatus === 'done' && doc.prUrl && doc.projectId) {
+            try {
+                const botId = await require('./bot').getBotUserId();
+                if (botId) {
+                    const c = await MongoDbCrudOpration(companyId, {
+                        type: SCHEMA_TYPE.COMMENTS,
+                        data: {
+                            type: 'text', project: false,
+                            projectId: doc.projectId, taskId,
+                            ...(doc.sprintId ? { sprintId: doc.sprintId } : {}),
+                            userId: botId,
+                            message: `✅ Done by AlianHub AI agent — PR: ${doc.prUrl}`,
+                        },
+                    }, 'save');
+                    try { require('../../event/socketEventEmitter').emit('insert', { type: 'insert', data: c, updatedFields: {}, module: 'comments' }); } catch (e) { /* socket best-effort */ }
+                }
+            } catch (e) { logger.error(`dev-agent: task-comment write-back failed: ${e.message}`); }
+        }
         return res.send({ status: true, statusText: 'Reply posted.', data: mask(saved) });
     } catch (error) {
         logger.error(`ERROR in dev-agent postReply: ${error.message}`);
@@ -302,10 +377,10 @@ exports.cancelJob = async (req, res) => {
         const companyId = req.headers['companyid'] || '';
         const messageId = String((req.body || {}).messageId || '').trim();
         if (!companyId || !messageId) return res.send({ status: false, statusText: 'companyId and messageId are required.' });
-        // Not started yet → cancel outright.
+        // Not started yet (any waiting/queued state) → cancel outright. (C7)
         const stopped = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.DEV_MESSAGES,
-            data: [{ _id: messageId, role: 'user', status: { $in: ['awaiting_approval', 'pending'] } }, { $set: { status: 'cancelled' } }, {}],
+            data: [{ _id: messageId, role: 'user', status: { $in: ['awaiting_repo', 'awaiting_approval', 'pending', 'awaiting_pr', 'pending_pr'] } }, { $set: { status: 'cancelled' } }, {}],
         }, 'updateOne');
         if (stopped && stopped.matchedCount) return res.send({ status: true, cancelled: true, state: 'cancelled' });
         // Already running → signal the runner to abort (runner-side handling: Point 3).
@@ -381,6 +456,8 @@ exports.setProjectRepo = async (req, res) => {
         const repo = String(b.repo || '').trim();
         const base = String(b.base || 'main').trim() || 'main';
         if (!companyId || !projectId || !repo) return res.send({ status: false, statusText: 'companyId, projectId and repo are required.' });
+        if (repo.startsWith('-') || /[\n\r\0]/.test(repo)) return res.send({ status: false, statusText: 'Invalid repository value.' });
+        if (base.startsWith('-') || !/^[A-Za-z0-9._/-]+$/.test(base)) return res.send({ status: false, statusText: 'Invalid base branch.' });
         await saveProjectRepo(companyId, projectId, repo, base, req.uid);
         const resumed = await resumeAwaitingRepo(companyId, projectId, repo, base);
         return res.send({ status: true, statusText: 'Project repository saved.', data: { repo, base, resumed } });
@@ -436,7 +513,7 @@ exports.exchangePairing = async (req, res) => {
         const rawToken = generateToken();
         await MongoDbCrudOpration(pairing.companyId, {
             type: SCHEMA_TYPE.API_TOKENS,
-            data: { name: 'dev-agent (paired)', tokenHash: hashToken(rawToken), prefix: tokenPrefixOf(rawToken), scopes: ['read', 'write'], userId: pairing.userId, active: true },
+            data: { name: 'dev-agent (paired)', tokenHash: hashToken(rawToken), prefix: tokenPrefixOf(rawToken), scopes: ['read', 'write'], userId: pairing.userId, active: true, expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) }, // expire in 90 days — re-pair to renew (D1)
         }, 'save');
         return res.send({ status: true, statusText: 'Paired.', data: { companyId: pairing.companyId, userId: pairing.userId, token: rawToken } });
     } catch (error) {
@@ -482,6 +559,8 @@ exports.serveLauncher = (req, res) => {
             base = `${proto}://${req.get('host')}`;
         }
         base = base.replace(/\/+$/, '');
+        // Re-validate after header reconstruction — the Host header is attacker-influenceable (D3).
+        if (!/^https?:\/\/[A-Za-z0-9.\-:]+$/.test(base)) return res.status(400).send('Invalid host');
         const runnerUrl = `${base}/api/v2/dev-agent-runner.js`;
 
         let filename; let contentType; let script;

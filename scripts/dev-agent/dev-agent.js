@@ -32,6 +32,7 @@ const { spawnSync, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const crypto = require('crypto');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -130,7 +131,7 @@ function resolveExe(cmd) {
 // ── run a command with an arg array (no shell → no quoting headaches). ─────
 // `input` (optional) is written to the child's stdin — used to hand Claude the
 // prompt, which avoids quoting a large multi-line arg (esp. on Windows).
-function run(cmd, cmdArgs, cwd, { capture = false, allowFail = false, input } = {}) {
+function run(cmd, cmdArgs, cwd, { capture = false, allowFail = false, input, timeout } = {}) {
     const { exe, viaCmd } = resolveExe(cmd);
     const file = viaCmd ? (process.env.ComSpec || 'cmd.exe') : exe;
     // No `/s`: it strips the quotes around a space-containing exe path
@@ -144,6 +145,9 @@ function run(cmd, cmdArgs, cwd, { capture = false, allowFail = false, input } = 
         encoding: 'utf8',
         shell: false,
         windowsHide: true,
+        timeout,
+        // Never block the runner on an interactive git/gh credential prompt — fail fast.
+        env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GH_PROMPT_DISABLED: '1', GH_NO_UPDATE_NOTIFIER: '1' },
     });
     if (r.error) { if (allowFail) return ''; throw new Error(`${cmd}: ${r.error.message}`); }
     if (r.status !== 0 && !allowFail) {
@@ -161,7 +165,7 @@ function killTree(child) {
         if (process.platform === 'win32') {
             spawnSync('taskkill', ['/pid', String(child.pid), '/t', '/f'], { windowsHide: true });
         } else {
-            child.kill('SIGKILL');
+            try { process.kill(-child.pid, 'SIGKILL'); } catch (e) { child.kill('SIGKILL'); } // kill the detached group; fall back to the child (C10)
         }
     } catch (e) { try { child.kill(); } catch (_) { /* ignore */ } }
 }
@@ -172,17 +176,18 @@ function killTree(child) {
 function runClaude(cfg, dir, prompt, onEvent, cancel) {
     const TIMEOUT_MS = 30 * 60 * 1000; // watchdog: a hung Claude must not wedge the poller forever
     return new Promise((resolve, reject) => {
+        if (cancel && cancel.requested) return reject(new Error('__CANCELLED__')); // stopped before we spawned (C9)
         const { exe, viaCmd } = resolveExe(cfg.claudeBin);
         const file = viaCmd ? (process.env.ComSpec || 'cmd.exe') : exe;
         const claudeArgs = ['-p', '--dangerously-skip-permissions', '--output-format', 'stream-json', '--verbose'];
-        const child = spawn(file, viaCmd ? ['/d', '/c', exe, ...claudeArgs] : claudeArgs, { cwd: dir, shell: false, windowsHide: true });
+        const child = spawn(file, viaCmd ? ['/d', '/c', exe, ...claudeArgs] : claudeArgs, { cwd: dir, shell: false, windowsHide: true, detached: process.platform !== 'win32' });
         if (cancel) cancel.child = child; // expose the child so an emergency Stop can kill it mid-run (Point 3)
-        let stderr = ''; let buf = ''; let settled = false;
+        let stderr = ''; let buf = ''; let settled = false; let resultText = '';
         const finish = (err) => {
             if (settled) return; settled = true; clearTimeout(timer);
             if (cancel) cancel.child = null;
             if (cancel && cancel.requested) return reject(new Error('__CANCELLED__')); // Stop won the race
-            if (err) reject(err); else resolve();
+            if (err) reject(err); else resolve(resultText); // resolve with Claude's final message (B5)
         };
         const timer = setTimeout(() => { try { killTree(child); } catch (e) { /* ignore */ } finish(new Error(`claude timed out after ${TIMEOUT_MS / 60000} min`)); }, TIMEOUT_MS);
         child.stdout.on('data', (chunk) => {
@@ -190,7 +195,7 @@ function runClaude(cfg, dir, prompt, onEvent, cancel) {
             let nl;
             while ((nl = buf.indexOf('\n')) >= 0) {
                 const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
-                if (line) { try { onEvent(JSON.parse(line)); } catch (e) { /* non-JSON line */ } }
+                if (line) { try { const ev = JSON.parse(line); if (ev && ev.type === 'result' && typeof ev.result === 'string') resultText = ev.result; onEvent(ev); } catch (e) { /* non-JSON line */ } }
             }
         });
         child.stderr.on('data', (c) => { stderr += c.toString(); });
@@ -246,6 +251,138 @@ async function api(cfg, method, endpoint, body) {
 
 const slug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'task';
 
+// Commits are authored as the bot (clear ownership in git history + audit) and this
+// also avoids a "no git identity configured" failure on a fresh machine. (B8)
+const BOT_GIT = ['-c', 'user.name=AlianHub AI Agent', '-c', 'user.email=ai-bot@alianhub.local'];
+const prWatch = new Map(); // branch → PR opened this session, watched for reviewer feedback (B4)
+
+// Conventional-commit naming so the branch, commit, and PR title pass this repo's
+// branch-name + commitlint CI (types feat|fix|…; lowercase type + scope; subject not
+// Start/Sentence/UPPER-case; no trailing period; header ≤100). Type is data-driven from
+// the task (a bug/defect → fix) with a safe 'feat' default; slug() is already CI-legal.
+function conventional(task, taskKey) {
+    const hay = [task && task.type, task && task.Task_type, task && task.taskType, task && task.TaskType, task && task.label, task && task.Task_Label, task && task.category]
+        .filter(Boolean).map((v) => String(v).toLowerCase()).join(' ');
+    const type = /\b(bug|fix|hotfix|defect|issue|error)\b/.test(hay) ? 'fix' : 'feat';
+    const scope = slug(taskKey); // lowercase kebab, non-empty ('task' fallback) → scope-case ok
+    const branch = `${type}/${scope}`;
+    const headerFor = (subject) => {
+        const prefix = `${type}(${scope}): `;
+        let s = String(subject || '').replace(/\s+/g, ' ').trim().toLowerCase().replace(/[.\s]+$/, '');
+        const max = 100 - prefix.length;
+        if (s.length > max) s = s.slice(0, max).replace(/\s+\S*$/, '') || s.slice(0, max);
+        return prefix + (s || 'update');
+    };
+    return { type, scope, branch, headerFor };
+}
+
+// Strip rich-text HTML → readable text (task descriptions + comments are HTML).
+function htmlToText(html) {
+    return String(html || '')
+        .replace(/<\s*br\s*\/?>/gi, '\n')
+        .replace(/<\/(?:p|div|li|h[1-6]|tr)>/gi, '\n')
+        .replace(/<li[^>]*>/gi, '• ')
+        .replace(/<[^>]+>/g, '')
+        .replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>').replace(/&quot;/gi, '"').replace(/&#39;/gi, "'")
+        .replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+// Lightweight secret scan of ADDED diff lines — refuse to commit obvious credentials.
+function findSecrets(diff) {
+    const patterns = [
+        [/-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----/, 'private key'],
+        [/AKIA[0-9A-Z]{16}/, 'AWS access key'],
+        [/\baws_secret_access_key\b/i, 'AWS secret'],
+        [/\bgh[pousr]_[A-Za-z0-9]{20,}\b/, 'GitHub token'],
+        [/\bxox[baprs]-[A-Za-z0-9-]{10,}\b/, 'Slack token'],
+        [/\b(?:api[_-]?key|secret|password|passwd|access[_-]?token|auth[_-]?token)\b\s*[:=]\s*['"][^'"\s]{16,}['"]/i, 'hardcoded credential'],
+    ];
+    const hits = new Set();
+    for (const line of String(diff || '').split('\n')) {
+        if (!line.startsWith('+') || line.startsWith('+++')) continue;
+        for (const [re, label] of patterns) { if (re.test(line)) hits.add(label); }
+    }
+    return [...hits];
+}
+
+// Stage the AI's changes (excluding env files) and refuse if the staged diff carries
+// obvious secrets — so nothing leaks into a commit/PR. Throws a clear message on a hit.
+function stageChanges(dir) {
+    run('git', ['add', '-A', '--', '.', ':(exclude).env', ':(exclude).env.*', ':(exclude)**/.env', ':(exclude)**/.env.*'], dir, { allowFail: true });
+    const secrets = findSecrets(run('git', ['diff', '--cached'], dir, { capture: true, allowFail: true }));
+    if (secrets.length) {
+        run('git', ['reset'], dir, { allowFail: true });
+        throw new Error(`possible secret(s) in the changes (${secrets.join(', ')}) — not committing. Remove the credential(s) and resend.`);
+    }
+}
+
+// Task comments (best-effort) — requirements & clarifications often live there.
+async function fetchComments(cfg, projectId, taskId) {
+    if (!projectId || !taskId) return [];
+    try {
+        const res = await api(cfg, 'GET', `/api/v1/comments/get-paginated-messages?projectId=${encodeURIComponent(projectId)}&taskId=${encodeURIComponent(taskId)}&batchLimit=30`);
+        const d = res && res.data;
+        const rows = Array.isArray(d) ? d : ((d && (d.messages || d.data || d.comments)) || []);
+        return Array.isArray(rows) ? rows : [];
+    } catch (e) { return []; }
+}
+
+// Verify the AI's work before it becomes a PR (A1): syntax-check every changed JS file
+// with `node --check` (instant, no deps) so a parse error is caught + self-fixed here,
+// not in CI. Build/lint/test verification comes in a later pass (it needs a non-blocking
+// spawn so a long build can't wedge the poller). Returns { ok, report }. Best-effort.
+// Like run() but never throws; returns { code, out } (stdout+stderr) and honours a timeout.
+function runResult(cmd, cmdArgs, cwd, { timeout } = {}) {
+    const { exe, viaCmd } = resolveExe(cmd);
+    const file = viaCmd ? (process.env.ComSpec || 'cmd.exe') : exe;
+    const args = viaCmd ? ['/d', '/c', exe, ...cmdArgs] : cmdArgs;
+    const r = spawnSync(file, args, {
+        cwd, stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8', shell: false, windowsHide: true,
+        timeout, maxBuffer: 64 * 1024 * 1024,
+        env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GH_PROMPT_DISABLED: '1', CI: '1' },
+    });
+    const timedOut = !!(r.error && r.error.code === 'ETIMEDOUT');
+    return { code: r.error ? (timedOut ? 124 : -1) : (r.status == null ? -1 : r.status), out: `${r.stdout || ''}${r.stderr || ''}`, timedOut };
+}
+function hasScript(pkgDir, name) {
+    try { const p = JSON.parse(fs.readFileSync(path.join(pkgDir, 'package.json'), 'utf8')); return !!(p.scripts && p.scripts[name]); } catch (e) { return false; }
+}
+
+function verifyWork(dir, changed, onProgress) {
+    const notes = []; let ok = true;
+    const touched = changed || [];
+    // 1) Syntax-check changed JS with `node --check` (instant, no deps). This is the HARD
+    //    signal that drives the self-fix loop — a parse error is always the AI's to fix.
+    const jsFiles = touched.filter((f) => /\.(js|cjs|mjs)$/.test(f) && fs.existsSync(path.join(dir, f)));
+    if (jsFiles.length && onProgress) onProgress(`🔎 syntax-checking ${jsFiles.length} changed JS file(s)…`);
+    for (const f of jsFiles) {
+        const r = spawnSync(process.execPath, ['--check', path.join(dir, f)], { cwd: dir, encoding: 'utf8', timeout: 30000, windowsHide: true });
+        if (r.status !== 0) {
+            ok = false;
+            notes.push(`✗ ${f}: ${String(r.stderr || (r.error && r.error.message) || 'check failed').trim().split('\n').slice(0, 4).join(' ').slice(0, 300)}`);
+        }
+    }
+    if (ok && jsFiles.length) notes.push(`✓ ${jsFiles.length} changed JS file(s) parse cleanly`);
+    // 2) Build/lint (C3) — only where deps are ALREADY installed (never auto-install: too
+    //    heavy). REPORT-ONLY: surfaced to the reviewer but does NOT drive the fix-loop, since a
+    //    build can fail for environment reasons (missing build-time vars) the AI can't fix.
+    if (touched.some((f) => f.startsWith('frontend/')) && fs.existsSync(path.join(dir, 'frontend', 'node_modules'))) {
+        for (const s of ['lint', 'build']) {
+            if (!hasScript(path.join(dir, 'frontend'), s)) continue;
+            if (onProgress) onProgress(`🔎 frontend ${s}…`);
+            const r = runResult('npm', ['run', s], path.join(dir, 'frontend'), { timeout: 12 * 60 * 1000 });
+            notes.push(r.code === 0 ? `✓ frontend ${s}` : `⚠️ frontend ${s} failed${r.timedOut ? ' (timed out)' : ''}:\n${r.out.trim().slice(-600)}`);
+        }
+    }
+    if (touched.some((f) => /\.(js|cjs|mjs)$/.test(f) && !f.startsWith('frontend/')) && fs.existsSync(path.join(dir, 'node_modules')) && hasScript(dir, 'lint')) {
+        if (onProgress) onProgress('🔎 lint…');
+        const r = runResult('npm', ['run', 'lint'], dir, { timeout: 6 * 60 * 1000 });
+        notes.push(r.code === 0 ? '✓ lint' : `⚠️ lint failed${r.timedOut ? ' (timed out)' : ''}:\n${r.out.trim().slice(-600)}`);
+    }
+    return { ok, report: notes.join('\n') };
+}
+
 const isGitUrl = (s) => /^(https?:\/\/|git@|ssh:\/\/)/i.test(String(s || '').trim());
 
 // A repo location string ("https://…" or a local path) → resolveWorkdir() args.
@@ -277,10 +414,20 @@ function resolveWorkdir(cfg, projectId, projectCode, args) {
         return { dir, base, pushable };
     }
     if (gitUrl) {
-        const name = slug((gitUrl.split('/').pop() || 'repo').replace(/\.git$/i, ''));
-        const dir = path.join(cfg.workspace, name);
+        // Namespace the clone by a short hash of the FULL url so two repos with the same
+        // basename (orgA/api vs orgB/api) never collide into one clone (C4).
+        const base0 = slug((gitUrl.split('/').pop() || 'repo').replace(/\.git$/i, ''));
+        const dir = path.join(cfg.workspace, `${base0}-${crypto.createHash('sha1').update(gitUrl).digest('hex').slice(0, 8)}`);
         if (fs.existsSync(path.join(dir, '.git'))) {
-            console.log(`📁  Workspace clone: ${dir}`);
+            // Reuse only if it is genuinely the same remote; otherwise the dir is stale → reclone.
+            const origin = run('git', ['remote', 'get-url', 'origin'], dir, { capture: true, allowFail: true }).trim();
+            if (origin === gitUrl) {
+                console.log(`📁  Workspace clone: ${dir}`);
+            } else {
+                console.log(`♻️  Stale clone (${origin || 'no remote'} ≠ ${gitUrl}) — recloning ${dir} …`);
+                fs.rmSync(dir, { recursive: true, force: true });
+                run('git', ['clone', gitUrl, dir], cfg.workspace);
+            }
         } else {
             fs.mkdirSync(cfg.workspace, { recursive: true });
             console.log(`📥  Cloning ${gitUrl} → ${dir} …`);
@@ -307,15 +454,20 @@ function readContext(dir, taskKey) {
     } catch (e) { return ''; }
 }
 
-function buildPrompt(taskKey, taskName, description, instruction, pushable, contextPath, contextText) {
+function buildPrompt({ taskKey, taskName, description, instruction, pushable, contextPath, contextText, comments, meta }) {
     return [
         `You are developing AlianHub task ${taskKey}: ${taskName}.`,
+        meta ? `\n${meta}` : '',
         description ? `\nTask description / acceptance criteria:\n${description}` : '',
+        comments ? `\nTask discussion so far (oldest → newest) — requirements and clarifications often live in the comments, so read them and honour them:\n${comments}` : '',
         contextText ? `\nPrior development context for this task (from ${contextPath}, written on earlier turns — possibly by other developers on other machines). Read it and continue from where it left off; do NOT redo work already done:\n${contextText}` : '',
         `\nThe user's instruction for this turn:\n${instruction}`,
         '',
+        "Before you code, read this repository's own conventions (CLAUDE.md, README, CONTRIBUTING, and its lint/editor config) and match the existing structure, style, and patterns. Keep the change focused and strictly in scope for the task.",
+        "If the task is too ambiguous or you are missing information needed to implement it safely, do NOT guess — briefly explain what you need and make no changes; a developer will clarify and resend.",
+        "Where the repository has a test setup, add or update a test that covers what you changed.",
         pushable
-            ? 'Implement it in this repository following the existing code conventions. Keep the change focused. Run relevant tests or a build if quick. Do NOT commit or push — the runner handles git.'
+            ? "Implement it in this repository. Run the repo's tests / build / lint if they are quick, to confirm your change works. Do NOT commit or push — the runner handles git."
             : 'This is a local working folder (it may be empty). Build what is asked directly here — create/scaffold whatever files are needed. Run relevant setup/tests if quick. Do NOT worry about git; the developer will test locally.',
         '',
         `SHARED TASK MEMORY — before you finish, create or update "${contextPath}" in this repo. Keep it concise and CUMULATIVE so any developer (different machine / Claude account) who continues this task later has the full picture. Append a new dated section covering: what you did this turn, key decisions/assumptions, current state, and what remains (TODO). It is committed with your changes.`,
@@ -351,13 +503,14 @@ function ensureTrusted(dir) {
 // Develop ONE turn. If the target is pushable (has a git remote), work on the
 // task branch and open/update a PR. Otherwise just build in the folder and let
 // the developer test locally. Returns { prUrl, note }.
-async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, description, instruction, onProgress, cancel }) {
+async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, description, instruction, onProgress, cancel, conv, comments, meta }) {
     ensureTrusted(dir);
+    const cv = conv || conventional({ TaskName: taskName }, taskKey);
     const ctxPath = contextRel(taskKey);
     const onEvent = (ev) => { const line = activityLine(ev); if (!line) return; if (onProgress) onProgress(line); else console.log(`   ${line}`); };
 
     if (pushable) {
-        const branch = `ai/${slug(taskKey)}`;
+        const branch = cv.branch;
         console.log(`\n🌿  ${dir}\n    ${taskKey} → branch "${branch}" (base "${base}")`);
         run('git', ['fetch', 'origin'], dir, { allowFail: true });
         // Never sweep the developer's uncommitted work into the AI's branch/PR.
@@ -373,43 +526,80 @@ async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, descri
             run('git', ['checkout', '-B', branch], dir);                     // fresh
         }
 
-        const prompt = buildPrompt(taskKey, taskName, description, instruction, pushable, ctxPath, readContext(dir, taskKey));
+        const prompt = buildPrompt({ taskKey, taskName, description, instruction, pushable, contextPath: ctxPath, contextText: readContext(dir, taskKey), comments, meta });
         console.log('\n🤖  Claude Code …\n');
-        await runClaude(cfg, dir, prompt, onEvent, cancel);
+        const result = await runClaude(cfg, dir, prompt, onEvent, cancel);
 
+        let didCommit = false;
         if (run('git', ['status', '--porcelain'], dir, { capture: true })) {
-            run('git', ['add', '-A'], dir);
-            run('git', ['commit', '-m', `${taskKey}: ${String(instruction).slice(0, 60)}\n\nvia AlianHub AI dev-agent (Claude Code)`], dir);
+            stageChanges(dir); // scoped staging + secret scan (A2)
+            run('git', [...BOT_GIT, 'commit', '-m', `${cv.headerFor(instruction)}\n\nvia AlianHub AI dev-agent (Claude Code)`], dir);
+            didCommit = true;
         }
         const ahead = run('git', ['rev-list', '--count', `origin/${base}..HEAD`], dir, { capture: true, allowFail: true });
-        if (!ahead || ahead === '0') return { prUrl: '', note: 'No code changes were needed.' };
+        // A committed change must never be silently dropped (C2): only report "no changes"
+        // when we truly produced nothing — no commit this turn AND branch not ahead of base.
+        if (!didCommit && (!ahead || ahead === '0')) return { prUrl: '', note: result ? String(result).slice(0, 1500) : 'No code changes were needed.' };
+
+        // Self-review (B3): a second pass over the ACTUAL diff to catch bugs, scope creep,
+        // and quality issues before a human sees it. One bounded pass; commits any fixes.
+        if (!(cancel && cancel.requested)) {
+            onProgress('🔎 self-reviewing the change…');
+            const reviewDiff = run('git', ['diff', `origin/${base}...HEAD`], dir, { capture: true, allowFail: true }) || run('git', ['show', 'HEAD'], dir, { capture: true, allowFail: true });
+            await runClaude(cfg, dir, `Review your OWN change for task ${taskKey} before it becomes a pull request — check correctness, security, that it is in-scope and complete, and that it matches the repo's conventions. If you find problems, FIX them now; if it is already good, change nothing. Do NOT commit or push.\n\nDiff so far:\n${String(reviewDiff).slice(0, 40000)}`, onEvent, cancel);
+            if (run('git', ['status', '--porcelain'], dir, { capture: true, allowFail: true })) {
+                stageChanges(dir);
+                run('git', [...BOT_GIT, 'commit', '-m', `${cv.headerFor('address self-review')}\n\nvia AlianHub AI dev-agent (Claude Code)`], dir, { allowFail: true });
+            }
+        }
+
+        // Verify before it becomes a PR (A1): syntax-check the changed JS; on failure hand
+        // the errors back to Claude to fix (≤2 rounds), then continue regardless (flagged),
+        // so even a stubborn failure yields a reviewable branch rather than silently blocking.
+        const listChanged = () => (run('git', ['diff', '--name-only', `origin/${base}...HEAD`], dir, { capture: true, allowFail: true })
+            || run('git', ['diff', '--name-only', `${base}...HEAD`], dir, { capture: true, allowFail: true })
+            || run('git', ['show', '--name-only', '--format=', 'HEAD'], dir, { capture: true, allowFail: true }))
+            .split('\n').map((s) => s.trim()).filter(Boolean);
+        let vr = verifyWork(dir, listChanged(), onProgress);
+        for (let i = 0; i < 2 && !vr.ok && !(cancel && cancel.requested); i += 1) {
+            onProgress(`🔧 verification failed — asking the AI to fix (round ${i + 1})…`);
+            await runClaude(cfg, dir, `Your change did not pass verification. Fix the problem(s) below, keeping the change focused. Do NOT commit or push — the runner handles git.\n\n${vr.report}`, onEvent, cancel);
+            if (run('git', ['status', '--porcelain'], dir, { capture: true, allowFail: true })) {
+                stageChanges(dir);
+                run('git', [...BOT_GIT, 'commit', '-m', `${cv.headerFor('fix verification issues')}\n\nvia AlianHub AI dev-agent (Claude Code)`], dir, { allowFail: true });
+            }
+            vr = verifyWork(dir, listChanged(), onProgress);
+        }
+        onProgress(vr.ok ? '✅ verification passed' : '⚠️ verification still failing — pushing for review anyway');
 
         // PR gate (Point 2): push the branch (so it's ready to review, and a manual PR
         // works too) but DON'T open the PR yet — hand back `pushed` so the caller can ask
         // for approval. openPr (a 'pending_pr' job) opens the PR once the user approves.
         run('git', ['push', '-u', 'origin', branch], dir);
-        return { prUrl: '', pushed: true, branch, note: '' };
+        return { prUrl: '', pushed: true, branch, note: '', verifyOk: vr.ok, verifyReport: vr.report };
     }
 
     // Local folder — no remote. Build freely; the developer tests locally.
-    const prompt = buildPrompt(taskKey, taskName, description, instruction, pushable, ctxPath, readContext(dir, taskKey));
+    const prompt = buildPrompt({ taskKey, taskName, description, instruction, pushable, contextPath: ctxPath, contextText: readContext(dir, taskKey), comments, meta });
     console.log(`\n🤖  Claude Code (local folder — building in place) …\n`);
-    await runClaude(cfg, dir, prompt, onEvent, cancel);
+    const result = await runClaude(cfg, dir, prompt, onEvent, cancel);
 
     // Best-effort snapshot if it's already a git repo (so the change is tracked).
     let committed = false;
     if (fs.existsSync(path.join(dir, '.git')) && run('git', ['status', '--porcelain'], dir, { capture: true, allowFail: true })) {
-        run('git', ['add', '-A'], dir, { allowFail: true });
-        run('git', ['commit', '-m', `${taskKey}: ${String(instruction).slice(0, 60)}`], dir, { allowFail: true });
+        stageChanges(dir); // scoped staging + secret scan (A2)
+        run('git', [...BOT_GIT, 'commit', '-m', cv.headerFor(instruction)], dir, { allowFail: true });
         committed = true;
     }
-    return { prUrl: '', note: `Work is ready in ${dir} — open & test it locally${committed ? ' (committed to your local repo)' : ''}. Point me at a git URL or add a remote when you want a PR.` };
+    const summary = result ? `\n\n${String(result).slice(0, 1200)}` : '';
+    return { prUrl: '', note: `Work is ready in ${dir} — open & test it locally${committed ? ' (committed to your local repo)' : ''}. Point me at a git URL or add a remote when you want a PR.${summary}` };
 }
 
 // Open (or return an existing) PR for a task's already-developed branch. Used by the
 // PR-approval step (Point 2) — no Claude run, just a defensive push + gh pr create.
-function openPr(cfg, dir, base, taskKey, taskName) {
-    const branch = `ai/${slug(taskKey)}`;
+function openPr(cfg, dir, base, taskKey, taskName, conv) {
+    const cv = conv || conventional({ TaskName: taskName }, taskKey);
+    const branch = cv.branch;
     run('git', ['fetch', 'origin'], dir, { allowFail: true });
     if (!run('git', ['rev-parse', '--verify', '--quiet', `origin/${branch}`], dir, { capture: true, allowFail: true })) {
         // Branch not on the remote yet — push the local one if it exists.
@@ -417,11 +607,18 @@ function openPr(cfg, dir, base, taskKey, taskName) {
             run('git', ['push', '-u', 'origin', branch], dir, { allowFail: true });
         }
     }
-    let prUrl = run('gh', ['pr', 'view', branch, '--json', 'url', '-q', '.url'], dir, { capture: true, allowFail: true });
+    let prUrl = run('gh', ['pr', 'list', '--head', branch, '--state', 'open', '--json', 'url', '-q', '.[0].url'], dir, { capture: true, allowFail: true }); // only reuse an OPEN PR, not a merged/closed one (C11)
     if (!prUrl) {
+        // Richer PR body (B2): summary + the files it touched, so reviewers have context.
+        const stat = run('git', ['diff', '--stat', `origin/${base}...origin/${branch}`], dir, { capture: true, allowFail: true });
+        const body = [
+            `Implements AlianHub task **${taskKey} — ${taskName}** via the AlianHub AI dev-agent (Claude Code).`,
+            stat ? `\n**Files changed**\n\`\`\`\n${stat.slice(0, 2000)}\n\`\`\`` : '',
+            '\n_Automated change — please review before merging._',
+        ].filter(Boolean).join('\n');
         prUrl = run('gh', ['pr', 'create', '--base', base, '--head', branch,
-            '--title', `${taskKey}: ${taskName}`,
-            '--body', `Implements **${taskKey} — ${taskName}** via the AlianHub AI dev-agent (Claude Code).\n\n_Please review before merging._`],
+            '--title', cv.headerFor(taskName),
+            '--body', body],
         dir, { capture: true });
     }
     return prUrl;
@@ -512,9 +709,11 @@ async function handleMessage(cfg, msg) {
     };
     // Land the complete transcript at the end (covers lines the throttle skipped).
     const flushProgress = () => postProgress(true);
+    let cleanup = null; // pushable workdir to reset if this turn fails, so a dirty tree can't wedge the next turn (C1)
     try {
         const task = await fetchTask(cfg, msg.taskId);
         const taskKey = task.TaskKey || msg.taskId;
+        const conv = conventional(task, taskKey); // CI-legal branch/commit/PR naming
         const projectCode = taskKey.includes('-') ? taskKey.split('-')[0] : '';
         // A bot-assigned job carries no repo — inherit the task's last-used repo (set in the Development tab).
         if (!String(msg.repo || '').trim()) {
@@ -525,25 +724,40 @@ async function handleMessage(cfg, msg) {
             } catch (e) { /* fall back to config.repos */ }
         }
         const { dir, base, pushable } = resolveWorkdir(cfg, String(task.ProjectID || ''), projectCode, repoArgsFromLocation(msg.repo, msg.base));
+        if (pushable) cleanup = dir;
         onProgress(`📁 ${pushable ? 'repository' : 'local folder'}: ${dir}`); // immediate first update so the tab changes right away
-        if (msg.status === 'pending_pr') {
+        if (msg.status === 'pending_pr' || msg.status === 'working_pr') {
             // PR-approval step (Point 2): the code is already developed + pushed — just
-            // open the pull request for its branch. No Claude run.
+            // open the pull request for its branch. No Claude run. ('working_pr' = a stale
+            // PR-open job recovered mid-flight — still open the PR, don't re-develop. C5)
             onProgress('🔀 Opening the pull request…');
-            const prUrl = pushable ? openPr(cfg, dir, base, taskKey, task.TaskName || '(untitled task)') : '';
+            const prUrl = pushable ? openPr(cfg, dir, base, taskKey, task.TaskName || '(untitled task)', conv) : '';
             const text = prUrl
                 ? `✅ PR opened: ${prUrl}`
                 : (pushable ? '⚠️ Could not open the PR — check that the branch was pushed.' : 'This is a local folder — there is no remote to open a PR against.');
             await reply(cfg, msg, { status: 'done', text, prUrl });
+            if (prUrl) prWatch.set(conv.branch, { taskId: msg.taskId, projectId: msg.projectId, sprintId: msg.sprintId, repo: msg.repo, base, dir, prUrl, lastSeen: new Date().toISOString() }); // watch for reviewer feedback (B4)
             console.log(`  ✓ PR: ${prUrl}`);
         } else {
-            const { prUrl, note, pushed, branch } = await developTurn(cfg, {
+            // Context enrichment (A3): task comments + a metadata line, so the AI works
+            // from the real requirements (which usually live in the discussion), not just
+            // the one-line description. Description HTML is stripped to readable text.
+            const commentRows = await fetchComments(cfg, String(task.ProjectID || ''), msg.taskId);
+            const comments = commentRows
+                .map((c) => { const b = htmlToText(c.message || c.comment || c.text || '').slice(0, 500); return b ? `- ${c.userName || c.createdByName || 'comment'}: ${b}` : ''; })
+                .filter(Boolean).slice(-15).join('\n');
+            const metaBits = [];
+            if (task.Task_Priority || task.priority) metaBits.push(`Priority: ${task.Task_Priority || task.priority}`);
+            if (task.sprintName || task.SprintName) metaBits.push(`Sprint: ${task.sprintName || task.SprintName}`);
+            const { prUrl, note, pushed, branch, verifyOk, verifyReport } = await developTurn(cfg, {
                 dir, base, pushable, taskKey, taskName: task.TaskName || '(untitled task)',
-                description: task.description || task.rawDescription || '', instruction: msg.text, onProgress, cancel,
+                description: htmlToText(task.description || task.rawDescription || ''), instruction: msg.text,
+                comments, meta: metaBits.join(' · '), conv, onProgress, cancel,
             });
             if (pushable && pushed && !prUrl) {
                 // PR gate (Point 2): developed + pushed — wait for approval to open the PR.
-                await reply(cfg, msg, { status: 'awaiting_pr', text: `✅ Developed & pushed \`${branch}\`. Review it, then click **Create PR** to open the pull request — or open it yourself on GitHub.` });
+                const vtext = verifyReport ? `\n\n🔎 ${verifyOk === false ? '⚠️ verification issues remain — review carefully:' : 'verified:'}\n${verifyReport.slice(0, 800)}` : '';
+                await reply(cfg, msg, { status: 'awaiting_pr', text: `✅ Developed & pushed \`${branch}\`. Review it, then click **Create PR** to open the pull request — or open it yourself on GitHub.${vtext}` });
                 console.log(`  ⏸ awaiting PR approval (${branch})`);
             } else {
                 const text = prUrl ? `✅ Done. PR: ${prUrl}` : `✅ ${note || 'Done.'}`;
@@ -552,6 +766,9 @@ async function handleMessage(cfg, msg) {
             }
         }
     } catch (e) {
+        // A cancelled/failed turn can leave the AI's partial edits in the tree; reset so the
+        // next turn's clean-tree guard isn't wedged (the user's work was clean at start). (C1)
+        if (cleanup) { run('git', ['reset', '--hard'], cleanup, { allowFail: true }); run('git', ['clean', '-fd'], cleanup, { allowFail: true }); }
         if (cancel.requested || /__CANCELLED__/.test(e.message || '')) {
             await reply(cfg, msg, { status: 'cancelled', text: '⏹ Stopped — cancelled by request.' });
             console.log('  ⏹ cancelled');
@@ -565,19 +782,56 @@ async function handleMessage(cfg, msg) {
     }
 }
 
+// B4: watch PRs this runner opened and, when a reviewer leaves NEW feedback, queue a
+// follow-up develop job (awaiting_approval) so the bot addresses it after a human OK.
+// In-memory for this session — a restart simply stops watching older PRs.
+async function checkPrFeedback(cfg) {
+    for (const [branch, w] of prWatch) {
+        try {
+            const out = run('gh', ['pr', 'view', branch, '--json', 'state,comments,reviews'], w.dir, { capture: true, allowFail: true });
+            if (!out) continue;
+            const pr = JSON.parse(out);
+            if (pr.state && pr.state !== 'OPEN') { prWatch.delete(branch); continue; } // merged/closed → stop watching
+            const items = [];
+            for (const c of (pr.comments || [])) if (c.body && c.createdAt && c.createdAt > w.lastSeen) items.push(`- ${String(c.body).slice(0, 600)}`);
+            for (const rv of (pr.reviews || [])) if (rv.body && rv.submittedAt && rv.submittedAt > w.lastSeen) items.push(`- (${rv.state || 'review'}) ${String(rv.body).slice(0, 600)}`);
+            if (!items.length) continue;
+            w.lastSeen = new Date().toISOString();
+            const text = `A reviewer left feedback on the pull request (${w.prUrl}). Address it on the SAME branch, keeping the change focused:\n\n${items.join('\n').slice(0, 4000)}`;
+            await api(cfg, 'POST', '/api/v2/dev-agent/enqueue', { taskId: w.taskId, projectId: w.projectId, sprintId: w.sprintId, text, repo: w.repo, base: w.base }).catch(() => {});
+            console.log(`  💬 review feedback on ${branch} → queued a follow-up for approval`);
+        } catch (e) { /* best-effort */ }
+    }
+}
+
 async function pollLoop(cfg, intervalMs) {
     console.log(`\n👀  Polling ${cfg.url} every ${Math.round(intervalMs / 1000)}s for Development-chat instructions… (Ctrl+C to stop)`);
+    const MAX = Math.max(1, Number(cfg.maxConcurrent) || 2); // develop a few tasks at once
+    const active = new Set();
+    let lastFeedback = 0;
     for (;;) {
         try {
-            const res = await api(cfg, 'GET', '/api/v2/dev-agent/pending');
-            const pending = (res && res.data) || [];
-            for (const msg of pending) {
-                // eslint-disable-next-line no-await-in-loop
-                await handleMessage(cfg, msg);
+            if (active.size < MAX) {
+                const res = await api(cfg, 'GET', '/api/v2/dev-agent/pending');
+                const pending = (res && res.data) || [];
+                for (const msg of pending) {
+                    if (active.size >= MAX) break;
+                    const id = String(msg._id);
+                    if (active.has(id)) continue; // already running on this machine
+                    active.add(id);
+                    // Fire-and-forget under the pool cap; the atomic /claim inside prevents
+                    // double-processing across runners, and each job has its own heartbeat +
+                    // cancel token, so they run independently (F1 concurrency).
+                    handleMessage(cfg, msg)
+                        .catch((e) => console.error(`task error: ${e.message}`))
+                        .finally(() => active.delete(id));
+                }
             }
         } catch (e) {
             console.error(`poll error: ${e.message}`);
         }
+        // B4: periodically pull PR review feedback for PRs opened this session (~60s).
+        if (prWatch.size && Date.now() - lastFeedback > 60000) { lastFeedback = Date.now(); await checkPrFeedback(cfg); }
         // eslint-disable-next-line no-await-in-loop
         await sleep(intervalMs);
     }

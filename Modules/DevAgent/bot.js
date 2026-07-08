@@ -87,6 +87,14 @@ async function enqueueForTask(companyId, taskData, projectData) {
     const sprintId = String(taskData.sprintId || '');
     const botUserId = await getBotUserId();
 
+    // Don't stack duplicate jobs if the bot is re-assigned while one is already open
+    // (the assign hook can fire even when the assignee didn't actually change). (C8)
+    const openJob = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.DEV_MESSAGES,
+        data: [{ taskId, role: 'user', status: { $in: ['awaiting_repo', 'awaiting_approval', 'pending', 'working', 'cancelling', 'awaiting_pr', 'pending_pr'] } }, { _id: 1 }, {}],
+    }, 'findOne').catch(() => null);
+    if (openJob) return;
+
     // Resolve the repo: (1) the newest message on THIS task that carried one (a
     // task-level override), else (2) the PROJECT's saved repo binding — set once from
     // any task's Development tab — so assigning the bot to ANY task in the project just
