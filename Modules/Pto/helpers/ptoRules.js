@@ -2,7 +2,7 @@
 // the heart of the feature: approved PTO reduces a user's available capacity.
 // Unit-tested in tests/pto-rules.test.js.
 
-const PTO_TYPES = ['vacation', 'sick', 'holiday', 'personal', 'unpaid'];
+const PTO_TYPES = ['casual', 'privilege', 'sick'];
 const PTO_STATUS = ['pending', 'approved', 'rejected'];
 const DEFAULT_HOURS_PER_DAY = 8;
 const DEFAULT_WEEKEND = [0, 6]; // Sun, Sat
@@ -29,7 +29,7 @@ const validatePtoEntry = (entry = {}) => {
     if (!start) errors.push('a valid startDate is required');
     if (!end) errors.push('a valid endDate is required');
     if (start && end && end < start) errors.push('endDate must be on or after startDate');
-    const type = PTO_TYPES.includes(entry.type) ? entry.type : 'vacation';
+    const type = PTO_TYPES.includes(entry.type) ? entry.type : 'casual';
     let hoursPerDay = Number(entry.hoursPerDay);
     if (!hoursPerDay || hoursPerDay <= 0 || hoursPerDay > 24) hoursPerDay = DEFAULT_HOURS_PER_DAY;
     const status = PTO_STATUS.includes(entry.status) ? entry.status : 'pending';

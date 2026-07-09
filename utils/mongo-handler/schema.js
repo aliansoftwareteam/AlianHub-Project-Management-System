@@ -514,7 +514,7 @@ const schema = {
     // reduce a user's available capacity (helpers/ptoRules.computeAvailableCapacity).
     ptoEntries: {
         userId: { type: String, required: true },
-        type: { type: String, default: 'vacation', required: false },
+        type: { type: String, default: 'casual', required: false },
         startDate: { type: Date, required: true },
         endDate: { type: Date, required: true },
         hoursPerDay: { type: Number, default: 8, required: false },
