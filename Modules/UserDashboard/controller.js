@@ -820,6 +820,139 @@ exports.getProjectUtilizationSummary = async (req, res) => {
 };
 
 /**
+ * Milestone Report Card — company-wide billing-milestone summary for the
+ * management dashboard. Owner/Admin (roleType 1/2) ONLY; any other caller
+ * gets an empty, "restricted" payload. The client also hides the card from
+ * non-management users — this server gate is defense-in-depth so the
+ * company-wide financial figures can never leak via a forged request.
+ *
+ * Milestones are billing milestones attached to projects (Fix/Hourly). They
+ * carry an `amount` but no currency of their own — currency comes from the
+ * parent project (ProjectCurrency). Read-only, companyId-scoped.
+ *
+ * Returns:
+ *   { status: true, data: {
+ *       totalsByCurrency: [{ currency, totalAmount, count }],
+ *       byStatus:         [{ status, count, totalAmount }],
+ *       recent:           [{ projectId, projectName, milestoneName,
+ *                            amount, currency, status, date }],
+ *       totalCount: <number>
+ *   }}
+ */
+exports.getMilestoneSummary = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        if (!companyId) {
+            return res.status(400).json({ status: false, message: "companyId header required" });
+        }
+
+        const emptyData = { totalsByCurrency: [], byStatus: [], recent: [], totalCount: 0 };
+
+        // Owner/Admin only — resolve the caller's real role from the DB
+        // (never from the body). Non-management callers get an empty payload.
+        const callerRoleType = await resolveCallerRoleType(companyId, req.uid);
+        if (!(callerRoleType === 1 || callerRoleType === 2)) {
+            return res.status(200).json({ status: true, data: { ...emptyData, restricted: true } });
+        }
+
+        const RECENT_LIMIT = Number(req.body && req.body.limit) > 0
+            ? Math.min(Number(req.body.limit), 20) : 6;
+
+        // All billing milestones in the company (DB-scoped collection).
+        const milestones = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.MILESTONE,
+            data: [
+                {},
+                { milestoneName: 1, amount: 1, projectId: 1, dueDate: 1, statusDate: 1, statusId: 1, billingPeriod: 1, updatedAt: 1, createdAt: 1 },
+            ],
+        }, "find").catch(() => []);
+
+        if (!milestones || !milestones.length) {
+            return res.status(200).json({ status: true, data: emptyData });
+        }
+
+        // Parent-project name + currency lookup.
+        const projectIds = [...new Set(milestones.map((m) => String(m.projectId)).filter(Boolean))]
+            .filter((id) => mongoose.Types.ObjectId.isValid(id))
+            .map((id) => new mongoose.Types.ObjectId(id));
+        const projectsMap = {};
+        if (projectIds.length) {
+            const projects = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.PROJECTS,
+                data: [
+                    { _id: { $in: projectIds } },
+                    { ProjectName: 1, ProjectCurrency: 1 },
+                ],
+            }, "find").catch(() => []);
+            (projects || []).forEach((p) => {
+                projectsMap[String(p._id)] = { name: p.ProjectName || "", currency: p.ProjectCurrency || "" };
+            });
+        }
+
+        const currencyAgg = {}; // currency → { totalAmount, count }
+        const statusAgg = {};   // status   → { count, totalAmount }
+        milestones.forEach((m) => {
+            const proj = projectsMap[String(m.projectId)] || {};
+            const currency = proj.currency || "—";
+            const amount = Number(m.amount) || 0;
+            if (!currencyAgg[currency]) currencyAgg[currency] = { totalAmount: 0, count: 0 };
+            currencyAgg[currency].totalAmount += amount;
+            currencyAgg[currency].count += 1;
+
+            const status = m.statusId || "No Status";
+            if (!statusAgg[status]) statusAgg[status] = { count: 0, totalAmount: 0 };
+            statusAgg[status].count += 1;
+            statusAgg[status].totalAmount += amount;
+        });
+
+        // Most-recent activity first — statusDate (epoch ms) is the milestone's
+        // own timeline; fall back to the document timestamps.
+        const dateOf = (m) => Number(m.statusDate)
+            || (m.updatedAt ? new Date(m.updatedAt).getTime() : 0)
+            || (m.createdAt ? new Date(m.createdAt).getTime() : 0);
+        const recent = [...milestones]
+            .sort((a, b) => dateOf(b) - dateOf(a))
+            .slice(0, RECENT_LIMIT)
+            .map((m) => {
+                const proj = projectsMap[String(m.projectId)] || {};
+                return {
+                    projectId: String(m.projectId || ""),
+                    projectName: proj.name || "",
+                    milestoneName: m.milestoneName || "",
+                    amount: Number(m.amount) || 0,
+                    currency: proj.currency || "—",
+                    status: m.statusId || "",
+                    date: dateOf(m) || null,
+                };
+            });
+
+        const data = {
+            totalsByCurrency: Object.keys(currencyAgg).map((currency) => ({
+                currency,
+                totalAmount: currencyAgg[currency].totalAmount,
+                count: currencyAgg[currency].count,
+            })).sort((a, b) => b.totalAmount - a.totalAmount),
+            byStatus: Object.keys(statusAgg).map((status) => ({
+                status,
+                count: statusAgg[status].count,
+                totalAmount: statusAgg[status].totalAmount,
+            })).sort((a, b) => b.count - a.count),
+            recent,
+            totalCount: milestones.length,
+        };
+
+        return res.status(200).json({ status: true, data });
+    } catch (error) {
+        logger.error(`getMilestoneSummary error: ${error && error.message ? error.message : error}`);
+        return res.status(500).json({
+            status: false,
+            message: "An error occurred while building the milestone summary.",
+            error: error && error.message ? error.message : String(error),
+        });
+    }
+};
+
+/**
  * Team Effort Breakdown (screenshot metric #5, generalized). Sums logged
  * minutes and rolls users into their teams (teams_management; a user in
  * multiple teams counts under each, none → "Unassigned"), bucketed by a

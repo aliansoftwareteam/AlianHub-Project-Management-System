@@ -613,6 +613,7 @@ export const getCardsComponentsSize = (key) => {
         case 'MyLeaveCard':
         case 'DueSoonCard':
         case 'MyTimeCard':
+        case 'MilestoneReportCard':
             return {
                 "minW": 3,
                 "maxW": 12,

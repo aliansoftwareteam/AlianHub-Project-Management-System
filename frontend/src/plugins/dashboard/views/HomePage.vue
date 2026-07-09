@@ -232,6 +232,7 @@
     import MyLeaveCard from "@/components/organisms/MyLeaveCard/MyLeaveCard.vue";
     import DueSoonCard from "@/components/organisms/DueSoonCard/DueSoonCard.vue";
     import MyTimeCard from "@/components/organisms/MyTimeCard/MyTimeCard.vue";
+    import MilestoneReportCard from "@/components/organisms/MilestoneReportCard/MilestoneReportCard.vue";
     import { useCustomComposable } from '@/composable';
     import { onBeforeRouteLeave } from 'vue-router';
     import { abortAllRequests } from "@/services";
@@ -349,6 +350,12 @@
             const response = await apiRequest("get", `${env.CARDCOMPONENT}`);
             if (response?.data?.length > 0) {
                 let cardsArray = checkPermission('sheet_settings.workload_timesheet') !== null ? response?.data : response?.data?.filter((e)=> !["TimeEstimatedWorkloadComp","TimeTrackComp","TimeEstimatedComp"].includes(e.key))
+                // Management-only cards — hide from the "Add card" catalog for
+                // anyone below Owner/Admin (roleType 1/2). The card's data
+                // endpoint is server-gated too.
+                if ([1, 2].includes(companyUserDetail.value?.roleType) === false) {
+                    cardsArray = cardsArray?.filter((e) => !["MilestoneReportCard"].includes(e.key));
+                }
                 cardComponent.value = JSON.parse(JSON.stringify(cardsArray));
                 filterCardComponent.value = structureCards(cardsArray);
             }
@@ -425,6 +432,8 @@
                 return DueSoonCard;
             case 'MyTimeCard':
                 return MyTimeCard;
+            case 'MilestoneReportCard':
+                return MilestoneReportCard;
             default:
                 return null;
         }
@@ -780,6 +789,7 @@
         'WorkedTasksTableCard', 'TeamCategoryBreakdownCard', 'TeamLoggedVsEtaCard',
         'TasksByStatusCard', 'TasksByProjectCard', 'TotalTasksCard',
         'NextUpCard', 'MyAchievementsCard', 'MyLeaveCard', 'DueSoonCard', 'MyTimeCard',
+        'MilestoneReportCard',
     ].includes(cid);
 
     // ── Dashboard-level date range ──────────────────────────────────

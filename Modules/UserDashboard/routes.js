@@ -22,6 +22,9 @@ exports.init = (app) => {
     // OnLeaveCard — approved leave tickets from the configured HR project
     // that overlap the selected window, plus AB/PR headcounts.
     app.post('/api/v1/dashboard/on-leave', ctrl.getOnLeaveBoard);
+    // MilestoneReportCard — company-wide billing-milestone summary
+    // (totals by currency/status + recent list). Owner/Admin only.
+    app.post('/api/v1/dashboard/milestone-summary', ctrl.getMilestoneSummary);
     // Member self-view cards (caller = req.uid).
     app.post('/api/v1/dashboard/my-next-tasks', ctrl.getMyNextTasks);
     app.post('/api/v1/dashboard/my-achievements', ctrl.getMyAchievements);
