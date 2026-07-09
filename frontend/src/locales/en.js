@@ -1830,6 +1830,7 @@ export default {
         col_type: "Type",
         col_hours: "Hours",
         col_status: "Status",
+        col_reason: "Reason",
         status: { pending: "Pending", approved: "Approved", rejected: "Rejected" },
         approve: "Approve",
         reject: "Reject",
