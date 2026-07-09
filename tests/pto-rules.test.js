@@ -4,7 +4,7 @@ describe('validatePtoEntry', () => {
     test('accepts a valid entry and normalizes defaults', () => {
         const r = R.validatePtoEntry({ userId: 'u1', startDate: '2026-07-01', endDate: '2026-07-03' });
         expect(r.valid).toBe(true);
-        expect(r.value.type).toBe('vacation');
+        expect(r.value.type).toBe('casual');
         expect(r.value.status).toBe('pending');
         expect(r.value.hoursPerDay).toBe(8);
     });
@@ -15,8 +15,14 @@ describe('validatePtoEntry', () => {
     test('clamps bad hoursPerDay and unknown type/status', () => {
         const r = R.validatePtoEntry({ userId: 'u1', startDate: '2026-07-01', endDate: '2026-07-01', hoursPerDay: 99, type: 'nope', status: 'weird' });
         expect(r.value.hoursPerDay).toBe(8);
-        expect(r.value.type).toBe('vacation');
+        expect(r.value.type).toBe('casual');
         expect(r.value.status).toBe('pending');
+    });
+    test('accepts the configured leave types (casual, privilege, sick)', () => {
+        for (const t of ['casual', 'privilege', 'sick']) {
+            const r = R.validatePtoEntry({ userId: 'u1', startDate: '2026-07-01', endDate: '2026-07-01', type: t });
+            expect(r.value.type).toBe(t);
+        }
     });
 });
 

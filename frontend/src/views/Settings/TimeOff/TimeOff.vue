@@ -50,6 +50,7 @@
                             <th>{{ $t('Pto.col_type') }}</th>
                             <th>{{ $t('Pto.col_hours') }}</th>
                             <th>{{ $t('Pto.col_status') }}</th>
+                            <th>{{ $t('Pto.col_reason') }}</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -57,9 +58,10 @@
                         <tr v-for="e in entries" :key="e._id">
                             <td v-if="isAdmin" class="pto-nowrap">{{ e.userName || '—' }}</td>
                             <td class="pto-nowrap">{{ fmt(e.startDate) }} → {{ fmt(e.endDate) }}</td>
-                            <td>{{ $t('Pto.types.' + (e.type || 'vacation')) }}</td>
+                            <td>{{ $t('Pto.types.' + (e.type || 'casual')) }}</td>
                             <td>{{ e.hoursPerDay }}h/day</td>
                             <td><span class="pto-badge" :class="e.status">{{ $t('Pto.status.' + e.status) }}</span></td>
+                            <td class="pto-reason" :title="e.reason || ''">{{ e.reason || '—' }}</td>
                             <td class="pto-rowactions">
                                 <template v-if="isAdmin && e.status === 'pending'">
                                     <button class="pto-mini ok" @click="setStatus(e, 'approved')">{{ $t('Pto.approve') }}</button>
@@ -68,8 +70,8 @@
                                 <button class="pto-mini del" @click="remove(e)">{{ $t('Pto.delete') }}</button>
                             </td>
                         </tr>
-                        <tr v-if="!entries.length && !loading"><td :colspan="isAdmin ? 6 : 5" class="pto-empty">{{ $t('Pto.empty') }}</td></tr>
-                        <tr v-if="loading && !entries.length"><td :colspan="isAdmin ? 6 : 5" class="pto-empty">{{ $t('Pto.loading') }}</td></tr>
+                        <tr v-if="!entries.length && !loading"><td :colspan="isAdmin ? 7 : 6" class="pto-empty">{{ $t('Pto.empty') }}</td></tr>
+                        <tr v-if="loading && !entries.length"><td :colspan="isAdmin ? 7 : 6" class="pto-empty">{{ $t('Pto.loading') }}</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -92,13 +94,13 @@ const { t } = useI18n();
 const roleType = computed(() => getters['settings/companyUserDetail'] && getters['settings/companyUserDetail'].roleType);
 const isAdmin = computed(() => roleType.value === 1 || roleType.value === 2);
 
-const types = ['vacation', 'sick', 'holiday', 'personal', 'unpaid'];
+const types = ['casual', 'privilege', 'sick'];
 const busy = ref(false);
 const loading = ref(false);
 const msg = ref(''); const msgType = ref('');
 const entries = ref([]);
 const capacity = ref(null);
-const form = reactive({ type: 'vacation', startDate: '', endDate: '', hoursPerDay: 8, reason: '' });
+const form = reactive({ type: 'casual', startDate: '', endDate: '', hoursPerDay: 8, reason: '' });
 
 const fmt = (d) => { try { return new Date(d).toLocaleDateString(); } catch (e) { return d; } };
 
@@ -169,6 +171,7 @@ onMounted(load);
 .pto-table th { text-align: left; background: #f7f8fc; color: #3a3f52; font-weight: 700; padding: 9px 12px; border-bottom: 1px solid #e6e7ee; white-space: nowrap; }
 .pto-table td { padding: 9px 12px; border-bottom: 1px solid #f0f1f6; color: #3a3f52; }
 .pto-nowrap { white-space: nowrap; }
+.pto-reason { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pto-badge { font-size: 11px; font-weight: 700; border-radius: 5px; padding: 2px 8px; text-transform: capitalize; }
 .pto-badge.pending { background: #fff8e6; color: #9a6b00; }
 .pto-badge.approved { background: #e7f6ee; color: #1c7a43; }
