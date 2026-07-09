@@ -617,7 +617,7 @@ function reportResult(action, response) {
     else $toast.success(msg);
 }
 
-async function runBulk(action, payload, { optimisticDeletedStatus, optimisticFields } = {}) {
+async function runBulk(action, payload, { optimisticDeletedStatus, optimisticFields, onSuccess } = {}) {
     if (isWorking.value) return;
     closeMenu();
     isWorking.value = true;
@@ -645,6 +645,7 @@ async function runBulk(action, payload, { optimisticDeletedStatus, optimisticFie
             return;
         }
         reportResult(action, response);
+        if (typeof onSuccess === 'function') { try { onSuccess(response); } catch (e) { /* post-success hook is best-effort */ } }
         selection.clear();
     } catch (error) {
         $toast.error(error?.message || `Bulk ${action} failed`);
@@ -678,8 +679,9 @@ function performArchive() {
 // Bulk move — the sidebar hands back the destination project + sprint. We
 // only send the destination; the backend derives each task's source sprint,
 // preserves its assignees/watchers, and auto-maps status/type for
-// cross-project moves. Store reconciliation comes from the per-task socket
-// `update` events the backend emits, matching single-task move.
+// cross-project moves. Task-row reconciliation comes from the per-task socket
+// `update` events the backend emits; the sprint-header task COUNTS are
+// re-synced in onSuccess below (setSprints), matching single-task move.
 function onBulkMoveConfirm({ project, sprint } = {}) {
     if (!project || !sprint || !sprint.id) return;
     showMove.value = false;
@@ -691,6 +693,17 @@ function onBulkMoveConfirm({ project, sprint } = {}) {
         },
         sprintObj: sprint,
         isSubTask: false,
+    }, {
+        // Re-sync sprint task counts after the move so the header badges update
+        // in real time. Single-move refreshes via projectData/setSprints; the
+        // bulk path previously reflected the new counts only after a reload.
+        onSuccess: () => {
+            const src = projectData?.value?._id || projectData?.value?.id;
+            const projectIds = [...new Set([project._id, src].filter(Boolean).map(String))];
+            projectIds.forEach((projectId) => {
+                store.dispatch('projectData/setSprints', { projectId }).catch(() => {});
+            });
+        },
     });
 }
 
