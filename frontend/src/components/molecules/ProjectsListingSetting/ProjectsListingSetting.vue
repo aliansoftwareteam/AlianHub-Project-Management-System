@@ -226,8 +226,12 @@ const userData = {
 const requireComp = computed(() => {
     let arr = getters['settings/projectTabComponents'];
     const removeArr = ["gantt", "timeline","embed"];
+    // Also drop the dead legacy 'Gantt'/'Timeline' keyNames (replaced by 'GanttView'/'TimelineView').
+    // getView() has no case for them (they render NotFound) and they duplicate the working views in
+    // this Required-Views picker — the value-based removeArr above doesn't catch them by keyName.
+    const removeKeyNames = ["Gantt", "Timeline"];
     arr= arr?.filter((item) => {
-        if(!removeArr.includes(item.value)) {
+        if(!removeArr.includes(item.value) && !removeKeyNames.includes(item.keyName)) {
             return item;
         }
     });
