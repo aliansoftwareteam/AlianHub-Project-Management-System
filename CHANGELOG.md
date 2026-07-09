@@ -16,6 +16,21 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.10.1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.10.0...v14.10.1) (2026-07-09)
+
+
+### 🐛 Bug Fixes
+
+* **header:** hide the integrations item in the workspace menu ([f2289e4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f2289e48d3b51b6b22acd9aebd79800f4f9d4db0))
+* **header:** hide the integrations item in the workspace menu ([7993276](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/79932768fc8ae53c64c115c5d806f957ac97f055))
+* **pto:** add reason column to the time-off table ([eeb7832](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/eeb78328faf93c012db55c092f054977cf6fc60c))
+* **pto:** restrict leave types and add reason column to time-off table ([a33e346](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a33e346bb4e90c83acd0a8c87f28d6ce16b810f7))
+* **pto:** restrict time-off types to casual, privilege, sick leave ([58620ae](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/58620ae625312301636aad8408641e7b4e0d9cb3))
+* **pto:** show the requester's name in the admin time-off table ([9e8f5df](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9e8f5df7918a37178300b786c23d2495ee240435))
+* **pto:** show the requester's name in the admin time-off table ([c5db565](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c5db565a9ec99b8305ef9f2eeb232aea8f54de53))
+* **settings:** hide sso, scim and audit log from the settings sidebar ([769976c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/769976c096c5e64d3788f44180358e763be8c185))
+* **settings:** hide sso, scim and audit log from the settings sidebar ([9480e44](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9480e449302c2e4cebf714513066efbe2c747238))
+
 ## [14.10.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.9.0...v14.10.0) (2026-07-08)
 
 
