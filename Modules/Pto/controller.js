@@ -53,7 +53,22 @@ exports.listPto = async (req, res) => {
         const rows = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PTO_ENTRIES, data: [match, {}, { sort: { startDate: -1 } }],
         }, 'find');
-        return res.json({ status: true, data: rows || [] });
+        // Attach the requester's display name so the admin Team view shows WHO applied —
+        // entries store only userId, and users live in the GLOBAL db. (AHE-3804)
+        const ids = [...new Set((rows || []).map((r) => String(r.userId)).filter((v) => mongoose.Types.ObjectId.isValid(v)))];
+        const users = ids.length ? await MongoDbCrudOpration('global', {
+            type: SCHEMA_TYPE.USERS,
+            data: [{ _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } }, { Employee_Name: 1, Employee_FName: 1, Employee_LName: 1, Employee_Email: 1 }],
+        }, 'find').catch(() => []) : [];
+        const nameById = {};
+        for (const u of (users || [])) {
+            nameById[String(u._id)] = u.Employee_Name || `${u.Employee_FName || ''} ${u.Employee_LName || ''}`.trim() || u.Employee_Email || '';
+        }
+        const data = (rows || []).map((r) => {
+            const o = typeof r.toObject === 'function' ? r.toObject() : r;
+            return { ...o, userName: nameById[String(o.userId)] || '' };
+        });
+        return res.json({ status: true, data });
     } catch (e) { logger.error(`listPto: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
 };
 
