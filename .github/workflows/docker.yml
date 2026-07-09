@@ -74,6 +74,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false   # don't bake GITHUB_TOKEN into .git/config (build context is `.`)
 
       # `linux/amd64` → `linux-amd64` for use in the per-arch artifact name.
       # matrix.platform is read via env (not string-interpolated into the

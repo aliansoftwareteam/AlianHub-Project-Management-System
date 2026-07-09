@@ -1,7 +1,7 @@
 <template>
     <div class="custom-form" ref="formRef">
         <div class="p-20px pt-0 pb-0 custom-form-container" v-if="Object.keys(formObj).length && fieldArray.length">
-            <div class="mb-2">
+            <div class="mb-2" v-if="hasGroup('display')">
                 <h3 class="group_by_card">{{$t('dashboardCard.display')}}</h3>
                 <template v-for="(field, index) in fieldArray.filter(e => e.groupBy === 'display')" :key="index">
                     <TextInputFieldComponent
@@ -17,7 +17,7 @@
                         v-else-if="field?.type === 'dropdown' && !field?.hidden && (field?.label === 'calculation' ? selectedMeasure === 1 || selectedMeasure === 2 : field?.label === 'timerange' ? selectedMeasure !== 3 : true)"
                         :id="makeUniqueId(6)"
                         :matchField="field?.label === 'status' ? 'key' : field?.label === 'measure' || field?.label === 'calculation' || field?.label === 'timerange' || field?.label === 'group_by' || field?.label === 'fields' ? 'id' || field?.label === 'logtype' : '_id'"
-                        :items="field?.label === 'show_assignees' ? [...teams, ...usersArray] : field?.label === 'location' ? allProjectsArray : field?.label === 'status' ? taskStatusArray : field?.label === 'measure' || field?.label === 'calculation' || field?.label === 'timerange' || field?.label === 'logtype' || field?.label === 'group_by' || field?.label === 'fields' ? field?.options : []"
+                        :items="field?.label === 'show_assignees' ? assigneeOptions : field?.label === 'location' ? allProjectsArray : field?.label === 'status' ? taskStatusArray : field?.label === 'measure' || field?.label === 'calculation' || field?.label === 'timerange' || field?.label === 'logtype' || field?.label === 'group_by' || field?.label === 'fields' ? field?.options : []"
                         :selectedItems="field?.label === 'show_assignees' ? selectedUser : field?.label === 'location' ? selectedProjects : field?.label === 'status' ? selectedStatus : field?.label === 'measure' ? selectedMeasure : field?.label === 'calculation' ? selectedCalculation : field?.label === 'timerange' ? selectedTimeRange : field?.label === 'logtype' ? selectedLogtype : field?.label === 'group_by' ? selectedGroupBy : field?.label === 'fields' ? selectedFields : []"
                         :field="field"
                         :displayType="field?.label === 'show_assignees' ? 'profile' : field?.label === 'location' ? 'project' : field?.label === 'status' ? 'color' : field?.label === 'measure' || field?.label === 'calculation' || field?.label === 'timerange' || field?.label === 'logtype' || field?.label === 'group_by' || field?.label === 'fields' ? 'text' : ''"
@@ -41,7 +41,7 @@
                     />
                 </template>
             </div>
-            <div class="mb-2">
+            <div class="mb-2" v-if="hasGroup('data')">
                 <h3 class="group_by_card">{{$t('dashboardCard.data')}}</h3>
                 <template v-for="(field, index) in fieldArray.filter(e => e.groupBy === 'data')" :key="index">
                     <TextInputFieldComponent 
@@ -57,7 +57,7 @@
                         v-else-if="field?.type === 'dropdown' && !field?.hidden && ((field?.label === 'calculation' || field?.label === 'show_assignees' ) && selectedMeasure ? selectedMeasure === 1 || selectedMeasure === 2 : field?.label === 'timerange' ? selectedMeasure !== 3 : true)"
                         :id="makeUniqueId(6)"
                         :matchField="field?.label === 'status' ? 'key' : field?.label === 'measure' || field?.label === 'calculation' || field?.label === 'timerange' || field?.label === 'group_by' || field?.label === 'fields' ? 'id' || field?.label === 'logtype' : '_id'"
-                        :items="field?.label === 'show_assignees' ? [...teams, ...usersArray] : field?.label === 'location' ? allProjectsArray : field?.label === 'status' ? taskStatusArray : field?.label === 'measure' || field?.label === 'calculation' || field?.label === 'timerange' || field?.label === 'logtype' || field?.label === 'group_by' || field?.label === 'fields' ? field?.options : []"
+                        :items="field?.label === 'show_assignees' ? assigneeOptions : field?.label === 'location' ? allProjectsArray : field?.label === 'status' ? taskStatusArray : field?.label === 'measure' || field?.label === 'calculation' || field?.label === 'timerange' || field?.label === 'logtype' || field?.label === 'group_by' || field?.label === 'fields' ? field?.options : []"
                         :selectedItems="field?.label === 'show_assignees' ? selectedUser : field?.label === 'location' ? selectedProjects : field?.label === 'status' ? selectedStatus : field?.label === 'measure' ? selectedMeasure : field?.label === 'calculation' ? selectedCalculation : field?.label === 'timerange' ? selectedTimeRange : field?.label === 'logtype' ? selectedLogtype : field?.label === 'group_by' ? selectedGroupBy : field?.label === 'fields' ? selectedFields : []"
                         :field="field"
                         :displayType="field?.label === 'show_assignees' ? 'profile' : field?.label === 'location' ? 'project' : field?.label === 'status' ? 'color' : field?.label === 'measure' || field?.label === 'calculation' || field?.label === 'timerange' || field?.label === 'logtype' || field?.label === 'group_by' || field?.label === 'fields' ? 'text' : ''"
@@ -250,6 +250,18 @@ const usersArray = computed(() => {
     }
 });
 
+// "Me" quick-select for the assignee picker — prepends a self option that
+// resolves to the viewer's own userId (their real id, so a saved/imported card
+// still points at whoever configured it). The viewer's normal list entry is
+// dropped to avoid a duplicate.
+const assigneeOptions = computed(() => {
+    const uid = userId && userId.value ? String(userId.value) : '';
+    const base = [...teams.value, ...usersArray.value];
+    if (!uid) return base;
+    const withoutSelf = base.filter((u) => String(u._id) !== uid);
+    return [{ _id: uid, Employee_Name: t('dashboardCard.me_option'), Employee_profileImageURL: '', isMe: true }, ...withoutSelf];
+});
+
 // ─── Recently Added Projects (Employee Workload card only) ──────────
 // Mirrors the project sidebar's "new_project_add" rule (organisms/Item):
 // a project is "newly added" when its createdAt is past midnight two days
@@ -341,6 +353,10 @@ const fieldArray = ref(
     JSON.parse(JSON.stringify(props.fieldsArray))
         .filter((f) => f && f.name !== 'hideEmptyEmployees')
 );
+
+// Whether a group (display/data) has any visible field — used to hide an
+// empty section heading (e.g. a card with no Data fields).
+const hasGroup = (g) => fieldArray.value.some((e) => e && e.groupBy === g && !e.hidden);
 
 const { checkErrors, checkAllFields } = useValidation();
 

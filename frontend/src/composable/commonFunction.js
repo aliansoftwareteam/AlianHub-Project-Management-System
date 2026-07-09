@@ -608,6 +608,11 @@ export const getCardsComponentsSize = (key) => {
         case 'TeamCategoryBreakdownCard':
         case 'TeamLoggedVsEtaCard':
         case 'OnLeaveCard':
+        case 'NextUpCard':
+        case 'MyAchievementsCard':
+        case 'MyLeaveCard':
+        case 'DueSoonCard':
+        case 'MyTimeCard':
             return {
                 "minW": 3,
                 "maxW": 12,
