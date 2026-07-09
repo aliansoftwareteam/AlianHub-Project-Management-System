@@ -40,7 +40,8 @@ export function useHelper() {
                 {
                     name: "Integrations",
                     to: {path: `/${companyId.value}/integrations`},
-                    show: true
+                    // Hidden from the Workspace menu for now — route + page are kept; flip to true to restore.
+                    show: false
                 }
             ]
         },
