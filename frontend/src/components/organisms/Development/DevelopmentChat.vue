@@ -31,9 +31,15 @@
                     </div>
                 </div>
             </div>
-            <div v-if="awaitingAgent" class="dev-msg is-agent">
-                <div class="dev-bubble"><span class="dev-spinner"></span>Starting…</div>
-            </div>
+        </div>
+
+        <!-- live status — pinned above the input so a running job is ALWAYS visible, even
+             when the history is long and scrolled (otherwise the working bubble scrolls out
+             of view and the job can look stuck). -->
+        <div v-if="liveStatus" class="dev-live">
+            <span class="dev-spinner"></span>
+            <span class="dev-live-head">{{ liveStatus.head }}</span>
+            <span v-if="liveStatus.last" class="dev-live-last" :title="liveStatus.last">{{ liveStatus.last }}</span>
         </div>
 
         <!-- input -->
@@ -78,9 +84,15 @@ const activeParents = computed(() => {
     return s;
 });
 const isWorking = (m) => m.role === 'agent' && !!m.parentId && activeParents.value.has(m.parentId);
-const awaitingAgent = computed(() => {
-    const last = messages.value[messages.value.length - 1];
-    return !!(last && last.role === 'user' && (last.status === 'pending' || last.status === 'working' || last.status === 'pending_pr'));
+// Live status pinned above the input (see template): always shows the running job's current
+// step — even when the history is long and scrolled — so a running job never looks stuck.
+const liveStatus = computed(() => {
+    const running = messages.value.some((m) => m.role === 'user' && (m.status === 'pending' || m.status === 'working' || m.status === 'pending_pr'));
+    if (!running) return null;
+    const prog = [...messages.value].reverse().find((m) => m.role === 'agent' && isWorking(m));
+    if (!prog) return { head: '⚙️ Starting…', last: '' };
+    const lines = String(prog.text || '').split('\n').map((s) => s.trim()).filter(Boolean);
+    return { head: lines[0] || '⚙️ Working…', last: lines.length > 1 ? lines[lines.length - 1] : '' };
 });
 
 const scrollDown = () => { nextTick(() => { if (listEl.value) listEl.value.scrollTop = listEl.value.scrollHeight; }); };
@@ -200,6 +212,10 @@ onBeforeUnmount(() => { if (timer) clearInterval(timer); });
 .dev-send { background: #2f3a8f; color: #fff; border: none; border-radius: 8px; padding: 10px 20px; font-size: 13px; cursor: pointer; }
 .dev-send:disabled { opacity: .5; cursor: default; }
 .dev-hint { font-size: 12px; color: #9aa0b4; padding: 0 2px 6px; }
+.dev-live { display: flex; align-items: center; gap: 8px; padding: 7px 12px; margin-top: 4px; border-top: 1px solid #eef0f6; font-size: 12px; background: #fafbff; }
+.dev-live .dev-spinner { background: #2f3a8f; margin-right: 0; }
+.dev-live-head { font-weight: 600; color: #4b5563; white-space: nowrap; }
+.dev-live-last { color: #9aa0b4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
 .dev-err { font-size: 12px; color: #c0392b; padding: 0 2px 6px; }
 .dev-empty-hint { font-size: 12px; color: #9aa0b4; margin-top: 10px; }
 .dev-spinner { display: inline-block; width: 9px; height: 9px; margin-right: 7px; border-radius: 50%; background: #c0392b; vertical-align: middle; animation: dev-pulse 1s ease-in-out infinite; }
