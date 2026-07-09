@@ -1807,7 +1807,7 @@ export default {
     Pto: {
         add_title: "Request time off",
         type: "Type",
-        types: { vacation: "Vacation", sick: "Sick", holiday: "Holiday", personal: "Personal", unpaid: "Unpaid" },
+        types: { casual: "Casual Leave", privilege: "Privilege Leave", sick: "Sick Leave", vacation: "Vacation", holiday: "Holiday", personal: "Personal", unpaid: "Unpaid" },
         start: "Start date",
         end: "End date",
         hours_per_day: "Hours per day",

@@ -57,7 +57,7 @@
                         <tr v-for="e in entries" :key="e._id">
                             <td v-if="isAdmin" class="pto-nowrap">{{ e.userName || '—' }}</td>
                             <td class="pto-nowrap">{{ fmt(e.startDate) }} → {{ fmt(e.endDate) }}</td>
-                            <td>{{ $t('Pto.types.' + (e.type || 'vacation')) }}</td>
+                            <td>{{ $t('Pto.types.' + (e.type || 'casual')) }}</td>
                             <td>{{ e.hoursPerDay }}h/day</td>
                             <td><span class="pto-badge" :class="e.status">{{ $t('Pto.status.' + e.status) }}</span></td>
                             <td class="pto-rowactions">
@@ -92,13 +92,13 @@ const { t } = useI18n();
 const roleType = computed(() => getters['settings/companyUserDetail'] && getters['settings/companyUserDetail'].roleType);
 const isAdmin = computed(() => roleType.value === 1 || roleType.value === 2);
 
-const types = ['vacation', 'sick', 'holiday', 'personal', 'unpaid'];
+const types = ['casual', 'privilege', 'sick'];
 const busy = ref(false);
 const loading = ref(false);
 const msg = ref(''); const msgType = ref('');
 const entries = ref([]);
 const capacity = ref(null);
-const form = reactive({ type: 'vacation', startDate: '', endDate: '', hoursPerDay: 8, reason: '' });
+const form = reactive({ type: 'casual', startDate: '', endDate: '', hoursPerDay: 8, reason: '' });
 
 const fmt = (d) => { try { return new Date(d).toLocaleDateString(); } catch (e) { return d; } };
 
