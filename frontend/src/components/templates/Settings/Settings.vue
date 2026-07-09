@@ -177,25 +177,29 @@
             icon: require("@/assets/images/svg/workspaceSecurity.svg"),
             permissions:['settings.settings_security_permissions'],
             activeIcon: require("@/assets/images/svg/workspaceSecurityActive.svg")
-        },{
-            label: "SSO",
-            to: {name: "SsoSettings"},
-            icon: require("@/assets/images/svg/ssoKey.svg"),
-            permissions:['settings.settings_security_permissions'],
-            activeIcon: require("@/assets/images/svg/ssoKeyActive.svg")
-        },{
-            label: "SCIM",
-            to: {name: "ScimSettings"},
-            icon: require("@/assets/images/svg/scimUsers.svg"),
-            permissions:['settings.settings_security_permissions'],
-            activeIcon: require("@/assets/images/svg/scimUsersActive.svg")
-        },{
-            label: "Audit Log",
-            to: {name: "AuditLog"},
-            icon: require("@/assets/images/svg/auditDoc.svg"),
-            permissions:['settings.settings_security_permissions'],
-            activeIcon: require("@/assets/images/svg/auditDocActive.svg")
-        },{
+        },
+        // SSO, SCIM and Audit Log menu items are hidden for now — their pages and
+        // routes are kept intact; uncomment the three blocks below to restore them.
+        // {
+        //     label: "SSO",
+        //     to: {name: "SsoSettings"},
+        //     icon: require("@/assets/images/svg/ssoKey.svg"),
+        //     permissions:['settings.settings_security_permissions'],
+        //     activeIcon: require("@/assets/images/svg/ssoKeyActive.svg")
+        // },{
+        //     label: "SCIM",
+        //     to: {name: "ScimSettings"},
+        //     icon: require("@/assets/images/svg/scimUsers.svg"),
+        //     permissions:['settings.settings_security_permissions'],
+        //     activeIcon: require("@/assets/images/svg/scimUsersActive.svg")
+        // },{
+        //     label: "Audit Log",
+        //     to: {name: "AuditLog"},
+        //     icon: require("@/assets/images/svg/auditDoc.svg"),
+        //     permissions:['settings.settings_security_permissions'],
+        //     activeIcon: require("@/assets/images/svg/auditDocActive.svg")
+        // },
+        {
             label: "Time Off",
             to: {name: "TimeOff"},
             icon: require("@/assets/images/svg/WorkspaceSettingsInactive.svg"),
