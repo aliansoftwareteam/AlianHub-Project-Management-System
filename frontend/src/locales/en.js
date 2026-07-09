@@ -1826,6 +1826,7 @@ export default {
         my_title: "My time off",
         refresh: "Refresh",
         col_dates: "Dates",
+        col_member: "Member",
         col_type: "Type",
         col_hours: "Hours",
         col_status: "Status",

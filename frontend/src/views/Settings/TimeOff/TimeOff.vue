@@ -45,6 +45,7 @@
                 <table class="pto-table">
                     <thead>
                         <tr>
+                            <th v-if="isAdmin">{{ $t('Pto.col_member') }}</th>
                             <th>{{ $t('Pto.col_dates') }}</th>
                             <th>{{ $t('Pto.col_type') }}</th>
                             <th>{{ $t('Pto.col_hours') }}</th>
@@ -54,6 +55,7 @@
                     </thead>
                     <tbody>
                         <tr v-for="e in entries" :key="e._id">
+                            <td v-if="isAdmin" class="pto-nowrap">{{ e.userName || '—' }}</td>
                             <td class="pto-nowrap">{{ fmt(e.startDate) }} → {{ fmt(e.endDate) }}</td>
                             <td>{{ $t('Pto.types.' + (e.type || 'vacation')) }}</td>
                             <td>{{ e.hoursPerDay }}h/day</td>
@@ -66,8 +68,8 @@
                                 <button class="pto-mini del" @click="remove(e)">{{ $t('Pto.delete') }}</button>
                             </td>
                         </tr>
-                        <tr v-if="!entries.length && !loading"><td colspan="5" class="pto-empty">{{ $t('Pto.empty') }}</td></tr>
-                        <tr v-if="loading && !entries.length"><td colspan="5" class="pto-empty">{{ $t('Pto.loading') }}</td></tr>
+                        <tr v-if="!entries.length && !loading"><td :colspan="isAdmin ? 6 : 5" class="pto-empty">{{ $t('Pto.empty') }}</td></tr>
+                        <tr v-if="loading && !entries.length"><td :colspan="isAdmin ? 6 : 5" class="pto-empty">{{ $t('Pto.loading') }}</td></tr>
                     </tbody>
                 </table>
             </div>
