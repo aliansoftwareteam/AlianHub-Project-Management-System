@@ -833,7 +833,7 @@
     const PROJECT_PERIOD_CARDS = [
         'RunningProjectsCard', 'UsersByCategoryCard', 'ProjectPulseCard',
         'WorkedTasksTableCard', 'TeamCategoryBreakdownCard', 'TeamLoggedVsEtaCard', 'OnLeaveCard',
-        'MyAchievementsCard', 'MyTimeCard',
+        'MyAchievementsCard', 'MyTimeCard', 'MilestoneReportCard',
     ];
     const PROJECT_PERIOD_OPTIONS = [
         { id: 0, label: 'Auto' },
@@ -843,7 +843,7 @@
     const PROJECT_PERIOD_DEFAULT = {
         RunningProjectsCard: 1, UsersByCategoryCard: 3, ProjectPulseCard: 1,
         WorkedTasksTableCard: 3, TeamCategoryBreakdownCard: 3, TeamLoggedVsEtaCard: 3, OnLeaveCard: 1,
-        MyAchievementsCard: 5, MyTimeCard: 3,
+        MyAchievementsCard: 5, MyTimeCard: 3, MilestoneReportCard: 5,
     };
     const periodOptionsFor = (cid) => (PROJECT_PERIOD_CARDS.includes(cid) ? PROJECT_PERIOD_OPTIONS : []);
     const periodValueFor = (item) => {

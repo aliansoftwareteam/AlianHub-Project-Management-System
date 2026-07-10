@@ -6,6 +6,7 @@ const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const dashboardTemplate = require("../../utils/dashboardTemplate.json");
 const cardComponent = require("../../utils/cardComponent.json");
+const { getUsdRates, toUsd } = require("../../utils/currencyRates");
 const {
     getDayOrRangeBounds,
     buildUserTeamMap,
@@ -828,15 +829,22 @@ exports.getProjectUtilizationSummary = async (req, res) => {
  *
  * Milestones are billing milestones attached to projects (Fix/Hourly). They
  * carry an `amount` but no currency of their own — currency comes from the
- * parent project (ProjectCurrency). Read-only, companyId-scoped.
+ * parent project (ProjectCurrency). Every figure is consolidated to USD using
+ * live FX rates (utils/currencyRates). Read-only, companyId-scoped.
+ *
+ * Body: { dateFrom?, dateTo? (ISO — the "due" window, default this month),
+ *         status? (drill the recent list), limit? }
  *
  * Returns:
  *   { status: true, data: {
- *       totalsByCurrency: [{ currency, totalAmount, count }],
- *       byStatus:         [{ status, count, totalAmount }],
- *       recent:           [{ projectId, projectName, milestoneName,
- *                            amount, currency, status, date }],
- *       totalCount: <number>
+ *       currency: "USD",
+ *       due:      { receivableUsd, receivedUsd, outstandingUsd,
+ *                   receivableCount, receivedCount },   // milestones DUE in range
+ *       allTime:  { totalUsd, count },                  // every milestone, USD
+ *       byStatus: [{ status, count }],                  // all-time; drives selector
+ *       recent:   [{ projectId, projectName, milestoneName,
+ *                    amountUsd, status, date }],
+ *       totalCount: <number>, period: { from, to }, ratesLive: <bool>
  *   }}
  */
 exports.getMilestoneSummary = async (req, res) => {
@@ -846,7 +854,12 @@ exports.getMilestoneSummary = async (req, res) => {
             return res.status(400).json({ status: false, message: "companyId header required" });
         }
 
-        const emptyData = { totalsByCurrency: [], byStatus: [], recent: [], totalCount: 0 };
+        const emptyData = {
+            currency: "USD",
+            due: { receivableUsd: 0, receivedUsd: 0, outstandingUsd: 0, receivableCount: 0, receivedCount: 0 },
+            allTime: { totalUsd: 0, count: 0 },
+            byStatus: [], recent: [], totalCount: 0, period: null, ratesLive: true,
+        };
 
         // Owner/Admin only — resolve the caller's real role from the DB
         // (never from the body). Non-management callers get an empty payload.
@@ -858,6 +871,20 @@ exports.getMilestoneSummary = async (req, res) => {
         const RECENT_LIMIT = Number(req.body && req.body.limit) > 0
             ? Math.min(Number(req.body.limit), 20) : 6;
 
+        // Time-range window for the "due milestones" panel. The card sends ISO
+        // dateFrom/dateTo from the shared card-header period dropdown; milestone
+        // dueDate is stored as epoch ms (0 = unset). Default to the current
+        // calendar month when the window is missing/invalid.
+        const toMs = (v) => { const t = v ? new Date(v).getTime() : NaN; return Number.isFinite(t) ? t : NaN; };
+        let fromMs = toMs(req.body && req.body.dateFrom);
+        let untilMs = toMs(req.body && req.body.dateTo);
+        if (!Number.isFinite(fromMs) || !Number.isFinite(untilMs)) {
+            const now = new Date();
+            fromMs = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+            untilMs = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).getTime();
+        }
+        const period = { from: fromMs, to: untilMs };
+
         // All billing milestones in the company (DB-scoped collection).
         const milestones = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.MILESTONE,
@@ -868,7 +895,7 @@ exports.getMilestoneSummary = async (req, res) => {
         }, "find").catch(() => []);
 
         if (!milestones || !milestones.length) {
-            return res.status(200).json({ status: true, data: emptyData });
+            return res.status(200).json({ status: true, data: { ...emptyData, period } });
         }
 
         // Parent-project name + currency lookup.
@@ -889,38 +916,67 @@ exports.getMilestoneSummary = async (req, res) => {
             });
         }
 
-        // ProjectCurrency is stored as a currency OBJECT ({ symbol, code, name, … }).
-        // Reduce it to a short display string, otherwise the card renders
-        // "[object Object]" (object coerced to a map key) or a raw JSON blob
-        // (object printed straight into a cell). Strings pass through unchanged.
-        const currencyStr = (pc) => {
-            if (!pc) return "—";
-            if (typeof pc === "string") return pc;
-            return pc.symbol || pc.symbol_native || pc.code || pc.name || "—";
+        // ProjectCurrency is stored as a currency OBJECT ({ symbol, code, name,
+        // … }); we need its ISO code to convert the amount to USD. A legacy
+        // plain 3-letter string is accepted too; anything else → unknown.
+        const currencyCode = (pc) => {
+            if (!pc) return "";
+            if (typeof pc === "string") return pc.length === 3 ? pc.toUpperCase() : "";
+            return String(pc.code || "").toUpperCase();
         };
-        // Optional status drill-down: when the card sends a `status`, the currency
-        // totals + recent list reflect only that status. byStatus is ALWAYS the
-        // full breakdown — it drives the card's status-filter selector.
+
+        // Live USD rates (cached; static fallback when offline). usdOf() converts
+        // a milestone's amount into USD via its project's currency.
+        const { rates, live: ratesLive } = await getUsdRates();
+        const usdOf = (m) => {
+            const proj = projectsMap[String(m.projectId)] || {};
+            return toUsd(m.amount, currencyCode(proj.currency), rates);
+        };
+
+        // Status drill-down: the recent list + totalCount also reflect a
+        // selected status. byStatus is the full per-status breakdown for the
+        // period — it drives the card's status selector. The receivable /
+        // received figures compute their own status split, so they ignore it.
         const statusFilter = (req.body && req.body.status) ? String(req.body.status) : "";
         const matchStatus = (m) => !statusFilter || String(m.statusId || "No Status") === statusFilter;
 
-        const currencyAgg = {}; // currency → { totalAmount, count }  (status-filtered)
-        const statusAgg = {};   // status   → { count, totalAmount }  (always full)
+        // Milestone billing lifecycle: NOT_FUNDED → FUNDED → RELEASE_REQUEST_SENT
+        // → RELEASED (money actually released to us). CANCELLED / REFUNDED aren't
+        // real receivables.
+        const NON_RECEIVABLE = new Set(["CANCELLED", "REFUNDED"]);
+        const RECEIVED_STATUS = "RELEASED";
+
+        // The whole card is scoped to the selected period: a milestone is "in
+        // the period" when its dueDate (epoch ms; 0 = unset) falls in the
+        // window. Only the all-time footer total spans every milestone.
+        const inRange = (m) => {
+            const d = Number(m.dueDate) || 0;
+            return d > 0 && d >= fromMs && d <= untilMs;
+        };
+
+        const statusAgg = {};        // status → { count }  (period-scoped; drives selector)
+        let allTimeUsd = 0;          // consolidated USD across every milestone (footer)
+        const due = { receivableUsd: 0, receivedUsd: 0, outstandingUsd: 0, receivableCount: 0, receivedCount: 0 };
+
         milestones.forEach((m) => {
-            const amount = Number(m.amount) || 0;
+            const usd = usdOf(m);
+            allTimeUsd += usd;        // all-time total spans every milestone
+            if (!inRange(m)) return;  // status bars, receivable & recent are period-scoped
 
             const status = m.statusId || "No Status";
-            if (!statusAgg[status]) statusAgg[status] = { count: 0, totalAmount: 0 };
+            if (!statusAgg[status]) statusAgg[status] = { count: 0 };
             statusAgg[status].count += 1;
-            statusAgg[status].totalAmount += amount;
 
-            if (!matchStatus(m)) return; // currency totals respect the active status filter
-            const proj = projectsMap[String(m.projectId)] || {};
-            const currency = currencyStr(proj.currency);
-            if (!currencyAgg[currency]) currencyAgg[currency] = { totalAmount: 0, count: 0 };
-            currencyAgg[currency].totalAmount += amount;
-            currencyAgg[currency].count += 1;
+            if (!NON_RECEIVABLE.has(status)) {
+                due.receivableUsd += usd;
+                due.receivableCount += 1;
+                if (status === RECEIVED_STATUS) {
+                    due.receivedUsd += usd;
+                    due.receivedCount += 1;
+                }
+            }
         });
+        due.outstandingUsd = Math.max(0, due.receivableUsd - due.receivedUsd);
 
         // Most-recent activity first — statusDate (epoch ms) is the milestone's
         // own timeline; fall back to the document timestamps.
@@ -928,7 +984,7 @@ exports.getMilestoneSummary = async (req, res) => {
             || (m.updatedAt ? new Date(m.updatedAt).getTime() : 0)
             || (m.createdAt ? new Date(m.createdAt).getTime() : 0);
         const recent = [...milestones]
-            .filter(matchStatus)
+            .filter((m) => inRange(m) && matchStatus(m))
             .sort((a, b) => dateOf(b) - dateOf(a))
             .slice(0, RECENT_LIMIT)
             .map((m) => {
@@ -937,26 +993,23 @@ exports.getMilestoneSummary = async (req, res) => {
                     projectId: String(m.projectId || ""),
                     projectName: proj.name || "",
                     milestoneName: m.milestoneName || "",
-                    amount: Number(m.amount) || 0,
-                    currency: currencyStr(proj.currency),
+                    amountUsd: usdOf(m),
                     status: m.statusId || "",
                     date: dateOf(m) || null,
                 };
             });
 
         const data = {
-            totalsByCurrency: Object.keys(currencyAgg).map((currency) => ({
-                currency,
-                totalAmount: currencyAgg[currency].totalAmount,
-                count: currencyAgg[currency].count,
-            })).sort((a, b) => b.totalAmount - a.totalAmount),
-            byStatus: Object.keys(statusAgg).map((status) => ({
-                status,
-                count: statusAgg[status].count,
-                totalAmount: statusAgg[status].totalAmount,
-            })).sort((a, b) => b.count - a.count),
+            currency: "USD",
+            due,
+            allTime: { totalUsd: allTimeUsd, count: milestones.length },
+            byStatus: Object.keys(statusAgg)
+                .map((status) => ({ status, count: statusAgg[status].count }))
+                .sort((a, b) => b.count - a.count),
             recent,
-            totalCount: milestones.filter(matchStatus).length,
+            totalCount: milestones.filter((m) => inRange(m) && matchStatus(m)).length,
+            period,
+            ratesLive,
         };
 
         return res.status(200).json({ status: true, data });
