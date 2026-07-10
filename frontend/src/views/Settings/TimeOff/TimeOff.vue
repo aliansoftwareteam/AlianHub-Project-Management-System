@@ -114,9 +114,8 @@ const monthRange = () => {
     return { from, to };
 };
 const capLabel = computed(() => {
-    const { from, to } = monthRange();
     const wd = capacity.value && capacity.value.workingDays;
-    return wd != null ? `${from} → ${to} · ${wd} ${t('Pto.working_days')}` : `${from} → ${to}`;
+    return wd != null ? `${wd} ${t('Pto.working_days')}` : '';
 });
 
 // A full working day is 9h (office standard). Leave "days" = working days
