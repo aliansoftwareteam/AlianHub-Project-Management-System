@@ -44,14 +44,41 @@ exports.listPto = async (req, res) => {
         if (privileged) { if (q.userId) match.userId = String(q.userId); }
         else { match.userId = String(req.uid); }
         if (q.status) match.status = String(q.status);
+        if (q.type) match.type = String(q.type);
         if (q.from || q.to) {
             const and = [];
             if (q.to) and.push({ startDate: { $lte: new Date(q.to) } });
             if (q.from) and.push({ endDate: { $gte: new Date(q.from) } });
             if (and.length) match.$and = and;
         }
+
+        // Member search (owner/admin only) — entries store userId; names live in
+        // the GLOBAL users db. Resolve users whose name/email match the term →
+        // userIds, then filter. Non-admins only ever see their own rows.
+        const search = privileged && q.search ? String(q.search).trim() : '';
+        if (search) {
+            const rx = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+            const matched = await MongoDbCrudOpration('global', {
+                type: SCHEMA_TYPE.USERS,
+                data: [{ $or: [{ Employee_Name: rx }, { Employee_FName: rx }, { Employee_LName: rx }, { Employee_Email: rx }] }, { _id: 1 }],
+            }, 'find').catch(() => []);
+            const searchIds = (matched || []).map((u) => String(u._id));
+            if (typeof match.userId === 'string') {
+                if (!searchIds.includes(match.userId)) match.userId = '__none__';
+            } else {
+                match.userId = { $in: searchIds.length ? searchIds : ['__none__'] };
+            }
+        }
+
+        // Pagination — 10 per page by default (max 50) so large histories batch.
+        const pageSize = Math.min(Math.max(Number(q.pageSize) || 10, 1), 50);
+        const page = Math.max(Number(q.page) || 1, 1);
+        const total = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.PTO_ENTRIES, data: [match],
+        }, 'countDocuments').catch(() => 0);
         const rows = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.PTO_ENTRIES, data: [match, {}, { sort: { startDate: -1 } }],
+            type: SCHEMA_TYPE.PTO_ENTRIES,
+            data: [match, {}, { sort: { startDate: -1 }, skip: (page - 1) * pageSize, limit: pageSize }],
         }, 'find');
         // Attach the requester's display name so the admin Team view shows WHO applied —
         // entries store only userId, and users live in the GLOBAL db. (AHE-3804)
@@ -68,9 +95,11 @@ exports.listPto = async (req, res) => {
             const o = typeof r.toObject === 'function' ? r.toObject() : r;
             // totalDays = working days in the entry's range × (hoursPerDay / full day),
             // so a half-day entry reads as 0.5 (drives the "Total Days" column).
-            return { ...o, userName: nameById[String(o.userId)] || '', totalDays: R.leaveDays(o) };
+            // createdAt: use the stored value, else derive it from the _id timestamp.
+            const createdAt = o.createdAt || new Date(parseInt(String(o._id).substring(0, 8), 16) * 1000);
+            return { ...o, userName: nameById[String(o.userId)] || '', totalDays: R.leaveDays(o), createdAt };
         });
-        return res.json({ status: true, data });
+        return res.json({ status: true, data, total, page, pageSize });
     } catch (e) { logger.error(`listPto: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
 };
 
@@ -107,6 +136,10 @@ exports.deletePto = async (req, res) => {
             type: SCHEMA_TYPE.PTO_ENTRIES, data: [{ _id: new mongoose.Types.ObjectId(String(id)) }],
         }, 'findOne');
         if (!entry) return res.status(404).json({ status: false, statusText: 'Not found.' });
+        // An approved leave is committed — it can't be deleted by anyone.
+        if (String(entry.status) === 'approved') {
+            return res.status(400).json({ status: false, statusText: 'An approved time-off entry cannot be deleted.' });
+        }
         if (!privileged && String(entry.userId) !== String(req.uid)) {
             return res.status(403).json({ status: false, statusText: 'You can only remove your own time off.' });
         }
