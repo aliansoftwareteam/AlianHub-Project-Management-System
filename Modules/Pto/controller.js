@@ -5,9 +5,55 @@ const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const { removeCache } = require('../../utils/commonFunctions');
 const logger = require('../../Config/loggerConfig');
 const R = require('./helpers/ptoRules');
+const { createNotificationsBody } = require('../notification/prepare-notification-data/controllerV2');
+const sendMail = require('../service.js');
 
 const companyOf = (req) => req.headers['companyid'] || (req.body && req.body.companyId) || (req.query && req.query.companyId);
 const audit = (req, entry) => { try { require('../Audit/recorder').recordAuditFromReq(req, entry); } catch (e) { /* best-effort */ } };
+
+// Best-effort: notify the requester when their leave is approved/rejected — an
+// in-app notification (bell, real-time via the globalNotification socket event)
+// plus a plain email. Wrapped so a notify/email failure never blocks the
+// approve/reject response. The templated email pipeline is task/project-only,
+// so we send a simple standalone email via the low-level mailer.
+const notifyPtoDecision = async (req, companyId, entry, status) => {
+    const toId = (v) => (mongoose.Types.ObjectId.isValid(String(v)) ? new mongoose.Types.ObjectId(String(v)) : null);
+    const ids = [entry.userId, req.uid].map(toId).filter(Boolean);
+    const users = ids.length ? await MongoDbCrudOpration('global', {
+        type: SCHEMA_TYPE.USERS,
+        data: [{ _id: { $in: ids } }, { Employee_Name: 1, Employee_FName: 1, Employee_LName: 1, Employee_Email: 1 }],
+    }, 'find').catch(() => []) : [];
+    const nameOf = (u) => (u && (u.Employee_Name || `${u.Employee_FName || ''} ${u.Employee_LName || ''}`.trim() || u.Employee_Email)) || '';
+    const requester = (users || []).find((u) => String(u._id) === String(entry.userId));
+    const approver = (users || []).find((u) => String(u._id) === String(req.uid));
+    const fmtD = (d) => { try { return new Date(d).toLocaleDateString('en-GB'); } catch (e) { return ''; } };
+    const t = String(entry.type || 'casual');
+    const typeLabel = `${t.charAt(0).toUpperCase()}${t.slice(1)} Leave`;
+    const range = fmtD(entry.startDate) + (String(entry.startDate) !== String(entry.endDate) ? ` - ${fmtD(entry.endDate)}` : '');
+    const verb = status === 'approved' ? 'approved' : 'rejected';
+    const message = `Your ${typeLabel} (${range}) was ${verb}${approver ? ` by ${nameOf(approver)}` : ''}.`;
+
+    // In-app notification for the requester (creates + emits globalNotification).
+    try {
+        await createNotificationsBody({
+            createdAt: new Date(), updatedAt: new Date(),
+            key: 'pto_status', type: 'pto', message,
+            userId: String(req.uid),
+            assigneeUsers: [String(entry.userId)], notSeen: [String(entry.userId)],
+            isSelected: false, companyId: String(companyId),
+            changeType: status, changeData: { ptoId: String(entry._id) },
+        });
+    } catch (e) { logger.error(`notifyPtoDecision in-app: ${e.message}`); }
+
+    // Standalone email (SMTP-dependent; no-op where mail isn't configured).
+    try {
+        const email = requester && requester.Employee_Email;
+        if (email) {
+            const html = `<p>Hi ${nameOf(requester) || 'there'},</p><p>${message}</p><p>You can review it under Settings &rarr; Time Off.</p>`;
+            await new Promise((resolve) => sendMail.SendNotificationEmail(`Time off ${verb}`, html, [email], true, () => resolve()));
+        }
+    } catch (e) { logger.error(`notifyPtoDecision email: ${e.message}`); }
+};
 
 // POST /api/v1/pto — create a PTO entry. A member creates their own (pending);
 // owner/admin may create for another user and/or set status (e.g. auto-approve).
@@ -120,6 +166,10 @@ exports.updatePtoStatus = async (req, res) => {
         if (!updated) return res.status(404).json({ status: false, statusText: 'Not found.' });
         removeCache(`pto:${companyId}`);
         audit(req, { action: `pto.${status}`, entityType: 'pto', entityId: String(id) });
+        // Notify the requester (in-app + email) — best-effort, never blocks.
+        if (status === 'approved' || status === 'rejected') {
+            notifyPtoDecision(req, companyId, updated, status).catch((e) => logger.error(`notifyPtoDecision: ${e.message}`));
+        }
         return res.json({ status: true, statusText: `PTO ${status}.`, data: updated });
     } catch (e) { logger.error(`updatePtoStatus: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
 };
