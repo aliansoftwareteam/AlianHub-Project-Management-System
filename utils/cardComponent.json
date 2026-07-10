@@ -2406,5 +2406,18 @@
         "image": "BatteryChartWorkload",
         "cardType": "member",
         "backgroundColor": "#0d9488"
+    },
+    {
+        "_id": "6a3800000000000000000501",
+        "name": "milestone_report_card_title",
+        "description": "milestone_report_card_description",
+        "permission": [],
+        "fields": [
+            { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "Milestone Report", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false }
+        ],
+        "key": "MilestoneReportCard",
+        "image": "Calculation",
+        "cardType": "project_progress",
+        "backgroundColor": "#0f766e"
     }
 ]
