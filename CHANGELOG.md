@@ -16,6 +16,36 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.11.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.10.1...v14.11.0) (2026-07-10)
+
+
+### 🚀 Features
+
+* add bulk move operation to task bulk action bar ([70ddc8b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/70ddc8bd27baf55307e26c44aa68012d8d1df472))
+* bulk move operation for multi-task selection ([ca739eb](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ca739ebc89736ed88252edca4d0ab58f92b360ef))
+* **dashboard:** add owner/admin milestone report card ([584ca93](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/584ca93ed00a9a7b465212c9c86ce7f95fdad5d0))
+* **dashboard:** add Owner/Admin Milestone report card ([2afd127](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2afd12742c3eca2d570a0baac60fd4630c7b877b))
+* **dashboard:** fix milestone card display + add status filter ([e6dda99](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e6dda9955f13dbad22082283fb3e000bef24d1cf))
+* **dashboard:** milestone card single USD tile + period receivable filter ([3b70c85](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3b70c852062796a7a0cae5108cc028b1a2676eb6))
+* **dashboard:** restrict Active Projects / Projects by Type / Running Projects cards to Owner/Admin ([f8c865c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f8c865cae4beee5372b94cd368667fbb688011e4))
+* **dashboard:** restrict Active Projects / Projects by Type / Running Projects cards to Owner/Admin ([422504e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/422504e0e77e14fe3c38d1e56614d6e753a337b4))
+* **pto:** 9h day default, working-days capacity, leave-day totals + Total Days column ([32b9bda](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/32b9bda0908830fe12b472c3f8acb8a43ee7b286))
+* **pto:** 9h day default, working-days capacity, leave-day totals + Total Days column ([b6e7b5d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b6e7b5d2f17ebf18a6c6eb7ec6140198eccf9176))
+* **pto:** notify requester on leave approve/reject (in-app + email) ([ee156a4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ee156a44f430611ac3aabfdb4609a6442a01b2df))
+* **pto:** time-off table search/filters/pagination, date validation, created column + saved-format dates ([2522c6c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2522c6cdb1263663ff811a69fecbc381a7af2f81))
+
+
+### 🐛 Bug Fixes
+
+* **dashboard:** pin milestone card footer + responsive tiles + open report in new tab ([bece857](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bece857da490080505f5cd3a9f84980c73a0f51f))
+* **pto:** drop the month date-range from the capacity label, keep the working-days count ([b5c6afc](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b5c6afcf8f27bd839b3e72eba7893e2204ac67a7))
+* **task:** remove permission gate on story points field ([563fc3d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/563fc3d38ff2b1ada471051d87f1b2c68097dfed))
+* **task:** remove permission gate on story points field ([547db0f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/547db0f5ba0d3ec73828eb14e35e10a8667bcc5a))
+* **tasks:** re-sync sprint counts in real time after bulk move ([01c3b76](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/01c3b76bc63772ec9d2523fbe8c70375c1e91329))
+* **tasks:** update sprint-count badges in real time on bulk move ([8063ebb](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8063ebb414aee2de65a9872187f0a8624db5f123))
+* **views:** remove duplicate legacy gantt and timeline views ([4856bf2](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4856bf2cbadb4d81985fc17ab331fb3ebcd710e9))
+* **views:** remove duplicate legacy gantt and timeline views ([2ad0d9b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2ad0d9ba24238372907c8c9564ff15152c1d21c7))
+
 ## [14.10.1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.10.0...v14.10.1) (2026-07-09)
 
 
