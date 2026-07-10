@@ -846,6 +846,10 @@ const getChange = () => {
     const Tabs2 = projectData.value.ProjectRequiredComponent?.filter((item) => item._id.length > 6);
     const ids = projectData.value.ProjectRequiredComponent?.map((item) => item._id);
     viewsListArray.value = [...(userTabs.filter((element) => element.id.length > 6 && (!ids.includes(element.id)))), ...Tabs2].sort((a, b) => !(a.isPin) ? 0 : (a.isPin == b.isPin ? 0 : (((!a.isPin && b.isPin) ? 1 : -1))));
+    // Drop the dead legacy 'Gantt'/'Timeline' keyNames (replaced by 'GanttView'/'TimelineView').
+    // getView() has no case for them so they render NotFound; older projects may still carry the
+    // stale entry. The "+ View" catalog already hides them, so mirror that filter in the tab bar.
+    viewsListArray.value = viewsListArray.value.filter((item) => item.keyName !== 'Timeline' && item.keyName !== 'Gantt');
     embedViews.value = ([...projectData.value.ProjectRequiredComponent.filter((item) => item._id.length == 6), ...(userTabs.filter((element) => element.id.length == 6))].sort((a, b) => (a.name.toLowerCase() < b.name.toLowerCase()) ? -1 : ((b.name.toLowerCase() < a.name.toLowerCase()) ? 1 : 0))).sort((a, b) => !(a.isPin) ? 0 : (a.isPin == b.isPin ? 0 : (((!a.isPin && b.isPin) ? 1 : -1))));
     if (projectDetailPermission.value === null) {
         viewsListArray.value = viewsListArray.value.filter((item) => item.keyName !== 'ProjectDetail');
