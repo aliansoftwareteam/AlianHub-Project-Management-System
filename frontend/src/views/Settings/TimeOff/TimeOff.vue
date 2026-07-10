@@ -3,7 +3,7 @@
         <div class="pto-grid">
             <!-- Request form -->
             <div class="pto-card">
-                <h3 class="m-0">{{ $t('Pto.add_title') }}</h3>
+                <h3 class="pto-form-title">{{ $t('Pto.add_title') }}</h3>
                 <div class="pto-row">
                     <label>{{ $t('Pto.type') }}</label>
                     <select v-model="form.type" class="form-control">
@@ -184,6 +184,7 @@ onMounted(load);
 .pto-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; margin-bottom: 16px; }
 @media (max-width: 800px) { .pto-grid { grid-template-columns: 1fr; } }
 .pto-card { background: #fff; border: 1px solid #e6e7ee; border-radius: 10px; padding: 18px; }
+.pto-form-title { margin: 0 0 16px; }
 .pto-sub { color: #6b7280; font-size: 12.5px; margin: 6px 0 14px; }
 .pto-days { color: #3a3f52; font-size: 13px; }
 .pto-days b { font-weight: 700; }
