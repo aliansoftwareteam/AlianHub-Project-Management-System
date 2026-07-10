@@ -889,20 +889,37 @@ exports.getMilestoneSummary = async (req, res) => {
             });
         }
 
-        const currencyAgg = {}; // currency → { totalAmount, count }
-        const statusAgg = {};   // status   → { count, totalAmount }
+        // ProjectCurrency is stored as a currency OBJECT ({ symbol, code, name, … }).
+        // Reduce it to a short display string, otherwise the card renders
+        // "[object Object]" (object coerced to a map key) or a raw JSON blob
+        // (object printed straight into a cell). Strings pass through unchanged.
+        const currencyStr = (pc) => {
+            if (!pc) return "—";
+            if (typeof pc === "string") return pc;
+            return pc.symbol || pc.symbol_native || pc.code || pc.name || "—";
+        };
+        // Optional status drill-down: when the card sends a `status`, the currency
+        // totals + recent list reflect only that status. byStatus is ALWAYS the
+        // full breakdown — it drives the card's status-filter selector.
+        const statusFilter = (req.body && req.body.status) ? String(req.body.status) : "";
+        const matchStatus = (m) => !statusFilter || String(m.statusId || "No Status") === statusFilter;
+
+        const currencyAgg = {}; // currency → { totalAmount, count }  (status-filtered)
+        const statusAgg = {};   // status   → { count, totalAmount }  (always full)
         milestones.forEach((m) => {
-            const proj = projectsMap[String(m.projectId)] || {};
-            const currency = proj.currency || "—";
             const amount = Number(m.amount) || 0;
-            if (!currencyAgg[currency]) currencyAgg[currency] = { totalAmount: 0, count: 0 };
-            currencyAgg[currency].totalAmount += amount;
-            currencyAgg[currency].count += 1;
 
             const status = m.statusId || "No Status";
             if (!statusAgg[status]) statusAgg[status] = { count: 0, totalAmount: 0 };
             statusAgg[status].count += 1;
             statusAgg[status].totalAmount += amount;
+
+            if (!matchStatus(m)) return; // currency totals respect the active status filter
+            const proj = projectsMap[String(m.projectId)] || {};
+            const currency = currencyStr(proj.currency);
+            if (!currencyAgg[currency]) currencyAgg[currency] = { totalAmount: 0, count: 0 };
+            currencyAgg[currency].totalAmount += amount;
+            currencyAgg[currency].count += 1;
         });
 
         // Most-recent activity first — statusDate (epoch ms) is the milestone's
@@ -911,6 +928,7 @@ exports.getMilestoneSummary = async (req, res) => {
             || (m.updatedAt ? new Date(m.updatedAt).getTime() : 0)
             || (m.createdAt ? new Date(m.createdAt).getTime() : 0);
         const recent = [...milestones]
+            .filter(matchStatus)
             .sort((a, b) => dateOf(b) - dateOf(a))
             .slice(0, RECENT_LIMIT)
             .map((m) => {
@@ -920,7 +938,7 @@ exports.getMilestoneSummary = async (req, res) => {
                     projectName: proj.name || "",
                     milestoneName: m.milestoneName || "",
                     amount: Number(m.amount) || 0,
-                    currency: proj.currency || "—",
+                    currency: currencyStr(proj.currency),
                     status: m.statusId || "",
                     date: dateOf(m) || null,
                 };
@@ -938,7 +956,7 @@ exports.getMilestoneSummary = async (req, res) => {
                 totalAmount: statusAgg[status].totalAmount,
             })).sort((a, b) => b.count - a.count),
             recent,
-            totalCount: milestones.length,
+            totalCount: milestones.filter(matchStatus).length,
         };
 
         return res.status(200).json({ status: true, data });

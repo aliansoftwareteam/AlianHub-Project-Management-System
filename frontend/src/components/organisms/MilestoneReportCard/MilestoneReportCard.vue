@@ -18,13 +18,27 @@
                 </div>
             </div>
 
-            <!-- By status mini-bars -->
+            <!-- By status mini-bars — also the status filter selector. Click a
+                 row to drill the totals + recent list into that status. -->
             <div v-if="data.byStatus.length" class="mrc-status">
-                <div class="mrc-section-title">{{ $t('dashboardCard.milestone_by_status') }}</div>
+                <div class="mrc-section-title">
+                    <span>{{ $t('dashboardCard.milestone_by_status') }}</span>
+                    <button v-if="selectedStatus" type="button" class="mrc-clear" title="Clear status filter" @click="clearStatus">
+                        {{ statusLabel(selectedStatus) }} ✕
+                    </button>
+                </div>
                 <div class="mrc-bars">
-                    <div v-for="row in data.byStatus" :key="row.status" class="mrc-bar-row">
+                    <div
+                        v-for="row in data.byStatus"
+                        :key="row.status"
+                        class="mrc-bar-row"
+                        :class="{ 'mrc-bar-row--active': selectedStatus === row.status, 'mrc-bar-row--dim': selectedStatus && selectedStatus !== row.status }"
+                        role="button"
+                        :title="`Filter by ${statusLabel(row.status)}`"
+                        @click="toggleStatus(row.status)"
+                    >
                         <span class="mrc-dot" :style="dotStyle(row.status)"></span>
-                        <span class="mrc-status-label" :title="statusLabel(row.status)">{{ statusLabel(row.status) }}</span>
+                        <span class="mrc-status-label">{{ statusLabel(row.status) }}</span>
                         <div class="mrc-track"><div class="mrc-fill" :style="{ width: statusPct(row.count) + '%' }"></div></div>
                         <span class="mrc-val">{{ row.count }}</span>
                     </div>
@@ -85,6 +99,7 @@ const router = useRouter();
 
 const data = ref({ totalsByCurrency: [], byStatus: [], recent: [], totalCount: 0 });
 const loading = ref(false);
+const selectedStatus = ref(''); // active status drill-down ('' = all)
 
 const isManagement = computed(() => [1, 2].includes(props.companyUserDetail?.roleType));
 
@@ -96,17 +111,29 @@ const formatAmount = (n) => {
     return num.toLocaleString(undefined, { maximumFractionDigits: 2 });
 };
 
-// A milestone status is stored as a colour value; render it as a swatch when
-// it looks like a hex colour, otherwise fall back to a neutral dot + label.
-const isHexColor = (s) => typeof s === 'string' && /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(s);
-const dotStyle = (status) => ({ backgroundColor: isHexColor(status) ? status : '#cbd2e0' });
-const statusLabel = (status) => (isHexColor(status) || !status) ? '—' : status;
+// Milestone status is a billing enum (RELEASED / FUNDED / NOT_FUNDED /
+// RELEASE_REQUEST_SENT / empty). Map each to a human-readable label + colour
+// (matching the full Milestone Report); unknown values are title-cased so a
+// new enum never shows raw underscores.
+const STATUS_META = {
+    RELEASED:             { label: 'Released',             color: '#1c7a43' },
+    FUNDED:               { label: 'Funded',               color: '#0d9488' },
+    NOT_FUNDED:           { label: 'Not Funded',           color: '#e08a1e' },
+    RELEASE_REQUEST_SENT: { label: 'Release Request Sent', color: '#3b6fe0' },
+};
+const titleCase = (s) => String(s).toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+const statusMeta = (status) => {
+    if (!status || status === 'No Status') return { label: 'No Status', color: '#cbd2e0' };
+    return STATUS_META[status] || { label: titleCase(status), color: '#cbd2e0' };
+};
+const statusLabel = (status) => statusMeta(status).label;
+const dotStyle = (status) => ({ backgroundColor: statusMeta(status).color });
 
 const load = async () => {
     if (!isManagement.value) return;
     loading.value = true;
     try {
-        const res = await apiRequest('post', `${env.MILESTONE_SUMMARY}`, {});
+        const res = await apiRequest('post', `${env.MILESTONE_SUMMARY}`, selectedStatus.value ? { status: selectedStatus.value } : {});
         const body = res && res.data;
         if (body && body.status && body.data) {
             data.value = {
@@ -123,6 +150,19 @@ const load = async () => {
     }
 };
 
+// Status filter (drill-down): clicking a By-Status row filters the currency
+// totals + recent list to that status; clicking the same row (or the ✕) clears.
+// byStatus always returns full from the server, so the selector stays intact.
+const toggleStatus = (status) => {
+    selectedStatus.value = selectedStatus.value === status ? '' : status;
+    load();
+};
+const clearStatus = () => {
+    if (!selectedStatus.value) return;
+    selectedStatus.value = '';
+    load();
+};
+
 const openReport = () => {
     const cid = route.params.cid;
     if (!cid) return;
@@ -136,20 +176,25 @@ onMounted(load);
 <style scoped>
 .mrc { height: 100%; width: 100%; padding: 10px 12px; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
 .mrc-msg { color: #9aa0b4; font-size: 12px; padding: 8px 0; }
-.mrc-section-title { font-size: 12px; font-weight: 600; color: #3a3f52; margin-bottom: 6px; }
+.mrc-section-title { font-size: 12px; font-weight: 600; color: #3a3f52; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.mrc-clear { border: none; background: none; padding: 0; font-size: 11px; font-weight: 600; color: #0d9488; cursor: pointer; white-space: nowrap; }
+.mrc-clear:hover { text-decoration: underline; }
 .mrc-total-grid { display: flex; flex-wrap: wrap; gap: 12px; }
 .mrc-total { flex: 1 1 120px; background: #f5f7fb; border-radius: 8px; padding: 10px; text-align: center; }
 .mrc-total-amount { font-size: 20px; font-weight: 700; color: #0f766e; line-height: 1.2; word-break: break-word; }
 .mrc-total-label { font-size: 11px; color: #6b7280; margin-top: 2px; }
 .mrc-bars { display: flex; flex-direction: column; gap: 6px; }
-.mrc-bar-row { display: flex; align-items: center; gap: 8px; }
+.mrc-bar-row { display: flex; align-items: center; gap: 8px; min-width: 0; cursor: pointer; padding: 2px 4px; margin: 0 -4px; border-radius: 6px; transition: background .12s ease, opacity .12s ease; }
+.mrc-bar-row:hover { background: #f5f7fb; }
+.mrc-bar-row--active { background: #eaf5f2; }
+.mrc-bar-row--dim { opacity: .5; }
 .mrc-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
 .mrc-status-label { width: 30%; font-size: 12px; color: #3a3f52; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mrc-track { flex: 1; height: 12px; background: #eef0f6; border-radius: 4px; overflow: hidden; }
 .mrc-fill { height: 100%; background: #0d9488; }
 .mrc-val { width: 34px; text-align: right; font-size: 12px; color: #3a3f52; }
 .mrc-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.mrc-item { display: flex; align-items: center; gap: 8px; }
+.mrc-item { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .mrc-item-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .mrc-item-name { font-size: 12px; color: #3a3f52; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mrc-item-project { font-size: 11px; color: #9aa0b4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
