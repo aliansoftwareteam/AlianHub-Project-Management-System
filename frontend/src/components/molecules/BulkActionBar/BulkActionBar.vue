@@ -197,6 +197,18 @@
                 </div>
             </BulkMenu>
 
+            <!-- MOVE — opens the shared move sidebar (project + sprint/folder
+                 picker) in bulk mode; backend auto-maps status/type. -->
+            <button
+                class="bulk-action-bar__btn"
+                :class="{ 'bulk-action-bar__btn--disabled': !canMove }"
+                :title="canMove ? 'Move selected tasks' : 'No permission to move'"
+                :disabled="!canMove"
+                @click="canMove && (showMove = true, closeMenu())"
+            >
+                <span>Move</span>
+            </button>
+
             <!-- DELETE -->
             <button
                 class="bulk-action-bar__btn bulk-action-bar__btn--danger"
@@ -248,6 +260,19 @@
         :showSpinner="isWorking"
         @confirm="performArchive"
     />
+
+    <!-- Bulk move: reuse the single-task move sidebar (project + sprint/folder
+         picker) in bulk mode. It emits the chosen destination; we fire the
+         bulkMove request. -->
+    <ConvertToSubTaskSidebar
+        v-if="showMove"
+        :closeSideBar="showMove"
+        :isMoveTask="true"
+        :isBulkMove="true"
+        :task="{}"
+        @isConvertSubtaskOPen="showMove = false"
+        @bulkMoveConfirm="onBulkMoveConfirm"
+    />
 </template>
 
 <script setup>
@@ -256,6 +281,7 @@ import { useStore } from 'vuex';
 import { useToast } from 'vue-toast-notification';
 
 import ConfirmationSidebar from '@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue';
+import ConvertToSubTaskSidebar from '@/components/molecules/ConvertToSubTaskSidebar/ConvertToSubTaskSidebar.vue';
 import DueDateCompo from '@/components/molecules/DueDateCompo/DueDateCompo.vue';
 import UserProfile from '@/components/atom/UserProfile/UserProfile.vue';
 import BulkMenu from './BulkMenu.vue';
@@ -278,6 +304,7 @@ const userId = inject('$userId', null);
 
 const showDeleteConfirm = ref(false);
 const showArchiveConfirm = ref(false);
+const showMove = ref(false);
 const isWorking = ref(false);
 const barRef = ref(null);
 
@@ -335,6 +362,7 @@ const canChangeDates = computed(() => checkPermission('task.task_due_date', proj
 const canChangeTags = computed(() => checkPermission('task.task_tag', projectData?.value?.isGlobalPermission) === true);
 const canDelete = computed(() => checkPermission('task.task_delete', projectData?.value?.isGlobalPermission) === true);
 const canArchive = computed(() => checkPermission('task.task_archive', projectData?.value?.isGlobalPermission) === true);
+const canMove = computed(() => checkPermission('task.task_move', projectData?.value?.isGlobalPermission) === true);
 
 const availableStatuses = computed(() => {
     const data = projectData?.value?.taskStatusData;
@@ -589,7 +617,7 @@ function reportResult(action, response) {
     else $toast.success(msg);
 }
 
-async function runBulk(action, payload, { optimisticDeletedStatus, optimisticFields } = {}) {
+async function runBulk(action, payload, { optimisticDeletedStatus, optimisticFields, onSuccess } = {}) {
     if (isWorking.value) return;
     closeMenu();
     isWorking.value = true;
@@ -617,6 +645,7 @@ async function runBulk(action, payload, { optimisticDeletedStatus, optimisticFie
             return;
         }
         reportResult(action, response);
+        if (typeof onSuccess === 'function') { try { onSuccess(response); } catch (e) { /* post-success hook is best-effort */ } }
         selection.clear();
     } catch (error) {
         $toast.error(error?.message || `Bulk ${action} failed`);
@@ -645,6 +674,74 @@ function performDelete() {
 
 function performArchive() {
     runBulk('bulkArchive', {}, { optimisticDeletedStatus: 2 });
+}
+
+// Bulk move — the sidebar hands back the destination project + sprint. We only
+// send the destination; the backend derives each task's source sprint, preserves
+// assignees/watchers, and auto-maps status/type for cross-project moves.
+//
+// Real-time counts, mirroring single-move (ConvertToSubTaskSidebar.moveTask):
+//   • Board task cards + per-status counts reconcile through the per-task socket
+//     `update` events the backend emits — same as single-move, whose
+//     taskClass.moveTask is API-only and relies on the socket too.
+//   • Sidebar sprint-count badges are NOT socket-driven, so — exactly like
+//     single-move — adjust them by hand: decrement each source sprint and
+//     increment the destination via mutateSprints. A bulk selection can span
+//     several source sprints, so snapshot each task's source sprint BEFORE the
+//     move and group the units (parent task counts itself + its subtasks).
+function onBulkMoveConfirm({ project, sprint } = {}) {
+    if (!project || !sprint || !sprint.id) return;
+    showMove.value = false;
+
+    const proj = projectData?.value;
+    const sourceGroups = new Map(); // `${folderId}::${sprintId}` -> { ref, units }
+    let totalUnits = 0;
+    for (const id of selection.selectedTaskIds.value) {
+        const t = findTaskInStore(id)?.task;
+        if (!t) continue;
+        const folderId = t.folderObjId || '';
+        const sid = String(t.sprintId);
+        const ref = folderId
+            ? proj?.sprintsfolders?.[folderId]?.sprintsObj?.[sid]
+            : proj?.sprintsObj?.[sid];
+        if (!ref) continue;
+        const units = t.isParentTask ? ((t.subTasks || 0) + 1) : 1;
+        const key = `${folderId}::${sid}`;
+        const g = sourceGroups.get(key) || { ref, units: 0 };
+        g.units += units;
+        sourceGroups.set(key, g);
+        totalUnits += units;
+    }
+
+    runBulk('bulkMove', {
+        projectData: {
+            id: project._id,
+            ProjectCode: project.ProjectCode,
+            ProjectName: project.ProjectName,
+        },
+        sprintObj: sprint,
+        isSubTask: false,
+    }, {
+        onSuccess: () => {
+            // Decrement each source sprint badge (mirrors single-move's
+            // moveTaskSprint.tasks -= sprintCount).
+            for (const { ref, units } of sourceGroups.values()) {
+                ref.tasks = (ref.tasks || 0) - units;
+                commit('projectData/mutateSprints', { op: 'modified', data: { ...ref } });
+            }
+            // Increment the destination sprint badge (mirrors
+            // selectedSprint.tasks + sprintCount).
+            const destFolderId = sprint.folderId || '';
+            const destSid = String(sprint.id);
+            const destRef = destFolderId
+                ? proj?.sprintsfolders?.[destFolderId]?.sprintsObj?.[destSid]
+                : proj?.sprintsObj?.[destSid];
+            if (destRef && totalUnits) {
+                destRef.tasks = (destRef.tasks || 0) + totalUnits;
+                commit('projectData/mutateSprints', { op: 'modified', data: { ...destRef } });
+            }
+        },
+    });
 }
 
 function onPriorityPick(priority) {

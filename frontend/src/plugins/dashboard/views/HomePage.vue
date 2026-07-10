@@ -232,6 +232,7 @@
     import MyLeaveCard from "@/components/organisms/MyLeaveCard/MyLeaveCard.vue";
     import DueSoonCard from "@/components/organisms/DueSoonCard/DueSoonCard.vue";
     import MyTimeCard from "@/components/organisms/MyTimeCard/MyTimeCard.vue";
+    import MilestoneReportCard from "@/components/organisms/MilestoneReportCard/MilestoneReportCard.vue";
     import { useCustomComposable } from '@/composable';
     import { onBeforeRouteLeave } from 'vue-router';
     import { abortAllRequests } from "@/services";
@@ -316,15 +317,26 @@
             isDataFetching.value = false;
         },2000)
     });
+    // Management-only dashboard cards (company-wide data) — visible only to
+    // Owner/Admin (roleType 1/2). Hidden from the "Add card" catalog AND from
+    // an already-saved layout for anyone below that.
+    const MANAGEMENT_ONLY_CARDS = ['MilestoneReportCard', 'ActiveProjectsCard', 'ProjectsByTypeCard', 'RunningProjectsCard'];
+    const isManagementUser = () => [1, 2].includes(companyUserDetail.value?.roleType);
+
     const getUserDashboard = async() => {
         try {
             const response = await apiRequest("get", `${env.DASHBOARD}/${userId.value}`);
             if (response?.data?.length > 0) {
-                const cards = response.data[0].cards || [];
+                let cards = response.data[0].cards || [];
                 currentLayout.value = response.data[0];
+                // Drop management-only cards from a non-management user's saved
+                // layout so any previously-added instance stops rendering.
+                if (!isManagementUser()) {
+                    cards = cards.filter((e) => !MANAGEMENT_ONLY_CARDS.includes(e.componentId));
+                }
                 if(cards) {
                     layout.value = cards.map((e) => ({...e.config.position,...(getCardsComponentsSize(e.componentId) ?? {}), i:e.uid,componentId:e.componentId, cardData: e.config.cardData, filterData: e.config.filterData}));
-                } 
+                }
             }
         } catch (error) {
             console.error(error)
@@ -349,6 +361,11 @@
             const response = await apiRequest("get", `${env.CARDCOMPONENT}`);
             if (response?.data?.length > 0) {
                 let cardsArray = checkPermission('sheet_settings.workload_timesheet') !== null ? response?.data : response?.data?.filter((e)=> !["TimeEstimatedWorkloadComp","TimeTrackComp","TimeEstimatedComp"].includes(e.key))
+                // Management-only cards — hide from the "Add card" catalog for
+                // anyone below Owner/Admin (roleType 1/2).
+                if (!isManagementUser()) {
+                    cardsArray = cardsArray?.filter((e) => !MANAGEMENT_ONLY_CARDS.includes(e.key));
+                }
                 cardComponent.value = JSON.parse(JSON.stringify(cardsArray));
                 filterCardComponent.value = structureCards(cardsArray);
             }
@@ -425,6 +442,8 @@
                 return DueSoonCard;
             case 'MyTimeCard':
                 return MyTimeCard;
+            case 'MilestoneReportCard':
+                return MilestoneReportCard;
             default:
                 return null;
         }
@@ -780,6 +799,7 @@
         'WorkedTasksTableCard', 'TeamCategoryBreakdownCard', 'TeamLoggedVsEtaCard',
         'TasksByStatusCard', 'TasksByProjectCard', 'TotalTasksCard',
         'NextUpCard', 'MyAchievementsCard', 'MyLeaveCard', 'DueSoonCard', 'MyTimeCard',
+        'MilestoneReportCard',
     ].includes(cid);
 
     // ── Dashboard-level date range ──────────────────────────────────
@@ -823,7 +843,7 @@
     const PROJECT_PERIOD_CARDS = [
         'RunningProjectsCard', 'UsersByCategoryCard', 'ProjectPulseCard',
         'WorkedTasksTableCard', 'TeamCategoryBreakdownCard', 'TeamLoggedVsEtaCard', 'OnLeaveCard',
-        'MyAchievementsCard', 'MyTimeCard',
+        'MyAchievementsCard', 'MyTimeCard', 'MilestoneReportCard',
     ];
     const PROJECT_PERIOD_OPTIONS = [
         { id: 0, label: 'Auto' },
@@ -833,7 +853,7 @@
     const PROJECT_PERIOD_DEFAULT = {
         RunningProjectsCard: 1, UsersByCategoryCard: 3, ProjectPulseCard: 1,
         WorkedTasksTableCard: 3, TeamCategoryBreakdownCard: 3, TeamLoggedVsEtaCard: 3, OnLeaveCard: 1,
-        MyAchievementsCard: 5, MyTimeCard: 3,
+        MyAchievementsCard: 5, MyTimeCard: 3, MilestoneReportCard: 5,
     };
     const periodOptionsFor = (cid) => (PROJECT_PERIOD_CARDS.includes(cid) ? PROJECT_PERIOD_OPTIONS : []);
     const periodValueFor = (item) => {

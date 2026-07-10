@@ -112,12 +112,13 @@
                     :permission="checkPermission('task.task_priority',project?.isGlobalPermission) === true"
                 />
             </div>
-            <div class="d-flex task-detail-right-side-label" v-if="checkPermission('task.task_estimated_hours',project?.isGlobalPermission) !== null">
+            <!-- Story Points: permission gate removed — free for anyone to view + edit. -->
+            <div class="d-flex task-detail-right-side-label">
                 <h4>Story Points</h4>
                 <StoryPoints
                     :pointsVal="task.points"
                     :estimationScale="project?.estimationScale || 'fibonacci'"
-                    :permission="checkPermission('task.task_estimated_hours',project?.isGlobalPermission) === true"
+                    :permission="true"
                     @select="updatePoints($event)"
                     class="taskdetail-label task-detail-right-wrapper ml-0"
                 />

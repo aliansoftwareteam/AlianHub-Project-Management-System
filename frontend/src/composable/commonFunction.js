@@ -154,19 +154,9 @@ export const projectComponentsIcons = (key) => {
             keyName: "Workload"
         },
         {
-            icon: require("@/assets/images/svg/component-inactive-icons/comp_gantt_inactive.svg"),
-            activeIcon: require("@/assets/images/svg/component-active-icons/comp_gantt_active.svg"),
-            keyName: "Gantt"
-        },
-        {
             icon: require("@/assets/images/svg/component-inactive-icons/comp_table_inactive.svg"),
             activeIcon: require("@/assets/images/svg/component-active-icons/comp_table_active.svg"),
             keyName: "TableView"
-        },
-        {
-            icon: require("@/assets/images/svg/component-inactive-icons/comp_timeline_inactive.svg"),
-            activeIcon: require("@/assets/images/svg/component-active-icons/comp_timeline_active.svg"),
-            keyName: "Timeline"
         },
         {
             icon: require("@/assets/images/svg/component-inactive-icons/comp_embed_inactive.svg"),
@@ -613,6 +603,7 @@ export const getCardsComponentsSize = (key) => {
         case 'MyLeaveCard':
         case 'DueSoonCard':
         case 'MyTimeCard':
+        case 'MilestoneReportCard':
             return {
                 "minW": 3,
                 "maxW": 12,

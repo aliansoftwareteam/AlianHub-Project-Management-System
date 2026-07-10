@@ -231,6 +231,7 @@ module.exports.DASHBOARD= '/api/v1/dashboard'
 module.exports.CARDCOMPONENT= '/api/v1/cardcomponent'
 // Resource Utilization & Consumption dashboard cards.
 module.exports.PROJECT_UTILIZATION_SUMMARY = '/api/v1/dashboard/project-utilization-summary'
+module.exports.MILESTONE_SUMMARY = '/api/v1/dashboard/milestone-summary'
 module.exports.TEAM_TASKTYPE_BREAKDOWN = '/api/v1/dashboard/team-tasktype-breakdown'
 module.exports.TEAM_LOGGED_VS_ETA = '/api/v1/dashboard/team-logged-vs-eta'
 // Member self-view dashboard cards.
