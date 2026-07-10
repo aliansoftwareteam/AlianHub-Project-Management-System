@@ -756,25 +756,93 @@ module.exports = {
     },
 
     // ---------------------- MOVE ----------------------
-    // payload: { companyId, userData, taskIds, sprintObj, oldSprintObj, oldProject, projectData, isSubTask, assignee, watcher }
-    // sprintObj is the destination sprint object the frontend builds today
-    // when calling single-task moveTask. oldProject/oldSprintObj/projectData
-    // mirror that single-task signature.
-    bulkMove({ companyId, userData, taskIds, sprintObj, oldSprintObj, oldProject, projectData, isSubTask = false, assignee = [], watcher = [] }) {
+    // payload: { companyId, userData, taskIds, sprintObj, projectData, isSubTask }
+    //   sprintObj   — destination sprint object (same shape the single-task
+    //                 picker builds: { id, name, folderId?, folderName?, ... }).
+    //   projectData — destination project summary { id, ProjectCode, ProjectName }.
+    //
+    // Unlike the single-task move — where the picker knows the one task's
+    // source sprint, current assignees, and lets the user hand-map status/type
+    // for a cross-project move — a bulk selection spans different source
+    // sprints, assignees, and statuses. So this derives everything per task:
+    //   • oldSprintObj  — from each task's own sprintId/folderObjId.
+    //   • assignee/watcher — each task's existing values (moveTaskFunction
+    //                        rewrites these fields, so passing a shared []
+    //                        would wipe them).
+    //   • cross-project status/type conversion — auto-mapped by name against
+    //                        the destination project, falling back to the
+    //                        destination's first status/type when no name
+    //                        matches. Same-project moves skip conversion.
+    bulkMove({ companyId, userData, taskIds, sprintObj, projectData, isSubTask = false }) {
         return new Promise(async (resolve, reject) => {
             try {
                 if (!companyId) return reject(new Error('companyId required'));
-                if (!sprintObj) return reject(new Error('sprintObj required'));
-                if (!projectData) return reject(new Error('projectData required'));
+                if (!sprintObj || !sprintObj.id) return reject(new Error('sprintObj required'));
+                if (!projectData || !projectData.id) return reject(new Error('projectData required'));
 
                 const { tasks, skipped } = await loadScopedTasks(companyId, taskIds, { includeArchived: false });
                 const updated = [];
                 const errors = [];
 
-                // moveTask is sequential per single-task behavior to avoid
-                // sprint count races; allSettled with serial awaits.
+                const loadProject = makeProjectLoader(companyId);
+                const destProject = await loadProject(projectData.id);
+                if (!destProject) return reject(new Error('destination project not found'));
+
+                const destStatuses = Array.isArray(destProject.taskStatusData) ? destProject.taskStatusData : [];
+                const destTypes = Array.isArray(destProject.taskTypeCounts) ? destProject.taskTypeCounts : [];
+                const norm = (s) => String(s || '').trim().toLowerCase();
+                // Prefer a non-"close" default so tasks don't land as closed.
+                const defaultStatus = destStatuses.find((s) => s.type !== 'close') || destStatuses[0] || null;
+                const mapStatus = (srcStatus) => {
+                    const pick = destStatuses.find((d) => norm(d.name) === norm(srcStatus?.name)) || defaultStatus;
+                    return pick ? { key: pick.key, name: pick.name, type: pick.type, bgColor: pick.bgColor, textColor: pick.textColor } : null;
+                };
+                const mapType = (srcType) => {
+                    const pick = destTypes.find((d) => norm(d.name) === norm(srcType?.name)) || destTypes[0] || null;
+                    return pick ? { value: pick.value, key: pick.key, name: pick.name } : null;
+                };
+
+                // moveTaskFunction reads oldProject.taskStatusData/.taskTypeCounts
+                // (the SOURCE project's lists) to find the task's current
+                // status/type, then applies the `.convertStatus`/`.convertType`
+                // we graft onto each entry. Build+cache one per source project.
+                const oldProjectCache = new Map();
+                const buildOldProject = async (srcProjectId) => {
+                    const key = String(srcProjectId);
+                    if (oldProjectCache.has(key)) return oldProjectCache.get(key);
+                    const src = await loadProject(srcProjectId);
+                    const built = src ? {
+                        id: src._id,
+                        ProjectName: src.ProjectName,
+                        taskStatusData: (Array.isArray(src.taskStatusData) ? src.taskStatusData : [])
+                            .map((s) => ({ ...s, convertStatus: mapStatus(s) })),
+                        taskTypeCounts: (Array.isArray(src.taskTypeCounts) ? src.taskTypeCounts : [])
+                            .map((t) => ({ ...t, convertType: mapType(t) })),
+                    } : null;
+                    oldProjectCache.set(key, built);
+                    return built;
+                };
+
+                // Sequential per single-task behavior to avoid sprint-count races.
                 for (const task of tasks) {
                     try {
+                        // No-op guard: already in the destination sprint/folder.
+                        if (String(task.sprintId) === String(sprintObj.id) &&
+                            String(task.folderObjId || '') === String(sprintObj.folderId || '')) {
+                            skipped.push({ taskId: String(task._id), reason: 'already-in-target' });
+                            continue;
+                        }
+                        const oldProject = await buildOldProject(task.ProjectID);
+                        if (!oldProject) {
+                            skipped.push({ taskId: String(task._id), reason: 'project-not-found' });
+                            continue;
+                        }
+                        const oldSprintObj = {
+                            id: task.sprintId,
+                            folderId: task.folderObjId || null,
+                            name: task.sprintArray?.name || '',
+                            folderName: task.sprintArray?.folderName || '',
+                        };
                         await this.moveTask({
                             companyId,
                             projectData,
@@ -783,8 +851,8 @@ module.exports = {
                             oldSprintObj,
                             oldProject,
                             isSubTask,
-                            assignee,
-                            watcher,
+                            assignee: Array.isArray(task.AssigneeUserId) ? task.AssigneeUserId : [],
+                            watcher: Array.isArray(task.watchers) ? task.watchers : [],
                             userData,
                         });
                         updated.push(String(task._id));
@@ -794,7 +862,7 @@ module.exports = {
                     }
                 }
 
-                emitBulkSummary('bulkMove', { taskIds: updated, targetSprintId: sprintObj?.id });
+                emitBulkSummary('bulkMove', { taskIds: updated, targetSprintId: sprintObj?.id, targetProjectId: projectData?.id });
                 resolve(summarize({ updated, skipped, errors }));
             } catch (error) {
                 logger.error(`bulkMove error: ${error.message}`);
