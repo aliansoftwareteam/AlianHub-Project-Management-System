@@ -66,7 +66,9 @@ exports.listPto = async (req, res) => {
         }
         const data = (rows || []).map((r) => {
             const o = typeof r.toObject === 'function' ? r.toObject() : r;
-            return { ...o, userName: nameById[String(o.userId)] || '' };
+            // totalDays = working days in the entry's range × (hoursPerDay / full day),
+            // so a half-day entry reads as 0.5 (drives the "Total Days" column).
+            return { ...o, userName: nameById[String(o.userId)] || '', totalDays: R.leaveDays(o) };
         });
         return res.json({ status: true, data });
     } catch (e) { logger.error(`listPto: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }

@@ -16,6 +16,7 @@
                 </div>
                 <div class="pto-row"><label>{{ $t('Pto.hours_per_day') }}</label><input v-model.number="form.hoursPerDay" type="number" min="1" max="24" class="form-control" /></div>
                 <div class="pto-row"><label>{{ $t('Pto.reason') }}</label><input v-model="form.reason" class="form-control" :placeholder="$t('Pto.reason_ph')" /></div>
+                <div class="pto-row pto-days" v-if="form.startDate && form.endDate">{{ $t('Pto.total_days') }}: <b>{{ formDays }}</b></div>
                 <div class="pto-actions">
                     <button class="pto-btn" :disabled="busy" @click="addEntry">{{ busy ? $t('Pto.saving') : $t('Pto.request') }}</button>
                     <span v-if="msg" class="pto-msg" :class="msgType">{{ msg }}</span>
@@ -49,6 +50,7 @@
                             <th>{{ $t('Pto.col_dates') }}</th>
                             <th>{{ $t('Pto.col_type') }}</th>
                             <th>{{ $t('Pto.col_hours') }}</th>
+                            <th>{{ $t('Pto.col_days') }}</th>
                             <th>{{ $t('Pto.col_status') }}</th>
                             <th>{{ $t('Pto.col_reason') }}</th>
                             <th></th>
@@ -60,6 +62,7 @@
                             <td class="pto-nowrap">{{ fmt(e.startDate) }} → {{ fmt(e.endDate) }}</td>
                             <td>{{ $t('Pto.types.' + (e.type || 'casual')) }}</td>
                             <td>{{ e.hoursPerDay }}h/day</td>
+                            <td class="pto-nowrap">{{ e.totalDays != null ? e.totalDays : leaveDays(e.startDate, e.endDate, e.hoursPerDay) }}</td>
                             <td><span class="pto-badge" :class="e.status">{{ $t('Pto.status.' + e.status) }}</span></td>
                             <td class="pto-reason" :title="e.reason || ''">{{ e.reason || '—' }}</td>
                             <td class="pto-rowactions">
@@ -70,8 +73,8 @@
                                 <button class="pto-mini del" @click="remove(e)">{{ $t('Pto.delete') }}</button>
                             </td>
                         </tr>
-                        <tr v-if="!entries.length && !loading"><td :colspan="isAdmin ? 7 : 6" class="pto-empty">{{ $t('Pto.empty') }}</td></tr>
-                        <tr v-if="loading && !entries.length"><td :colspan="isAdmin ? 7 : 6" class="pto-empty">{{ $t('Pto.loading') }}</td></tr>
+                        <tr v-if="!entries.length && !loading"><td :colspan="isAdmin ? 8 : 7" class="pto-empty">{{ $t('Pto.empty') }}</td></tr>
+                        <tr v-if="loading && !entries.length"><td :colspan="isAdmin ? 8 : 7" class="pto-empty">{{ $t('Pto.loading') }}</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -100,7 +103,7 @@ const loading = ref(false);
 const msg = ref(''); const msgType = ref('');
 const entries = ref([]);
 const capacity = ref(null);
-const form = reactive({ type: 'casual', startDate: '', endDate: '', hoursPerDay: 8, reason: '' });
+const form = reactive({ type: 'casual', startDate: '', endDate: '', hoursPerDay: 9, reason: '' });
 
 const fmt = (d) => { try { return new Date(d).toLocaleDateString(); } catch (e) { return d; } };
 
@@ -110,7 +113,35 @@ const monthRange = () => {
     const to = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 0)).toISOString().slice(0, 10);
     return { from, to };
 };
-const capLabel = computed(() => { const { from, to } = monthRange(); return `${from} → ${to}`; });
+const capLabel = computed(() => {
+    const { from, to } = monthRange();
+    const wd = capacity.value && capacity.value.workingDays;
+    return wd != null ? `${from} → ${to} · ${wd} ${t('Pto.working_days')}` : `${from} → ${to}`;
+});
+
+// A full working day is 9h (office standard). Leave "days" = working days
+// (Mon–Fri) in the range × (hoursPerDay / full day) — a 4.5h half day = 0.5.
+// Mirrors the server-side ptoRules.leaveDays used for the table + capacity.
+const FULL_DAY_HOURS = 9;
+const workingDaysBetween = (start, end) => {
+    const s = new Date(start), e = new Date(end);
+    if (isNaN(s.getTime()) || isNaN(e.getTime())) return 0;
+    let cur = new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate()));
+    const last = new Date(Date.UTC(e.getUTCFullYear(), e.getUTCMonth(), e.getUTCDate()));
+    if (last < cur) return 0;
+    let n = 0;
+    while (cur <= last) {
+        const d = cur.getUTCDay();
+        if (d !== 0 && d !== 6) n++;
+        cur.setUTCDate(cur.getUTCDate() + 1);
+    }
+    return n;
+};
+const leaveDays = (start, end, hoursPerDay) => {
+    const hpd = Number(hoursPerDay) > 0 ? Number(hoursPerDay) : FULL_DAY_HOURS;
+    return Math.round((workingDaysBetween(start, end) * hpd / FULL_DAY_HOURS) * 100) / 100;
+};
+const formDays = computed(() => (form.startDate && form.endDate) ? leaveDays(form.startDate, form.endDate, form.hoursPerDay) : 0);
 
 const load = async () => {
     loading.value = true;
@@ -155,6 +186,8 @@ onMounted(load);
 @media (max-width: 800px) { .pto-grid { grid-template-columns: 1fr; } }
 .pto-card { background: #fff; border: 1px solid #e6e7ee; border-radius: 10px; padding: 18px; }
 .pto-sub { color: #6b7280; font-size: 12.5px; margin: 6px 0 14px; }
+.pto-days { color: #3a3f52; font-size: 13px; }
+.pto-days b { font-weight: 700; }
 .pto-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
 .pto-row > label { font-size: 12.5px; font-weight: 600; color: #3a3f52; }
 .pto-row.two { flex-direction: row; gap: 12px; }
