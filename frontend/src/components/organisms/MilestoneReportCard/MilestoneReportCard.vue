@@ -7,6 +7,9 @@
         <div v-else-if="!isManagement" class="mrc-msg">{{ $t('dashboardCard.milestone_management_only') }}</div>
 
         <template v-else>
+            <!-- Scrollable content; the "View full report" footer is pinned
+                 below this area so it stays visible without scrolling. -->
+            <div class="mrc-scroll">
             <!-- Totals by currency -->
             <div class="mrc-totals">
                 <div v-if="!data.totalsByCurrency.length" class="mrc-msg">{{ $t('dashboardCard.no_milestones') }}</div>
@@ -60,7 +63,9 @@
                 </ul>
             </div>
 
-            <!-- Link to the full Milestone Report page -->
+            </div>
+
+            <!-- Pinned footer (outside the scroll area) — opens the full report in a new tab. -->
             <div class="mrc-footer">
                 <a class="mrc-link" role="button" @click="openReport">{{ $t('dashboardCard.view_full_report') }}</a>
             </div>
@@ -166,7 +171,9 @@ const clearStatus = () => {
 const openReport = () => {
     const cid = route.params.cid;
     if (!cid) return;
-    router.push({ name: 'Milestone Report', params: { cid } });
+    // Open the full Milestone Report in a NEW TAB (resolve the SPA route → URL).
+    const routeData = router.resolve({ name: 'Milestone Report', params: { cid } });
+    window.open(routeData.href, '_blank', 'noopener');
 };
 
 watch(() => props.refreshTrigger, load);
@@ -174,13 +181,16 @@ onMounted(load);
 </script>
 
 <style scoped>
-.mrc { height: 100%; width: 100%; padding: 10px 12px; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
+.mrc { height: 100%; width: 100%; padding: 10px 12px; overflow: hidden; display: flex; flex-direction: column; }
+.mrc-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 12px; padding-right: 8px; }
 .mrc-msg { color: #9aa0b4; font-size: 12px; padding: 8px 0; }
 .mrc-section-title { font-size: 12px; font-weight: 600; color: #3a3f52; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .mrc-clear { border: none; background: none; padding: 0; font-size: 11px; font-weight: 600; color: #0d9488; cursor: pointer; white-space: nowrap; }
 .mrc-clear:hover { text-decoration: underline; }
-.mrc-total-grid { display: flex; flex-wrap: wrap; gap: 12px; }
-.mrc-total { flex: 1 1 120px; background: #f5f7fb; border-radius: 8px; padding: 10px; text-align: center; }
+/* Auto-arrange the currency tiles: as many equal columns as fit the card
+   width (min 140px each), wrapping 4 → 3 → 2 → 1 as it narrows. */
+.mrc-total-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.mrc-total { background: #f5f7fb; border-radius: 8px; padding: 10px; text-align: center; min-width: 0; }
 .mrc-total-amount { font-size: 20px; font-weight: 700; color: #0f766e; line-height: 1.2; word-break: break-word; }
 .mrc-total-label { font-size: 11px; color: #6b7280; margin-top: 2px; }
 .mrc-bars { display: flex; flex-direction: column; gap: 6px; }
@@ -199,7 +209,7 @@ onMounted(load);
 .mrc-item-name { font-size: 12px; color: #3a3f52; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mrc-item-project { font-size: 11px; color: #9aa0b4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mrc-item-amount { font-size: 12px; font-weight: 600; color: #0f766e; white-space: nowrap; }
-.mrc-footer { margin-top: auto; padding-top: 4px; }
+.mrc-footer { flex: 0 0 auto; margin-top: 8px; border-top: 1px solid #eef0f6; padding-top: 8px; text-align: center; }
 .mrc-link { font-size: 12px; color: #0d9488; cursor: pointer; text-decoration: none; }
 .mrc-link:hover { text-decoration: underline; }
 </style>
