@@ -317,15 +317,26 @@
             isDataFetching.value = false;
         },2000)
     });
+    // Management-only dashboard cards (company-wide data) — visible only to
+    // Owner/Admin (roleType 1/2). Hidden from the "Add card" catalog AND from
+    // an already-saved layout for anyone below that.
+    const MANAGEMENT_ONLY_CARDS = ['MilestoneReportCard', 'ActiveProjectsCard', 'ProjectsByTypeCard', 'RunningProjectsCard'];
+    const isManagementUser = () => [1, 2].includes(companyUserDetail.value?.roleType);
+
     const getUserDashboard = async() => {
         try {
             const response = await apiRequest("get", `${env.DASHBOARD}/${userId.value}`);
             if (response?.data?.length > 0) {
-                const cards = response.data[0].cards || [];
+                let cards = response.data[0].cards || [];
                 currentLayout.value = response.data[0];
+                // Drop management-only cards from a non-management user's saved
+                // layout so any previously-added instance stops rendering.
+                if (!isManagementUser()) {
+                    cards = cards.filter((e) => !MANAGEMENT_ONLY_CARDS.includes(e.componentId));
+                }
                 if(cards) {
                     layout.value = cards.map((e) => ({...e.config.position,...(getCardsComponentsSize(e.componentId) ?? {}), i:e.uid,componentId:e.componentId, cardData: e.config.cardData, filterData: e.config.filterData}));
-                } 
+                }
             }
         } catch (error) {
             console.error(error)
@@ -351,10 +362,9 @@
             if (response?.data?.length > 0) {
                 let cardsArray = checkPermission('sheet_settings.workload_timesheet') !== null ? response?.data : response?.data?.filter((e)=> !["TimeEstimatedWorkloadComp","TimeTrackComp","TimeEstimatedComp"].includes(e.key))
                 // Management-only cards — hide from the "Add card" catalog for
-                // anyone below Owner/Admin (roleType 1/2). The card's data
-                // endpoint is server-gated too.
-                if ([1, 2].includes(companyUserDetail.value?.roleType) === false) {
-                    cardsArray = cardsArray?.filter((e) => !["MilestoneReportCard"].includes(e.key));
+                // anyone below Owner/Admin (roleType 1/2).
+                if (!isManagementUser()) {
+                    cardsArray = cardsArray?.filter((e) => !MANAGEMENT_ONLY_CARDS.includes(e.key));
                 }
                 cardComponent.value = JSON.parse(JSON.stringify(cardsArray));
                 filterCardComponent.value = structureCards(cardsArray);
