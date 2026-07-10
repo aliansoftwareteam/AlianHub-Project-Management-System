@@ -4,7 +4,7 @@
 
 const PTO_TYPES = ['casual', 'privilege', 'sick'];
 const PTO_STATUS = ['pending', 'approved', 'rejected'];
-const DEFAULT_HOURS_PER_DAY = 8;
+const DEFAULT_HOURS_PER_DAY = 9; // office mandates a 9-hour working day
 const DEFAULT_WEEKEND = [0, 6]; // Sun, Sat
 
 const toDate = (v) => {
@@ -91,6 +91,16 @@ const ptoHoursInRange = (entry, rangeStart, rangeEnd, weekendDays = DEFAULT_WEEK
     return workingDaysBetween(ov.start, ov.end, weekendDays) * hpd;
 };
 
+// Leave DAYS an entry represents (for display): working days (Mon–Fri) inside
+// the entry's own start→end range × (hoursPerDay / a full working day). So a
+// half day (hoursPerDay = half of a full day) counts as 0.5. Rounded to 2 dp.
+const leaveDays = (entry = {}, fullDayHours = DEFAULT_HOURS_PER_DAY, weekendDays = DEFAULT_WEEKEND) => {
+    const days = workingDaysBetween(entry.startDate, entry.endDate, weekendDays);
+    const hpd = Number(entry && entry.hoursPerDay) > 0 ? Number(entry.hoursPerDay) : DEFAULT_HOURS_PER_DAY;
+    const full = Number(fullDayHours) > 0 ? Number(fullDayHours) : DEFAULT_HOURS_PER_DAY;
+    return Math.round((days * hpd / full) * 100) / 100;
+};
+
 // Available capacity over [rangeStart, rangeEnd], subtracting APPROVED PTO only.
 const computeAvailableCapacity = ({
     rangeStart,
@@ -119,5 +129,6 @@ module.exports = {
     workingDaysBetween,
     overlapRange,
     ptoHoursInRange,
+    leaveDays,
     computeAvailableCapacity,
 };
