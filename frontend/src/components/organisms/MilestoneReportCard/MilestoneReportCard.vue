@@ -218,7 +218,7 @@ const whenOf = (m) => {
     if (t <= 0) return null;
     const now = new Date();
     const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const endToday = startToday + 24 * 60 * 60 * 1000 - 1;
+    const endToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
     if (t > endToday) return { key: 'future', label: translate('dashboardCard.milestone_upcoming') };
     if (t >= startToday) return { key: 'present', label: translate('dashboardCard.milestone_due_today') };
     const settled = String(m.status || '') === 'RELEASED';
