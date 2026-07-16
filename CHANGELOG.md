@@ -16,6 +16,14 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.12.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.11.0...v14.12.0) (2026-07-16)
+
+
+### 🚀 Features
+
+* **dashboard:** milestone card due-date timeline table ([c28019a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c28019a8ca98f75c0c2d9fcdd3aefbf1f4ef7921))
+* **dashboard:** milestone card due-date timeline table ([a9d2fd2](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a9d2fd29ac486717d7fbdd76dfe26e65c1008fb8))
+
 ## [14.11.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.10.1...v14.11.0) (2026-07-10)
 
 
