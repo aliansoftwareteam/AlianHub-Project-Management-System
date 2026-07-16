@@ -78,6 +78,10 @@
                     </div>
                 </button>
             </div>
+            <div v-if="isDemoMode && !isSpinner && !errorMessage" class="demo-login-buttons">
+                <button type="button" class="btn btn-blue btn-login btn-demo-login font-roboto-sans cursor-pointer font-weight-500" tabindex="4" @click="ownerLogin">Login as Owner/Admin</button>
+                <button type="button" class="btn btn-blue btn-login btn-demo-login font-roboto-sans cursor-pointer font-weight-500" tabindex="5" @click="memberLogin">Login as Member</button>
+            </div>
             <RegisterViewComponent @handleChange="handleChange" :isSpinner="isSpinner" />
             <!-- <div class="create-accountlink text-center">
                 <span class="font-roboto-sans font-weight-normal font-weight-400 gray">{{$t('Auth.NotR')}}? <router-link :style="[{'pointer-events' : isSpinner ? 'none' : ''}]" to="/signup" class="light-purple font-weight-500">{{$t('Auth.createAcc')}}</router-link></span>
@@ -156,7 +160,8 @@
 <script setup>
 // PACKAGES
 import Cookies from 'js-cookie';
-import {  defineComponent, inject } from "vue";
+import {  defineComponent, inject, computed } from "vue";
+import { useStore } from "vuex";
 
 // COMPONENTS
 import AuthTemplate from "@/components/templates/Authentication/index.vue";
@@ -187,6 +192,17 @@ const  { checkErrors , checkAllFields } = useValidation();
 import * as env from '@/config/env';
 const axios = inject("$axios");
 const isDevider = ref(isAuthDeviderShow());
+
+// Demo mode — surfaces two one-click login buttons using the seeded demo
+// accounts. `brandSettings.demoMode` is true only when the server has
+// DEMO_MODE=true; on real deployments this stays hidden. The emails match
+// what the DB-reset cron reseeds (owner@example.com / member@example.com).
+const store = useStore();
+const brandSettings = computed(() => store.getters['brandSettingTab/brandSettings'] || {});
+const isDemoMode = computed(() => brandSettings.value.demoMode === true);
+const DEMO_PASSWORD = 'Abc@1234';
+const DEMO_OWNER_EMAIL = 'owner@example.com';
+const DEMO_MEMBER_EMAIL = 'member@example.com';
 
 defineComponent({
 	name: "Login-Page",
@@ -283,6 +299,18 @@ defineComponent({
             })
         })
     }
+    const ownerLogin = () => {
+        formData.value.email.value = DEMO_OWNER_EMAIL;
+        formData.value.password.value = DEMO_PASSWORD;
+        handleSubmit();
+    }
+
+    const memberLogin = () => {
+        formData.value.email.value = DEMO_MEMBER_EMAIL;
+        formData.value.password.value = DEMO_PASSWORD;
+        handleSubmit();
+    }
+
     //Hanlde login v4
     const handleSubmit = async () => {
         try {
@@ -578,6 +606,22 @@ defineComponent({
 
 .progress:nth-child(3) {
   animation-delay: 0.6s;
+}
+
+.demo-login-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 12px;
+}
+.btn-demo-login {
+    background: #fff;
+    color: #2f3990;
+    border: 1px solid #2f3990;
+    height: 48px;
+}
+.btn-demo-login:hover {
+    background: #f4f5ff;
 }
 </style>
 <style src="./style.css">
