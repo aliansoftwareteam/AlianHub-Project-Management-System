@@ -978,15 +978,30 @@ exports.getMilestoneSummary = async (req, res) => {
         });
         due.outstandingUsd = Math.max(0, due.receivableUsd - due.receivedUsd);
 
-        // Most-recent activity first — statusDate (epoch ms) is the milestone's
-        // own timeline; fall back to the document timestamps.
+        // statusDate (epoch ms) is the milestone's own activity timestamp; fall
+        // back to the document timestamps. Kept for the legacy `date` field.
         const dateOf = (m) => Number(m.statusDate)
             || (m.updatedAt ? new Date(m.updatedAt).getTime() : 0)
             || (m.createdAt ? new Date(m.createdAt).getTime() : 0);
-        const recent = [...milestones]
-            .filter((m) => inRange(m) && matchStatus(m))
-            .sort((a, b) => dateOf(b) - dateOf(a))
-            .slice(0, RECENT_LIMIT)
+
+        // The list is a due-date TIMELINE (past → present → future) within the
+        // selected range. All in-range items have a dueDate > 0 (see inRange).
+        // To show both sides of "now" we window around the present: take the
+        // nearest upcoming milestones and the nearest recent-past ones, then
+        // order the picked set ascending by dueDate so the card reads
+        // past → today → upcoming rather than always truncating the future away.
+        const nowMs = Date.now();
+        const dueOf = (m) => Number(m.dueDate) || 0;
+        const inScope = milestones.filter((m) => inRange(m) && matchStatus(m));
+        const future = inScope.filter((m) => dueOf(m) > nowMs).sort((a, b) => dueOf(a) - dueOf(b));   // nearest upcoming first
+        const pastNow = inScope.filter((m) => dueOf(m) <= nowMs).sort((a, b) => dueOf(b) - dueOf(a)); // nearest recent-past first
+        let futurePick = future.slice(0, Math.ceil(RECENT_LIMIT / 2));
+        let pastPick = pastNow.slice(0, RECENT_LIMIT - futurePick.length);
+        if (pastPick.length + futurePick.length < RECENT_LIMIT) {
+            futurePick = future.slice(0, RECENT_LIMIT - pastPick.length); // backfill when past is short
+        }
+        const recent = [...pastPick, ...futurePick]
+            .sort((a, b) => dueOf(a) - dueOf(b)) // timeline order
             .map((m) => {
                 const proj = projectsMap[String(m.projectId)] || {};
                 return {
@@ -996,6 +1011,7 @@ exports.getMilestoneSummary = async (req, res) => {
                     amountUsd: usdOf(m),
                     status: m.statusId || "",
                     date: dateOf(m) || null,
+                    dueDate: dueOf(m) || null,
                 };
             });
 
