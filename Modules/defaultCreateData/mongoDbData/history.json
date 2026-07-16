@@ -1,0 +1,4482 @@
+[{
+  "_id": {
+    "$oid": "660b793e3e3690d66930ed0e"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 1</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b793c3e3690d66930ed0c",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:24.394Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:24.394Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b793e3e3690d66930ed10"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 1</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:24.394Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:24.394Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79423e3690d66930ed1b"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 2</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79423e3690d66930ed19",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:30.281Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:30.281Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79443e3690d66930ed1d"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 2</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:30.281Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:30.281Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79443e3690d66930ed25"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 3</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79443e3690d66930ed23",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:32.534Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:32.534Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79463e3690d66930ed2c"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 4</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79463e3690d66930ed2a",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:34.465Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:34.465Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79463e3690d66930ed2e"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 3</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:32.534Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:32.534Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79483e3690d66930ed36"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 5</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79483e3690d66930ed34",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:36.463Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:36.463Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79483e3690d66930ed38"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 4</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:34.465Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:34.465Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b794a3e3690d66930ed41"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 5</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:36.463Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:36.463Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b794b3e3690d66930ed4c"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 6</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b794b3e3690d66930ed4a",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:39.833Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:39.833Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b794d3e3690d66930ed53"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 6</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:39.833Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:39.833Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b794e3e3690d66930ed5b"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 7</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b794d3e3690d66930ed59",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:41.998Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:41.998Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b794f3e3690d66930ed5d"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 8</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b794d3e3690d66930ed51",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:41.649Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:41.649Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b794f3e3690d66930ed5f"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 8</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:41.649Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:41.649Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b794f3e3690d66930ed69"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 7</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:41.998Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:41.998Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79513e3690d66930ed71"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 9</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b794f3e3690d66930ed64",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:43.761Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:43.761Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79513e3690d66930ed73"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 9</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:43.761Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:43.761Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79533e3690d66930ed83"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 10</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79533e3690d66930ed81",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:47.669Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:47.669Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79553e3690d66930ed85"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 10</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:47.670Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:47.670Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79573e3690d66930ed8f"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 12</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79573e3690d66930ed8d",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:51.716Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:51.716Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79573e3690d66930ed92"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 11</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79553e3690d66930ed8a",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:49.768Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:49.768Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79573e3690d66930ed94"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 11</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:49.768Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:49.768Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79593e3690d66930ed9c"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 12</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:51.716Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:51.716Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b795a3e3690d66930eda7"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 13</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b795a3e3690d66930eda5",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:54.388Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:54.388Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b795c3e3690d66930edac"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 13</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:54.388Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:54.388Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b795c3e3690d66930edb4"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 14</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b795c3e3690d66930edb2",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:56.996Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:56.996Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b795f3e3690d66930edb9"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 14</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:56.996Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:56.996Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b795f3e3690d66930edc1"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 15</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b795f3e3690d66930edbf",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:59.230Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:59.230Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79613e3690d66930edc6"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 15</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:19:59.230Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:19:59.230Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79613e3690d66930edce"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 16</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79613e3690d66930edcc",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:01.435Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:01.435Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79633e3690d66930edd3"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 16</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:01.435Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:01.435Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79643e3690d66930eddb"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 17</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79643e3690d66930edd9",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:04.066Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:04.066Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79663e3690d66930ede0"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 17</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:04.066Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:04.066Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79663e3690d66930ede8"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 18</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79663e3690d66930ede6",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:06.465Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:06.465Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79683e3690d66930eded"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 18</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:06.465Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:06.465Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79693e3690d66930edf5"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 19</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79683e3690d66930edf3",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:08.995Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:08.995Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b796b3e3690d66930edfa"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 19</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:08.995Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:08.995Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b796b3e3690d66930ee02"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 20</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b796b3e3690d66930ee00",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:11.168Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:11.168Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b796d3e3690d66930ee07"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 20</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:11.168Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:11.168Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b797f3e3690d66930ee12"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 21</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b797f3e3690d66930ee10",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:31.599Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:31.599Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79813e3690d66930ee16"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 22</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79813e3690d66930ee14",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:33.157Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:33.157Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79813e3690d66930ee18"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 21</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:31.599Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:31.599Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79823e3690d66930ee20"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 23</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79823e3690d66930ee1e",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:34.809Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:34.809Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79833e3690d66930ee22"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 22</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:33.157Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:33.157Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79843e3690d66930ee2d"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 24</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79843e3690d66930ee2b",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:36.391Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:36.391Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79843e3690d66930ee2f"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 23</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:34.809Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:34.809Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79853e3690d66930ee3c"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 25</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79853e3690d66930ee3a",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:37.678Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:37.678Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79863e3690d66930ee3e"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 24</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:36.391Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:36.391Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79873e3690d66930ee47"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 26</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79853e3690d66930ee38",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:37.579Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:37.579Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79873e3690d66930ee49"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 26</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:37.579Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:37.579Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79873e3690d66930ee4e"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 25</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:37.678Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:37.678Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79893e3690d66930ee59"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 27</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79893e3690d66930ee57",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:41.040Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:41.040Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b798a3e3690d66930ee64"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 28</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798a3e3690d66930ee62",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:42.501Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:42.501Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b798b3e3690d66930ee66"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 27</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:41.040Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:41.040Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b798b3e3690d66930ee6e"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 29</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798b3e3690d66930ee6c",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:43.953Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:43.953Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b798c3e3690d66930ee70"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 28</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:42.501Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:42.501Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b798d3e3690d66930ee79"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 29</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:43.953Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:43.953Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b798e3e3690d66930ee84"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 30</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798e3e3690d66930ee82",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:46.867Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:46.867Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79903e3690d66930ee89"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Task 30</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:20:46.867Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:20:46.867Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b79f33e3690d66930ee94"
+  },
+  "Key": "Task_Status",
+  "Message": "<b>Company Owner</b> has changed <b> Status</b> as <b>Done</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b793c3e3690d66930ed0c",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:22:25.388Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:22:25.388Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7a053e3690d66930ee9a"
+  },
+  "Key": "Task_Status",
+  "Message": "<b>Company Owner</b> has changed <b> Status</b> as <b>Done</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79423e3690d66930ed19",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:22:42.998Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:22:42.998Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7a0e3e3690d66930eea0"
+  },
+  "Key": "Task_Status",
+  "Message": "<b>Company Owner</b> has changed <b> Status</b> as <b>Done</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79443e3690d66930ed23",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:22:52.798Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:22:52.798Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7a1f3e3690d66930eea6"
+  },
+  "Key": "Task_Status",
+  "Message": "<b>Company Owner</b> has changed <b> Status</b> as <b>Complete</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79463e3690d66930ed2a",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:23:09.281Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:23:09.281Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7a2f3e3690d66930eeac"
+  },
+  "Key": "Task_Status",
+  "Message": "<b>Company Owner</b> has changed <b> Status</b> as <b>Complete</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79483e3690d66930ed34",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:23:25.212Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:23:25.212Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7a403e3690d66930eeb2"
+  },
+  "Key": "Task_Status",
+  "Message": "<b>Company Owner</b> has changed <b> Status</b> as <b>Complete</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b794b3e3690d66930ed4a",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:23:42.658Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:23:42.658Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7a483e3690d66930eeba"
+  },
+  "Key": "Task_Status",
+  "Message": "<b>Company Owner</b> has changed <b> Status</b> as <b>In Progress</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798e3e3690d66930ee82",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:23:50.279Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:23:50.279Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7a4a3e3690d66930eebe"
+  },
+  "Key": "Task_Status",
+  "Message": "<b>Company Owner</b> has changed <b> Status</b> as <b>In Progress</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798b3e3690d66930ee6c",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:23:52.036Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:23:52.036Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7a4f3e3690d66930eec4"
+  },
+  "Key": "Task_Status",
+  "Message": "<b>Company Owner</b> has changed <b> Status</b> as <b>In Progress</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798a3e3690d66930ee62",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:23:57.103Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:23:57.103Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7a523e3690d66930eeca"
+  },
+  "Key": "Task_Status",
+  "Message": "<b>Company Owner</b> has changed <b> Status</b> as <b>Blocked</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79893e3690d66930ee57",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:24:00.151Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:24:00.151Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7a563e3690d66930eed0"
+  },
+  "Key": "Task_Status",
+  "Message": "<b>Company Owner</b> has changed <b> Status</b> as <b>Under Review</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79853e3690d66930ee3a",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:24:04.188Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:24:04.188Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7a5e3e3690d66930eed6"
+  },
+  "Key": "Task_Status",
+  "Message": "<b>Company Owner</b> has changed <b> Status</b> as <b>Under Review</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79853e3690d66930ee38",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:24:12.976Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:24:12.976Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7a693e3690d66930eedc"
+  },
+  "Key": "Task_Status",
+  "Message": "<b>Company Owner</b> has changed <b> Status</b> as <b>Deferred</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79843e3690d66930ee2b",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:24:23.114Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:24:23.114Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7a6c3e3690d66930eee2"
+  },
+  "Key": "Task_Status",
+  "Message": "<b>Company Owner</b> has changed <b> Status</b> as <b>Deferred</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79823e3690d66930ee1e",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:24:26.586Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:24:26.586Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7a703e3690d66930eee8"
+  },
+  "Key": "Task_Status",
+  "Message": "<b>Company Owner</b> has changed <b> Status</b> as <b>Deferred</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79813e3690d66930ee14",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:24:30.730Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:24:30.730Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7a803e3690d66930eeee"
+  },
+  "Key": "Task_Status",
+  "Message": "<b>Company Owner</b> has changed <b> Status</b> as <b>Awaiting Feedback</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b794d3e3690d66930ed51",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:24:46.453Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:24:46.453Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7a873e3690d66930eef4"
+  },
+  "Key": "Task_Status",
+  "Message": "<b>Company Owner</b> has changed <b> Status</b> as <b>Awaiting Feedback</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b794d3e3690d66930ed59",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:24:53.710Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:24:53.710Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7a8e3e3690d66930eefa"
+  },
+  "Key": "Task_Status",
+  "Message": "<b>Company Owner</b> has changed <b> Status</b> as <b>Awaiting Feedback</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b794f3e3690d66930ed64",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:25:00.641Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:25:00.641Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7a953e3690d66930ef00"
+  },
+  "Key": "Task_Status",
+  "Message": "<b>Company Owner</b> has changed <b> Status</b> as <b>Cancelled</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79533e3690d66930ed81",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:25:07.889Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:25:07.889Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7a9c3e3690d66930ef06"
+  },
+  "Key": "Task_Status",
+  "Message": "<b>Company Owner</b> has changed <b> Status</b> as <b>Cancelled</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79553e3690d66930ed8a",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:25:14.490Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:25:14.490Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7aa13e3690d66930ef0c"
+  },
+  "Key": "Task_Status",
+  "Message": "<b>Company Owner</b> has changed <b> Status</b> as <b>Cancelled</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79573e3690d66930ed8d",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:25:19.487Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:25:19.487Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7aa63e3690d66930ef12"
+  },
+  "Key": "Task_Status",
+  "Message": "<b>Company Owner</b> has changed <b> Status</b> as <b>On Hold</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b795a3e3690d66930eda5",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:25:24.263Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:25:24.263Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7aaa3e3690d66930ef18"
+  },
+  "Key": "Task_Status",
+  "Message": "<b>Company Owner</b> has changed <b> Status</b> as <b>On Hold</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b795c3e3690d66930edb2",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:25:28.735Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:25:28.735Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7aae3e3690d66930ef1e"
+  },
+  "Key": "Task_Status",
+  "Message": "<b>Company Owner</b> has changed <b> Status</b> as <b>On Hold</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b795f3e3690d66930edbf",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:25:32.549Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:25:32.549Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7aea3e3690d66930ef25"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Admin</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79613e3690d66930edcc",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:26:32.611Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:26:32.611Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7aea3e3690d66930ef27"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79613e3690d66930edcc",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:26:34.639Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:26:34.639Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7af13e3690d66930ef2c"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Member</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79643e3690d66930edd9",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:26:39.166Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:26:39.166Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7af13e3690d66930ef2e"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79643e3690d66930edd9",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:26:41.209Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:26:41.209Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7af73e3690d66930ef33"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Member</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79663e3690d66930ede6",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:26:45.942Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:26:45.942Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7af73e3690d66930ef35"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79663e3690d66930ede6",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:26:47.981Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:26:47.981Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7afe3e3690d66930ef3a"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Admin</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79683e3690d66930edf3",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:26:52.566Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:26:52.566Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7afe3e3690d66930ef3c"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79683e3690d66930edf3",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:26:54.606Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:26:54.606Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b043e3690d66930ef41"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Admin</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b796b3e3690d66930ee00",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:26:58.430Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:26:58.430Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b043e3690d66930ef43"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b796b3e3690d66930ee00",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:27:00.461Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:27:00.461Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b093e3690d66930ef48"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Owner</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b797f3e3690d66930ee10",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:27:03.984Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:27:03.984Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b0a3e3690d66930ef4a"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b797f3e3690d66930ee10",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:27:06.013Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:27:06.013Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b113e3690d66930ef4f"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Admin</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798a3e3690d66930ee62",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:27:11.528Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:27:11.528Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b113e3690d66930ef51"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798a3e3690d66930ee62",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:27:13.572Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:27:13.572Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b173e3690d66930ef56"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Member</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798b3e3690d66930ee6c",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:27:17.282Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:27:17.282Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b173e3690d66930ef58"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798b3e3690d66930ee6c",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:27:19.312Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:27:19.312Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b1c3e3690d66930ef5d"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Owner</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798e3e3690d66930ee82",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:27:22.946Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:27:22.946Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b1d3e3690d66930ef5f"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798e3e3690d66930ee82",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:27:25.156Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:27:25.156Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b243e3690d66930ef64"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Member</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79893e3690d66930ee57",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:27:30.248Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:27:30.248Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b243e3690d66930ef66"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79893e3690d66930ee57",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:27:32.282Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:27:32.282Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b2a3e3690d66930ef6b"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Admin</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79853e3690d66930ee38",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:27:36.940Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:27:36.940Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b2a3e3690d66930ef6d"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79853e3690d66930ee38",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:27:38.981Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:27:38.981Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b313e3690d66930ef72"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Owner</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79853e3690d66930ee3a",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:27:43.820Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:27:43.820Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b313e3690d66930ef74"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79853e3690d66930ee3a",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:27:45.862Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:27:45.862Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b3a3e3690d66930ef79"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Admin</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79813e3690d66930ee14",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:27:52.300Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:27:52.300Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b3a3e3690d66930ef7b"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79813e3690d66930ee14",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:27:54.341Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:27:54.341Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b3f3e3690d66930ef80"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Owner</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79823e3690d66930ee1e",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:27:57.615Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:27:57.615Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b3f3e3690d66930ef82"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79823e3690d66930ee1e",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:27:59.647Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:27:59.647Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b443e3690d66930ef87"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Owner</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79843e3690d66930ee2b",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:28:02.403Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:28:02.403Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b443e3690d66930ef89"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79843e3690d66930ee2b",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:28:04.448Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:28:04.448Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b4e3e3690d66930ef8e"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Owner</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b794d3e3690d66930ed51",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:28:12.535Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:28:12.535Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b4e3e3690d66930ef90"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b794d3e3690d66930ed51",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:28:14.590Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:28:14.590Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b543e3690d66930ef95"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Owner</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b794d3e3690d66930ed59",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:28:18.913Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:28:18.913Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b543e3690d66930ef97"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b794d3e3690d66930ed59",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:28:20.959Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:28:20.959Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b5a3e3690d66930ef9c"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Owner</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b794f3e3690d66930ed64",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:28:24.303Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:28:24.303Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b5a3e3690d66930ef9e"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b794f3e3690d66930ed64",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:28:26.347Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:28:26.347Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b623e3690d66930efa3"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Member</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79533e3690d66930ed81",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:28:32.552Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:28:32.552Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b623e3690d66930efa5"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79533e3690d66930ed81",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:28:34.594Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:28:34.594Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b673e3690d66930efaa"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Member</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79553e3690d66930ed8a",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:28:37.211Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:28:37.211Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b673e3690d66930efac"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79553e3690d66930ed8a",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:28:39.290Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:28:39.290Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b6c3e3690d66930efb1"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Admin</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79573e3690d66930ed8d",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:28:42.293Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:28:42.293Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b6c3e3690d66930efb3"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79573e3690d66930ed8d",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:28:44.339Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:28:44.339Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b743e3690d66930efb8"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Admin</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b795a3e3690d66930eda5",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:28:50.434Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:28:50.434Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b743e3690d66930efba"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b795a3e3690d66930eda5",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:28:52.477Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:28:52.477Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b793e3690d66930efbf"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Admin</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b795c3e3690d66930edb2",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:28:55.274Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:28:55.274Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b793e3690d66930efc1"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b795c3e3690d66930edb2",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:28:57.312Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:28:57.312Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b7e3e3690d66930efc6"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Admin</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b795f3e3690d66930edbf",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:29:00.932Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:29:00.932Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b7e3e3690d66930efc8"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b795f3e3690d66930edbf",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:29:02.979Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:29:02.979Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b873e3690d66930efcd"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Member</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b793c3e3690d66930ed0c",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:29:09.677Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:29:09.677Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b873e3690d66930efcf"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b793c3e3690d66930ed0c",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:29:11.720Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:29:11.720Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b8c3e3690d66930efd4"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Admin</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79423e3690d66930ed19",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:29:14.075Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:29:14.075Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b8c3e3690d66930efd6"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79423e3690d66930ed19",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:29:16.120Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:29:16.120Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b903e3690d66930efdb"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Admin</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79443e3690d66930ed23",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:29:18.736Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:29:18.736Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7b903e3690d66930efdd"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79443e3690d66930ed23",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:29:20.770Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:29:20.770Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7ba83e3690d66930efe2"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Admin</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79463e3690d66930ed2a",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:29:42.209Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:29:42.209Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7ba83e3690d66930efe4"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79463e3690d66930ed2a",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:29:44.243Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:29:44.243Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7bac3e3690d66930efe9"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Member</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79483e3690d66930ed34",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:29:46.638Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:29:46.638Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7bac3e3690d66930efeb"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79483e3690d66930ed34",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:29:48.672Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:29:48.672Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7bb13e3690d66930eff0"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Member</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b794b3e3690d66930ed4a",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:29:51.202Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:29:51.202Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7bb13e3690d66930eff2"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b794b3e3690d66930ed4a",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:29:53.239Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:29:53.239Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7bdb3e3690d66930f016"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>04/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79613e3690d66930edcc",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:30:35.051Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:30:35.051Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7bdd3e3690d66930f01d"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>05/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79643e3690d66930edd9",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:30:37.442Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:30:37.442Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7bdf3e3690d66930f022"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>04/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79663e3690d66930ede6",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:30:39.518Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:30:39.518Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7be13e3690d66930f025"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>06/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79683e3690d66930edf3",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:30:41.326Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:30:41.326Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7be43e3690d66930f02c"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>10/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b796b3e3690d66930ee00",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:30:44.243Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:30:44.243Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7be73e3690d66930f031"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>11/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b797f3e3690d66930ee10",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:30:47.410Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:30:47.410Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7bef3e3690d66930f03f"
+  },
+  "Key": "task_priority",
+  "Message": "<b>Company Owner</b> has changed <b> Priority</b> as <b>HIGH</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79643e3690d66930edd9",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:30:53.899Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:30:53.899Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7bf13e3690d66930f046"
+  },
+  "Key": "task_priority",
+  "Message": "<b>Company Owner</b> has changed <b> Priority</b> as <b>LOW</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79663e3690d66930ede6",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:30:55.878Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:30:55.878Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7bf63e3690d66930f051"
+  },
+  "Key": "task_priority",
+  "Message": "<b>Company Owner</b> has changed <b> Priority</b> as <b>LOW</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b796b3e3690d66930ee00",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:31:00.286Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:31:00.286Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7bfa3e3690d66930f05a"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>03/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798a3e3690d66930ee62",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:31:06.394Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:31:06.394Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7bfc3e3690d66930f05f"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>03/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798b3e3690d66930ee6c",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:31:08.689Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:31:08.689Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7bff3e3690d66930f064"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>04/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798e3e3690d66930ee82",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:31:11.280Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:31:11.280Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c043e3690d66930f06e"
+  },
+  "Key": "task_priority",
+  "Message": "<b>Company Owner</b> has changed <b> Priority</b> as <b>HIGH</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798b3e3690d66930ee6c",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:31:14.887Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:31:14.887Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c0e3e3690d66930f07b"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>01/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79893e3690d66930ee57",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:31:26.460Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:31:26.460Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c133e3690d66930f084"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>04/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79853e3690d66930ee38",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:31:31.654Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:31:31.654Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c153e3690d66930f089"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>04/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79853e3690d66930ee3a",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:31:33.372Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:31:33.372Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c193e3690d66930f091"
+  },
+  "Key": "task_priority",
+  "Message": "<b>Company Owner</b> has changed <b> Priority</b> as <b>LOW</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79853e3690d66930ee38",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:31:35.585Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:31:35.585Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c1d3e3690d66930f098"
+  },
+  "Key": "task_priority",
+  "Message": "<b>Company Owner</b> has changed <b> Priority</b> as <b>HIGH</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79853e3690d66930ee3a",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:31:39.212Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:31:39.212Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c213e3690d66930f0a3"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>12/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79813e3690d66930ee14",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:31:45.745Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:31:45.745Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c233e3690d66930f0a8"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>12/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79823e3690d66930ee1e",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:31:47.846Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:31:47.846Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c253e3690d66930f0ad"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>12/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79843e3690d66930ee2b",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:31:49.965Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:31:49.965Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c2a3e3690d66930f0b4"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>03/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b794d3e3690d66930ed51",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:31:54.034Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:31:54.034Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c2b3e3690d66930f0b9"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>03/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b794d3e3690d66930ed59",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:31:55.864Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:31:55.864Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c2d3e3690d66930f0bc"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>03/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b794f3e3690d66930ed64",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:31:57.648Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:31:57.648Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c343e3690d66930f0c8"
+  },
+  "Key": "task_priority",
+  "Message": "<b>Company Owner</b> has changed <b> Priority</b> as <b>LOW</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b794d3e3690d66930ed51",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:32:02.091Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:02.091Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c363e3690d66930f0d0"
+  },
+  "Key": "task_priority",
+  "Message": "<b>Company Owner</b> has changed <b> Priority</b> as <b>LOW</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b794d3e3690d66930ed59",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:32:04.469Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:04.469Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c413e3690d66930f0df"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>01/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79533e3690d66930ed81",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:32:17.736Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:17.736Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c443e3690d66930f0e6"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>31/03/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79553e3690d66930ed8a",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:32:20.806Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:20.806Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c493e3690d66930f0ed"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>29/03/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79573e3690d66930ed8d",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:32:25.080Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:25.080Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c4d3e3690d66930f0f7"
+  },
+  "Key": "task_priority",
+  "Message": "<b>Company Owner</b> has changed <b> Priority</b> as <b>LOW</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79533e3690d66930ed81",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:32:27.686Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:27.686Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c4f3e3690d66930f0ff"
+  },
+  "Key": "task_priority",
+  "Message": "<b>Company Owner</b> has changed <b> Priority</b> as <b>LOW</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79553e3690d66930ed8a",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:32:29.613Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:29.613Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c513e3690d66930f105"
+  },
+  "Key": "task_priority",
+  "Message": "<b>Company Owner</b> has changed <b> Priority</b> as <b>LOW</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79573e3690d66930ed8d",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:32:31.447Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:31.447Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c563e3690d66930f10e"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>18/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b795a3e3690d66930eda5",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:32:38.053Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:38.053Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c573e3690d66930f113"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>17/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b795c3e3690d66930edb2",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:32:39.803Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:39.803Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c593e3690d66930f118"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>17/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b795f3e3690d66930edbf",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:32:41.384Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:41.384Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c5e3e3690d66930f120"
+  },
+  "Key": "task_priority",
+  "Message": "<b>Company Owner</b> has changed <b> Priority</b> as <b>LOW</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b795c3e3690d66930edb2",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:32:44.881Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:44.881Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c633e3690d66930f12a"
+  },
+  "Key": "task_priority",
+  "Message": "<b>Company Owner</b> has changed <b> Priority</b> as <b>HIGH</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b793c3e3690d66930ed0c",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:32:49.553Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:49.553Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c673e3690d66930f133"
+  },
+  "Key": "task_priority",
+  "Message": "<b>Company Owner</b> has changed <b> Priority</b> as <b>HIGH</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79423e3690d66930ed19",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:32:53.269Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:53.269Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c6b3e3690d66930f13d"
+  },
+  "Key": "task_priority",
+  "Message": "<b>Company Owner</b> has changed <b> Priority</b> as <b>HIGH</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79443e3690d66930ed23",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:32:57.113Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:57.113Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c6f3e3690d66930f146"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>30/03/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b793c3e3690d66930ed0c",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:33:03.422Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:33:03.422Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c723e3690d66930f14d"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>30/03/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79423e3690d66930ed19",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:33:06.509Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:33:06.509Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c753e3690d66930f152"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>29/03/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79443e3690d66930ed23",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:33:09.424Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:33:09.424Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c803e3690d66930f161"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>01/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79463e3690d66930ed2a",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:33:20.939Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:33:20.939Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c8c3e3690d66930f16e"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>22/03/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79463e3690d66930ed2a",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:33:32.027Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:33:32.027Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c913e3690d66930f177"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>22/03/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79483e3690d66930ed34",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:33:37.279Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:33:37.279Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c963e3690d66930f17e"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>22/03/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b794b3e3690d66930ed4a",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:33:42.061Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:33:42.061Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c9a3e3690d66930f186"
+  },
+  "Key": "task_priority",
+  "Message": "<b>Company Owner</b> has changed <b> Priority</b> as <b>LOW</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79463e3690d66930ed2a",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:33:44.882Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:33:44.882Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7c9e3e3690d66930f190"
+  },
+  "Key": "task_priority",
+  "Message": "<b>Company Owner</b> has changed <b> Priority</b> as <b>HIGH</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79483e3690d66930ed34",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:33:48.821Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:33:48.821Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d103e3690d66930f19f"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Sub Task 1.1</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b7d0e3e3690d66930f19d",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:35:42.981Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:35:42.981Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d103e3690d66930f1a1"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Sub Task 1.1</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:35:42.981Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:35:42.981Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d133e3690d66930f1ac"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Sub Task 1.2</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b7d133e3690d66930f1aa",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:35:47.711Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:35:47.711Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d153e3690d66930f1ae"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Sub Task 1.2</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:35:47.712Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:35:47.712Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d203e3690d66930f1ba"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Member</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b7d0e3e3690d66930f19d",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:35:58.579Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:35:58.579Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d203e3690d66930f1bc"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b7d0e3e3690d66930f19d",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:36:00.622Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:36:00.622Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d273e3690d66930f1c1"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Member</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b7d133e3690d66930f1aa",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:36:05.298Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:36:05.298Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d273e3690d66930f1c3"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b7d133e3690d66930f1aa",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:36:07.337Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:36:07.337Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d2f3e3690d66930f1c6"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>30/03/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b7d0e3e3690d66930f19d",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:36:15.926Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:36:15.926Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d353e3690d66930f1c9"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>30/03/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b7d133e3690d66930f1aa",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:36:21.045Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:36:21.045Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d3d3e3690d66930f1cd"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Sub Task 16.1</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b7d3d3e3690d66930f1cb",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:36:29.370Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:36:29.370Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d3f3e3690d66930f1cf"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Sub Task 16.1</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:36:29.370Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:36:29.370Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d403e3690d66930f1d8"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Sub Task 16.2</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b7d403e3690d66930f1d6",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:36:32.294Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:36:32.294Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d423e3690d66930f1de"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Sub Task 16.3</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b7d423e3690d66930f1dc",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:36:34.295Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:36:34.295Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d423e3690d66930f1e0"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Sub Task 16.2</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:36:32.294Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:36:32.294Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d443e3690d66930f1e7"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Sub Task 16.3</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:36:34.295Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:36:34.295Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d4b3e3690d66930f1f4"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Sub Task 20.1</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b7d4b3e3690d66930f1f2",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:36:43.687Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:36:43.687Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d4d3e3690d66930f1f6"
+  },
+  "Key": "Task_Created",
+  "Message": "<b>Company Owner</b> has created new <b>Sub Task 20.1</b> task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "",
+  "Type": "project",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:36:43.687Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:36:43.687Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d823e3690d66930f202"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Admin</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b7d3d3e3690d66930f1cb",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:37:36.304Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:37:36.304Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d823e3690d66930f204"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b7d3d3e3690d66930f1cb",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:37:38.345Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:37:38.345Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d863e3690d66930f209"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Admin</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b7d403e3690d66930f1d6",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:37:40.732Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:37:40.732Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d863e3690d66930f20b"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b7d403e3690d66930f1d6",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:37:42.776Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:37:42.776Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d8b3e3690d66930f210"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Admin</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b7d423e3690d66930f1dc",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:37:45.155Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:37:45.155Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d8b3e3690d66930f212"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b7d423e3690d66930f1dc",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:37:47.274Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:37:47.274Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d923e3690d66930f215"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>03/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b7d3d3e3690d66930f1cb",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:37:54.600Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:37:54.600Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d943e3690d66930f218"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>03/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b7d403e3690d66930f1d6",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:37:56.708Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:37:56.708Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d963e3690d66930f21b"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>03/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b7d423e3690d66930f1dc",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:37:58.492Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:37:58.492Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d9f3e3690d66930f220"
+  },
+  "Key": "Assignee_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>Company Admin</b> to <b>Assignee</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b7d4b3e3690d66930f1f2",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:38:05.905Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:38:05.905Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7d9f3e3690d66930f222"
+  },
+  "Key": "Watcher_Changed",
+  "Message": "<b>Company Owner</b> has added the <b>undefined</b> to <b>Watcher</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b7d4b3e3690d66930f1f2",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:38:07.936Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:38:07.936Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b7db63e3690d66930f225"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>10/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b7d4b3e3690d66930f1f2",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:38:30.858Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:38:30.858Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b81293e3690d66930f229"
+  },
+  "Key": "TimeLog",
+  "Message": "<b>Company Owner</b> has added <b>07:21 hrs (02/04/2024 from 01:00 AM to 08:21 AM) </b> logged hours\n                ",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79463e3690d66930ed2a",
+  "Type": "Logtask",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T03:53:11.697Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:53:11.697Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b8a033e3690d66930f230"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Start Date</b> as <b>01/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798e3e3690d66930ee82",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T04:30:59.262Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:30:59.262Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b8a033e3690d66930f233"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Start Date</b> as <b>01/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798b3e3690d66930ee6c",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T04:30:59.584Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:30:59.584Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b8a033e3690d66930f236"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Start Date</b> as <b>01/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798e3e3690d66930ee82",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T04:30:59.702Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:30:59.702Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b8a053e3690d66930f238"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Start Date</b> as <b>01/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798a3e3690d66930ee62",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T04:30:59.314Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:30:59.314Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b8a463e3690d66930f26d"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Start Date</b> as <b>01/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79893e3690d66930ee57",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T04:32:06.058Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:32:06.058Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b8a573e3690d66930f270"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Start Date</b> as <b>01/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79853e3690d66930ee3a",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T04:32:23.035Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:32:23.035Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b8a5a3e3690d66930f273"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>01/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79853e3690d66930ee3a",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T04:32:26.918Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:32:26.918Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b8a5d3e3690d66930f276"
+  },
+  "Key": "Project_DueDate",
+  "Message": "<b>Company Owner</b> has added <b> Due Date</b> as <b>04/04/2024</b>.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b79853e3690d66930ee3a",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T04:32:29.626Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:32:29.626Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b8b483e3690d66930f278"
+  },
+  "Key": "Task_Due_Date",
+  "Message": "<b>Company Owner</b> has added <b>hrs(09:00)</b> <b>estimated time</b> of this task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798e3e3690d66930ee82",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T04:36:22.992Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:36:22.992Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b8b493e3690d66930f27a"
+  },
+  "Key": "Task_Due_Date",
+  "Message": "<b>Company Owner</b> has added <b>hrs(09:00)</b> <b>estimated time</b> of this task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798e3e3690d66930ee82",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T04:36:22.995Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:36:22.995Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b8b633e3690d66930f27e"
+  },
+  "Key": "TimeLog",
+  "Message": "<b>Company Owner</b> has added <b>04:00 hrs (02/04/2024 from 08:00 AM to 12:00 PM) </b> logged hours\n                ",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798e3e3690d66930ee82",
+  "Type": "Logtask",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T04:36:49.051Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:36:49.051Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b8b6f3e3690d66930f285"
+  },
+  "Key": "TimeLog",
+  "Message": "<b>Company Owner</b> has added <b>05:00 hrs (02/04/2024 from 01:00 PM to 06:00 PM) </b> logged hours\n                ",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798e3e3690d66930ee82",
+  "Type": "Logtask",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T04:37:03.449Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:37:03.449Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b8b813e3690d66930f28c"
+  },
+  "Key": "TimeLog",
+  "Message": "<b>Company Owner</b> has added <b>04:00 hrs (01/04/2024 from 08:00 AM to 12:00 PM) </b> logged hours\n                ",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798e3e3690d66930ee82",
+  "Type": "Logtask",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T04:37:19.471Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:37:19.471Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b8b933e3690d66930f293"
+  },
+  "Key": "TimeLog",
+  "Message": "<b>Company Owner</b> has added <b>05:00 hrs (01/04/2024 from 01:00 PM to 06:00 PM) </b> logged hours\n                ",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798e3e3690d66930ee82",
+  "Type": "Logtask",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T04:37:39.860Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:37:39.860Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b8bad3e3690d66930f298"
+  },
+  "Key": "Task_Due_Date",
+  "Message": "<b>Company Owner</b> updated the <b>estimated time</b> of <b>Company Member</b> from <b></b> to <b>09:00</b> of this task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798b3e3690d66930ee6c",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T04:38:05.688Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:38:05.688Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b8baf3e3690d66930f29a"
+  },
+  "Key": "Task_Due_Date",
+  "Message": "<b>Company Owner</b> updated the <b>estimated time</b> of <b>Company Member</b> from <b></b> to <b>09:00</b> of this task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798b3e3690d66930ee6c",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T04:38:05.695Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:38:05.695Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b8bd13e3690d66930f29c"
+  },
+  "Key": "Task_Due_Date",
+  "Message": "<b>Company Owner</b> updated the <b>estimated time</b> of <b>Company Admin</b> from <b></b> to <b>09:00</b> of this task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798a3e3690d66930ee62",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T04:38:41.202Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:38:41.202Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b8bd33e3690d66930f29e"
+  },
+  "Key": "Task_Due_Date",
+  "Message": "<b>Company Owner</b> updated the <b>estimated time</b> of <b>Company Admin</b> from <b></b> to <b>09:00</b> of this task.",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798a3e3690d66930ee62",
+  "Type": "task",
+  "UserId": "660a74e6e0e256e20ff902ed",
+  "createdAt": {
+    "$date": "2024-04-02T04:38:41.206Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:38:41.206Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b8c623e3690d66930f2a3"
+  },
+  "Key": "TimeLog",
+  "Message": "<b>Company Admin</b> has added <b>04:00 hrs (01/04/2024 from 08:00 AM to 12:00 PM) </b> logged hours\n                ",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798a3e3690d66930ee62",
+  "Type": "Logtask",
+  "UserId": "660a7537377c47af1e61828e",
+  "createdAt": {
+    "$date": "2024-04-02T04:41:04.251Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:41:04.251Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b8c733e3690d66930f2aa"
+  },
+  "Key": "TimeLog",
+  "Message": "<b>Company Admin</b> has added <b>05:00 hrs (01/04/2024 from 01:00 PM to 06:00 PM) </b> logged hours\n                ",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798a3e3690d66930ee62",
+  "Type": "Logtask",
+  "UserId": "660a7537377c47af1e61828e",
+  "createdAt": {
+    "$date": "2024-04-02T04:41:23.322Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:41:23.322Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b8c803e3690d66930f2b1"
+  },
+  "Key": "TimeLog",
+  "Message": "<b>Company Admin</b> has added <b>04:00 hrs (02/04/2024 from 08:00 AM to 12:00 PM) </b> logged hours\n                ",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798a3e3690d66930ee62",
+  "Type": "Logtask",
+  "UserId": "660a7537377c47af1e61828e",
+  "createdAt": {
+    "$date": "2024-04-02T04:41:34.731Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:41:34.731Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b8c943e3690d66930f2b8"
+  },
+  "Key": "TimeLog",
+  "Message": "<b>Company Admin</b> has added <b>05:00 hrs (02/04/2024 from 01:00 PM to 06:00 PM) </b> logged hours\n                ",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798a3e3690d66930ee62",
+  "Type": "Logtask",
+  "UserId": "660a7537377c47af1e61828e",
+  "createdAt": {
+    "$date": "2024-04-02T04:41:56.922Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:41:56.922Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b8de13e3690d66930f2c2"
+  },
+  "Key": "TimeLog",
+  "Message": "<b>Company Member</b> has added <b>04:00 hrs (01/04/2024 from 08:00 AM to 12:00 PM) </b> logged hours\n                ",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798b3e3690d66930ee6c",
+  "Type": "Logtask",
+  "UserId": "660a753791a01ea17711db03",
+  "createdAt": {
+    "$date": "2024-04-02T04:47:27.392Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:47:27.392Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b8dee3e3690d66930f2c9"
+  },
+  "Key": "TimeLog",
+  "Message": "<b>Company Member</b> has added <b>05:00 hrs (01/04/2024 from 01:00 PM to 06:00 PM) </b> logged hours\n                ",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798b3e3690d66930ee6c",
+  "Type": "Logtask",
+  "UserId": "660a753791a01ea17711db03",
+  "createdAt": {
+    "$date": "2024-04-02T04:47:42.531Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:47:42.531Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b8dfe3e3690d66930f2d0"
+  },
+  "Key": "TimeLog",
+  "Message": "<b>Company Member</b> has added <b>04:00 hrs (02/04/2024 from 08:00 AM to 12:00 PM) </b> logged hours\n                ",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798b3e3690d66930ee6c",
+  "Type": "Logtask",
+  "UserId": "660a753791a01ea17711db03",
+  "createdAt": {
+    "$date": "2024-04-02T04:47:56.987Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:47:56.987Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660b8e0b3e3690d66930f2d7"
+  },
+  "Key": "TimeLog",
+  "Message": "<b>Company Member</b> has added <b>05:00 hrs (02/04/2024 from 01:00 PM to 06:00 PM) </b> logged hours\n                ",
+  "ProjectId": "660a753f17c43b963ea05302",
+  "TaskId": "660b798b3e3690d66930ee6c",
+  "Type": "Logtask",
+  "UserId": "660a753791a01ea17711db03",
+  "createdAt": {
+    "$date": "2024-04-02T04:48:11.380Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:48:11.380Z"
+  },
+  "__v": 0
+}]

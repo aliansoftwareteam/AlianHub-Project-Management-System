@@ -1,0 +1,220 @@
+[{
+  "_id": {
+    "$oid": "660a74ed17c43b963ea0527a"
+  },
+  "activeIcon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2FSELECTED_LIST.svg?alt=media&token=f8fb2539-939f-4357-a6ef-95423b5d998d",
+  "icon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2Flistrequiredview.png?alt=media&token=80163486-00e0-40b8-a415-4d359de406c2",
+  "keyName": "ProjectListView",
+  "name": "List",
+  "setAsDefault": true,
+  "sortIndex": 1,
+  "value": "list",
+  "viewStatus": true,
+  "createdAt": {
+    "$date": "2024-04-01T08:48:45.089Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T08:48:45.089Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660a74ef17c43b963ea0527e"
+  },
+  "activeIcon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2FSELECTED_BOARD.svg?alt=media&token=e4df3658-a821-46d1-8f86-f139a01cb88c",
+  "icon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2FBoardrequiredview.png?alt=media&token=0b04dde0-b70f-475b-a2a4-e73398c50b45",
+  "keyName": "ProjectKanban",
+  "name": "Board",
+  "setAsDefault": false,
+  "sortIndex": 2,
+  "value": "ProjectKanban",
+  "viewStatus": false,
+  "createdAt": {
+    "$date": "2024-04-01T08:48:47.097Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T08:48:47.097Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660a74ef17c43b963ea05280"
+  },
+  "activeIcon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2FSELECTED_PROJECT-DETAIL.svg?alt=media&token=19cdbb09-237b-4fa9-bad5-e74d8f0c5e75",
+  "icon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2Fprojectdeatilrequiredview.png?alt=media&token=8bba4ffe-2799-4e64-8c54-ce89b4da28b3",
+  "keyName": "ProjectDetail",
+  "name": "Project Details",
+  "setAsDefault": false,
+  "sortIndex": 3,
+  "value": "projectDetails",
+  "viewStatus": false,
+  "createdAt": {
+    "$date": "2024-04-01T08:48:47.099Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T08:48:47.099Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660a74ef17c43b963ea05282"
+  },
+  "activeIcon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2FSELECTED_COMMENTS.svg?alt=media&token=f0dfc328-0685-4e5e-8df6-449010e2a187",
+  "icon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2Fcommentrequiredview.png?alt=media&token=334db1d7-b8a4-4e6e-a99a-704ce79a619b",
+  "keyName": "Comments",
+  "name": "Comments",
+  "setAsDefault": false,
+  "sortIndex": 4,
+  "value": "comments",
+  "viewStatus": false,
+  "createdAt": {
+    "$date": "2024-04-01T08:48:47.100Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T08:48:47.100Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660a74ef17c43b963ea05284"
+  },
+  "activeIcon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2FSELECTED_CALANDER.svg?alt=media&token=2c761e34-0d67-48a7-9a4d-c2030508b2ce",
+  "icon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2Fcalendarrequiredview.png?alt=media&token=f49f661c-dd54-41cc-8423-5a6d559b8325",
+  "keyName": "Calendar",
+  "name": "Calendar",
+  "setAsDefault": false,
+  "sortIndex": 5,
+  "value": "calendar",
+  "viewStatus": false,
+  "createdAt": {
+    "$date": "2024-04-01T08:48:47.101Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T08:48:47.101Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660a74ef17c43b963ea05286"
+  },
+  "activeIcon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2FSELECTED_ACTIVITY.svg?alt=media&token=ec43856a-e338-4479-bbbb-919416319c10",
+  "icon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2FActivityrequiredview.png?alt=media&token=2414de5c-23e9-48f2-afc7-2153063655cc",
+  "keyName": "ActivityLog",
+  "name": "Activity",
+  "setAsDefault": false,
+  "sortIndex": 6,
+  "value": "activitylog",
+  "viewStatus": false,
+  "createdAt": {
+    "$date": "2024-04-01T08:48:47.102Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T08:48:47.102Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660a74ef17c43b963ea05288"
+  },
+  "activeIcon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2FSELECTED_WORKLOAD.svg?alt=media&token=b46f7f20-9dc5-49c6-9e6c-519c4188080d",
+  "icon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2Fworkloadrequiredview.png?alt=media&token=6664e407-b0a8-4a65-998f-024b8a26da64",
+  "keyName": "Workload",
+  "name": "Workload",
+  "setAsDefault": false,
+  "sortIndex": 7,
+  "value": "workload",
+  "viewStatus": false,
+  "createdAt": {
+    "$date": "2024-04-01T08:48:47.103Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T08:48:47.103Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660a74ef17c43b963ea0528a"
+  },
+  "activeIcon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2FSELECTED_GANTT.svg?alt=media&token=8330ad14-3439-4453-983a-8ee9973f5b46",
+  "icon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2Fganttrequiredview.png?alt=media&token=060e00d5-cac8-4930-b88b-a0bbb6ad3697",
+  "keyName": "Gantt",
+  "name": "Gantt",
+  "setAsDefault": false,
+  "sortIndex": 8,
+  "value": "gantt",
+  "viewStatus": false,
+  "createdAt": {
+    "$date": "2024-04-01T08:48:47.104Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T08:48:47.104Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660a74ef17c43b963ea0528c"
+  },
+  "activeIcon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2FSELECTED_TABLE.svg?alt=media&token=5633cb54-cfa7-475d-9d8e-445bd2d0622e",
+  "icon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2Ftablerequiredview.png?alt=media&token=cef9c087-7c42-4293-8de9-5130b1afa5c9",
+  "keyName": "TableView",
+  "name": "Table",
+  "setAsDefault": false,
+  "sortIndex": 9,
+  "value": "TableView",
+  "viewStatus": false,
+  "createdAt": {
+    "$date": "2024-04-01T08:48:47.105Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T08:48:47.105Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660a74ef17c43b963ea0528e"
+  },
+  "activeIcon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2FSELECTED_TIMELINE.svg?alt=media&token=ffb88eb5-2353-47ca-b24e-379e4591082d",
+  "icon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2Ftimelinerequiredview.png?alt=media&token=ee988545-11cf-413c-b02d-a925dcff89b5",
+  "keyName": "Timeline",
+  "name": "Timeline",
+  "setAsDefault": false,
+  "sortIndex": 10,
+  "value": "timeline",
+  "viewStatus": false,
+  "createdAt": {
+    "$date": "2024-04-01T08:48:47.106Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T08:48:47.106Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660a74ef17c43b963ea05290"
+  },
+  "activeIcon": "https://firebasestorage.googleapis.com/v0/b/alian-hub-beta.appspot.com/o/default_images%2Fembed_active.png?alt=media&token=f8c0e11d-5984-4f62-b0a0-b22f0d856d39",
+  "icon": "https://firebasestorage.googleapis.com/v0/b/alian-hub-beta.appspot.com/o/default_images%2Fembed_icon.png?alt=media&token=d7e3785b-0297-4166-b0ca-18e7e42a522f",
+  "keyName": "Embed",
+  "name": "Embed",
+  "setAsDefault": false,
+  "sortIndex": 11,
+  "value": "embed",
+  "viewStatus": false,
+  "createdAt": {
+    "$date": "2024-04-01T08:48:47.107Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T08:48:47.107Z"
+  },
+  "__v": 0
+}]

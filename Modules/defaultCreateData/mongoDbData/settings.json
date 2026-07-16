@@ -1,0 +1,1156 @@
+[{
+  "_id": {
+    "$oid": "660a74eaaa43a6e3bf2e6e37"
+  },
+  "settings": [
+    "Fixed Price",
+    "Hourly Price",
+    "In House"
+  ],
+  "name": "project_category",
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:25.306Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:25.306Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74eaaa43a6e3bf2e6e4a"
+  },
+  "settings": [
+    "Monthly",
+    "Weekly"
+  ],
+  "name": "hourly_milestone_range",
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:25.306Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:25.306Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74eaaa43a6e3bf2e6e63"
+  },
+  "settings": [
+    "Mon - Sun"
+  ],
+  "name": "hourly_milestone_weekly_range",
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:25.306Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:25.306Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74eaaa43a6e3bf2e6e78"
+  },
+  "settings": [
+    {
+      "name": "High",
+      "value": "HIGH",
+      "image": "taskPriorities/priority_high.png",
+      "statusImage": "taskPriorities/priority_high.png",
+      "isDeleted": false
+    },
+    {
+      "name": "Medium",
+      "value": "MEDIUM",
+      "image": "taskPriorities/priority_medium.png",
+      "statusImage": "taskPriorities/priority_medium.png",
+      "isDeleted": false
+    },
+    {
+      "name": "Low",
+      "value": "LOW",
+      "image": "taskPriorities/priority_low.png",
+      "statusImage": "taskPriorities/priority_low.png",
+      "isDeleted": false
+    }
+  ],
+  "name": "task_priorities",
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:25.307Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:25.307Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74eaaa43a6e3bf2e6e90"
+  },
+  "settings": [
+    {
+      "backgroundColor": "#ff9600",
+      "textColor": "#ffffff",
+      "name": "Not Funded",
+      "value": "NOT_FUNDED",
+      "isDefault": false,
+      "isDeleted": false,
+      "isFuture": false,
+      "isPast": true,
+      "milestoneStatusDate": {
+        "$date": "2024-04-01T08:48:40.525Z"
+      },
+      "isCount": 0
+    },
+    {
+      "backgroundColor": "#18bbd0",
+      "textColor": "#ffffff",
+      "name": "Funded",
+      "value": "FUNDED",
+      "isDefault": true,
+      "isDeleted": false,
+      "isFuture": false,
+      "isPast": true,
+      "milestoneStatusDate": {
+        "$date": "2024-04-01T08:48:40.525Z"
+      },
+      "isCount": 0
+    },
+    {
+      "backgroundColor": "#1a78bc",
+      "textColor": "#ffffff",
+      "name": "Estimated Release",
+      "value": "ESTIMATED_RELEASE",
+      "isDefault": false,
+      "isDeleted": false,
+      "isFuture": true,
+      "isPast": false,
+      "milestoneStatusDate": {
+        "$date": "2024-04-01T08:48:40.525Z"
+      },
+      "isCount": 0
+    },
+    {
+      "backgroundColor": "#8e7bff",
+      "textColor": "#ffffff",
+      "name": "Release Request Sent",
+      "value": "RELEASE_REQUEST_SENT",
+      "isDefault": false,
+      "isDeleted": false,
+      "isFuture": false,
+      "isPast": true,
+      "milestoneStatusDate": {
+        "$date": "2024-04-01T08:48:40.525Z"
+      },
+      "isCount": 0
+    },
+    {
+      "backgroundColor": "#28c76f",
+      "textColor": "#ffffff",
+      "name": "Released",
+      "value": "RELEASED",
+      "isDefault": true,
+      "isDeleted": false,
+      "isFuture": true,
+      "isPast": true,
+      "milestoneStatusDate": {
+        "$date": "2024-04-01T08:48:40.525Z"
+      },
+      "isCount": 0
+    },
+    {
+      "backgroundColor": "#ff5252",
+      "textColor": "#ffffff",
+      "name": "Cancelled",
+      "value": "CANCELLED",
+      "isDefault": true,
+      "isDeleted": false,
+      "isFuture": false,
+      "isPast": true,
+      "milestoneStatusDate": {
+        "$date": "2024-04-01T08:48:40.525Z"
+      },
+      "isCount": 0
+    },
+    {
+      "backgroundColor": "#e329d1",
+      "textColor": "#ffffff",
+      "name": "Refunded",
+      "value": "REFUNDED",
+      "isDefault": true,
+      "isDeleted": false,
+      "isFuture": false,
+      "isPast": true,
+      "milestoneStatusDate": {
+        "$date": "2024-04-01T08:48:40.525Z"
+      },
+      "isCount": 0
+    }
+  ],
+  "name": "milestone_status",
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:25.307Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:25.307Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74eaaa43a6e3bf2e6ea5"
+  },
+  "settings": [
+    {
+      "dateFormat": "DD/MM/YYYY"
+    }
+  ],
+  "name": "date_format",
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:25.307Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:25.307Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74eaaa43a6e3bf2e6ec3"
+  },
+  "settings": [
+    {
+      "name": ".docm",
+      "systemGenerated": true
+    },
+    {
+      "name": ".dotm",
+      "systemGenerated": true
+    },
+    {
+      "name": ".xlsm",
+      "systemGenerated": true
+    },
+    {
+      "name": ".xltm",
+      "systemGenerated": true
+    },
+    {
+      "name": ".xlam",
+      "systemGenerated": true
+    },
+    {
+      "name": ".pptm",
+      "systemGenerated": true
+    },
+    {
+      "name": ".potm",
+      "systemGenerated": true
+    },
+    {
+      "name": ".ppam",
+      "systemGenerated": true
+    },
+    {
+      "name": ".ppsm",
+      "systemGenerated": true
+    },
+    {
+      "name": ".sldm",
+      "systemGenerated": true
+    },
+    {
+      "name": ".doc",
+      "systemGenerated": true
+    },
+    {
+      "name": ".docx",
+      "systemGenerated": true
+    },
+    {
+      "name": ".dot",
+      "systemGenerated": true
+    },
+    {
+      "name": ".dotx",
+      "systemGenerated": true
+    },
+    {
+      "name": ".rtf",
+      "systemGenerated": true
+    },
+    {
+      "name": ".wiz",
+      "systemGenerated": true
+    },
+    {
+      "name": ".pot",
+      "systemGenerated": true
+    },
+    {
+      "name": ".potx",
+      "systemGenerated": true
+    },
+    {
+      "name": ".ppa",
+      "systemGenerated": true
+    },
+    {
+      "name": ".pps",
+      "systemGenerated": true
+    },
+    {
+      "name": ".ppsx",
+      "systemGenerated": true
+    },
+    {
+      "name": ".ppt",
+      "systemGenerated": true
+    },
+    {
+      "name": ".pptx",
+      "systemGenerated": true
+    },
+    {
+      "name": ".pwz",
+      "systemGenerated": true
+    },
+    {
+      "name": ".xla",
+      "systemGenerated": true
+    },
+    {
+      "name": ".xlb",
+      "systemGenerated": true
+    },
+    {
+      "name": ".xlcxlk",
+      "systemGenerated": true
+    },
+    {
+      "name": ".xls",
+      "systemGenerated": true
+    },
+    {
+      "name": ".xlsb",
+      "systemGenerated": true
+    },
+    {
+      "name": ".xlsx",
+      "systemGenerated": true
+    },
+    {
+      "name": ".xlt",
+      "systemGenerated": true
+    },
+    {
+      "name": ".xltx",
+      "systemGenerated": true
+    },
+    {
+      "name": ".xlw",
+      "systemGenerated": true
+    },
+    {
+      "name": ".cal",
+      "systemGenerated": true
+    },
+    {
+      "name": ".frm",
+      "systemGenerated": true
+    },
+    {
+      "name": ".mbx",
+      "systemGenerated": true
+    },
+    {
+      "name": ".mif",
+      "systemGenerated": true
+    },
+    {
+      "name": ".mpc",
+      "systemGenerated": true
+    },
+    {
+      "name": ".mpd",
+      "systemGenerated": true
+    },
+    {
+      "name": ".mpp",
+      "systemGenerated": true
+    },
+    {
+      "name": ".mpt",
+      "systemGenerated": true
+    },
+    {
+      "name": ".mpv",
+      "systemGenerated": true
+    },
+    {
+      "name": ".win",
+      "systemGenerated": true
+    },
+    {
+      "name": ".wmf",
+      "systemGenerated": true
+    },
+    {
+      "name": ".arj",
+      "systemGenerated": true
+    },
+    {
+      "name": ".bz2",
+      "systemGenerated": true
+    },
+    {
+      "name": ".cab",
+      "systemGenerated": true
+    },
+    {
+      "name": ".gz",
+      "systemGenerated": true
+    },
+    {
+      "name": ".gzip",
+      "systemGenerated": true
+    },
+    {
+      "name": ".lha",
+      "systemGenerated": true
+    },
+    {
+      "name": ".lzh",
+      "systemGenerated": true
+    },
+    {
+      "name": ".rar",
+      "systemGenerated": true
+    },
+    {
+      "name": ".rpm",
+      "systemGenerated": true
+    },
+    {
+      "name": ".tar",
+      "systemGenerated": true
+    },
+    {
+      "name": ".tgz",
+      "systemGenerated": true
+    },
+    {
+      "name": ".z",
+      "systemGenerated": true
+    },
+    {
+      "name": ".zip",
+      "systemGenerated": true
+    },
+    {
+      "name": ".cfm",
+      "systemGenerated": true
+    },
+    {
+      "name": ".css",
+      "systemGenerated": true
+    },
+    {
+      "name": ".htc",
+      "systemGenerated": true
+    },
+    {
+      "name": ".htm",
+      "systemGenerated": true
+    },
+    {
+      "name": ".html",
+      "systemGenerated": true
+    },
+    {
+      "name": ".htt",
+      "systemGenerated": true
+    },
+    {
+      "name": ".htx",
+      "systemGenerated": true
+    },
+    {
+      "name": ".idc",
+      "systemGenerated": true
+    },
+    {
+      "name": ".nsf",
+      "systemGenerated": true
+    },
+    {
+      "name": ".plg",
+      "systemGenerated": true
+    },
+    {
+      "name": ".txt",
+      "systemGenerated": true
+    },
+    {
+      "name": ".ulx",
+      "systemGenerated": true
+    },
+    {
+      "name": ".cmp",
+      "systemGenerated": true
+    },
+    {
+      "name": ".eps",
+      "systemGenerated": true
+    },
+    {
+      "name": ".prn",
+      "systemGenerated": true
+    },
+    {
+      "name": ".ps",
+      "systemGenerated": true
+    },
+    {
+      "name": ".abf",
+      "systemGenerated": true
+    },
+    {
+      "name": ".atm",
+      "systemGenerated": true
+    },
+    {
+      "name": ".awe",
+      "systemGenerated": true
+    },
+    {
+      "name": ".fdf",
+      "systemGenerated": true
+    },
+    {
+      "name": ".ofm",
+      "systemGenerated": true
+    },
+    {
+      "name": ".p65",
+      "systemGenerated": true
+    },
+    {
+      "name": ".pdd",
+      "systemGenerated": true
+    },
+    {
+      "name": ".pdf",
+      "systemGenerated": true
+    },
+    {
+      "name": ".a3m",
+      "systemGenerated": true
+    },
+    {
+      "name": ".a4m",
+      "systemGenerated": true
+    },
+    {
+      "name": ".bin",
+      "systemGenerated": true
+    },
+    {
+      "name": ".hqx",
+      "systemGenerated": true
+    },
+    {
+      "name": ".rs",
+      "systemGenerated": true
+    },
+    {
+      "name": ".aff",
+      "systemGenerated": true
+    },
+    {
+      "name": ".affc",
+      "systemGenerated": true
+    },
+    {
+      "name": ".aif",
+      "systemGenerated": true
+    },
+    {
+      "name": ".aiff",
+      "systemGenerated": true
+    },
+    {
+      "name": ".aiffc",
+      "systemGenerated": true
+    },
+    {
+      "name": ".au",
+      "systemGenerated": true
+    },
+    {
+      "name": ".m3u",
+      "systemGenerated": true
+    },
+    {
+      "name": ".mid",
+      "systemGenerated": true
+    },
+    {
+      "name": ".mod",
+      "systemGenerated": true
+    },
+    {
+      "name": ".mp3",
+      "systemGenerated": true
+    },
+    {
+      "name": ".ra",
+      "systemGenerated": true
+    },
+    {
+      "name": ".rmi",
+      "systemGenerated": true
+    },
+    {
+      "name": ".snd",
+      "systemGenerated": true
+    },
+    {
+      "name": ".voc",
+      "systemGenerated": true
+    },
+    {
+      "name": ".wav",
+      "systemGenerated": true
+    },
+    {
+      "name": ".vcf",
+      "systemGenerated": true
+    },
+    {
+      "name": ".xml",
+      "systemGenerated": true
+    },
+    {
+      "name": ".xsf",
+      "systemGenerated": true
+    },
+    {
+      "name": ".asf",
+      "systemGenerated": true
+    },
+    {
+      "name": ".asx",
+      "systemGenerated": true
+    },
+    {
+      "name": ".avi",
+      "systemGenerated": true
+    },
+    {
+      "name": ".lsf",
+      "systemGenerated": true
+    },
+    {
+      "name": ".lsx",
+      "systemGenerated": true
+    },
+    {
+      "name": ".m1v",
+      "systemGenerated": true
+    },
+    {
+      "name": ".mmm",
+      "systemGenerated": true
+    },
+    {
+      "name": ".mov",
+      "systemGenerated": true
+    },
+    {
+      "name": ".movie",
+      "systemGenerated": true
+    },
+    {
+      "name": ".mp2",
+      "systemGenerated": true
+    },
+    {
+      "name": ".mp4",
+      "systemGenerated": true
+    },
+    {
+      "name": ".mpa",
+      "systemGenerated": true
+    },
+    {
+      "name": ".mpe",
+      "systemGenerated": true
+    },
+    {
+      "name": ".mpeg",
+      "systemGenerated": true
+    },
+    {
+      "name": ".mpg",
+      "systemGenerated": true
+    },
+    {
+      "name": ".mpv2",
+      "systemGenerated": true
+    },
+    {
+      "name": ".qt",
+      "systemGenerated": true
+    },
+    {
+      "name": ".vdo",
+      "systemGenerated": true
+    },
+    {
+      "name": ".art",
+      "systemGenerated": true
+    },
+    {
+      "name": ".bmp",
+      "systemGenerated": true
+    },
+    {
+      "name": ".dib",
+      "systemGenerated": true
+    },
+    {
+      "name": ".gif",
+      "systemGenerated": true
+    },
+    {
+      "name": ".ico",
+      "systemGenerated": true
+    },
+    {
+      "name": ".jfif",
+      "systemGenerated": true
+    },
+    {
+      "name": ".jpe",
+      "systemGenerated": true
+    },
+    {
+      "name": ".jpeg",
+      "systemGenerated": true
+    },
+    {
+      "name": ".jpg",
+      "systemGenerated": true
+    },
+    {
+      "name": ".png",
+      "systemGenerated": true
+    },
+    {
+      "name": ".tif",
+      "systemGenerated": true
+    },
+    {
+      "name": ".tiff",
+      "systemGenerated": true
+    },
+    {
+      "name": ".xbm",
+      "systemGenerated": true
+    },
+    {
+      "name": ".csv",
+      "systemGenerated": true
+    },
+    {
+      "name": ".psd",
+      "systemGenerated": true
+    },
+    {
+      "name": ".mkv",
+      "systemGenerated": true
+    },
+    {
+      "name": ".json",
+      "systemGenerated": true
+    },
+    {
+      "name": ".xd",
+      "systemGenerated": true
+    },
+    {
+      "name": ".cdr",
+      "systemGenerated": true
+    }
+  ],
+  "name": "file_extension",
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:25.307Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:25.307Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74eaaa43a6e3bf2e6eda"
+  },
+  "settings": [
+    {
+      "name": "Pending",
+      "key": 1
+    },
+    {
+      "name": "Accepted",
+      "key": 2
+    },
+    {
+      "name": "Rejected",
+      "key": 3
+    }
+  ],
+  "name": "company_user_status",
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:25.307Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:25.307Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74ecaa43a6e3bf2e70ff"
+  },
+  "settings": [
+    {
+      "name": "Guest",
+      "key": 0
+    },
+    {
+      "name": "Owner",
+      "key": 1
+    },
+    {
+      "name": "Admin",
+      "key": 2
+    },
+    {
+      "name": "Member",
+      "key": 3
+    }
+  ],
+  "name": "roles",
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:25.307Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:25.307Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f2aa43a6e3bf2e7c7e"
+  },
+  "settings": [
+    {
+      "key": 1,
+      "name": "To Do",
+      "bgColor": "#ff960035",
+      "textColor": "#ff9600",
+      "isDeleted": false
+    },
+    {
+      "key": 2,
+      "name": "Complete",
+      "bgColor": "#6BC95035",
+      "textColor": "#6BC950",
+      "isDeleted": false
+    },
+    {
+      "key": 3,
+      "name": "In Progress",
+      "bgColor": "#6473e835",
+      "textColor": "#6473e8",
+      "isDeleted": false
+    },
+    {
+      "key": 4,
+      "name": "In Review",
+      "bgColor": "#9759c035",
+      "textColor": "#9759c0",
+      "isDeleted": false
+    },
+    {
+      "key": 5,
+      "name": "Backlog",
+      "bgColor": "#ec414135",
+      "textColor": "#ec4141",
+      "isDeleted": false
+    },
+    {
+      "key": 6,
+      "name": "Done",
+      "bgColor": "#24c11035",
+      "textColor": "#24c110",
+      "isDeleted": false
+    },
+    {
+      "key": 7,
+      "name": "On Hold",
+      "bgColor": "#cedb1f35",
+      "textColor": "#cedb1f",
+      "isDeleted": false
+    },
+    {
+      "key": 8,
+      "name": "Ready For Production",
+      "bgColor": "#55eb3735",
+      "textColor": "#55eb37",
+      "isDeleted": false
+    },
+    {
+      "key": 9,
+      "name": "Code Review",
+      "bgColor": "#324e3135",
+      "textColor": "#324e31",
+      "isDeleted": false
+    },
+    {
+      "bgColor": "#ff000035",
+      "name": "Blocked",
+      "textColor": "#ff0000",
+      "key": 10,
+      "type": "active"
+    },
+    {
+      "bgColor": "#0000ff35",
+      "name": "Under Review",
+      "textColor": "#0000ff",
+      "key": 11,
+      "type": "active"
+    },
+    {
+      "bgColor": "#80808035",
+      "name": "Deferred",
+      "textColor": "#808080",
+      "key": 12,
+      "type": "active"
+    },
+    {
+      "bgColor": "#ffd70035",
+      "name": "Awaiting Feedback",
+      "textColor": "#ffd700",
+      "key": 13,
+      "type": "active"
+    },
+    {
+      "bgColor": "#69696935",
+      "name": "Cancelled",
+      "textColor": "#696969",
+      "key": 14,
+      "type": "active"
+    }
+  ],
+  "name": "task_status",
+  "totalStatus": 14,
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:25.307Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:25.307Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f2aa43a6e3bf2e7ca9"
+  },
+  "settings": [
+    {
+      "backgroundColor": "#E3E1FC35",
+      "textColor": "#7367F0",
+      "name": "Open",
+      "value": "open",
+      "isDeleted": false,
+      "key": 1
+    },
+    {
+      "backgroundColor": "#ED514535",
+      "textColor": "#ED5145",
+      "name": "Close",
+      "value": "close",
+      "isDeleted": false,
+      "key": 2
+    },
+    {
+      "backgroundColor": "#68c21e35",
+      "textColor": "#68c21e",
+      "name": "Done",
+      "value": "done",
+      "isDeleted": false,
+      "key": 3
+    },
+    {
+      "backgroundColor": "#c6b45d35",
+      "textColor": "#c6b45d",
+      "name": "On Hold",
+      "value": "on_hold",
+      "isDeleted": false,
+      "key": 4
+    },
+    {
+      "backgroundColor": "#1aee1735",
+      "textColor": "#1aee17",
+      "name": "Completed",
+      "value": "completed",
+      "isDeleted": false,
+      "key": 5
+    },
+    {
+      "backgroundColor": "#ff880035",
+      "textColor": "#ff8800",
+      "name": "In Process",
+      "value": "in_process",
+      "isDeleted": false,
+      "key": 6
+    },
+    {
+      "backgroundColor": "#E62CE935",
+      "textColor": "#E62CE9",
+      "name": "Backlog",
+      "value": "backlog",
+      "isDeleted": false,
+      "key": 7
+    },
+    {
+      "key": 8,
+      "value": "planning",
+      "backgroundColor": "#ffbb0035",
+      "textColor": "#ffbb00",
+      "name": "Planning",
+      "type": "active"
+    },
+    {
+      "key": 9,
+      "value": "active",
+      "backgroundColor": "#00ff0035",
+      "textColor": "#00ff00",
+      "name": "Active",
+      "type": "active"
+    },
+    {
+      "key": 10,
+      "value": "cancelled",
+      "backgroundColor": "#ff000035",
+      "textColor": "#ff0000",
+      "name": "Cancelled",
+      "type": "active"
+    }
+  ],
+  "name": "project_status",
+  "totalStatus": 10,
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:25.307Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:25.307Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f2aa43a6e3bf2e7cc7"
+  },
+  "settings": [
+    {
+      "name": "Task",
+      "isDeleted": false,
+      "value": "task",
+      "key": 1,
+      "taskImage": "setting/task_type/task.png"
+    },
+    {
+      "name": "Bug",
+      "isDeleted": false,
+      "value": "bug",
+      "key": 2,
+      "taskImage": "setting/task_type/bug.png"
+    },
+    {
+      "name": "Sub Task",
+      "isDeleted": false,
+      "value": "sub_task",
+      "key": 3,
+      "taskImage": "setting/task_type/subtask.png"
+    },
+    {
+      "name": "Design",
+      "isDeleted": false,
+      "value": "design",
+      "key": 4,
+      "taskImage": "setting/task_type/design.png"
+    },
+    {
+      "value": "engagement_tasks",
+      "name": "Engagement Tasks",
+      "taskImage": "https://s3.us-east-1.wasabisys.com/enterprice/projectTemplate/Engagement Tasks.svg",
+      "key": 5
+    },
+    {
+      "value": "collaboration_tasks",
+      "name": "Collaboration Tasks",
+      "taskImage": "https://s3.us-east-1.wasabisys.com/enterprice/projectTemplate/Collaboration Tasks.svg",
+      "key": 6
+    },
+    {
+      "value": "support_tasks",
+      "name": "Support Tasks",
+      "taskImage": "https://s3.us-east-1.wasabisys.com/enterprice/projectTemplate/Support Tasks.svg",
+      "key": 7
+    },
+    {
+      "value": "content_creation_tasks",
+      "name": "Content Creation Tasks",
+      "taskImage": "https://s3.us-east-1.wasabisys.com/enterprice/projectTemplate/Content Creation Tasks.svg",
+      "key": 8
+    }
+  ],
+  "name": "task_type",
+  "totalStatus": 8,
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:25.308Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:25.308Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a7627e0e256e20ffd8fed"
+  },
+  "settings": [
+    {
+      "key": 1,
+      "name": "Admin"
+    },
+    {
+      "key": 2,
+      "name": "Member"
+    }
+  ],
+  "name": "designations",
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:25.308Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:25.308Z"
+  }
+}]

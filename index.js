@@ -207,6 +207,7 @@ function initializeControllers() {
     require('./Modules/projectSetting/init').init(app);
     require('./Modules/taskIndex/init').init(app);
     require('./Modules/createProject/init.js').init(app);
+    require('./Modules/defaultCreateData/init').init(app);
     require('./Modules/notification-count/init').init(app);
     require('./Modules/notification/sendEmail/init').init(app);
     require('./Modules/trackerUserPermission/init').init(app);

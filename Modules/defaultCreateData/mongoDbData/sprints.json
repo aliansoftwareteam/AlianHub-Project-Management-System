@@ -1,0 +1,44 @@
+[{
+  "_id": {
+    "$oid": "660a754117c43b963ea05307"
+  },
+  "name": "List",
+  "projectId": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "tasks": 36,
+  "private": false,
+  "deletedStatusKey": 0,
+  "AssigneeUserId": [],
+  "watchers": [],
+  "favouriteTasks": [],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:27.379Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:36:45.699Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "66543810c9f8d06f55e2b298"
+  },
+  "name": "DEFAULT",
+  "projectId": {
+    "$oid": "660a74edaa43a6e3bf2e71df"
+  },
+  "tasks": 0,
+  "private": false,
+  "deletedStatusKey": 0,
+  "AssigneeUserId": [],
+  "watchers": [],
+  "favouriteTasks": [],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-05-27T07:03:51.437Z"
+  },
+  "updatedAt": {
+    "$date": "2024-05-27T07:03:51.437Z"
+  }
+}]

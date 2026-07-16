@@ -1,0 +1,108 @@
+[{
+  "_id": {
+    "$oid": "660a74edaa43a6e3bf2e71c2"
+  },
+  "ProjectName": "CHANNELS",
+  "AssigneeUserId": [],
+  "LeadUserId": [],
+  "ProjectCode": "C",
+  "ProjectRequiredComponent": [],
+  "TaskTypeTemplateId": "",
+  "TemplateId": "",
+  "TemplateTaskStatusId": "",
+  "__v": 0,
+  "apps": [],
+  "checklistArray": [],
+  "createdAt": {
+    "$date": "2024-04-01T08:48:45.044Z"
+  },
+  "default": false,
+  "description": "",
+  "dueDateDeadLine": [],
+  "isPrivateSpace": false,
+  "lastTaskId": 0,
+  "milestoneAmount": 0,
+  "projectStatusData": [],
+  "sprintsObj": {},
+  "sprintsfolders": {},
+  "taskStatusData": [
+    {
+      "bgColor": "#ff960035",
+      "key": 1,
+      "name": "To Do",
+      "textColor": "#ff9600",
+      "type": "default_active",
+      "value": "to_do"
+    }
+  ],
+  "taskTypeCounts": [
+    {
+      "default": true,
+      "key": 0,
+      "name": "Task",
+      "value": "task",
+      "taskCount": 0,
+      "taskImage": "https://firebasestorage.googleapis.com/v0/b/alian-hub-beta.appspot.com/o/default_images%2Ftask.png?alt=media&token=a3c55f9b-42d3-426d-9749-f40cc04de3fa"
+    }
+  ],
+  "updatedAt": {
+    "$date": "2024-04-01T08:48:45.044Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74edaa43a6e3bf2e71df"
+  },
+  "ProjectName": "one to one",
+  "AssigneeUserId": [],
+  "LeadUserId": [],
+  "ProjectCode": "oto",
+  "ProjectRequiredComponent": [],
+  "TaskTypeTemplateId": "",
+  "TemplateId": "",
+  "TemplateTaskStatusId": "",
+  "__v": 0,
+  "apps": [],
+  "checklistArray": [],
+  "createdAt": {
+    "$date": "2024-04-01T08:48:45.047Z"
+  },
+  "default": true,
+  "description": "",
+  "dueDateDeadLine": [],
+  "isPrivateSpace": false,
+  "lastTaskId": 0,
+  "milestoneAmount": 0,
+  "projectStatusData": [],
+  "sprintsObj": {
+    "HloFvH": {
+      "id": "HloFvH",
+      "name": "defaultSprint",
+      "value": "DEFAULTSPRINT"
+    }
+  },
+  "sprintsfolders": {},
+  "taskStatusData": [
+    {
+      "bgColor": "#ff960035",
+      "key": 1,
+      "name": "To Do",
+      "textColor": "#ff9600",
+      "type": "default_active",
+      "value": "to_do"
+    }
+  ],
+  "taskTypeCounts": [
+    {
+      "default": true,
+      "key": 0,
+      "name": "Task",
+      "value": "task",
+      "taskCount": 0,
+      "taskImage": "https://firebasestorage.googleapis.com/v0/b/alian-hub-beta.appspot.com/o/default_images%2Ftask.png?alt=media&token=a3c55f9b-42d3-426d-9749-f40cc04de3fa"
+    }
+  ],
+  "updatedAt": {
+    "$date": "2024-04-01T08:48:45.047Z"
+  }
+}]

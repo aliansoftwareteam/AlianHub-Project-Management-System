@@ -1,0 +1,2413 @@
+[{
+  "_id": {
+    "$oid": "660b793c3e3690d66930ed0c"
+  },
+  "TaskName": "Task 1",
+  "TaskKey": "DP-1",
+  "AssigneeUserId": [
+    "660a753791a01ea17711db03"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a753791a01ea17711db03"
+  ],
+  "DueDate": {
+    "$date": "2024-03-30T03:32:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-03-30T03:32:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "Done",
+    "key": 6,
+    "type": "done"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "HIGH",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "done",
+  "statusKey": 6,
+  "createdAt": {
+    "$date": "2024-04-02T03:19:24.213Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:35:49.724Z"
+  },
+  "__v": 0,
+  "groupByStatusIndex": 0,
+  "groupByAssigneeIndex": 0,
+  "subTasks": 2
+},
+{
+  "_id": {
+    "$oid": "660b79423e3690d66930ed19"
+  },
+  "TaskName": "Task 2",
+  "TaskKey": "DP-2",
+  "AssigneeUserId": [
+    "660a7537377c47af1e61828e"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a7537377c47af1e61828e"
+  ],
+  "DueDate": {
+    "$date": "2024-03-30T03:33:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-03-30T03:33:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "Done",
+    "key": 6,
+    "type": "done"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "HIGH",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "done",
+  "statusKey": 6,
+  "createdAt": {
+    "$date": "2024-04-02T03:19:30.253Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:33:06.484Z"
+  },
+  "__v": 0,
+  "groupByStatusIndex": -65536,
+  "groupByAssigneeIndex": 0
+},
+{
+  "_id": {
+    "$oid": "660b79443e3690d66930ed23"
+  },
+  "TaskName": "Task 3",
+  "TaskKey": "DP-3",
+  "AssigneeUserId": [
+    "660a7537377c47af1e61828e"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a7537377c47af1e61828e"
+  ],
+  "DueDate": {
+    "$date": "2024-03-29T03:33:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-03-29T03:33:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "Done",
+    "key": 6,
+    "type": "done"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "HIGH",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "done",
+  "statusKey": 6,
+  "createdAt": {
+    "$date": "2024-04-02T03:19:32.504Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:33:09.396Z"
+  },
+  "__v": 0,
+  "groupByStatusIndex": -131072,
+  "groupByAssigneeIndex": -65536
+},
+{
+  "_id": {
+    "$oid": "660b79463e3690d66930ed2a"
+  },
+  "TaskName": "Task 4",
+  "TaskKey": "DP-4",
+  "AssigneeUserId": [
+    "660a7537377c47af1e61828e"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a7537377c47af1e61828e"
+  ],
+  "DueDate": {
+    "$date": "2024-03-22T03:33:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-03-22T03:33:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "Complete",
+    "key": 2,
+    "type": "close"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "LOW",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "close",
+  "statusKey": 2,
+  "createdAt": {
+    "$date": "2024-04-02T03:19:34.439Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:33:44.843Z"
+  },
+  "__v": 0,
+  "groupByStatusIndex": 0,
+  "groupByAssigneeIndex": -131072
+},
+{
+  "_id": {
+    "$oid": "660b79483e3690d66930ed34"
+  },
+  "TaskName": "Task 5",
+  "TaskKey": "DP-5",
+  "AssigneeUserId": [
+    "660a753791a01ea17711db03"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a753791a01ea17711db03"
+  ],
+  "DueDate": {
+    "$date": "2024-03-22T03:33:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-03-22T03:33:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "Complete",
+    "key": 2,
+    "type": "close"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "HIGH",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "close",
+  "statusKey": 2,
+  "createdAt": {
+    "$date": "2024-04-02T03:19:36.436Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:33:48.783Z"
+  },
+  "__v": 0,
+  "groupByStatusIndex": -65536,
+  "groupByAssigneeIndex": -65536
+},
+{
+  "_id": {
+    "$oid": "660b794b3e3690d66930ed4a"
+  },
+  "TaskName": "Task 6",
+  "TaskKey": "DP-6",
+  "AssigneeUserId": [
+    "660a753791a01ea17711db03"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a753791a01ea17711db03"
+  ],
+  "DueDate": {
+    "$date": "2024-03-22T03:33:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-03-22T03:33:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "Complete",
+    "key": 2,
+    "type": "close"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "MEDIUM",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "close",
+  "statusKey": 2,
+  "createdAt": {
+    "$date": "2024-04-02T03:19:39.808Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:33:42.027Z"
+  },
+  "__v": 0,
+  "groupByPriorityIndex": -327680,
+  "groupByStatusIndex": -131072,
+  "groupByAssigneeIndex": -131072
+},
+{
+  "_id": {
+    "$oid": "660b794d3e3690d66930ed51"
+  },
+  "TaskName": "Task 8",
+  "TaskKey": "DP-7",
+  "AssigneeUserId": [
+    "660a74e6e0e256e20ff902ed"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a74e6e0e256e20ff902ed"
+  ],
+  "DueDate": {
+    "$date": "2024-04-03T03:31:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-04-03T03:31:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "Awaiting Feedback",
+    "key": 13,
+    "type": "active"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "LOW",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "active",
+  "statusKey": 13,
+  "createdAt": {
+    "$date": "2024-04-02T03:19:41.622Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:02.057Z"
+  },
+  "__v": 0,
+  "groupByStatusIndex": 0,
+  "groupByAssigneeIndex": 0
+},
+{
+  "_id": {
+    "$oid": "660b794d3e3690d66930ed59"
+  },
+  "TaskName": "Task 7",
+  "TaskKey": "DP-8",
+  "AssigneeUserId": [
+    "660a74e6e0e256e20ff902ed"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a74e6e0e256e20ff902ed"
+  ],
+  "DueDate": {
+    "$date": "2024-04-03T03:31:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-04-03T03:31:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "Awaiting Feedback",
+    "key": 13,
+    "type": "active"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "LOW",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "active",
+  "statusKey": 13,
+  "createdAt": {
+    "$date": "2024-04-02T03:19:41.977Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:04.439Z"
+  },
+  "__v": 0,
+  "groupByStatusIndex": -65536,
+  "groupByAssigneeIndex": -65536
+},
+{
+  "_id": {
+    "$oid": "660b794f3e3690d66930ed64"
+  },
+  "TaskName": "Task 9",
+  "TaskKey": "DP-9",
+  "AssigneeUserId": [
+    "660a74e6e0e256e20ff902ed"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a74e6e0e256e20ff902ed"
+  ],
+  "DueDate": {
+    "$date": "2024-04-03T03:31:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-04-03T03:31:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "Awaiting Feedback",
+    "key": 13,
+    "type": "active"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "MEDIUM",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "active",
+  "statusKey": 13,
+  "createdAt": {
+    "$date": "2024-04-02T03:19:43.719Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:31:57.613Z"
+  },
+  "__v": 0,
+  "groupByPriorityIndex": -524288,
+  "groupByStatusIndex": -131072,
+  "groupByAssigneeIndex": -131072
+},
+{
+  "_id": {
+    "$oid": "660b79533e3690d66930ed81"
+  },
+  "TaskName": "Task 10",
+  "TaskKey": "DP-10",
+  "AssigneeUserId": [
+    "660a753791a01ea17711db03"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a753791a01ea17711db03"
+  ],
+  "DueDate": {
+    "$date": "2024-04-01T03:32:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-04-01T03:32:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "Cancelled",
+    "key": 14,
+    "type": "active"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "LOW",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "active",
+  "statusKey": 14,
+  "createdAt": {
+    "$date": "2024-04-02T03:19:47.642Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:27.660Z"
+  },
+  "__v": 0,
+  "groupByStatusIndex": 0,
+  "groupByAssigneeIndex": -196608
+},
+{
+  "_id": {
+    "$oid": "660b79553e3690d66930ed8a"
+  },
+  "TaskName": "Task 11",
+  "TaskKey": "DP-11",
+  "AssigneeUserId": [
+    "660a753791a01ea17711db03"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a753791a01ea17711db03"
+  ],
+  "DueDate": {
+    "$date": "2024-03-31T03:32:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-03-31T03:32:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "Cancelled",
+    "key": 14,
+    "type": "active"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "LOW",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "active",
+  "statusKey": 14,
+  "createdAt": {
+    "$date": "2024-04-02T03:19:49.680Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:29.559Z"
+  },
+  "__v": 0,
+  "groupByStatusIndex": -65536,
+  "groupByAssigneeIndex": -262144
+},
+{
+  "_id": {
+    "$oid": "660b79573e3690d66930ed8d"
+  },
+  "TaskName": "Task 12",
+  "TaskKey": "DP-12",
+  "AssigneeUserId": [
+    "660a7537377c47af1e61828e"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a7537377c47af1e61828e"
+  ],
+  "DueDate": {
+    "$date": "2024-03-29T03:32:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-03-29T03:32:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "Cancelled",
+    "key": 14,
+    "type": "active"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "LOW",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "active",
+  "statusKey": 14,
+  "createdAt": {
+    "$date": "2024-04-02T03:19:51.689Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:31.422Z"
+  },
+  "__v": 0,
+  "groupByStatusIndex": -131072,
+  "groupByAssigneeIndex": -196608
+},
+{
+  "_id": {
+    "$oid": "660b795a3e3690d66930eda5"
+  },
+  "TaskName": "Task 13",
+  "TaskKey": "DP-13",
+  "AssigneeUserId": [
+    "660a7537377c47af1e61828e"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a7537377c47af1e61828e"
+  ],
+  "DueDate": {
+    "$date": "2024-04-18T03:32:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-04-18T03:32:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "On Hold",
+    "key": 7,
+    "type": "active"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "MEDIUM",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "active",
+  "statusKey": 7,
+  "createdAt": {
+    "$date": "2024-04-02T03:19:54.357Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:38.023Z"
+  },
+  "__v": 0,
+  "groupByPriorityIndex": -786432,
+  "groupByStatusIndex": 0,
+  "groupByAssigneeIndex": -262144
+},
+{
+  "_id": {
+    "$oid": "660b795c3e3690d66930edb2"
+  },
+  "TaskName": "Task 14",
+  "TaskKey": "DP-14",
+  "AssigneeUserId": [
+    "660a7537377c47af1e61828e"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a7537377c47af1e61828e"
+  ],
+  "DueDate": {
+    "$date": "2024-04-17T03:32:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-04-17T03:32:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "On Hold",
+    "key": 7,
+    "type": "active"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "LOW",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "active",
+  "statusKey": 7,
+  "createdAt": {
+    "$date": "2024-04-02T03:19:56.970Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:44.854Z"
+  },
+  "__v": 0,
+  "groupByStatusIndex": -65536,
+  "groupByAssigneeIndex": -327680
+},
+{
+  "_id": {
+    "$oid": "660b795f3e3690d66930edbf"
+  },
+  "TaskName": "Task 15",
+  "TaskKey": "DP-15",
+  "AssigneeUserId": [
+    "660a7537377c47af1e61828e"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a7537377c47af1e61828e"
+  ],
+  "DueDate": {
+    "$date": "2024-04-17T03:32:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-04-17T03:32:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "On Hold",
+    "key": 7,
+    "type": "active"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "MEDIUM",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "active",
+  "statusKey": 7,
+  "createdAt": {
+    "$date": "2024-04-02T03:19:59.204Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:41.351Z"
+  },
+  "__v": 0,
+  "groupByPriorityIndex": -917504,
+  "groupByStatusIndex": -131072,
+  "groupByAssigneeIndex": -393216
+},
+{
+  "_id": {
+    "$oid": "660b79613e3690d66930edcc"
+  },
+  "TaskName": "Task 16",
+  "TaskKey": "DP-16",
+  "AssigneeUserId": [
+    "660a7537377c47af1e61828e"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a7537377c47af1e61828e"
+  ],
+  "DueDate": {
+    "$date": "2024-04-04T03:30:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-04-04T03:30:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "To Do",
+    "key": 1,
+    "type": "default_active"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "MEDIUM",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "default_active",
+  "statusKey": 1,
+  "createdAt": {
+    "$date": "2024-04-02T03:20:01.409Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:36:36.314Z"
+  },
+  "__v": 0,
+  "groupByStatusIndex": -786432,
+  "groupByDueDateIndex": -983040,
+  "groupByPriorityIndex": -983040,
+  "groupByAssigneeIndex": -458752,
+  "subTasks": 3
+},
+{
+  "_id": {
+    "$oid": "660b79643e3690d66930edd9"
+  },
+  "TaskName": "Task 17",
+  "TaskKey": "DP-17",
+  "AssigneeUserId": [
+    "660a753791a01ea17711db03"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a753791a01ea17711db03"
+  ],
+  "DueDate": {
+    "$date": "2024-04-05T03:30:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-04-05T03:30:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "To Do",
+    "key": 1,
+    "type": "default_active"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "HIGH",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "default_active",
+  "statusKey": 1,
+  "createdAt": {
+    "$date": "2024-04-02T03:20:04.040Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:18.423Z"
+  },
+  "__v": 0,
+  "groupByStatusIndex": -851968,
+  "groupByDueDateIndex": -983040,
+  "groupByPriorityIndex": -1048576,
+  "groupByAssigneeIndex": -327680
+},
+{
+  "_id": {
+    "$oid": "660b79663e3690d66930ede6"
+  },
+  "TaskName": "Task 18",
+  "TaskKey": "DP-18",
+  "AssigneeUserId": [
+    "660a753791a01ea17711db03"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a753791a01ea17711db03"
+  ],
+  "DueDate": {
+    "$date": "2024-04-04T03:30:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-04-04T03:30:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "To Do",
+    "key": 1,
+    "type": "default_active"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "LOW",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "default_active",
+  "statusKey": 1,
+  "createdAt": {
+    "$date": "2024-04-02T03:20:06.440Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:24.723Z"
+  },
+  "__v": 0,
+  "groupByStatusIndex": -917504,
+  "groupByDueDateIndex": -983040,
+  "groupByPriorityIndex": -1048576,
+  "groupByAssigneeIndex": -393216
+},
+{
+  "_id": {
+    "$oid": "660b79683e3690d66930edf3"
+  },
+  "TaskName": "Task 19",
+  "TaskKey": "DP-19",
+  "AssigneeUserId": [
+    "660a7537377c47af1e61828e"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a7537377c47af1e61828e"
+  ],
+  "DueDate": {
+    "$date": "2024-04-06T03:30:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-04-06T03:30:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "To Do",
+    "key": 1,
+    "type": "default_active"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "MEDIUM",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "default_active",
+  "statusKey": 1,
+  "createdAt": {
+    "$date": "2024-04-02T03:20:08.967Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:30.935Z"
+  },
+  "__v": 0,
+  "groupByStatusIndex": -983040,
+  "groupByDueDateIndex": -983040,
+  "groupByPriorityIndex": -1048576,
+  "groupByAssigneeIndex": -524288
+},
+{
+  "_id": {
+    "$oid": "660b796b3e3690d66930ee00"
+  },
+  "TaskName": "Task 20",
+  "TaskKey": "DP-20",
+  "AssigneeUserId": [
+    "660a7537377c47af1e61828e"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a7537377c47af1e61828e"
+  ],
+  "DueDate": {
+    "$date": "2024-04-10T03:30:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-04-10T03:30:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "To Do",
+    "key": 1,
+    "type": "default_active"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "LOW",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "default_active",
+  "statusKey": 1,
+  "createdAt": {
+    "$date": "2024-04-02T03:20:11.140Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:36:45.700Z"
+  },
+  "__v": 0,
+  "groupByStatusIndex": -1048576,
+  "groupByDueDateIndex": -983040,
+  "groupByPriorityIndex": -1114112,
+  "groupByAssigneeIndex": -589824,
+  "subTasks": 1
+},
+{
+  "_id": {
+    "$oid": "660b797f3e3690d66930ee10"
+  },
+  "TaskName": "Task 21",
+  "TaskKey": "DP-21",
+  "AssigneeUserId": [
+    "660a74e6e0e256e20ff902ed"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a74e6e0e256e20ff902ed"
+  ],
+  "DueDate": {
+    "$date": "2024-04-11T03:30:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-04-11T03:30:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "To Do",
+    "key": 1,
+    "type": "default_active"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "MEDIUM",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "default_active",
+  "statusKey": 1,
+  "createdAt": {
+    "$date": "2024-04-02T03:20:31.572Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:43.363Z"
+  },
+  "__v": 0,
+  "groupByStatusIndex": -1114112,
+  "groupByDueDateIndex": -983040,
+  "groupByPriorityIndex": -1114112,
+  "groupByAssigneeIndex": -196608
+},
+{
+  "_id": {
+    "$oid": "660b79813e3690d66930ee14"
+  },
+  "TaskName": "Task 22",
+  "TaskKey": "DP-22",
+  "AssigneeUserId": [
+    "660a7537377c47af1e61828e"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a7537377c47af1e61828e"
+  ],
+  "DueDate": {
+    "$date": "2024-04-12T03:31:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-04-12T03:31:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "Deferred",
+    "key": 12,
+    "type": "active"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "MEDIUM",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "active",
+  "statusKey": 12,
+  "createdAt": {
+    "$date": "2024-04-02T03:20:33.124Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:32:53.631Z"
+  },
+  "__v": 0,
+  "groupByDueDateIndex": -393216,
+  "groupByPriorityIndex": -1179648,
+  "groupByStatusIndex": 0,
+  "groupByAssigneeIndex": -655360
+},
+{
+  "_id": {
+    "$oid": "660b79823e3690d66930ee1e"
+  },
+  "TaskName": "Task 23",
+  "TaskKey": "DP-23",
+  "AssigneeUserId": [
+    "660a74e6e0e256e20ff902ed"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a74e6e0e256e20ff902ed"
+  ],
+  "DueDate": {
+    "$date": "2024-04-12T03:31:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-04-12T03:31:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "Deferred",
+    "key": 12,
+    "type": "active"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "MEDIUM",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "active",
+  "statusKey": 12,
+  "createdAt": {
+    "$date": "2024-04-02T03:20:34.783Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:33:01.883Z"
+  },
+  "__v": 0,
+  "groupByDueDateIndex": -393216,
+  "groupByPriorityIndex": -1245184,
+  "groupByStatusIndex": -65536,
+  "groupByAssigneeIndex": -262144
+},
+{
+  "_id": {
+    "$oid": "660b79843e3690d66930ee2b"
+  },
+  "TaskName": "Task 24",
+  "TaskKey": "DP-24",
+  "AssigneeUserId": [
+    "660a74e6e0e256e20ff902ed"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a74e6e0e256e20ff902ed"
+  ],
+  "DueDate": {
+    "$date": "2024-04-12T03:31:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-04-12T03:31:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "Deferred",
+    "key": 12,
+    "type": "active"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "MEDIUM",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "active",
+  "statusKey": 12,
+  "createdAt": {
+    "$date": "2024-04-02T03:20:36.366Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:33:10.157Z"
+  },
+  "__v": 0,
+  "groupByDueDateIndex": -393216,
+  "groupByPriorityIndex": -1310720,
+  "groupByStatusIndex": -131072,
+  "groupByAssigneeIndex": -327680
+},
+{
+  "_id": {
+    "$oid": "660b79853e3690d66930ee38"
+  },
+  "TaskName": "Task 26",
+  "TaskKey": "DP-25",
+  "AssigneeUserId": [
+    "660a7537377c47af1e61828e"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a7537377c47af1e61828e"
+  ],
+  "DueDate": {
+    "$date": "2024-04-04T03:31:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-04-04T03:31:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "Under Review",
+    "key": 11,
+    "type": "active"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "LOW",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "active",
+  "statusKey": 11,
+  "createdAt": {
+    "$date": "2024-04-02T03:20:37.552Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T03:33:18.418Z"
+  },
+  "__v": 0,
+  "groupByDueDateIndex": -393216,
+  "groupByPriorityIndex": -1376256,
+  "groupByStatusIndex": 0,
+  "groupByAssigneeIndex": -720896
+},
+{
+  "_id": {
+    "$oid": "660b79853e3690d66930ee3a"
+  },
+  "TaskName": "Task 25",
+  "TaskKey": "DP-26",
+  "AssigneeUserId": [
+    "660a74e6e0e256e20ff902ed"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a74e6e0e256e20ff902ed"
+  ],
+  "DueDate": {
+    "$date": "2024-04-04T03:31:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-04-04T03:31:00.000Z"
+      }
+    },
+    {
+      "date": {
+        "$date": "2024-04-01T03:31:00.000Z"
+      }
+    },
+    {
+      "date": {
+        "$date": "2024-04-04T03:31:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "Under Review",
+    "key": 11,
+    "type": "active"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "HIGH",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "active",
+  "statusKey": 11,
+  "createdAt": {
+    "$date": "2024-04-02T03:20:37.646Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:32:29.595Z"
+  },
+  "__v": 0,
+  "groupByPriorityIndex": -1376256,
+  "groupByStatusIndex": -65536,
+  "groupByAssigneeIndex": -393216,
+  "startDate": {
+    "$date": "2024-04-01T04:32:00.000Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660b79893e3690d66930ee57"
+  },
+  "TaskName": "Task 27",
+  "TaskKey": "DP-27",
+  "AssigneeUserId": [
+    "660a753791a01ea17711db03"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a753791a01ea17711db03"
+  ],
+  "DueDate": {
+    "$date": "2024-04-01T03:31:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-04-01T03:31:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "Blocked",
+    "key": 10,
+    "type": "active"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "MEDIUM",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "active",
+  "statusKey": 10,
+  "createdAt": {
+    "$date": "2024-04-02T03:20:41.016Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:32:06.026Z"
+  },
+  "__v": 0,
+  "groupByDueDateIndex": -393216,
+  "groupByPriorityIndex": -1376256,
+  "groupByStatusIndex": 0,
+  "groupByAssigneeIndex": -458752,
+  "startDate": {
+    "$date": "2024-04-01T04:32:00.000Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660b798a3e3690d66930ee62"
+  },
+  "TaskName": "Task 28",
+  "TaskKey": "DP-28",
+  "AssigneeUserId": [
+    "660a7537377c47af1e61828e"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a7537377c47af1e61828e"
+  ],
+  "DueDate": {
+    "$date": "2024-04-03T03:31:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-04-03T03:31:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "In Progress",
+    "key": 3,
+    "type": "active"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "MEDIUM",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "active",
+  "statusKey": 3,
+  "createdAt": {
+    "$date": "2024-04-02T03:20:42.477Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:30:59.144Z"
+  },
+  "__v": 0,
+  "groupByDueDateIndex": -393216,
+  "groupByPriorityIndex": -1441792,
+  "groupByStatusIndex": 0,
+  "groupByAssigneeIndex": -786432,
+  "startDate": {
+    "$date": "2024-04-01T04:30:00.000Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660b798b3e3690d66930ee6c"
+  },
+  "TaskName": "Task 29",
+  "TaskKey": "DP-29",
+  "AssigneeUserId": [
+    "660a753791a01ea17711db03"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a753791a01ea17711db03"
+  ],
+  "DueDate": {
+    "$date": "2024-04-03T03:31:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-04-03T03:31:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "In Progress",
+    "key": 3,
+    "type": "active"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "HIGH",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "active",
+  "statusKey": 3,
+  "createdAt": {
+    "$date": "2024-04-02T03:20:43.930Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:30:59.549Z"
+  },
+  "__v": 0,
+  "groupByDueDateIndex": 0,
+  "groupByPriorityIndex": -1507328,
+  "groupByStatusIndex": -65536,
+  "groupByAssigneeIndex": -524288,
+  "startDate": {
+    "$date": "2024-04-01T04:30:00.000Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660b798e3e3690d66930ee82"
+  },
+  "TaskName": "Task 30",
+  "TaskKey": "DP-30",
+  "AssigneeUserId": [
+    "660a74e6e0e256e20ff902ed"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a74e6e0e256e20ff902ed"
+  ],
+  "DueDate": {
+    "$date": "2024-04-04T03:31:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-04-04T03:31:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "In Progress",
+    "key": 3,
+    "type": "active"
+  },
+  "isParentTask": true,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "MEDIUM",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "active",
+  "statusKey": 3,
+  "createdAt": {
+    "$date": "2024-04-02T03:20:46.840Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:30:59.669Z"
+  },
+  "__v": 0,
+  "groupByDueDateIndex": 0,
+  "groupByPriorityIndex": -1507328,
+  "groupByStatusIndex": -131072,
+  "groupByAssigneeIndex": -458752,
+  "startDate": {
+    "$date": "2024-04-01T04:30:00.000Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660b7d0e3e3690d66930f19d"
+  },
+  "TaskName": "Sub Task 1.1",
+  "TaskKey": "DP-31",
+  "AssigneeUserId": [
+    "660a753791a01ea17711db03"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a753791a01ea17711db03"
+  ],
+  "DueDate": {
+    "$date": "2024-03-30T03:36:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-03-30T03:36:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "660b793c3e3690d66930ed0c",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "To Do",
+    "key": 1,
+    "type": "default_active"
+  },
+  "isParentTask": false,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "MEDIUM",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "default_active",
+  "statusKey": 1,
+  "createdAt": {
+    "$date": "2024-04-02T03:35:42.944Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:31:10.972Z"
+  },
+  "__v": 0,
+  "groupByDueDateIndex": 0,
+  "groupByPriorityIndex": -1572864,
+  "groupByStatusIndex": -1179648,
+  "groupByAssigneeIndex": -589824
+},
+{
+  "_id": {
+    "$oid": "660b7d133e3690d66930f1aa"
+  },
+  "TaskName": "Sub Task 1.2",
+  "TaskKey": "DP-32",
+  "AssigneeUserId": [
+    "660a753791a01ea17711db03"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a753791a01ea17711db03"
+  ],
+  "DueDate": {
+    "$date": "2024-03-30T03:36:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-03-30T03:36:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "660b793c3e3690d66930ed0c",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "To Do",
+    "key": 1,
+    "type": "default_active"
+  },
+  "isParentTask": false,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "MEDIUM",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "default_active",
+  "statusKey": 1,
+  "createdAt": {
+    "$date": "2024-04-02T03:35:47.673Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:31:19.244Z"
+  },
+  "__v": 0,
+  "groupByDueDateIndex": 0,
+  "groupByPriorityIndex": -1638400,
+  "groupByStatusIndex": -1245184,
+  "groupByAssigneeIndex": -655360
+},
+{
+  "_id": {
+    "$oid": "660b7d3d3e3690d66930f1cb"
+  },
+  "TaskName": "Sub Task 16.1",
+  "TaskKey": "DP-33",
+  "AssigneeUserId": [
+    "660a7537377c47af1e61828e"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a7537377c47af1e61828e"
+  ],
+  "DueDate": {
+    "$date": "2024-04-03T03:37:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-04-03T03:37:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "660b79613e3690d66930edcc",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "To Do",
+    "key": 1,
+    "type": "default_active"
+  },
+  "isParentTask": false,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "MEDIUM",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "default_active",
+  "statusKey": 1,
+  "createdAt": {
+    "$date": "2024-04-02T03:36:29.344Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:31:27.503Z"
+  },
+  "__v": 0,
+  "groupByDueDateIndex": 0,
+  "groupByPriorityIndex": -1703936,
+  "groupByStatusIndex": -1310720,
+  "groupByAssigneeIndex": -851968
+},
+{
+  "_id": {
+    "$oid": "660b7d403e3690d66930f1d6"
+  },
+  "TaskName": "Sub Task 16.2",
+  "TaskKey": "DP-34",
+  "AssigneeUserId": [
+    "660a7537377c47af1e61828e"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a7537377c47af1e61828e"
+  ],
+  "DueDate": {
+    "$date": "2024-04-03T03:37:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-04-03T03:37:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "660b79613e3690d66930edcc",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "To Do",
+    "key": 1,
+    "type": "default_active"
+  },
+  "isParentTask": false,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "MEDIUM",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "default_active",
+  "statusKey": 1,
+  "createdAt": {
+    "$date": "2024-04-02T03:36:32.270Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:31:35.785Z"
+  },
+  "__v": 0,
+  "groupByDueDateIndex": 0,
+  "groupByPriorityIndex": -1769472,
+  "groupByStatusIndex": -1376256,
+  "groupByAssigneeIndex": -917504
+},
+{
+  "_id": {
+    "$oid": "660b7d423e3690d66930f1dc"
+  },
+  "TaskName": "Sub Task 16.3",
+  "TaskKey": "DP-35",
+  "AssigneeUserId": [
+    "660a7537377c47af1e61828e"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a7537377c47af1e61828e"
+  ],
+  "DueDate": {
+    "$date": "2024-04-03T03:37:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-04-03T03:37:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "660b79613e3690d66930edcc",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "To Do",
+    "key": 1,
+    "type": "default_active"
+  },
+  "isParentTask": false,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "MEDIUM",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "default_active",
+  "statusKey": 1,
+  "createdAt": {
+    "$date": "2024-04-02T03:36:34.266Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:31:44.622Z"
+  },
+  "__v": 0,
+  "groupByDueDateIndex": 0,
+  "groupByPriorityIndex": -1835008,
+  "groupByStatusIndex": -1441792,
+  "groupByAssigneeIndex": -983040
+},
+{
+  "_id": {
+    "$oid": "660b7d4b3e3690d66930f1f2"
+  },
+  "TaskName": "Sub Task 20.1",
+  "TaskKey": "DP-36",
+  "AssigneeUserId": [
+    "660a7537377c47af1e61828e"
+  ],
+  "watchers": [
+    "660a74e6e0e256e20ff902ed",
+    "660a7537377c47af1e61828e"
+  ],
+  "DueDate": {
+    "$date": "2024-04-10T03:38:00.000Z"
+  },
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-04-10T03:38:00.000Z"
+      }
+    }
+  ],
+  "TaskType": "task",
+  "TaskTypeKey": 1,
+  "ParentTaskId": "660b796b3e3690d66930ee00",
+  "ProjectID": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "CompanyId": {
+    "$oid": "660a74e817c43b963ea051e7"
+  },
+  "status": {
+    "text": "To Do",
+    "key": 1,
+    "type": "default_active"
+  },
+  "isParentTask": false,
+  "Task_Leader": "660a74e6e0e256e20ff902ed",
+  "sprintArray": {
+    "id": "660a754117c43b963ea05307",
+    "name": "List"
+  },
+  "Task_Priority": "MEDIUM",
+  "deletedStatusKey": 0,
+  "sprintId": {
+    "$oid":"660a754117c43b963ea05307"
+  },
+  "queueListArray": [],
+  "attachments": [],
+  "checklistArray": [],
+  "tagsArray": [],
+  "favouriteTasks": [],
+  "statusType": "default_active",
+  "statusKey": 1,
+  "createdAt": {
+    "$date": "2024-04-02T03:36:43.659Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:31:53.095Z"
+  },
+  "__v": 0,
+  "groupByDueDateIndex": 0,
+  "groupByPriorityIndex": -1900544,
+  "groupByStatusIndex": -1507328,
+  "groupByAssigneeIndex": -1048576
+}]

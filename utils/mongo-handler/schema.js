@@ -1489,10 +1489,6 @@ const schema = {
         EstimatedTime: {
             type: Number,
             required: true
-        },
-        userId: {
-            type: String,
-            required: true
         }
     },
     currency_list: {

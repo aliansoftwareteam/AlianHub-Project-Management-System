@@ -1,0 +1,2241 @@
+[{
+  "_id": {
+    "$oid": "660a74ed17c43b963ea05275"
+  },
+  "dependency": "",
+  "desc": "",
+  "isParent": true,
+  "key": "project",
+  "name": "Project",
+  "parentId": "",
+  "roles": [
+    {
+      "key": 0,
+      "permission": false
+    },
+    {
+      "key": 2,
+      "permission": null
+    },
+    {
+      "key": 3,
+      "permission": true
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.201Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.201Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74ed17c43b963ea05276"
+  },
+  "dependency": "",
+  "desc": "",
+  "isParent": true,
+  "key": "task",
+  "name": "Task",
+  "parentId": "",
+  "roles": [
+    {
+      "key": 0,
+      "permission": false
+    },
+    {
+      "key": 2,
+      "permission": null
+    },
+    {
+      "key": 3,
+      "permission": true
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.201Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.201Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74ed17c43b963ea05277"
+  },
+  "dependency": "",
+  "desc": "",
+  "isParent": true,
+  "key": "settings",
+  "name": "Company Settings",
+  "parentId": "",
+  "roles": [
+    {
+      "key": 0,
+      "permission": false
+    },
+    {
+      "key": 2,
+      "permission": null
+    },
+    {
+      "key": 3,
+      "permission": null
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.201Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.201Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74ed17c43b963ea05278"
+  },
+  "dependency": "",
+  "desc": "",
+  "isParent": true,
+  "key": "sheet_settings",
+  "name": "Sheet Settings",
+  "parentId": "",
+  "roles": [
+    {
+      "key": 0,
+      "permission": false
+    },
+    {
+      "key": 2,
+      "permission": null
+    },
+    {
+      "key": 3,
+      "permission": true
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.201Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.201Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74efaa43a6e3bf2e7576"
+  },
+  "dependency": "project",
+  "desc": "",
+  "isParent": false,
+  "key": "project_list",
+  "name": "Project List",
+  "parentId": "660a74ed17c43b963ea05275",
+  "priorityIndex": 0,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": true,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.201Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.201Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74efaa43a6e3bf2e7581"
+  },
+  "dependency": "project_list",
+  "desc": "",
+  "isParent": false,
+  "key": "project_create",
+  "name": "Project Create",
+  "parentId": "660a74ed17c43b963ea05275",
+  "priorityIndex": 1,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": false,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.201Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.201Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74efaa43a6e3bf2e7594"
+  },
+  "dependency": "project_list",
+  "desc": "",
+  "isParent": false,
+  "key": "project_name_edit",
+  "name": "Project Name Edit",
+  "parentId": "660a74ed17c43b963ea05275",
+  "priorityIndex": 2,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": false,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.201Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.201Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74efaa43a6e3bf2e75b2"
+  },
+  "dependency": "project_list",
+  "desc": "",
+  "isParent": false,
+  "key": "project_sprint_create",
+  "name": "Project Sprint Create",
+  "parentId": "660a74ed17c43b963ea05275",
+  "priorityIndex": 3,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": false,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.201Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.201Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74efaa43a6e3bf2e75c4"
+  },
+  "dependency": "project_list",
+  "desc": "",
+  "isParent": false,
+  "key": "project_folder_create",
+  "name": "Project folder Create",
+  "parentId": "660a74ed17c43b963ea05275",
+  "priorityIndex": 4,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": false,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.202Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.202Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74efaa43a6e3bf2e75e1"
+  },
+  "dependency": "project_list",
+  "desc": "",
+  "isParent": false,
+  "key": "project_folder_name_edit",
+  "name": "Project folder Name Edit",
+  "parentId": "660a74ed17c43b963ea05275",
+  "priorityIndex": 5,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": false,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.202Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.202Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74efaa43a6e3bf2e75f4"
+  },
+  "dependency": "project_list",
+  "desc": "",
+  "isParent": false,
+  "key": "project_sprint_name_edit",
+  "name": "Project sprint Name Edit",
+  "parentId": "660a74ed17c43b963ea05275",
+  "priorityIndex": 6,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": false,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.202Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.202Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74efaa43a6e3bf2e760b"
+  },
+  "dependency": "project_list",
+  "desc": "",
+  "isParent": false,
+  "key": "project_details",
+  "name": "Project Details",
+  "parentId": "660a74ed17c43b963ea05275",
+  "priorityIndex": 7,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": false,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.202Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.202Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74efaa43a6e3bf2e761f"
+  },
+  "dependency": "project_details",
+  "desc": "",
+  "isParent": false,
+  "key": "project_status_change",
+  "name": "Project Status Change",
+  "parentId": "660a74ed17c43b963ea05275",
+  "priorityIndex": 8,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": false,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.202Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.202Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74efaa43a6e3bf2e7634"
+  },
+  "dependency": "project_details",
+  "desc": "",
+  "isParent": false,
+  "key": "project_assignee",
+  "name": "Project Assignee",
+  "parentId": "660a74ed17c43b963ea05275",
+  "priorityIndex": 9,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": false,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.202Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.202Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74efaa43a6e3bf2e7648"
+  },
+  "dependency": "project_details",
+  "desc": "",
+  "isParent": false,
+  "key": "project_category",
+  "name": "Project Category",
+  "parentId": "660a74ed17c43b963ea05275",
+  "priorityIndex": 10,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": false,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.202Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.202Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74efaa43a6e3bf2e7657"
+  },
+  "dependency": "project_details",
+  "desc": "",
+  "isParent": false,
+  "key": "project_source",
+  "name": "Proejct Source",
+  "parentId": "660a74ed17c43b963ea05275",
+  "priorityIndex": 11,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": false,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.202Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.202Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74efaa43a6e3bf2e7671"
+  },
+  "dependency": "project_details",
+  "desc": "",
+  "isParent": false,
+  "key": "project_type",
+  "name": "Project Type",
+  "parentId": "660a74ed17c43b963ea05275",
+  "priorityIndex": 12,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": false,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.202Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.202Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74efaa43a6e3bf2e7682"
+  },
+  "dependency": "project_details",
+  "desc": "",
+  "isParent": false,
+  "key": "project_currency",
+  "name": "Project Currency",
+  "parentId": "660a74ed17c43b963ea05275",
+  "priorityIndex": 13,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": false,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.202Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.202Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74efaa43a6e3bf2e768e"
+  },
+  "dependency": "project_details",
+  "desc": "",
+  "isParent": false,
+  "key": "project_amount",
+  "name": "Project Amount",
+  "parentId": "660a74ed17c43b963ea05275",
+  "priorityIndex": 14,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": false,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.202Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.202Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74efaa43a6e3bf2e76a1"
+  },
+  "dependency": "project_details",
+  "desc": "",
+  "isParent": false,
+  "key": "project_start_date",
+  "name": "Project Start Date",
+  "parentId": "660a74ed17c43b963ea05275",
+  "priorityIndex": 15,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": false,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.203Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.203Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74efaa43a6e3bf2e76bb"
+  },
+  "dependency": "project_details",
+  "desc": "",
+  "isParent": false,
+  "key": "project_end_date",
+  "name": "Project End Date",
+  "parentId": "660a74ed17c43b963ea05275",
+  "priorityIndex": 16,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": false,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.203Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.203Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74efaa43a6e3bf2e76c7"
+  },
+  "dependency": "project_details",
+  "desc": "",
+  "isParent": false,
+  "key": "project_due_date",
+  "name": "Project Due Date",
+  "parentId": "660a74ed17c43b963ea05275",
+  "priorityIndex": 17,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": false,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.203Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.203Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74efaa43a6e3bf2e76db"
+  },
+  "dependency": "project_details",
+  "desc": "",
+  "isParent": false,
+  "key": "project_close",
+  "name": "Project Close",
+  "parentId": "660a74ed17c43b963ea05275",
+  "priorityIndex": 18,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": false,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.203Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.203Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74efaa43a6e3bf2e7700"
+  },
+  "dependency": "project_details",
+  "desc": "",
+  "isParent": false,
+  "key": "project_description",
+  "name": "Project Description",
+  "parentId": "660a74ed17c43b963ea05275",
+  "priorityIndex": 19,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": false,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.203Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.203Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74efaa43a6e3bf2e7716"
+  },
+  "dependency": "project_details",
+  "desc": "",
+  "isParent": false,
+  "key": "project_checklist",
+  "name": "Project Checklist",
+  "parentId": "660a74ed17c43b963ea05275",
+  "priorityIndex": 20,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": false,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.203Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.203Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74efaa43a6e3bf2e772b"
+  },
+  "dependency": "project_details",
+  "desc": "",
+  "isParent": false,
+  "key": "project_checklist_assign_remove",
+  "name": "Project Checklist Assign/remove",
+  "parentId": "660a74ed17c43b963ea05275",
+  "priorityIndex": 21,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": false,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.203Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.203Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74efaa43a6e3bf2e774e"
+  },
+  "dependency": "project_details",
+  "desc": "",
+  "isParent": false,
+  "key": "project_attachments",
+  "name": "Project Attachments",
+  "parentId": "660a74ed17c43b963ea05275",
+  "priorityIndex": 22,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": false,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.203Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.203Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74efaa43a6e3bf2e7767"
+  },
+  "dependency": "project_details",
+  "desc": "",
+  "isParent": false,
+  "key": "project_milestone",
+  "name": "Project Milestone",
+  "parentId": "660a74ed17c43b963ea05275",
+  "priorityIndex": 23,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": false,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.203Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.203Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74efaa43a6e3bf2e7777"
+  },
+  "dependency": "task",
+  "desc": "",
+  "isParent": false,
+  "key": "task_list",
+  "name": "Task list",
+  "parentId": "660a74ed17c43b963ea05276",
+  "priorityIndex": 0,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": true,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74efaa43a6e3bf2e778d"
+  },
+  "dependency": "task_list",
+  "desc": "",
+  "isParent": false,
+  "key": "task_create",
+  "name": "Task Create",
+  "parentId": "660a74ed17c43b963ea05276",
+  "priorityIndex": 1,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": true,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74efaa43a6e3bf2e77aa"
+  },
+  "dependency": "task_list",
+  "desc": "",
+  "isParent": false,
+  "key": "sub_task_create",
+  "name": "Sub Task Create",
+  "parentId": "660a74ed17c43b963ea05276",
+  "priorityIndex": 2,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": true,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e77be"
+  },
+  "dependency": "task_list",
+  "desc": "",
+  "isParent": false,
+  "key": "task_name_edit",
+  "name": "Task Name Edit",
+  "parentId": "660a74ed17c43b963ea05276",
+  "priorityIndex": 3,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": true,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e77d1"
+  },
+  "dependency": "task_list",
+  "desc": "",
+  "isParent": false,
+  "key": "task_status",
+  "name": "Task Status",
+  "parentId": "660a74ed17c43b963ea05276",
+  "priorityIndex": 4,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": true,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e77df"
+  },
+  "dependency": "task_list",
+  "desc": "",
+  "isParent": false,
+  "key": "task_assignee",
+  "name": "Task Assignee",
+  "parentId": "660a74ed17c43b963ea05276",
+  "priorityIndex": 5,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": true,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e77fa"
+  },
+  "dependency": "task_list",
+  "desc": "",
+  "isParent": false,
+  "key": "task_priority",
+  "name": "Task Priority",
+  "parentId": "660a74ed17c43b963ea05276",
+  "priorityIndex": 6,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": true,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e7806"
+  },
+  "dependency": "task_list",
+  "desc": "",
+  "isParent": false,
+  "key": "task_due_date",
+  "name": "Task Due Date",
+  "parentId": "660a74ed17c43b963ea05276",
+  "priorityIndex": 7,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": true,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e7824"
+  },
+  "dependency": "task_list",
+  "desc": "",
+  "isParent": false,
+  "key": "task_estimated_hours",
+  "name": "Task Estimated Hours",
+  "parentId": "660a74ed17c43b963ea05276",
+  "priorityIndex": 8,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": null,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e7837"
+  },
+  "dependency": "task_list",
+  "desc": "",
+  "isParent": false,
+  "key": "task_description",
+  "name": "Task Description",
+  "parentId": "660a74ed17c43b963ea05276",
+  "priorityIndex": 9,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": true,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e7843"
+  },
+  "dependency": "task_list",
+  "desc": "",
+  "isParent": false,
+  "key": "task_checklist",
+  "name": "Task Checklist",
+  "parentId": "660a74ed17c43b963ea05276",
+  "priorityIndex": 10,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": true,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e785e"
+  },
+  "dependency": "task_list",
+  "desc": "",
+  "isParent": false,
+  "key": "task_checklist_assign_remove",
+  "name": "Task Checklist Assign/remove",
+  "parentId": "660a74ed17c43b963ea05276",
+  "priorityIndex": 11,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": true,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e7872"
+  },
+  "dependency": "task_list",
+  "desc": "",
+  "isParent": false,
+  "key": "task_attachments",
+  "name": "Task Attachments",
+  "parentId": "660a74ed17c43b963ea05276",
+  "priorityIndex": 12,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": true,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e78a8"
+  },
+  "dependency": "task",
+  "desc": "",
+  "isParent": false,
+  "key": "show_tasks",
+  "name": "Show Tasks",
+  "parentId": "660a74ed17c43b963ea05276",
+  "priorityIndex": 13,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": null,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.204Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e78c4"
+  },
+  "dependency": "task_list",
+  "desc": "",
+  "isParent": false,
+  "key": "task_custom_field",
+  "name": "Custom Field",
+  "parentId": "660a74ed17c43b963ea05276",
+  "priorityIndex": 14,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": true,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.205Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.205Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e78f5"
+  },
+  "dependency": "settings",
+  "desc": "",
+  "isParent": false,
+  "key": "settings_task_priority",
+  "name": "Task Priority",
+  "parentId": "660a74ed17c43b963ea05277",
+  "priorityIndex": 1,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": null,
+      "disabled": true
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.205Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.205Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e78f7"
+  },
+  "dependency": "settings",
+  "desc": "",
+  "isParent": false,
+  "key": "settings_edit_company",
+  "name": "Edit Company",
+  "parentId": "660a74ed17c43b963ea05277",
+  "priorityIndex": 0,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": null,
+      "disabled": true
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.205Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.205Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e790f"
+  },
+  "dependency": "settings",
+  "desc": "",
+  "isParent": false,
+  "key": "settings_file_extensions",
+  "name": "File Extensions",
+  "parentId": "660a74ed17c43b963ea05277",
+  "priorityIndex": 2,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": null,
+      "disabled": true
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.205Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.205Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e7933"
+  },
+  "dependency": "settings",
+  "desc": "",
+  "isParent": false,
+  "key": "settings_project_milestone_status",
+  "name": "Project Milestone Status",
+  "parentId": "660a74ed17c43b963ea05277",
+  "priorityIndex": 3,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": null,
+      "disabled": true
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.205Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.205Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e7948"
+  },
+  "dependency": "settings",
+  "desc": "",
+  "isParent": false,
+  "key": "settings_invite_member",
+  "name": "Invite Member",
+  "parentId": "660a74ed17c43b963ea05277",
+  "priorityIndex": 4,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": null,
+      "disabled": true
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.205Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.205Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e7957"
+  },
+  "dependency": "settings",
+  "desc": "",
+  "isParent": false,
+  "key": "settings_member_list",
+  "name": "Member list",
+  "parentId": "660a74ed17c43b963ea05277",
+  "priorityIndex": 5,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": null,
+      "disabled": true
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.205Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.205Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e7971"
+  },
+  "dependency": "settings",
+  "desc": "",
+  "isParent": false,
+  "key": "settings_create_team",
+  "name": "Create Team",
+  "parentId": "660a74ed17c43b963ea05277",
+  "priorityIndex": 6,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": null,
+      "disabled": true
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.205Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.205Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e797d"
+  },
+  "dependency": "settings",
+  "desc": "",
+  "isParent": false,
+  "key": "settings_team_list",
+  "name": "Team List",
+  "parentId": "660a74ed17c43b963ea05277",
+  "priorityIndex": 7,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": null,
+      "disabled": true
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.205Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.205Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e7998"
+  },
+  "dependency": "settings",
+  "desc": "",
+  "isParent": false,
+  "key": "settings_project_list",
+  "name": "Project List",
+  "parentId": "660a74ed17c43b963ea05277",
+  "priorityIndex": 8,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": null,
+      "disabled": true
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.205Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.205Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e79ac"
+  },
+  "dependency": "settings",
+  "desc": "",
+  "isParent": false,
+  "key": "settings_security_permissions",
+  "name": "Security & Permissions",
+  "parentId": "660a74ed17c43b963ea05277",
+  "priorityIndex": 9,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": null,
+      "disabled": true
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.205Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.205Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e79c0"
+  },
+  "dependency": "settings",
+  "desc": "",
+  "isParent": false,
+  "key": "settings_role_management",
+  "name": "Role Management",
+  "parentId": "660a74ed17c43b963ea05277",
+  "priorityIndex": 10,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": null,
+      "disabled": true
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.205Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.205Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e79d3"
+  },
+  "dependency": "settings",
+  "desc": "",
+  "isParent": false,
+  "key": "settings_designation",
+  "name": "Designation",
+  "parentId": "660a74ed17c43b963ea05277",
+  "priorityIndex": 11,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": null,
+      "disabled": true
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.206Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.206Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e79e4"
+  },
+  "dependency": "settings",
+  "desc": "",
+  "isParent": false,
+  "key": "milestone_weekly_range",
+  "name": "Milestone Weekly Range",
+  "parentId": "660a74ed17c43b963ea05277",
+  "priorityIndex": 12,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": null,
+      "disabled": true
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.206Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.206Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e79fb"
+  },
+  "dependency": "settings",
+  "desc": "",
+  "isParent": false,
+  "key": "settings_custom_field",
+  "name": "Custom Field",
+  "parentId": "660a74ed17c43b963ea05277",
+  "priorityIndex": 13,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": null,
+      "disabled": true
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.206Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.206Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e7a10"
+  },
+  "dependency": "sheet_settings",
+  "desc": "",
+  "isParent": false,
+  "key": "user_timesheet",
+  "name": "User Timesheet",
+  "parentId": "660a74ed17c43b963ea05278",
+  "priorityIndex": 0,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": 1,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.206Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.206Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e7a24"
+  },
+  "dependency": "sheet_settings",
+  "desc": "",
+  "isParent": false,
+  "key": "project_timesheet",
+  "name": "Project Timesheet",
+  "parentId": "660a74ed17c43b963ea05278",
+  "priorityIndex": 1,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": 1,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.206Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.206Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e7a3a"
+  },
+  "dependency": "sheet_settings",
+  "desc": "",
+  "isParent": false,
+  "key": "workload_timesheet",
+  "name": "Workload Timesheet",
+  "parentId": "660a74ed17c43b963ea05278",
+  "priorityIndex": 2,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": 1,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.206Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.206Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e7a48"
+  },
+  "dependency": "sheet_settings",
+  "desc": "",
+  "isParent": false,
+  "key": "milestone_report",
+  "name": "Milestone Report",
+  "parentId": "660a74ed17c43b963ea05278",
+  "priorityIndex": 3,
+  "roles": [
+    {
+      "key": 0,
+      "permission": false,
+      "disabled": false
+    },
+    {
+      "key": 2,
+      "permission": null,
+      "disabled": true
+    },
+    {
+      "key": 3,
+      "permission": null,
+      "disabled": false
+    }
+  ],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.206Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.206Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74f0aa43a6e3bf2e7a64"
+  },
+  "dependency": "",
+  "desc": "",
+  "isParent": true,
+  "key": "toggle",
+  "name": "Toggle",
+  "parentId": "",
+  "roles": [],
+  "allowAdminForPrivateSpace": true,
+  "showAllTasks": true,
+  "showAllProjects": true,
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:23.206Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:23.206Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "66baa24ccb1c5396c7a38062"
+  },
+  "dependency": "",
+  "desc": "",
+  "isParent": true,
+  "key": "artificial_intelligence",
+  "name": "Artificial Intelligence",
+  "parentId": "",
+  "roles": [],
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-08-13T00:01:16.816Z"
+  },
+  "updatedAt": {
+    "$date": "2024-08-13T00:01:16.816Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "66baa28735cf80461f83577e"
+  },
+  "key": "per_user_generate_limit",
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-08-13T00:01:20.650Z"
+  },
+  "dependency": "artificial_intelligence",
+  "desc": "",
+  "isParent": false,
+  "name": "Per User Token Limit",
+  "parentId": "66baa24ccb1c5396c7a38062",
+  "priorityIndex": 0,
+  "roles": [],
+  "updatedAt": {
+    "$date": "2024-08-13T00:01:20.650Z"
+  }
+}]

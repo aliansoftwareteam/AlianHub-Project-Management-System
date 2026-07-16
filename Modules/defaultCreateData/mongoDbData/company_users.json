@@ -1,0 +1,66 @@
+[{
+  "_id": {
+    "$oid": "660a74f3aa43a6e3bf2e7cff"
+  },
+  "userId": "660a74e6e0e256e20ff902ed",
+  "__v": 0,
+  "companyId": "660a74e817c43b963ea051e7",
+  "createdAt": {
+    "$date": "2024-04-01T08:48:50.939Z"
+  },
+  "designation": 0,
+  "isDelete": false,
+  "isRestrict": false,
+  "linkId": "",
+  "roleType": 1,
+  "status": 2,
+  "updatedAt": {
+    "$date": "2024-04-01T08:48:50.939Z"
+  },
+  "userEmail": "owner@example.com",
+  "isTrackerUser": true
+},
+{
+  "_id": {
+    "$oid": "660a753717c43b963ea052f6"
+  },
+  "companyId": "660a74e817c43b963ea051e7",
+  "designation": 1,
+  "isDelete": false,
+  "linkId": "",
+  "roleType": 2,
+  "status": 2,
+  "userEmail": "admin@example.com",
+  "userId": "660a7537377c47af1e61828e",
+  "isRestrict": false,
+  "createdAt": {
+    "$date": "2024-04-01T08:49:59.232Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T08:49:59.232Z"
+  },
+  "__v": 0,
+  "isTrackerUser": true
+},
+{
+  "_id": {
+    "$oid": "660a753b17c43b963ea052fa"
+  },
+  "companyId": "660a74e817c43b963ea051e7",
+  "designation": 2,
+  "isDelete": false,
+  "linkId": "",
+  "roleType": 3,
+  "status": 2,
+  "userEmail": "member@example.com",
+  "userId": "660a753791a01ea17711db03",
+  "isRestrict": false,
+  "createdAt": {
+    "$date": "2024-04-01T08:50:03.952Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T08:50:03.952Z"
+  },
+  "isTrackerUser": true,
+  "__v": 0
+}]

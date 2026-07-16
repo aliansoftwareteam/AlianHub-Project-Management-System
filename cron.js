@@ -11,6 +11,7 @@ const reminders = require("./Modules/Reminders/controller");
 const timeReminders = require("./Modules/TimeSheet/controller/timeReminders");
 const auditRecorder = require("./Modules/Audit/recorder");
 const scheduledReports = require("./Modules/ScheduledReports/controller");
+const defaultCreateRef = require("./Modules/defaultCreateData/controller");
 
 // BUG-035 / #89 — pin every cron to a known timezone so schedules don't
 // shift when the server's local tz changes (DST transition, container
@@ -122,6 +123,21 @@ schedule.scheduleJob({ rule: '0 2 * * *', tz: CRON_TZ }, async () => {
         await auditRecorder.runAuditRetentionForAllCompanies();
     } catch (err) {
         logger.error(`[Cron] audit retention failed: ${err && err.message ? err.message : err}`);
+    }
+})
+
+// Demo DB reset — daily at 01:00, only when DEMO_MODE=true. Purges non-demo
+// users from `global`, then delete+reseeds the 18 tracked collections on the
+// fixed demo companyId ("660a74e817c43b963ea051e7") from Modules/defaultCreateData/mongoDbData/*.json,
+// with timestamps shifted so tasks/timesheets look "current". The guard checks
+// env at fire time so DEMO_MODE can be flipped without restarting the process.
+schedule.scheduleJob({ rule: '0 1 * * *', tz: CRON_TZ }, async () => {
+    if (process.env.DEMO_MODE !== 'true') return;
+    logger.info(`[Cron] defaultCreateData.addDefaultdata (DEMO_MODE)`);
+    try {
+        defaultCreateRef.addDefaultdata();
+    } catch (err) {
+        logger.error(`[Cron] demo reset failed: ${err && err.message ? err.message : err}`);
     }
 })
 

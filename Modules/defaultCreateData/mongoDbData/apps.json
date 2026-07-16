@@ -1,0 +1,162 @@
+[{
+  "_id": {
+    "$oid": "660a74ef17c43b963ea05292"
+  },
+  "afterIcon": "setting-icons/apps/flagblue.png",
+  "appStatus": true,
+  "beforeIcon": "setting-icons/apps/flaggrey.png",
+  "key": "Priority",
+  "name": "Priority",
+  "sortIndex": 1,
+  "createdAt": {
+    "$date": "2024-04-01T08:48:47.153Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T08:48:47.153Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660a74ef17c43b963ea05294"
+  },
+  "afterIcon": "setting-icons/apps/mutipleblue.png",
+  "appStatus": true,
+  "beforeIcon": "setting-icons/apps/mutiplegrey.png",
+  "key": "MultipleAssignees",
+  "name": "Multiple Assignees",
+  "sortIndex": 2,
+  "createdAt": {
+    "$date": "2024-04-01T08:48:47.154Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T08:48:47.154Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660a74ef17c43b963ea05296"
+  },
+  "afterIcon": "setting-icons/apps/timeBlue.png",
+  "appStatus": true,
+  "beforeIcon": "setting-icons/apps/timegrey.png",
+  "key": "TimeEstimates",
+  "name": "Time Estimate",
+  "sortIndex": 3,
+  "createdAt": {
+    "$date": "2024-04-01T08:48:47.155Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T08:48:47.155Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660a74ef17c43b963ea05298"
+  },
+  "afterIcon": "setting-icons/apps/checkflagblue.png",
+  "appStatus": true,
+  "beforeIcon": "setting-icons/apps/checkflaggrey.png",
+  "key": "Milestones",
+  "name": "Milestones",
+  "sortIndex": 4,
+  "createdAt": {
+    "$date": "2024-04-01T08:48:47.156Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T08:48:47.156Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660a74ef17c43b963ea0529a"
+  },
+  "afterIcon": "setting-icons/apps/tagsblue.png",
+  "appStatus": false,
+  "beforeIcon": "setting-icons/apps/tagsgrey.png",
+  "key": "tags",
+  "name": "Tags",
+  "sortIndex": 5,
+  "createdAt": {
+    "$date": "2024-04-01T08:48:47.157Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T08:48:47.157Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660a74ef17c43b963ea0529c"
+  },
+  "afterIcon": "setting-icons/apps/editblue.png",
+  "appStatus": false,
+  "beforeIcon": "setting-icons/apps/editgrey.png",
+  "key": "CustomFields",
+  "name": "Custom Fields",
+  "sortIndex": 6,
+  "createdAt": {
+    "$date": "2024-04-01T08:48:47.158Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T08:48:47.158Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660a74ef17c43b963ea0529e"
+  },
+  "afterIcon": "setting-icons/apps/timevalueblue.png",
+  "appStatus": false,
+  "beforeIcon": "setting-icons/apps/timetracking.png",
+  "key": "TimeTracking",
+  "name": "Time Tracking",
+  "sortIndex": 7,
+  "createdAt": {
+    "$date": "2024-04-01T08:48:47.159Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T08:48:47.159Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "660a74ef17c43b963ea052a0"
+  },
+  "afterIcon": "setting-icons/apps/checkBlue.png",
+  "appStatus": false,
+  "beforeIcon": "setting-icons/apps/checkgrey.png",
+  "key": "IncompleteWarning",
+  "name": "Incomplete Warning",
+  "sortIndex": 8,
+  "createdAt": {
+    "$date": "2024-04-01T08:48:47.161Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T08:48:47.161Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "66baa24fcb1c5396c7a3808a"
+  },
+  "afterIcon": "setting-icons/apps/aiBlue.png",
+  "appStatus": false,
+  "beforeIcon": "setting-icons/apps/aiGrey.png",
+  "key": "AI",
+  "name": "AI",
+  "sortIndex": 9,
+  "createdAt": {
+    "$date": "2024-08-13T00:01:19.651Z"
+  },
+  "updatedAt": {
+    "$date": "2024-08-13T00:01:19.651Z"
+  },
+  "__v": 0
+}]

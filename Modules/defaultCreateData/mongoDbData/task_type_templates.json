@@ -1,0 +1,165 @@
+[{
+  "_id": {
+    "$oid": "660a74ef17c43b963ea052a8"
+  },
+  "TemplateName": "Development",
+  "taskTypes": [
+    {
+      "assignAsSubtask": false,
+      "assignAsTask": false,
+      "default": true,
+      "isAddNewStatus": false,
+      "isDeleted": false,
+      "isEditable": false,
+      "key": 1,
+      "name": "Task",
+      "taskCount": 0,
+      "value": "task",
+      "taskImage": "setting/task_type/task.png"
+    },
+    {
+      "assignAsSubtask": false,
+      "assignAsTask": false,
+      "default": false,
+      "isAddNewStatus": false,
+      "isDeleted": false,
+      "isEditable": false,
+      "key": 3,
+      "name": "Sub Task",
+      "taskCount": 0,
+      "value": "sub_task",
+      "taskImage": "setting/task_type/subtask.png"
+    },
+    {
+      "assignAsSubtask": false,
+      "assignAsTask": false,
+      "default": false,
+      "isAddNewStatus": false,
+      "isDeleted": false,
+      "isEditable": false,
+      "key": 2,
+      "name": "Bug",
+      "taskCount": 0,
+      "value": "bug",
+      "taskImage": "setting/task_type/bug.png"
+    }
+  ],
+  "default": true,
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:31.526Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:31.526Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74ef17c43b963ea052aa"
+  },
+  "TemplateName": "Design",
+  "taskTypes": [
+    {
+      "assignAsSubtask": false,
+      "assignAsTask": false,
+      "default": true,
+      "isAddNewStatus": false,
+      "isDeleted": false,
+      "isEditable": false,
+      "key": 1,
+      "name": "Task",
+      "taskCount": 0,
+      "value": "task",
+      "taskImage": "setting/task_type/task.png"
+    },
+    {
+      "assignAsSubtask": false,
+      "assignAsTask": false,
+      "default": false,
+      "isAddNewStatus": false,
+      "isDeleted": false,
+      "isEditable": false,
+      "key": 3,
+      "name": "Sub Task",
+      "taskCount": 0,
+      "value": "sub_task",
+      "taskImage": "setting/task_type/subtask.png"
+    },
+    {
+      "assignAsSubtask": false,
+      "assignAsTask": false,
+      "default": false,
+      "isAddNewStatus": false,
+      "isDeleted": false,
+      "isEditable": false,
+      "key": 2,
+      "name": "Bug",
+      "taskCount": 0,
+      "value": "bug",
+      "taskImage": "setting/task_type/bug.png"
+    }
+  ],
+  "default": true,
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:31.526Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:31.526Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74ef17c43b963ea052ac"
+  },
+  "TemplateName": "UI/UX",
+  "taskTypes": [
+    {
+      "assignAsSubtask": false,
+      "assignAsTask": false,
+      "default": true,
+      "isAddNewStatus": false,
+      "isDeleted": false,
+      "isEditable": false,
+      "key": 1,
+      "name": "Task",
+      "taskCount": 0,
+      "value": "task",
+      "taskImage": "setting/task_type/task.png"
+    },
+    {
+      "assignAsSubtask": false,
+      "assignAsTask": false,
+      "default": false,
+      "isAddNewStatus": false,
+      "isDeleted": false,
+      "isEditable": false,
+      "key": 3,
+      "name": "Sub Task",
+      "taskCount": 0,
+      "value": "sub_task",
+      "taskImage": "setting/task_type/subtask.png"
+    },
+    {
+      "assignAsSubtask": false,
+      "assignAsTask": false,
+      "default": false,
+      "isAddNewStatus": false,
+      "isDeleted": false,
+      "isEditable": false,
+      "key": 4,
+      "name": "Design",
+      "taskCount": 0,
+      "value": "design",
+      "taskImage": "setting/task_type/design.png"
+    }
+  ],
+  "default": true,
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:31.527Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:31.527Z"
+  }
+}]

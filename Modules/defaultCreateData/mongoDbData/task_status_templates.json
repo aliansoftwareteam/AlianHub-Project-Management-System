@@ -1,0 +1,232 @@
+[{
+  "_id": {
+    "$oid": "660a74ef17c43b963ea052a2"
+  },
+  "ActiveStatusList": [
+    {
+      "bgColor": "#6473e835",
+      "isAddNewStatus": false,
+      "isEditable": false,
+      "key": 3,
+      "type": "active",
+      "name": "In Progress",
+      "textColor": "#6473e8",
+      "value": "in_progress"
+    },
+    {
+      "bgColor": "#9759c035",
+      "isAddNewStatus": false,
+      "isEditable": false,
+      "key": 4,
+      "type": "active",
+      "name": "In Review",
+      "textColor": "#9759c0",
+      "value": "in_review"
+    },
+    {
+      "bgColor": "#ec414135",
+      "isAddNewStatus": false,
+      "isEditable": false,
+      "key": 5,
+      "type": "active",
+      "name": "Backlog",
+      "textColor": "#ec4141",
+      "value": "backlog"
+    },
+    {
+      "bgColor": "#24c11035",
+      "isAddNewStatus": false,
+      "isEditable": false,
+      "key": 6,
+      "type": "active",
+      "name": "Done",
+      "textColor": "#24c110",
+      "value": "done"
+    }
+  ],
+  "DoneStatusList": [],
+  "TemplateName": "Development",
+  "defaultActive": {
+    "bgColor": "#ff960035",
+    "isEditable": false,
+    "key": 1,
+    "name": "To Do",
+    "textColor": "#ff9600",
+    "value": "to_do",
+    "type": "default_active"
+  },
+  "defaultComplete": {
+    "bgColor": "#6BC95035",
+    "isEditable": false,
+    "key": 2,
+    "name": "Complete",
+    "textColor": "#6BC950",
+    "value": "complete",
+    "type": "close"
+  },
+  "default": true,
+  "taskActiveStatus": [
+    1,
+    3,
+    4,
+    5,
+    6
+  ],
+  "taskcloseStatus": 2,
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:29.448Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:29.448Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74ef17c43b963ea052a4"
+  },
+  "ActiveStatusList": [
+    {
+      "bgColor": "#6473e835",
+      "isAddNewStatus": false,
+      "isEditable": false,
+      "key": 3,
+      "type": "active",
+      "name": "In Progress",
+      "textColor": "#6473e8",
+      "value": "in_progress"
+    },
+    {
+      "bgColor": "#9759c035",
+      "isAddNewStatus": false,
+      "isEditable": false,
+      "key": 4,
+      "type": "active",
+      "name": "In Review",
+      "textColor": "#9759c0",
+      "value": "in_review"
+    },
+    {
+      "bgColor": "#ec414135",
+      "isAddNewStatus": false,
+      "isEditable": false,
+      "key": 5,
+      "type": "active",
+      "name": "Backlog",
+      "textColor": "#ec4141",
+      "value": "backlog"
+    },
+    {
+      "bgColor": "#24c11035",
+      "isAddNewStatus": false,
+      "isEditable": false,
+      "key": 6,
+      "type": "active",
+      "name": "Done",
+      "textColor": "#24c110",
+      "value": "done"
+    }
+  ],
+  "DoneStatusList": [],
+  "TemplateName": "UI/UX",
+  "defaultActive": {
+    "bgColor": "#ff960035",
+    "isEditable": false,
+    "key": 1,
+    "name": "To Do",
+    "textColor": "#ff9600",
+    "value": "to_do",
+    "type": "default_active"
+  },
+  "defaultComplete": {
+    "bgColor": "#6BC95035",
+    "isEditable": false,
+    "key": 2,
+    "name": "Complete",
+    "textColor": "#6BC950",
+    "value": "complete",
+    "type": "close"
+  },
+  "default": true,
+  "taskActiveStatus": [
+    1,
+    3,
+    4,
+    5,
+    6
+  ],
+  "taskcloseStatus": 2,
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:29.449Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:29.449Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a74ef17c43b963ea052a6"
+  },
+  "ActiveStatusList": [
+    {
+      "bgColor": "#6473e835",
+      "isAddNewStatus": false,
+      "isEditable": false,
+      "key": 3,
+      "type": "active",
+      "name": "In Progress",
+      "textColor": "#6473e8",
+      "value": "in_progress"
+    },
+    {
+      "bgColor": "#9759c035",
+      "isAddNewStatus": false,
+      "isEditable": false,
+      "key": 4,
+      "type": "active",
+      "name": "In Review",
+      "textColor": "#9759c0",
+      "value": "in_review"
+    }
+  ],
+  "DoneStatusList": [],
+  "TemplateName": "Marketing",
+  "defaultActive": {
+    "bgColor": "#ff960035",
+    "isEditable": false,
+    "key": 1,
+    "name": "To Do",
+    "textColor": "#ff9600",
+    "value": "to_do",
+    "type": "default_active"
+  },
+  "defaultComplete": {
+    "bgColor": "#6BC95035",
+    "isEditable": false,
+    "key": 2,
+    "name": "Complete",
+    "textColor": "#6BC950",
+    "value": "complete",
+    "type": "close"
+  },
+  "default": true,
+  "taskActiveStatus": [
+    1,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "taskcloseStatus": 2,
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:29.449Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T13:14:29.449Z"
+  }
+}]

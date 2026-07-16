@@ -1,0 +1,754 @@
+[{
+  "_id": {
+    "$oid": "660a74f3aa43a6e3bf2e7cfb"
+  },
+  "userId": "660a74e6e0e256e20ff902ed",
+  "__v": 0,
+  "before": {
+    "key": "before",
+    "sectionName": "Before",
+    "items": [
+      {
+        "name": "Project Due Date",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "before_project_due_date",
+        "notifySelection": true,
+        "durationSelection": true,
+        "duration": "5_m",
+        "notifyFor": "assigned_to_me"
+      },
+      {
+        "name": "Project End Date",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "before_project_end_date",
+        "notifySelection": true,
+        "durationSelection": true,
+        "duration": "5_m",
+        "notifyFor": "assigned_to_me"
+      },
+      {
+        "name": "Task Due Date",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "before_task_due_date",
+        "notifySelection": true,
+        "durationSelection": true,
+        "duration": "5_m",
+        "notifyFor": "assigned_to_me"
+      },
+      {
+        "name": "Task End Date",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "before_task_end_date",
+        "notifySelection": true,
+        "durationSelection": true,
+        "duration": "5_m",
+        "notifyFor": "assigned_to_me"
+      }
+    ]
+  },
+  "chat": {
+    "key": "chat",
+    "sectionName": "Chat",
+    "items": [
+      {
+        "name": "Message Create",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "message_create"
+      }
+    ]
+  },
+  "createdAt": {
+    "$date": "2024-04-01T08:48:50.937Z"
+  },
+  "project": {
+    "key": "project",
+    "sectionName": "Project",
+    "items": [
+      {
+        "name": "Project Create",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_create"
+      },
+      {
+        "name": "Project Name",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_name"
+      },
+      {
+        "name": "Project Status Change",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_status_change"
+      },
+      {
+        "name": "Project Assignee",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_assignee"
+      },
+      {
+        "name": "Project Lead",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_lead"
+      },
+      {
+        "name": "Project Category",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_category"
+      },
+      {
+        "name": "Project Source",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_source"
+      },
+      {
+        "name": "Project Type",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_type"
+      },
+      {
+        "name": "Project Currency",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_currency"
+      },
+      {
+        "name": "Project Amount",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_amount"
+      },
+      {
+        "name": "Project Start Date",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_start_date"
+      },
+      {
+        "name": "Project End Date",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_end_date"
+      },
+      {
+        "name": "Project Due Date",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_due_date"
+      },
+      {
+        "name": "Project Close",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_close"
+      },
+      {
+        "name": "Project Description",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_description"
+      },
+      {
+        "name": "Project Checklist",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_checklist"
+      },
+      {
+        "name": "Project Checklist Assign",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_checklist_assign"
+      },
+      {
+        "name": "Project Checklist Remove",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_checklist_remove"
+      },
+      {
+        "name": "Project Attachments",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_attachments"
+      },
+      {
+        "name": "Project Milestone",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_milestone"
+      },
+      {
+        "name": "Project Milestone Status Change",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_milestone_status_change"
+      },
+      {
+        "name": "Project Sprint Create",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_sprint_create"
+      },
+      {
+        "name": "Project Folder Create",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_folder_create"
+      },
+      {
+        "name": "Comments I'm @mentioned In",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "comments_i'm_@mentioned_in"
+      }
+    ]
+  },
+  "tasks": {
+    "key": "tasks",
+    "sectionName": "Tasks",
+    "items": [
+      {
+        "name": "Task Notification",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "notifyFor": "assigned_to_me",
+        "notifySelection": true,
+        "key": "task_notification"
+      },
+      {
+        "name": "Task Create",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "task_create"
+      },
+      {
+        "name": "Task Edit",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "task_edit"
+      },
+      {
+        "name": "Task Status",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "task_status"
+      },
+      {
+        "name": "Task Assignee",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "task_assignee"
+      },
+      {
+        "name": "Task Priority",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "task_priority"
+      },
+      {
+        "name": "Task Type",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "task_type"
+      },
+      {
+        "name": "Task Due Date",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "task_due_date"
+      },
+      {
+        "name": "Task Description",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "task_description"
+      },
+      {
+        "name": "Task Checklist",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "task_checklist"
+      },
+      {
+        "name": "Task Checklist Assign",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "task_checklist_assign"
+      },
+      {
+        "name": "Task Checklist Remove",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "task_checklist_remove"
+      },
+      {
+        "name": "Task Attachments",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "task_attachments"
+      },
+      {
+        "name": "Comments I'm @mentioned In",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "comments_I'm_@mentioned_in"
+      },
+      {
+        "name": "Logged Hours Notification",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "logged_hours_notification"
+      },
+      {
+        "name": "After 3 hours Today Pending Hours Log Notification",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "after_3_hours_today_pending_hours"
+      },
+      {
+        "name": "Task Estimated Hours",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "task_estimated_hours"
+      }
+    ]
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T08:48:50.937Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "660a77afaa43a6e3bf311139"
+  },
+  "userId": "660a77ab4f291a7c66160ef5",
+  "__v": 0,
+  "before": {
+    "key": "before",
+    "sectionName": "Before",
+    "items": [
+      {
+        "name": "Project Due Date",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "before_project_due_date",
+        "notifySelection": true,
+        "durationSelection": true,
+        "duration": "5_m",
+        "notifyFor": "assigned_to_me"
+      },
+      {
+        "name": "Project End Date",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "before_project_end_date",
+        "notifySelection": true,
+        "durationSelection": true,
+        "duration": "5_m",
+        "notifyFor": "assigned_to_me"
+      },
+      {
+        "name": "Task Due Date",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "before_task_due_date",
+        "notifySelection": true,
+        "durationSelection": true,
+        "duration": "5_m",
+        "notifyFor": "assigned_to_me"
+      },
+      {
+        "name": "Task End Date",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "before_task_end_date",
+        "notifySelection": true,
+        "durationSelection": true,
+        "duration": "5_m",
+        "notifyFor": "assigned_to_me"
+      }
+    ]
+  },
+  "chat": {
+    "key": "chat",
+    "sectionName": "Chat",
+    "items": [
+      {
+        "name": "Message Create",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "message_create"
+      }
+    ]
+  },
+  "createdAt": {
+    "$date": "2024-04-01T09:00:31.532Z"
+  },
+  "project": {
+    "key": "project",
+    "sectionName": "Project",
+    "items": [
+      {
+        "name": "Project Create",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_create"
+      },
+      {
+        "name": "Project Name",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_name"
+      },
+      {
+        "name": "Project Status Change",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_status_change"
+      },
+      {
+        "name": "Project Assignee",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_assignee"
+      },
+      {
+        "name": "Project Lead",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_lead"
+      },
+      {
+        "name": "Project Category",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_category"
+      },
+      {
+        "name": "Project Source",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_source"
+      },
+      {
+        "name": "Project Type",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_type"
+      },
+      {
+        "name": "Project Currency",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_currency"
+      },
+      {
+        "name": "Project Amount",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_amount"
+      },
+      {
+        "name": "Project Start Date",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_start_date"
+      },
+      {
+        "name": "Project End Date",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_end_date"
+      },
+      {
+        "name": "Project Due Date",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_due_date"
+      },
+      {
+        "name": "Project Close",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_close"
+      },
+      {
+        "name": "Project Description",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_description"
+      },
+      {
+        "name": "Project Checklist",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_checklist"
+      },
+      {
+        "name": "Project Checklist Assign",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_checklist_assign"
+      },
+      {
+        "name": "Project Checklist Remove",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_checklist_remove"
+      },
+      {
+        "name": "Project Attachments",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_attachments"
+      },
+      {
+        "name": "Project Milestone",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_milestone"
+      },
+      {
+        "name": "Project Milestone Status Change",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_milestone_status_change"
+      },
+      {
+        "name": "Project Sprint Create",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_sprint_create"
+      },
+      {
+        "name": "Project Folder Create",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "project_folder_create"
+      },
+      {
+        "name": "Comments I'm @mentioned In",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "comments_i'm_@mentioned_in"
+      }
+    ]
+  },
+  "tasks": {
+    "key": "tasks",
+    "sectionName": "Tasks",
+    "items": [
+      {
+        "name": "Task Notification",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "notifyFor": "assigned_to_me",
+        "notifySelection": true,
+        "key": "task_notification"
+      },
+      {
+        "name": "Task Create",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "task_create"
+      },
+      {
+        "name": "Task Edit",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "task_edit"
+      },
+      {
+        "name": "Task Status",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "task_status"
+      },
+      {
+        "name": "Task Assignee",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "task_assignee"
+      },
+      {
+        "name": "Task Priority",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "task_priority"
+      },
+      {
+        "name": "Task Type",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "task_type"
+      },
+      {
+        "name": "Task Due Date",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "task_due_date"
+      },
+      {
+        "name": "Task Description",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "task_description"
+      },
+      {
+        "name": "Task Checklist",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "task_checklist"
+      },
+      {
+        "name": "Task Checklist Assign",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "task_checklist_assign"
+      },
+      {
+        "name": "Task Checklist Remove",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "task_checklist_remove"
+      },
+      {
+        "name": "Task Attachments",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "task_attachments"
+      },
+      {
+        "name": "Comments I'm @mentioned In",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "comments_I'm_@mentioned_in"
+      },
+      {
+        "name": "Logged Hours Notification",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "logged_hours_notification"
+      },
+      {
+        "name": "After 3 hours Today Pending Hours Log Notification",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "after_3_hours_today_pending_hours"
+      },
+      {
+        "name": "Task Estimated Hours",
+        "email": false,
+        "browser": true,
+        "mobile": true,
+        "key": "task_estimated_hours"
+      }
+    ]
+  },
+  "updatedAt": {
+    "$date": "2024-04-01T09:00:31.532Z"
+  }
+}]

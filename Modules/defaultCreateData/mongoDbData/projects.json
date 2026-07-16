@@ -1,0 +1,561 @@
+[{
+  "_id": {
+    "$oid": "660a753f17c43b963ea05302"
+  },
+  "AssigneeUserId": [],
+  "CompanyId": "660a74e817c43b963ea051e7",
+  "DueDate": {
+    "$date": "2024-08-31T04:52:00.000Z"
+  },
+  "LeadUserId": [],
+  "ProjectCategory": "Fixed Price",
+  "ProjectCode": "DP",
+  "ProjectCurrency": {
+    "_id": "660a74ed17c43b963ea05227",
+    "code": "INR",
+    "count": 1,
+    "decimal_digits": 2,
+    "isDefault": true,
+    "isDelete": true,
+    "name": "Indian Rupee",
+    "name_plural": "Indian rupees",
+    "rounding": 0,
+    "symbol": "₹",
+    "symbol_native": "টকা",
+    "createdAt": "2024-04-01T08:48:45.031Z",
+    "updatedAt": "2024-04-01T08:48:45.031Z"
+  },
+  "ProjectName": "Development Project",
+  "ProjectRequiredComponent": [
+    {
+      "activeIcon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2FSELECTED_LIST.svg?alt=media&token=f8fb2539-939f-4357-a6ef-95423b5d998d",
+      "icon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2Flistrequiredview.png?alt=media&token=80163486-00e0-40b8-a415-4d359de406c2",
+      "createdAt": {
+        "$date": "2024-04-01T08:48:45.089Z"
+      },
+      "keyName": "ProjectListView",
+      "name": "List",
+      "updatedAt": {
+        "$date": "2024-04-01T08:48:45.089Z"
+      },
+      "_id": "660a74ed17c43b963ea0527a",
+      "setAsDefault": true,
+      "viewStatus": true
+    },
+    {
+      "_id": "660a74ef17c43b963ea05280",
+      "activeIcon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2FSELECTED_PROJECT-DETAIL.svg?alt=media&token=19cdbb09-237b-4fa9-bad5-e74d8f0c5e75",
+      "icon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2Fprojectdeatilrequiredview.png?alt=media&token=8bba4ffe-2799-4e64-8c54-ce89b4da28b3",
+      "keyName": "ProjectDetail",
+      "name": "Project Details",
+      "setAsDefault": false,
+      "sortIndex": 3,
+      "value": "projectDetails",
+      "viewStatus": false,
+      "__v": 0,
+      "isPin": false,
+      "id": "660a74ef17c43b963ea05280",
+      "createdAt": {
+        "$date": "2024-04-02T04:52:27.434Z"
+      }
+    },
+    {
+      "_id": "660a74ef17c43b963ea0528c",
+      "activeIcon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2FSELECTED_TABLE.svg?alt=media&token=5633cb54-cfa7-475d-9d8e-445bd2d0622e",
+      "icon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2Ftablerequiredview.png?alt=media&token=cef9c087-7c42-4293-8de9-5130b1afa5c9",
+      "keyName": "TableView",
+      "name": "Table",
+      "setAsDefault": false,
+      "sortIndex": 6,
+      "value": "TableView",
+      "viewStatus": false,
+      "__v": 0,
+      "isPin": false,
+      "id": "660a74ef17c43b963ea0528c",
+      "createdAt": {
+        "$date": "2024-04-02T04:53:11.722Z"
+      }
+    },
+    {
+      "_id": "660a74ef17c43b963ea05284",
+      "activeIcon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2FSELECTED_CALANDER.svg?alt=media&token=2c761e34-0d67-48a7-9a4d-c2030508b2ce",
+      "icon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2Fcalendarrequiredview.png?alt=media&token=f49f661c-dd54-41cc-8423-5a6d559b8325",
+      "keyName": "Calendar",
+      "name": "Calendar",
+      "setAsDefault": false,
+      "sortIndex": 5,
+      "value": "calendar",
+      "viewStatus": false,
+      "__v": 0,
+      "isPin": false,
+      "id": "660a74ef17c43b963ea05284",
+      "createdAt": {
+        "$date": "2024-04-02T04:53:19.857Z"
+      }
+    },
+    {
+      "_id": "660a74ef17c43b963ea0527e",
+      "activeIcon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2FSELECTED_BOARD.svg?alt=media&token=e4df3658-a821-46d1-8f86-f139a01cb88c",
+      "icon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2FBoardrequiredview.png?alt=media&token=0b04dde0-b70f-475b-a2a4-e73398c50b45",
+      "keyName": "ProjectKanban",
+      "name": "Board",
+      "setAsDefault": false,
+      "sortIndex": 2,
+      "value": "ProjectKanban",
+      "viewStatus": false,
+      "__v": 0,
+      "isPin": false,
+      "id": "660a74ef17c43b963ea0527e",
+      "createdAt": {
+        "$date": "2024-04-02T04:53:29.986Z"
+      }
+    },
+    {
+      "_id": "660a74ef17c43b963ea05282",
+      "activeIcon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2FSELECTED_COMMENTS.svg?alt=media&token=f0dfc328-0685-4e5e-8df6-449010e2a187",
+      "icon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2Fcommentrequiredview.png?alt=media&token=334db1d7-b8a4-4e6e-a99a-704ce79a619b",
+      "keyName": "Comments",
+      "name": "Comments",
+      "setAsDefault": false,
+      "sortIndex": 4,
+      "value": "comments",
+      "viewStatus": false,
+      "__v": 0,
+      "isPin": false,
+      "id": "660a74ef17c43b963ea05282",
+      "createdAt": {
+        "$date": "2024-04-02T04:53:38.873Z"
+      }
+    },
+    {
+      "_id": "660a74ef17c43b963ea05286",
+      "activeIcon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2FSELECTED_ACTIVITY.svg?alt=media&token=ec43856a-e338-4479-bbbb-919416319c10",
+      "icon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2FActivityrequiredview.png?alt=media&token=2414de5c-23e9-48f2-afc7-2153063655cc",
+      "keyName": "ActivityLog",
+      "name": "Activity",
+      "setAsDefault": false,
+      "sortIndex": 9,
+      "value": "activitylog",
+      "viewStatus": false,
+      "__v": 0,
+      "isPin": false,
+      "id": "660a74ef17c43b963ea05286",
+      "createdAt": {
+        "$date": "2024-04-02T04:53:50.218Z"
+      }
+    },
+    {
+      "_id": "660a74ef17c43b963ea05288",
+      "activeIcon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2FSELECTED_WORKLOAD.svg?alt=media&token=b46f7f20-9dc5-49c6-9e6c-519c4188080d",
+      "icon": "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/ProjectDefaultIcon%2Fworkloadrequiredview.png?alt=media&token=6664e407-b0a8-4a65-998f-024b8a26da64",
+      "keyName": "Workload",
+      "name": "Workload",
+      "setAsDefault": false,
+      "sortIndex": 7,
+      "value": "workload",
+      "viewStatus": false,
+      "__v": 0,
+      "isPin": false,
+      "id": "660a74ef17c43b963ea05288",
+      "createdAt": {
+        "$date": "2024-04-02T04:53:56.433Z"
+      }
+    }
+  ],
+  "ProjectRequiredDefaultComponent": "ProjectListView",
+  "ProjectType": "Fix",
+  "TaskTypeTemplateId": "",
+  "TemplateId": "65f8452375b493b510d0021f",
+  "TemplateTaskStatusId": "",
+  "apps": [
+    {
+      "afterIcon": "setting-icons/apps/flagblue.png",
+      "beforeIcon": "setting-icons/apps/flaggrey.png",
+      "createdAt": {
+        "$date": "2024-04-01T08:48:47.153Z"
+      },
+      "key": "Priority",
+      "sortIndex": 1,
+      "name": "Priority",
+      "_id": "660a74ef17c43b963ea05292",
+      "appStatus": true,
+      "updatedAt": {
+        "$date": "2024-04-01T08:48:47.153Z"
+      }
+    },
+    {
+      "afterIcon": "setting-icons/apps/mutipleblue.png",
+      "beforeIcon": "setting-icons/apps/mutiplegrey.png",
+      "createdAt": {
+        "$date": "2024-04-01T08:48:47.154Z"
+      },
+      "key": "MultipleAssignees",
+      "sortIndex": 2,
+      "name": "Multiple Assignees",
+      "_id": "660a74ef17c43b963ea05294",
+      "appStatus": true,
+      "updatedAt": {
+        "$date": "2024-04-01T08:48:47.154Z"
+      }
+    },
+    {
+      "afterIcon": "setting-icons/apps/timeBlue.png",
+      "beforeIcon": "setting-icons/apps/timegrey.png",
+      "createdAt": {
+        "$date": "2024-04-01T08:48:47.155Z"
+      },
+      "key": "TimeEstimates",
+      "sortIndex": 3,
+      "name": "Time Estimate",
+      "_id": "660a74ef17c43b963ea05296",
+      "appStatus": true,
+      "updatedAt": {
+        "$date": "2024-04-01T08:48:47.155Z"
+      }
+    },
+    {
+      "afterIcon": "setting-icons/apps/checkflagblue.png",
+      "beforeIcon": "setting-icons/apps/checkflaggrey.png",
+      "createdAt": {
+        "$date": "2024-04-01T08:48:47.156Z"
+      },
+      "key": "Milestones",
+      "sortIndex": 4,
+      "name": "Milestones",
+      "_id": "660a74ef17c43b963ea05298",
+      "appStatus": true,
+      "updatedAt": {
+        "$date": "2024-04-01T08:48:47.156Z"
+      }
+    },
+    {
+      "afterIcon": "setting-icons/apps/tagsblue.png",
+      "beforeIcon": "setting-icons/apps/tagsgrey.png",
+      "createdAt": {
+        "$date": "2024-04-01T08:48:47.157Z"
+      },
+      "key": "tags",
+      "sortIndex": 5,
+      "name": "Tags",
+      "_id": "660a74ef17c43b963ea0529a",
+      "appStatus": true,
+      "updatedAt": {
+        "$date": "2024-04-01T08:48:47.157Z"
+      }
+    },
+    {
+      "afterIcon": "setting-icons/apps/editblue.png",
+      "beforeIcon": "setting-icons/apps/editgrey.png",
+      "createdAt": {
+        "$date": "2024-04-01T08:48:47.158Z"
+      },
+      "key": "CustomFields",
+      "sortIndex": 6,
+      "name": "Custom Fields",
+      "_id": "660a74ef17c43b963ea0529c",
+      "appStatus": true,
+      "updatedAt": {
+        "$date": "2024-04-01T08:48:47.158Z"
+      }
+    },
+    {
+      "afterIcon": "setting-icons/apps/timevalueblue.png",
+      "beforeIcon": "setting-icons/apps/timetracking.png",
+      "createdAt": {
+        "$date": "2024-04-01T08:48:47.159Z"
+      },
+      "key": "TimeTracking",
+      "sortIndex": 7,
+      "name": "Time Tracking",
+      "_id": "660a74ef17c43b963ea0529e",
+      "appStatus": true,
+      "updatedAt": {
+        "$date": "2024-04-01T08:48:47.159Z"
+      }
+    },
+    {
+      "afterIcon": "setting-icons/apps/checkBlue.png",
+      "beforeIcon": "setting-icons/apps/checkgrey.png",
+      "createdAt": {
+        "$date": "2024-04-01T08:48:47.161Z"
+      },
+      "key": "IncompleteWarning",
+      "sortIndex": 8,
+      "name": "Incomplete Warning",
+      "appStatus": false,
+      "_id": "660a74ef17c43b963ea052a0",
+      "updatedAt": {
+        "$date": "2024-04-01T08:48:47.161Z"
+      }
+    },
+    {
+      "_id": "66baa24fcb1c5396c7a3808a",
+      "afterIcon": "setting-icons/apps/aiBlue.png",
+      "appStatus": true,
+      "beforeIcon": "setting-icons/apps/aiGrey.png",
+      "key": "AI",
+      "name": "AI",
+      "sortIndex": 9,
+      "createdAt": {
+        "$date": "2024-08-13T00:01:19.651Z"
+      },
+      "updatedAt": {
+        "$date": "2024-08-13T00:01:19.651Z"
+      }
+    }
+  ],
+  "checklistArray": [],
+  "attachments": [],
+  "description": "",
+  "dueDateDeadLine": [
+    {
+      "date": {
+        "$date": "2024-08-31T04:52:00.000Z"
+      }
+    }
+  ],
+  "isPrivateSpace": false,
+  "lastTaskId": 36,
+  "milestoneAmount": 0,
+  "projectCreatedBy": "660a74e6e0e256e20ff902ed",
+  "projectIcon": {
+    "type": "color",
+    "data": "#92CF44"
+  },
+  "projectStatusData": [
+    {
+      "value": "open",
+      "backgroundColor": "#E3E1FC35",
+      "key": 1,
+      "textColor": "#7367F0",
+      "name": "Open",
+      "type": "default_active"
+    },
+    {
+      "value": "on_hold",
+      "backgroundColor": "#c6b45d35",
+      "key": 4,
+      "textColor": "#c6b45d",
+      "name": "On Hold",
+      "type": "active"
+    },
+    {
+      "value": "completed",
+      "backgroundColor": "#1aee1735",
+      "key": 5,
+      "textColor": "#1aee17",
+      "name": "Completed",
+      "type": "active"
+    },
+    {
+      "key": 8,
+      "value": "planning",
+      "backgroundColor": "#ffbb0035",
+      "textColor": "#ffbb00",
+      "name": "Planning",
+      "type": "active"
+    },
+    {
+      "key": 9,
+      "value": "active",
+      "backgroundColor": "#00ff0035",
+      "textColor": "#00ff00",
+      "name": "Active",
+      "type": "active"
+    },
+    {
+      "key": 10,
+      "value": "cancelled",
+      "backgroundColor": "#ff000035",
+      "textColor": "#ff0000",
+      "name": "Cancelled",
+      "type": "active"
+    },
+    {
+      "value": "done",
+      "backgroundColor": "#68c21e35",
+      "key": 3,
+      "textColor": "#68c21e",
+      "name": "Done",
+      "type": "done"
+    },
+    {
+      "value": "close",
+      "backgroundColor": "#ED514535",
+      "key": 2,
+      "textColor": "#ED5145",
+      "name": "Close",
+      "type": "close"
+    }
+  ],
+  "status": "open",
+  "statusType": "active",
+  "taskStatusData": [
+    {
+      "bgColor": "#ff960035",
+      "key": 1,
+      "textColor": "#ff9600",
+      "name": "To Do",
+      "type": "default_active"
+    },
+    {
+      "bgColor": "#6473e835",
+      "key": 3,
+      "textColor": "#6473e8",
+      "name": "In Progress",
+      "type": "active"
+    },
+    {
+      "bgColor": "#ff000035",
+      "name": "Blocked",
+      "textColor": "#ff0000",
+      "key": 10,
+      "type": "active"
+    },
+    {
+      "bgColor": "#0000ff35",
+      "name": "Under Review",
+      "textColor": "#0000ff",
+      "key": 11,
+      "type": "active"
+    },
+    {
+      "bgColor": "#80808035",
+      "name": "Deferred",
+      "textColor": "#808080",
+      "key": 12,
+      "type": "active"
+    },
+    {
+      "bgColor": "#ffd70035",
+      "name": "Awaiting Feedback",
+      "textColor": "#ffd700",
+      "key": 13,
+      "type": "active"
+    },
+    {
+      "bgColor": "#69696935",
+      "name": "Cancelled",
+      "textColor": "#696969",
+      "key": 14,
+      "type": "active"
+    },
+    {
+      "bgColor": "#cedb1f35",
+      "key": 7,
+      "textColor": "#cedb1f",
+      "name": "On Hold",
+      "type": "active"
+    },
+    {
+      "bgColor": "#24c11035",
+      "key": 6,
+      "textColor": "#24c110",
+      "name": "Done",
+      "type": "done"
+    },
+    {
+      "bgColor": "#6BC95035",
+      "key": 2,
+      "textColor": "#6BC950",
+      "name": "Complete",
+      "type": "close"
+    }
+  ],
+  "taskTypeCounts": [
+    {
+      "value": "task",
+      "key": 1,
+      "taskImage": "setting/task_type/task.png",
+      "name": "Task",
+      "taskCount": 36
+    },
+    {
+      "value": "engagement_tasks",
+      "name": "Engagement Tasks",
+      "taskImage": "https://s3.us-east-1.wasabisys.com/enterprice/projectTemplate/Engagement Tasks.svg",
+      "key": 5
+    },
+    {
+      "value": "collaboration_tasks",
+      "name": "Collaboration Tasks",
+      "taskImage": "https://s3.us-east-1.wasabisys.com/enterprice/projectTemplate/Collaboration Tasks.svg",
+      "key": 6
+    },
+    {
+      "value": "support_tasks",
+      "name": "Support Tasks",
+      "taskImage": "https://s3.us-east-1.wasabisys.com/enterprice/projectTemplate/Support Tasks.svg",
+      "key": 7
+    },
+    {
+      "value": "content_creation_tasks",
+      "name": "Content Creation Tasks",
+      "taskImage": "https://s3.us-east-1.wasabisys.com/enterprice/projectTemplate/Content Creation Tasks.svg",
+      "key": 8
+    }
+  ],
+  "deletedStatusKey": 0,
+  "isGlobalPermission": true,
+  "isRestrict": false,
+  "__v": 0,
+  "createdAt": {
+    "$date": "2024-04-01T13:14:16.938Z"
+  },
+  "updatedAt": {
+    "$date": "2024-04-02T04:48:13.434Z"
+  },
+  "lastProjectActivity": 1712033291,
+  "StartDate": {
+    "$date": "2024-03-01T04:52:00.000Z"
+  },
+  "EndDate": {
+    "$date": "2024-08-31T04:52:00.000Z"
+  },
+  "viewColumn":[{
+    "label": "Chat",
+    "key": "commentCounts",
+    "postition": 0,
+    "show": true
+},
+{
+    "label": "Assignee",
+    "key": "AssigneeUserId",
+    "funcPermission": "task.task_assignee",
+    "postition": 1,
+    "show": true
+},
+{
+    "label": "Due Date",
+    "key": "DueDate",
+    "funcPermission": "task.task_due_date",
+    "postition": 2,
+    "show": true
+},
+{
+    "label": "Priority",
+    "key": "Task_Priority",
+    "funcPermission": "task.task_priority",
+    "appPermission": "Priority",
+    "postition": 3,
+    "show": true
+},
+{
+    "label": "Key",
+    "key": "TaskKey",
+    "postition": 4,
+    "show": true
+},
+{
+    "label": "CreatedDate",
+    "key": "created_date",
+    "postition": 5,
+    "show": true
+},
+{
+    "label": "CreatedBy",
+    "key": "created_by",
+    "postition": 6,
+    "show": true
+}]
+}]
