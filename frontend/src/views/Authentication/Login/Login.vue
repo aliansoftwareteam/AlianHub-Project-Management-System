@@ -79,8 +79,8 @@
                 </button>
             </div>
             <div v-if="isDemoMode && !isSpinner && !errorMessage" class="demo-login-buttons">
-                <button type="button" class="btn btn-blue btn-login btn-demo-login font-roboto-sans cursor-pointer font-weight-500" tabindex="4" @click="ownerLogin">Login as Owner/Admin</button>
-                <button type="button" class="btn btn-blue btn-login btn-demo-login font-roboto-sans cursor-pointer font-weight-500" tabindex="5" @click="memberLogin">Login as Member</button>
+                <button type="button" class="border-primary btn btn-blue btn-login btn-demo-login font-roboto-sans cursor-pointer font-weight-500" tabindex="4" @click="ownerLogin">Login as Owner/Admin</button>
+                <button type="button" class="border-primary btn btn-blue btn-login btn-demo-login font-roboto-sans cursor-pointer font-weight-500" tabindex="5" @click="memberLogin">Login as Member</button>
             </div>
             <RegisterViewComponent @handleChange="handleChange" :isSpinner="isSpinner" />
             <!-- <div class="create-accountlink text-center">
