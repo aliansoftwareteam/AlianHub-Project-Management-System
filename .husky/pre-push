@@ -9,7 +9,7 @@ STANDARD='^(feat|fix|hotfix|refactor|chore|docs|perf|test|ci|build|style)/[a-z0-
 RELEASE='^release/v[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.-]+)?$'
 BACKPORT='^hotfix-backport/[a-z0-9]+(-[a-z0-9.]+)*$'
 BOT='^(dependabot|renovate)/.+$'
-LONG_RUNNING='^(staging|main)$'
+LONG_RUNNING='^(staging|main|demo)$'
 
 for pattern in "$STANDARD" "$RELEASE" "$BACKPORT" "$BOT" "$LONG_RUNNING"; do
     if echo "$BRANCH" | grep -Eq "$pattern"; then
