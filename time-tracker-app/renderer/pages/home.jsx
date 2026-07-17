@@ -14,6 +14,7 @@ import { DateTime } from 'luxon';
 import TrackerTask from '../components/TrackerTask';
 import WasabiImage from '../components/WasabiImage/WasabiImage'
 import { fetchAndProcessProjects } from '../utils/projectUtils'
+import { formatMinutes } from '../hooks/useTodayLogged'
 
 export default function HomePage() {
   const router = useRouter();
@@ -31,6 +32,7 @@ export default function HomePage() {
   const [isSpinner,setIsSpinner] = useState(false);
   const isInterNetLost = useSelector((state)=> state.auth.isInternetLost);
   const [tasks, setTasks] = useState([]);
+  const [taskLoggedMap, setTaskLoggedMap] = useState({}); // taskId -> minutes logged today
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [selectedTaskData, setSelectedTaskData] = useState(null);
   const [taskComment, setTaskComment] = useState('');
@@ -230,6 +232,7 @@ export default function HomePage() {
         if (item.TaskName) {
           obj.taskName = item.TaskName
           obj.key = item.TaskKey
+          obj.taskId = item._id
           obj.sprintName = item.sprintArray?.name || ''
           obj.folderName = item.folderArray?.name || ''
           let projectIndex = option.findIndex((x) => x.value === item.ProjectID)
@@ -243,6 +246,7 @@ export default function HomePage() {
           }
           obj.taskName = item.taskData.TaskName
           obj.key = item.taskData.TaskKey
+          obj.taskId = item.taskData._id || item.TicketID
           obj.sprintName = item.taskData.sprintData[0]?.name || ''
           obj.folderName = item.taskData.folderArray[0]?.name || ''
           obj.comment = item.LogDescription
@@ -260,6 +264,25 @@ export default function HomePage() {
         }
       })
       setTasks(finalResult)
+
+      // Today's logged minutes per task (summed across that task's logs).
+      try {
+        const loggedAgg = await apiRequest('post', `/api/v1/timesheet`, {
+          queryeta: [
+            { $match: { $and: [
+              { Loggeduser: { $in: [user?._id] } },
+              { LogStartTime: { $gte: (startDate / 1000), $lte: (endDate / 1000) } },
+              { logAddType: { $in: [0, 1] } },
+            ] } },
+            { $group: { _id: "$TicketID", minutes: { $sum: "$LogTimeDuration" } } },
+          ],
+        });
+        const map = {};
+        (loggedAgg.data || []).forEach((r) => { map[String(r._id)] = r.minutes; });
+        setTaskLoggedMap(map);
+      } catch (e) {
+        console.error("Error fetching per-task logged time:", e);
+      }
     } catch (error) {
       console.error("Error fetching tasks for list:", error);
     }
@@ -373,8 +396,8 @@ export default function HomePage() {
         <>
           {!isTaskModalOpen && (
             <div className="bg-[#f4f5f7] h-[calc(100vh-135px)] overflow-auto scrollbar-hide">
-            <div className="flex flex-col items-center overflow-y-scroll text-sm scrollbar-hide bg-white shadow-[0px_1.615384578704834px_12.115384101867676px_0px_#0000001F] rounded-2xl m-3">
-              <div className='text-red-400 mt-2.5'>{isInterNetLost ? 'Internet Connection Lost' : ''}</div>
+            <div className="flex flex-col items-center overflow-y-scroll text-sm scrollbar-hide bg-white shadow-[0px_1.615384578704834px_12.115384101867676px_0px_#0000001F] rounded-2xl mx-4 mt-2 mb-3">
+              {isInterNetLost && <div className='text-red-400 text-xs pt-2'>Internet Connection Lost</div>}
               {isProjectLoading ? (
                 <div className="flex justify-center items-center p-8">
                   <Loader />
@@ -388,8 +411,8 @@ export default function HomePage() {
 
               {/* Action Buttons */}
               {!isProjectLoading && (
-                <div className="max-w-[94%] w-full flex justify-between h-[50px] items-center mt-[15px] mb-[15px]">
-                    <div className="w-1/2 text-center">
+                <div className="w-full flex justify-between items-center mt-[8px] mb-[15px] px-[15px]">
+                    <div className="w-1/2">
                       <button
                         className="text-[#2F3990] underline text-sm font-medium cursor-pointer"
                         onClick={() => {
@@ -399,7 +422,7 @@ export default function HomePage() {
                         Add Manual Time
                       </button>
                     </div>
-                    <div className="w-1/2 flex justify-center">
+                    <div className="w-1/2 flex justify-end">
                       <button
                         className="px-[25px] py-[10px] bg-[#1CB303] text-white rounded text-sm hover:bg-[#169302] transition-colors"
                         onClick={handleStartTracker}
@@ -428,53 +451,53 @@ export default function HomePage() {
                 </div>
               </div> */}
             </div>
-            {!isProjectLoading && (
-              <div>
-                <div className='w-[90%] flex justify-between mx-5 text-[#2F3990] font-medium'>
-                 {tasks.length > 0 && <div>Today's Tasks</div>}
-                </div>
-                {tasks.map((task) => (
-                <div key={task.key} className="bg-white shadow-sm rounded-xl p-4 m-4" onClick={() => startTrackerFromTask(task)}>
-                  <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-3 w-full">
-                  <div className="flex-shrink-0">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center cursor-pointer`}>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="25" height="25" viewBox="0 0 25 25" fill="none">
-                        <path d="M12.4999 0.00012207C5.59988 0.00012207 -0.00012207 5.60012 -0.00012207 12.5001C-0.00012207 19.4001 5.59988 25.0001 12.4999 25.0001C19.3999 25.0001 24.9999 19.4001 24.9999 12.5001C24.9999 5.60012 19.3999 0.00012207 12.4999 0.00012207ZM9.37488 18.1251V6.87512L18.1249 12.5001L9.37488 18.1251Z" fill="#CFCFCF"/>
-                      </svg>
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-0 overflow-hidden">
+            {!isProjectLoading && tasks.length > 0 && (
+              <div className="mx-4 mb-4">
+                <div className="text-[#2F3990] font-medium mb-2 px-1">Today's Tasks</div>
+                <div className="bg-white rounded-xl overflow-hidden">
+                  {tasks.map((task) => (
                     <div
-                      className="truncate"
-                      title={`${task?.folderName || ''} ${task?.sprintName || ''}`}
+                      key={task.key}
+                      onClick={() => startTrackerFromTask(task)}
+                      className="flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
                     >
-                      {task.key} | {task?.projectName && `${task?.projectName}`} 
-                      {task?.folderName && " / "}
-                      {task?.folderName && (
-                        <>
-                          <img
-                            src="/images/png/folder.png"
-                            className="w-[10px] h-[10px] mx-1 inline-block"
-                            alt="folder"
-                          />
-                          {task?.folderName}
-                        </>
-                      )}
-                      {task?.sprintName && `/ ${task?.sprintName}`}
+                      <div className="flex-shrink-0 mt-0.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 25 25" fill="none">
+                          <path d="M12.4999 0.00012207C5.59988 0.00012207 -0.00012207 5.60012 -0.00012207 12.5001C-0.00012207 19.4001 5.59988 25.0001 12.4999 25.0001C19.3999 25.0001 24.9999 19.4001 24.9999 12.5001C24.9999 5.60012 19.3999 0.00012207 12.4999 0.00012207ZM9.37488 18.1251V6.87512L18.1249 12.5001L9.37488 18.1251Z" fill="#CFCFCF"/>
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <div
+                          className="truncate text-xs text-gray-500"
+                          title={`${task?.folderName || ''} ${task?.sprintName || ''}`}
+                        >
+                          {task.key} | {task?.projectName && `${task?.projectName}`}
+                          {task?.folderName && " / "}
+                          {task?.folderName && (
+                            <>
+                              <img
+                                src="/images/png/folder.png"
+                                className="w-[10px] h-[10px] mx-1 inline-block"
+                                alt="folder"
+                              />
+                              {task?.folderName}
+                            </>
+                          )}
+                          {task?.sprintName && `/ ${task?.sprintName}`}
+                        </div>
+                        <p className="text-sm font-medium text-gray-800 mt-0.5 flex items-center gap-1">
+                          <span className="text-yellow-500 shrink-0">
+                            <WasabiImage url={getTaskTypeImage(task.projectName, task.fullData.taskData?.TaskType)} isUser={false} className="!w-[15px] !h-[15px]" />
+                          </span>
+                          <span className="truncate" title={task.taskName}>{task.taskName}</span>
+                        </p>
+                      </div>
+                      <div className="shrink-0 self-center text-xs font-semibold text-[#2F3990] tabular-nums">
+                        {taskLoggedMap[String(task.taskId)] ? formatMinutes(taskLoggedMap[String(task.taskId)]) : '--'}
+                      </div>
                     </div>
-                    <p className="text-base font-semibold text-gray-800 mt-1 flex items-center gap-1">
-                      <span className="text-yellow-500">
-                        <WasabiImage url={getTaskTypeImage(task.projectName, task.fullData.taskData?.TaskType)} isUser={false} className="!w-[15px] !h-[15px]" />
-                      </span> {task.taskName}
-                    </p>
-                  </div>
+                  ))}
                 </div>
-
-                    {/* <div className="text-right text-gray-800 font-semibold text-lg">{task.totalTime}</div> */}
-                  </div>
-                </div>
-              ))}
               </div>
             )}
           </div>

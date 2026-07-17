@@ -3,9 +3,13 @@ import serve from 'electron-serve'
 import { createWindow } from './helpers'
 const path = require('node:path')
 const fs = require('fs')
-const iconPath = path.join(__dirname, 'logo.png')
-const trayIconPath = path.join(__dirname, 'traylogo.png')
 const isProd = process.env.NODE_ENV === 'production'
+// Prod: assets are packaged into app/ (see electron-builder.yml). Dev: read from source resources/.
+const assetPath = (name) => isProd ? path.join(__dirname, name) : path.join(__dirname, '..', 'resources', name)
+const iconPath = assetPath('logo.png')
+const trayIconPath = assetPath('traylogo.png')
+// Prod: next export copies public/ into app/. Dev: read straight from renderer/public.
+const notificationHtmlPath = isProd ? path.join(__dirname, 'notification.html') : path.join(__dirname, '..', 'renderer', 'public', 'notification.html')
 let notification = null;
 let screenshotNotificationWindow = null;
 
@@ -442,14 +446,14 @@ ipcMain.on('screenshot:capture', () => {
 function sendNotification(dataUrl) {
 
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-  const windowWidth = 350;
-  const windowHeight = 200;
+  const windowWidth = 372;
+  const windowHeight = 282;
 
   screenshotNotificationWindow = new BrowserWindow({
     width: windowWidth,
     height: windowHeight,
-    x: width - windowWidth - 10,
-    y: height - windowHeight - 10,
+    x: width - windowWidth,
+    y: height - windowHeight, // extra gap above the taskbar so the card bottom isn't clipped
     frame: false,
     alwaysOnTop: true,
     skipTaskbar: true,
@@ -462,11 +466,11 @@ function sendNotification(dataUrl) {
     }
   });
 
-  screenshotNotificationWindow.loadFile(path.join(__dirname, 'notification.html'));
+  screenshotNotificationWindow.loadFile(notificationHtmlPath);
   screenshotNotificationWindow.webContents.send('logo-path', iconPath);
   screenshotNotificationWindow.webContents.on('did-finish-load', () => {
     screenshotNotificationWindow.webContents.send('screenshot-path', dataUrl);
-    screenshotNotificationWindow.show();
+    screenshotNotificationWindow.showInactive(); // don't steal focus from the user's current input
 
     const notificationWindow = screenshotNotificationWindow;
     const closeHandler = () => {

@@ -1,4 +1,11 @@
 @import "tailwindcss";
+
+/* App backdrop — matches the body so the header's rounded bottom corners
+   don't reveal a white notch behind them. */
+body {
+  background-color: #f4f5f7;
+}
+
 ::-webkit-scrollbar{
   width: 0%;
 }

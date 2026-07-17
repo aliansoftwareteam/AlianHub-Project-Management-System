@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 const { publicRuntimeConfig } = getConfig();
 import getConfig from "next/config";
-import { useSelector } from 'react-redux'
+import { useSelector, useDispatch } from 'react-redux'
+import { fetchAndProcessProjects } from '../../utils/projectUtils'
 import WasabiImage from '../WasabiImage/WasabiImage';
 import TimeElapsed from '../TimeElapsed/TimeElapsed';
 import { removeAllTimeLog, setTrackerStopTime } from '../../store/timelog';
@@ -13,14 +14,30 @@ import SettingsModal from '../Settings/SettingsModal';
 import Modal from '../Modal/Modal';
 import { logoutFunction } from '../../controller/user/user';
 import Loader from '../Loader/Loader';
+import { useTodayLoggedMinutes, formatMinutes } from '../../hooks/useTodayLogged';
 
 function Header() {
     const { user } = useSelector((state) => state.user)
+    const loggedMinutes = useTodayLoggedMinutes();
     const timeLog = useSelector((state) => state.timeLog);
     const { isAuthenticated } = useSelector((state) => state.auth);
     const router = useRouter();
+    const dispatch = useDispatch();
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isSpinner,setIsSpinner] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+
+    async function refreshData() {
+        if (isRefreshing) return;
+        setIsRefreshing(true);
+        try {
+            await fetchAndProcessProjects(dispatch, true); // reloads projects; home re-derives tasks
+        } catch (error) {
+            console.error('Refresh failed:', error);
+        } finally {
+            setIsRefreshing(false);
+        }
+    }
     const timeLogRef = React.useRef(timeLog);
 
     useEffect(() => {
@@ -139,18 +156,29 @@ function Header() {
 
             {isAuthenticated && (
                 <div className="leading-normal cursor-default px-[15px] py-[10px]">
-                    <div className="flex items-center justify-between font-medium text-sm text-white leading-[18px]">
-                        <div>
-                            <WasabiImage url={user?.Employee_profileImageURL} isUser={true} className='w-[26px] h-[26px] rounded-full' />
+                    <div className="flex items-center justify-between text-white">
+                        <div className="flex flex-col leading-none min-w-0" title="Logged today">
+                            <span className="text-[10px] opacity-80">Logged today</span>
+                            <span className="text-[26px] font-normal leading-tight tabular-nums">
+                                {formatMinutes(loggedMinutes)}<span className="text-[16px] font-normal opacity-80 ml-1">hrs</span>
+                            </span>
                         </div>
-                        <span>Timer</span>
-                        <div className="cursor-pointer no-drag" onClick={() => setIsSettingsOpen(true)}>
-                            <img
-                                src="/images/svg/settings.svg"
-                            // onClick={() => {
-                            //     this.setState({isOpen:true})
-                            // }} 
-                            />
+                        <div className="flex items-center gap-3 shrink-0">
+                            <button
+                                type="button"
+                                onClick={refreshData}
+                                disabled={isRefreshing}
+                                title="Refresh"
+                                className="no-drag text-white/80 hover:text-white disabled:opacity-60 flex items-center justify-center"
+                            >
+                                <svg className={isRefreshing ? 'animate-spin' : ''} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                                    <path d="M21 3v6h-6" />
+                                </svg>
+                            </button>
+                            <div className="cursor-pointer no-drag" onClick={() => setIsSettingsOpen(true)} title={`${user?.Employee_Name || ''} — Settings`}>
+                                <WasabiImage url={user?.Employee_profileImageURL} isUser={true} thumbnail="35x35" className='w-[34px] h-[34px] rounded-full shrink-0 ring-2 ring-white/40' />
+                            </div>
                         </div>
                     </div>
 

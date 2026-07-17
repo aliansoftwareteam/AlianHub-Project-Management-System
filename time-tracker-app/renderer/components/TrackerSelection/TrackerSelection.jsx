@@ -26,6 +26,17 @@ const TrackerSelection = forwardRef(({
   const [startTimeErr, setStartTimeErr] = useState("");
   const [endTimeErr, setEndTimeErr] = useState("");
 
+  // Task-name search mode ('project' = cascade, 'task' = search by name w/ pagination)
+  const [searchMode, setSearchMode] = useState('project');
+  const [taskSelected, setTaskSelected] = useState(null);
+  const [taskSearchOptions, setTaskSearchOptions] = useState([]);
+  const [taskPage, setTaskPage] = useState(0);
+  const [taskHasMore, setTaskHasMore] = useState(true);
+  const [taskLoading, setTaskLoading] = useState(false);
+  const taskTermRef = React.useRef('');
+  const taskDebounceRef = React.useRef(null);
+  const TASK_PAGE_SIZE = 20;
+
   // Add error states
   const [errors, setErrors] = useState({
     projectError: '',
@@ -63,90 +74,17 @@ const TrackerSelection = forwardRef(({
   
     const handleTrackerInfoFill = async (url) => {
       try {
-        setComment('');
-        setSelectedTask(null);
-        setSelectedSprint(null);
-        setSelectedList(null);
-        setSprintFolder([]);
-        setTaskOptions([]);
-        setErrors({ ...errors, projectError: '' });
-        setSprintAndFolderOption([]);
-  
         const queryParams = url.url.split('?')[1].split('&');
         const projectId = queryParams[3]?.split('=')[1];
         const sprintId = queryParams[2]?.split('=')[1];
         const taskId = queryParams[1]?.split('=')[1];
         const folderId = queryParams[4]?.split('=')[1];
-  
-        const selectedProjectOption = projectOption.find(x => x._id === projectId);
-        if (!selectedProjectOption) return;
-  
-        const project = { ...selectedProjectOption, sprintsObj: {}, sprintsfolders: {} };
-        const { sprint, folder } = await getSprintFolderData(project._id);
-        project.sprintsObj = sprint;
-        project.sprintsfolders = folder;
-        setSelectedProject(project);
-  
-        const options = await setdropDownOptions(project);
-  
-        const companyId = currentCopany.id;
-        const userid = user._id;
-  
-        const obj = {
-          findQuery: [{
-            "$match": {
-              objId: { sprintId, ProjectID: projectId, CompanyId: companyId },
-              statusType: { $in: ["active", "default_active"] },
-              AssigneeUserId: { $in: [userid] }
-            }
-          }]
-        };
-  
-        const res = await apiRequest("post", `/api/v1/task/find`, obj);
-        const tasks = res?.data?.map(item => ({
-          ...item,
-          id: item._id,
-          taskNameWithId: `${item.TaskKey} | ${item.TaskName}`,
-          taskName: item.taskName
-        })) || [];
-  
-        setTaskOptions(tasks);
-  
-        const taskOption = tasks.find(item => item.id === taskId);
-  
-        if (folderId && sprintId) {
-          const folderOption = options.find(item => item.folderId === folderId);
-          if (folderOption) {
-            setSelectedList({ value: `${folderId}_folder`, label: folderOption.name });
-  
-            const sprintFolder = Object.values(project.sprintsfolders?.[folderId]?.sprintsObj || {}).filter(data =>
-              !data.private || (data.private && data.AssigneeUserId?.includes(user._id))
-            );
-            setSprintFolder(sprintFolder);
-  
-            const selectedSprint = sprintFolder.find(item => item.id === sprintId);
-            if (selectedSprint) {
-              setSelectedSprint({ value: `${sprintId}__sprint`, label: selectedSprint.name });
-            }
-  
-            if (taskOption) {
-              handleTaskChange({ value: taskId, label: taskOption.taskNameWithId });
-            }
-          }
-        } else if (!folderId && sprintId) {
-          const sprintOption = options.find(item => item.id === sprintId);
-          if (sprintOption) {
-            setSelectedList({ value: `${sprintId}_sprint`, label: sprintOption.name });
-            if (taskOption) {
-              handleTaskChange({ value: taskId, label: taskOption.taskNameWithId });
-            }
-          }
-        }
+        await applyTaskSelection({ projectId, sprintId, folderId, taskId });
       } catch (err) {
         console.error(err);
       }
     };
-  
+
     window.ipc.on('trackerInfoFill', handleTrackerInfoFill);
   
     return () => {
@@ -348,6 +286,151 @@ const TrackerSelection = forwardRef(({
     setSelectedTask(selected);
   };
 
+  // Resolve a task's project/list/sprint into the same state the cascade produces,
+  // so getSelectedData()/validate()/start all work regardless of how it was picked.
+  const applyTaskSelection = async ({ projectId, sprintId, folderId, taskId, taskLabel }) => {
+    try {
+      setComment('');
+      setSelectedTask(null);
+      setSelectedSprint(null);
+      setSelectedList(null);
+      setSprintFolder([]);
+      setTaskOptions([]);
+      setSprintAndFolderOption([]);
+      setErrors((prev) => ({ ...prev, projectError: '' }));
+
+      const selectedProjectOption = projectOption.find((x) => x._id === projectId);
+      if (!selectedProjectOption) return;
+
+      const project = { ...selectedProjectOption, sprintsObj: {}, sprintsfolders: {} };
+      const { sprint, folder } = await getSprintFolderData(project._id);
+      project.sprintsObj = sprint;
+      project.sprintsfolders = folder;
+      setSelectedProject(project);
+
+      const options = await setdropDownOptions(project);
+
+      const obj = {
+        findQuery: [{
+          "$match": {
+            objId: { sprintId, ProjectID: projectId, CompanyId: currentCopany.id },
+            statusType: { $in: ["active", "default_active"] },
+            AssigneeUserId: { $in: [user._id] }
+          }
+        }]
+      };
+      const res = await apiRequest("post", `/api/v1/task/find`, obj);
+      const tasks = res?.data?.map((item) => ({
+        ...item,
+        id: item._id,
+        taskNameWithId: `${item.TaskKey} | ${item.TaskName}`,
+        taskName: item.taskName
+      })) || [];
+      setTaskOptions(tasks);
+
+      const taskOption = tasks.find((item) => item.id === taskId);
+      const label = taskLabel || taskOption?.taskNameWithId || '';
+
+      if (folderId && sprintId) {
+        const folderOption = (options || []).find((item) => item.folderId === folderId);
+        if (folderOption) {
+          setSelectedList({ value: `${folderId}_folder`, label: folderOption.name });
+          const sf = Object.values(project.sprintsfolders?.[folderId]?.sprintsObj || {}).filter((data) =>
+            !data.private || (data.private && data.AssigneeUserId?.includes(user._id))
+          );
+          setSprintFolder(sf);
+          const selSprint = sf.find((item) => item.id === sprintId);
+          if (selSprint) setSelectedSprint({ value: `${sprintId}__sprint`, label: selSprint.name });
+          if (label) handleTaskChange({ value: taskId, label });
+        }
+      } else if (!folderId && sprintId) {
+        const sprintOption = (options || []).find((item) => item.id === sprintId);
+        if (sprintOption) {
+          setSelectedList({ value: `${sprintId}_sprint`, label: sprintOption.name });
+          if (label) handleTaskChange({ value: taskId, label });
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // --- Task-name search (By Task mode) with server-side pagination ---
+  const fetchTasksByName = async (term, page) => {
+    const match = {
+      objId: { CompanyId: currentCopany?.id },
+      AssigneeUserId: { $in: [user?._id] },
+      statusType: { $in: ["active", "default_active"] },
+    };
+    if (term) match.TaskName = { $regex: term, $options: 'i' };
+    const findQuery = [
+      { $match: match },
+      { $sort: { _id: -1 } },
+      { $skip: page * TASK_PAGE_SIZE },
+      { $limit: TASK_PAGE_SIZE },
+      { $lookup: { from: 'projects', localField: 'ProjectID', foreignField: '_id', as: 'projectArr', pipeline: [{ $project: { ProjectName: 1 } }] } },
+      { $unwind: { path: '$projectArr', preserveNullAndEmptyArrays: true } },
+      { $lookup: { from: 'folders', localField: 'folderObjId', foreignField: '_id', as: 'folderArr', pipeline: [{ $project: { name: 1 } }] } },
+      { $unwind: { path: '$folderArr', preserveNullAndEmptyArrays: true } },
+      { $lookup: { from: 'sprints', localField: 'sprintId', foreignField: '_id', as: 'sprintArr', pipeline: [{ $project: { name: 1 } }] } },
+      { $unwind: { path: '$sprintArr', preserveNullAndEmptyArrays: true } },
+    ];
+    const res = await apiRequest('post', '/api/v1/task/find', { findQuery });
+    return (res?.data || []).map((t) => ({
+      value: t._id,
+      label: `${t.TaskKey} | ${t.TaskName}`,
+      path: [t.projectArr?.ProjectName, t.folderArr?.name, t.sprintArr?.name].filter(Boolean).join(' / '),
+      task: t,
+    }));
+  };
+
+  const loadTasks = async (term, page) => {
+    setTaskLoading(true);
+    try {
+      const opts = await fetchTasksByName(term, page);
+      setTaskHasMore(opts.length === TASK_PAGE_SIZE);
+      setTaskSearchOptions((prev) => (page === 0 ? opts : [...prev, ...opts]));
+      setTaskPage(page);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setTaskLoading(false);
+    }
+  };
+
+  const handleTaskInputChange = (input, meta) => {
+    if (meta.action !== 'input-change') return;
+    taskTermRef.current = input;
+    if (taskDebounceRef.current) clearTimeout(taskDebounceRef.current);
+    // Only fetch once the user types; an empty box shows nothing.
+    if (!input.trim()) {
+      setTaskSearchOptions([]);
+      setTaskHasMore(false);
+      setTaskPage(0);
+      return;
+    }
+    taskDebounceRef.current = setTimeout(() => loadTasks(input, 0), 350);
+  };
+
+  const loadMoreTasks = () => {
+    if (taskLoading || !taskHasMore) return;
+    loadTasks(taskTermRef.current, taskPage + 1);
+  };
+
+  const handleTaskSearchSelect = (option) => {
+    setTaskSelected(option);
+    setErrors((prev) => ({ ...prev, taskError: '' }));
+    const t = option?.task || {};
+    applyTaskSelection({
+      projectId: t.ProjectID ? String(t.ProjectID) : '',
+      sprintId: t.sprintId ? String(t.sprintId) : '',
+      folderId: t.folderObjId ? String(t.folderObjId) : '',
+      taskId: String(t._id),
+      taskLabel: option.label,
+    });
+  };
+
+
   const handleCommentChange = (e) => {
     setErrors({ ...errors, commentError: '' });
     setComment(e.target.value);
@@ -362,6 +445,11 @@ const TrackerSelection = forwardRef(({
     setSprintAndFolderOption([]);
     setSprintFolder([]);
     setTaskOptions([]);
+    setTaskSelected(null);
+    setTaskSearchOptions([]);
+    setTaskPage(0);
+    setTaskHasMore(true);
+    taskTermRef.current = '';
   };
 
   const handleDateChange = (e) => {
@@ -461,12 +549,40 @@ const TrackerSelection = forwardRef(({
     validate
   }));
 
+  // Render the dropdown in a body portal so it isn't clipped by the rounded/overflow wrapper or the small window.
+  const menuProps = {
+    menuPortalTarget: typeof document !== 'undefined' ? document.body : null,
+    menuPosition: 'fixed',
+    styles: { menuPortal: (base) => ({ ...base, zIndex: 9999 }) },
+  };
+
   return (
-    <div className={`max-w-[94%] w-full  mt-[30px] rounded-[15px] flex justify-center p-[15px] ${showDateTime ? 'bg-white' : ''}`}>
+    <div className={`w-full rounded-[15px] flex justify-center p-[15px] ${showDateTime ? 'bg-white' : ''}`}>
       <div className="w-full">
+        {/* Find-by toggle */}
+        <div className="mb-[10px] flex rounded-lg bg-[#EEF0FB] p-[3px] text-sm">
+          <button
+            type="button"
+            onClick={() => setSearchMode('project')}
+            className={`flex-1 rounded-md py-[6px] font-medium transition-colors ${searchMode === 'project' ? 'bg-white text-[#2F3990] shadow-sm' : 'text-[#6b7280]'}`}
+          >
+            By Project
+          </button>
+          <button
+            type="button"
+            onClick={() => setSearchMode('task')}
+            className={`flex-1 rounded-md py-[6px] font-medium transition-colors ${searchMode === 'task' ? 'bg-white text-[#2F3990] shadow-sm' : 'text-[#6b7280]'}`}
+          >
+            By Task
+          </button>
+        </div>
+
+        {searchMode === 'project' && (
+        <>
         {/* Project Select */}
-        <div className="mb-[15px]">
+        <div className="relative mb-[13px]">
           <Select
+            {...menuProps}
             value={selectedProject}
             options={projectOption}
             onChange={handleProjectChange}
@@ -476,19 +592,20 @@ const TrackerSelection = forwardRef(({
             isSearchable={true}
           />
           {errors.projectError && (
-            <div className="text-red-500 text-sm mt-1">{errors.projectError}</div>
+            <div className="absolute left-1 top-full mt-[1px] text-red-500 text-[11px] leading-none">{errors.projectError}</div>
           )}
         </div>
 
         {/* List Select */}
-        <div className="mb-[15px]">
+        <div className="relative mb-[13px]">
           <Select
+            {...menuProps}
             value={selectedList}
-            options={sprintAndFolderOption.length > 0 
-              ? sprintAndFolderOption.map((item) => ({ 
-                  label: item.name, 
-                  value: `${"id" in item ? item.id : "folderId" in item ? item.folderId : ""}_${"folderId" in item ? "folder" : 'sprint'}` 
-                })) 
+            options={sprintAndFolderOption.length > 0
+              ? sprintAndFolderOption.map((item) => ({
+                  label: item.name,
+                  value: `${"id" in item ? item.id : "folderId" in item ? item.folderId : ""}_${"folderId" in item ? "folder" : 'sprint'}`
+                }))
               : [{label: 'No Option Available',value: ''}]
             }
             onChange={handleListChange}
@@ -497,16 +614,17 @@ const TrackerSelection = forwardRef(({
             isSearchable={true}
           />
           {errors.listError && (
-            <div className="text-red-500 text-sm mt-1">{errors.listError}</div>
+            <div className="absolute left-1 top-full mt-[1px] text-red-500 text-[11px] leading-none">{errors.listError}</div>
           )}
         </div>
 
         {/* Sprint Select */}
         {sprintFolder.length > 0 && (
-          <div className="mb-[15px]">
+          <div className="relative mb-[13px]">
             <Select
+              {...menuProps}
               value={selectedSprint}
-              options={sprintFolder.length > 0 ? sprintFolder.map((item) => ({ 
+              options={sprintFolder.length > 0 ? sprintFolder.map((item) => ({
                 label: item.name, 
                 value: `${item.id}_${'sprint'}` 
               })) : [{label: 'No Option Available',value: ''}]}
@@ -516,16 +634,17 @@ const TrackerSelection = forwardRef(({
               isSearchable={true}
             />
             {errors.sprintError && (
-              <div className="text-red-500 text-sm mt-1">{errors.sprintError}</div>
+              <div className="absolute left-1 top-full mt-[1px] text-red-500 text-[11px] leading-none">{errors.sprintError}</div>
             )}
           </div>
         )}
 
         {/* Task Select */}
-        <div className="mb-[15px]">
+        <div className="relative mb-[13px]">
           <Select
+            {...menuProps}
             value={selectedTask}
-            options={taskOptions.length > 0 ? taskOptions.map((item) => ({ 
+            options={taskOptions.length > 0 ? taskOptions.map((item) => ({
               label: item.taskNameWithId, 
               value: `${item.id}` 
             })): [{label: 'No Option Available',value: ''}]}
@@ -535,13 +654,43 @@ const TrackerSelection = forwardRef(({
             isSearchable={true}
           />
           {errors.taskError && (
-            <div className="text-red-500 text-sm mt-1">{errors.taskError}</div>
+            <div className="absolute left-1 top-full mt-[1px] text-red-500 text-[11px] leading-none">{errors.taskError}</div>
           )}
         </div>
+        </>
+        )}
+
+        {/* Task-name search */}
+        {searchMode === 'task' && (
+          <div className="relative mb-[13px]">
+            <Select
+              {...menuProps}
+              value={taskSelected}
+              options={taskSearchOptions}
+              onChange={handleTaskSearchSelect}
+              onInputChange={handleTaskInputChange}
+              onMenuScrollToBottom={loadMoreTasks}
+              isLoading={taskLoading}
+              filterOption={null}
+              placeholder="Search task by name"
+              isSearchable={true}
+              noOptionsMessage={() => (taskLoading ? 'Loading…' : (taskTermRef.current.trim() ? 'No tasks found' : 'Type to search tasks'))}
+              formatOptionLabel={(opt) => (
+                <div className="flex flex-col">
+                  <span className="truncate">{opt.label}</span>
+                  {opt.path && <span className="text-[11px] text-gray-500 truncate">{opt.path}</span>}
+                </div>
+              )}
+            />
+            {errors.taskError && (
+              <div className="absolute left-1 top-full mt-[1px] text-red-500 text-[11px] leading-none">{errors.taskError}</div>
+            )}
+          </div>
+        )}
 
 
         {/* Comment Area */}
-        <div className="mt-[15px]">
+        <div className="relative mt-[6px] mb-[6px]">
           <div className="flex justify-center">
             <textarea
               className="w-full h-[90px] rounded-[5px] resize-none text-sm p-3 text-[#959595] border border-[#DFE1E6] outline-none font-roboto placeholder-[#b3b3b3]"
@@ -551,7 +700,7 @@ const TrackerSelection = forwardRef(({
             />
           </div>
           {errors.commentError && (
-            <div className="text-red-500 text-sm mt-1">{errors.commentError}</div>
+            <div className="absolute left-1 top-full mt-[1px] text-red-500 text-[11px] leading-none">{errors.commentError}</div>
           )}
         </div>
 

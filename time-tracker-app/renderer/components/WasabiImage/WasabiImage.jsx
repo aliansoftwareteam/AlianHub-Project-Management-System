@@ -3,46 +3,73 @@ import { getUserImage } from '../../controller/user/user';
 import { useSelector } from 'react-redux';
 import { apiRequest } from '../../utils/services';
 
-const WasabiImage = ({ url = "",isUser,className="" }) => {
-    const [image, setImage] = useState('/images/png/default_user.png');
+const DEFAULT_USER = '/images/png/default_user.png';
+const DEFAULT_TASK = 'https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/defaut_task_status_img.png?alt=media&token=570a9fca-e23a-41ee-a47b-d82fb766b1fd';
+
+const WasabiImage = ({ url = "", isUser, className = "", thumbnail = "" }) => {
+    const [image, setImage] = useState(null);
+    const [loading, setLoading] = useState(true);
     const currentCopany = useSelector((state) => state.company.currentCompany);
+    const fallback = isUser ? DEFAULT_USER : DEFAULT_TASK;
+    const triedOriginalRef = React.useRef(false);
+
+    // Insert the thumbnail size before the extension, e.g. photo.jpg -> photo-35x35.jpg
+    const withThumb = (p) => {
+        if (!thumbnail) return p;
+        const i = p.lastIndexOf('.');
+        return i === -1 ? p : `${p.slice(0, i)}-${thumbnail}.${p.slice(i + 1)}`;
+    };
+
+    const resolveUser = (path, done) => {
+        getUserImage({ path })
+            .then(res => done(res.status ? res.statusText : fallback))
+            .catch(() => done(fallback));
+    };
+
     useEffect(() => {
-        
-        if (url !== "") {
-            if (url.includes("http")) {
-                setImage(url);
-            } else {
-                if(isUser){
-                    getUserImage({ path: url })
-                    .then(res => {
-                        if (res.status) {
-                            setImage(res.statusText);
-                        } else {
-                            setImage('images/png/default_user.png');
-                        }
-                    });
-                } else {
-                    apiRequest("post",'/api/v1/wasabi/retriveObject',{
-                        companyId: currentCopany?._id,
-                        path: url
-                    }).then((res)=>{
-                        setImage(res.data.statusText);
-                    }).catch((error) => {
-                        console.error(error);
-                    })
-                }
-            }
+        let active = true;
+        triedOriginalRef.current = false;
+        const done = (src) => { if (active) { setImage(src); setLoading(false); } };
+
+        if (url === "") {
+            done(fallback);
+            return;
         }
-    }, [url]);
+        setLoading(true);
+        if (url.includes("http")) {
+            done(url);
+        } else if (isUser) {
+            resolveUser(withThumb(url), done);
+        } else {
+            apiRequest("post", '/api/v1/wasabi/retriveObject', { companyId: currentCopany?._id, path: url })
+                .then(res => done(res.data.statusText))
+                .catch(() => done(fallback));
+        }
+        return () => { active = false; };
+    }, [url, thumbnail]);
+
+    // If the thumbnail object is missing, retry the full-size image once before giving up.
+    const handleError = () => {
+        if (isUser && thumbnail && !triedOriginalRef.current && url && !url.includes("http")) {
+            triedOriginalRef.current = true;
+            resolveUser(url, (src) => setImage(src));
+            return;
+        }
+        setImage(fallback);
+    };
+
+    if (loading) {
+        return <span className={`inline-block bg-gray-200 animate-pulse ${className}`} />;
+    }
 
     return (
-        <img 
-            src={image} 
+        <img
+            src={image}
             className={`object-cover ${className}`}
             alt="User Profile"
-            onError={() => isUser ? setImage('/images/png/default_user.png') : setImage('https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/defaut_task_status_img.png?alt=media&token=570a9fca-e23a-41ee-a47b-d82fb766b1fd')}
+            onError={handleError}
         />
     );
 };
 
-export default WasabiImage; 
+export default WasabiImage;
