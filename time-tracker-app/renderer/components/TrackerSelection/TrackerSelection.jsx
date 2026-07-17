@@ -8,6 +8,7 @@ import moment from 'moment';
 const TrackerSelection = forwardRef(({
   projectOption,
   showDateTime = false, // New prop to control date/time visibility
+  onDeepLink,           // (payload) => start directly from a deep link (bypasses the UI cascade)
 },ref) => {
   // Local state management
   const { user } = useSelector((state) => state.user)
@@ -72,21 +73,29 @@ const TrackerSelection = forwardRef(({
 
   useEffect(() => {
   
-    const handleTrackerInfoFill = async (url) => {
+    const handleTrackerInfoFill = (payload) => {
       try {
-        const queryParams = url.url.split('?')[1].split('&');
-        const projectId = queryParams[3]?.split('=')[1];
-        const sprintId = queryParams[2]?.split('=')[1];
-        const taskId = queryParams[1]?.split('=')[1];
-        const folderId = queryParams[4]?.split('=')[1];
-        await applyTaskSelection({ projectId, sprintId, folderId, taskId });
+        // Deep link: myapp://open?type=trackerStart&taskId=..&comment=..
+        // Hand off to the parent, which fetches what start needs and starts directly.
+        const raw = payload?.url || '';
+        const qs = raw.includes('?') ? raw.slice(raw.indexOf('?') + 1) : '';
+        const params = new URLSearchParams(qs);
+        const taskId = params.get('taskId') || '';
+        const comment = params.get('comment') || '';
+        if (taskId && onDeepLink) onDeepLink({ taskId, comment });
       } catch (err) {
         console.error(err);
       }
     };
 
     window.ipc.on('trackerInfoFill', handleTrackerInfoFill);
-  
+
+    // Tell main we can handle a deep link now (projects loaded) so it flushes
+    // any link buffered during a cold launch.
+    if (projectOption && projectOption.length > 0) {
+      window.ipc.send('deeplink:renderer-ready');
+    }
+
     return () => {
       window.ipc.removeAll('trackerInfoFill');
     };
@@ -331,27 +340,45 @@ const TrackerSelection = forwardRef(({
       const taskOption = tasks.find((item) => item.id === taskId);
       const label = taskLabel || taskOption?.taskNameWithId || '';
 
+      let resolvedList = null;
+      let resolvedSprint = null;
+      let resolvedTask = null;
+
       if (folderId && sprintId) {
         const folderOption = (options || []).find((item) => item.folderId === folderId);
         if (folderOption) {
-          setSelectedList({ value: `${folderId}_folder`, label: folderOption.name });
+          resolvedList = { value: `${folderId}_folder`, label: folderOption.name };
+          setSelectedList(resolvedList);
           const sf = Object.values(project.sprintsfolders?.[folderId]?.sprintsObj || {}).filter((data) =>
             !data.private || (data.private && data.AssigneeUserId?.includes(user._id))
           );
           setSprintFolder(sf);
           const selSprint = sf.find((item) => item.id === sprintId);
-          if (selSprint) setSelectedSprint({ value: `${sprintId}__sprint`, label: selSprint.name });
-          if (label) handleTaskChange({ value: taskId, label });
+          if (selSprint) {
+            resolvedSprint = { value: `${sprintId}__sprint`, label: selSprint.name };
+            setSelectedSprint(resolvedSprint);
+          }
+          if (label) {
+            resolvedTask = { value: taskId, label };
+            handleTaskChange(resolvedTask);
+          }
         }
       } else if (!folderId && sprintId) {
         const sprintOption = (options || []).find((item) => item.id === sprintId);
         if (sprintOption) {
-          setSelectedList({ value: `${sprintId}_sprint`, label: sprintOption.name });
-          if (label) handleTaskChange({ value: taskId, label });
+          resolvedList = { value: `${sprintId}_sprint`, label: sprintOption.name };
+          setSelectedList(resolvedList);
+          if (label) {
+            resolvedTask = { value: taskId, label };
+            handleTaskChange(resolvedTask);
+          }
         }
       }
+
+      return { selectedProject: project, selectedList: resolvedList, selectedSprint: resolvedSprint, selectedTask: resolvedTask };
     } catch (err) {
       console.error(err);
+      return null;
     }
   };
 

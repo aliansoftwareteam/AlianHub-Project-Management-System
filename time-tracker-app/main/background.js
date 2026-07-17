@@ -77,6 +77,37 @@ if (process.defaultApp) {
 
 let mainWindow
 let tray = null
+
+// Read the `type` query param from a myapp:// deep link, order-independently.
+const deepLinkType = (u) => {
+  try {
+    return new URLSearchParams((u || '').split('?').slice(1).join('?')).get('type')
+  } catch (e) {
+    return null
+  }
+}
+
+// Cold-launch buffering: a trackerStart deep link can arrive before the renderer
+// has loaded projects. Buffer it and deliver once the renderer signals ready.
+let pendingTrackerDeepLink = null
+let rendererReadyForDeepLink = false
+
+const deliverTrackerDeepLink = (url) => {
+  if (!url) return
+  if (rendererReadyForDeepLink && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('trackerInfoFill', { url })
+  } else {
+    pendingTrackerDeepLink = url
+  }
+}
+
+ipcMain.on('deeplink:renderer-ready', () => {
+  rendererReadyForDeepLink = true
+  if (pendingTrackerDeepLink && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('trackerInfoFill', { url: pendingTrackerDeepLink })
+    pendingTrackerDeepLink = null
+  }
+})
 let isTracking = null
 let activityInterval = null
 
@@ -292,9 +323,9 @@ function verifyScreenCapturePermission() {
   
   let deepLinkURL = process.argv.find(item => item.startsWith("myapp://")) || null
   if (deepLinkURL) {
-    let type = deepLinkURL?.split('?')[1]?.split('&')[0]?.split('=')[1];
+    let type = deepLinkType(deepLinkURL);
     if (type && type == 'trackerStart') {
-      mainWindow.webContents.send('trackerInfoFill', { url: deepLinkURL })
+      deliverTrackerDeepLink(deepLinkURL)
     } else {
       mainWindow.webContents.send('deeplinkUrl', { url: deepLinkURL })
     }
@@ -303,9 +334,9 @@ function verifyScreenCapturePermission() {
 
 app.on('open-url', (event, deepLinkURL) => {
   event.preventDefault();
-  let type = deepLinkURL?.split('?')[1]?.split('&')[0]?.split('=')[1];
+  let type = deepLinkType(deepLinkURL);
   if (type && type == 'trackerStart') {
-    mainWindow.webContents.send('trackerInfoFill', { url: deepLinkURL })
+    deliverTrackerDeepLink(deepLinkURL)
   } else {
     mainWindow.webContents.send('deeplinkUrl', { url: deepLinkURL })
   }
@@ -320,11 +351,11 @@ if (!gotTheLock) {
       if (mainWindow.isMinimized()) mainWindow.restore()
       mainWindow.focus()
     }
-    let url = commandLine.pop()
+    let url = commandLine.find(item => item.startsWith("myapp://")) || commandLine.pop()
     if (url) {
-      let type = url?.split('?')[1]?.split('&')[0]?.split('=')[1];
+      let type = deepLinkType(url);
       if (type && type == 'trackerStart') {
-        mainWindow.webContents.send('trackerInfoFill', { url: url })
+        deliverTrackerDeepLink(url)
       } else {
         mainWindow.webContents.send('deeplinkUrl', { url: url })
       }

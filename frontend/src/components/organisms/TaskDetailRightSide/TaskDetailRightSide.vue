@@ -1,6 +1,17 @@
 <template>
     <div class="task-detail-right-side">
         <div>
+            <div class="start-in-tracker-wrap" v-if="isAssignee">
+                <button
+                    type="button"
+                    class="start-in-tracker-btn"
+                    @click="startInTracker"
+                    title="Start this task in the AlianHub desktop tracker"
+                >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                    Start Tracker
+                </button>
+            </div>
             <h4 class="details-heading">{{$t('ProjectDetails.details')}}</h4>
             <div class="d-flex task-detail-right-side-label" v-if="checkPermission('task.task_list',project?.isGlobalPermission)!==null && checkPermission('task.task_status',project?.isGlobalPermission) !== null">
                 <h4>{{$t('ProjectDetails.status')}}</h4>
@@ -235,6 +246,8 @@ import { useI18n } from "vue-i18n";
 import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import { openInTracker, isTrackerCapableDevice } from '@/utils/trackerDeepLink';
+import Swal from 'sweetalert2';
 
 // Icon for the "Generate estimate using AI" sidebar button. Same asset
 // the SubTasks / Checklist / Sprints components use for their AI actions
@@ -289,6 +302,54 @@ const props = defineProps({
     },
     clientWidth: Number,
 })
+
+// Only assignees of the task can start tracking it.
+const isAssignee = computed(() => (props.task?.AssigneeUserId || []).includes(userId.value));
+
+const escapeHtml = (s) => String(s || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// Collect a comment, then deep-link to the desktop tracker which auto-starts on this task.
+const startInTracker = async () => {
+    if (!isTrackerCapableDevice()) {
+        $toast.warning('Open this on a desktop with the AlianHub Tracker installed.');
+        return;
+    }
+    const { value: comment } = await Swal.fire({
+        title: 'Start Tracker',
+        iconHtml: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2F3990" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+        html: `<div style="font-size:13px;color:#6b7280;background:#f4f5f7;border-radius:6px;padding:8px 10px;margin:4px 0 6px;word-break:break-word;text-align:left;">${escapeHtml(props.task?.TaskKey)} · ${escapeHtml(props.task?.TaskName)}</div>`,
+        input: 'textarea',
+        inputLabel: 'What are you working on?',
+        inputPlaceholder: 'Add a comment for this session…',
+        inputAttributes: { 'aria-label': 'Comment' },
+        showCancelButton: true,
+        confirmButtonText: 'Start tracking',
+        cancelButtonText: 'Cancel',
+        confirmButtonColor: '#2F3990',
+        reverseButtons: true,
+        inputValidator: (v) => (!v || !v.trim() ? 'Please enter a comment' : undefined),
+    });
+    if (!comment || !comment.trim()) return; // cancelled or empty
+
+    const res = openInTracker({
+        taskId: props.task?._id,
+        projectId: props.task?.ProjectID,
+        sprintId: props.task?.sprintId,
+        folderId: props.task?.folderObjId || '',
+        comment: comment.trim(),
+    });
+    if (res.ok) {
+        $toast.success('Opening the tracker…');
+        return;
+    }
+    if (res.reason === 'unsupported') {
+        $toast.warning('Open this on a desktop with the AlianHub Tracker installed.');
+    } else if (res.reason === 'missing') {
+        $toast.error('Task details are incomplete to start the tracker.');
+    } else {
+        $toast.error('Could not open the tracker.');
+    }
+};
 //ref
 const taskLeaderData = ref(getUser(props.task?.Task_Leader));
 const assigneeInProgress = ref({});

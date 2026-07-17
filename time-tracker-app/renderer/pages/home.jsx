@@ -291,6 +291,11 @@ export default function HomePage() {
 
   const handleStartTracker = () => {
     const selectedData = trackerRef.current.getSelectedData();
+    startTrackerWithData(selectedData);
+  };
+
+  const startTrackerWithData = (selectedData) => {
+    if (!selectedData) return;
     setIsSpinner(true);
     try {
       window.ipc.send("start-listen-event");
@@ -362,6 +367,61 @@ export default function HomePage() {
   };
 
 
+  // Deep link (myapp://…?type=trackerStart&taskId=..&comment=..): skip the UI
+  // cascade — fetch just what start needs (task + project/folder/sprint names),
+  // start the tracker, and jump to the running screen.
+  const handleDeepLink = async ({ taskId, comment }) => {
+    if (!taskId) return;
+    setIsSpinner(true);
+    try {
+      const res = await apiRequest('post', `/api/v1/task/find`, {
+        findQuery: [
+          { $match: { objId: { _id: taskId, CompanyId: currentCopany?._id } } },
+          { $lookup: { from: 'projects', localField: 'ProjectID', foreignField: '_id', as: 'projectArr', pipeline: [{ $project: { ProjectName: 1 } }] } },
+          { $unwind: { path: '$projectArr', preserveNullAndEmptyArrays: true } },
+          { $lookup: { from: 'folders', localField: 'folderObjId', foreignField: '_id', as: 'folderArr', pipeline: [{ $project: { name: 1 } }] } },
+          { $unwind: { path: '$folderArr', preserveNullAndEmptyArrays: true } },
+          { $lookup: { from: 'sprints', localField: 'sprintId', foreignField: '_id', as: 'sprintArr', pipeline: [{ $project: { name: 1 } }] } },
+          { $unwind: { path: '$sprintArr', preserveNullAndEmptyArrays: true } },
+        ],
+      });
+      const task = res?.data?.[0];
+      if (!task) { setIsSpinner(false); return; }
+
+      const projectId = String(task.ProjectID || '');
+      const sprintId = task.sprintId ? String(task.sprintId) : '';
+      const projectName = task.projectArr?.ProjectName || '';
+      const folderName = task.folderArr?.name || '';
+      const sprintName = task.sprintArr?.name || '';
+      const taskName = task.TaskName || '';
+      const description = (comment && comment.trim()) || taskName;
+      const taskTypeImage = getTaskTypeImage(projectName, task.TaskType);
+
+      window.ipc.send("start-listen-event");
+      const startRes = await apiRequest('post', `/api/v3/timeTracker/start`, {
+        userId: user?._id || "",
+        projectId,
+        taskId,
+        description,
+        companyId: currentCopany?._id || "",
+        actionTime: Math.floor(Number(DateTime.utc().ts) / 1000),
+        type: "timesheets",
+      });
+      if (startRes?.data?.status) {
+        dispatch(setTrackerStartTime(startRes.data.statusText));
+        dispatch(setComment({ comment: description, sprintId, taskId, projectId, taskName, projectName, folderName, sprintName, taskTypeImage }));
+        setIsSpinner(false);
+        router.push('/trackerRunning');
+      } else {
+        setIsSpinner(false);
+        console.error('Deep-link start failed', startRes?.data);
+      }
+    } catch (e) {
+      setIsSpinner(false);
+      console.error('Deep-link start error', e);
+    }
+  };
+
   const startTrackerFromTask = (task) => {
     setSelectedTaskData(task);
     setTaskComment(task.comment || '');
@@ -407,6 +467,7 @@ export default function HomePage() {
                 <TrackerSelection
                   ref={trackerRef}
                   projectOption={projectOption}
+                  onDeepLink={handleDeepLink}
                 />
               )}
 
