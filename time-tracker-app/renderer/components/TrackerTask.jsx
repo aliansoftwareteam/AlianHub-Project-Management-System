@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { setComment, setTrackerStartTime } from '../store/timelog';
 import { DateTime } from 'luxon';
 import { apiRequest } from '../utils/services';
+import { DEFAULT_TASK_IMAGE } from '../utils/imageDefaults';
 
 export default function TrackerTask({
   selectedTaskData,
@@ -73,7 +74,7 @@ export default function TrackerTask({
 
   const getTaskTypeImage = (projectName, key) => {
     let project = projects.find((x) => x.ProjectName === projectName);
-    let imgUrl = "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/defaut_task_status_img.png?alt=media&token=570a9fca-e23a-41ee-a47b-d82fb766b1fd";
+    let imgUrl = DEFAULT_TASK_IMAGE;
     if (project?.taskTypeCounts?.length > 0) {
       const match = project.taskTypeCounts.find((item) => item.value === key);
       if (match?.taskImage) {

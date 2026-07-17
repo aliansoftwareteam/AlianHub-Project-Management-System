@@ -2,9 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getUserImage } from '../../controller/user/user';
 import { useSelector } from 'react-redux';
 import { apiRequest } from '../../utils/services';
-
-const DEFAULT_USER = '/images/png/default_user.png';
-const DEFAULT_TASK = 'https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/defaut_task_status_img.png?alt=media&token=570a9fca-e23a-41ee-a47b-d82fb766b1fd';
+import { DEFAULT_USER_IMAGE as DEFAULT_USER, DEFAULT_TASK_IMAGE as DEFAULT_TASK } from '../../utils/imageDefaults';
 
 const WasabiImage = ({ url = "", isUser, className = "", thumbnail = "" }) => {
     const [image, setImage] = useState(null);
@@ -36,7 +34,8 @@ const WasabiImage = ({ url = "", isUser, className = "", thumbnail = "" }) => {
             return;
         }
         setLoading(true);
-        if (url.includes("http")) {
+        if (url.includes("http") || url.startsWith("/")) {
+            // Absolute URL or a local public asset (e.g. the default images) — use as-is.
             done(url);
         } else if (isUser) {
             resolveUser(withThumb(url), done);
