@@ -9,4 +9,9 @@ files:
     filter:
       - package.json
       - app
+  - from: resources
+    to: app
+    filter:
+      - logo.png
+      - traylogo.png
 publish: null

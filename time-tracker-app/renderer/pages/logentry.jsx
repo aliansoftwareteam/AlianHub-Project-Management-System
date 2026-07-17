@@ -6,6 +6,7 @@ import { apiRequest } from '../utils/services';
 import TrackerTask from '../components/TrackerTask';
 import WasabiImage from '../components/WasabiImage/WasabiImage';
 import { fetchAndProcessProjects } from '../utils/projectUtils';
+import { DEFAULT_TASK_IMAGE } from '../utils/imageDefaults';
 
 const LogEntryView = () => {
   const dispatch = useDispatch();
@@ -182,7 +183,7 @@ const LogEntryView = () => {
   };
 
   const getTaskTypeImage = (project, key) => {
-    let imgUrl = "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/defaut_task_status_img.png?alt=media&token=570a9fca-e23a-41ee-a47b-d82fb766b1fd";
+    let imgUrl = DEFAULT_TASK_IMAGE;
     if (project?.taskTypeCounts?.length > 0) {
       const match = project.taskTypeCounts.find((item) => item.key === key);
       if (match?.taskImage) {
