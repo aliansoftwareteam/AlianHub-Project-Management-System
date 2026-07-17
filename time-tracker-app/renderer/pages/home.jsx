@@ -452,20 +452,15 @@ export default function HomePage() {
               </div> */}
             </div>
             {!isProjectLoading && tasks.length > 0 && (
-              <div className="mx-4 mb-4">
+              <div className="mx-4 mb-8">
                 <div className="text-[#2F3990] font-medium mb-2 px-1">Today's Tasks</div>
                 <div className="bg-white rounded-xl overflow-hidden">
                   {tasks.map((task) => (
                     <div
                       key={task.key}
                       onClick={() => startTrackerFromTask(task)}
-                      className="flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                      className="flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-blue-50 border-b border-gray-100 last:border-b-0"
                     >
-                      <div className="flex-shrink-0 mt-0.5">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 25 25" fill="none">
-                          <path d="M12.4999 0.00012207C5.59988 0.00012207 -0.00012207 5.60012 -0.00012207 12.5001C-0.00012207 19.4001 5.59988 25.0001 12.4999 25.0001C19.3999 25.0001 24.9999 19.4001 24.9999 12.5001C24.9999 5.60012 19.3999 0.00012207 12.4999 0.00012207ZM9.37488 18.1251V6.87512L18.1249 12.5001L9.37488 18.1251Z" fill="#CFCFCF"/>
-                        </svg>
-                      </div>
                       <div className="flex-1 min-w-0 overflow-hidden">
                         <div
                           className="truncate text-xs text-gray-500"
@@ -493,7 +488,7 @@ export default function HomePage() {
                         </p>
                       </div>
                       <div className="shrink-0 self-center text-xs font-semibold text-[#2F3990] tabular-nums">
-                        {taskLoggedMap[String(task.taskId)] ? formatMinutes(taskLoggedMap[String(task.taskId)]) : '--'}
+                        {taskLoggedMap[String(task.taskId)] ? `${formatMinutes(taskLoggedMap[String(task.taskId)])} hrs` : '--'}
                       </div>
                     </div>
                   ))}

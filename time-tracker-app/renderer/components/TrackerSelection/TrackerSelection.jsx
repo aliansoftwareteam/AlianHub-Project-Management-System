@@ -564,14 +564,14 @@ const TrackerSelection = forwardRef(({
           <button
             type="button"
             onClick={() => setSearchMode('project')}
-            className={`flex-1 rounded-md py-[6px] font-medium transition-colors ${searchMode === 'project' ? 'bg-white text-[#2F3990] shadow-sm' : 'text-[#6b7280]'}`}
+            className={`flex-1 cursor-pointer rounded-md py-[6px] font-medium transition-colors ${searchMode === 'project' ? 'bg-white text-[#2F3990] shadow-sm' : 'text-[#6b7280]'}`}
           >
             By Project
           </button>
           <button
             type="button"
             onClick={() => setSearchMode('task')}
-            className={`flex-1 rounded-md py-[6px] font-medium transition-colors ${searchMode === 'task' ? 'bg-white text-[#2F3990] shadow-sm' : 'text-[#6b7280]'}`}
+            className={`flex-1 cursor-pointer rounded-md py-[6px] font-medium transition-colors ${searchMode === 'task' ? 'bg-white text-[#2F3990] shadow-sm' : 'text-[#6b7280]'}`}
           >
             By Task
           </button>
