@@ -49,7 +49,11 @@
                                             class="tle-task-link"
                                             :class="{ 'tle-task-clickable': t.taskId && t.projectId }"
                                             :title="(t.taskKey ? t.taskKey + ' ' : '') + (t.taskName || '')"
+                                            :role="t.taskId && t.projectId ? 'button' : null"
+                                            :tabindex="t.taskId && t.projectId ? 0 : null"
                                             @click.stop="openTaskDetail(t)"
+                                            @keydown.enter.stop.prevent="openTaskDetail(t)"
+                                            @keydown.space.stop.prevent="openTaskDetail(t)"
                                             @mousedown.stop
                                         >
                                             <span v-if="t.taskKey" class="tle-task-key">{{ t.taskKey }}</span>
@@ -243,6 +247,7 @@ onMounted(load);
 .tle-task-link { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 auto; }
 .tle-task-link.tle-task-clickable { cursor: pointer; }
 .tle-task-link.tle-task-clickable:hover .tle-task-name { text-decoration: underline; }
+.tle-task-link.tle-task-clickable:focus-visible { outline: 2px solid #0d9488; outline-offset: 2px; border-radius: 3px; }
 .tle-task-key { color: #0d9488; font-weight: 600; flex: none; }
 .tle-task-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tle-task-proj { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #9aa0b4; }
