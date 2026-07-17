@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import Router from 'next/router';
-import { setCaptures, setActivityTick, setTrackerStopTime, removeExtraClicks } from '../store/timelog';
+import { setCaptures, setActivityTick, setTrackerStopTime, removeExtraClicks, setComment, setTrackerStartTime, removeAllTimeLog } from '../store/timelog';
 import { TrackerController } from '../controller/tracker/tracker';
+import { apiRequest } from '../utils/services';
 import store from '../store/store';
 import moment from 'moment';
 import { DateTime } from 'luxon';
@@ -16,6 +17,83 @@ function TimeTrackerView() {
   const [timeAgo, setTimeAgo] = useState("");
   const [keyboardClicks, setKeyboardClicks] = useState(timeLog.keyboardClicks);
   const isInterNetLost = useSelector((state)=> state.auth.isInternetLost);
+
+  // Editing the active session's comment restarts the tracker on the same task.
+  const [isEditing, setIsEditing] = useState(false);
+  const [editComment, setEditComment] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  const startEditComment = () => {
+    setEditComment(timeLog.comment || "");
+    setIsEditing(true);
+  };
+
+  const saveEditComment = async () => {
+    const newComment = editComment.trim();
+    if (!newComment || isSaving) return;
+    setIsSaving(true);
+
+    // Capture the running session's task context before it's cleared on stop.
+    const prev = store.getState().timeLog;
+    const ctx = {
+      taskId: prev.taskId,
+      projectId: prev.projectId,
+      sprintId: prev.sprintId,
+      taskName: prev.taskName,
+      projectName: prev.projectName,
+      folderName: prev.folderName,
+      sprintName: prev.sprintName,
+      taskTypeImage: prev.taskTypeImage,
+    };
+
+    try {
+      // Stop the current session...
+      await TrackerController.TrackerStop();
+      dispatch(setTrackerStopTime());
+      dispatch(removeAllTimeLog());
+
+      // ...then start a fresh one on the same task with the new comment.
+      window.ipc.send("start-listen-event");
+      const startObj = {
+        userId: store.getState().user?.user?._id || "",
+        projectId: ctx.projectId || "",
+        taskId: ctx.taskId || "",
+        description: newComment,
+        companyId: store.getState()?.company?.currentCompany?._id || "",
+        actionTime: Math.floor(Number(DateTime.utc().ts) / 1000),
+        type: "timesheets",
+      };
+      const res = await apiRequest('post', `/api/v3/timeTracker/start`, startObj);
+
+      if (res?.data?.status) {
+        dispatch(setTrackerStartTime(res.data.statusText));
+        dispatch(setComment({
+          comment: newComment,
+          sprintId: ctx.sprintId,
+          taskId: ctx.taskId,
+          projectId: ctx.projectId,
+          taskName: ctx.taskName,
+          projectName: ctx.projectName,
+          folderName: ctx.folderName,
+          sprintName: ctx.sprintName,
+          taskTypeImage: ctx.taskTypeImage,
+        }));
+        setIsEditing(false);
+        // Re-arm screenshot capture: a pending timer could have fired during the
+        // stop→start gap (trackerStart false) and killed the chain.
+        startScreenshotCapture();
+      } else {
+        // Couldn't restart (error/offline) — session is stopped, return home.
+        console.error('Failed to restart tracker after comment edit', res);
+        Router.push('/home');
+      }
+    } catch (error) {
+      console.error('Edit-comment restart failed', error);
+      Router.push('/home');
+    } finally {
+      setIsSaving(false);
+    }
+  };
   
   // Create refs to hold latest values
   const timeLogRef = React.useRef(timeLog);
@@ -208,11 +286,49 @@ function TimeTrackerView() {
     <div className="p-4">
       <div className='text-red-400 my-2.5'>{isInterNetLost ? 'Internet connection lost but we are still tracking your data' : ''}</div>
       <div className="mx-auto mt-0 rounded-lg">
-      <div className="flex justify-between items-start bg-white p-4 shadow-md mb-4 rounded-lg mx-2 text-left">
-        <span className="text-[14px] font-normal text-[#535358]"> 
-          {timeLog?.comment}
-        </span>
-        <img src="/images/png/p_edit.png" alt="edit" />
+      <div className="bg-white p-4 shadow-md mb-4 rounded-lg mx-2 text-left">
+        {isEditing ? (
+          <div>
+            <textarea
+              className="w-full h-[70px] rounded-[5px] resize-none text-[14px] p-2 text-[#535358] border border-[#DFE1E6] outline-none focus:border-[#2F3990]"
+              value={editComment}
+              onChange={(e) => setEditComment(e.target.value)}
+              placeholder="Comment"
+              autoFocus
+              disabled={isSaving}
+            />
+            <div className="flex justify-end gap-2 mt-2">
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                disabled={isSaving}
+                className="px-3 py-1 text-sm text-gray-600 rounded hover:bg-gray-100 cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveEditComment}
+                disabled={isSaving || !editComment.trim()}
+                className="px-3 py-1 text-sm text-white bg-[#2F3990] rounded hover:bg-[#26317a] cursor-pointer disabled:opacity-50"
+              >
+                {isSaving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex justify-between items-start">
+            <span className="text-[14px] font-normal text-[#535358]">
+              {timeLog?.comment}
+            </span>
+            <img
+              src="/images/png/p_edit.png"
+              alt="edit"
+              onClick={startEditComment}
+              className="cursor-pointer shrink-0 ml-2"
+            />
+          </div>
+        )}
       </div>
     
       <div className="py-0 w-11/12 mx-auto">

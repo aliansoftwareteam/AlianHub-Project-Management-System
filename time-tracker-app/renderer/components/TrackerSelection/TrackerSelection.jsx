@@ -557,7 +557,7 @@ const TrackerSelection = forwardRef(({
   };
 
   return (
-    <div className={`w-full rounded-[15px] flex justify-center p-[15px] ${showDateTime ? 'bg-white' : ''}`}>
+    <div className={`w-full rounded-[15px] flex justify-center p-[15px] pb-[10px] ${showDateTime ? 'bg-white' : ''}`}>
       <div className="w-full">
         {/* Find-by toggle */}
         <div className="mb-[10px] flex rounded-lg bg-[#EEF0FB] p-[3px] text-sm">

@@ -412,7 +412,7 @@ export default function HomePage() {
 
               {/* Action Buttons */}
               {!isProjectLoading && (
-                <div className="w-full flex justify-between items-center mt-[8px] mb-[15px] px-[15px]">
+                <div className="w-full flex justify-between items-center mb-[15px] px-[15px]">
                     <div className="w-1/2">
                       <button
                         className="text-[#2F3990] underline text-sm font-medium cursor-pointer"
