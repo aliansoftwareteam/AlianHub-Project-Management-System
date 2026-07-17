@@ -364,6 +364,9 @@ function syncFilterQuery() {
     }
     filterQuery.value = base;
 }
+// Any filter active — advanced-filter rows OR the date-range clause. Load paths
+// must key off this (not props.filterData), else a date-only filter is bypassed.
+const hasActiveFilter = computed(() => Object.keys(filterQuery.value).length > 0);
 // Re-run the active load path after a date-filter change (mirrors filterData watcher).
 function applyDateRange() {
     if (!currentCompany.value?.planFeature?.listView) return;
@@ -448,7 +451,7 @@ function init(group, refetch, projects, sprints, groupedTasksData, isBoard, isIn
         groupBy(group, refetch, projects, sprints, groupedTasksData, isBoard, 'list', false, fetchTask, (resp) => {
             setTimeout(() => {
                 resolve(resp);
-                if(props.filterData && props.filterData.length > 0){
+                if(hasActiveFilter.value){
                     return;
                 }
                 isLoading.value = false;
@@ -581,7 +584,9 @@ watch(() => props.filterData, (newValue,oldVal) => {
             searchMongoDB();
         }, 1000);
     }
-    if((oldVal && oldVal.length > 0 && (!newValue || newValue.length === 0))) {
+    // Only fall back to the unfiltered list when NO filter remains — a still-active
+    // date-range filter must keep the search path (handled by the branch above).
+    if((oldVal && oldVal.length > 0 && (!newValue || newValue.length === 0)) && !hasActiveFilter.value) {
         skip.value = 0;
         fetchTasks(15);
     }
@@ -932,7 +937,7 @@ const scrollFunction = (e) => {
     if(groupById.value === 4) {
         debouncer(50).then(() => {
             if (e.target.scrollTop + e.target.clientHeight >= e.target.scrollHeight - 50) {
-                if(props.filterData && props.filterData.length > 0) {
+                if(hasActiveFilter.value) {
                     searchMongoDB()
                 }
                 else{
@@ -974,7 +979,7 @@ function toggleTask(task,e) {
             };
             let obs = new IntersectionObserver((e) => {
                 if(e[0] && e[0]?.isIntersecting) {
-                    let storeSprintTasks = props.filterData && props.filterData.length > 0 ? searchTaskData.value : getters["projectData/alltasks"] || [];
+                    let storeSprintTasks = hasActiveFilter.value ? searchTaskData.value : getters["projectData/alltasks"] || [];
                     if(storeSprintTasks.length && storeSprintTasks.find((x) => x._id === task._id)) {
                         fetchSubTask(task, true);
                     }
@@ -994,7 +999,7 @@ function toggleTask(task,e) {
     }
 }
 function fetchSubTask(task) {
-    if(props.filterData && props.filterData.length > 0) {
+    if(hasActiveFilter.value) {
         searchMongoDB(task._id);
     }
     else{
@@ -1004,7 +1009,7 @@ function fetchSubTask(task) {
 function checkSubTaskScroll(e, task) {
     debouncer(50)
     .then(() => {
-        if(props.filterData && props.filterData.length > 0) {
+        if(hasActiveFilter.value) {
             searchMongoDB(task._id);
         }
         else{
