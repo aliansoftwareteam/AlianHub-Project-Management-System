@@ -498,8 +498,9 @@ function sendNotification(dataUrl) {
   });
 
   screenshotNotificationWindow.loadFile(notificationHtmlPath);
-  screenshotNotificationWindow.webContents.send('logo-path', iconPath);
   screenshotNotificationWindow.webContents.on('did-finish-load', () => {
+    // Send after load so the renderer's IPC listeners are registered (else the events are missed).
+    screenshotNotificationWindow.webContents.send('logo-path', iconPath);
     screenshotNotificationWindow.webContents.send('screenshot-path', dataUrl);
     screenshotNotificationWindow.showInactive(); // don't steal focus from the user's current input
 

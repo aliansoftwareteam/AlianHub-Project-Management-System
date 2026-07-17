@@ -179,9 +179,15 @@ function Header() {
                                     </svg>
                                 </button>
                             )}
-                            <div className="cursor-pointer no-drag" onClick={() => setIsSettingsOpen(true)} title={`${user?.Employee_Name || ''} — Settings`}>
+                            <button
+                                type="button"
+                                className="cursor-pointer no-drag bg-transparent border-0 p-0 rounded-full flex items-center"
+                                onClick={() => setIsSettingsOpen(true)}
+                                aria-label={`${user?.Employee_Name || 'User'} — Settings`}
+                                title={`${user?.Employee_Name || ''} — Settings`}
+                            >
                                 <WasabiImage url={user?.Employee_profileImageURL} isUser={true} thumbnail="35x35" className='w-[34px] h-[34px] rounded-full shrink-0 ring-2 ring-white/40' />
-                            </div>
+                            </button>
                         </div>
                     </div>
 

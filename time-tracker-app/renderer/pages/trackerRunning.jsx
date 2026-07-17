@@ -79,6 +79,9 @@ function TimeTrackerView() {
           taskTypeImage: ctx.taskTypeImage,
         }));
         setIsEditing(false);
+        // Sync the ref to the just-updated store, else startScreenshotCapture sees
+        // a stale trackerStart:false and bails without scheduling.
+        timeLogRef.current = store.getState().timeLog;
         // Re-arm screenshot capture: a pending timer could have fired during the
         // stop→start gap (trackerStart false) and killed the chain.
         startScreenshotCapture();
@@ -321,12 +324,14 @@ function TimeTrackerView() {
             <span className="text-[14px] font-normal text-[#535358]">
               {timeLog?.comment}
             </span>
-            <img
-              src="/images/png/p_edit.png"
-              alt="edit"
+            <button
+              type="button"
               onClick={startEditComment}
-              className="cursor-pointer shrink-0 ml-2"
-            />
+              aria-label="Edit comment"
+              className="cursor-pointer shrink-0 ml-2 bg-transparent border-0 p-0"
+            >
+              <img src="/images/png/p_edit.png" alt="" />
+            </button>
           </div>
         )}
       </div>

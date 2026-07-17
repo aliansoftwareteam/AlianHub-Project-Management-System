@@ -36,6 +36,7 @@ const TrackerSelection = forwardRef(({
   const [taskLoading, setTaskLoading] = useState(false);
   const taskTermRef = React.useRef('');
   const taskDebounceRef = React.useRef(null);
+  const taskReqSeqRef = React.useRef(0); // discard out-of-order search responses
   const TASK_PAGE_SIZE = 20;
 
   // Add error states
@@ -368,6 +369,9 @@ const TrackerSelection = forwardRef(({
         if (sprintOption) {
           resolvedList = { value: `${sprintId}_sprint`, label: sprintOption.name };
           setSelectedList(resolvedList);
+          // Keep the sprint in state so getSelectedData() retains the sprint id.
+          resolvedSprint = sprintOption;
+          setSelectedSprint(resolvedSprint);
           if (label) {
             resolvedTask = { value: taskId, label };
             handleTaskChange(resolvedTask);
@@ -389,7 +393,11 @@ const TrackerSelection = forwardRef(({
       AssigneeUserId: { $in: [user?._id] },
       statusType: { $in: ["active", "default_active"] },
     };
-    if (term) match.TaskName = { $regex: term, $options: 'i' };
+    if (term) {
+      // Treat the search text as literal — escape regex metacharacters.
+      const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      match.TaskName = { $regex: escaped, $options: 'i' };
+    }
     const findQuery = [
       { $match: match },
       { $sort: { _id: -1 } },
@@ -412,16 +420,18 @@ const TrackerSelection = forwardRef(({
   };
 
   const loadTasks = async (term, page) => {
+    const seq = ++taskReqSeqRef.current;
     setTaskLoading(true);
     try {
       const opts = await fetchTasksByName(term, page);
+      if (seq !== taskReqSeqRef.current) return; // a newer request superseded this one
       setTaskHasMore(opts.length === TASK_PAGE_SIZE);
       setTaskSearchOptions((prev) => (page === 0 ? opts : [...prev, ...opts]));
       setTaskPage(page);
     } catch (e) {
       console.error(e);
     } finally {
-      setTaskLoading(false);
+      if (seq === taskReqSeqRef.current) setTaskLoading(false);
     }
   };
 
@@ -477,6 +487,14 @@ const TrackerSelection = forwardRef(({
     setTaskPage(0);
     setTaskHasMore(true);
     taskTermRef.current = '';
+  };
+
+  // Switching modes clears the hidden mode's selection so validation/start
+  // can't act on stale values from the other tab.
+  const switchMode = (mode) => {
+    if (mode === searchMode) return;
+    handleRemoveSelected();
+    setSearchMode(mode);
   };
 
   const handleDateChange = (e) => {
@@ -590,14 +608,14 @@ const TrackerSelection = forwardRef(({
         <div className="mb-[10px] flex rounded-lg bg-[#EEF0FB] p-[3px] text-sm">
           <button
             type="button"
-            onClick={() => setSearchMode('project')}
+            onClick={() => switchMode('project')}
             className={`flex-1 cursor-pointer rounded-md py-[6px] font-medium transition-colors ${searchMode === 'project' ? 'bg-white text-[#2F3990] shadow-sm' : 'text-[#6b7280]'}`}
           >
             By Project
           </button>
           <button
             type="button"
-            onClick={() => setSearchMode('task')}
+            onClick={() => switchMode('task')}
             className={`flex-1 cursor-pointer rounded-md py-[6px] font-medium transition-colors ${searchMode === 'task' ? 'bg-white text-[#2F3990] shadow-sm' : 'text-[#6b7280]'}`}
           >
             By Task

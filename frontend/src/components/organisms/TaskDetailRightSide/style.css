@@ -216,7 +216,7 @@
     border-radius: 6px;
     padding: 8px 10px;
     margin-bottom: 12px;
-    word-break: break-word;
+    overflow-wrap: break-word;
 }
 .tracker-modal-label {
     display: block;

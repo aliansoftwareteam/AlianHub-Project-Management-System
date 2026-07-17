@@ -388,6 +388,13 @@ export default function HomePage() {
       const task = res?.data?.[0];
       if (!task) { setIsSpinner(false); return; }
 
+      // Only the task's assignees may start it (deep links can be hand-crafted).
+      if (!(task.AssigneeUserId || []).includes(user?._id)) {
+        setIsSpinner(false);
+        console.warn('Deep-link start blocked: current user is not an assignee of the task');
+        return;
+      }
+
       const projectId = String(task.ProjectID || '');
       const sprintId = task.sprintId ? String(task.sprintId) : '';
       const projectName = task.projectArr?.ProjectName || '';
