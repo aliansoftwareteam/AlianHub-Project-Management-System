@@ -3289,6 +3289,8 @@ export default {
         auto_range: "Auto (dashboard range)",
         dashboard_range: "Date range",
         dashboard_range_hint: "Cards set to “Auto” follow this range",
+        enable_date_range: "Enable date range filter",
+        tasklist_date_range: "Date range",
         plm_type: "Type",
         plm_worked_in_period: "Worked in period",
         plm_yes: "Yes",

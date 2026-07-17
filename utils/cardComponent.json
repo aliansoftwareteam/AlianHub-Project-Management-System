@@ -383,9 +383,7 @@
                         "name": "time_tracker"
                     },
                     {
-                        "id": {
-                            "$numberLong": "3"
-                        },
+                        "id": 3,
                         "name": "task"
                     }
                 ],
@@ -692,9 +690,7 @@
                         "name": "time_tracker"
                     },
                     {
-                        "id": {
-                            "$numberLong": "3"
-                        },
+                        "id": 3,
                         "name": "task"
                     }
                 ],
@@ -1265,9 +1261,7 @@
                         "name": "time_tracker"
                     },
                     {
-                        "id": {
-                            "$numberLong": "3"
-                        },
+                        "id": 3,
                         "name": "task"
                     }
                 ],
@@ -1499,9 +1493,7 @@
                 "groupBy": "data",
                 "type": "dropdown",
                 "name": "groupBy",
-                "value": {
-                    "$numberLong": "0"
-                },
+                "value": 0,
                 "placeHolder": "group_by",
                 "options": [
                     {
@@ -1521,6 +1513,19 @@
                         "name": "none"
                     }
                 ],
+                "rules": "",
+                "info": "",
+                "hidden": false,
+                "disabled": false
+            },
+            {
+                "label": "enable_date_range",
+                "groupBy": "data",
+                "type": "radio",
+                "name": "enableDateRange",
+                "value": false,
+                "placeHolder": "",
+                "options": [],
                 "rules": "",
                 "info": "",
                 "hidden": false,

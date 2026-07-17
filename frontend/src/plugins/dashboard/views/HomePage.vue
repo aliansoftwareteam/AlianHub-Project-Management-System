@@ -52,7 +52,7 @@
                             :title="item?.cardData?.fieldName"
                             :id="item.i"
                             :showRefresh="isRefreshable(item.componentId)"
-                            :periodOptions="periodOptionsFor(item.componentId)"
+                            :periodOptions="periodOptionsFor(item)"
                             :periodValue="periodValueFor(item)"
                             @period-change="(val) => handlePeriodChange(item, val)"
                             @delete-card="handleRemoveCard(item.i)"
@@ -80,7 +80,7 @@
                         :title="item?.cardData?.fieldName"
                         :id="item.i"
                         :showRefresh="isRefreshable(item.componentId)"
-                        :periodOptions="periodOptionsFor(item.componentId)"
+                        :periodOptions="periodOptionsFor(item)"
                         :periodValue="periodValueFor(item)"
                         @period-change="(val) => handlePeriodChange(item, val)"
                         @delete-card="handleRemoveCard(item.i)"
@@ -192,7 +192,7 @@
     </div>
 </template>
 <script setup>
-    import {  ref, reactive, onMounted, inject, computed, watch,defineExpose, nextTick,provide } from 'vue';
+    import {  ref, reactive, onMounted, onBeforeUnmount, inject, computed, watch,defineExpose, nextTick,provide } from 'vue';
     import { GridLayout, GridItem } from 'grid-layout-plus';
     import useCustomFieldImage from '@/composable/customFieldIcon.js';
     import AdvanceSearchModal from '@/components/atom/Modal/Modal.vue';
@@ -692,6 +692,46 @@
     const move = () => {
         isMoving.value = true;
     };
+
+    // Auto-scroll while dragging/resizing a card near a viewport edge.
+    // grid-layout-plus maps the pointer to viewport coords with no auto-scroll,
+    // so a card at the bottom of the screen can't be grown/moved past the edge —
+    // the cursor can't travel below the screen and nothing scrolls. We nudge the
+    // dashboard's scroll host when the cursor nears the top/bottom edge.
+    // ponytail: fixed 60px edge zone; find the scroll host lazily per drag.
+    const EDGE = 60;
+    let scrollHost = null;
+    let scrollVy = 0;
+    let scrollRAF = 0;
+    const getScrollHost = () => {
+        const grid = document.querySelector('.vgl-layout');
+        let el = grid ? grid.parentElement : null;
+        while (el && el !== document.body) {
+            const oy = getComputedStyle(el).overflowY;
+            if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight) return el;
+            el = el.parentElement;
+        }
+        return document.scrollingElement || document.documentElement;
+    };
+    const scrollTick = () => {
+        if (!scrollVy || !isMoving.value || !scrollHost) { scrollRAF = 0; return; }
+        scrollHost.scrollTop += scrollVy;
+        scrollRAF = requestAnimationFrame(scrollTick);
+    };
+    const onDragPointerMove = (e) => {
+        if (!isMoving.value) { scrollVy = 0; scrollHost = null; return; }
+        if (!scrollHost) scrollHost = getScrollHost();
+        const fromBottom = window.innerHeight - e.clientY;
+        if (fromBottom < EDGE) scrollVy = Math.ceil((EDGE - fromBottom) / 3);
+        else if (e.clientY < EDGE) scrollVy = -Math.ceil((EDGE - e.clientY) / 3);
+        else scrollVy = 0;
+        if (scrollVy && !scrollRAF) scrollRAF = requestAnimationFrame(scrollTick);
+    };
+    onMounted(() => document.addEventListener('pointermove', onDragPointerMove, true));
+    onBeforeUnmount(() => {
+        document.removeEventListener('pointermove', onDragPointerMove, true);
+        if (scrollRAF) cancelAnimationFrame(scrollRAF);
+    });
     const layoutUpdatedEvent = async(newLayout) => {
         try {
             if(!isMoving.value) return;
@@ -853,9 +893,16 @@
     const PROJECT_PERIOD_DEFAULT = {
         RunningProjectsCard: 1, UsersByCategoryCard: 3, ProjectPulseCard: 1,
         WorkedTasksTableCard: 3, TeamCategoryBreakdownCard: 3, TeamLoggedVsEtaCard: 3, OnLeaveCard: 1,
-        MyAchievementsCard: 5, MyTimeCard: 3, MilestoneReportCard: 5,
+        MyAchievementsCard: 5, MyTimeCard: 3, MilestoneReportCard: 5, TASKLIST: 0,
     };
-    const periodOptionsFor = (cid) => (PROJECT_PERIOD_CARDS.includes(cid) ? PROJECT_PERIOD_OPTIONS : []);
+    // TASKLIST shows the period dropdown only when its date-range toggle is on.
+    const periodOptionsFor = (item) => {
+        const cid = item && item.componentId;
+        if (cid === 'TASKLIST') {
+            return (item.cardData && item.cardData.enableDateRange) ? PROJECT_PERIOD_OPTIONS : [];
+        }
+        return PROJECT_PERIOD_CARDS.includes(cid) ? PROJECT_PERIOD_OPTIONS : [];
+    };
     const periodValueFor = (item) => {
         // NOTE: can't use `|| default` — 0 (Auto) is a valid saved value.
         const v = Number(item && item.cardData && item.cardData.timerange);
