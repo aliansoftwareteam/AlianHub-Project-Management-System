@@ -16,6 +16,20 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.13.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.12.0...v14.13.0) (2026-07-17)
+
+
+### 🚀 Features
+
+* **dashboard:** task-list date filter, ETA links, resize + RBAC/conf… ([fc589f2](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fc589f2d94776d10bffd1396c2a6b89468ce0275))
+* **dashboard:** task-list date filter, ETA links, resize + RBAC/config fixes ([67f66d0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/67f66d02ccb8b9d1618a6784e6aa399a14f61f3b))
+
+
+### 🐛 Bug Fixes
+
+* **dashboard:** key task-list load paths off merged filterQuery ([591cfff](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/591cfffa4dfabe74192542638163d7d78fa0344b))
+* **dashboard:** keyboard-accessible task links in Team Logged vs ETA card ([0ec6fd8](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0ec6fd88b68b3d927e7f7dfb6efebebd4ef69d2c))
+
 ## [14.12.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.11.0...v14.12.0) (2026-07-16)
 
 
