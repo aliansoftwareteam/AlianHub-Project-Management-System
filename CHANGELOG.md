@@ -16,6 +16,29 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.14.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.13.0...v14.14.0) (2026-07-17)
+
+
+### 🚀 Features
+
+* **tracker:** deep link to start a task in the desktop tracker from web ([bb463cf](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bb463cf909108f9699812adeda1ee034068aebff))
+* **tracker:** edit comment on running screen restarts session ([e900276](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e90027612d2929973ca6159d1e6a4622bf1e2cd1))
+* **tracker:** pop-in/pop-out animation for the screenshot notification ([cbe69f0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/cbe69f01e569cc5ea409c5073c7e573478ac36cc))
+* **tracker:** rework header/form UI, add task search & today's logged hours ([b52313c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b52313c57e91a06dca27538878654061b3a02a7d))
+
+
+### 🐛 Bug Fixes
+
+* **storage:** getUserProfile returns a valid signed URL ([b52313c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b52313c57e91a06dca27538878654061b3a02a7d))
+* **tracker:** address CodeRabbit review on [#384](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/issues/384) ([de42749](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/de427491e40a762cd5007a51a52e7904b82e1359))
+* **tracker:** hide header refresh button while tracking ([d6f141e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d6f141e737a89b12ebc623f487ed5375412c1e4d))
+* **tracker:** replace dead Firebase default task image with local asset ([2991c0f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2991c0f6a8983edd982a2414dadb74db190be481))
+
+
+### ♻️ Refactors
+
+* **tracker:** use project Modal for the Start Tracker prompt ([f8442f5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f8442f50995684917bdd13482fc4357786bdd8e6))
+
 ## [14.13.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.12.0...v14.13.0) (2026-07-17)
 
 
