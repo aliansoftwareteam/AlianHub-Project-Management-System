@@ -16,6 +16,7 @@ import WasabiImage from '../components/WasabiImage/WasabiImage'
 import { fetchAndProcessProjects } from '../utils/projectUtils'
 import { formatMinutes } from '../hooks/useTodayLogged'
 import { DEFAULT_TASK_IMAGE } from '../utils/imageDefaults'
+import { openTaskInWeb } from '../utils/taskWebLink'
 
 export default function HomePage() {
   const router = useRouter();
@@ -435,6 +436,20 @@ export default function HomePage() {
     setIsTaskModalOpen(true);
   }
 
+  // Open a Today's-Tasks row in the web app (worked tasks wrap the doc in taskData).
+  const openTaskWeb = (e, task) => {
+    e.stopPropagation();
+    const fd = task?.fullData || {};
+    const td = fd.taskData || fd;
+    openTaskInWeb({
+      cid: currentCopany?._id,
+      projectId: String(fd.ProjectID || fd.ProjectId || td.ProjectID || ''),
+      folderObjId: td.folderObjId ? String(td.folderObjId) : '',
+      sprintId: td.sprintId ? String(td.sprintId) : '',
+      taskId: String(td._id || fd.TicketID || task.taskId || ''),
+    });
+  }
+
   const getTaskTypeImage = (projectName, key) => {
     let project = projectOption.find((x) => x.label === projectName);
     let imgUrl = DEFAULT_TASK_IMAGE;
@@ -462,7 +477,6 @@ export default function HomePage() {
           </div>
         </> :
         <>
-          {!isTaskModalOpen && (
             <div className="bg-[#f4f5f7] h-[calc(100vh-135px)] overflow-auto scrollbar-hide">
             <div className="flex flex-col items-center overflow-y-scroll text-sm scrollbar-hide bg-white shadow-[0px_1.615384578704834px_12.115384101867676px_0px_#0000001F] rounded-2xl mx-4 mt-2 mb-3">
               {isInterNetLost && <div className='text-red-400 text-xs pt-2'>Internet Connection Lost</div>}
@@ -556,16 +570,28 @@ export default function HomePage() {
                           <span className="truncate" title={task.taskName}>{task.taskName}</span>
                         </p>
                       </div>
-                      <div className="shrink-0 self-center text-xs font-semibold text-[#2F3990] tabular-nums">
+                      <div className="shrink-0 self-center text-s font-semibold text-[#2F3990] tabular-nums">
                         {taskLoggedMap[String(task.taskId)] ? `${formatMinutes(taskLoggedMap[String(task.taskId)])} hrs` : '--'}
                       </div>
+                      <button
+                        type="button"
+                        onClick={(e) => openTaskWeb(e, task)}
+                        title="Open task in browser"
+                        aria-label="Open task in browser"
+                        className="shrink-0 self-center text-gray-400 hover:text-[#2F3990] cursor-pointer bg-transparent border-0 p-0"
+                      >
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                          <polyline points="15 3 21 3 21 9" />
+                          <line x1="10" y1="14" x2="21" y2="3" />
+                        </svg>
+                      </button>
                     </div>
                   ))}
                 </div>
               </div>
             )}
           </div>
-          )}
         </>
         }
 
@@ -578,8 +604,15 @@ export default function HomePage() {
           <ManualTimeEntry onClose={() => setIsManualTimeModalOpen(false)} />
         </Modal>
 
-        {/* Custom Task Modal */}
-        {isTaskModalOpen && (
+        {/* Start-tracker bottom sheet (slides up over the Today's Tasks list) */}
+        <Modal
+          isOpen={isTaskModalOpen}
+          onClose={() => {
+            setIsTaskModalOpen(false);
+            setSelectedTaskData(null);
+          }}
+          title="Start Tracker"
+        >
           <TrackerTask
             selectedTaskData={selectedTaskData}
             projects={allProjects}
@@ -588,7 +621,7 @@ export default function HomePage() {
               setSelectedTaskData(null);
             }}
           />
-        )}
+        </Modal>
       </div>
     </React.Fragment>
   )

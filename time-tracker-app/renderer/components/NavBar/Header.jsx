@@ -192,8 +192,8 @@ function Header() {
                     </div>
 
                     {timeLog.trackerStart && (
-                        <div>
-                            <div className="shadow-md rounded-xl bg-[#FFFFFF33] bg-opacity-50 p-3 mt-4 flex items-center">
+                        <div className="mt-2">
+                            <div className="shadow-md rounded-xl bg-[#FFFFFF33] bg-opacity-50 p-3 flex items-center">
                                 {/* <div className="w-[5%] h-4">
                                     <svg
                                         xmlns="http://www.w3.org/2000/svg"
@@ -236,11 +236,11 @@ function Header() {
                                 </div>
                             </div>
                             <div className="flex justify-between mt-2">
-                                <div className="text-left pt-2 pb-1">
-                                    <p className="text-gray-400 text-xs leading-[18px] m-0">Current Session</p>
+                                <div className="text-left pb-1">
+                                    <p className="text-white text-xs leading-[18px] m-0">Current Session</p>
                                     <TimeElapsed time={new Date(timeLog?.startTime)} />
                                 </div>
-                                <div className="flex items-center no-drag">
+                                <div className="flex items-center no-drag text-[26px] font-normal text-white">
                                     {timeLog?.trackerStart ? (
                                         <img
                                             src="/images/svg/pushbtn.svg"

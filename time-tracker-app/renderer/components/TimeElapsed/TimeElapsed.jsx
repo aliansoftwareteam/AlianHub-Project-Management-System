@@ -22,11 +22,11 @@ const TimeElapsed = (props) => {
         const minutes = Math.floor(seconds / 60);
         const hours = Math.floor(minutes / 60);
 
-        return `${hours}h : ${minutes % 60}m : ${seconds % 60}s`;
+        return `${(hours).toString().padStart(2, '0')}:${(minutes % 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')} hrs`;
     };
 
     return (
-        <span style={{ fontWeight: 600, fontSize: '30px', lineHeight: '39px', color: '#fff' }}>
+        <span style={{ fontWeight: 'normal', fontSize: '30px', lineHeight: '39px', color: '#fff' }}>
             {formatTime(elapsedTime)}
         </span>
     );
