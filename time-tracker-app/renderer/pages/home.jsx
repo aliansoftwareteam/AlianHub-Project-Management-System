@@ -38,6 +38,7 @@ export default function HomePage() {
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [selectedTaskData, setSelectedTaskData] = useState(null);
   const [taskComment, setTaskComment] = useState('');
+  const [expandedTasks, setExpandedTasks] = useState({}); // task.key -> expanded?
 
   useEffect(() => {
     init();
@@ -436,6 +437,11 @@ export default function HomePage() {
     setIsTaskModalOpen(true);
   }
 
+  const toggleTaskExpand = (e, key) => {
+    e.stopPropagation();
+    setExpandedTasks((m) => ({ ...m, [key]: !m[key] }));
+  };
+
   // Open a Today's-Tasks row in the web app (worked tasks wrap the doc in taskData).
   const openTaskWeb = (e, task) => {
     e.stopPropagation();
@@ -538,56 +544,76 @@ export default function HomePage() {
               <div className="mx-4 mb-8">
                 <div className="text-[#2F3990] font-medium mb-2 px-1">Today's Tasks</div>
                 <div className="bg-white rounded-xl overflow-hidden">
-                  {tasks.map((task) => (
+                  {tasks.map((task) => {
+                    const isExpanded = !!expandedTasks[task.key];
+                    return (
                     <div
                       key={task.key}
                       onClick={() => startTrackerFromTask(task)}
-                      className="flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-blue-50 border-b border-gray-100 last:border-b-0"
+                      className="px-4 py-2.5 cursor-pointer hover:bg-blue-50 border-b border-gray-100 last:border-b-0"
                     >
-                      <div className="flex-1 min-w-0 overflow-hidden">
-                        <div
-                          className="truncate text-xs text-gray-500"
-                          title={`${task?.folderName || ''} ${task?.sprintName || ''}`}
+                      {/* Collapsed line: task name + open-in-web + expand */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-yellow-500 shrink-0">
+                          <WasabiImage url={getTaskTypeImage(task.projectName, task.fullData.taskData?.TaskType)} isUser={false} className="!w-[15px] !h-[15px]" />
+                        </span>
+                        <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-800" title={task.taskName}>{task.taskName}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => openTaskWeb(e, task)}
+                          title="Open task in browser"
+                          aria-label="Open task in browser"
+                          className="shrink-0 text-gray-400 hover:text-[#2F3990] cursor-pointer bg-transparent border-0 p-0"
                         >
-                          {task.key} | {task?.projectName && `${task?.projectName}`}
-                          {task?.folderName && " / "}
-                          {task?.folderName && (
-                            <>
-                              <img
-                                src="/images/png/folder.png"
-                                className="w-[10px] h-[10px] mx-1 inline-block"
-                                alt="folder"
-                              />
-                              {task?.folderName}
-                            </>
-                          )}
-                          {task?.sprintName && `/ ${task?.sprintName}`}
-                        </div>
-                        <p className="text-sm font-medium text-gray-800 mt-0.5 flex items-center gap-1">
-                          <span className="text-yellow-500 shrink-0">
-                            <WasabiImage url={getTaskTypeImage(task.projectName, task.fullData.taskData?.TaskType)} isUser={false} className="!w-[15px] !h-[15px]" />
-                          </span>
-                          <span className="truncate" title={task.taskName}>{task.taskName}</span>
-                        </p>
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                            <polyline points="15 3 21 3 21 9" />
+                            <line x1="10" y1="14" x2="21" y2="3" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => toggleTaskExpand(e, task.key)}
+                          aria-expanded={isExpanded}
+                          aria-label={isExpanded ? 'Hide details' : 'Show details'}
+                          className="shrink-0 text-gray-400 hover:text-gray-600 cursor-pointer bg-transparent border-0 p-0"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                            <polyline points="6 9 12 15 18 9" />
+                          </svg>
+                        </button>
                       </div>
-                      <div className="shrink-0 self-center text-s font-semibold text-[#2F3990] tabular-nums">
+
+                      {/* Tracked time */}
+                      <div className="mt-0.5 text-xs font-semibold text-[#2F3990] tabular-nums">
                         {taskLoggedMap[String(task.taskId)] ? `${formatMinutes(taskLoggedMap[String(task.taskId)])} hrs` : '--'}
                       </div>
-                      <button
-                        type="button"
-                        onClick={(e) => openTaskWeb(e, task)}
-                        title="Open task in browser"
-                        aria-label="Open task in browser"
-                        className="shrink-0 self-center text-gray-400 hover:text-[#2F3990] cursor-pointer bg-transparent border-0 p-0"
-                      >
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                          <polyline points="15 3 21 3 21 9" />
-                          <line x1="10" y1="14" x2="21" y2="3" />
-                        </svg>
-                      </button>
+
+                      {/* Expanded: breadcrumb + comment */}
+                      {isExpanded && (
+                        <div className="mt-1.5">
+                          <div
+                            className="truncate text-[11px] text-gray-400"
+                            title={`${task?.folderName || ''} ${task?.sprintName || ''}`}
+                          >
+                            {task.key} | {task?.projectName && `${task?.projectName}`}
+                            {task?.folderName && " / "}
+                            {task?.folderName && (
+                              <>
+                                <img src="/images/png/folder.png" className="w-[10px] h-[10px] mx-1 inline-block" alt="folder" />
+                                {task?.folderName}
+                              </>
+                            )}
+                            {task?.sprintName && `/ ${task?.sprintName}`}
+                          </div>
+                          {task.comment && (
+                            <p className="text-xs text-gray-700 leading-snug mt-1" title={task.comment}>{task.comment}</p>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
