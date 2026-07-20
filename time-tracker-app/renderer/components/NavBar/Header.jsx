@@ -115,9 +115,9 @@ function Header() {
     }
 
     return (
-        <div className="bg-[#2F3990] shadow-[0px_0px_16px_rgba(0,0,0,0.1)] rounded-[5px_5px_20px_20px] sticky top-0 z-2 drag-region">
+        <div className="bg-[#2F3990] shadow-[0px_0px_16px_rgba(0,0,0,0.1)] rounded-[5px_5px_20px_20px] sticky top-0 z-2">
             {isSpinner && <Loader/>}
-            <div className="flex justify-between items-center h-[45px] mb-0 pl-[15px]">
+            <div className="flex justify-between items-center mb-0 pl-[15px] h-[45px] drag-region bg-[#2F3990]">
                 {/* Logo and Title Section */}
                 <div className="moveApp flex items-center flex-row text-white text-sm">
                     <img
@@ -131,13 +131,13 @@ function Header() {
                 {/* Window Controls */}
                 <div className="flex items-center">
                     <button
-                        className="header-btn btn w-[35px] h-[35px] leading-[5px] bg-transparent hover:bg-white/30 flex justify-center items-center no-drag"
+                        className="header-btn btn cursor-pointer w-[40px] h-[45px] leading-[5px] bg-transparent hover:bg-white/30 flex justify-center items-center no-drag"
                         onClick={() => { miniMizeWindow() }}
                     >
                         <img src="/images/png/mini-squre.png" alt="Minimize" />
                     </button>
                     <button
-                        className="header-btn-red btn w-[35px] h-[35px] leading-[5px] bg-transparent hover:bg-red-500 flex justify-center items-center no-drag"
+                        className="header-btn-red btn cursor-pointer w-[40px] h-[45px] leading-[5px] bg-transparent hover:bg-red-500 flex justify-center items-center no-drag"
                         onClick={() => { closeWindow() }}
                     >
                         <img src="/images/png/close.png" alt="Close" />
@@ -155,7 +155,7 @@ function Header() {
             </Modal>
 
             {isAuthenticated && (
-                <div className="leading-normal cursor-default px-[15px] py-[10px]">
+                <div className="leading-normal cursor-default px-[15px] py-[10px] pt-[5px]">
                     <div className="flex items-center justify-between text-white">
                         <div className="flex flex-col leading-none min-w-0" title="Logged today">
                             <span className="text-[10px] opacity-80">Logged today</span>
@@ -236,7 +236,7 @@ function Header() {
                                 </div>
                             </div>
                             <div className="flex justify-between mt-2">
-                                <div className="text-left pb-1">
+                                <div className="text-left">
                                     <p className="text-white text-xs leading-[18px] m-0">Current Session</p>
                                     <TimeElapsed time={new Date(timeLog?.startTime)} />
                                 </div>
