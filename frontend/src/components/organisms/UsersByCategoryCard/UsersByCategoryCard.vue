@@ -147,6 +147,7 @@ const cfg = computed(() => {
     return {
         categoryMap: (cd.categoryMap && typeof cd.categoryMap === 'object' && !Array.isArray(cd.categoryMap)) ? cd.categoryMap : {},
         projectIds: Array.isArray(cd.projectId) ? cd.projectId : [],
+        projectMode: cd.projectMode || 'all',
         assigneeIds: Array.isArray(cd.AssigneeUserId) ? cd.AssigneeUserId : [],
         includeSubtasks: cd.isParentTask !== false,
     };
@@ -251,6 +252,7 @@ async function load() {
             metric: 'users_by_category',
             categoryMap: cleanCategoryMap(cfg.value.categoryMap),
             projectIds: cfg.value.projectIds || [],
+            projectMode: cfg.value.projectMode || 'all',
             userIds: Array.isArray(assignees) ? assignees : [],
             includeSubtasks: cfg.value.includeSubtasks,
             dateFrom,

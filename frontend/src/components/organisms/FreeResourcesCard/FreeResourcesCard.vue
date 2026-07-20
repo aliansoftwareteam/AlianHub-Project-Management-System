@@ -127,6 +127,7 @@ const load = async () => {
         const payload = {
             employeeIds,
             projectIds: props.cardData?.projectId || [],
+            projectMode: props.cardData?.projectMode || 'all',
             isParentTask: props.cardData?.isParentTask !== false,
             dateFrom,
             dateTo,

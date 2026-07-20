@@ -97,16 +97,19 @@ onMounted(() => {
 const getQuery = (componentId) => {
     const roleType = props.companyUserDetail.roleType;
     const projectIDs = cardObject.value?.projectId?.length ? cardObject.value?.projectId : (props.allProjectsArrayFilter?.map(e=>e?._id) ?? []);
+    // Project scope: all → $in all accessible; include → $in selected;
+    // exclude → $nin selected (new projects auto-included).
+    const projectMode = cardObject.value?.projectMode || 'all';
+    const selectedProjectIds = cardObject.value?.projectId || [];
+    const projectIdMatch = (projectMode === 'exclude' && selectedProjectIds.length)
+        ? { ProjectID: { objId: { $nin: selectedProjectIds } } }
+        : (projectIDs.length ? { ProjectID: { objId: { $in: projectIDs } } } : {});
     const isParentTaskKeys = cardObject.value?.isParentTask === true ? [true, false] : [true];
 
     switch (componentId) {
         case 'TasksByAssigneePieChartCard': {
             const taskAssineeFilter = {
-                ...(projectIDs.length && {
-                    ProjectID: {
-                        objId: { $in: projectIDs }
-                    },
-                }),
+                ...projectIdMatch,
                 isParentTask: {
                     $in: isParentTaskKeys
                 },
@@ -132,11 +135,7 @@ const getQuery = (componentId) => {
         }
         case 'WorkloadByStatusPieChartCard': {
             const workloadUserFilter = {
-                ...(projectIDs.length && {
-                    ProjectID: {
-                        objId: { $in: projectIDs }
-                    },
-                }),
+                ...projectIdMatch,
                 isParentTask: {
                     $in: isParentTaskKeys
                 },

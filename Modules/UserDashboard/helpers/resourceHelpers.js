@@ -126,7 +126,7 @@ function bucketForStatus(statusName, statusType) {
  * @returns {Promise<{loggedByUserTask:Object.<string,number>, taskMap:Object.<string,object>, userIds:Set<string>}>}
  */
 async function getLoggedAndTasksInRange(companyId, opts = {}) {
-    const { fromSec, toSec, projectIds = [], statusKeys = [], visibleUserIds = null, taskMatch = null } = opts;
+    const { fromSec, toSec, projectIds = [], projectMode = 'all', statusKeys = [], visibleUserIds = null, taskMatch = null } = opts;
 
     const tsFilter = { LogStartTime: { $gte: fromSec, $lte: toSec } };
     if (Array.isArray(visibleUserIds)) {
@@ -154,8 +154,9 @@ async function getLoggedAndTasksInRange(companyId, opts = {}) {
             .filter((id) => mongoose.Types.ObjectId.isValid(id))
             .map((id) => new mongoose.Types.ObjectId(id));
         const taskFilter = { _id: { $in: validIds }, deletedStatusKey: 0 };
-        if (projectIds.length) {
-            taskFilter.ProjectID = { $in: projectIds.map((id) => new mongoose.Types.ObjectId(String(id))) };
+        const lgProjClause = projectScopeClause(projectMode, projectIds);
+        if (lgProjClause) {
+            taskFilter.ProjectID = lgProjClause;
         }
         if (statusKeys.length) {
             taskFilter.statusKey = { $in: statusKeys.map(Number) };

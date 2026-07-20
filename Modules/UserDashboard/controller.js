@@ -318,6 +318,7 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
             employeeIds: rawEmployeeIds.filter((id) => mongoose.Types.ObjectId.isValid(String(id))),
             projectIds: Array.isArray(payload.projectIds) ? payload.projectIds
                 : Array.isArray(payload.projectId) ? payload.projectId : [],
+            projectMode: payload.projectMode || 'all',
             dateFrom: payload.dateFrom ? new Date(payload.dateFrom) : null,
             dateTo: payload.dateTo ? new Date(payload.dateTo) : null,
             statusKeys: Array.isArray(payload.statusKeys) ? payload.statusKeys
@@ -526,8 +527,9 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
                 .filter((id) => mongoose.Types.ObjectId.isValid(id))
                 .map((id) => new mongoose.Types.ObjectId(id));
             const taskFilter = { _id: { $in: validIds }, deletedStatusKey: 0 };
-            if (cfg.projectIds.length) {
-                taskFilter.ProjectID = { $in: cfg.projectIds.map((id) => new mongoose.Types.ObjectId(String(id))) };
+            const empProjClause = projectScopeClause(cfg.projectMode, cfg.projectIds);
+            if (empProjClause) {
+                taskFilter.ProjectID = empProjClause;
             }
             if (cfg.statusKeys.length) {
                 taskFilter.statusKey = { $in: cfg.statusKeys.map(Number) };
@@ -1171,7 +1173,7 @@ exports.getTeamTaskTypeBreakdown = async (req, res) => {
             });
         } else {
             const { loggedByUserTask, taskMap } = await getLoggedAndTasksInRange(companyId, {
-                fromSec, toSec, projectIds, statusKeys, visibleUserIds, taskMatch,
+                fromSec, toSec, projectIds, projectMode: payload.projectMode || 'all', statusKeys, visibleUserIds, taskMatch,
             });
 
             let sprintTypeMap = {};
@@ -1279,6 +1281,7 @@ exports.getTeamLoggedVsEta = async (req, res) => {
             fromSec, toSec,
             projectIds: Array.isArray(payload.projectIds) ? payload.projectIds
                 : Array.isArray(payload.projectId) ? payload.projectId : [],
+            projectMode: payload.projectMode || 'all',
             statusKeys: Array.isArray(payload.statusKeys) ? payload.statusKeys
                 : Array.isArray(payload.statusKey) ? payload.statusKey : [],
             visibleUserIds,
@@ -1652,6 +1655,7 @@ exports.getProjectProgressMetric = async (req, res) => {
 
             const includeSubtasks = payload.includeSubtasks === undefined ? true : !!payload.includeSubtasks;
             const projectIds = objIds(payload.projectIds);
+            const projectMode = payload.projectMode || 'all';
             // User filter is a plain string-id match on Loggeduser (mirrors the
             // workload report). Non-admins are already pinned to themselves by
             // userScope(), so this explicit filter only applies for admins.
@@ -1682,7 +1686,8 @@ exports.getProjectProgressMetric = async (req, res) => {
             const tIds = objIds([...taskIdSet]);
             if (tIds.length) {
                 const taskFilter = { _id: { $in: tIds }, deletedStatusKey: 0 };
-                if (projectIds.length) taskFilter.ProjectID = { $in: projectIds };
+                const pmClause = projectScopeClause(projectMode, projectIds);
+                if (pmClause) taskFilter.ProjectID = pmClause;
                 if (includeSubtasks === false) taskFilter.isParentTask = true;
                 const tasks = await MongoDbCrudOpration(companyId, {
                     type: SCHEMA_TYPE.TASKS,

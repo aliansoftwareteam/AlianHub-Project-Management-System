@@ -74,7 +74,8 @@
                 if(!filterQuery.value?.$and) {
                     filterQuery.value.$and = [];
                 }
-                filterQuery.value.$and.push({ ProjectID: { objId:{$in: cardDataObject.value.projectId}} },cardDataObject.value.isParentTask === true ? {} : { isParentTask: !cardDataObject.value.isParentTask },{ deletedStatusKey:0 });
+                const pExclude = (cardDataObject.value.projectMode === 'exclude') && (cardDataObject.value.projectId || []).length;
+                filterQuery.value.$and.push({ ProjectID: { objId: pExclude ? { $nin: cardDataObject.value.projectId } : { $in: cardDataObject.value.projectId } } },cardDataObject.value.isParentTask === true ? {} : { isParentTask: !cardDataObject.value.isParentTask },{ deletedStatusKey:0 });
             }
             let timeuserId = [];
             if(checkPermission('sheet_settings.workload_timesheet') === 2 || checkPermission('sheet_settings.workload_timesheet') === true) {
@@ -101,8 +102,8 @@
             let projectStatsQuery = [
                 ...(cardDataObject.value.measure === 1 || cardDataObject.value.measure === 2
                     ? [
-                        { $match: { 
-                            ProjectId: { $in: cardDataObject.value.projectId },
+                        { $match: {
+                            ProjectId: (cardDataObject.value.projectMode === 'exclude' && (cardDataObject.value.projectId || []).length) ? { $nin: cardDataObject.value.projectId } : { $in: cardDataObject.value.projectId },
                             ...(cardDataObject.value.measure === 2 && {LogStartTime: {
                                 $gte: start,
                                 $lte: end

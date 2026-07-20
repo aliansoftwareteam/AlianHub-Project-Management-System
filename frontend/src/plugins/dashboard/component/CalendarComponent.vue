@@ -182,6 +182,12 @@ const searchMongoTasks = (date = null, reset = true) => {
         let startDate = date == null ? new Date(dateValue.value.setHours(0, 0, 0)).getTime() : new Date(date.setHours(0, 0, 0)).getTime();
         let endDate = date == null ? new Date(dateValue.value.setHours(23, 59, 59)).getTime() : new Date(date.setHours(23, 59, 59)).getTime();
         const projectIDs = cardObject.value.projectId.length ? cardObject.value.projectId : JSON.parse(JSON.stringify(allProjects.value)).map((e) => e?._id);
+        // Project scope: exclude → $nin selected; else → $in (selected or all accessible).
+        const projectMode = cardObject.value.projectMode || 'all';
+        const excludeIds = cardObject.value.projectId || [];
+        const projectIdObjId = (projectMode === 'exclude' && excludeIds.length)
+            ? { $nin: excludeIds }
+            : (projectIDs && projectIDs.length ? { $in: projectIDs } : {});
         // const statusKeys = cardObject.value.statusArray || [];
         let queryAndConditions = [
             {
@@ -192,7 +198,7 @@ const searchMongoTasks = (date = null, reset = true) => {
             { deletedStatusKey: 0 },
             {
                 ProjectID: {
-                    objId: projectIDs && projectIDs.length ? { $in: projectIDs } : {},
+                    objId: projectIdObjId,
                 },
             },
             ...(filterQuery.value ? Object.entries(filterQuery.value).map(([key, value]) => ({ [key]: value })) : [])
