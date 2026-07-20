@@ -5,9 +5,55 @@ const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const { removeCache } = require('../../utils/commonFunctions');
 const logger = require('../../Config/loggerConfig');
 const R = require('./helpers/ptoRules');
+const { createNotificationsBody } = require('../notification/prepare-notification-data/controllerV2');
+const sendMail = require('../service.js');
 
 const companyOf = (req) => req.headers['companyid'] || (req.body && req.body.companyId) || (req.query && req.query.companyId);
 const audit = (req, entry) => { try { require('../Audit/recorder').recordAuditFromReq(req, entry); } catch (e) { /* best-effort */ } };
+
+// Best-effort: notify the requester when their leave is approved/rejected — an
+// in-app notification (bell, real-time via the globalNotification socket event)
+// plus a plain email. Wrapped so a notify/email failure never blocks the
+// approve/reject response. The templated email pipeline is task/project-only,
+// so we send a simple standalone email via the low-level mailer.
+const notifyPtoDecision = async (req, companyId, entry, status) => {
+    const toId = (v) => (mongoose.Types.ObjectId.isValid(String(v)) ? new mongoose.Types.ObjectId(String(v)) : null);
+    const ids = [entry.userId, req.uid].map(toId).filter(Boolean);
+    const users = ids.length ? await MongoDbCrudOpration('global', {
+        type: SCHEMA_TYPE.USERS,
+        data: [{ _id: { $in: ids } }, { Employee_Name: 1, Employee_FName: 1, Employee_LName: 1, Employee_Email: 1 }],
+    }, 'find').catch(() => []) : [];
+    const nameOf = (u) => (u && (u.Employee_Name || `${u.Employee_FName || ''} ${u.Employee_LName || ''}`.trim() || u.Employee_Email)) || '';
+    const requester = (users || []).find((u) => String(u._id) === String(entry.userId));
+    const approver = (users || []).find((u) => String(u._id) === String(req.uid));
+    const fmtD = (d) => { try { return new Date(d).toLocaleDateString('en-GB'); } catch (e) { return ''; } };
+    const t = String(entry.type || 'casual');
+    const typeLabel = `${t.charAt(0).toUpperCase()}${t.slice(1)} Leave`;
+    const range = fmtD(entry.startDate) + (String(entry.startDate) !== String(entry.endDate) ? ` - ${fmtD(entry.endDate)}` : '');
+    const verb = status === 'approved' ? 'approved' : 'rejected';
+    const message = `Your ${typeLabel} (${range}) was ${verb}${approver ? ` by ${nameOf(approver)}` : ''}.`;
+
+    // In-app notification for the requester (creates + emits globalNotification).
+    try {
+        await createNotificationsBody({
+            createdAt: new Date(), updatedAt: new Date(),
+            key: 'pto_status', type: 'pto', message,
+            userId: String(req.uid),
+            assigneeUsers: [String(entry.userId)], notSeen: [String(entry.userId)],
+            isSelected: false, companyId: String(companyId),
+            changeType: status, changeData: { ptoId: String(entry._id) },
+        });
+    } catch (e) { logger.error(`notifyPtoDecision in-app: ${e.message}`); }
+
+    // Standalone email (SMTP-dependent; no-op where mail isn't configured).
+    try {
+        const email = requester && requester.Employee_Email;
+        if (email) {
+            const html = `<p>Hi ${nameOf(requester) || 'there'},</p><p>${message}</p><p>You can review it under Settings &rarr; Time Off.</p>`;
+            await new Promise((resolve) => sendMail.SendNotificationEmail(`Time off ${verb}`, html, [email], true, () => resolve()));
+        }
+    } catch (e) { logger.error(`notifyPtoDecision email: ${e.message}`); }
+};
 
 // POST /api/v1/pto — create a PTO entry. A member creates their own (pending);
 // owner/admin may create for another user and/or set status (e.g. auto-approve).
@@ -44,14 +90,41 @@ exports.listPto = async (req, res) => {
         if (privileged) { if (q.userId) match.userId = String(q.userId); }
         else { match.userId = String(req.uid); }
         if (q.status) match.status = String(q.status);
+        if (q.type) match.type = String(q.type);
         if (q.from || q.to) {
             const and = [];
             if (q.to) and.push({ startDate: { $lte: new Date(q.to) } });
             if (q.from) and.push({ endDate: { $gte: new Date(q.from) } });
             if (and.length) match.$and = and;
         }
+
+        // Member search (owner/admin only) — entries store userId; names live in
+        // the GLOBAL users db. Resolve users whose name/email match the term →
+        // userIds, then filter. Non-admins only ever see their own rows.
+        const search = privileged && q.search ? String(q.search).trim() : '';
+        if (search) {
+            const rx = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+            const matched = await MongoDbCrudOpration('global', {
+                type: SCHEMA_TYPE.USERS,
+                data: [{ $or: [{ Employee_Name: rx }, { Employee_FName: rx }, { Employee_LName: rx }, { Employee_Email: rx }] }, { _id: 1 }],
+            }, 'find').catch(() => []);
+            const searchIds = (matched || []).map((u) => String(u._id));
+            if (typeof match.userId === 'string') {
+                if (!searchIds.includes(match.userId)) match.userId = '__none__';
+            } else {
+                match.userId = { $in: searchIds.length ? searchIds : ['__none__'] };
+            }
+        }
+
+        // Pagination — 10 per page by default (max 50) so large histories batch.
+        const pageSize = Math.min(Math.max(Number(q.pageSize) || 10, 1), 50);
+        const page = Math.max(Number(q.page) || 1, 1);
+        const total = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.PTO_ENTRIES, data: [match],
+        }, 'countDocuments').catch(() => 0);
         const rows = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.PTO_ENTRIES, data: [match, {}, { sort: { startDate: -1 } }],
+            type: SCHEMA_TYPE.PTO_ENTRIES,
+            data: [match, {}, { sort: { startDate: -1 }, skip: (page - 1) * pageSize, limit: pageSize }],
         }, 'find');
         // Attach the requester's display name so the admin Team view shows WHO applied —
         // entries store only userId, and users live in the GLOBAL db. (AHE-3804)
@@ -66,9 +139,13 @@ exports.listPto = async (req, res) => {
         }
         const data = (rows || []).map((r) => {
             const o = typeof r.toObject === 'function' ? r.toObject() : r;
-            return { ...o, userName: nameById[String(o.userId)] || '' };
+            // totalDays = working days in the entry's range × (hoursPerDay / full day),
+            // so a half-day entry reads as 0.5 (drives the "Total Days" column).
+            // createdAt: use the stored value, else derive it from the _id timestamp.
+            const createdAt = o.createdAt || new Date(parseInt(String(o._id).substring(0, 8), 16) * 1000);
+            return { ...o, userName: nameById[String(o.userId)] || '', totalDays: R.leaveDays(o), createdAt };
         });
-        return res.json({ status: true, data });
+        return res.json({ status: true, data, total, page, pageSize });
     } catch (e) { logger.error(`listPto: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
 };
 
@@ -89,6 +166,10 @@ exports.updatePtoStatus = async (req, res) => {
         if (!updated) return res.status(404).json({ status: false, statusText: 'Not found.' });
         removeCache(`pto:${companyId}`);
         audit(req, { action: `pto.${status}`, entityType: 'pto', entityId: String(id) });
+        // Notify the requester (in-app + email) — best-effort, never blocks.
+        if (status === 'approved' || status === 'rejected') {
+            notifyPtoDecision(req, companyId, updated, status).catch((e) => logger.error(`notifyPtoDecision: ${e.message}`));
+        }
         return res.json({ status: true, statusText: `PTO ${status}.`, data: updated });
     } catch (e) { logger.error(`updatePtoStatus: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
 };
@@ -105,6 +186,10 @@ exports.deletePto = async (req, res) => {
             type: SCHEMA_TYPE.PTO_ENTRIES, data: [{ _id: new mongoose.Types.ObjectId(String(id)) }],
         }, 'findOne');
         if (!entry) return res.status(404).json({ status: false, statusText: 'Not found.' });
+        // An approved leave is committed — it can't be deleted by anyone.
+        if (String(entry.status) === 'approved') {
+            return res.status(400).json({ status: false, statusText: 'An approved time-off entry cannot be deleted.' });
+        }
         if (!privileged && String(entry.userId) !== String(req.uid)) {
             return res.status(403).json({ status: false, statusText: 'You can only remove your own time off.' });
         }

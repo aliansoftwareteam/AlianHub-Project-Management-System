@@ -1,6 +1,39 @@
 <template>
     <div class="task-detail-right-side">
         <div>
+            <div class="start-in-tracker-wrap" v-if="isAssignee">
+                <button
+                    type="button"
+                    class="start-in-tracker-btn"
+                    @click="startInTracker"
+                    title="Start this task in the AlianHub desktop tracker"
+                >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                    Start Tracker
+                </button>
+            </div>
+
+            <Modal
+                :modelValue="showTrackerModal"
+                title="Start Tracker"
+                acceptButtonText="Start tracking"
+                bodyClasses="tracker-modal-body"
+                @close="showTrackerModal = false"
+                @accept="confirmStartTracker"
+            >
+                <template #body>
+                    <div class="tracker-modal-task">{{ task?.TaskKey }} · {{ task?.TaskName }}</div>
+                    <label class="tracker-modal-label">What are you working on?</label>
+                    <textarea
+                        v-model="trackerComment"
+                        rows="4"
+                        class="tracker-modal-textarea"
+                        placeholder="Add a comment for this session…"
+                        @input="trackerCommentError = ''"
+                    ></textarea>
+                    <div class="tracker-modal-error" v-if="trackerCommentError">{{ trackerCommentError }}</div>
+                </template>
+            </Modal>
             <h4 class="details-heading">{{$t('ProjectDetails.details')}}</h4>
             <div class="d-flex task-detail-right-side-label" v-if="checkPermission('task.task_list',project?.isGlobalPermission)!==null && checkPermission('task.task_status',project?.isGlobalPermission) !== null">
                 <h4>{{$t('ProjectDetails.status')}}</h4>
@@ -112,12 +145,13 @@
                     :permission="checkPermission('task.task_priority',project?.isGlobalPermission) === true"
                 />
             </div>
-            <div class="d-flex task-detail-right-side-label" v-if="checkPermission('task.task_estimated_hours',project?.isGlobalPermission) !== null">
+            <!-- Story Points: permission gate removed — free for anyone to view + edit. -->
+            <div class="d-flex task-detail-right-side-label">
                 <h4>Story Points</h4>
                 <StoryPoints
                     :pointsVal="task.points"
                     :estimationScale="project?.estimationScale || 'fibonacci'"
-                    :permission="checkPermission('task.task_estimated_hours',project?.isGlobalPermission) === true"
+                    :permission="true"
                     @select="updatePoints($event)"
                     class="taskdetail-label task-detail-right-wrapper ml-0"
                 />
@@ -234,6 +268,8 @@ import { useI18n } from "vue-i18n";
 import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import { openInTracker, isTrackerCapableDevice } from '@/utils/trackerDeepLink';
+import Modal from '@/components/atom/Modal/Modal.vue';
 
 // Icon for the "Generate estimate using AI" sidebar button. Same asset
 // the SubTasks / Checklist / Sprints components use for their AI actions
@@ -288,6 +324,51 @@ const props = defineProps({
     },
     clientWidth: Number,
 })
+
+// Only assignees of the task can start tracking it.
+const isAssignee = computed(() => (props.task?.AssigneeUserId || []).includes(userId.value));
+
+// Start Tracker modal (project Modal component) — collects a comment, then deep-links.
+const showTrackerModal = ref(false);
+const trackerComment = ref('');
+const trackerCommentError = ref('');
+
+const startInTracker = () => {
+    if (!isTrackerCapableDevice()) {
+        $toast.warning('Open this on a desktop with the AlianHub Tracker installed.');
+        return;
+    }
+    trackerComment.value = '';
+    trackerCommentError.value = '';
+    showTrackerModal.value = true;
+};
+
+const confirmStartTracker = () => {
+    const comment = (trackerComment.value || '').trim();
+    if (!comment) {
+        trackerCommentError.value = 'Please enter a comment';
+        return;
+    }
+    const res = openInTracker({
+        taskId: props.task?._id,
+        projectId: props.task?.ProjectID,
+        sprintId: props.task?.sprintId,
+        folderId: props.task?.folderObjId || '',
+        comment,
+    });
+    showTrackerModal.value = false;
+    if (res.ok) {
+        $toast.success('Opening the tracker…');
+        return;
+    }
+    if (res.reason === 'unsupported') {
+        $toast.warning('Open this on a desktop with the AlianHub Tracker installed.');
+    } else if (res.reason === 'missing') {
+        $toast.error('Task details are incomplete to start the tracker.');
+    } else {
+        $toast.error('Could not open the tracker.');
+    }
+};
 //ref
 const taskLeaderData = ref(getUser(props.task?.Task_Leader));
 const assigneeInProgress = ref({});

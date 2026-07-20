@@ -397,11 +397,17 @@ const initializeFormObject = () => {
 
 const initializeSelectedValues = () => {
     if (formObj.value?.projectId) {
-        selectedProjects.value = props.isEditCard 
-            ? (formObj.value?.projectId?.value?.length ? formObj.value?.projectId?.value : (props.allProjectsArray?.map(e => e._id) || [])) 
+        selectedProjects.value = props.isEditCard
+            ? (formObj.value?.projectId?.value?.length ? formObj.value?.projectId?.value : (props.allProjectsArray?.map(e => e._id) || []))
             : (props.allProjectsArray?.map(e => e._id) || []);
         filteredProjects.value = props.allProjectsArray.filter(project =>
             selectedProjects.value.includes(project._id));
+    } else if (fieldArray.value?.some(e => e.groupBy === 'filter')) {
+        // Self-scoped cards (My Achievements, Due Soon, …) have no project picker,
+        // but their filter's value lists (status/priority/…) are derived from the
+        // projects' taskStatusData. Fall back to all projects so those render.
+        selectedProjects.value = props.allProjectsArray?.map(e => e._id) || [];
+        filteredProjects.value = props.allProjectsArray || [];
     }
 
     if (formObj.value?.AssigneeUserId) {
@@ -449,7 +455,11 @@ const initializeSelectedValues = () => {
        taskFilter.value=formObj.value?.filter?.value || [];
     }
     if(formObj.value?.groupBy){
-        selectedGroupBy.value=formObj.value?.groupBy?.value;
+        // groupBy may arrive as a stale Mongo extended-JSON object ({ $numberLong: "0" });
+        // normalize to the plain number so the option lookup matches (else the label
+        // renders as "dashboardCard.undefined"). Strings/numbers pass through unchanged.
+        const g = formObj.value?.groupBy?.value;
+        selectedGroupBy.value = (g && typeof g === 'object' && g.$numberLong !== undefined) ? Number(g.$numberLong) : g;
     }
 };
 

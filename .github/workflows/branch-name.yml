@@ -46,7 +46,7 @@ jobs:
           # staging -> main, or hotfix flows branching from main).
           # Per BRANCHING.md these are the only branches with no type
           # prefix that are allowed.
-          LONG_RUNNING='^(staging|main)$'
+          LONG_RUNNING='^(staging|main|demo)$'
 
           if [[ "$BRANCH" =~ $STANDARD ]]     || \
              [[ "$BRANCH" =~ $RELEASE ]]      || \

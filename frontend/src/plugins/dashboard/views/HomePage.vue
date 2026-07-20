@@ -52,7 +52,7 @@
                             :title="item?.cardData?.fieldName"
                             :id="item.i"
                             :showRefresh="isRefreshable(item.componentId)"
-                            :periodOptions="periodOptionsFor(item.componentId)"
+                            :periodOptions="periodOptionsFor(item)"
                             :periodValue="periodValueFor(item)"
                             @period-change="(val) => handlePeriodChange(item, val)"
                             @delete-card="handleRemoveCard(item.i)"
@@ -80,7 +80,7 @@
                         :title="item?.cardData?.fieldName"
                         :id="item.i"
                         :showRefresh="isRefreshable(item.componentId)"
-                        :periodOptions="periodOptionsFor(item.componentId)"
+                        :periodOptions="periodOptionsFor(item)"
                         :periodValue="periodValueFor(item)"
                         @period-change="(val) => handlePeriodChange(item, val)"
                         @delete-card="handleRemoveCard(item.i)"
@@ -192,7 +192,7 @@
     </div>
 </template>
 <script setup>
-    import {  ref, reactive, onMounted, inject, computed, watch,defineExpose, nextTick,provide } from 'vue';
+    import {  ref, reactive, onMounted, onBeforeUnmount, inject, computed, watch,defineExpose, nextTick,provide } from 'vue';
     import { GridLayout, GridItem } from 'grid-layout-plus';
     import useCustomFieldImage from '@/composable/customFieldIcon.js';
     import AdvanceSearchModal from '@/components/atom/Modal/Modal.vue';
@@ -232,6 +232,7 @@
     import MyLeaveCard from "@/components/organisms/MyLeaveCard/MyLeaveCard.vue";
     import DueSoonCard from "@/components/organisms/DueSoonCard/DueSoonCard.vue";
     import MyTimeCard from "@/components/organisms/MyTimeCard/MyTimeCard.vue";
+    import MilestoneReportCard from "@/components/organisms/MilestoneReportCard/MilestoneReportCard.vue";
     import { useCustomComposable } from '@/composable';
     import { onBeforeRouteLeave } from 'vue-router';
     import { abortAllRequests } from "@/services";
@@ -316,15 +317,26 @@
             isDataFetching.value = false;
         },2000)
     });
+    // Management-only dashboard cards (company-wide data) — visible only to
+    // Owner/Admin (roleType 1/2). Hidden from the "Add card" catalog AND from
+    // an already-saved layout for anyone below that.
+    const MANAGEMENT_ONLY_CARDS = ['MilestoneReportCard', 'ActiveProjectsCard', 'ProjectsByTypeCard', 'RunningProjectsCard'];
+    const isManagementUser = () => [1, 2].includes(companyUserDetail.value?.roleType);
+
     const getUserDashboard = async() => {
         try {
             const response = await apiRequest("get", `${env.DASHBOARD}/${userId.value}`);
             if (response?.data?.length > 0) {
-                const cards = response.data[0].cards || [];
+                let cards = response.data[0].cards || [];
                 currentLayout.value = response.data[0];
+                // Drop management-only cards from a non-management user's saved
+                // layout so any previously-added instance stops rendering.
+                if (!isManagementUser()) {
+                    cards = cards.filter((e) => !MANAGEMENT_ONLY_CARDS.includes(e.componentId));
+                }
                 if(cards) {
                     layout.value = cards.map((e) => ({...e.config.position,...(getCardsComponentsSize(e.componentId) ?? {}), i:e.uid,componentId:e.componentId, cardData: e.config.cardData, filterData: e.config.filterData}));
-                } 
+                }
             }
         } catch (error) {
             console.error(error)
@@ -349,6 +361,11 @@
             const response = await apiRequest("get", `${env.CARDCOMPONENT}`);
             if (response?.data?.length > 0) {
                 let cardsArray = checkPermission('sheet_settings.workload_timesheet') !== null ? response?.data : response?.data?.filter((e)=> !["TimeEstimatedWorkloadComp","TimeTrackComp","TimeEstimatedComp"].includes(e.key))
+                // Management-only cards — hide from the "Add card" catalog for
+                // anyone below Owner/Admin (roleType 1/2).
+                if (!isManagementUser()) {
+                    cardsArray = cardsArray?.filter((e) => !MANAGEMENT_ONLY_CARDS.includes(e.key));
+                }
                 cardComponent.value = JSON.parse(JSON.stringify(cardsArray));
                 filterCardComponent.value = structureCards(cardsArray);
             }
@@ -425,6 +442,8 @@
                 return DueSoonCard;
             case 'MyTimeCard':
                 return MyTimeCard;
+            case 'MilestoneReportCard':
+                return MilestoneReportCard;
             default:
                 return null;
         }
@@ -673,6 +692,46 @@
     const move = () => {
         isMoving.value = true;
     };
+
+    // Auto-scroll while dragging/resizing a card near a viewport edge.
+    // grid-layout-plus maps the pointer to viewport coords with no auto-scroll,
+    // so a card at the bottom of the screen can't be grown/moved past the edge —
+    // the cursor can't travel below the screen and nothing scrolls. We nudge the
+    // dashboard's scroll host when the cursor nears the top/bottom edge.
+    // ponytail: fixed 60px edge zone; find the scroll host lazily per drag.
+    const EDGE = 60;
+    let scrollHost = null;
+    let scrollVy = 0;
+    let scrollRAF = 0;
+    const getScrollHost = () => {
+        const grid = document.querySelector('.vgl-layout');
+        let el = grid ? grid.parentElement : null;
+        while (el && el !== document.body) {
+            const oy = getComputedStyle(el).overflowY;
+            if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight) return el;
+            el = el.parentElement;
+        }
+        return document.scrollingElement || document.documentElement;
+    };
+    const scrollTick = () => {
+        if (!scrollVy || !isMoving.value || !scrollHost) { scrollRAF = 0; return; }
+        scrollHost.scrollTop += scrollVy;
+        scrollRAF = requestAnimationFrame(scrollTick);
+    };
+    const onDragPointerMove = (e) => {
+        if (!isMoving.value) { scrollVy = 0; scrollHost = null; return; }
+        if (!scrollHost) scrollHost = getScrollHost();
+        const fromBottom = window.innerHeight - e.clientY;
+        if (fromBottom < EDGE) scrollVy = Math.ceil((EDGE - fromBottom) / 3);
+        else if (e.clientY < EDGE) scrollVy = -Math.ceil((EDGE - e.clientY) / 3);
+        else scrollVy = 0;
+        if (scrollVy && !scrollRAF) scrollRAF = requestAnimationFrame(scrollTick);
+    };
+    onMounted(() => document.addEventListener('pointermove', onDragPointerMove, true));
+    onBeforeUnmount(() => {
+        document.removeEventListener('pointermove', onDragPointerMove, true);
+        if (scrollRAF) cancelAnimationFrame(scrollRAF);
+    });
     const layoutUpdatedEvent = async(newLayout) => {
         try {
             if(!isMoving.value) return;
@@ -780,6 +839,7 @@
         'WorkedTasksTableCard', 'TeamCategoryBreakdownCard', 'TeamLoggedVsEtaCard',
         'TasksByStatusCard', 'TasksByProjectCard', 'TotalTasksCard',
         'NextUpCard', 'MyAchievementsCard', 'MyLeaveCard', 'DueSoonCard', 'MyTimeCard',
+        'MilestoneReportCard',
     ].includes(cid);
 
     // ── Dashboard-level date range ──────────────────────────────────
@@ -823,7 +883,7 @@
     const PROJECT_PERIOD_CARDS = [
         'RunningProjectsCard', 'UsersByCategoryCard', 'ProjectPulseCard',
         'WorkedTasksTableCard', 'TeamCategoryBreakdownCard', 'TeamLoggedVsEtaCard', 'OnLeaveCard',
-        'MyAchievementsCard', 'MyTimeCard',
+        'MyAchievementsCard', 'MyTimeCard', 'MilestoneReportCard',
     ];
     const PROJECT_PERIOD_OPTIONS = [
         { id: 0, label: 'Auto' },
@@ -833,9 +893,16 @@
     const PROJECT_PERIOD_DEFAULT = {
         RunningProjectsCard: 1, UsersByCategoryCard: 3, ProjectPulseCard: 1,
         WorkedTasksTableCard: 3, TeamCategoryBreakdownCard: 3, TeamLoggedVsEtaCard: 3, OnLeaveCard: 1,
-        MyAchievementsCard: 5, MyTimeCard: 3,
+        MyAchievementsCard: 5, MyTimeCard: 3, MilestoneReportCard: 5, TASKLIST: 0,
     };
-    const periodOptionsFor = (cid) => (PROJECT_PERIOD_CARDS.includes(cid) ? PROJECT_PERIOD_OPTIONS : []);
+    // TASKLIST shows the period dropdown only when its date-range toggle is on.
+    const periodOptionsFor = (item) => {
+        const cid = item && item.componentId;
+        if (cid === 'TASKLIST') {
+            return (item.cardData && item.cardData.enableDateRange) ? PROJECT_PERIOD_OPTIONS : [];
+        }
+        return PROJECT_PERIOD_CARDS.includes(cid) ? PROJECT_PERIOD_OPTIONS : [];
+    };
     const periodValueFor = (item) => {
         // NOTE: can't use `|| default` — 0 (Auto) is a valid saved value.
         const v = Number(item && item.cardData && item.cardData.timerange);

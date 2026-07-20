@@ -8,6 +8,8 @@
   "include-component-in-tag": false,
   "include-v-in-tag": true,
   "separate-pull-requests": false,
+  "release-search-depth": 2000,
+  "commit-search-depth": 2000,
   "packages": {
     ".": {
       "release-type": "node",

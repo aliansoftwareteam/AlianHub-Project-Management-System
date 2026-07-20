@@ -4,6 +4,8 @@ import { useRouter } from 'next/router';
 import { setComment, setTrackerStartTime } from '../store/timelog';
 import { DateTime } from 'luxon';
 import { apiRequest } from '../utils/services';
+import { DEFAULT_TASK_IMAGE } from '../utils/imageDefaults';
+import WasabiImage from './WasabiImage/WasabiImage';
 
 export default function TrackerTask({
   selectedTaskData,
@@ -73,7 +75,7 @@ export default function TrackerTask({
 
   const getTaskTypeImage = (projectName, key) => {
     let project = projects.find((x) => x.ProjectName === projectName);
-    let imgUrl = "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/defaut_task_status_img.png?alt=media&token=570a9fca-e23a-41ee-a47b-d82fb766b1fd";
+    let imgUrl = DEFAULT_TASK_IMAGE;
     if (project?.taskTypeCounts?.length > 0) {
       const match = project.taskTypeCounts.find((item) => item.value === key);
       if (match?.taskImage) {
@@ -85,61 +87,54 @@ export default function TrackerTask({
   };
 
   return (
-    <div className="flex items-center justify-center bg-[#f4f5f7] p-3 max-h-[calc(100%-130px)]">
-      <div className="bg-white rounded-2xl w-full max-w-lg p-8 relative border border-gray-100 shadow-[0px_1.615384578704834px_12.115384101867676px_0px_#0000001F] flex flex-col h-[467px]">
-        {/* Title */}
-        {/* <h2 className="text-2xl font-semibold mb-6 text-center flex-shrink-0 cursor-pointer">Start Tracker</h2> */}
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-auto scrollbar-hide space-y-4">
-          <div>
-            <div><strong>Project</strong></div>
-            <div>{selectedTaskData.projectName}</div>
-          </div>
-          {selectedTaskData.folderName && 
-            <div>
-              <div><strong>Folder</strong></div>
-              <div>{selectedTaskData.folderName}</div>
-            </div>
-          }
-          <div>
-            <div><strong>Sprint</strong></div>
-            <div>{selectedTaskData.sprintName}</div>
-          </div>
-          <div>
-            <div><strong>Task</strong></div>
-            <div>{selectedTaskData.key} | {selectedTaskData.taskName}</div>
-          </div>
-          <div>
-            {/* <label className="block font-semibold mb-1">Comment:</label> */}
-            <textarea
-              type="text"
-              className="w-full h-[90px] rounded-[5px] border border-[#DFE1E6] resize-none px-3 py-2 outline-none"
-              value={taskComment}
-              onChange={e => { setTaskComment(e.target.value); setTaskModalError(''); }}
-              placeholder="Comment"
-            />
-            {taskModalError && <div className="text-red-500 text-sm mt-1">{taskModalError}</div>}
-          </div>
-        </div>
-        {/* Button Row */}
-        <div className="flex justify-end gap-3 mt-8 flex-shrink-0">
-          <button
-            className="px-5 py-2 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 font-bold cursor-pointer"
-            onClick={onClose}
-            disabled={isSpinner}
-          >
-            Cancel
-          </button>
-          <div className="w-1/2 flex justify-center">
-            <button
-              className="px-[25px] py-[10px] bg-[#1CB303] text-white rounded text-sm hover:bg-[#169302] transition-colors whitespace-nowrap cursor-pointer font-bold"
-              onClick={handleStart}
-              disabled={isSpinner}
-            >
-              {isSpinner ? 'Starting...' : 'Start Tracker'}
-            </button>
-          </div>
-        </div>
+    <div className="px-2 pb-2">
+      {/* Task breadcrumb + headline (mirrors the Today's Tasks row) */}
+      <div
+        className="truncate text-xs text-gray-500"
+        title={`${selectedTaskData?.folderName || ''} ${selectedTaskData?.sprintName || ''}`}
+      >
+        {selectedTaskData.key} | {selectedTaskData.projectName}
+        {selectedTaskData.folderName && (
+          <>
+            {" / "}
+            <img src="/images/png/folder.png" className="w-[10px] h-[10px] mx-1 inline-block" alt="folder" />
+            {selectedTaskData.folderName}
+          </>
+        )}
+        {selectedTaskData.sprintName && ` / ${selectedTaskData.sprintName}`}
+      </div>
+      <p className="text-sm font-medium text-gray-800 mt-1 mb-3 flex items-center gap-1.5">
+        <WasabiImage
+          url={getTaskTypeImage(selectedTaskData.projectName, selectedTaskData?.fullData?.taskData?.TaskType)}
+          isUser={false}
+          className="!w-[16px] !h-[16px] shrink-0"
+        />
+        <span className="truncate" title={selectedTaskData.taskName}>{selectedTaskData.taskName}</span>
+      </p>
+
+      <textarea
+        className="w-full h-[80px] rounded-[5px] border border-[#DFE1E6] resize-none px-3 py-2 outline-none text-sm"
+        value={taskComment}
+        onChange={e => { setTaskComment(e.target.value); setTaskModalError(''); }}
+        placeholder="Comment"
+      />
+      {taskModalError && <div className="text-red-500 text-xs mt-1">{taskModalError}</div>}
+
+      <div className="flex justify-end gap-3 mt-4">
+        <button
+          className="px-5 py-2 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 font-bold text-sm cursor-pointer"
+          onClick={onClose}
+          disabled={isSpinner}
+        >
+          Cancel
+        </button>
+        <button
+          className="px-[25px] py-2 bg-[#1CB303] text-white rounded text-sm hover:bg-[#169302] transition-colors whitespace-nowrap cursor-pointer font-bold"
+          onClick={handleStart}
+          disabled={isSpinner}
+        >
+          {isSpinner ? 'Starting...' : 'Start Tracker'}
+        </button>
       </div>
     </div>
   );

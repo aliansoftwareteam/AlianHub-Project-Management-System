@@ -3,9 +3,13 @@ import serve from 'electron-serve'
 import { createWindow } from './helpers'
 const path = require('node:path')
 const fs = require('fs')
-const iconPath = path.join(__dirname, 'logo.png')
-const trayIconPath = path.join(__dirname, 'traylogo.png')
 const isProd = process.env.NODE_ENV === 'production'
+// Prod: assets are packaged into app/ (see electron-builder.yml). Dev: read from source resources/.
+const assetPath = (name) => isProd ? path.join(__dirname, name) : path.join(__dirname, '..', 'resources', name)
+const iconPath = assetPath('logo.png')
+const trayIconPath = assetPath('traylogo.png')
+// Prod: next export copies public/ into app/. Dev: read straight from renderer/public.
+const notificationHtmlPath = isProd ? path.join(__dirname, 'notification.html') : path.join(__dirname, '..', 'renderer', 'public', 'notification.html')
 let notification = null;
 let screenshotNotificationWindow = null;
 
@@ -73,6 +77,37 @@ if (process.defaultApp) {
 
 let mainWindow
 let tray = null
+
+// Read the `type` query param from a myapp:// deep link, order-independently.
+const deepLinkType = (u) => {
+  try {
+    return new URLSearchParams((u || '').split('?').slice(1).join('?')).get('type')
+  } catch (e) {
+    return null
+  }
+}
+
+// Cold-launch buffering: a trackerStart deep link can arrive before the renderer
+// has loaded projects. Buffer it and deliver once the renderer signals ready.
+let pendingTrackerDeepLink = null
+let rendererReadyForDeepLink = false
+
+const deliverTrackerDeepLink = (url) => {
+  if (!url) return
+  if (rendererReadyForDeepLink && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('trackerInfoFill', { url })
+  } else {
+    pendingTrackerDeepLink = url
+  }
+}
+
+ipcMain.on('deeplink:renderer-ready', () => {
+  rendererReadyForDeepLink = true
+  if (pendingTrackerDeepLink && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('trackerInfoFill', { url: pendingTrackerDeepLink })
+    pendingTrackerDeepLink = null
+  }
+})
 let isTracking = null
 let activityInterval = null
 
@@ -288,9 +323,9 @@ function verifyScreenCapturePermission() {
   
   let deepLinkURL = process.argv.find(item => item.startsWith("myapp://")) || null
   if (deepLinkURL) {
-    let type = deepLinkURL?.split('?')[1]?.split('&')[0]?.split('=')[1];
+    let type = deepLinkType(deepLinkURL);
     if (type && type == 'trackerStart') {
-      mainWindow.webContents.send('trackerInfoFill', { url: deepLinkURL })
+      deliverTrackerDeepLink(deepLinkURL)
     } else {
       mainWindow.webContents.send('deeplinkUrl', { url: deepLinkURL })
     }
@@ -299,9 +334,9 @@ function verifyScreenCapturePermission() {
 
 app.on('open-url', (event, deepLinkURL) => {
   event.preventDefault();
-  let type = deepLinkURL?.split('?')[1]?.split('&')[0]?.split('=')[1];
+  let type = deepLinkType(deepLinkURL);
   if (type && type == 'trackerStart') {
-    mainWindow.webContents.send('trackerInfoFill', { url: deepLinkURL })
+    deliverTrackerDeepLink(deepLinkURL)
   } else {
     mainWindow.webContents.send('deeplinkUrl', { url: deepLinkURL })
   }
@@ -316,11 +351,11 @@ if (!gotTheLock) {
       if (mainWindow.isMinimized()) mainWindow.restore()
       mainWindow.focus()
     }
-    let url = commandLine.pop()
+    let url = commandLine.find(item => item.startsWith("myapp://")) || commandLine.pop()
     if (url) {
-      let type = url?.split('?')[1]?.split('&')[0]?.split('=')[1];
+      let type = deepLinkType(url);
       if (type && type == 'trackerStart') {
-        mainWindow.webContents.send('trackerInfoFill', { url: url })
+        deliverTrackerDeepLink(url)
       } else {
         mainWindow.webContents.send('deeplinkUrl', { url: url })
       }
@@ -442,14 +477,14 @@ ipcMain.on('screenshot:capture', () => {
 function sendNotification(dataUrl) {
 
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-  const windowWidth = 350;
-  const windowHeight = 200;
+  const windowWidth = 372;
+  const windowHeight = 282;
 
   screenshotNotificationWindow = new BrowserWindow({
     width: windowWidth,
     height: windowHeight,
-    x: width - windowWidth - 10,
-    y: height - windowHeight - 10,
+    x: width - windowWidth,
+    y: height - windowHeight, // extra gap above the taskbar so the card bottom isn't clipped
     frame: false,
     alwaysOnTop: true,
     skipTaskbar: true,
@@ -462,11 +497,12 @@ function sendNotification(dataUrl) {
     }
   });
 
-  screenshotNotificationWindow.loadFile(path.join(__dirname, 'notification.html'));
-  screenshotNotificationWindow.webContents.send('logo-path', iconPath);
+  screenshotNotificationWindow.loadFile(notificationHtmlPath);
   screenshotNotificationWindow.webContents.on('did-finish-load', () => {
+    // Send after load so the renderer's IPC listeners are registered (else the events are missed).
+    screenshotNotificationWindow.webContents.send('logo-path', iconPath);
     screenshotNotificationWindow.webContents.send('screenshot-path', dataUrl);
-    screenshotNotificationWindow.show();
+    screenshotNotificationWindow.showInactive(); // don't steal focus from the user's current input
 
     const notificationWindow = screenshotNotificationWindow;
     const closeHandler = () => {

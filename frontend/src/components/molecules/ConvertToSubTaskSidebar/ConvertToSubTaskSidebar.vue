@@ -18,8 +18,10 @@
                 <template v-if="isMoveTask || isConvertTask">
                     <button v-if="Object.keys(selectedSprintData).length > 0" class="btn-primary font-roboto-sans ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-14'"  :style="[{padding : clientWidth ? '3px 14.4px' : '3px 5px'}]"  @click="moveTaskButton()">{{isMoveTask ? $t("ProjectDetails.move") : $t('ProjectDetails.convert')}}</button>
                     <button v-else class="btn-secondary font-roboto-sans ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-11'"  :style="[{padding : clientWidth>767 ? '3px 14.4px' : '3px 3px'}]">{{isMoveTask ? $t("ProjectDetails.move") : $t('ProjectDetails.convert')}}</button>
-                    <button v-if="Object.keys(selectedSprintData).length > 0" class="btn-primary font-roboto-sans ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-14'"  :style="[{padding : clientWidth ? '3px 14.4px' : '3px 5px'}]"  @click="moveTaskButton(),isRedirect = true">{{isMoveTask ? $t('ProjectDetails.MOVE_AND_OPEN') : $t('ProjectDetails.CONVERT_AND_OPEN')}}</button>
-                    <button v-else class="btn-secondary font-roboto-sans ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-11'"  :style="[{padding : clientWidth>767 ? '3px 14.4px' : '3px 3px'}]">{{isMoveTask ? $t('ProjectDetails.MOVE_AND_OPEN') : $t('ProjectDetails.CONVERT_AND_OPEN')}}</button>
+                    <template v-if="props.isBulkMove === false">
+                        <button v-if="Object.keys(selectedSprintData).length > 0" class="btn-primary font-roboto-sans ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-14'"  :style="[{padding : clientWidth ? '3px 14.4px' : '3px 5px'}]"  @click="moveTaskButton(),isRedirect = true">{{isMoveTask ? $t('ProjectDetails.MOVE_AND_OPEN') : $t('ProjectDetails.CONVERT_AND_OPEN')}}</button>
+                        <button v-else class="btn-secondary font-roboto-sans ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-11'"  :style="[{padding : clientWidth>767 ? '3px 14.4px' : '3px 3px'}]">{{isMoveTask ? $t('ProjectDetails.MOVE_AND_OPEN') : $t('ProjectDetails.CONVERT_AND_OPEN')}}</button>
+                    </template>
                 </template>
                 <div v-if="isMergeTask || isOpenSubTask || openMoveSubTask">
                     <button v-if="isTaskSelected" class="btn-primary font-roboto-sans ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-14'"  :style="[{padding : clientWidth ? '3px 14.4px' : '3px 5px'}]"  @click="callMergeTaskForItem(false)">{{isMergeTask ? $t("ProjectDetails.merge") : openMoveSubTask ? $t("ProjectDetails.move") : $t('ProjectDetails.convert')}}</button>
@@ -229,6 +231,14 @@
         item: {
             type: Object,
             default: () => {}
+        },
+        // Bulk multi-task move. Reuses the project + sprint/folder picker but
+        // skips the single-task conversion/assignee modals — on confirm it
+        // just emits the chosen destination. The backend (bulkMove) derives
+        // per-task source sprint, assignees, and auto-maps status/type.
+        isBulkMove: {
+            type: Boolean,
+            default: false
         }
     });
     const isDisable = computed(() => props.isDisableButton)
@@ -273,7 +283,7 @@
             else { return projectsGetter.value.data; }
         }
     });
-    const emit = defineEmits(["isConvertSubtaskOPen","dataToMainComp","createTask"])
+    const emit = defineEmits(["isConvertSubtaskOPen","dataToMainComp","createTask","bulkMoveConfirm"])
     const projectData = (props.selectedProjectObject == undefined || Object.keys(props.selectedProjectObject).length == 0) ? inject("selectedProject") : '';
     const isSidebarOPen = ref(props.closeSideBar);
     const selectedProjectData = ref(props.selectedProjectObject == undefined ? projectData.value : props.selectedProjectObject);
@@ -905,6 +915,19 @@
     }
 
     const moveTaskButton = () => {
+        // Bulk move: no per-task conversion here — hand the destination to the
+        // caller (BulkActionBar) which fires the bulkMove request.
+        if(props.isBulkMove === true){
+            if(Object.keys(selectedSprintData.value).length === 0){
+                return;
+            }
+            emit('bulkMoveConfirm', {
+                project: selectedProjectData.value,
+                sprint: selectedSprintData.value,
+            });
+            closeSidebar();
+            return;
+        }
         checkTaskPerSprintPermisssion(selectedSprintData.value.id).then((resp) => {
             if(resp){
                 if(props.isMoveTask === true && isSpinner.value === false){

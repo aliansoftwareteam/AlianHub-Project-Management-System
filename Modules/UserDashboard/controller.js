@@ -6,6 +6,8 @@ const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const dashboardTemplate = require("../../utils/dashboardTemplate.json");
 const cardComponent = require("../../utils/cardComponent.json");
+const { getUsdRates, toUsd } = require("../../utils/currencyRates");
+const { fetchRules } = require("../settings/securityPermissions/controller");
 const {
     getDayOrRangeBounds,
     buildUserTeamMap,
@@ -58,6 +60,43 @@ async function resolveCallerRoleType(companyId, uid) {
     } catch (e) {
         logger.error(`resolveCallerRoleType error (company=${companyId}, uid=${uid}): ${e.message || e}`);
         return 3;
+    }
+}
+
+// SECURITY: project-level visibility for the company-wide project cards. Mirrors
+// the project-list scoping (Modules/Project/controller/getProjectFilterData.js):
+// owner/admin (roleType 1|2) see everything (returns null → no filter); a member
+// sees private projects they belong to (AssigneeUserId includes their id or a
+// team id) plus public projects — public are also membership-gated unless the
+// caller holds the `public_projects` permission. Returns a Mongo sub-filter to
+// merge into a PROJECTS query, or null for no restriction. Fails closed (member
+// scope) on any lookup error.
+async function resolveVisibleProjectFilter(companyId, uid) {
+    if (!uid) return { _id: { $in: [] } }; // no identity → see nothing
+    try {
+        const [teams, rules, roleType] = await Promise.all([
+            MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.TEAMS_MANAGEMENT,
+                data: [{ assigneeUsersArray: { $in: [String(uid)] } }, { _id: 1 }],
+            }, "find").catch(() => []),
+            fetchRules(companyId).catch(() => []),
+            resolveCallerRoleType(companyId, uid),
+        ]);
+        if (roleType === 1 || roleType === 2) return null; // admin/owner → all projects
+        const teamIds = (teams || []).map((t) => "tId_" + t._id);
+        const member = { $in: [String(uid), ...teamIds] };
+        const rule = Array.isArray(rules) ? rules.find((x) => x && x.key === "public_projects") : null;
+        const showAllProjects = !!(rule && rule.roles && rule.roles.find((r) => r.key === roleType && r.permission === true));
+        return {
+            $or: [
+                { isPrivateSpace: true, AssigneeUserId: member },
+                { isPrivateSpace: false, ...(showAllProjects ? {} : { AssigneeUserId: member }) },
+            ],
+        };
+    } catch (e) {
+        logger.error(`resolveVisibleProjectFilter error (company=${companyId}, uid=${uid}): ${e.message || e}`);
+        // Fail closed to member-only-nothing rather than leaking company-wide.
+        return { _id: { $in: [] } };
     }
 }
 
@@ -748,13 +787,17 @@ exports.getProjectUtilizationSummary = async (req, res) => {
         // needs the per-project rows behind each number, not just totals.
         const includeProjects = req.body && req.body.includeProjects === true;
 
+        // SECURITY: scope to the caller's visible projects. Owner/admin → null
+        // (all projects); a member → only projects they belong to / public ones.
+        const projFilter = await resolveVisibleProjectFilter(companyId, req.uid);
+
         // 1 + 3 — active projects and their ProjectType mix. Drill-down also
         // needs each project's status + its per-project status palette
         // (projectStatusData) so the modal can render the status in colour.
         const activeProjects = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PROJECTS,
             data: [
-                { statusType: { $nin: ["close"] }, deletedStatusKey: 0 },
+                { statusType: { $nin: ["close"] }, deletedStatusKey: 0, ...(projFilter || {}) },
                 includeProjects
                     ? { ProjectType: 1, ProjectName: 1, status: 1, statusType: 1, projectStatusData: 1 }
                     : { ProjectType: 1, ProjectName: 1 },
@@ -790,10 +833,17 @@ exports.getProjectUtilizationSummary = async (req, res) => {
         (timelogs || []).forEach((ts) => {
             if (ts.ProjectId) workingProjectIds.add(String(ts.ProjectId));
         });
+        // For a scoped (member) caller, count only projects they can see; admins
+        // (projFilter === null) keep the company-wide count unchanged.
+        let workingProjects = workingProjectIds.size;
+        if (projFilter) {
+            const accessibleIds = new Set((activeProjects || []).map((p) => String(p._id)));
+            workingProjects = [...workingProjectIds].filter((id) => accessibleIds.has(id)).length;
+        }
 
         const data = {
             activeProjects: (activeProjects || []).length,
-            workingProjects: workingProjectIds.size,
+            workingProjects,
             typeMix,
         };
         if (includeProjects) {
@@ -814,6 +864,225 @@ exports.getProjectUtilizationSummary = async (req, res) => {
         return res.status(500).json({
             status: false,
             message: "An error occurred while building the project utilization summary.",
+            error: error && error.message ? error.message : String(error),
+        });
+    }
+};
+
+/**
+ * Milestone Report Card — company-wide billing-milestone summary for the
+ * management dashboard. Owner/Admin (roleType 1/2) ONLY; any other caller
+ * gets an empty, "restricted" payload. The client also hides the card from
+ * non-management users — this server gate is defense-in-depth so the
+ * company-wide financial figures can never leak via a forged request.
+ *
+ * Milestones are billing milestones attached to projects (Fix/Hourly). They
+ * carry an `amount` but no currency of their own — currency comes from the
+ * parent project (ProjectCurrency). Every figure is consolidated to USD using
+ * live FX rates (utils/currencyRates). Read-only, companyId-scoped.
+ *
+ * Body: { dateFrom?, dateTo? (ISO — the "due" window, default this month),
+ *         status? (drill the recent list), limit? }
+ *
+ * Returns:
+ *   { status: true, data: {
+ *       currency: "USD",
+ *       due:      { receivableUsd, receivedUsd, outstandingUsd,
+ *                   receivableCount, receivedCount },   // milestones DUE in range
+ *       allTime:  { totalUsd, count },                  // every milestone, USD
+ *       byStatus: [{ status, count }],                  // all-time; drives selector
+ *       recent:   [{ projectId, projectName, milestoneName,
+ *                    amountUsd, status, date }],
+ *       totalCount: <number>, period: { from, to }, ratesLive: <bool>
+ *   }}
+ */
+exports.getMilestoneSummary = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        if (!companyId) {
+            return res.status(400).json({ status: false, message: "companyId header required" });
+        }
+
+        const emptyData = {
+            currency: "USD",
+            due: { receivableUsd: 0, receivedUsd: 0, outstandingUsd: 0, receivableCount: 0, receivedCount: 0 },
+            allTime: { totalUsd: 0, count: 0 },
+            byStatus: [], recent: [], totalCount: 0, period: null, ratesLive: true,
+        };
+
+        // Owner/Admin only — resolve the caller's real role from the DB
+        // (never from the body). Non-management callers get an empty payload.
+        const callerRoleType = await resolveCallerRoleType(companyId, req.uid);
+        if (!(callerRoleType === 1 || callerRoleType === 2)) {
+            return res.status(200).json({ status: true, data: { ...emptyData, restricted: true } });
+        }
+
+        const RECENT_LIMIT = Number(req.body && req.body.limit) > 0
+            ? Math.min(Number(req.body.limit), 20) : 6;
+
+        // Time-range window for the "due milestones" panel. The card sends ISO
+        // dateFrom/dateTo from the shared card-header period dropdown; milestone
+        // dueDate is stored as epoch ms (0 = unset). Default to the current
+        // calendar month when the window is missing/invalid.
+        const toMs = (v) => { const t = v ? new Date(v).getTime() : NaN; return Number.isFinite(t) ? t : NaN; };
+        let fromMs = toMs(req.body && req.body.dateFrom);
+        let untilMs = toMs(req.body && req.body.dateTo);
+        if (!Number.isFinite(fromMs) || !Number.isFinite(untilMs)) {
+            const now = new Date();
+            fromMs = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+            untilMs = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).getTime();
+        }
+        const period = { from: fromMs, to: untilMs };
+
+        // All billing milestones in the company (DB-scoped collection).
+        const milestones = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.MILESTONE,
+            data: [
+                {},
+                { milestoneName: 1, amount: 1, projectId: 1, dueDate: 1, statusDate: 1, statusId: 1, billingPeriod: 1, updatedAt: 1, createdAt: 1 },
+            ],
+        }, "find").catch(() => []);
+
+        if (!milestones || !milestones.length) {
+            return res.status(200).json({ status: true, data: { ...emptyData, period } });
+        }
+
+        // Parent-project name + currency lookup.
+        const projectIds = [...new Set(milestones.map((m) => String(m.projectId)).filter(Boolean))]
+            .filter((id) => mongoose.Types.ObjectId.isValid(id))
+            .map((id) => new mongoose.Types.ObjectId(id));
+        const projectsMap = {};
+        if (projectIds.length) {
+            const projects = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.PROJECTS,
+                data: [
+                    { _id: { $in: projectIds } },
+                    { ProjectName: 1, ProjectCurrency: 1 },
+                ],
+            }, "find").catch(() => []);
+            (projects || []).forEach((p) => {
+                projectsMap[String(p._id)] = { name: p.ProjectName || "", currency: p.ProjectCurrency || "" };
+            });
+        }
+
+        // ProjectCurrency is stored as a currency OBJECT ({ symbol, code, name,
+        // … }); we need its ISO code to convert the amount to USD. A legacy
+        // plain 3-letter string is accepted too; anything else → unknown.
+        const currencyCode = (pc) => {
+            if (!pc) return "";
+            if (typeof pc === "string") return pc.length === 3 ? pc.toUpperCase() : "";
+            return String(pc.code || "").toUpperCase();
+        };
+
+        // Live USD rates (cached; static fallback when offline). usdOf() converts
+        // a milestone's amount into USD via its project's currency.
+        const { rates, live: ratesLive } = await getUsdRates();
+        const usdOf = (m) => {
+            const proj = projectsMap[String(m.projectId)] || {};
+            return toUsd(m.amount, currencyCode(proj.currency), rates);
+        };
+
+        // Status drill-down: the recent list + totalCount also reflect a
+        // selected status. byStatus is the full per-status breakdown for the
+        // period — it drives the card's status selector. The receivable /
+        // received figures compute their own status split, so they ignore it.
+        const statusFilter = (req.body && req.body.status) ? String(req.body.status) : "";
+        const matchStatus = (m) => !statusFilter || String(m.statusId || "No Status") === statusFilter;
+
+        // Milestone billing lifecycle: NOT_FUNDED → FUNDED → RELEASE_REQUEST_SENT
+        // → RELEASED (money actually released to us). CANCELLED / REFUNDED aren't
+        // real receivables.
+        const NON_RECEIVABLE = new Set(["CANCELLED", "REFUNDED"]);
+        const RECEIVED_STATUS = "RELEASED";
+
+        // The whole card is scoped to the selected period: a milestone is "in
+        // the period" when its dueDate (epoch ms; 0 = unset) falls in the
+        // window. Only the all-time footer total spans every milestone.
+        const inRange = (m) => {
+            const d = Number(m.dueDate) || 0;
+            return d > 0 && d >= fromMs && d <= untilMs;
+        };
+
+        const statusAgg = {};        // status → { count }  (period-scoped; drives selector)
+        let allTimeUsd = 0;          // consolidated USD across every milestone (footer)
+        const due = { receivableUsd: 0, receivedUsd: 0, outstandingUsd: 0, receivableCount: 0, receivedCount: 0 };
+
+        milestones.forEach((m) => {
+            const usd = usdOf(m);
+            allTimeUsd += usd;        // all-time total spans every milestone
+            if (!inRange(m)) return;  // status bars, receivable & recent are period-scoped
+
+            const status = m.statusId || "No Status";
+            if (!statusAgg[status]) statusAgg[status] = { count: 0 };
+            statusAgg[status].count += 1;
+
+            if (!NON_RECEIVABLE.has(status)) {
+                due.receivableUsd += usd;
+                due.receivableCount += 1;
+                if (status === RECEIVED_STATUS) {
+                    due.receivedUsd += usd;
+                    due.receivedCount += 1;
+                }
+            }
+        });
+        due.outstandingUsd = Math.max(0, due.receivableUsd - due.receivedUsd);
+
+        // statusDate (epoch ms) is the milestone's own activity timestamp; fall
+        // back to the document timestamps. Kept for the legacy `date` field.
+        const dateOf = (m) => Number(m.statusDate)
+            || (m.updatedAt ? new Date(m.updatedAt).getTime() : 0)
+            || (m.createdAt ? new Date(m.createdAt).getTime() : 0);
+
+        // The list is a due-date TIMELINE (past → present → future) within the
+        // selected range. All in-range items have a dueDate > 0 (see inRange).
+        // To show both sides of "now" we window around the present: take the
+        // nearest upcoming milestones and the nearest recent-past ones, then
+        // order the picked set ascending by dueDate so the card reads
+        // past → today → upcoming rather than always truncating the future away.
+        const nowMs = Date.now();
+        const dueOf = (m) => Number(m.dueDate) || 0;
+        const inScope = milestones.filter((m) => inRange(m) && matchStatus(m));
+        const future = inScope.filter((m) => dueOf(m) > nowMs).sort((a, b) => dueOf(a) - dueOf(b));   // nearest upcoming first
+        const pastNow = inScope.filter((m) => dueOf(m) <= nowMs).sort((a, b) => dueOf(b) - dueOf(a)); // nearest recent-past first
+        let futurePick = future.slice(0, Math.ceil(RECENT_LIMIT / 2));
+        let pastPick = pastNow.slice(0, RECENT_LIMIT - futurePick.length);
+        if (pastPick.length + futurePick.length < RECENT_LIMIT) {
+            futurePick = future.slice(0, RECENT_LIMIT - pastPick.length); // backfill when past is short
+        }
+        const recent = [...pastPick, ...futurePick]
+            .sort((a, b) => dueOf(a) - dueOf(b)) // timeline order
+            .map((m) => {
+                const proj = projectsMap[String(m.projectId)] || {};
+                return {
+                    projectId: String(m.projectId || ""),
+                    projectName: proj.name || "",
+                    milestoneName: m.milestoneName || "",
+                    amountUsd: usdOf(m),
+                    status: m.statusId || "",
+                    date: dateOf(m) || null,
+                    dueDate: dueOf(m) || null,
+                };
+            });
+
+        const data = {
+            currency: "USD",
+            due,
+            allTime: { totalUsd: allTimeUsd, count: milestones.length },
+            byStatus: Object.keys(statusAgg)
+                .map((status) => ({ status, count: statusAgg[status].count }))
+                .sort((a, b) => b.count - a.count),
+            recent,
+            totalCount: milestones.filter((m) => inRange(m) && matchStatus(m)).length,
+            period,
+            ratesLive,
+        };
+
+        return res.status(200).json({ status: true, data });
+    } catch (error) {
+        logger.error(`getMilestoneSummary error: ${error && error.message ? error.message : error}`);
+        return res.status(500).json({
+            status: false,
+            message: "An error occurred while building the milestone summary.",
             error: error && error.message ? error.message : String(error),
         });
     }
@@ -1049,6 +1318,8 @@ exports.getTeamLoggedVsEta = async (req, res) => {
                     taskId: tid,
                     taskName: task.TaskName || "",
                     taskKey: task.TaskKey || "",
+                    projectId: task.ProjectID ? String(task.ProjectID) : "",
+                    sprintId: task.sprintId ? String(task.sprintId) : "",
                     projectName: projectsMap[String(task.ProjectID)] || "",
                     loggedMinutes: logged,
                     etaMinutes: eta,
@@ -1158,10 +1429,15 @@ exports.getProjectProgressMetric = async (req, res) => {
         };
 
         // Active project criteria — matches the app's "active" definition:
-        // not closed, not deleted. Counted COMPANY-WIDE (no viewer scope).
+        // not closed, not deleted. SECURITY: scoped to the caller's visible
+        // projects (owner/admin → all; member → own/public), so the active-project
+        // count and by-type breakdown no longer leak company-wide project data.
+        const needsProjectScope = metric === "active_projects" || metric === "projects_by_type";
+        const projFilter = needsProjectScope ? await resolveVisibleProjectFilter(companyId, req.uid) : null;
         const activeProjectFilter = {
             statusType: { $ne: "close" },
             deletedStatusKey: { $in: [0, null] },
+            ...(projFilter || {}),
         };
 
         // Drill-down mode — clicking a count/bar opens a modal listing the

@@ -1823,26 +1823,10 @@ exports.importProjectTabComponents = (companyName) => {
             viewStatus: false
         },
         {
-            name: "Gantt",
-            sortIndex: 8,
-            keyName: "Gantt",
-            value: "gantt",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
             name: "Table",
             sortIndex: 9,
             keyName: "TableView",
             value: "TableView",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Timeline",
-            sortIndex: 10,
-            keyName: "Timeline",
-            value: "timeline",
             setAsDefault: false,
             viewStatus: false
         },
