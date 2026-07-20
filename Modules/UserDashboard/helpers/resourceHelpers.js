@@ -231,6 +231,25 @@ async function getSprintTypeMap(companyId, sprintIds = []) {
  * self-scope `$or:[{AssigneeUserId},{Task_Leader}]`). Everything is folded into
  * $and so multiple $or groups coexist. Mutates and returns the filter.
  */
+/**
+ * Build a project-scope match clause from a card's saved scope.
+ *   mode 'all'      → null (no restriction — all accessible projects)
+ *   mode 'include'  → { $in:  ids }
+ *   mode 'exclude'  → { $nin: ids }
+ * Empty ids → null (no restriction). Pass { string: true } for the timesheet
+ * `ProjectId` field (stored as a String) vs task/project `_id` (ObjectId).
+ *
+ * @returns {object|null} clause for ProjectID/_id/ProjectId, or null
+ */
+function projectScopeClause(mode, ids, { string = false } = {}) {
+    const valid = (ids || []).filter((id) => mongoose.Types.ObjectId.isValid(String(id)));
+    if (!valid.length) return null;
+    const vals = string ? valid.map(String) : valid.map((id) => new mongoose.Types.ObjectId(String(id)));
+    if (mode === 'exclude') return { $nin: vals };
+    if (mode === 'include') return { $in: vals };
+    return null;
+}
+
 function applyTaskMatch(taskFilter, taskMatch) {
     if (!taskMatch || typeof taskMatch !== "object" || !Object.keys(taskMatch).length) return taskFilter;
     const andParts = [];
@@ -253,4 +272,5 @@ module.exports = {
     getUserNameMap,
     getSprintTypeMap,
     applyTaskMatch,
+    projectScopeClause,
 };

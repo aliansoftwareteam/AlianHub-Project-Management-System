@@ -393,35 +393,39 @@ button {
     }
   }
 
-/* "All projects" toggle — aligned under the project field column, with spacing
-   below the selection above it. */
-.cf-all-projects-row {
-  display: flex;
-  align-items: center;
+/* Project scope: mode selector (All / Include / Exclude) + list, filter-style. */
+.cf-project-scope {
   margin-bottom: 16px;
 }
-.cf-all-projects-spacer {
-  flex: 0 0 35%;
-  width: 35%;
-}
-@media (max-width: 480px) {
-  .cf-all-projects-spacer { display: none; }
-}
-.cf-toggle {
-  display: inline-flex;
+.cf-project-mode-row {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #374151;
-  cursor: pointer;
+}
+.cf-scope-label {
+  width: 35%;
   margin: 0;
 }
-.cf-toggle input {
+.cf-scope-select {
+  width: 65%;
+  height: 36px;
+  border: 1px solid #DFE1E6;
+  border-radius: 5px;
+  padding: 0 8px;
+  font-size: 13px;
+  color: #374151;
+  background: #fff;
   cursor: pointer;
 }
-/* Disabled project picker while "All projects" is on (kept visible, not removed). */
-.cf-disabled {
-  pointer-events: none;
-  opacity: 0.55;
+.cf-scope-list {
+  margin-top: 10px;
+}
+/* The list keeps the DropDown's own label slot for alignment but hides the
+   duplicate "Project" text (the mode row above already labels it). */
+.cf-scope-list :deep(.custom-field-label) {
+  visibility: hidden;
+}
+@media (max-width: 480px) {
+  .cf-project-mode-row { flex-wrap: wrap; }
+  .cf-scope-label, .cf-scope-select { width: 100%; }
+  .cf-scope-list :deep(.custom-field-label) { display: none; }
 }

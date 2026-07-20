@@ -15,6 +15,7 @@ const {
     getUserNameMap,
     getSprintTypeMap,
     applyTaskMatch,
+    projectScopeClause,
 } = require("./helpers/resourceHelpers");
 
 // Parse a client-built advanced-filter match from the request body.
@@ -791,9 +792,10 @@ exports.getProjectUtilizationSummary = async (req, res) => {
         // (all projects); a member → only projects they belong to / public ones.
         const projFilter = await resolveVisibleProjectFilter(companyId, req.uid);
 
-        // Optional project scoping from the card's project selector (empty = all).
-        const selectedProjectIds = (Array.isArray(req.body?.projectId) ? req.body.projectId : [])
-            .filter((id) => mongoose.Types.ObjectId.isValid(String(id)));
+        // Project scoping from the card selector: all / include ($in) / exclude ($nin).
+        const projectMode = req.body?.projectMode || 'all';
+        const projClause = projectScopeClause(projectMode, req.body?.projectId);
+        const tsProjClause = projectScopeClause(projectMode, req.body?.projectId, { string: true });
 
         // 1 + 3 — active projects and their ProjectType mix. Drill-down also
         // needs each project's status + its per-project status palette
@@ -801,7 +803,7 @@ exports.getProjectUtilizationSummary = async (req, res) => {
         const activeProjects = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PROJECTS,
             data: [
-                { statusType: { $nin: ["close"] }, deletedStatusKey: 0, ...(projFilter || {}), ...(selectedProjectIds.length ? { _id: { $in: selectedProjectIds.map((id) => new mongoose.Types.ObjectId(String(id))) } } : {}) },
+                { statusType: { $nin: ["close"] }, deletedStatusKey: 0, ...(projFilter || {}), ...(projClause ? { _id: projClause } : {}) },
                 includeProjects
                     ? { ProjectType: 1, ProjectName: 1, status: 1, statusType: 1, projectStatusData: 1 }
                     : { ProjectType: 1, ProjectName: 1 },
@@ -828,7 +830,7 @@ exports.getProjectUtilizationSummary = async (req, res) => {
         const timelogs = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET,
             data: [
-                { LogStartTime: { $gte: fromSec, $lte: toSec }, ...(selectedProjectIds.length ? { ProjectId: { $in: selectedProjectIds.map(String) } } : {}) },
+                { LogStartTime: { $gte: fromSec, $lte: toSec }, ...(tsProjClause ? { ProjectId: tsProjClause } : {}) },
                 { ProjectId: 1 },
             ],
         }, "find").catch(() => []);
@@ -1924,10 +1926,12 @@ exports.getMyNextTasks = async (req, res) => {
         if (!uid) return res.status(200).json({ status: true, data: { tasks: [] } });
         const limit = Math.min(Number(req.body && req.body.limit) || 8, 25);
 
+        const projClause = projectScopeClause(req.body?.projectMode || 'all', req.body?.projectId);
         const nextFilter = applyTaskMatch({
             deletedStatusKey: 0,
             statusType: { $ne: "close" },
             $or: [{ AssigneeUserId: uid }, { Task_Leader: uid }],
+            ...(projClause ? { ProjectID: projClause } : {}),
         }, bodyTaskMatch(req.body));
         const tasks = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
@@ -2014,6 +2018,7 @@ exports.getMyAchievements = async (req, res) => {
         const { dateFrom, dateTo } = getDayOrRangeBounds(req.body || {});
 
         // Tasks the member completed in the window (updatedAt = completion proxy).
+        const projClause = projectScopeClause(req.body?.projectMode || 'all', req.body?.projectId);
         const achFilter = applyTaskMatch({
             deletedStatusKey: 0,
             // Completed = close OR done (matches bucketForStatus in resourceHelpers).
@@ -2022,6 +2027,7 @@ exports.getMyAchievements = async (req, res) => {
             // them, not ones they merely lead/created (Task_Leader).
             AssigneeUserId: uid,
             updatedAt: { $gte: dateFrom, $lte: dateTo },
+            ...(projClause ? { ProjectID: projClause } : {}),
         }, bodyTaskMatch(req.body));
         const tasks = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
@@ -2225,11 +2231,13 @@ exports.getMyDueSoon = async (req, res) => {
         const start = new Date(); start.setHours(0, 0, 0, 0);
         const end = new Date(); end.setDate(end.getDate() + days); end.setHours(23, 59, 59, 999);
 
+        const projClause = projectScopeClause(req.body?.projectMode || 'all', req.body?.projectId);
         const filter = applyTaskMatch({
             deletedStatusKey: 0,
             statusType: { $ne: "close" },
             $or: [{ AssigneeUserId: uid }, { Task_Leader: uid }],
             DueDate: { $gte: start, $lte: end },
+            ...(projClause ? { ProjectID: projClause } : {}),
         }, bodyTaskMatch(req.body));
 
         const tasks = await MongoDbCrudOpration(companyId, {

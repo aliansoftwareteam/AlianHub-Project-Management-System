@@ -81,8 +81,9 @@ const timerange = computed(() => {
     return Number.isFinite(v) && v >= 0 && v <= 8 ? v : 1;
 });
 
-// Selected projects to scope to (empty = all visible projects).
+// Project scope to send: mode (all/include/exclude) + selected ids.
 const projectIds = computed(() => Array.isArray(props.cardData?.projectId) ? props.cardData.projectId : []);
+const projectMode = computed(() => props.cardData?.projectMode || 'all');
 
 // Compact date-range resolver (ids match the card catalog convention).
 function resolveDateRange(value) {
@@ -139,7 +140,7 @@ const load = async () => {
     loading.value = true;
     try {
         const { dateFrom, dateTo } = resolveDateRange(timerange.value);
-        const res = await apiRequest('post', `${env.PROJECT_UTILIZATION_SUMMARY}`, { dateFrom, dateTo, projectId: projectIds.value });
+        const res = await apiRequest('post', `${env.PROJECT_UTILIZATION_SUMMARY}`, { dateFrom, dateTo, projectId: projectIds.value, projectMode: projectMode.value });
         const body = res && res.data;
         if (body && body.status) {
             data.value = {
@@ -178,7 +179,7 @@ const openDrill = async (filter) => {
     drillLoading.value = true;
     try {
         const { dateFrom, dateTo } = resolveDateRange(timerange.value);
-        const res = await apiRequest('post', `${env.PROJECT_UTILIZATION_SUMMARY}`, { dateFrom, dateTo, includeProjects: true, projectId: projectIds.value });
+        const res = await apiRequest('post', `${env.PROJECT_UTILIZATION_SUMMARY}`, { dateFrom, dateTo, includeProjects: true, projectId: projectIds.value, projectMode: projectMode.value });
         const body = res && res.data;
         allDrillProjects.value = (body && body.status && body.data.projects) || [];
     } catch (e) {

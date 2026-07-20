@@ -3070,6 +3070,9 @@ export default {
         refferal_code_error: "Refferal code is not valid",
     },
     dashboardCard: {
+        project_scope_all: "All projects",
+        project_scope_include: "Include",
+        project_scope_exclude: "Exclude",
         tasks_by_status_card_title: "Tasks by Status",
         tasks_by_status_card_description: "Count of tasks grouped by status",
         tasks_by_project_card_title: "Tasks by Project",
