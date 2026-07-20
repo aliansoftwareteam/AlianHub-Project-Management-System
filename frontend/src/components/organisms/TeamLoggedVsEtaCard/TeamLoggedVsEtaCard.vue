@@ -163,6 +163,7 @@ const load = async () => {
         const payload = {
             employeeIds: Array.isArray(employeeIds) ? employeeIds : [],
             projectIds: props.cardData?.projectId || [],
+            projectMode: props.cardData?.projectMode || 'all',
             statusKeys: props.cardData?.statusArray || [],
             dateFrom,
             dateTo,

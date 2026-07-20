@@ -100,6 +100,7 @@ const load = async () => {
             dimension: dimension.value,
             employeeIds: Array.isArray(employeeIds) ? employeeIds : [],
             projectIds: props.cardData?.projectId || [],
+            projectMode: props.cardData?.projectMode || 'all',
             statusKeys: props.cardData?.statusArray || [],
             dateFrom,
             dateTo,

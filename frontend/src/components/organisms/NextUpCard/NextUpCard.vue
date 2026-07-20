@@ -86,7 +86,7 @@ const load = async () => {
     try {
         const fd = Array.isArray(props.filterData) ? props.filterData : Object.values(props.filterData || {});
         const taskMatch = fd.length ? buildFilterQuery(fd, userId && userId.value ? String(userId.value) : '') : null;
-        const res = await apiRequest('post', `${env.MY_NEXT_TASKS}`, { limit: Number(props.cardData?.limit) || 8, taskMatch });
+        const res = await apiRequest('post', `${env.MY_NEXT_TASKS}`, { limit: Number(props.cardData?.limit) || 8, taskMatch, projectId: props.cardData?.projectId || [], projectMode: props.cardData?.projectMode || 'all' });
         const d = res && res.data && res.data.status ? (res.data.data || {}) : {};
         tasks.value = d.tasks || [];
     } catch (e) {

@@ -16,6 +16,8 @@ import WasabiImage from '../components/WasabiImage/WasabiImage'
 import { fetchAndProcessProjects } from '../utils/projectUtils'
 import { formatMinutes } from '../hooks/useTodayLogged'
 import { DEFAULT_TASK_IMAGE } from '../utils/imageDefaults'
+import { openTaskInWeb } from '../utils/taskWebLink'
+import { useDeepLinkStart } from '../hooks/useDeepLinkStart'
 
 export default function HomePage() {
   const router = useRouter();
@@ -37,6 +39,7 @@ export default function HomePage() {
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [selectedTaskData, setSelectedTaskData] = useState(null);
   const [taskComment, setTaskComment] = useState('');
+  const [expandedTasks, setExpandedTasks] = useState({}); // task.key -> expanded?
 
   useEffect(() => {
     init();
@@ -367,72 +370,33 @@ export default function HomePage() {
   };
 
 
-  // Deep link (myapp://…?type=trackerStart&taskId=..&comment=..): skip the UI
-  // cascade — fetch just what start needs (task + project/folder/sprint names),
-  // start the tracker, and jump to the running screen.
-  const handleDeepLink = async ({ taskId, comment }) => {
-    if (!taskId) return;
-    setIsSpinner(true);
-    try {
-      const res = await apiRequest('post', `/api/v1/task/find`, {
-        findQuery: [
-          { $match: { objId: { _id: taskId, CompanyId: currentCopany?._id } } },
-          { $lookup: { from: 'projects', localField: 'ProjectID', foreignField: '_id', as: 'projectArr', pipeline: [{ $project: { ProjectName: 1 } }] } },
-          { $unwind: { path: '$projectArr', preserveNullAndEmptyArrays: true } },
-          { $lookup: { from: 'folders', localField: 'folderObjId', foreignField: '_id', as: 'folderArr', pipeline: [{ $project: { name: 1 } }] } },
-          { $unwind: { path: '$folderArr', preserveNullAndEmptyArrays: true } },
-          { $lookup: { from: 'sprints', localField: 'sprintId', foreignField: '_id', as: 'sprintArr', pipeline: [{ $project: { name: 1 } }] } },
-          { $unwind: { path: '$sprintArr', preserveNullAndEmptyArrays: true } },
-        ],
-      });
-      const task = res?.data?.[0];
-      if (!task) { setIsSpinner(false); return; }
-
-      // Only the task's assignees may start it (deep links can be hand-crafted).
-      if (!(task.AssigneeUserId || []).includes(user?._id)) {
-        setIsSpinner(false);
-        console.warn('Deep-link start blocked: current user is not an assignee of the task');
-        return;
-      }
-
-      const projectId = String(task.ProjectID || '');
-      const sprintId = task.sprintId ? String(task.sprintId) : '';
-      const projectName = task.projectArr?.ProjectName || '';
-      const folderName = task.folderArr?.name || '';
-      const sprintName = task.sprintArr?.name || '';
-      const taskName = task.TaskName || '';
-      const description = (comment && comment.trim()) || taskName;
-      const taskTypeImage = getTaskTypeImage(projectName, task.TaskType);
-
-      window.ipc.send("start-listen-event");
-      const startRes = await apiRequest('post', `/api/v3/timeTracker/start`, {
-        userId: user?._id || "",
-        projectId,
-        taskId,
-        description,
-        companyId: currentCopany?._id || "",
-        actionTime: Math.floor(Number(DateTime.utc().ts) / 1000),
-        type: "timesheets",
-      });
-      if (startRes?.data?.status) {
-        dispatch(setTrackerStartTime(startRes.data.statusText));
-        dispatch(setComment({ comment: description, sprintId, taskId, projectId, taskName, projectName, folderName, sprintName, taskTypeImage }));
-        setIsSpinner(false);
-        router.push('/trackerRunning');
-      } else {
-        setIsSpinner(false);
-        console.error('Deep-link start failed', startRes?.data);
-      }
-    } catch (e) {
-      setIsSpinner(false);
-      console.error('Deep-link start error', e);
-    }
-  };
+  // Deep link (myapp://…?type=trackerStart&taskId=..&comment=..): start directly.
+  // Shared with Layout (already-running prompt) via the hook.
+  const handleDeepLink = useDeepLinkStart(setIsSpinner);
 
   const startTrackerFromTask = (task) => {
     setSelectedTaskData(task);
     setTaskComment(task.comment || '');
     setIsTaskModalOpen(true);
+  }
+
+  const toggleTaskExpand = (e, key) => {
+    e.stopPropagation();
+    setExpandedTasks((m) => ({ ...m, [key]: !m[key] }));
+  };
+
+  // Open a Today's-Tasks row in the web app (worked tasks wrap the doc in taskData).
+  const openTaskWeb = (e, task) => {
+    e.stopPropagation();
+    const fd = task?.fullData || {};
+    const td = fd.taskData || fd;
+    openTaskInWeb({
+      cid: currentCopany?._id,
+      projectId: String(fd.ProjectID || fd.ProjectId || td.ProjectID || ''),
+      folderObjId: td.folderObjId ? String(td.folderObjId) : '',
+      sprintId: td.sprintId ? String(td.sprintId) : '',
+      taskId: String(td._id || fd.TicketID || task.taskId || ''),
+    });
   }
 
   const getTaskTypeImage = (projectName, key) => {
@@ -462,7 +426,6 @@ export default function HomePage() {
           </div>
         </> :
         <>
-          {!isTaskModalOpen && (
             <div className="bg-[#f4f5f7] h-[calc(100vh-135px)] overflow-auto scrollbar-hide">
             <div className="flex flex-col items-center overflow-y-scroll text-sm scrollbar-hide bg-white shadow-[0px_1.615384578704834px_12.115384101867676px_0px_#0000001F] rounded-2xl mx-4 mt-2 mb-3">
               {isInterNetLost && <div className='text-red-400 text-xs pt-2'>Internet Connection Lost</div>}
@@ -524,48 +487,80 @@ export default function HomePage() {
               <div className="mx-4 mb-8">
                 <div className="text-[#2F3990] font-medium mb-2 px-1">Today's Tasks</div>
                 <div className="bg-white rounded-xl overflow-hidden">
-                  {tasks.map((task) => (
+                  {tasks.map((task) => {
+                    const isExpanded = !!expandedTasks[task.key];
+                    return (
                     <div
                       key={task.key}
                       onClick={() => startTrackerFromTask(task)}
-                      className="flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-blue-50 border-b border-gray-100 last:border-b-0"
+                      className="px-4 py-2.5 cursor-pointer hover:bg-blue-50 border-b border-gray-100 last:border-b-0"
                     >
-                      <div className="flex-1 min-w-0 overflow-hidden">
-                        <div
-                          className="truncate text-xs text-gray-500"
-                          title={`${task?.folderName || ''} ${task?.sprintName || ''}`}
+                      {/* Collapsed line: task name + open-in-web + expand */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-yellow-500 shrink-0">
+                          <WasabiImage url={getTaskTypeImage(task.projectName, task.fullData.taskData?.TaskType)} isUser={false} className="!w-[15px] !h-[15px]" />
+                        </span>
+                        <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-800" title={task.taskName}>{task.taskName}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => openTaskWeb(e, task)}
+                          title="Open task in browser"
+                          aria-label="Open task in browser"
+                          className="shrink-0 text-gray-400 hover:text-[#2F3990] cursor-pointer bg-transparent border-0 p-0"
                         >
-                          {task.key} | {task?.projectName && `${task?.projectName}`}
-                          {task?.folderName && " / "}
-                          {task?.folderName && (
-                            <>
-                              <img
-                                src="/images/png/folder.png"
-                                className="w-[10px] h-[10px] mx-1 inline-block"
-                                alt="folder"
-                              />
-                              {task?.folderName}
-                            </>
-                          )}
-                          {task?.sprintName && `/ ${task?.sprintName}`}
-                        </div>
-                        <p className="text-sm font-medium text-gray-800 mt-0.5 flex items-center gap-1">
-                          <span className="text-yellow-500 shrink-0">
-                            <WasabiImage url={getTaskTypeImage(task.projectName, task.fullData.taskData?.TaskType)} isUser={false} className="!w-[15px] !h-[15px]" />
-                          </span>
-                          <span className="truncate" title={task.taskName}>{task.taskName}</span>
-                        </p>
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                            <polyline points="15 3 21 3 21 9" />
+                            <line x1="10" y1="14" x2="21" y2="3" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => toggleTaskExpand(e, task.key)}
+                          aria-expanded={isExpanded}
+                          aria-label={isExpanded ? 'Hide details' : 'Show details'}
+                          className="shrink-0 text-gray-400 hover:text-gray-600 cursor-pointer bg-transparent border-0 p-0"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                            <polyline points="6 9 12 15 18 9" />
+                          </svg>
+                        </button>
                       </div>
-                      <div className="shrink-0 self-center text-xs font-semibold text-[#2F3990] tabular-nums">
+
+                      {/* Tracked time */}
+                      <div className="mt-0.5 text-xs font-semibold text-[#2F3990] tabular-nums">
                         {taskLoggedMap[String(task.taskId)] ? `${formatMinutes(taskLoggedMap[String(task.taskId)])} hrs` : '--'}
                       </div>
+
+                      {/* Expanded: breadcrumb + comment */}
+                      {isExpanded && (
+                        <div className="mt-1.5">
+                          <div
+                            className="truncate text-[11px] text-gray-400"
+                            title={`${task?.folderName || ''} ${task?.sprintName || ''}`}
+                          >
+                            {task.key} | {task?.projectName && `${task?.projectName}`}
+                            {task?.folderName && " / "}
+                            {task?.folderName && (
+                              <>
+                                <img src="/images/png/folder.png" className="w-[10px] h-[10px] mx-1 inline-block" alt="folder" />
+                                {task?.folderName}
+                              </>
+                            )}
+                            {task?.sprintName && `/ ${task?.sprintName}`}
+                          </div>
+                          {task.comment && (
+                            <p className="text-xs text-gray-700 leading-snug mt-1" title={task.comment}>{task.comment}</p>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
           </div>
-          )}
         </>
         }
 
@@ -578,8 +573,15 @@ export default function HomePage() {
           <ManualTimeEntry onClose={() => setIsManualTimeModalOpen(false)} />
         </Modal>
 
-        {/* Custom Task Modal */}
-        {isTaskModalOpen && (
+        {/* Start-tracker bottom sheet (slides up over the Today's Tasks list) */}
+        <Modal
+          isOpen={isTaskModalOpen}
+          onClose={() => {
+            setIsTaskModalOpen(false);
+            setSelectedTaskData(null);
+          }}
+          title="Start Tracker"
+        >
           <TrackerTask
             selectedTaskData={selectedTaskData}
             projects={allProjects}
@@ -588,7 +590,7 @@ export default function HomePage() {
               setSelectedTaskData(null);
             }}
           />
-        )}
+        </Modal>
       </div>
     </React.Fragment>
   )

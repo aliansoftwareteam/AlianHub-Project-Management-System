@@ -2,7 +2,7 @@
   "private": true,
   "name": "alianhubtimetracker",
   "description": "My application description",
-  "version": "5.0.2",
+  "version": "5.1.1",
   "author": "Alian Software",
   "homepage": "https://aliansoftware.com",
   "main": "app/background.js",

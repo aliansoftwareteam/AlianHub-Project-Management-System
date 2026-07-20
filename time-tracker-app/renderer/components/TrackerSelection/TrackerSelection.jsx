@@ -89,7 +89,9 @@ const TrackerSelection = forwardRef(({
       }
     };
 
-    window.ipc.on('trackerInfoFill', handleTrackerInfoFill);
+    // Keep only THIS component's subscription in cleanup (removeAll would also
+    // drop Layout's always-mounted listener for the already-running prompt).
+    const unsubscribe = window.ipc.on('trackerInfoFill', handleTrackerInfoFill);
 
     // Tell main we can handle a deep link now (projects loaded) so it flushes
     // any link buffered during a cold launch.
@@ -98,7 +100,7 @@ const TrackerSelection = forwardRef(({
     }
 
     return () => {
-      window.ipc.removeAll('trackerInfoFill');
+      if (typeof unsubscribe === 'function') unsubscribe();
     };
   }, [projectOption]);
   
@@ -392,6 +394,7 @@ const TrackerSelection = forwardRef(({
       objId: { CompanyId: currentCopany?.id },
       AssigneeUserId: { $in: [user?._id] },
       statusType: { $in: ["active", "default_active"] },
+      deletedStatusKey: 0,
     };
     if (term) {
       // Treat the search text as literal — escape regex metacharacters.

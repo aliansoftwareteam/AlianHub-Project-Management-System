@@ -405,7 +405,7 @@ watch(() => props.cardData.projectId, async(newIds,oldIds) => {
     if(oldIds === undefined || JSON.stringify(newIds) === JSON.stringify(oldIds)) {
         return;
     }
-    filteredProjects.value = filterProjectsByIds(props.allProjectsArrayFilter, newIds);
+    filteredProjects.value = filterProjectsByIds(props.allProjectsArrayFilter, newIds, props.cardData.projectMode);
     await getAllSprints();
     syncFilterQuery();
     const hasFilter = Object.keys(filterQuery.value).length > 0;
@@ -419,7 +419,12 @@ watch(() => props.cardData.projectId, async(newIds,oldIds) => {
     }
 }, { immediate: true });
 
-function filterProjectsByIds(projectArray, idsArray) {
+function filterProjectsByIds(projectArray, idsArray, mode = 'all') {
+    // exclude → everything except the selected ids (new projects auto-included).
+    if (mode === 'exclude' && idsArray && idsArray.length) {
+        return projectArray.filter(project => !idsArray.includes(project._id));
+    }
+    // all (empty) → every accessible project; include → only the selected.
     if(!idsArray || idsArray.length === 0) {
         return projectArray;
     }
@@ -475,7 +480,7 @@ async function handleInit () {
     let fields = props.cardData?.fields || []
     filteredHeaders.value = fields.length === 0 ? [] : headers.value.filter(item => fields.includes(item.id));
     groupById.value = normalizeGroupId(props.cardData.groupBy);
-    filteredProjects.value = filterProjectsByIds(props.allProjectsArrayFilter, props.cardData.projectId);
+    filteredProjects.value = filterProjectsByIds(props.allProjectsArrayFilter, props.cardData.projectId, props.cardData.projectMode);
     if(filteredProjects.value.length === 0) return;
     isLoading.value = true;
     await getAllSprints()

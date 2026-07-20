@@ -97,16 +97,21 @@ onMounted(() => {
 const getQuery = (componentId) => {
     const roleType = props.companyUserDetail.roleType;
     const projectIDs = cardObject.value?.projectId?.length ? cardObject.value?.projectId : (props.allProjectsArrayFilter?.map(e=>e?._id) ?? []);
+    // Project scope (all / include / exclude), always bounded to accessible.
+    const projectMode = cardObject.value?.projectMode || 'all';
+    const selectedProjectIds = cardObject.value?.projectId || [];
+    // exclude → whitelist (accessible minus excluded) so the query stays bounded
+    // to the user's accessible projects (a raw $nin would leak other projects).
+    const accessibleProjectIds = props.allProjectsArrayFilter?.map((e) => e?._id) ?? [];
+    const projectIdMatch = (projectMode === 'exclude' && selectedProjectIds.length)
+        ? { ProjectID: { objId: { $in: accessibleProjectIds.filter((id) => !selectedProjectIds.includes(id)) } } }
+        : (projectIDs.length ? { ProjectID: { objId: { $in: projectIDs } } } : {});
     const isParentTaskKeys = cardObject.value?.isParentTask === true ? [true, false] : [true];
 
     switch (componentId) {
         case 'TasksByAssigneeBarChartCard': {
             const taskAssineeFilter = {
-                ...(projectIDs.length && {
-                    ProjectID: {
-                        objId: { $in: projectIDs }
-                    }
-                }),
+                ...projectIdMatch,
                 isParentTask: {
                     $in: isParentTaskKeys
                 },
@@ -132,11 +137,7 @@ const getQuery = (componentId) => {
         }
         case 'WorkloadByStatusBarChartCard': {
             const workloadUserFilter = {
-                ...(projectIDs.length && {
-                    ProjectID: {
-                        objId: { $in: projectIDs }
-                    }
-                }),
+                ...projectIdMatch,
                 deletedStatusKey:{
                     $in:[0]
                 },

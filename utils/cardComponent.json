@@ -2001,7 +2001,8 @@
                 "info": "",
                 "hidden": false,
                 "disabled": false
-            }
+            },
+            { "label": "location", "groupBy": "data", "type": "dropdown", "name": "projectId", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false }
         ],
         "key": "ProjectPulseCard",
         "image": "PieChartWorkload",
@@ -2300,6 +2301,7 @@
         "permission": [],
         "fields": [
             { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "Next Up", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false },
+            { "label": "location", "groupBy": "data", "type": "dropdown", "name": "projectId", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
             { "label": "next_up_limit", "groupBy": "data", "type": "text", "name": "limit", "value": "8", "placeHolder": "8", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
             { "label": "add_filter", "type": "filter", "name": "filter", "value": [], "placeHolder": "filter", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false, "groupBy": "filter" }
         ],
@@ -2315,6 +2317,7 @@
         "permission": [],
         "fields": [
             { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "My Achievements", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false },
+            { "label": "location", "groupBy": "data", "type": "dropdown", "name": "projectId", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
             {
                 "label": "timerange",
                 "groupBy": "data",
@@ -2368,6 +2371,7 @@
         "permission": [],
         "fields": [
             { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "Due Soon", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false },
+            { "label": "location", "groupBy": "data", "type": "dropdown", "name": "projectId", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
             { "label": "due_soon_days", "groupBy": "data", "type": "text", "name": "days", "value": "7", "placeHolder": "7", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
             { "label": "add_filter", "type": "filter", "name": "filter", "value": [], "placeHolder": "filter", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false, "groupBy": "filter" }
         ],
