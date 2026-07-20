@@ -392,6 +392,7 @@ const TrackerSelection = forwardRef(({
       objId: { CompanyId: currentCopany?.id },
       AssigneeUserId: { $in: [user?._id] },
       statusType: { $in: ["active", "default_active"] },
+      deletedStatusKey: 0,
     };
     if (term) {
       // Treat the search text as literal — escape regex metacharacters.
