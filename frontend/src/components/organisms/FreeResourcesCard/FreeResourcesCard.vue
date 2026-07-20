@@ -124,6 +124,15 @@ const load = async () => {
         const employeeIds = (Array.isArray(selectedIds) && selectedIds.length)
             ? selectedIds.filter((id) => poolSet.has(String(id)))
             : assignablePool;
+        // Empty pool means either the store hasn't loaded yet (the companyUsers
+        // watcher will reload) or every selected user is ineligible. Either way,
+        // DON'T send [] — the backend treats that as "no filter" and would fetch
+        // all users, bypassing the deleted/admin exclusions. Show empty instead.
+        if (!employeeIds.length) {
+            employees.value = [];
+            loading.value = false;
+            return;
+        }
         const payload = {
             employeeIds,
             projectIds: props.cardData?.projectId || [],

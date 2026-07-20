@@ -232,7 +232,7 @@ const getEstimateData = async () => {
                             Loggeduser: { 
                                 $in: timeSheetUserId 
                             },
-                            ProjectId: (cardObject.value.projectMode === 'exclude' && (cardObject.value.projectId || []).length) ? { $nin: cardObject.value.projectId } : { $in: cardObject.value.projectId },
+                            ProjectId: { $in: (cardObject.value.projectMode === 'exclude' && (cardObject.value.projectId || []).length) ? (props.allProjectsArrayFilter?.map((e) => e?._id) ?? []).filter((id) => !cardObject.value.projectId.includes(id)) : cardObject.value.projectId },
                             LogStartTime: {
                                 $gte: start,
                                 $lte: end
@@ -261,7 +261,7 @@ const getEstimateData = async () => {
                 userId: {
                     $in: userId ?? []
                 },
-                ProjectId: (cardObject.value.projectMode === 'exclude' && (cardObject.value.projectId || []).length) ? { $nin: cardObject.value.projectId } : { $in: cardObject.value.projectId ?? [] },
+                ProjectId: { $in: (cardObject.value.projectMode === 'exclude' && (cardObject.value.projectId || []).length) ? (props.allProjectsArrayFilter?.map((e) => e?._id) ?? []).filter((id) => !cardObject.value.projectId.includes(id)) : (cardObject.value.projectId ?? []) },
                 Date: {
                     dbDate: {
                         $gte: start * 1000,

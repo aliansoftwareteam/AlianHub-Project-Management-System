@@ -64,12 +64,18 @@ const Layout = ({ children }) => {
     if (!link) return;
     try {
       await TrackerController.TrackerStop();
-      store.dispatch(setTrackerStopTime());
-      store.dispatch(removeAllTimeLog());
     } catch (e) {
-      store.dispatch(setTrackerStopTime());
+      // Stop failed (offline etc.) — still tear down local state below so the
+      // new session doesn't inherit the previous session's captures/clicks.
+      console.error('Deep-link stop failed', e);
     }
-    await startFromDeepLink(link);
+    // Always clear old session state before starting the new one.
+    store.dispatch(setTrackerStopTime());
+    store.dispatch(removeAllTimeLog());
+    const started = await startFromDeepLink(link);
+    // If the new start failed, the old session is already gone — return home so
+    // the user isn't stranded on a stale running screen.
+    if (!started) router.push('/home');
   };
 
   useEffect(() => {

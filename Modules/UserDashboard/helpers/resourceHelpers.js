@@ -244,11 +244,12 @@ async function getSprintTypeMap(companyId, sprintIds = []) {
  */
 function projectScopeClause(mode, ids, { string = false } = {}) {
     const valid = (ids || []).filter((id) => mongoose.Types.ObjectId.isValid(String(id)));
-    if (!valid.length) return null;
+    if (!valid.length) return null; // no ids → all accessible (new 'all' cards send [])
     const vals = string ? valid.map(String) : valid.map((id) => new mongoose.Types.ObjectId(String(id)));
     if (mode === 'exclude') return { $nin: vals };
-    if (mode === 'include') return { $in: vals };
-    return null;
+    // include, OR a legacy card whose mode is 'all' but still carries saved ids —
+    // treat those ids as an include list so old cards keep their existing scope.
+    return { $in: vals };
 }
 
 function applyTaskMatch(taskFilter, taskMatch) {
