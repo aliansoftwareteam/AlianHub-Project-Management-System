@@ -16,6 +16,31 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.15.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.14.0...v14.15.0) (2026-07-20)
+
+
+### 🚀 Features
+
+* **dashboard:** all-projects toggle for card project selector ([3d8d639](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3d8d6393d496af1f77ca2bfb46df35bd7dff0a77))
+* **dashboard:** project scope selector (all/include/exclude) + wire personal cards ([837a75c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/837a75c9083d0c336442643b939e9e5ed4afc121))
+* **dashboard:** project-scope selector + time tracker UX/deep-link improvements ([fa513ff](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fa513ff79d5182b1f83423b1c0e8f84736f59c13))
+* **dashboard:** roll out project scope (include/exclude) to remaining cards ([0ab39a9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0ab39a940fd48c318d53a2193f58f3d4a8ba0c5e))
+* **tracker:** collapsible Today's Tasks rows with grouped totals ([acecc66](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/acecc66c4495e0c2f6ff9fc8f67fe7134d664206))
+* **tracker:** compact start sheet, running-screen polish, open-in-web ([6e39a02](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6e39a023dc4b0849eb39d7208acfaa6d91938505))
+* **tracker:** hide Start Tracker on completed tasks ([b320866](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b3208665bcadb5bd6ac2b2e2e114ac3083e88fa8))
+* **tracker:** notify on idle instead of auto-stopping ([94b14ae](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/94b14ae087c983c8f97978bf429a19151779bdea))
+* **tracker:** prompt on deep-link start while already tracking ([692cf6b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/692cf6bf714a623c332a14b01d8ea53b47971e0a))
+* **tracker:** toast when the Start Tracker deep link doesn't open ([b79502b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b79502b459f576435882f97ece5780659c54918a))
+* **tracker:** toast when the Start Tracker deep link doesn't open ([fd03f1b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fd03f1b4bd98da4700dc46cc6ddac9f2ad9ad5db))
+
+
+### 🐛 Bug Fixes
+
+* **dashboard:** address CodeRabbit review on [#387](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/issues/387) ([9fe8d2c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9fe8d2cb2acf12aa40dd3e8a06d50ee6b21c455d))
+* **dashboard:** correct my-achievements ownership/completion and add projectpulse project filter ([f331718](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f3317186ff30889a891c525394876eaed7d314fb))
+* **dashboard:** free resources pool from store companyUsers, excluding deleted/admin ([5f80e4e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5f80e4e3ea750f9656be4b2688e479e25dbb0ddf))
+* **tracker:** exclude soft-deleted tasks from By-Task search ([9d49423](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9d4942384eb1ad703a1a1e8fb24f748c145a3079))
+
 ## [14.14.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.13.0...v14.14.0) (2026-07-17)
 
 
