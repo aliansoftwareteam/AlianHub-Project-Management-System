@@ -392,3 +392,36 @@ button {
         top: 6px;
     }
   }
+
+/* "All projects" toggle — aligned under the project field column, with spacing
+   below the selection above it. */
+.cf-all-projects-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.cf-all-projects-spacer {
+  flex: 0 0 35%;
+  width: 35%;
+}
+@media (max-width: 480px) {
+  .cf-all-projects-spacer { display: none; }
+}
+.cf-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+  margin: 0;
+}
+.cf-toggle input {
+  cursor: pointer;
+}
+/* Disabled project picker while "All projects" is on (kept visible, not removed). */
+.cf-disabled {
+  pointer-events: none;
+  opacity: 0.55;
+}
