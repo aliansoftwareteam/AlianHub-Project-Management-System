@@ -355,6 +355,11 @@ const confirmStartTracker = () => {
         sprintId: props.task?.sprintId,
         folderId: props.task?.folderObjId || '',
         comment,
+    }, {
+        // If the tracker doesn't come to the foreground shortly, it's either not
+        // installed or too old to support the myapp:// deep link — one generic
+        // toast covers both (the web can't tell them apart).
+        onNotOpened: () => $toast.warning(t('Toast.tracker_not_opened')),
     });
     showTrackerModal.value = false;
     if (res.ok) {

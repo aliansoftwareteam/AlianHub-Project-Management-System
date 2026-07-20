@@ -25,10 +25,29 @@ export const buildTrackerDeepLink = ({ taskId, projectId, sprintId, folderId, co
 // Note: browsers can't reliably tell if the protocol/app is installed, so a
 // "nothing happened" case is indistinguishable from success — the caller should
 // hint the user that the tracker must be installed.
-export const openInTracker = (params = {}) => {
+export const openInTracker = (params = {}, opts = {}) => {
   if (!params.taskId || !params.projectId) return { ok: false, reason: 'missing' };
   if (!isTrackerCapableDevice()) return { ok: false, reason: 'unsupported' };
   try {
+    // Best-effort "did the tracker actually open?" check. A browser can't query
+    // installed apps, so we watch for this tab losing focus/visibility: when the
+    // OS hands off to the tracker, the page is backgrounded. If that doesn't
+    // happen within the timeout, the tracker is either NOT INSTALLED or too OLD
+    // to register the myapp:// handler — indistinguishable from the web, so the
+    // caller shows ONE generic "install / update the tracker" toast for both.
+    const onNotOpened = typeof opts.onNotOpened === 'function' ? opts.onNotOpened : null;
+    if (onNotOpened && typeof window !== 'undefined' && typeof document !== 'undefined') {
+      let opened = false;
+      const markOpened = () => { opened = true; };
+      const onVisibility = () => { if (document.hidden) opened = true; };
+      window.addEventListener('blur', markOpened, { once: true });
+      document.addEventListener('visibilitychange', onVisibility);
+      setTimeout(() => {
+        window.removeEventListener('blur', markOpened);
+        document.removeEventListener('visibilitychange', onVisibility);
+        if (!opened) onNotOpened();
+      }, 1500);
+    }
     window.location.href = buildTrackerDeepLink(params);
     return { ok: true };
   } catch (e) {
