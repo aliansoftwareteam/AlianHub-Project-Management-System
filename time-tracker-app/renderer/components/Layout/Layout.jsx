@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useSelector, useDispatch } from 'react-redux';
 import { initializeAuth, setInternetLost, setShowOfflineQueueScreen } from '../../store/authSlice';
@@ -8,6 +8,7 @@ import Footer from '../Footer/Footer';
 import { getAssignCompanyData } from '../../controller/company/company';
 import { TrackerController } from '../../controller/tracker/tracker';
 import { removeAllTimeLog, setTrackerStopTime } from '../../store/timelog';
+import { useDeepLinkStart } from '../../hooks/useDeepLinkStart';
 import { getQueue, removeFirstFromQueue, objectToFormData } from '../../utils/apiQueue';
 import { apiRequest, apiRequestFormData, apiRequestWithoutCompnay, apiRequestWithoutSecure } from '../../utils/services';
 import store from '../../store/store';
@@ -23,10 +24,53 @@ const Layout = ({ children }) => {
   const showOflineLogout = useSelector(state => state.auth.showOflineLogout);
   const isInternetLost = useSelector((state) => state.auth.isInternetLost);
   const intervalRef = useRef(null);
+  const startFromDeepLink = useDeepLinkStart();
+  // Deep link that arrived while a tracker is already running — prompt the user.
+  const [deepLinkPrompt, setDeepLinkPrompt] = useState(null); // { taskId, comment }
 
   useEffect(() => {
     timeLogRef.current = timeLog;
   }, [timeLog]);
+
+  // Deep link while ALREADY tracking: TrackerSelection (home) isn't mounted, so
+  // handle it here. Not-tracking links are handled by home/TrackerSelection.
+  useEffect(() => {
+    const handleTrackerInfoFill = (payload) => {
+      try {
+        const raw = payload?.url || '';
+        const qs = raw.includes('?') ? raw.slice(raw.indexOf('?') + 1) : '';
+        const params = new URLSearchParams(qs);
+        const taskId = params.get('taskId') || '';
+        const comment = params.get('comment') || '';
+        if (!taskId) return;
+        // Only intercept when a session is running; otherwise let home handle it.
+        if (timeLogRef.current.trackerStart) {
+          setDeepLinkPrompt({ taskId, comment });
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    const unsubscribe = window.ipc.on('trackerInfoFill', handleTrackerInfoFill);
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, []);
+
+  // Prompt actions: stop the current session then start the deep-linked task.
+  const stopAndStartDeepLink = async () => {
+    const link = deepLinkPrompt;
+    setDeepLinkPrompt(null);
+    if (!link) return;
+    try {
+      await TrackerController.TrackerStop();
+      store.dispatch(setTrackerStopTime());
+      store.dispatch(removeAllTimeLog());
+    } catch (e) {
+      store.dispatch(setTrackerStopTime());
+    }
+    await startFromDeepLink(link);
+  };
 
   useEffect(() => {
     dispatch(initializeAuth());
@@ -198,6 +242,34 @@ const Layout = ({ children }) => {
         <div>{children}</div>
         {isAuthenticated && !timeLog.trackerStart && <Footer />}
         {/* {this.state.showFooter && <Footer />} */}
+
+        {/* Deep link arrived while a tracker is already running. */}
+        {deepLinkPrompt && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-white rounded-2xl w-full max-w-sm p-5 shadow-lg">
+              <div className="text-base font-semibold text-gray-800">A tracker is already running</div>
+              <p className="text-sm text-gray-600 mt-2">
+                Do you want to stop the current session and start the new task, or keep the current one running?
+              </p>
+              <div className="flex justify-end gap-3 mt-5">
+                <button
+                  type="button"
+                  className="px-4 py-2 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 font-medium text-sm cursor-pointer"
+                  onClick={() => setDeepLinkPrompt(null)}
+                >
+                  Keep current
+                </button>
+                <button
+                  type="button"
+                  className="px-4 py-2 rounded bg-[#1CB303] text-white hover:bg-[#169302] font-medium text-sm cursor-pointer"
+                  onClick={stopAndStartDeepLink}
+                >
+                  Stop &amp; start new
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   )
 };
