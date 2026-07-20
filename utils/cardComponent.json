@@ -2001,7 +2001,8 @@
                 "info": "",
                 "hidden": false,
                 "disabled": false
-            }
+            },
+            { "label": "location", "groupBy": "data", "type": "dropdown", "name": "projectId", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false }
         ],
         "key": "ProjectPulseCard",
         "image": "PieChartWorkload",

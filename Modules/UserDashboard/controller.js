@@ -791,13 +791,17 @@ exports.getProjectUtilizationSummary = async (req, res) => {
         // (all projects); a member → only projects they belong to / public ones.
         const projFilter = await resolveVisibleProjectFilter(companyId, req.uid);
 
+        // Optional project scoping from the card's project selector (empty = all).
+        const selectedProjectIds = (Array.isArray(req.body?.projectId) ? req.body.projectId : [])
+            .filter((id) => mongoose.Types.ObjectId.isValid(String(id)));
+
         // 1 + 3 — active projects and their ProjectType mix. Drill-down also
         // needs each project's status + its per-project status palette
         // (projectStatusData) so the modal can render the status in colour.
         const activeProjects = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PROJECTS,
             data: [
-                { statusType: { $nin: ["close"] }, deletedStatusKey: 0, ...(projFilter || {}) },
+                { statusType: { $nin: ["close"] }, deletedStatusKey: 0, ...(projFilter || {}), ...(selectedProjectIds.length ? { _id: { $in: selectedProjectIds.map((id) => new mongoose.Types.ObjectId(String(id))) } } : {}) },
                 includeProjects
                     ? { ProjectType: 1, ProjectName: 1, status: 1, statusType: 1, projectStatusData: 1 }
                     : { ProjectType: 1, ProjectName: 1 },
@@ -824,7 +828,7 @@ exports.getProjectUtilizationSummary = async (req, res) => {
         const timelogs = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET,
             data: [
-                { LogStartTime: { $gte: fromSec, $lte: toSec } },
+                { LogStartTime: { $gte: fromSec, $lte: toSec }, ...(selectedProjectIds.length ? { ProjectId: { $in: selectedProjectIds.map(String) } } : {}) },
                 { ProjectId: 1 },
             ],
         }, "find").catch(() => []);
@@ -1580,7 +1584,7 @@ exports.getProjectProgressMetric = async (req, res) => {
             const taskIds = objIds(pairs.map((p) => p.taskId));
             if (taskIds.length) {
                 const tasks = await MongoDbCrudOpration(companyId, {
-                    type: SCHEMA_TYPE.TASKS, data: [{ _id: { $in: taskIds } }, { TaskName: 1, TaskKey: 1, ProjectID: 1, sprintArray: 1 }],
+                    type: SCHEMA_TYPE.TASKS, data: [{ _id: { $in: taskIds }, deletedStatusKey: 0 }, { TaskName: 1, TaskKey: 1, ProjectID: 1, sprintArray: 1 }],
                 }, "find").catch(() => []);
                 (tasks || []).forEach((t) => { taskMap[String(t._id)] = t; });
                 const pids = objIds(Object.values(taskMap).map((t) => t.ProjectID));
@@ -2012,8 +2016,11 @@ exports.getMyAchievements = async (req, res) => {
         // Tasks the member completed in the window (updatedAt = completion proxy).
         const achFilter = applyTaskMatch({
             deletedStatusKey: 0,
-            statusType: "close",
-            $or: [{ AssigneeUserId: uid }, { Task_Leader: uid }],
+            // Completed = close OR done (matches bucketForStatus in resourceHelpers).
+            statusType: { $in: ["close", "done"] },
+            // Achievements are the caller's OWN work — only tasks assigned to
+            // them, not ones they merely lead/created (Task_Leader).
+            AssigneeUserId: uid,
             updatedAt: { $gte: dateFrom, $lte: dateTo },
         }, bodyTaskMatch(req.body));
         const tasks = await MongoDbCrudOpration(companyId, {
@@ -2038,6 +2045,32 @@ exports.getMyAchievements = async (req, res) => {
             });
         }
 
+        // Real completion time per task — the latest 'Task_Status' history entry
+        // (when the task moved to Close). `updatedAt` is unreliable for this: it
+        // bumps on ANY edit (description, comments, priority…), so an on-time
+        // task edited after its due date would look late. History carries a
+        // reliable createdAt only since BUG-046 (2026-05-12); older entries fall
+        // back to updatedAt below. Same signal the burndown chart uses.
+        const lastStatusChange = new Map();
+        if (taskIds.length) {
+            // History stores TaskId as either string or ObjectId — match both.
+            const idObjects = (tasks || []).map((t) => t._id);
+            const historyRows = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.HISTORY,
+                data: [
+                    { Key: 'Task_Status', TaskId: { $in: [...taskIds, ...idObjects] } },
+                    'TaskId createdAt',
+                ],
+            }, "find").catch(() => []);
+            (historyRows || []).forEach((row) => {
+                if (!row.createdAt) return;
+                const key = String(row.TaskId);
+                const at = new Date(row.createdAt);
+                const cur = lastStatusChange.get(key);
+                if (!cur || at > cur) lastStatusChange.set(key, at);
+            });
+        }
+
         let onEstimate = 0;
         let overEstimate = 0;
         let onTime = 0;
@@ -2049,10 +2082,15 @@ exports.getMyAchievements = async (req, res) => {
             if (within === true) onEstimate += 1;
             else if (within === false) overEstimate += 1;
 
+            // Prefer the real status-change completion time; fall back to
+            // updatedAt only for tasks predating reliable history timestamps.
+            const completedAt = lastStatusChange.get(String(t._id))
+                || (t.updatedAt ? new Date(t.updatedAt) : null);
+
             let onTimeFlag = null;
             if (t.DueDate) {
                 withDue += 1;
-                const doneMs = t.updatedAt ? new Date(t.updatedAt).getTime() : 0;
+                const doneMs = completedAt ? completedAt.getTime() : 0;
                 const dueEnd = new Date(t.DueDate); dueEnd.setHours(23, 59, 59, 999);
                 onTimeFlag = !!(doneMs && doneMs <= dueEnd.getTime());
                 if (onTimeFlag) onTime += 1;
@@ -2068,7 +2106,7 @@ exports.getMyAchievements = async (req, res) => {
                 within,
                 onTime: onTimeFlag,
                 dueDate: t.DueDate || null,
-                completedAt: t.updatedAt || null,
+                completedAt: completedAt ? completedAt.toISOString() : null,
             };
         }).sort((a, b) => new Date(b.completedAt || 0) - new Date(a.completedAt || 0));
 
