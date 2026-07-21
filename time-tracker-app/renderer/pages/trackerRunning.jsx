@@ -127,11 +127,23 @@ function TimeTrackerView() {
 
     return () => {
       // Cleanup event listeners
-      
+
       stopScreenshotCapture();
       clearInterval(dateTimeIntervalId);
     };
   }, []); // No timeLog dependency
+
+  // Re-arm screenshot capture when a NEW session starts while this screen stays
+  // mounted — e.g. a deep-link "stop & start new" handled by Layout. trackerID
+  // changes per session; scheduleNextCapture clears any pending timer first, so
+  // this is safe to run on mount too.
+  useEffect(() => {
+    if (timeLog.trackerStart) {
+      timeLogRef.current = timeLog;
+      startScreenshotCapture();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeLog.trackerID]);
 
   const startScreenshotCapture = () => {
 
@@ -174,10 +186,15 @@ function TimeTrackerView() {
   };
 
   const handleScreenShot = async (e, image) => {
-    
+
     // Use ref to access latest timeLog
     const currentTimeLog = timeLogRef.current;
-    
+
+    // Drop stray/in-flight captures that arrive while no session is active —
+    // e.g. during the stop→start gap of a deep-link "stop & start new" — so a
+    // screenshot never logs to a cleared or previous session.
+    if (!currentTimeLog.trackerStart || !currentTimeLog.startTime) return;
+
     const now = DateTime.now();
     const dateTimeWithSecondsZero = now.set({ second: 0 });
     const isoString = dateTimeWithSecondsZero.toISO();

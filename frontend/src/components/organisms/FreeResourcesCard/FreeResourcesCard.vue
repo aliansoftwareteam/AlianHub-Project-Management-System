@@ -111,11 +111,32 @@ const load = async () => {
     loading.value = true;
     try {
         const { dateFrom, dateTo } = resolveIsoRange(1); // today
-        // Read teams fresh — the store may populate after this card mounts.
-        const employeeIds = teamIdToUserId(props.cardData?.AssigneeUserId || [], getters['settings/teams'] || []);
+        // Assignable pool from the Settings store — the source of truth for company
+        // membership. Drop removed members (isDelete) and owner/admin (roleType 1/2)
+        // so Free Resources only lists real assignable staff.
+        const assignablePool = (getters['settings/companyUsers'] || [])
+            .filter((u) => u && u.isDelete === false && u.roleType !== 1 && u.roleType !== 2)
+            .map((u) => String(u.userId));
+        // Honour a team/assignee selection when present, but always drop
+        // deleted/admin; otherwise use the whole assignable pool.
+        const selectedIds = teamIdToUserId(props.cardData?.AssigneeUserId || [], getters['settings/teams'] || []);
+        const poolSet = new Set(assignablePool);
+        const employeeIds = (Array.isArray(selectedIds) && selectedIds.length)
+            ? selectedIds.filter((id) => poolSet.has(String(id)))
+            : assignablePool;
+        // Empty pool means either the store hasn't loaded yet (the companyUsers
+        // watcher will reload) or every selected user is ineligible. Either way,
+        // DON'T send [] — the backend treats that as "no filter" and would fetch
+        // all users, bypassing the deleted/admin exclusions. Show empty instead.
+        if (!employeeIds.length) {
+            employees.value = [];
+            loading.value = false;
+            return;
+        }
         const payload = {
-            employeeIds: Array.isArray(employeeIds) ? employeeIds : [],
+            employeeIds,
             projectIds: props.cardData?.projectId || [],
+            projectMode: props.cardData?.projectMode || 'all',
             isParentTask: props.cardData?.isParentTask !== false,
             dateFrom,
             dateTo,
@@ -142,6 +163,9 @@ const load = async () => {
 watch(() => props.refreshTrigger, load);
 watch(() => props.cardData, load, { deep: true });
 watch(() => props.filterData, load, { deep: true });
+// The store's companyUsers may populate after this card mounts — reload so the
+// assignable pool (and thus the query) isn't built from an empty list.
+watch(() => (getters['settings/companyUsers'] || []).length, load);
 onMounted(load);
 </script>
 

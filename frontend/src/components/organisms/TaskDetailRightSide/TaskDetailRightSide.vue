@@ -1,7 +1,7 @@
 <template>
     <div class="task-detail-right-side">
         <div>
-            <div class="start-in-tracker-wrap" v-if="isAssignee">
+            <div class="start-in-tracker-wrap" v-if="isAssignee && !isTaskCompleted">
                 <button
                     type="button"
                     class="start-in-tracker-btn"
@@ -328,6 +328,14 @@ const props = defineProps({
 // Only assignees of the task can start tracking it.
 const isAssignee = computed(() => (props.task?.AssigneeUserId || []).includes(userId.value));
 
+// Only OPEN tasks can be tracked — hide "Start Tracker" on completed/closed
+// tasks. A task is completed when its status type is 'close' (the same rule the
+// per-task completion checks use in Task.vue / TaskDetail.vue + bucketForStatus).
+const isTaskCompleted = computed(() => {
+    const ty = props.task?.status?.type || props.task?.statusType || '';
+    return ty === 'close';
+});
+
 // Start Tracker modal (project Modal component) — collects a comment, then deep-links.
 const showTrackerModal = ref(false);
 const trackerComment = ref('');
@@ -355,6 +363,11 @@ const confirmStartTracker = () => {
         sprintId: props.task?.sprintId,
         folderId: props.task?.folderObjId || '',
         comment,
+    }, {
+        // If the tracker doesn't come to the foreground shortly, it's either not
+        // installed or too old to support the myapp:// deep link — one generic
+        // toast covers both (the web can't tell them apart).
+        onNotOpened: () => $toast.warning(t('Toast.tracker_not_opened')),
     });
     showTrackerModal.value = false;
     if (res.ok) {

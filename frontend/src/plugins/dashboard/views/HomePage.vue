@@ -160,7 +160,7 @@
                     <div v-if="!Object.keys(filterCardComponent).length" class="font-size-13 p0x-15px gray81 center_no_record_found">{{$t('UserTimesheet.no_records_found')}}</div>
                 </div>
                 <div v-else-if="cardTab === 2 && Object.keys(fieldArray)?.length">
-                    <CardFieldComponent :cardType="fieldArray?.cardType" :componentId="fieldArray?.key" :isEditCard="isEditCard" :allProjectsArray="props.allProjectsArray" @closeSidebar="handleCardClose" :fieldsArray="fieldArray?.fields" ref="childRef" @handleFunction="handleCardAddOnDashboard"/>
+                    <CardFieldComponent :cardType="fieldArray?.cardType" :componentId="fieldArray?.key" :isEditCard="isEditCard" :savedProjectMode="editProjectMode" :allProjectsArray="props.allProjectsArray" @closeSidebar="handleCardClose" :fieldsArray="fieldArray?.fields" ref="childRef" @handleFunction="handleCardAddOnDashboard"/>
                 </div>
             </template>
         </AdvanceSearchModal>
@@ -289,6 +289,8 @@
     const filterCardComponent = ref([]);
     const currentLayout = ref({});
     const isEditCard = ref(false);
+    // Saved project scope mode for the card being edited (not a catalog field).
+    const editProjectMode = ref('');
     const isShowModal = ref(props.isShowModalToggle || false);
     const cardTab = ref(props.cardTabIndex || 0);
     const search = ref('');
@@ -635,6 +637,7 @@
 
             isEditCard.value = true;
             editCardId.value = uid;
+            editProjectMode.value = cardData?.projectMode || '';
             fields.forEach(element => {
                 if(element.name === 'filter') {
                     if (filterData && filterData.length > 0) {
@@ -779,6 +782,7 @@
     };
     const handleCard = (val) => {
         fieldArray.value = val;
+        editProjectMode.value = ''; // new card → CardFieldComponent defaults to 'all'
         cardTab.value = 2;
     };
     const handleCardClose = () => {

@@ -388,10 +388,11 @@ const startActivitySampling = () => {
       idleHandled = false
     } else if (idleThresholdSec > 0 && idleSeconds >= idleThresholdSec && !idleHandled) {
       idleHandled = true
+      // Notify only — do NOT auto-stop the tracker. Tracking keeps running; this
+      // is just a heads-up that no input was detected for the threshold.
       mainWindow.webContents.send('idle:detected', { idleSeconds, thresholdSeconds: idleThresholdSec })
-      mainWindow.webContents.send('stop-tracker', true)
       try {
-        new Notification({ title: 'Alianhub Time Tracker', body: `Tracking paused — no activity for ${Math.round(idleThresholdSec / 60)} min.` }).show()
+        new Notification({ title: 'Alianhub Time Tracker', body: `No activity detected for ${Math.round(idleThresholdSec / 60)} min.` }).show()
       } catch (e) { /* notifications are best-effort */ }
     }
     if (mouseMoved) {

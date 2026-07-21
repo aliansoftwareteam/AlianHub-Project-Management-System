@@ -54,7 +54,7 @@
                     />
 
                     <DropDownListComponent
-                        v-else-if="field?.type === 'dropdown' && !field?.hidden && ((field?.label === 'calculation' || field?.label === 'show_assignees' ) && selectedMeasure ? selectedMeasure === 1 || selectedMeasure === 2 : field?.label === 'timerange' ? selectedMeasure !== 3 : true)"
+                        v-else-if="field?.type === 'dropdown' && !field?.hidden && field?.label !== 'location' && ((field?.label === 'calculation' || field?.label === 'show_assignees' ) && selectedMeasure ? selectedMeasure === 1 || selectedMeasure === 2 : field?.label === 'timerange' ? selectedMeasure !== 3 : true)"
                         :id="makeUniqueId(6)"
                         :matchField="field?.label === 'status' ? 'key' : field?.label === 'measure' || field?.label === 'calculation' || field?.label === 'timerange' || field?.label === 'group_by' || field?.label === 'fields' ? 'id' || field?.label === 'logtype' : '_id'"
                         :items="field?.label === 'show_assignees' ? assigneeOptions : field?.label === 'location' ? allProjectsArray : field?.label === 'status' ? taskStatusArray : field?.label === 'measure' || field?.label === 'calculation' || field?.label === 'timerange' || field?.label === 'logtype' || field?.label === 'group_by' || field?.label === 'fields' ? field?.options : []"
@@ -79,6 +79,44 @@
                         @update:form-obj="handleFormUpdate"
                         :index="index"
                     />
+
+                    <!-- Project scope: mode (All / Include / Exclude) then the list,
+                         filter-style. 'All' persists [] (dynamic all accessible);
+                         Include/Exclude apply the selected ids as $in / $nin. -->
+                    <div
+                        v-if="field?.label === 'location' && !field?.hidden"
+                        class="cf-project-scope"
+                    >
+                        <div class="cf-project-mode-row">
+                            <label class="custom-field-label cf-scope-label">{{ $t(`dashboardCard.${field?.label}`) }}</label>
+                            <select
+                                class="cf-scope-select"
+                                :value="projectMode"
+                                @change="onProjectModeChange($event.target.value)"
+                            >
+                                <option value="all">{{ $t('dashboardCard.project_scope_all') }}</option>
+                                <option value="include">{{ $t('dashboardCard.project_scope_include') }}</option>
+                                <option value="exclude">{{ $t('dashboardCard.project_scope_exclude') }}</option>
+                            </select>
+                        </div>
+
+                        <div v-if="projectMode !== 'all'" class="cf-scope-list">
+                            <DropDownListComponent
+                                :id="makeUniqueId(6)"
+                                matchField="_id"
+                                :items="allProjectsArray"
+                                :selectedItems="selectedProjects"
+                                :field="field"
+                                displayType="project"
+                                :is-multi-select="true"
+                                searchKey="ProjectName"
+                                :getDisplayText="(item) => `${props?.allProjectsArray?.find(e => e._id === item)?.ProjectName}`"
+                                :getDisplayTextOption="(item) => `${props?.allProjectsArray?.find(e => e._id === item?._id)?.ProjectName}`"
+                                @update:selected="updateData"
+                                :error="errorProject"
+                            />
+                        </div>
+                    </div>
 
                     <!-- Recently Added Projects — quick-review list of projects
                          created in the last ~2 days (same rule as the project
@@ -173,6 +211,10 @@ const selectedUser = ref([]);
 const selectedStatus = ref([]);
 const selectedProjects = ref([]);
 const filteredProjects = ref([]);
+// Project scope mode: 'all' (every accessible project, dynamic — persisted as an
+// empty projectId), 'include' (only the selected projects), or 'exclude' (all
+// accessible EXCEPT the selected). Include/exclude require a selection.
+const projectMode = ref('all');
 const selectedFields = ref([]);
 const taskFilter = ref([]);
 const selectedMeasure = ref(null);
@@ -207,7 +249,13 @@ const props = defineProps({
     componentId: {
         type: String,
         default: '',
-    }
+    },
+    // Saved project scope mode ('all' | 'include' | 'exclude') — not a catalog
+    // field, so it's passed in separately for the edit modal to restore.
+    savedProjectMode: {
+        type: String,
+        default: '',
+    },
 });
 const usersArray = computed(() => {
     let lableAray = props.fieldsArray.map(field => field.label);
@@ -312,6 +360,20 @@ const newlyAddedProjects = computed(() => {
         .filter((p) => !dismissedNewProjects.value.includes(p._id))
         .sort((a, b) => resolveCreatedMs(b?.createdAt) - resolveCreatedMs(a?.createdAt));
 });
+// When "All projects" is turned on we ignore the picker and clear the required-
+// selection error; the value is persisted as an empty projectId (= all
+// accessible, dynamic) in the submit handler.
+const onProjectModeChange = (mode) => {
+    projectMode.value = mode;
+    if (mode === 'all') {
+        errorProject.value = '';
+        // Keep the underlying selection populated (all accessible) so anything
+        // reading it stays valid; Save persists [] (dynamic all).
+        selectedProjects.value = (props.allProjectsArray || []).map((e) => e._id);
+        filteredProjects.value = [...(props.allProjectsArray || [])];
+    }
+};
+
 // Toggle a project in/out of the SAME selectedProjects array the Project
 // dropdown drives, so Save persists it through the existing path untouched.
 const toggleNewProject = (projectId) => {
@@ -397,8 +459,14 @@ const initializeFormObject = () => {
 
 const initializeSelectedValues = () => {
     if (formObj.value?.projectId) {
-        selectedProjects.value = props.isEditCard
-            ? (formObj.value?.projectId?.value?.length ? formObj.value?.projectId?.value : (props.allProjectsArray?.map(e => e._id) || []))
+        const savedIds = formObj.value?.projectId?.value || [];
+        // Restore the saved mode; fall back to include (has ids) / all (empty).
+        // New cards default to all (dynamic).
+        projectMode.value = props.isEditCard
+            ? (props.savedProjectMode || (savedIds.length ? 'include' : 'all'))
+            : 'all';
+        selectedProjects.value = savedIds.length
+            ? savedIds
             : (props.allProjectsArray?.map(e => e._id) || []);
         filteredProjects.value = props.allProjectsArray.filter(project =>
             selectedProjects.value.includes(project._id));
@@ -485,16 +553,24 @@ const emit = defineEmits(['handleFunction', 'closeSidebar']);
 const handleSubmit = async () => {
     error.value = "";
     errorProject.value = "";
+    // Keep the projectId field value populated so a required-location rule
+    // validates; the persisted value is decided below (empty = all mode).
+    if (formObj.value?.projectId) {
+        formObj.value.projectId.value = projectMode.value === 'all'
+            ? (props.allProjectsArray?.map(e => e._id) || [])
+            : selectedProjects.value;
+    }
+
     const filteredData = Object.fromEntries(
         // eslint-disable-next-line
         Object.entries(formObj.value).filter(([_, field]) => !field.hidden)
     );
-    
+
     if (formObj.value?.AssigneeUserId && !selectedUser.value.length) {
         error.value = t(`dashboardCard.error_assignees`);
     }
     
-    if (formObj.value?.projectId && !selectedProjects.value.length) {
+    if (formObj.value?.projectId && projectMode.value !== 'all' && !selectedProjects.value.length) {
         errorProject.value = t(`dashboardCard.error_location`);
     }
     const valid = await checkAllFields(filteredData);
@@ -523,7 +599,12 @@ const handleSubmit = async () => {
 
     // Override specific values
     if (formObj.value.AssigneeUserId) emitData.AssigneeUserId = selectedUser.value;
-    if (formObj.value.projectId) emitData.projectId = selectedProjects.value;
+    // Persist scope mode + ids. 'all' → [] (dynamic all accessible); 'include'/
+    // 'exclude' → the explicit ids the backend applies as $in / $nin.
+    if (formObj.value.projectId) {
+        emitData.projectMode = projectMode.value;
+        emitData.projectId = projectMode.value === 'all' ? [] : selectedProjects.value;
+    }
     if (formObj.value.statusArray) emitData.statusArray = selectedStatus.value;
     if (formObj.value.measure) emitData.measure = selectedMeasure.value;
     if (formObj.value.calculation) emitData.calculation = selectedCalculation.value;

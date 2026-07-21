@@ -74,7 +74,11 @@
                 if(!filterQuery.value?.$and) {
                     filterQuery.value.$and = [];
                 }
-                filterQuery.value.$and.push({ ProjectID: { objId:{$in: cardDataObject.value.projectId}} },cardDataObject.value.isParentTask === true ? {} : { isParentTask: !cardDataObject.value.isParentTask },{ deletedStatusKey:0 });
+                const pAccessible = props.allProjectsArrayFilter?.map((e) => e?._id) ?? [];
+                const pExclude = (cardDataObject.value.projectMode === 'exclude') && (cardDataObject.value.projectId || []).length;
+                // exclude → whitelist (accessible minus excluded), stays bounded to accessible.
+                const pScoped = pExclude ? pAccessible.filter((id) => !cardDataObject.value.projectId.includes(id)) : cardDataObject.value.projectId;
+                filterQuery.value.$and.push({ ProjectID: { objId: { $in: pScoped } } },cardDataObject.value.isParentTask === true ? {} : { isParentTask: !cardDataObject.value.isParentTask },{ deletedStatusKey:0 });
             }
             let timeuserId = [];
             if(checkPermission('sheet_settings.workload_timesheet') === 2 || checkPermission('sheet_settings.workload_timesheet') === true) {
@@ -101,8 +105,8 @@
             let projectStatsQuery = [
                 ...(cardDataObject.value.measure === 1 || cardDataObject.value.measure === 2
                     ? [
-                        { $match: { 
-                            ProjectId: { $in: cardDataObject.value.projectId },
+                        { $match: {
+                            ProjectId: { $in: (cardDataObject.value.projectMode === 'exclude' && (cardDataObject.value.projectId || []).length) ? (props.allProjectsArrayFilter?.map((e) => e?._id) ?? []).filter((id) => !cardDataObject.value.projectId.includes(id)) : cardDataObject.value.projectId },
                             ...(cardDataObject.value.measure === 2 && {LogStartTime: {
                                 $gte: start,
                                 $lte: end

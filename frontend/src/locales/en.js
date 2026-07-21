@@ -2510,6 +2510,7 @@ export default {
             "Error in updating milestone refund amount",
         The_project_not_found: "The project not found.",
         The_project_is_archived: "The project is archived.",
+        tracker_not_opened: "AlianHub Tracker didn't open. Please make sure it's installed or updated to the latest version.",
         Start_date_of_project_should_be_smaller_than_current_date:
             "Start date of project should be smaller than current date",
         All_the_range_is_included_in_milestone:
@@ -3073,6 +3074,9 @@ export default {
         refferal_code_error: "Refferal code is not valid",
     },
     dashboardCard: {
+        project_scope_all: "All projects",
+        project_scope_include: "Include",
+        project_scope_exclude: "Exclude",
         tasks_by_status_card_title: "Tasks by Status",
         tasks_by_status_card_description: "Count of tasks grouped by status",
         tasks_by_project_card_title: "Tasks by Project",

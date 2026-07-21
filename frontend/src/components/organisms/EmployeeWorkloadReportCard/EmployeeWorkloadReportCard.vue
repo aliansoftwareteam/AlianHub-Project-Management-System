@@ -512,6 +512,7 @@ async function fetchReport() {
         const payload = {
             employeeIds: Array.isArray(employeeIds) ? employeeIds : [],
             projectIds: cardObject.value.projectId || [],
+            projectMode: cardObject.value.projectMode || 'all',
             statusKeys: cardObject.value.statusArray || [],
             isParentTask: cardObject.value.isParentTask !== false,
             dateFrom,

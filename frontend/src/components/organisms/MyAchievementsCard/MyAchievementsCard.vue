@@ -151,7 +151,7 @@ const load = async () => {
         const { dateFrom, dateTo } = resolveCardRange(timerange.value, globalRange && globalRange.value);
         const fd = Array.isArray(props.filterData) ? props.filterData : Object.values(props.filterData || {});
         const taskMatch = fd.length ? buildFilterQuery(fd, userId && userId.value ? String(userId.value) : '') : null;
-        const res = await apiRequest('post', `${env.MY_ACHIEVEMENTS}`, { dateFrom, dateTo, taskMatch });
+        const res = await apiRequest('post', `${env.MY_ACHIEVEMENTS}`, { dateFrom, dateTo, taskMatch, projectId: props.cardData?.projectId || [], projectMode: props.cardData?.projectMode || 'all' });
         const d = res && res.data && res.data.status ? (res.data.data || {}) : {};
         data.value = { ...EMPTY, ...d, recent: d.recent || [] };
         loaded.value = true;
