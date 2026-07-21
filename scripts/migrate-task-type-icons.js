@@ -78,6 +78,38 @@ const VALUE_MAP = {
     sprint_planning: ['calendar-check-outline', '#0D9488'],
     optimization: ['speedometer', '#EA580C'],
     image: ['image-outline', '#0EA5E9'],
+    // ── dev-company values (664d…) ─────────────────────────────────────────
+    test: ['test-tube', '#7C3AED'],
+    testing: ['test-tube', '#0D9488'],
+    qa: ['clipboard-check-outline', '#CA8A04'],
+    backlog_grooming: ['playlist-check', '#8B5CF6'],
+    feature_development: ['source-branch', '#2563EB'],
+    code_review: ['eye-check-outline', '#6366F1'],
+    bug_fixing: ['bug-check-outline', '#DC2626'],
+    integration: ['merge', '#0891B2'],
+    feedback_collection: ['comment-quote-outline', '#EA580C'],
+    story: ['bookmark-outline', '#16A34A'],
+    epic: ['flag-outline', '#9333EA'],
+    subtask: ['subdirectory-arrow-right', '#9CA3AF'],
+    feature: ['star-outline', '#F59E0B'],
+    content: ['text-box-outline', '#16A34A'],
+    // engineering
+    'ui/ux': ['palette-swatch-outline', '#DB2777'],
+    frontend: ['language-html5', '#2563EB'],
+    backend: ['server', '#7C3AED'],
+    admin_panel: ['view-dashboard-outline', '#475569'],
+    database: ['database', '#0D9488'],
+    devops: ['infinity', '#EA580C'],
+    shopify_task: ['storefront-outline', '#16A34A'],
+    mobile: ['cellphone', '#0EA5E9'],
+    // legal
+    litigation_support: ['scale-balance', '#B45309'],
+    contract_review: ['file-sign', '#CA8A04'],
+    document_drafting: ['file-document-edit-outline', '#0D9488'],
+    legal_research: ['book-search-outline', '#7C3AED'],
+    // junk/test placeholders → neutral
+    ddddsee334434: ['help-circle-outline', '#9CA3AF'],
+    demo_25: ['help-circle-outline', '#9CA3AF'],
 };
 // Keyword fallback for any value/name not in VALUE_MAP.
 const KEYWORD = [
@@ -107,19 +139,40 @@ function withIcon(entry) {
 const isBadKey = (k) => !Number.isInteger(k); // NaN, undefined, doubles, objects
 
 /**
- * Re-key one taskTypeCounts array. Returns { entries, changes:[{value,old,new}],
- * valueToKey } where a "keeper" retains its (valid, first-seen) key and the rest
- * get fresh unique keys. No merges (distinct values assumed; dupes reported).
+ * Normalize one taskTypeCounts array in two passes:
+ *   1. MERGE same-value duplicates → one keeper (prefer entry with an icon, then
+ *      lowest valid key, then first); the rest are dropped. Tasks pointing at a
+ *      dropped entry are consolidated onto the keeper's key (done in the caller,
+ *      matching by value).
+ *   2. RE-KEY: give any keeper with a NaN/duplicate key a fresh unique integer;
+ *      keepers with a valid, unclaimed key retain it (no task rewrite needed).
+ * Returns { entries, changes:[{value,old,new}], merges:[{value,kept,droppedCount}], valueToKey }.
  */
 function rekey(entries) {
+    // Pass 1 — merge by value (case-insensitive), preserving first-seen order.
+    const groups = new Map();
+    for (const e of entries) {
+        const v = String(e.value || '').toLowerCase();
+        if (!groups.has(v)) groups.set(v, []);
+        groups.get(v).push(e);
+    }
+    const merges = [];
+    const keepers = [];
+    for (const group of groups.values()) {
+        if (group.length === 1) { keepers.push(group[0]); continue; }
+        const keeper = group.find((g) => g.iconValue)
+            || group.filter((g) => Number.isInteger(g.key)).sort((a, b) => a.key - b.key)[0]
+            || group[0];
+        keepers.push(keeper);
+        merges.push({ value: group[0].value, kept: keeper.key, droppedCount: group.length - 1 });
+    }
+    // Pass 2 — unique keys for the keepers.
     const claimed = new Set();
-    let next = entries.reduce((m, e) => (Number.isInteger(e.key) && e.key > m ? e.key : m), 0);
+    let next = keepers.reduce((m, e) => (Number.isInteger(e.key) && e.key > m ? e.key : m), 0);
     const changes = [];
     const valueToKey = {};
-    const dupValues = [];
-    const out = entries.map((e) => {
+    const out = keepers.map((e) => {
         const value = String(e.value || '');
-        if (valueToKey[value.toLowerCase()] !== undefined) dupValues.push(value); // same-value dup
         let key = e.key;
         if (isBadKey(key) || claimed.has(key)) {
             key = ++next;
@@ -129,13 +182,13 @@ function rekey(entries) {
         valueToKey[value.toLowerCase()] = key;
         return { ...e, key };
     });
-    return { entries: out, changes, valueToKey, dupValues };
+    return { entries: out, changes, merges, valueToKey };
 }
 
 // ── report accumulator ──────────────────────────────────────────────────────
 const report = {
     projects: [], statusLikeUsage: {}, orphanTotal: 0, taskRewriteTotal: 0,
-    keyFixTotal: 0, iconSetTotal: 0, dupValueProjects: [],
+    keyFixTotal: 0, iconSetTotal: 0, mergeTotal: 0,
 };
 
 async function crud(type, data, method) {
@@ -154,19 +207,19 @@ async function run() {
     for (const p of projects || []) {
         const pid = String(p._id);
         const original = Array.isArray(p.taskTypeCounts) ? p.taskTypeCounts : [];
-        const { entries, changes, valueToKey, dupValues } = rekey(original);
-        if (dupValues.length) report.dupValueProjects.push({ project: p.ProjectName, values: dupValues });
+        const { entries, changes, merges } = rekey(original);
 
-        // Tasks to rewrite: those whose type value's key changed. Match by value.
-        const perValue = [];
-        for (const ch of changes) {
+        // Task rewrites: for each FINAL entry, count tasks of that value whose key
+        // differs from the entry's key. This subsumes both re-keys AND merges
+        // (tasks pointing at a dropped duplicate get consolidated onto the keeper).
+        const rewrites = [];
+        for (const e of entries) {
             const n = await crud(SCHEMA_TYPE.TASKS,
-                [{ ProjectID: pid, TaskType: ch.value }], 'countDocuments');
-            perValue.push({ ...ch, tasks: n });
-            report.taskRewriteTotal += n;
+                [{ ProjectID: pid, TaskType: e.value, TaskTypeKey: { $ne: e.key } }], 'countDocuments');
+            if (n > 0) { rewrites.push({ value: e.value, key: e.key, tasks: n }); report.taskRewriteTotal += n; }
         }
 
-        // Orphans: tasks whose TaskType matches no entry value (left untouched).
+        // Orphans: tasks whose TaskType matches no keeper value (left untouched).
         const values = entries.map((e) => e.value).filter(Boolean);
         const orphans = await crud(SCHEMA_TYPE.TASKS,
             [{ ProjectID: pid, TaskType: { $nin: values } }], 'countDocuments');
@@ -181,18 +234,18 @@ async function run() {
         }
 
         report.keyFixTotal += changes.length;
-        if (changes.length || orphans) {
-            report.projects.push({ project: p.ProjectName, pid, keyFixes: perValue, orphans });
+        report.mergeTotal += merges.reduce((s, m) => s + m.droppedCount, 0);
+        if (changes.length || merges.length || rewrites.length || orphans) {
+            report.projects.push({ project: p.ProjectName, pid, changes, merges, rewrites, orphans });
         }
 
         if (APPLY) {
-            // B: write corrected keys. A: also set icons on the same array (one write).
-            const finalEntries = entries.map(withIcon);
+            const finalEntries = entries.map(withIcon); // deduped + re-keyed + icons
             report.iconSetTotal += finalEntries.length;
             await crud(SCHEMA_TYPE.PROJECTS, [{ _id: p._id }, { $set: { taskTypeCounts: finalEntries } }], 'updateOne');
-            for (const ch of changes) {
+            for (const r of rewrites) {
                 await crud(SCHEMA_TYPE.TASKS,
-                    [{ ProjectID: pid, TaskType: ch.value }, { $set: { TaskTypeKey: ch.new } }], 'updateMany');
+                    [{ ProjectID: pid, TaskType: r.value, TaskTypeKey: { $ne: r.key } }, { $set: { TaskTypeKey: r.key } }], 'updateMany');
             }
         }
     }
@@ -220,26 +273,30 @@ async function run() {
 
     // ── print report ─────────────────────────────────────────────────────────
     console.log(`Projects scanned:            ${(projects || []).length}`);
-    console.log(`Projects needing key fixes:  ${report.projects.filter((x) => x.keyFixes.length).length}`);
-    console.log(`Total task-type key fixes:   ${report.keyFixTotal}`);
-    console.log(`Total tasks to re-key:       ${report.taskRewriteTotal}`);
+    console.log(`Projects with changes:       ${report.projects.length}`);
+    console.log(`Duplicate entries merged:    ${report.mergeTotal}`);
+    console.log(`Task-type key fixes:         ${report.keyFixTotal}`);
+    console.log(`Tasks to re-key:             ${report.taskRewriteTotal}`);
     console.log(`Orphan tasks (untouched):    ${report.orphanTotal}`);
     console.log(`Catalog entries (settings):  ${catalogCount}   Template entries: ${templateEntryCount}`);
-    console.log(`Icon/color fields ${APPLY ? 'set' : 'to set'}:     ${APPLY ? report.iconSetTotal : catalogCount + templateEntryCount + '(+ project entries)'}`);
+    console.log(`Icon/color fields ${APPLY ? 'set' : 'to set'}:     ${APPLY ? report.iconSetTotal : catalogCount + templateEntryCount + ' (+ project entries)'}`);
 
     if (Object.keys(report.statusLikeUsage).length) {
         console.log('\nStatus-like task types — usage (decision #1):');
         for (const [v, n] of Object.entries(report.statusLikeUsage)) console.log(`  ${v}: ${n} task(s)`);
     }
-    if (report.dupValueProjects.length) {
-        console.log('\n⚠ Same-value duplicates found (would need merge — review):');
-        report.dupValueProjects.forEach((d) => console.log(`  ${d.project}: ${d.values.join(', ')}`));
-    }
     if (report.projects.length) {
-        console.log('\nPer-project key fixes:');
+        console.log('\nPer-project changes:');
         for (const p of report.projects) {
-            console.log(`  • ${p.project} (${p.pid})  orphans:${p.orphans}`);
-            p.keyFixes.forEach((k) => console.log(`      ${k.value}: key ${JSON.stringify(k.old)} → ${k.new}  (${k.tasks} task(s))`));
+            const bits = [];
+            if (p.merges.length) bits.push(`${p.merges.reduce((s, m) => s + m.droppedCount, 0)} merged`);
+            if (p.changes.length) bits.push(`${p.changes.length} re-keyed`);
+            if (p.rewrites.length) bits.push(`${p.rewrites.reduce((s, r) => s + r.tasks, 0)} tasks`);
+            if (p.orphans) bits.push(`${p.orphans} orphans`);
+            console.log(`  • ${p.project} (${p.pid}) — ${bits.join(', ') || 'icons only'}`);
+            p.merges.forEach((m) => console.log(`      merge ${m.value}: drop ${m.droppedCount} dup(s), keep key ${JSON.stringify(m.kept)}`));
+            p.changes.forEach((c) => console.log(`      re-key ${c.value}: ${JSON.stringify(c.old)} → ${c.new}`));
+            p.rewrites.forEach((r) => console.log(`      rewrite ${r.value} → key ${r.key}: ${r.tasks} task(s)`));
         }
     }
     console.log(`\n${APPLY ? '✓ APPLIED.' : 'DRY-RUN complete — nothing written.'} ${APPLY ? 'Now clear caches: tasktype:' + companyId + ', taskTypeTemplate:' + companyId + ', UserProjectData:*' : 'Re-run with --apply after backup.'}\n`);

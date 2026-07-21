@@ -36,7 +36,7 @@ const cat = [
     ['backlog_refinement', 29], ['development', 30], ['sprint_planning', 31], ['optimization', 32], ['image', 33],
 ].map(([value, key]) => ({ value, key }));
 
-const { entries, changes, dupValues } = rekey(cat);
+const { entries, changes, merges } = rekey(cat);
 const keys = entries.map((e) => e.key);
 const byVal = Object.fromEntries(entries.map((e) => [e.value, e.key]));
 
@@ -50,6 +50,13 @@ assert.notStrictEqual(byVal.financial_analysis, 12, 'financial_analysis re-keyed
 ['in_review', 'backlog', 'approved', 'done', 'complete'].forEach((v) =>
     assert.notStrictEqual(byVal[v], 23, `${v} re-keyed off 23`));
 assert.strictEqual(changes.length, 18, `expected 18 re-keys (11 NaN + 1@12 + 1@13 + 5@23), got ${changes.length}`);
-assert.strictEqual(dupValues.length, 0, 'no same-value duplicates in this catalog');
+assert.strictEqual(merges.length, 0, 'no same-value duplicates in this catalog');
+
+// Merge case: same value twice (both key 5) → one keeper, one merge, no orphan key.
+const dup = rekey([{ value: 'test', key: 5 }, { value: 'test', key: 5 }, { value: 'bug', key: 2 }]);
+assert.strictEqual(dup.entries.length, 2, 'duplicate test entry merged away');
+assert.strictEqual(dup.merges.length, 1, 'one merge recorded');
+assert.strictEqual(dup.merges[0].droppedCount, 1, 'one dup dropped');
+assert.strictEqual(new Set(dup.entries.map((e) => e.key)).size, 2, 'keys unique after merge');
 
 console.log(`ok — migration logic: ${entries.length} entries, ${changes.length} re-keyed, all keys unique`);
