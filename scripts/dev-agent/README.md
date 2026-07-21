@@ -1,121 +1,93 @@
-# AlianHub AI dev-agent (runner)
+# AlianHub AI dev-agent
 
-The bridge between a task's **Development** chat in AlianHub and **Claude Code**
-on your machine. Open a task → **Development** tab → chat instructions (like
-talking to Claude). This runner picks them up, develops with Claude Code, opens
-a PR, and replies in the same chat — then iterates on your follow-up messages.
+Turns a task's **Development** chat into real code. You describe what to build in
+the task's **Development** tab (or assign the **AI Bot**); the dev-agent running
+on a connected computer develops it with **Claude Code**, opens a PR, and replies
+in the chat — then iterates on your follow-ups.
 
-The "agent" is just this script + Claude Code (the actual developer). It talks
-to AlianHub over its REST API with a Personal API Token — nothing special runs
-on the server. It runs on **your machine**, where Claude Code, git and gh live.
+Everything is configured **in the app** — Settings → **AI Developer** and the
+task's **Development** tab. There are no token files or CLI flags to set by hand
+in the normal flow.
 
 ```
-Development chat  ──►  runner (poll)  ──►  Claude Code develops  ──►  push + PR  ──►  reply in the chat
-        ▲                                                                                    │
-        └──────────────────────────── you review / test / ask for changes ◄─────────────────┘
+Development chat  ──►  connected computer (dev-agent + Claude Code)  ──►  push + PR  ──►  reply in the chat
+        ▲                                                                                       │
+        └────────────────────────────── you review / test / ask for changes ◄──────────────────┘
 ```
 
-## Prerequisites (on this machine)
+## One-time setup (in the app)
+
+### 1. Connect a computer
+The agent runs on a real machine — where Claude Code, git and `gh` live — **not**
+on the AlianHub server. In AlianHub go to **Settings → AI Developer → Connect
+this computer** and click **Connect Computer**, then **open the file it
+downloads**. The dev-agent installs and starts itself and keeps running in the
+background, ready to develop the tasks you chat or assign. (Direct **Windows /
+macOS / Linux** downloads are on the same card.)
+
+Do this once per machine — the download self-configures (pairs to your account)
+and remembers itself. That machine needs:
 
 - **Node 18+**
-- **Claude Code CLI** (`claude`) — installed and logged in
-- **git**
-- **GitHub CLI** (`gh`) — authenticated (`gh auth login`)
+- the **`claude` CLI**, logged in (run `claude` once → `/login`; uses your subscription, no API key)
+- **`gh`** (GitHub CLI), authenticated (`gh auth login`) — used to open PRs
 
-You do NOT need the repo cloned in advance — the agent clones a git URL on
-demand (or uses a local clone if you give it a path).
+### 2. (Optional) Enable the AI Bot
+**Settings → AI Developer → Enable AI Bot** turns on an assignable **"AI Bot"**
+user. It shows up only in **your** assignee picker — other members don't see it,
+and it never appears in the Members list.
 
-## Setup
+## Using it
 
-1. Copy the config template and fill it in (or use env vars):
-   ```bash
-   cp config.example.json config.json
-   ```
-   > `config.json` holds your API token — it is git-ignored. Never commit it.
+### Set the repository (once per project)
+Open a task → **Development** tab → at the top set the **repository** (a local
+folder path *or* a git URL) and the **base branch**. It's **saved for the whole
+project** — every task in that project, and the AI Bot, reuses it automatically.
+The branch is what the AI branches from and opens its PR against (git repos only).
 
-   | key | what |
-   |-----|------|
-   | `url` | your AlianHub URL, e.g. `http://localhost:4000` |
-   | `pat` | a Personal API Token (`ahp_…`) — create one in AlianHub → Settings → **API Tokens** (needs **read + write** scope) |
-   | `companyId` | your company id (the 24-hex in the app URL) |
-   | `userId` | *(optional)* user id to attribute the agent's replies to |
-   | `claudeBin` | *(optional)* full path to the `claude` CLI if it isn't on PATH, e.g. `C:/Users/you/AppData/Roaming/npm/claude.cmd` |
-   | `workspace` | *(optional)* folder where git-URL clones are stored (default `./workspace`) |
-   | `repos` | *(optional)* fallback repo per project — `{ "<projectId|projectCode>": { gitUrl?, localPath?, base? } }` |
+### Chat to build
+Type an instruction in the Development tab (e.g. "Implement this task"). The
+connected computer develops it with Claude Code, opens a PR, and replies
+**✅ Done. PR: …**. Review/test, then chat the next change — it iterates on the
+same branch.
 
-   Env equivalents: `ALIANHUB_URL`, `ALIANHUB_PAT`, `ALIANHUB_COMPANY_ID`, `ALIANHUB_USER_ID`, `ALIANHUB_WORKSPACE`.
-
-## Run
-
-**Poll mode (recommended)** — start it once and leave it running; it watches
-every task's Development chat:
-```bash
-node dev-agent.js --poll [--interval 5000]
-```
-
-**One-shot (testing)** — develop a single task once from the CLI:
-```bash
-node dev-agent.js --task <taskId> --git https://github.com/org/repo.git --base main
-node dev-agent.js --task <taskId> --repo "E:/repos/my-project"
-```
+### Or assign the AI Bot (auto-develop)
+Assign the **AI Bot** user to a task. It proposes a job — the task's title +
+description become the instruction — shown with a **needs approval** badge and
+**Approve & start** / **Reject** buttons. Approve it and the agent develops
+exactly like a chat turn, using the repository set in that task's Development tab.
 
 ## How it works
 
-1. **You** open a task → **Development** tab → set the repository (git URL or a
-   local path + base branch) and type an instruction (e.g. "Implement this task").
-2. The runner (poll) picks up the instruction, resolves the repo (clones the URL
-   into the workspace, or uses your local clone), and creates/continues the
-   branch `ai/<task-key>`.
-3. It runs `claude -p "<task + your instruction>"` — Claude Code writes the code.
-4. It commits, pushes, and opens a PR (follow-up messages update the same PR).
-5. It replies in the Development chat: **✅ Done. PR: …**
-6. You test, then type the next change — the agent iterates on the same branch.
-
-## AI Bot — assign a task to auto-develop
-
-Instead of chatting, you can let a task develop itself. In AlianHub → **Settings →
-API Tokens → Enable AI Bot**, then **assign the "AI Bot" user** to any task. That
-auto-enqueues a Development job (the task's title + description become the
-instruction) and this runner develops it exactly like a chat turn, replying on
-the task's Development tab with the PR.
-
-Nothing repo-related is stored in AlianHub, so for the bot flow the runner takes
-the repo from its local **`config.json` `repos`** map (keyed by project code or
-id). If the task's project isn't configured there, the agent replies with a clear
-"no repository" message — set it in `repos` and re-assign.
+1. You set the repo + send an instruction (or assign the AI Bot and approve it).
+2. The connected computer's dev-agent resolves the repo (clones the git URL into
+   its workspace, or uses the local folder) and creates/continues branch `ai/<task-key>`.
+3. It runs Claude Code on the task + your instruction — Claude writes the code.
+4. It commits, pushes, and opens/updates a PR.
+5. It replies in the Development chat with the PR link.
+6. You test; the next message iterates on the same branch.
 
 ## Shared task memory
 
 The agent keeps a per-task log at **`.alianhub/tasks/<TaskKey>.md`** inside the
 repo. Before each turn it reads that file for prior context; after each turn it
 updates it (what was done, key decisions, what remains) and commits it with the
-code. Because the memory lives in the repo, any developer who continues the task
-later — on a **different machine or Claude account** — gets the full history from
-a `git pull`/clone. No external store, no per-machine state. (For a local folder
-with no remote, the file is written locally and becomes shared once you use a git
-URL / add a remote.)
+code. Because the memory lives in the repo, whoever continues the task later — on
+a **different machine or Claude account** — gets the full history from a
+`git pull`/clone. No external store, no per-machine state. (For a local folder
+with no remote, it's written locally and becomes shared once you add a git remote.)
 
 ## Safety
 
-- Code execution happens **on your machine**, never on the AlianHub server.
+- Code runs **on the connected computer**, never on the AlianHub server.
 - Every change lands as a **PR you review and merge** — the agent never merges.
-- The repository is chosen **per conversation** (temporary) — nothing is persisted.
+- **AI Bot jobs need your approval** (Approve & start) before any code runs.
+- The repository is chosen **per project in the UI** — the agent never invents a target.
 - If Claude Code produces no changes, the runner says so and opens no PR.
 
 ## Troubleshooting
 
-- **`Not logged in · Please run /login`** — the `claude` CLI the runner uses isn't
-  authenticated (this is separate from the Claude desktop app). Run `claude` in a
-  terminal once and `/login` — it uses your subscription, no API key needed. The
-  runner's startup line shows which `claude` it found.
-- **`claude: spawnSync claude ENOENT`** — the CLI isn't visible on the runner's
-  PATH. The runner also looks next to `node.exe` and in `%APPDATA%\npm`; if it
-  still can't find it, set the full path in config.json → `"claudeBin"`.
-- **workspace not trusted** — handled by `--dangerously-skip-permissions`; if it
-  ever still blocks, open that folder in Claude Code once and accept the trust dialog.
-
-## Roadmap
-
-- **Live updates** — the chat currently polls every few seconds; wire it to the
-  existing Socket.io pipeline for instant replies.
-- **AI Bot user** — assign a task to a bot user to auto-start a Development chat.
+- **"Set the repository above to start"** — set the repo + base branch at the top of the Development tab first.
+- **"First time? Connect your computer…"** — do the one-time **Connect Computer** step in Settings → AI Developer.
+- **Nothing happens after you send / approve** — check the connected computer is still running the agent, that `claude` is logged in there (`/login`), and that `gh` is authenticated.
+- **`claude … ENOENT` / not found** on the connected machine — the `claude` CLI isn't on that machine's PATH; install it / make sure `claude` runs in a terminal there.
