@@ -3,8 +3,8 @@
          registered before render → resolves offline, never hits the CDN.
          Unknown names fall back to DEFAULT_ICON (which is always loaded). -->
     <template v-if="isLibrary">
-        <Icon v-if="ready" v-bind="$attrs" :icon="effectiveIcon" :color="iconColor" />
-        <span v-else v-bind="$attrs" class="tticon__placeholder" />
+        <Icon v-if="ready" v-bind="$attrs" class="tticon--lib" :icon="effectiveIcon" :color="iconColor" />
+        <span v-else v-bind="$attrs" class="tticon__placeholder tticon--lib" />
     </template>
     <!-- Uploaded icon stored as a full URL. -->
     <img
@@ -56,10 +56,17 @@ watch(isLibrary, (lib) => {
 </script>
 
 <style scoped>
+/* Library (Iconify) icons render as crisp SVG, so we size them a bit larger and
+   uniformly for legibility — !important so it wins over the many small legacy
+   per-call-site classes/inline styles (e.g. 13–14px task__type-image). Does not
+   affect uploaded images (they don't get this class). */
+.tticon--lib {
+    width: 17px !important;
+    height: 17px !important;
+    vertical-align: middle;
+    flex: none;
+}
 .tticon__placeholder {
     display: inline-block;
-    height: 14px;
-    width: 14px;
-    vertical-align: middle;
 }
 </style>
