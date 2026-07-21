@@ -9,12 +9,10 @@
                                 <img :src="dragIcon" class="dragImage position-re" />
                             </span>
                         <template v-if="!element.isEditable && !isChangeColor" >
-                            <img v-if="element?.taskImage?.includes('http')" :src="element.taskImage ? element.taskImage : defaultTaskType" alt="task_type"  @click="$emit('click:uploadImage'),$emit('click:ImageItem',element)" class="ignore-drag project__setting-ignoredrag border-radius-2-px mr-5px cursor-pointer">
-                            <WasabiImage
-                                v-else
+                            <TaskTypeIcon
+                                :taskType="element"
                                 @click="$emit('click:uploadImage'),$emit('click:ImageItem',element)"
                                 class="ignore-drag project__setting-ignoredrag border-radius-2-px mr-5px cursor-pointer"
-                                :data="{url: element.taskImage}"
                             />
                         </template>
                         <input v-if="!element.isAddNewStatus && element.textColor" :id="`ActiveTaskStatus${index}`" type="color" v-model.trim="element.textColor" @input="element.bgColor = element.textColor+'35',emit('changeColor')" class="ignore-drag border-radius-2-px mr-8px border-0 d-inline-block p-0 cursor-pointer bg-transparent change__colorignore-drag" disabled>
@@ -62,7 +60,7 @@ import { ref,defineProps, defineEmits, watch, defineComponent,inject } from 'vue
 import draggable from 'vuedraggable';
 import DropDown from '@/components/molecules/DropDown/DropDown.vue';
 import { useCustomComposable } from "@/composable";
-import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
+import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
 const {makeUniqueId} = useCustomComposable();
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
     const emit = defineEmits(["onSelect","resetTaskTypeErr","renameUpdate","disbaleButton","DraggableOption","update:modelValue","click:ImageItem","click:uploadImage", "enter:updateFieldValue", "click:updateFieldValue", "input:deleteFieldValue","changeColor"]);
@@ -116,7 +114,6 @@ import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption
     const deletered = require("@/assets/images/svg/deletered.svg");
     const dotcolor = require("@/assets/images/svg/three_dot.svg");
     const deleteIcon = require("@/assets/images/svg/redDelete_Icon.svg");
-    const defaultTaskType = inject("$defaultTaskStatusImg");
 
 
     watch(() => props.modelValue, (newVal, oldVal) => {

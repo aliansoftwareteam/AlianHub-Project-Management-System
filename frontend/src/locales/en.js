@@ -3241,6 +3241,8 @@ export default {
         ach_tab_overdue_empty: "Nothing delivered late this period. 🎉",
         ach_tab_needs_empty: "Nothing on-time went over estimate. 👍",
         color: "Color",
+        icon_library: "Library",
+        icon_upload: "Upload",
         my_leave_card_title: "My Leave",
         my_leave_card_description: "Your leave requests and their current status.",
         my_leave_setup_hint: "Pick your company's leave project in this card's settings to see your requests.",
