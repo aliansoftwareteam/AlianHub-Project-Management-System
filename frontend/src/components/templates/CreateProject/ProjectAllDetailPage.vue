@@ -51,12 +51,7 @@
             <h5 :class="{'font-size-13 font-weight-500': clientWidth > 767 , 'font-size-16 font-weight-400': clientWidth <= 767}">{{ $t('Projects.task_type') }}</h5>
             <ul class="d-flex align-items-center" v-if="theModel.taskTypeForm.taskTypeField && Object.keys(theModel.taskTypeForm.taskTypeField.value).length">
                 <li class="setImagevalue cursor-pointer" v-for="(taskType,index) in theModel.taskTypeForm.taskTypeField.value.taskTypes" :key="index">
-                    <img class="task-type-image-block" v-if="taskType.taskImage.includes('http')" :src="taskType.taskImage" alt="task_type">
-                    <WasabiImage
-                        v-else
-                        class="task-type-image-block"
-                        :data="{url: taskType.taskImage}"
-                    />
+                    <TaskTypeIcon :taskType="taskType" class="task-type-image-block" />
                 </li>
             </ul>
         </div>
@@ -99,7 +94,7 @@
 <script setup>
 import { ref , inject, onMounted} from "vue";
 import Assignee from '@/components/molecules/Assignee/Assignee.vue';
-import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
+import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
 import { projectComponentsIcons } from '@/composable/commonFunction';
 
 const multipleAssigneBlue = require("@/assets/images/png/mutipleblue.png");
