@@ -15,7 +15,7 @@ assert.strictEqual(isBadKey(23), false);
 assert.deepStrictEqual(mapFor({ value: 'bug' }), { icon: 'mdi:bug', color: '#DC2626' });
 assert.deepStrictEqual(mapFor({ value: 'design' }), { icon: 'mdi:palette', color: '#F76808' });
 assert.strictEqual(mapFor({ value: 'zzz custom bug thing' }).icon, 'mdi:bug'); // keyword hit
-assert.deepStrictEqual(mapFor({ value: 'totally_unknown' }), { icon: 'mdi:checkbox-marked-circle-outline', color: '#2F3990' });
+assert.deepStrictEqual(mapFor({ value: 'totally_unknown' }), { icon: 'mdi:checkbox-marked-circle', color: '#2F3990' });
 
 // STATUS_LIKE membership.
 assert.ok(STATUS_LIKE.has('done') && STATUS_LIKE.has('complete') && !STATUS_LIKE.has('task'));

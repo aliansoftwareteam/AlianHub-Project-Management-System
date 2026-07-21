@@ -14,7 +14,7 @@ export const CURATED_SETS = ['mdi', 'lucide', 'tabler'];
 export const DEFAULT_ICON_COLOR = '#2F3990';
 
 // Fallback when no icon is chosen / a name can't be resolved.
-export const DEFAULT_ICON = 'mdi:checkbox-marked-circle-outline';
+export const DEFAULT_ICON = 'mdi:checkbox-marked-circle';
 
 // Keyword → icon, used to auto-assign icons to task-type names (AI templates,
 // migration fallback). First matching keyword wins; else DEFAULT_ICON.
@@ -24,15 +24,15 @@ export const KEYWORD_ICON_MAP = {
     subtask: 'mdi:subdirectory-arrow-right',
     'sub task': 'mdi:subdirectory-arrow-right',
     design: 'mdi:palette',
-    task: 'mdi:checkbox-marked-circle-outline',
-    story: 'mdi:bookmark-outline',
-    epic: 'mdi:flag-outline',
-    feature: 'mdi:star-outline',
+    task: 'mdi:checkbox-marked-circle',
+    story: 'mdi:bookmark',
+    epic: 'mdi:flag',
+    feature: 'mdi:star',
     research: 'mdi:magnify',
     test: 'mdi:test-tube',
-    review: 'mdi:eye-check-outline',
-    doc: 'mdi:file-document-outline',
-    meeting: 'mdi:account-group-outline',
+    review: 'mdi:eye-check',
+    doc: 'mdi:file-document',
+    meeting: 'mdi:account-group',
 };
 
 // Keyword → default tint for known task types. Names not listed fall back to
