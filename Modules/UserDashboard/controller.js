@@ -2043,16 +2043,23 @@ exports.getMyAchievements = async (req, res) => {
         }, "find").catch(() => []);
 
         // Total logged per task (any user) → compared to the shared estimate.
+        // Also track the last worklog time (max LogEndTime) → a completion proxy
+        // that survives a late administrative status flip (see on-time note below).
         const loggedByTask = {};
+        const lastLogByTask = {};
         const taskIds = (tasks || []).map((t) => String(t._id));
         if (taskIds.length) {
             const tlogs = await MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.TIMESHEET,
-                data: [{ TicketID: { $in: taskIds } }, { TicketID: 1, LogTimeDuration: 1 }],
+                data: [{ TicketID: { $in: taskIds } }, { TicketID: 1, LogTimeDuration: 1, LogEndTime: 1 }],
             }, "find").catch(() => []);
             (tlogs || []).forEach((ts) => {
                 if (!ts.TicketID) return;
-                loggedByTask[String(ts.TicketID)] = (loggedByTask[String(ts.TicketID)] || 0) + (Number(ts.LogTimeDuration) || 0);
+                const key = String(ts.TicketID);
+                loggedByTask[key] = (loggedByTask[key] || 0) + (Number(ts.LogTimeDuration) || 0);
+                // LogEndTime is epoch SECONDS → convert to ms for date comparisons.
+                const endMs = (Number(ts.LogEndTime) || 0) * 1000;
+                if (endMs > (lastLogByTask[key] || 0)) lastLogByTask[key] = endMs;
             });
         }
 
@@ -2103,7 +2110,15 @@ exports.getMyAchievements = async (req, res) => {
                 withDue += 1;
                 const doneMs = completedAt ? completedAt.getTime() : 0;
                 const dueEnd = new Date(t.DueDate); dueEnd.setHours(23, 59, 59, 999);
-                onTimeFlag = !!(doneMs && doneMs <= dueEnd.getTime());
+                // On-time if the work wrapped up by the due date. The status-change
+                // time is the primary signal, but a task that sat in Done and was
+                // flipped to Complete only later reads as late by that alone — so the
+                // last worklog (max LogEndTime) rescues it when work actually finished
+                // on time. Late tasks aren't loosened: work continued past due leaves
+                // logs after the due date, so lastLogMs won't be within it either.
+                const lastLogMs = lastLogByTask[String(t._id)] || 0;
+                onTimeFlag = !!((doneMs && doneMs <= dueEnd.getTime())
+                    || (lastLogMs && lastLogMs <= dueEnd.getTime()));
                 if (onTimeFlag) onTime += 1;
             }
             return {
