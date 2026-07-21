@@ -1934,6 +1934,10 @@ exports.getMyNextTasks = async (req, res) => {
         const projClause = projectScopeClause(req.body?.projectMode || 'all', req.body?.projectId);
         const nextFilter = applyTaskMatch({
             deletedStatusKey: 0,
+            // Exclude chat threads — main/global chats are stored as tasks
+            // (mainChat: true) with the member as AssigneeUserId, so they'd
+            // otherwise surface as work items here.
+            mainChat: { $ne: true },
             statusType: { $ne: "close" },
             $or: [{ AssigneeUserId: uid }, { Task_Leader: uid }],
             ...(projClause ? { ProjectID: projClause } : {}),
@@ -2026,6 +2030,7 @@ exports.getMyAchievements = async (req, res) => {
         const projClause = projectScopeClause(req.body?.projectMode || 'all', req.body?.projectId);
         const achFilter = applyTaskMatch({
             deletedStatusKey: 0,
+            mainChat: { $ne: true }, // exclude chat threads (stored as tasks)
             // Completed = close OR done (matches bucketForStatus in resourceHelpers).
             statusType: { $in: ["close", "done"] },
             // Achievements are the caller's OWN work — only tasks assigned to
@@ -2063,6 +2068,13 @@ exports.getMyAchievements = async (req, res) => {
             });
         }
 
+        // Drop zero-evidence completions: a task closed with NO logged time AND
+        // no estimate has nothing to evaluate, so it isn't a real achievement.
+        // Excluded from everything below — completedCount, the tabs, and the
+        // on-time/on-estimate rates — so the card reflects only substantiated work.
+        const achievedTasks = (tasks || []).filter((t) =>
+            (loggedByTask[String(t._id)] || 0) > 0 || (Number(t.totalEstimatedTime) || 0) > 0);
+
         // Real completion time per task — the latest 'Task_Status' history entry
         // (when the task moved to Close). `updatedAt` is unreliable for this: it
         // bumps on ANY edit (description, comments, priority…), so an on-time
@@ -2093,7 +2105,7 @@ exports.getMyAchievements = async (req, res) => {
         let overEstimate = 0;
         let onTime = 0;
         let withDue = 0;
-        const recent = (tasks || []).map((t) => {
+        const recent = achievedTasks.map((t) => {
             const estimate = Number(t.totalEstimatedTime) || 0;
             const logged = loggedByTask[String(t._id)] || 0;
             const within = estimate > 0 ? logged <= estimate : null;
@@ -2149,7 +2161,7 @@ exports.getMyAchievements = async (req, res) => {
         return res.status(200).json({
             status: true,
             data: {
-                completedCount: (tasks || []).length,
+                completedCount: achievedTasks.length,
                 onEstimate,
                 overEstimate,
                 onEstimateRate: rated ? Math.round((onEstimate / rated) * 100) : null,
@@ -2254,6 +2266,7 @@ exports.getMyDueSoon = async (req, res) => {
         const projClause = projectScopeClause(req.body?.projectMode || 'all', req.body?.projectId);
         const filter = applyTaskMatch({
             deletedStatusKey: 0,
+            mainChat: { $ne: true }, // exclude chat threads (stored as tasks)
             statusType: { $ne: "close" },
             $or: [{ AssigneeUserId: uid }, { Task_Leader: uid }],
             DueDate: { $gte: start, $lte: end },
