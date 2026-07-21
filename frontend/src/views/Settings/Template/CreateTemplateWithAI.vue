@@ -175,7 +175,7 @@ import { useI18n } from "vue-i18n";
 // Components
 import Sidebar from "@/components/molecules/Sidebar/Sidebar.vue";
 import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
-import { iconForName, DEFAULT_ICON_COLOR } from "@/utils/iconLibrary";
+import { iconForName, colorForName } from "@/utils/iconLibrary";
 
 // Define the component
 defineComponent({
@@ -321,7 +321,7 @@ const handleGenerate = async () => {
                 ...tt,
                 iconType: 'library',
                 iconValue: iconForName(tt.name),
-                iconColor: DEFAULT_ICON_COLOR,
+                iconColor: colorForName(tt.name),
             }));
         }
         activeTab.value = 3;

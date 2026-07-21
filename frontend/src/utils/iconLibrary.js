@@ -18,6 +18,7 @@ export const DEFAULT_ICON = 'mdi:checkbox-marked-circle-outline';
 
 // Keyword → icon, used to auto-assign icons to task-type names (AI templates,
 // migration fallback). First matching keyword wins; else DEFAULT_ICON.
+// Order matters: 'sub task' must precede any 'task' entry.
 export const KEYWORD_ICON_MAP = {
     bug: 'mdi:bug',
     subtask: 'mdi:subdirectory-arrow-right',
@@ -32,6 +33,15 @@ export const KEYWORD_ICON_MAP = {
     review: 'mdi:eye-check-outline',
     doc: 'mdi:file-document-outline',
     meeting: 'mdi:account-group-outline',
+};
+
+// Keyword → default tint for known task types. Names not listed fall back to
+// DEFAULT_ICON_COLOR (theme primary). Same first-match-wins ordering.
+export const KEYWORD_COLOR_MAP = {
+    bug: '#DC2626',        // red
+    subtask: '#9CA3AF',    // light gray
+    'sub task': '#9CA3AF',
+    design: '#F76808',     // orange
 };
 
 let loadPromise = null;
@@ -104,4 +114,15 @@ export function iconForName(name) {
         if (n.includes(kw)) return KEYWORD_ICON_MAP[kw];
     }
     return DEFAULT_ICON;
+}
+
+/**
+ * Map a task-type name to its default tint. Falls back to the theme primary.
+ */
+export function colorForName(name) {
+    const n = String(name || '').toLowerCase();
+    for (const kw of Object.keys(KEYWORD_COLOR_MAP)) {
+        if (n.includes(kw)) return KEYWORD_COLOR_MAP[kw];
+    }
+    return DEFAULT_ICON_COLOR;
 }
