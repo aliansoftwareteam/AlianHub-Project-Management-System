@@ -843,7 +843,7 @@
         'WorkedTasksTableCard', 'TeamCategoryBreakdownCard', 'TeamLoggedVsEtaCard',
         'TasksByStatusCard', 'TasksByProjectCard', 'TotalTasksCard',
         'NextUpCard', 'MyAchievementsCard', 'MyLeaveCard', 'DueSoonCard', 'MyTimeCard',
-        'MilestoneReportCard',
+        'MilestoneReportCard', 'TASKLIST',
     ].includes(cid);
 
     // ── Dashboard-level date range ──────────────────────────────────
