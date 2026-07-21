@@ -20,6 +20,32 @@ framework; follows the `scripts/*.js` ops-script pattern, e.g. `seed-formula-rol
 Run manually by ops during the deploy window, once per company. Scope for this run: **one
 company only** (per decision #3).
 
+### Deploy runbook
+```bash
+# 1. Backup (only safety net — no automatic rollback)
+mongodump --uri "$MONGODB_URL/<companyId>" --out ./backup-<companyId>-<date>
+
+# 2. Dry-run — review the report, confirm numbers match the baseline below
+node scripts/migrate-task-type-icons.js --company <companyId>
+
+# 3. Apply
+node scripts/migrate-task-type-icons.js --company <companyId> --apply
+
+# 4. Clear caches so the app serves fresh data (or restart the backend)
+#    keys: tasktype:<companyId>, taskTypeTemplate:<companyId>, UserProjectData:<companyId>:*
+```
+Rollback = `mongorestore` from step 1. Changes are additive (icon fields) plus one key fix, so
+restore is rarely needed, but keep the dump until verified in the app.
+
+### Dry-run baseline — company `6571e7165470e64b12032734` (captured pre-deploy)
+Expected report (data may drift before deploy; investigate large deltas):
+- Projects scanned: **865**; needing key fixes: **1** (`Alian Hub ERP` → `feedback_&_revision null→4`, 1 task).
+- Total tasks to re-key: **1**. Orphan tasks (untouched): **~9,980** — dominated by `TaskType:"task"`
+  in projects whose `taskTypeCounts` omits a "task" entry (pre-existing; resolves by key, left alone).
+- Status-like usage: **0** (`in_progress` present, 0 tasks; others absent). → status-like rows carry
+  no task usage; safe to leave (or drop from catalog later).
+- Catalog entries: **46**; template entries: **9**; project entries: all 865 get icons.
+
 ---
 
 ## 0. Key facts that constrain the design (from codebase audit)
