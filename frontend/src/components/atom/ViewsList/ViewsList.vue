@@ -1,19 +1,19 @@
 <template>
     <div
     v-if="item._id && item._id.length>6"
-        :class="{'bg-light-gray': active}"
+        :class="{'bg-light-gray': active, 'has-view-menu': hasViewMenu}"
         class="d-flex align-items-center text-nowrap border-top-radius-10-px cursor-pointer wrapper h-100"
         @click.stop="$emit('click', item)"
     >
         <div :class="{'border-left': firstChild && !active, 'border-right': !active, 'border-none activeViewList': active}" class="d-flex align-items-center font-size-14 view-list position-re"
-        :style="{ height: active ? '48px' : 'auto' }">
+        :style="{ height: active ? '36px' : 'auto' }">
            <span v-if="commentCount" class="count-block comment__count white position-ab">{{commentCount <= 99 ? commentCount : '+99'}}</span> 
-           <img class="position-ab list_make_as_defaultimg" v-if="item.setAsDefault" :src="viewDefaultIcon" />
            <img :src="active ? projectComponentsIcons(item.keyName)?.activeIcon : projectComponentsIcons(item.keyName)?.icon" :alt="item.name" class="mr-10px">
            <span class="gray81">{{$t(`ViewList.${item.name}`)}}</span>
+           <img class="list__default-home" v-if="item.setAsDefault" :src="viewDefaultIcon" />
            <img :src="active ? activePin : pin" v-if="item?.isPin && item.isPin" class="ml-10px active__pin-condition">
            <span class="notification-tick blinking position-sti ml-7px" v-if="item?.isPrivate"></span>
-           <div class="view-list__menu" v-if="checkPermission('project.view_list',project.isGlobalPermission) === true">
+           <div class="view-list__menu" v-if="hasViewMenu">
            <DropDown :id="item._id" @isVisible="isDropDownVisible" :zIndex="6">
                 <template #button>
                     <img :src="dots" class="dots ml-5px" :ref="item._id">
@@ -89,6 +89,10 @@ const companyOwner = computed(() => getters["settings/companyOwnerDetail"])
 const project = inject("selectedProject")
 const {checkPermission} = useCustomComposable();
 const {getters,commit} = useStore()
+// The per-view triple-dot menu only renders when the user has this permission.
+// The hover width-increase exists to make room for that menu, so gate it on the
+// same permission -- a user without the menu should not get a pointless gap.
+const hasViewMenu = computed(() => checkPermission('project.view_list', project.value?.isGlobalPermission) === true);
 const toast = useToast()
 const user = getUser(userId.value);
 const userData = {
@@ -209,8 +213,18 @@ defineEmits(['click']);
     height: 20px;
     width: 15px;
 }
-/* ⋯ menu: positioned OVER the tab's right edge (out of flow) so it never
-   reserves space or resizes the tab — it only appears on hover. */
+/* Clear hover affordance on non-active tabs (active tabs already carry
+   .bg-light-gray) so short-named tabs read as an obvious clickable target. */
+.wrapper{
+    border-radius: 8px 8px 0 0;
+}
+.wrapper:hover:not(.bg-light-gray){
+    background: #f4f5f7;
+}
+/* ⋯ menu: out of flow at the tab's right edge (so its dropdown popup is never
+   clipped), shown only on hover. On hover the tab grows its right padding
+   (.wrapper:hover .view-list) to open clear space here, so the ⋯ never covers
+   the view name. */
 .view-list__menu{
     position: absolute;
     right: 2px;
@@ -219,21 +233,29 @@ defineEmits(['click']);
     display: inline-flex;
     align-items: center;
 }
-/* The trigger is a proper rounded button (white chip + soft shadow) so it
-   reads as a control and cleanly masks the sliver of label it overlaps. */
+/* Compact ⋯ trigger: it now lives in empty space (not over the label), so it
+   no longer needs the white "masking chip" — just a light hover highlight. */
 .dots{
-    height: 24px;
-    width: 28px;
-    padding: 4px 6px;
-    border-radius: 6px;
+    height: 20px;
+    width: 20px;
+    padding: 3px;
+    border-radius: 5px;
     box-sizing: border-box;
     object-fit: contain;
     cursor: pointer;
-    background: #fff;
-    box-shadow: 0 1px 4px rgba(16, 24, 40, 0.18);
+    background: transparent;
 }
 .dots:hover{
-    background: #f1f2f4;
+    background: #e9eaee;
+}
+/* "Default view" home marker — in-flow after the name (not an absolute corner
+   badge) so it never overlaps the label. */
+.list__default-home{
+    height: 12px;
+    width: 12px;
+    margin-left: 6px;
+    object-fit: contain;
+    flex: 0 0 auto;
 }
 .count-block.comment__count{
    color: #eabb00 !important;

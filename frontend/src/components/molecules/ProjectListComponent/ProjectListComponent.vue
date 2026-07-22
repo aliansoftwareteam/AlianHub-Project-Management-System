@@ -38,7 +38,7 @@
             </div>
             <div @click="$emit('update:showArchivedProjects', false)">{{$t('ProjectSlider.hide_archive')}}</div>
         </div>
-        <div class="bg-white position-sti d-flex align-items-center justify-content-between p-10px assignee__drop-wrapper" v-if="!showArchivedProjects">
+        <div class="bg-white position-sti d-flex align-items-center justify-content-between assignee__drop-wrapper" style="height: 36px; padding: 0 10px;" v-if="!showArchivedProjects">
             <div class="d-flex align-items-center">
                 <img id="projestleftlistfilter_driver" :src="filterFavorites ? starImage : blankStar" alt="starImage" class="cursor-pointer fillstar__image" @click="emit('update:filterFavorites', !filterFavorites)" v-show="!search && ProjectfilterObject?.query && !Object.keys(ProjectfilterObject?.query).length && !Object.keys(ProjectfilterObject?.sortByField).length && !Object.keys(ProjectfilterObject?.sortByOrder).length"/>
             </div>
@@ -53,8 +53,19 @@
                         </DropDownOption>
                     </template>
                 </DropDown>
-                <button v-if="!showArchivedProjects && checkPermission('project.project_list',projectData.isGlobalPermission) === true && checkPermission('project.project_create',projectData.isGlobalPermission) === true" class="outline-primary ml-1 font-size-16 p0x-13px" @click="tourTest('isProjectTour'), $emit('createProject')" id="createproject_driver">+ {{$t('ProjectSlider.new_project')}}</button>
-                <button v-if="!showArchivedProjects && currentCompany?.planFeature?.aiPermission && checkPermission('project.project_list',projectData.isGlobalPermission) === true && checkPermission('project.project_create',projectData.isGlobalPermission) === true" class="outline-primary ml-1 font-size-16 p0x-13px aipg-trigger" @click="$emit('createAiProject')" id="createAiProject_driver" :title="$t ? $t('Projects.create_with_ai') : 'Create project with AI'">✨ Create with AI</button>
+                <DropDown v-if="!showArchivedProjects && checkPermission('project.project_list',projectData.isGlobalPermission) === true && checkPermission('project.project_create',projectData.isGlobalPermission) === true" class="project__new-dropdown">
+                    <template #button>
+                        <button ref="new_project_menu" class="ml-1 project__new-btn" id="createproject_driver" :title="$t('ProjectSlider.new_project')">+ New <span class="project__new-caret">▾</span></button>
+                    </template>
+                    <template #options>
+                        <DropDownOption @click="$refs.new_project_menu.click(), tourTest('isProjectTour'), $emit('createProject')">
+                            <span>Blank project</span>
+                        </DropDownOption>
+                        <DropDownOption v-if="currentCompany?.planFeature?.aiPermission" class="aipg-trigger" id="createAiProject_driver" @click="$refs.new_project_menu.click(), $emit('createAiProject')">
+                            <span>Create with AI</span>
+                        </DropDownOption>
+                    </template>
+                </DropDown>
             </div>
         </div>
         </div>

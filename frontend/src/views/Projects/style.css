@@ -12,12 +12,30 @@
 }
 .list-view-header {
   padding: 0px 19px;
-  border-bottom: 1px solid #CFCFCF;
+  border-bottom: 1px solid #e8eaed;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 48px;
+  height: 44px;
   background-color: #fff;
+}
+/* ── Project view-tabs strip lives on its OWN full-width row (ClickUp-style),
+   between the project header and the filter toolbar — so short tab names like
+   "List" get a roomy, unambiguous clickable area instead of being squeezed in
+   the header next to the title + actions. Hidden on mobile (the header keeps
+   its own "all views" dropdown there). */
+.project-views-row {
+  display: flex;
+  align-items: center;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 12px;
+  background-color: #fff;
+  border-bottom: 1px solid #e8eaed;
+  box-sizing: border-box;
+}
+@media (max-width: 767px) {
+  .project-views-row { display: none; }
 }
 .list-head-left {
   display: flex;
@@ -45,28 +63,29 @@
    cap the width, so they're always clearly visible. !important overrides the
    old base rule that capped this bar to ~15%. */
 .list-head-right { flex-shrink: 0; max-width: none !important; }
-/* Tab strip: fill remaining width, scroll horizontally, gap between tabs. */
+/* Tab strip: sized to its tabs (no width cap) so "+ View" sits right after the
+   last tab, ClickUp-style, across the full-width row. It only scrolls when the
+   tabs genuinely overflow the row — in the common case everything fits and no
+   scrollbar shows at all. */
 .view_list_scroll {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
-  max-width: 800px;
   /* Horizontal scroll only (the tall active tab must not trigger a vertical
-     scrollbar), and offset the 6px scrollbar with matching top padding so the
-     tab labels stay vertically centered in the row while it's showing. */
+     scrollbar). No top padding: with no scrollbar in the common case the tabs
+     sit vertically centered on their own. */
   overflow-y: hidden;
-  padding-top: 6px;
   box-sizing: border-box;
-  scrollbar-width: thin;            /* Firefox */
-  scrollbar-color: #b4b8c0 #eef0f2; /* Firefox: thumb / track */
+  scrollbar-width: thin;                 /* Firefox */
+  scrollbar-color: #c7ccd4 transparent;  /* Firefox: thumb / track */
 }
 .view-list-wrapper { flex-shrink: 0; }
 .project__requirementcomponent-wrapper { flex-shrink: 0; }
 /* Clearly-visible 6px horizontal scrollbar (the strip no longer uses the
    2px `style-scroll` utility). */
-.view_list_scroll::-webkit-scrollbar { height: 6px; }
-.view_list_scroll::-webkit-scrollbar-track { background: #eef0f2; border-radius: 6px; }
-.view_list_scroll::-webkit-scrollbar-thumb { background: #b4b8c0; border-radius: 6px; }
-.view_list_scroll::-webkit-scrollbar-thumb:hover { background: #969ba6; }
+.view_list_scroll::-webkit-scrollbar { height: 4px; }
+.view_list_scroll::-webkit-scrollbar-track { background: transparent; }
+.view_list_scroll::-webkit-scrollbar-thumb { background: #c7ccd4; border-radius: 4px; }
+.view_list_scroll::-webkit-scrollbar-thumb:hover { background: #a9afb9; }
 /* Per-tab "⋯" menu shows on hover only; it's positioned over the tab's right
    edge in ViewsList (out of flow) so it never reserves space or resizes. */
 .list-head-right {
@@ -92,8 +111,8 @@
   display: block;
 }
 .list-view-header-title{
-  font-size: 18px;
-  line-height: 26.4px;
+  font-size: 16px;
+  line-height: 22px;
 }
 .key-wapper {
   margin-left: 12px;
@@ -120,11 +139,21 @@
   width: 0px;
 }
 .view-list {
-  /* Symmetric padding gives each name breathing room and centers the
-     border-right divider between two tabs (no flex `gap`, which would only
-     pad one side of the divider). */
-  padding: 0 18px 0 18px;
-  justify-content: center;
+  /* Left-aligned, compact tabs. The hover ⋯ menu is out of flow at the right
+     edge and shows only on hover; to give it room WITHOUT ever covering the
+     name, the tab GROWS its right padding on hover (see .wrapper:hover rule
+     below). So the view name stays fully visible in every case — idle or
+     hovered, few views or many. */
+  padding: 0 12px;
+  justify-content: flex-start;
+  transition: padding-right 0.15s ease;
+}
+/* Grow the hovered tab so the ⋯ menu opens into fresh space at the right,
+   never overlapping the view name (works for any name length / tab count).
+   Gated on .has-view-menu: only tabs whose user can open the ⋯ menu expand,
+   otherwise the widening would just add dead space. */
+.wrapper.has-view-menu:hover .view-list {
+  padding-right: 34px;
 }
 .list-head-midmobile {
   display: none;
@@ -262,7 +291,7 @@
 @media (max-width: 1820px) {
   .list-head-left {max-width: 50%;}
   .list-head-mid {max-width: 50%;}
-  .view-list {padding: 0 20px 0 20px;}
+  .view-list {padding: 0 12px;}
   .view-list-wrapper {margin-left: 5px;}
   .list-head-leftrightwrappper {width: 80%;}
   .list-head-right {width: 20%;}
