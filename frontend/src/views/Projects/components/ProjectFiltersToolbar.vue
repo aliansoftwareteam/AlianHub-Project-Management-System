@@ -8,7 +8,7 @@
                         type="text"
                         :placeHolder="$t('PlaceHolder.search')"
                         class="form-control"
-                        :style="{width: (clientWidth > 1025 ? '260px' : '90%')}"
+                        :style="{width: (clientWidth > 767 ? '260px' : '90%')}"
                         :value="taskSearch"
                         @input="$emit('update:taskSearch', $event.target.value)"
                     >
@@ -389,6 +389,18 @@ const groupIcon = require('@/assets/images/peopleGray.png');
 @media (min-width: 768px) {
     .task-filter-assignee > :deep(.mr-1) {
         margin-right: 8px;
+    }
+    /* Responsive fix: keep the search box at its own width so it never
+       stretches to fill the row when the toolbar wraps (previously the 90%
+       width ballooned across a full wrapped line). And give the wrapper a
+       row-gap so, when the search + action groups wrap onto two lines, the
+       rows have clean vertical spacing instead of touching. */
+    .task-filtersearchassignee-wrapper {
+        row-gap: 10px;
+    }
+    .task-filtersearch,
+    .task-fitler-search {
+        flex: 0 0 auto;
     }
 }
 </style>
