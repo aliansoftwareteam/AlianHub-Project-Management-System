@@ -16,6 +16,26 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.16.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.15.0...v14.16.0) (2026-07-22)
+
+
+### 🚀 Features
+
+* **dashboard:** add refresh button to Task List card ([2b6f5a0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2b6f5a071acd3197c6eec68dad74324a07e2dfeb))
+* **projects:** compact project sidebar header and "+ New" menu ([3157419](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/315741975bfed3ebda577ac37573a7548c1c74b4))
+* **projects:** move view switcher to its own row + lighter header ([65361ef](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/65361ef6c353843b624f919cb633f972ccd8d358))
+
+
+### 🐛 Bug Fixes
+
+* **dashboard:** base achievements on-time on last worklog, status fallback ([32c780b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/32c780bb1ffd2009cdd89a05f459dc8571946562))
+* **dashboard:** count on-time via last worklog when status flip is late ([4abd197](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4abd19730400bb7e3e0d7513c7de8986fda9a899))
+* **dashboard:** exclude chat tasks and zero-evidence completions from member cards ([a159d52](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a159d528308073f6dc61401a01558af2058d16de))
+* **dashboard:** relabel achievements 'Needs Improvement' tab to 'Over Estimate' ([00d2ea5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/00d2ea5ef87f9a7d8f70483b4461653a85c64858))
+* **kanban:** clean up card checkbox and drop task type from board cards ([baa4c7e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/baa4c7e04c198a6d24f7e565dfecb21c7459d624))
+* **projects:** only grow view tabs on hover when the user has the view menu ([c4e5488](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c4e548889e4c89247734998710efa6a187572c6b))
+* **projects:** stop the filter search stretching when the toolbar wraps ([ef47b9c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ef47b9ca76df58cbe9b17f102efc23c568ce2346))
+
 ## [14.15.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.14.0...v14.15.0) (2026-07-20)
 
 
