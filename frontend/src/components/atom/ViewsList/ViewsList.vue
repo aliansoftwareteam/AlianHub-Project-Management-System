@@ -1,7 +1,7 @@
 <template>
     <div
     v-if="item._id && item._id.length>6"
-        :class="{'bg-light-gray': active}"
+        :class="{'bg-light-gray': active, 'has-view-menu': hasViewMenu}"
         class="d-flex align-items-center text-nowrap border-top-radius-10-px cursor-pointer wrapper h-100"
         @click.stop="$emit('click', item)"
     >
@@ -13,7 +13,7 @@
            <img class="list__default-home" v-if="item.setAsDefault" :src="viewDefaultIcon" />
            <img :src="active ? activePin : pin" v-if="item?.isPin && item.isPin" class="ml-10px active__pin-condition">
            <span class="notification-tick blinking position-sti ml-7px" v-if="item?.isPrivate"></span>
-           <div class="view-list__menu" v-if="checkPermission('project.view_list',project.isGlobalPermission) === true">
+           <div class="view-list__menu" v-if="hasViewMenu">
            <DropDown :id="item._id" @isVisible="isDropDownVisible" :zIndex="6">
                 <template #button>
                     <img :src="dots" class="dots ml-5px" :ref="item._id">
@@ -89,6 +89,10 @@ const companyOwner = computed(() => getters["settings/companyOwnerDetail"])
 const project = inject("selectedProject")
 const {checkPermission} = useCustomComposable();
 const {getters,commit} = useStore()
+// The per-view triple-dot menu only renders when the user has this permission.
+// The hover width-increase exists to make room for that menu, so gate it on the
+// same permission -- a user without the menu should not get a pointless gap.
+const hasViewMenu = computed(() => checkPermission('project.view_list', project.value?.isGlobalPermission) === true);
 const toast = useToast()
 const user = getUser(userId.value);
 const userData = {

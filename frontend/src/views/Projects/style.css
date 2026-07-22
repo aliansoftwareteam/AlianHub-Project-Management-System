@@ -149,8 +149,10 @@
   transition: padding-right 0.15s ease;
 }
 /* Grow the hovered tab so the ⋯ menu opens into fresh space at the right,
-   never overlapping the view name (works for any name length / tab count). */
-.wrapper:hover .view-list {
+   never overlapping the view name (works for any name length / tab count).
+   Gated on .has-view-menu: only tabs whose user can open the ⋯ menu expand,
+   otherwise the widening would just add dead space. */
+.wrapper.has-view-menu:hover .view-list {
   padding-right: 34px;
 }
 .list-head-midmobile {
