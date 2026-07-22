@@ -12,25 +12,32 @@
 .kanban-card-wrapper { position: relative; }
 .kanban-card-multi-select {
     position: absolute;
-    top: 6px;
-    left: 6px;
+    top: 8px;
+    left: 8px;
     z-index: 5;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 20px;
     height: 20px;
-    background: #fff;
-    border: 1px solid #e0e0e0;
+    /* no background/border here — the native checkbox draws its own box; a
+       wrapper box just doubled up with it. */
     border-radius: 4px;
     cursor: pointer;
 }
 .kanban-card-multi-select input[type="checkbox"] {
-    width: 12px;
-    height: 12px;
+    width: 14px;
+    height: 14px;
     cursor: pointer;
     accent-color: #8591F9;
     margin: 0;
+}
+/* Leading spacer where the task-type icon used to be: reserves the top-left
+   corner for the absolute multi-select checkbox so the card title stays clear. */
+.kanban-card-checkbox-space {
+    display: inline-block;
+    flex: 0 0 auto;
+    width: 20px;
 }
 
 .kanban-board .kanban-column {

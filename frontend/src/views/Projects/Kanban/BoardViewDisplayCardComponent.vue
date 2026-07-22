@@ -21,14 +21,10 @@
             <div>
                 <div class="d-flex justify-content-between">
                     <div class="d-flex align-items-center mw-82">
-                        <ProjectTaskType
-                            :id="element._id+'type'"
-                            :modelValue="taskType"
-                            :options="projectTaskType"
-                            :disabled="showArchiveVar && checkPermission('task.task_list', projectData.isGlobalPermission) !== true || checkPermission('task.task_type', projectData.isGlobalPermission) !== true || showArchiveVar !== false"
-                            @select="changeTaskType($event)"
-                            :imgClasses="`m-0`"
-                        />
+                        <!-- Task type removed from the Kanban card. This spacer keeps the
+                             top-left slot for the absolute multi-select checkbox so the
+                             title never sits underneath it. -->
+                        <span class="kanban-card-checkbox-space" aria-hidden="true"></span>
                         <div class="list-group-kanban-item__taskName text-ellipsis font-weight-500 font-size-14 ml-5px black" :title="element.TaskName">
                             <img v-if="element.deletedStatusKey === 2" :src="inventoryIcon" alt="inventory" class="ml-5px" />
                             <img v-if="element.deletedStatusKey === 1" :src="deleteIcon" alt="delete" class="ml-5px" />
@@ -245,7 +241,6 @@
     import ConvertToSubTaskSidebar from '@/components/molecules/ConvertToSubTaskSidebar/ConvertToSubTaskSidebar.vue';
     import ConvertToList from '@/components/molecules/ConvertToList/ConvertToList.vue';
     import DueDateCompo from '@/components/molecules/DueDateCompo/DueDateCompo.vue';
-    import ProjectTaskType from "@/components/atom/TaskTypeSelection/TaskTypeSelection.vue"
     import { useI18n } from "vue-i18n";
     const { t } = useI18n();
     const router = useRouter()
@@ -310,12 +305,6 @@
     const openSubTaskSideabr = ref(false)
     const dueDate = computed(() => element.value.DueDate)
 
-    const projectTaskType = computed(() => {
-        return projectData.value.taskTypeCounts;
-    })
-    const taskType = computed(() => {
-        return projectData.value.taskTypeCounts.find((x) => x.key === element.value.TaskTypeKey)
-    })
     const myCounts = computed(() => {
         let total = 0;
         if(getters["users/myCounts"]?.data?.[`task_${projectData.value._id}_${props.data.sprintId}_${props.data._id}_comments`]) {
@@ -515,11 +504,6 @@
         } catch (error) {
             console.error("ERROR in updateDueDate: ", error);
         }
-    }
-    function changeTaskType(status) {
-        const statusIndex = projectData.value.taskTypeCounts.findIndex((x) => x.key === props.data.TaskTypeKey);
-        if(statusIndex === -1) return;
-        updateTaskByGroup(element.value, status, 4);
     }
     function updateTask(value = null) {
         const deletedStatusKey = value !== null ? value : archive.value ? 2 : 1;
