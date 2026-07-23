@@ -7,9 +7,9 @@
     >
         <div :class="{'border-left': firstChild && !active, 'border-right': !active, 'border-none activeViewList': active}" class="d-flex align-items-center font-size-14 view-list position-re"
         :style="{ height: active ? '36px' : 'auto' }">
-           <span v-if="commentCount" class="count-block comment__count white position-ab">{{commentCount <= 99 ? commentCount : '+99'}}</span> 
            <img :src="active ? projectComponentsIcons(item.keyName)?.activeIcon : projectComponentsIcons(item.keyName)?.icon" :alt="item.name" class="mr-10px">
            <span class="gray81">{{$t(`ViewList.${item.name}`)}}</span>
+           <span v-if="commentCount" class="count-block comment__count white">{{commentCount <= 99 ? commentCount : '+99'}}</span>
            <img class="list__default-home" v-if="item.setAsDefault" :src="viewDefaultIcon" />
            <img :src="active ? activePin : pin" v-if="item?.isPin && item.isPin" class="ml-10px active__pin-condition">
            <span class="notification-tick blinking position-sti ml-7px" v-if="item?.isPrivate"></span>
@@ -257,12 +257,14 @@ defineEmits(['click']);
     object-fit: contain;
     flex: 0 0 auto;
 }
+/* In-flow pill after the view name (not an absolute corner badge) so the
+   comment count never overlaps the label — in any state, at any tab width. */
 .count-block.comment__count{
    color: #eabb00 !important;
    background-color: transparent;
    border: 1px solid #eabb00 !important;
-   top: -9px;
-   right: 4px;
+   margin-left: 6px;
+   flex: 0 0 auto;
 }
 
 .active__pin-condition{
