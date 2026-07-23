@@ -16,6 +16,20 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.17.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.16.0...v14.17.0) (2026-07-23)
+
+
+### 🚀 Features
+
+* **tracker:** custom idle notification via a shared notification template ([6c6b606](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6c6b6060a05edfbc00c7704af89ed98c64fd957e))
+* **tracker:** custom idle notification via a shared notification template ([c937681](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c93768187da9bdc7e720605a43049884e6f57d16))
+
+
+### 🐛 Bug Fixes
+
+* prevent comment count overlapping the project view tab label ([a55a92d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a55a92d410ab5beb5628db4e85325171bbe7980a))
+* prevent comment count overlapping the project view tab label ([ecfb350](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ecfb350b85ddeec4db095f77ba126e376a59e3bd))
+
 ## [14.16.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.15.0...v14.16.0) (2026-07-22)
 
 
