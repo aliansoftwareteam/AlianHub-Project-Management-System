@@ -10,6 +10,7 @@ const iconPath = assetPath('logo.png')
 const trayIconPath = assetPath('traylogo.png')
 // Prod: next export copies public/ into app/. Dev: read straight from renderer/public.
 const notificationHtmlPath = isProd ? path.join(__dirname, 'notification.html') : path.join(__dirname, '..', 'renderer', 'public', 'notification.html')
+const notificationTemplateHtmlPath = isProd ? path.join(__dirname, 'notification-template.html') : path.join(__dirname, '..', 'renderer', 'public', 'notification-template.html')
 let notification = null;
 let screenshotNotificationWindow = null;
 
@@ -259,6 +260,11 @@ function verifyScreenCapturePermission() {
 
 ;(async () => {
   await app.whenReady()
+
+  // Windows shows the AppUserModelID as the notification header ("attribution").
+  // Set a friendly one so toasts read "AlianHub Time Tracker" instead of the
+  // default "electron.app.alianhubtimetracker".
+  if (process.platform === 'win32') app.setAppUserModelId('AlianHub Time Tracker')
   
   // Load saved permissions state
   loadPermissionsState()
@@ -392,7 +398,7 @@ const startActivitySampling = () => {
       // is just a heads-up that no input was detected for the threshold.
       mainWindow.webContents.send('idle:detected', { idleSeconds, thresholdSeconds: idleThresholdSec })
       try {
-        new Notification({ title: 'Alianhub Time Tracker', body: `No activity detected for ${Math.round(idleThresholdSec / 60)} min.` }).show()
+        showNotification({ title: 'No activity detected', subtitle: `You've been idle for ${Math.round(idleThresholdSec / 60)} min.` })
       } catch (e) { /* notifications are best-effort */ }
     }
     if (mouseMoved) {
@@ -525,6 +531,57 @@ function sendNotification(dataUrl) {
     });
   });
 
+}
+
+// Common in-app notification — one shared layout (notification-template.html)
+// whose content is passed in, so any future notification can reuse it:
+//   showNotification({ title, subtitle, image, timeout })
+// Pass `image` (a data URL / path) to show a media preview; omit it for a
+// compact text-only card. The screenshot notification keeps its own file and
+// flow (sendNotification) and is intentionally left untouched.
+function showNotification({ title, subtitle = '', image = null, timeout = 10000 }) {
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  const windowWidth = 372;
+  // Taller when there's a media/preview image; compact for text-only.
+  const windowHeight = image ? 282 : 92;
+
+  const win = new BrowserWindow({
+    width: windowWidth,
+    height: windowHeight,
+    x: width - windowWidth,
+    y: height - windowHeight,
+    frame: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    transparent: true,
+    show: false,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    }
+  });
+
+  win.loadFile(notificationTemplateHtmlPath);
+  win.webContents.on('did-finish-load', () => {
+    win.webContents.send('logo-path', iconPath);
+    win.webContents.send('notification:render', { title, subtitle, image, timeout });
+    win.showInactive(); // don't steal focus from the user's current input
+
+    const closeHandler = () => {
+      if (!win.isDestroyed()) win.close();
+    };
+    ipcMain.once('notification:close', closeHandler);
+
+    const autoCloseTimer = setTimeout(() => {
+      if (!win.isDestroyed()) win.close();
+    }, timeout);
+
+    win.once('closed', () => {
+      clearTimeout(autoCloseTimer);
+      ipcMain.removeListener('notification:close', closeHandler);
+    });
+  });
 }
 
 powerMonitor.on('suspend', () => {
