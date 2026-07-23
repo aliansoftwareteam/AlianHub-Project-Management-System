@@ -1934,6 +1934,10 @@ exports.getMyNextTasks = async (req, res) => {
         const projClause = projectScopeClause(req.body?.projectMode || 'all', req.body?.projectId);
         const nextFilter = applyTaskMatch({
             deletedStatusKey: 0,
+            // Exclude chat threads — main/global chats are stored as tasks
+            // (mainChat: true) with the member as AssigneeUserId, so they'd
+            // otherwise surface as work items here.
+            mainChat: { $ne: true },
             statusType: { $ne: "close" },
             $or: [{ AssigneeUserId: uid }, { Task_Leader: uid }],
             ...(projClause ? { ProjectID: projClause } : {}),
@@ -2026,6 +2030,7 @@ exports.getMyAchievements = async (req, res) => {
         const projClause = projectScopeClause(req.body?.projectMode || 'all', req.body?.projectId);
         const achFilter = applyTaskMatch({
             deletedStatusKey: 0,
+            mainChat: { $ne: true }, // exclude chat threads (stored as tasks)
             // Completed = close OR done (matches bucketForStatus in resourceHelpers).
             statusType: { $in: ["close", "done"] },
             // Achievements are the caller's OWN work — only tasks assigned to
@@ -2043,18 +2048,32 @@ exports.getMyAchievements = async (req, res) => {
         }, "find").catch(() => []);
 
         // Total logged per task (any user) → compared to the shared estimate.
+        // Also track the last worklog time (max LogEndTime) → a completion proxy
+        // that survives a late administrative status flip (see on-time note below).
         const loggedByTask = {};
+        const lastLogByTask = {};
         const taskIds = (tasks || []).map((t) => String(t._id));
         if (taskIds.length) {
             const tlogs = await MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.TIMESHEET,
-                data: [{ TicketID: { $in: taskIds } }, { TicketID: 1, LogTimeDuration: 1 }],
+                data: [{ TicketID: { $in: taskIds } }, { TicketID: 1, LogTimeDuration: 1, LogEndTime: 1 }],
             }, "find").catch(() => []);
             (tlogs || []).forEach((ts) => {
                 if (!ts.TicketID) return;
-                loggedByTask[String(ts.TicketID)] = (loggedByTask[String(ts.TicketID)] || 0) + (Number(ts.LogTimeDuration) || 0);
+                const key = String(ts.TicketID);
+                loggedByTask[key] = (loggedByTask[key] || 0) + (Number(ts.LogTimeDuration) || 0);
+                // LogEndTime is epoch SECONDS → convert to ms for date comparisons.
+                const endMs = (Number(ts.LogEndTime) || 0) * 1000;
+                if (endMs > (lastLogByTask[key] || 0)) lastLogByTask[key] = endMs;
             });
         }
+
+        // Drop zero-evidence completions: a task closed with NO logged time AND
+        // no estimate has nothing to evaluate, so it isn't a real achievement.
+        // Excluded from everything below — completedCount, the tabs, and the
+        // on-time/on-estimate rates — so the card reflects only substantiated work.
+        const achievedTasks = (tasks || []).filter((t) =>
+            (loggedByTask[String(t._id)] || 0) > 0 || (Number(t.totalEstimatedTime) || 0) > 0);
 
         // Real completion time per task — the latest 'Task_Status' history entry
         // (when the task moved to Close). `updatedAt` is unreliable for this: it
@@ -2086,7 +2105,7 @@ exports.getMyAchievements = async (req, res) => {
         let overEstimate = 0;
         let onTime = 0;
         let withDue = 0;
-        const recent = (tasks || []).map((t) => {
+        const recent = achievedTasks.map((t) => {
             const estimate = Number(t.totalEstimatedTime) || 0;
             const logged = loggedByTask[String(t._id)] || 0;
             const within = estimate > 0 ? logged <= estimate : null;
@@ -2103,7 +2122,15 @@ exports.getMyAchievements = async (req, res) => {
                 withDue += 1;
                 const doneMs = completedAt ? completedAt.getTime() : 0;
                 const dueEnd = new Date(t.DueDate); dueEnd.setHours(23, 59, 59, 999);
-                onTimeFlag = !!(doneMs && doneMs <= dueEnd.getTime());
+                // On-time = the work wrapped up by the due date. The last worklog
+                // (max LogEndTime) is the primary signal: it reflects when work
+                // actually finished and survives a late administrative status flip
+                // (task sat in Done, moved to Complete only later). When a task has
+                // NO logs, fall back to the status-change completion time so it's
+                // still judged fairly rather than auto-failing.
+                const lastLogMs = lastLogByTask[String(t._id)] || 0;
+                const completionMs = lastLogMs || doneMs;
+                onTimeFlag = !!(completionMs && completionMs <= dueEnd.getTime());
                 if (onTimeFlag) onTime += 1;
             }
             return {
@@ -2134,7 +2161,7 @@ exports.getMyAchievements = async (req, res) => {
         return res.status(200).json({
             status: true,
             data: {
-                completedCount: (tasks || []).length,
+                completedCount: achievedTasks.length,
                 onEstimate,
                 overEstimate,
                 onEstimateRate: rated ? Math.round((onEstimate / rated) * 100) : null,
@@ -2239,6 +2266,7 @@ exports.getMyDueSoon = async (req, res) => {
         const projClause = projectScopeClause(req.body?.projectMode || 'all', req.body?.projectId);
         const filter = applyTaskMatch({
             deletedStatusKey: 0,
+            mainChat: { $ne: true }, // exclude chat threads (stored as tasks)
             statusType: { $ne: "close" },
             $or: [{ AssigneeUserId: uid }, { Task_Leader: uid }],
             DueDate: { $gte: start, $lte: end },
