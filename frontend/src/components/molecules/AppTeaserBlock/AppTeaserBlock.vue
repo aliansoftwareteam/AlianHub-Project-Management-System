@@ -1,7 +1,7 @@
 <template>
     <!-- Inline variant: a compact "locked" chip for inline controls (tags, AI buttons). -->
     <div v-if="variant === 'inline'" class="app-teaser-chip cursor-pointer" role="button" tabindex="0"
-        :title="resolvedDescription" @click="goToSettings" @keyup.enter="goToSettings">
+        :title="`${resolvedDescription} — enable under ${location}`" @click="goToSettings" @keyup.enter="goToSettings">
         <span class="app-teaser-chip__lock" aria-hidden="true">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="4" y="11" width="16" height="9" rx="2"></rect>
@@ -25,6 +25,13 @@
         <span class="app-teaser-banner__text">
             <span class="app-teaser-banner__title">{{ resolvedTitle }}</span>
             <span class="app-teaser-banner__desc">{{ resolvedDescription }}</span>
+            <span class="app-teaser-banner__hint">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 8 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H2a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 3.6 8a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H8a1.65 1.65 0 0 0 1-1.51V2a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V8a1.65 1.65 0 0 0 1.51 1H22a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+                {{ location }}
+            </span>
         </span>
         <span class="app-teaser-banner__cta">
             {{ buttonText }}
@@ -48,7 +55,9 @@ const props = defineProps({
     buttonText: { type: String, default: 'Enable in settings' },
     // Heading is composed as: "{headPrefix} <highlight>{title}</highlight> {headSuffix}".
     headPrefix: { type: String, default: 'Enable' },
-    headSuffix: { type: String, default: 'in this project' }
+    headSuffix: { type: String, default: 'in this project' },
+    // Breadcrumb telling the user exactly where to switch the app on.
+    location: { type: String, default: 'Settings → Projects → Apps' }
 });
 
 const router = useRouter();

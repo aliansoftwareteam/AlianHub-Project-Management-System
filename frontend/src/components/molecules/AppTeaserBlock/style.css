@@ -44,6 +44,17 @@
     line-height: 1.4;
     color: #6B6B70;
 }
+.app-teaser-banner__hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 4px;
+    font-size: 11px;
+    color: #9092AC;
+}
+.app-teaser-banner__hint svg {
+    flex: none;
+}
 .app-teaser-banner__cta {
     display: inline-flex;
     align-items: center;
