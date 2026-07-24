@@ -63,6 +63,16 @@
                         <img src="@/assets/images/svg/ai_image_white.svg" class="mr-10-px"/>
                         <span>{{ $t('AI.write_with_ai') }}</span>
                     </button>
+                    <!-- Tags app available on the plan but not switched on for this project: inline locked chip. -->
+                    <AppTeaserBlock
+                        v-if="getAppState('tags', projectData) === 'disabled' && checkPermission('task.task_tag',projectData?.isGlobalPermission) !== null"
+                        appKey="tags" variant="inline" class="mr-1"
+                    />
+                    <!-- AI app available on the plan but not switched on for this project: inline locked chip. -->
+                    <AppTeaserBlock
+                        v-if="getAppState('AI', projectData) === 'disabled' && checkPermission('task.task_create',projectData?.isGlobalPermission) === true"
+                        appKey="AI" variant="inline" class="mr-1"
+                    />
                     <DropDown id="group_by" class="mr-1 group_by">
                         <template #button>
                             <button class="text-nowrap btn-white border-groupBy border-radius-6-px cursor-pointer" ref="group_by_status" @click="currentActive='group'">
@@ -282,8 +292,9 @@ const showEstimationScale = ref(false);
 const showRecent = ref(false);
 const showExport = ref(false);
 import { useCustomComposable } from '@/composable';
+import AppTeaserBlock from '@/components/molecules/AppTeaserBlock/AppTeaserBlock.vue';
 
-const { checkPermission, checkApps } = useCustomComposable();
+const { checkPermission, checkApps, getAppState } = useCustomComposable();
 
 defineProps({
     activeTab: { type: String, required: true },

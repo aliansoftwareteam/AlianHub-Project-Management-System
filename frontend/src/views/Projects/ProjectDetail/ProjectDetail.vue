@@ -70,6 +70,10 @@
                     @updateTotalDifference="updateTotalDifference"
                 />
             </div>
+            <!-- Milestones app available on the plan but not switched on for this project: representational teaser. -->
+            <div class="milestone__fixhourly-wrapper" v-else-if="getAppState('Milestones', projectData) === 'disabled' && checkPermission('project.project_milestone',projectData.isGlobalPermission) !== null">
+                <AppTeaserBlock appKey="Milestones" />
+            </div>
             <ProjectDetailRightSide v-if="activeTab === 'ProjectDetail' && clientWidth <= 767 && activeTab !== 'Calendar'" :projectData="projectData" @rightSideBarEmit="rightSideBarEmit" @description="handleDescription" />
         </template>
     </div>
@@ -85,6 +89,7 @@
     import HourlyMilestone from '@/components/organisms/HourlyMilestone/HourlyMilestone.vue';
     import CheckListComponent from '@/components/molecules/CheckList/CheckList.vue'
     import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
+    import AppTeaserBlock from '@/components/molecules/AppTeaserBlock/AppTeaserBlock.vue';
     import * as env from '@/config/env';
     import { apiRequest, apiRequestWithoutCompnay } from '../../../services'
     import Swal from 'sweetalert2';
@@ -107,7 +112,7 @@
         isvisible:{type:Boolean,default:() => true}
     });
     const projectData = inject('selectedProject');
-    const { checkPermission, makeUniqueId, checkApps, checkBucketStorage, sanitizeInput } = useCustomComposable();
+    const { checkPermission, makeUniqueId, checkApps, getAppState, checkBucketStorage, sanitizeInput } = useCustomComposable();
     const { getters,commit } = useStore();
     const checkList = computed(() => projectData.value.checklistArray)
     const currentCompany = computed(() => getters["settings/selectedCompany"])

@@ -3,18 +3,8 @@
     Assignee: Parth Detroja [30-05-2023]
 -->
 <template>
-    <div :class="[{'position-re':!props.planCondition}]" class="pt-20px">
-        <div v-if="!props.planCondition">
-            <UpgradePlan 
-                :isImage="false"
-                :buttonText="$t('Upgrades.upgrade_your_plan')"
-                :lastTitle="$t('Checklist.to_unlock_checklist')"
-                :secondTitle="$t('Upgrades.unlimited')"
-                :firstTitle="$t('Upgrades.upgrade_to')"
-                :message="$t('Upgrades.the_feature_not_available')"
-            />
-        </div>
-        <div class="checklist-main mobile__bg--withPadding" :class="[{'bg-colorlightgray pointer-event-none opacity-5 blur-3-px':!props.planCondition}]">
+    <div class="pt-20px">
+        <div class="checklist-main mobile__bg--withPadding">
             <div class="d-flex align-items-center">
                 <h4 :class="{'font-size-16 font-weight-600' : clientWidth <=767 , 'font-size-14 font-weight-700' : clientWidth > 767 }" class="black">{{$t('Checklist.checklist')}}</h4>
                 <div class="d-flex align-items-center ml-auto" @click="generateChecklistWithAi()" v-if="checkApps('AI',project) && checkPermission('task.task_checklist',project?.isGlobalPermission) === true">
@@ -155,7 +145,6 @@ import AiCheckList from './AiCheckList.vue';
 import { useAiApiFunction } from "@/composable/aiHelper";
 import Skelaton from "@/components/atom/Skelaton/AiSkelaton.vue";
 import Skelatons from '@/components/atom/Skelaton/Skelaton.vue';
-import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import { useI18n } from "vue-i18n";
 const { t } = useI18n();
 import taskClass from "@/utils/TaskOperations";

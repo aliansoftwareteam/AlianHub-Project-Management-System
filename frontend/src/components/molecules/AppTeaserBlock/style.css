@@ -1,0 +1,89 @@
+/* Block variant: compact dashed "available, not enabled" banner — auto height,
+   wraps in narrow columns (e.g. the task/project Details sidebar). */
+.app-teaser-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    width: 100%;
+    margin: 16px 0;
+    padding: 10px 12px;
+    border: 1px dashed #C9CDE0;
+    border-radius: 10px;
+    background: transparent;
+    transition: border-color 0.12s ease, background 0.12s ease;
+}
+.app-teaser-banner:hover {
+    border-color: #4B5DEE;
+    background: #F7F8FF;
+}
+.app-teaser-banner__ic {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    flex: none;
+    border-radius: 8px;
+    background: #EEF0FF;
+    color: #2B37A8;
+}
+.app-teaser-banner__text {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 120px;
+}
+.app-teaser-banner__title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #191A2B;
+}
+.app-teaser-banner__desc {
+    font-size: 12px;
+    line-height: 1.4;
+    color: #6B6B70;
+}
+.app-teaser-banner__cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: auto;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #4B5DEE;
+    white-space: nowrap;
+}
+
+/* Inline "locked" chip variant */
+.app-teaser-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #565979;
+    background: #F4F4FA;
+    border: 1px solid #E1E1EF;
+    border-radius: 8px;
+    white-space: nowrap;
+}
+.app-teaser-chip:hover {
+    border-color: #B9C0F5;
+    background: #EEF0FF;
+}
+.app-teaser-chip__lock {
+    display: inline-flex;
+    align-items: center;
+    color: #8A8CA6;
+}
+.app-teaser-chip__label {
+    color: #191A2B;
+}
+.app-teaser-chip__cta {
+    color: #4B5DEE;
+    font-weight: 600;
+}
+

@@ -98,6 +98,8 @@
         </div>
         <AddTimeLog v-if="activeTimeLog === true" :closeTimeLogSidebar="closeTimeLogSidebar" :isAddLog="isAddLog" :task="task" :modelValue="timeLogData" @addTime="(eve) => addTime(eve,selectedFilter)" />
     </div>
+    <!-- Time Tracking app available on the plan but not switched on for this project: representational teaser. -->
+    <AppTeaserBlock v-else-if="getAppState('TimeTracking') === 'disabled'" appKey="TimeTracking" class="m-3" />
     <div v-else class="d-flex align-items-center justify-content-center w-100 h-100">
         <img :src="accessDeniedImage" alt="accessDenied">
     </div>
@@ -109,6 +111,7 @@
 
     import { useStore } from 'vuex';
     import { useGetterFunctions, useCustomComposable } from "@/composable";
+    import AppTeaserBlock from '@/components/molecules/AppTeaserBlock/AppTeaserBlock.vue';
 
     import RangePickerComp from '@/components/molecules/RangePickerComp/RangePickerComp.vue';
     import UserProfile from "@/components/atom/UserProfile/UserProfile.vue";
@@ -124,7 +127,7 @@
     const userId =  inject('$userId');
     const {getUser} = useGetterFunctions();
     const { getters } = useStore();
-    const {makeUniqueId,checkApps} = useCustomComposable();
+    const {makeUniqueId,checkApps,getAppState} = useCustomComposable();
     const defaultUserIcon = inject("$defaultUserAvatar");
     const accessDeniedImage = require("@/assets/images/access_denied_img.png");
 
