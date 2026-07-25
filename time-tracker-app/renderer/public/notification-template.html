@@ -129,6 +129,21 @@
       document.getElementById('logo').src = path;
     });
 
+    // Measure the actual laid-out card and ask main to fit the window to it, so
+    // content of ANY length is shown in full and never clipped. Height = the
+    // card + the body's vertical padding (which reserves room for the shadow).
+    function reportSize() {
+      const card = document.querySelector('.toast');
+      if (!card) return;
+      const cs = getComputedStyle(document.body);
+      const padV = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+      const h = Math.ceil(card.getBoundingClientRect().height + padV);
+      ipcRenderer.send('notification:size', { height: h });
+    }
+    // Re-measure once a media preview finishes loading (its box may resize).
+    const mediaEl = document.getElementById('media');
+    if (mediaEl) mediaEl.addEventListener('load', reportSize);
+
     // Single entry point: the shared layout renders whatever the caller sends.
     // { title, subtitle, image?, timeout? } — pass an image to show the media
     // preview, omit it for a compact text-only card.
@@ -148,6 +163,8 @@
       }
 
       startCountdown(typeof data.timeout === 'number' ? data.timeout : 10000);
+      // Wait for layout to settle after the text/image change, then fit the window.
+      requestAnimationFrame(() => requestAnimationFrame(reportSize));
     });
 
     function closeWithAnim() {

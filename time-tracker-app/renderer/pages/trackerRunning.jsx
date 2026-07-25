@@ -4,6 +4,7 @@ import Router from 'next/router';
 import { setCaptures, setActivityTick, setTrackerStopTime, removeExtraClicks, setComment, setTrackerStartTime, removeAllTimeLog } from '../store/timelog';
 import { TrackerController } from '../controller/tracker/tracker';
 import { apiRequest } from '../utils/services';
+import { fetchEstimateStatus } from '../utils/estimateLimit';
 import store from '../store/store';
 import moment from 'moment';
 import { DateTime } from 'luxon';
@@ -53,6 +54,16 @@ function TimeTrackerView() {
       dispatch(setTrackerStopTime());
       dispatch(removeAllTimeLog());
 
+      // AHE-3831 — the stop finalized the prior session, so re-check the estimate
+      // before restarting; if it's now met, stay stopped.
+      const companyId = store.getState()?.company?.currentCompany?._id || "";
+      const est = await fetchEstimateStatus(companyId, ctx.taskId);
+      if (est.ok && est.blockStart) {
+        try { window.ipc.send('estimate:limit', { reason: est.blockReason, taskName: ctx.taskName }); } catch (e) { /* best-effort */ }
+        Router.push('/home');
+        return;
+      }
+
       // ...then start a fresh one on the same task with the new comment.
       window.ipc.send("start-listen-event");
       const startObj = {
@@ -67,6 +78,7 @@ function TimeTrackerView() {
       const res = await apiRequest('post', `/api/v3/timeTracker/start`, startObj);
 
       if (res?.data?.status) {
+        autoStoppedRef.current = false;
         dispatch(setTrackerStartTime(res.data.statusText));
         dispatch(setComment({
           comment: newComment,
@@ -78,6 +90,7 @@ function TimeTrackerView() {
           folderName: ctx.folderName,
           sprintName: ctx.sprintName,
           taskTypeImage: ctx.taskTypeImage,
+          remainingMinutes: est.hasEstimate ? est.remainingMinutes : null,
         }));
         setIsEditing(false);
         // Sync the ref to the just-updated store, else startScreenshotCapture sees
@@ -103,6 +116,8 @@ function TimeTrackerView() {
   const timeLogRef = React.useRef(timeLog);
   const keyboardClicksRef = React.useRef(keyboardClicks);
   const screenshotTimeoutRef = useRef(null);
+  // AHE-3831 — guards the estimate auto-stop so it fires exactly once per session.
+  const autoStoppedRef = useRef(false);
 
   // Update refs when values change
   useEffect(() => {
@@ -257,6 +272,32 @@ function TimeTrackerView() {
     } else {
       setTimeAgo("");
     }
+    checkEstimateLimit(currentTimeLog);
+  };
+
+  // AHE-3831 — auto-stop when this session's elapsed time reaches the minutes
+  // that were left against the task estimate when it started. `remainingMinutes`
+  // is null when the task has no estimate, so it never caps those.
+  const checkEstimateLimit = async (currentTimeLog) => {
+    if (autoStoppedRef.current) return;
+    if (!currentTimeLog?.trackerStart || !currentTimeLog?.startTime) return;
+    if (typeof currentTimeLog.remainingMinutes !== 'number') return;
+
+    const elapsedMinutes = (Date.now() - new Date(currentTimeLog.startTime).getTime()) / 60000;
+    if (elapsedMinutes < currentTimeLog.remainingMinutes) return;
+
+    // Set the guard synchronously so the next 1s tick can't double-stop.
+    autoStoppedRef.current = true;
+    const taskName = currentTimeLog.taskName;
+    try {
+      await TrackerController.TrackerStop();
+    } catch (e) {
+      console.error('Estimate auto-stop failed', e);
+    }
+    dispatch(setTrackerStopTime());
+    dispatch(removeAllTimeLog());
+    try { window.ipc.send('estimate:limit', { reason: 'autostopped', taskName }); } catch (e) { /* best-effort */ }
+    Router.push('/home');
   };
 
   const setActivityEvent = (e) => {

@@ -5,6 +5,7 @@ import { setComment, setTrackerStartTime } from '../store/timelog';
 import { DateTime } from 'luxon';
 import { apiRequest } from '../utils/services';
 import { DEFAULT_TASK_IMAGE } from '../utils/imageDefaults';
+import { fetchEstimateStatus } from '../utils/estimateLimit';
 import WasabiImage from './WasabiImage/WasabiImage';
 
 export default function TrackerTask({
@@ -29,6 +30,14 @@ export default function TrackerTask({
     }
     setIsSpinner(true);
     try {
+      const taskId = selectedTaskData?.fullData?.TicketID || selectedTaskData?.fullData?._id;
+      // AHE-3831 — a task needs an estimate with time left to be tracked.
+      const est = await fetchEstimateStatus(currentCopany?._id, taskId);
+      if (est.ok && est.blockStart) {
+        setTaskModalError(est.blockMessage);
+        setIsSpinner(false);
+        return;
+      }
       window.ipc.send("start-listen-event");
       let obj = {
         userId: user?._id || "",
@@ -53,7 +62,8 @@ export default function TrackerTask({
           projectName: selectedTaskData?.projectName,
           folderName: selectedTaskData?.folderName || '',
           sprintName: selectedTaskData?.sprintName,
-          taskTypeImage: taskTypeImage
+          taskTypeImage: taskTypeImage,
+          remainingMinutes: est.hasEstimate ? est.remainingMinutes : null
         }));
         setIsSpinner(false);
         onClose();
