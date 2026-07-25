@@ -98,8 +98,15 @@
         </div>
         <AddTimeLog v-if="activeTimeLog === true" :closeTimeLogSidebar="closeTimeLogSidebar" :isAddLog="isAddLog" :task="task" :modelValue="timeLogData" @addTime="(eve) => addTime(eve,selectedFilter)" />
     </div>
-    <!-- Time Tracking app available on the plan but not switched on for this project: representational teaser. -->
-    <AppTeaserBlock v-else-if="getAppState('TimeTracking') === 'disabled'" appKey="TimeTracking" class="m-3" />
+    <!-- Time Tracking app available on the plan but not switched on for this project: representational teaser.
+         Centered + width-constrained so it reads as a tidy empty-state card in the wide Time Log tab
+         (the full-width block variant is meant for narrow sidebar columns), matching the access-denied
+         state below. -->
+    <div v-else-if="getAppState('TimeTracking') === 'disabled'" class="d-flex align-items-center justify-content-center w-100 h-100 p-3">
+        <div class="w-100" style="max-width: 480px;">
+            <AppTeaserBlock appKey="TimeTracking" />
+        </div>
+    </div>
     <div v-else class="d-flex align-items-center justify-content-center w-100 h-100">
         <img :src="accessDeniedImage" alt="accessDenied">
     </div>
