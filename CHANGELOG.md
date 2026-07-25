@@ -16,6 +16,14 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.18.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.17.0...v14.18.0) (2026-07-25)
+
+
+### 🚀 Features
+
+* **tracker:** gate tracking on task estimated hours ([bfaf168](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bfaf168d82a84ff66b1fc1d591a32f00647a957a))
+* **tracker:** gate tracking on task estimated hours ([fe4101e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fe4101eb2b06f5d465e6582c316a12432979239c))
+
 ## [14.17.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.16.0...v14.17.0) (2026-07-23)
 
 
