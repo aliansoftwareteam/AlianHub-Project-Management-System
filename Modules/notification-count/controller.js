@@ -181,7 +181,17 @@ exports.updateUnReadCommentsCountFun = (req) => {
             if (!(req.body && req.body.companyId)) {
                 reject({
                     status: false,
-                    statusText: "companyId is required"  
+                    statusText: "companyId is required"
+                });
+                return;
+            }
+
+            // SEC (AHE-3834) — the tenant is the authenticated company (header), not a
+            // client-chosen body value. Blocks mutating another company's unread counts.
+            if (req.headers && req.headers['companyid'] && String(req.body.companyId) !== String(req.headers['companyid'])) {
+                reject({
+                    status: false,
+                    statusText: "companyId mismatch"
                 });
                 return;
             }

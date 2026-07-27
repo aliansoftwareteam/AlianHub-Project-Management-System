@@ -195,6 +195,11 @@ import { useStore } from "vuex";
 import { useToast } from "vue-toast-notification";
 import FileAndLinks from '@/components/molecules/FileAndLinks/FileAndLinks.vue'
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
+// AHE-3834 — this view renders a channel FontAwesomeIcon in its header but never
+// registered the icon packs; it silently relied on ChatListItem's side effect
+// (so the header icon broke when no chat row had rendered yet). Register here too
+// — the call is memoized, so it costs nothing after the first.
+import { ensureFaIcons } from "@/utils/faIcons";
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 
 // COMPONENTS
@@ -245,6 +250,9 @@ defineComponent({
         Comments
     }
 })
+
+// Register the FA icon packs used by the channel icon in this view's header.
+ensureFaIcons();
 
 const chatSidebar = ref(false);
 const searchType = ref("");
@@ -352,6 +360,8 @@ onUnmounted(() => {
         snapRef.value();
     }
     commit("mainChat/setChatPayload",{});
+    // AHE-3834 — guard: on a dropped/never-established socket this threw on unmount.
+    if(!socket.value || !socket.value.id) return;
     socket.value.emit('getRoomList', socket.value.id, (rooms) => {
         let chatRooms = rooms.filter((x)=> x.includes('chat_'));
         if (chatRooms.length) {
