@@ -225,6 +225,30 @@
                     </button>
                 </div>
             </div>
+            <!-- AHE — reason required when RE-updating an already-set estimate; the
+                 reason is written to the task Activity Log by the backend. -->
+            <Modal
+                :modelValue="showEstimateReasonModal"
+                :closeOnBackdrop="false"
+                :acceptButtonText="$t('Home.Confirm')"
+                :cancelButtonText="$t('Projects.cancel')"
+                @accept="submitEstimateReason"
+                @close="cancelEstimateReason"
+            >
+                <template #header>
+                    <h3 class="m-0 font-size-16 font-weight-600 black">Reason for changing estimated hours</h3>
+                </template>
+                <template #body>
+                    <textarea
+                        v-model.trim="estimateReasonText"
+                        class="w-100 border-radius-6-px font-size-14"
+                        style="min-height:90px; resize:vertical; border:1px solid #DFE1E6; outline:none; padding:8px;"
+                        placeholder="Why are you changing the estimated hours?"
+                        @input="estimateReasonError = false"
+                    ></textarea>
+                    <span v-if="estimateReasonError" class="red font-size-12">Please enter a reason.</span>
+                </template>
+            </Modal>
             <div class="d-flex task-detail-right-side-label" v-if="checkApps('TimeEstimates') && checkPermission('task.task_estimated_hours',project?.isGlobalPermission) !== null">
                 <h4>{{$t('UserTimesheet.task_planning')}}</h4>
                 <Skelaton v-if="isMainSpinner" style="height: 24px;" class="w-100px border-radius-7-px"/>
@@ -787,7 +811,27 @@ const updateStartDate = (event) => {
         $toast.error(t('Toast.Start_date_not_updated'),{position: 'top-right'});
     }
 }
+// AHE — re-updating an already-set estimate requires a reason (logged to the
+// task Activity Log). The first-ever set (previous 0) saves directly.
+const showEstimateReasonModal = ref(false);
+const pendingEstimateValue = ref(null);
+const estimateReasonText = ref('');
+const estimateReasonError = ref(false);
+
 const updateTotalEstimatedTime = (value) => {
+    const previous = Number(props.task.totalEstimatedTime) || 0;
+    if (previous > 0 && value !== previous) {
+        // Re-update — prompt for a reason before persisting.
+        pendingEstimateValue.value = value;
+        estimateReasonText.value = '';
+        estimateReasonError.value = false;
+        showEstimateReasonModal.value = true;
+        return;
+    }
+    persistEstimate(value);
+}
+
+const persistEstimate = (value, reason = '') => {
     const userData = getUserData();
 
     const firebaseObj = {
@@ -795,7 +839,8 @@ const updateTotalEstimatedTime = (value) => {
     }
     let obj = {
         'previousEstimatedTime': props.task.totalEstimatedTime,
-        'userName' : userData.Employee_Name
+        'userName' : userData.Employee_Name,
+        ...(reason ? { reason } : {})
     }
     const projectData = {
         _id: project.value._id,
@@ -812,6 +857,26 @@ const updateTotalEstimatedTime = (value) => {
     .catch((err) => {
         console.error(err);
     })
+}
+
+const submitEstimateReason = () => {
+    if (!estimateReasonText.value || !estimateReasonText.value.trim()) {
+        estimateReasonError.value = true;
+        return;
+    }
+    persistEstimate(pendingEstimateValue.value, estimateReasonText.value.trim());
+    showEstimateReasonModal.value = false;
+    pendingEstimateValue.value = null;
+    estimateReasonText.value = '';
+    estimateReasonError.value = false;
+}
+
+const cancelEstimateReason = () => {
+    // Abort the change — nothing persists, so the input reverts to the task's value.
+    showEstimateReasonModal.value = false;
+    pendingEstimateValue.value = null;
+    estimateReasonText.value = '';
+    estimateReasonError.value = false;
 }
 
 const displayTime = (time) => {

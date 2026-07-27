@@ -599,6 +599,18 @@
                                         }
                                     }
                                 }
+                                // AHE — flag projects that contain any task whose estimate was
+                                // re-updated, so the row shows a red dot for the TL. One grouped
+                                // lookup; best-effort (never blocks the timesheet render).
+                                try {
+                                    apiRequest('post', `${env.TASK}/find`, { findQuery: [
+                                        { $match: { estimateChangedFlag: true, deletedStatusKey: { $ne: 1 } } },
+                                        { $group: { _id: "$ProjectID" } }
+                                    ] }).then((flagRes) => {
+                                        const flaggedIds = new Set((flagRes?.data || []).map((r) => String(r._id)));
+                                        finalProjectData.value = finalProjectData.value.map((p) => ({ ...p, hasEstimateChanged: flaggedIds.has(String(p.id)) }));
+                                    }).catch((e) => console.error('estimate-flag rollup failed', e));
+                                } catch (e) { console.error(e); }
                                 isManinSpinner.value = false;
                             } else {
                                 isManinSpinner.value = false;

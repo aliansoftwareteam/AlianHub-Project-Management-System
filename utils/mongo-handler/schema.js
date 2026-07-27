@@ -196,6 +196,14 @@ const schema = {
             type: Number,
             required: false
         },
+        // AHE — set true when a task's estimate is RE-updated (changed after it was
+        // first set). Surfaced in the Project Timesheet so a TL sees which tasks had
+        // their estimate changed. Permanent for now; a manual clear will be added later.
+        estimateChangedFlag: {
+            type: Boolean,
+            default: false,
+            required: false
+        },
         points: {
             type: Number,
             default: null,
