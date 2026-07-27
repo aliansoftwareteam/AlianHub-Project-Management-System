@@ -16,6 +16,11 @@
                     <CreateTagPopup :task="task" @send:tagChipArray="(val)=>tagChipArray = val"  @send:ids="(val)=>ids = val" :project="projectData" :isTaskList="false" />
                 </template>
             </div>
+            <!-- Tags app available on the plan but not switched on for this project: representational teaser. -->
+            <AppTeaserBlock
+                v-else-if="getAppState('tags', projectData) === 'disabled'"
+                appKey="tags" class="mb-1"
+            />
             <Description
                 v-if="checkPermission('task.task_description',projectData?.isGlobalPermission) !== null && checkApps('AI',projectData) !== undefined && checkPermission('task.task_description',projectData?.isGlobalPermission) !== undefined && Object.keys(projectData).length > 0"
                 :isShowAi="checkApps('AI',projectData) && checkPermission('task.task_description',projectData?.isGlobalPermission) == true"
@@ -44,8 +49,9 @@
                 :task="task"
                 class="mt-1"
             />
-            <div class="position-re">
-                <div v-if="checkPermission('task.task_custom_field',projectData?.isGlobalPermission) !== null && checkApps('CustomFields')">
+            <div class="position-re" v-if="checkPermission('task.task_custom_field',projectData?.isGlobalPermission) !== null">
+                <!-- App enabled for this project: existing behavior (feature, or blurred feature + upgrade overlay when the plan doesn't include it). -->
+                <div v-if="checkApps('CustomFields')">
                     <div :class="[{'pointer-event-none opacity-5 blur-3-px':!currentCompany?.planFeature?.customFields}]">
                         <CustomFieldRenderViewComponent
                             @blurUpdate="submitHandler"
@@ -67,6 +73,11 @@
                         />
                     </div>
                 </div>
+                <!-- App available on the plan but not switched on for this project: representational teaser. -->
+                <AppTeaserBlock
+                    v-else-if="getAppState('CustomFields', projectData) === 'disabled'"
+                    appKey="CustomFields"
+                />
             </div>
             <CheckListComponent 
                 v-if="checkPermission('task.task_checklist',projectData?.isGlobalPermission) !== null"
@@ -131,6 +142,7 @@ import axios from 'axios';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import taskClass from '@/utils/TaskOperations';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
+import AppTeaserBlock from '@/components/molecules/AppTeaserBlock/AppTeaserBlock.vue';
 import {storageQueryBuilder,generateFileName} from '@/utils/storageQueryBuild.js';
 import { useClipRecorder } from '@/composables/useClipRecorder';
 import { useI18n } from 'vue-i18n';
@@ -140,7 +152,7 @@ const $toast = useToast();
 const {t} = useI18n();
 const { getters,commit } = useStore();
 const { getUser } = useGetterFunctions();
-const { checkPermission, makeUniqueId, checkBucketStorage,checkApps } = useCustomComposable();
+const { checkPermission, makeUniqueId, checkBucketStorage,checkApps,getAppState } = useCustomComposable();
 const { openRecorder } = useClipRecorder();
 
 // props
