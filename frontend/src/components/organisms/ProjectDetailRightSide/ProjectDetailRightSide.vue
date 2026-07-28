@@ -131,8 +131,9 @@
                 </template>
             </div>
         </div>
-        <div class="position-re">
-            <div v-if="checkPermission('project.project_custom_field',projectData?.isGlobalPermission) !== null && checkApps('CustomFields')">
+        <div class="position-re" v-if="checkPermission('project.project_custom_field',projectData?.isGlobalPermission) !== null">
+            <!-- App enabled for this project: existing behavior (feature, or blurred feature + upgrade overlay when the plan doesn't include it). -->
+            <div v-if="checkApps('CustomFields')">
                 <div v-if="projectData" :class="[{'pointer-event-none opacity-5 blur-3-px':!currentCompany?.planFeature?.customFields}]">
                     <CustomFieldProjectDetailView
                         @blurUpdate="submitHandler"
@@ -154,6 +155,11 @@
                     />
                 </div>
             </div>
+            <!-- App available on the plan but not switched on for this project: representational teaser. -->
+            <AppTeaserBlock
+                v-else-if="getAppState('CustomFields', projectData) === 'disabled'"
+                appKey="CustomFields"
+            />
         </div>
         <ConfirmModal :modelValue="showConfirmModal" :acceptButtonText="$t('Home.Confirm')"
                     :cancelButtonText="$t('Projects.cancel')" maxlength="150" :header="false" :showCloseIcon="false" @close="showConfirmModal = false">
@@ -200,9 +206,10 @@ import { projectAssignee, projectAssigneeRemove, projectCurrency, projectDueDate
 import { useConvertDate, useCustomComposable, useGetterFunctions } from '@/composable';
 import StartEndDate from '@/components/molecules/FixMilestoneDate/FixMilestoneDate.vue';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
+import AppTeaserBlock from '@/components/molecules/AppTeaserBlock/AppTeaserBlock.vue';
 import UserProfile from '@/components/atom/UserProfile/UserProfile.vue';
 
-const { checkPermission,checkApps } = useCustomComposable();
+const { checkPermission,checkApps,getAppState } = useCustomComposable();
 const {convertDateFormat} = useConvertDate();
 
 const { t } = useI18n();

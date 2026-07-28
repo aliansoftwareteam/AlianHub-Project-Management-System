@@ -10,6 +10,7 @@ const iconPath = assetPath('logo.png')
 const trayIconPath = assetPath('traylogo.png')
 // Prod: next export copies public/ into app/. Dev: read straight from renderer/public.
 const notificationHtmlPath = isProd ? path.join(__dirname, 'notification.html') : path.join(__dirname, '..', 'renderer', 'public', 'notification.html')
+const notificationTemplateHtmlPath = isProd ? path.join(__dirname, 'notification-template.html') : path.join(__dirname, '..', 'renderer', 'public', 'notification-template.html')
 let notification = null;
 let screenshotNotificationWindow = null;
 
@@ -259,6 +260,11 @@ function verifyScreenCapturePermission() {
 
 ;(async () => {
   await app.whenReady()
+
+  // Windows shows the AppUserModelID as the notification header ("attribution").
+  // Set a friendly one so toasts read "AlianHub Time Tracker" instead of the
+  // default "electron.app.alianhubtimetracker".
+  if (process.platform === 'win32') app.setAppUserModelId('AlianHub Time Tracker')
   
   // Load saved permissions state
   loadPermissionsState()
@@ -392,7 +398,7 @@ const startActivitySampling = () => {
       // is just a heads-up that no input was detected for the threshold.
       mainWindow.webContents.send('idle:detected', { idleSeconds, thresholdSeconds: idleThresholdSec })
       try {
-        new Notification({ title: 'Alianhub Time Tracker', body: `No activity detected for ${Math.round(idleThresholdSec / 60)} min.` }).show()
+        showNotification({ title: 'No activity detected', subtitle: `You've been idle for ${Math.round(idleThresholdSec / 60)} min.` })
       } catch (e) { /* notifications are best-effort */ }
     }
     if (mouseMoved) {
@@ -424,6 +430,26 @@ ipcMain.on('stop-listen-event', () => {
   isTracking = false
   stopActivitySampling()
   mainWindow.webContents.send('tracking:status', { active: false })
+})
+
+// AHE-3831 — the renderer hit an estimate gate (no estimate set, estimate already
+// met, or a live auto-stop). Surface it via the shared notification card.
+ipcMain.on('estimate:limit', (event, data) => {
+  const d = data || {}
+  const name = d.taskName ? `"${d.taskName}"` : 'This task'
+  let title = 'Tracker reached task estimate hours limit'
+  let subtitle
+  if (d.reason === 'no-estimate') {
+    title = 'Add estimated hours to start the tracker'
+    subtitle = `${name} has no estimated hours set.`
+  } else if (d.reason === 'autostopped') {
+    subtitle = `${name} reached its estimated hours — tracking stopped.`
+  } else {
+    subtitle = `${name} has already reached its estimated hours.`
+  }
+  try {
+    showNotification({ title, subtitle })
+  } catch (e) { /* notifications are best-effort */ }
 })
 
 // TIME-05: configurable idle threshold (value in minutes; 0 disables auto-pause).
@@ -525,6 +551,82 @@ function sendNotification(dataUrl) {
     });
   });
 
+}
+
+// Common in-app notification — one shared layout (notification-template.html)
+// whose content is passed in, so any future notification can reuse it:
+//   showNotification({ title, subtitle, image, timeout })
+// Pass `image` (a data URL / path) to show a media preview; omit it for a
+// compact text-only card. The screenshot notification keeps its own file and
+// flow (sendNotification) and is intentionally left untouched.
+function showNotification({ title, subtitle = '', image = null, timeout = 10000 }) {
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  const windowWidth = 372;
+  // Best-guess starting height; the renderer measures its real laid-out content
+  // and we resize to fit (see 'notification:size' below), so content of ANY
+  // length — a 1–3 line title, with or without a media preview — is shown in
+  // full and never clipped. The card stays anchored bottom-right and grows
+  // upward, so its bottom is always above the taskbar.
+  const initialHeight = image ? 282 : 120;
+
+  const win = new BrowserWindow({
+    width: windowWidth,
+    height: initialHeight,
+    x: width - windowWidth,
+    y: height - initialHeight,
+    frame: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    transparent: true,
+    show: false,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    }
+  });
+
+  // Show only once — either after the first size report, or via the fallback.
+  let shown = false;
+  const showOnce = () => {
+    if (shown || win.isDestroyed()) return;
+    shown = true;
+    win.showInactive(); // don't steal focus from the user's current input
+  };
+
+  // Fit the window to the content the renderer actually rendered, keeping the
+  // bottom edge above the taskbar. Scoped to THIS window (event.sender check) so
+  // concurrent notifications never resize each other.
+  const sizeHandler = (event, data) => {
+    if (win.isDestroyed() || event.sender !== win.webContents) return;
+    const h = Math.max(60, Math.min(Math.round((data && data.height) || initialHeight), height - 20));
+    win.setBounds({ x: width - windowWidth, y: height - h, width: windowWidth, height: h });
+    showOnce();
+  };
+  ipcMain.on('notification:size', sizeHandler);
+
+  win.loadFile(notificationTemplateHtmlPath);
+  win.webContents.on('did-finish-load', () => {
+    win.webContents.send('logo-path', iconPath);
+    win.webContents.send('notification:render', { title, subtitle, image, timeout });
+    // Fallback: show at the initial height if no size report arrives shortly.
+    setTimeout(showOnce, 400);
+
+    const closeHandler = () => {
+      if (!win.isDestroyed()) win.close();
+    };
+    ipcMain.once('notification:close', closeHandler);
+
+    const autoCloseTimer = setTimeout(() => {
+      if (!win.isDestroyed()) win.close();
+    }, timeout);
+
+    win.once('closed', () => {
+      clearTimeout(autoCloseTimer);
+      ipcMain.removeListener('notification:close', closeHandler);
+      ipcMain.removeListener('notification:size', sizeHandler);
+    });
+  });
 }
 
 powerMonitor.on('suspend', () => {

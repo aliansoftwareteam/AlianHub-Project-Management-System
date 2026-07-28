@@ -439,7 +439,10 @@ module.exports = {
                             _id: new mongoose.Types.ObjectId(taskData._id)
                         }, {
                             $set: {
-                                ...firebaseObj
+                                ...firebaseObj,
+                                // AHE — flag the task for the TL on a RE-update (an estimate
+                                // already existed). First-time set (previous 0/undefined) never flags.
+                                ...(Number(obj.previousEstimatedTime) > 0 ? { estimateChangedFlag: true } : {})
                             }
                         },
                         {returnDocument: "after"}
@@ -478,9 +481,17 @@ module.exports = {
                             logger.error(`ERROR in notification: ${error.message}`);
                         });
                     }
+                    // AHE — a RE-update requires a reason; append it to the activity-log
+                    // message. Message renders as HTML (v-html), so escape the user text.
+                    const escapeHtml = (s) => String(s == null ? '' : s)
+                        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    const reasonText = obj.reason && String(obj.reason).trim()
+                        ? ` <b>Reason:</b> ${escapeHtml(String(obj.reason).trim())}`
+                        : '';
                     let historyObj = {
                         key: "task_total_estimate",
-                        message : `<b>${obj.userName}</b> has updated total estimated time from <b>${previousDisplayText}</b> to <b>${updatedDisplayText}</b>.`,
+                        message : `<b>${obj.userName}</b> has updated total estimated time from <b>${previousDisplayText}</b> to <b>${updatedDisplayText}</b>.${reasonText}`,
                         sprintId: taskData.sprintId
                     };
                     HandleHistory('task',projectData.CompanyId, projectData._id,taskData._id,historyObj, userData).then(async () => {});

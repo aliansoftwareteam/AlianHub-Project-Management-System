@@ -18,6 +18,7 @@ import { formatMinutes } from '../hooks/useTodayLogged'
 import { DEFAULT_TASK_IMAGE } from '../utils/imageDefaults'
 import { openTaskInWeb } from '../utils/taskWebLink'
 import { useDeepLinkStart } from '../hooks/useDeepLinkStart'
+import { fetchEstimateStatus } from '../utils/estimateLimit'
 
 export default function HomePage() {
   const router = useRouter();
@@ -297,10 +298,17 @@ export default function HomePage() {
     startTrackerWithData(selectedData);
   };
 
-  const startTrackerWithData = (selectedData) => {
+  const startTrackerWithData = async (selectedData) => {
     if (!selectedData) return;
     setIsSpinner(true);
     try {
+      // AHE-3831 — a task needs an estimate with time left to be tracked.
+      const est = await fetchEstimateStatus(currentCopany?._id, selectedData?.selectedTask?.value || "");
+      if (est.ok && est.blockStart) {
+        setIsSpinner(false);
+        try { window.ipc.send('estimate:limit', { reason: est.blockReason, taskName: (selectedData?.selectedTask?.label || '').split(' | ')[1] || '' }); } catch (e) { /* best-effort */ }
+        return;
+      }
       window.ipc.send("start-listen-event");
       let obj = {
         userId: user?._id || "",
@@ -346,7 +354,8 @@ export default function HomePage() {
             projectName: selectedData?.selectedProject?.ProjectName,
             folderName: folderName,
             sprintName: sprintName,
-            taskTypeImage: taskTypeImage
+            taskTypeImage: taskTypeImage,
+            remainingMinutes: est.hasEstimate ? est.remainingMinutes : null
           }));
           setIsSpinner(false);
           router.push('/trackerRunning')

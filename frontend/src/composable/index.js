@@ -116,6 +116,41 @@ export function useCustomComposable() {
             return null;
         }
     }
+
+    // Tri-state variant of checkApps for the representational "app not enabled"
+    // blocks. Returns:
+    //   'enabled'  — app is switched on for this project and entitled by the plan
+    //   'disabled' — entitled by the plan but not switched on for this project
+    //   'upgrade'  — not entitled by the company's subscription plan
+    // Plan gating mirrors checkApps; only the flags we have confirmed are gated,
+    // any other app is treated as always-entitled so it never shows a false
+    // upgrade state.
+    function getAppState(app = null, projectData) {
+        if(app === null) return 'disabled';
+
+        const currentCompany = computed(() => Store.getters["settings/selectedCompany"]);
+        const planFeature = currentCompany.value?.planFeature || {};
+        const planKeyByApp = {
+            Priority: 'projectProjectApp',
+            tags: 'tagProjectApp',
+            CustomFields: 'customFields',
+            AI: 'aiPermission'
+        };
+        const planKey = planKeyByApp[app];
+        if(planKey && !planFeature[planKey]) return 'upgrade';
+
+        const project = inject("selectedProject") || {};
+        const checkProject = project?.value && Object.keys(project.value || {}).length > 0 ? project.value : projectData;
+
+        let appIndex = -1;
+        if(checkProject?.apps) {
+            appIndex = checkProject.apps.findIndex((x) => x.key === app);
+            if(appIndex === -1) {
+                appIndex = checkProject.apps.findIndex((x) => x === app);
+            }
+        }
+        return appIndex !== -1 ? 'enabled' : 'disabled';
+    }
  // eslint-disable-next-line
   /* eslint-disable */
     function showCounts({project, key = "project", sprints = [], showArchived = false}){
@@ -446,6 +481,7 @@ export function useCustomComposable() {
         makeUniqueId,
         checkPermission,
         checkApps,
+        getAppState,
         showCounts,
         changeText,
         checkLink,

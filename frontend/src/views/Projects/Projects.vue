@@ -126,7 +126,22 @@
                                     </div>
                                     <img :src="publicFolder" class="vertical-middle" alt="public-folder" v-if="clientWidth > 767 && !projectData.isPrivateSpace"/>
                                 </div>
-                                <div class="list-head-mid h-100" :class="{'desktop-view' : clientWidth > 767}" id="projectview_driver">
+                            </div>
+                            <ProjectActionsBar
+                                :projectData="projectData"
+                                :clientWidth="clientWidth"
+                                :users="users"
+                                :teams="teams"
+                                @openSidebar="open"
+                                @openWatcher="openProjectWatcher = true"
+                                @changeAssignee="(type, $event) => changeAssignee(type, $event)"
+                                @openPermissionSidebar="openPermissionSidebar"
+                                @startEditName="projectName.value = projectData?.ProjectName; editProject = true"
+                                @openColorAvatar="showColorAvatar = true; assignAvatarData({id: projectData._id, name: projectData.ProjectName, icon: projectData?.projectIcon})"
+                                @archiveProject="(val) => { showSidebar = true; archive = val }"
+                            />
+                        </div>
+                        <div class="project-views-row" id="projectview_driver">
                                     <template v-if="clientWidth > 765">
                                         <div class="d-flex align-items-center overflow-x-auto view_list_scroll h-100">
                                             <ViewsList
@@ -227,21 +242,6 @@
                                         </div>
                                     </template>
                                 </div>
-                            </div>
-                            <ProjectActionsBar
-                                :projectData="projectData"
-                                :clientWidth="clientWidth"
-                                :users="users"
-                                :teams="teams"
-                                @openSidebar="open"
-                                @openWatcher="openProjectWatcher = true"
-                                @changeAssignee="(type, $event) => changeAssignee(type, $event)"
-                                @openPermissionSidebar="openPermissionSidebar"
-                                @startEditName="projectName.value = projectData?.ProjectName; editProject = true"
-                                @openColorAvatar="showColorAvatar = true; assignAvatarData({id: projectData._id, name: projectData.ProjectName, icon: projectData?.projectIcon})"
-                                @archiveProject="(val) => { showSidebar = true; archive = val }"
-                            />
-                        </div>
                         <div v-if="showLoader" class="d-flex box-shadow-6 position-fi z-index-10 right-22px bottom-22px bg-white p-10px border-radius-5-px align-items-center">
                             <div class="progress-container d-flex align-items-center position-re">
                                 <div class="progress-circle" :style="circleStyle">
@@ -270,7 +270,7 @@
                                 },
                                 {'board-veiw-main-parent': activeTab === 'ProjectKanban'}
                             ]"
-                            :style="{height: clientWidth > 767 ? 'calc(100% - 48px)' : 'calc(100% - 62px)'}"
+                            :style="{height: clientWidth > 767 ? 'calc(100% - 80px)' : 'calc(100% - 62px)'}"
                         >
                             <ProjectFiltersToolbar
                                 :activeTab="activeTab"

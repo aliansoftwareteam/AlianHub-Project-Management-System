@@ -253,6 +253,12 @@ const props = defineProps({
     companyUserDetail: {
         type: Object,
         default: () => {}
+    },
+    // Incremented by the card-header refresh icon (HomePage refreshKeys).
+    // Watched below to re-run the active load path.
+    refreshTrigger: {
+        type: Number,
+        default: 0
     }
 })
 
@@ -382,6 +388,8 @@ function applyDateRange() {
         processProjects(groupById.value, true, groupedTasks, false, true);
     }
 }
+// Header refresh icon → reload the list via the active load path.
+watch(() => props.refreshTrigger, (n, o) => { if (n !== o) applyDateRange(); });
 watch(dateRangeField, () => { if (dateRangeEnabled.value) applyDateRange(); });
 // Period dropdown change (persists to cardData.timerange) and enable/disable toggle.
 watch(timerange, () => { if (dateRangeEnabled.value) applyDateRange(); });

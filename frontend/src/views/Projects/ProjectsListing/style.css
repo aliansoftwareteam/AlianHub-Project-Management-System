@@ -13,7 +13,7 @@
 }
 
 .searchBox {
-  height: 48px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -22,6 +22,37 @@
   top: 0px;
   z-index: 1;
   /* box-shadow: 0px 2px 10px #bbb9b9; */
+}
+/* Lighter divider under the project-sidebar search header only. Scoped with the
+   compound selector so the shared global .border-bottom-serach (also used by the
+   dashboard/calendar headers) is left untouched. */
+.searchBox.border-bottom-serach {
+  border-bottom: 1px solid #e5e7eb;
+}
+/* Compact single "+ New project" dropdown button (Option A) — replaces the two
+   larger "New project" / "Create with AI" buttons to save space. */
+.project__new-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  color: #fff;
+  background: linear-gradient(90deg, #4B5DEE 0%, #F241CD 100%);
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.project__new-btn:hover {
+  filter: brightness(0.97);
+}
+.project__new-btn .project__new-caret {
+  font-size: 12px;
+  opacity: 0.9;
 }
 .project-list-title {
   font-size: 16px;
