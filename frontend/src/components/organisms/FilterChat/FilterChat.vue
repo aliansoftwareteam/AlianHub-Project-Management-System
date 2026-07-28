@@ -132,7 +132,10 @@ function hightlight(msg, wrapStart = `<b class="mentioned">`, wrapEnd = `</b>`) 
         })
     }
     if(searchText.value){
-        const regex = new RegExp(`(${searchText.value})`, 'gi');
+        // AHE-3834 — escape regex metacharacters. A search containing `(`, `[`, `*`
+        // etc. previously threw inside RegExp and silently killed the highlight.
+        const escaped = searchText.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`(${escaped})`, 'gi');
         return msg.replace(regex, '<mark>$1</mark>');
     }else{
         return msg;

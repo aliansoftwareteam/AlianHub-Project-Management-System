@@ -310,10 +310,14 @@ function checkShowMentions(selectionStart, keyCode) {
 }
 
 function handlePaste(e) {
-    const item = e.clipboardData.items[0];
+    // AHE-3834 — guard: an empty/absent clipboard payload threw on `item.kind`.
+    // Also collect ALL pasted files instead of only the first item.
+    const items = Array.from(e?.clipboardData?.items || []);
+    if(!items.length) return;
 
-    if(item.kind === "file") {
-        emit('pasteFile', [item.getAsFile()]);
+    const files = items.filter((item) => item.kind === "file").map((item) => item.getAsFile()).filter(Boolean);
+    if(files.length) {
+        emit('pasteFile', files);
     }
 }
 </script>

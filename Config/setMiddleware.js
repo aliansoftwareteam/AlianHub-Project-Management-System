@@ -195,6 +195,9 @@ const verifyJWTTokenWithCRoute = [
     // Cross-project Portfolio rollup (Modules/Portfolio, REP-01) — JWT+company;
     // prefix-matches /portfolio, /portfolio/:id, /portfolio/:id/rollup.
     '/api/v1/portfolio',
+    // Per-project Dashboard metrics (Modules/ProjectDashboard) — JWT+company so
+    // req.uid is populated for the server-side, role-based data scoping.
+    '/api/v1/project-dashboard',
     // Custom report builder (Modules/CustomReports, REP-02) — JWT+company;
     // prefix-matches /reports/custom, /reports/custom/run, /reports/custom/:id.
     '/api/v1/reports/custom',

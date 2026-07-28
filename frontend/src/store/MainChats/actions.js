@@ -27,21 +27,38 @@ export const setChats = ({ commit, rootState }, payload) => {
                     .catch((error) => {
                         reject(error);
                     })
+            } else {
+                // AHE-3834 — the fetch is skipped when the list is already cached
+                // (`from` set). Previously nothing resolved here, so any awaiting
+                // caller hung forever (e.g. the chat loading skeleton).
+                resolve(rootState.mainChat?.chats?.data?.length || []);
             }
-            rootState.settings?.socketInstance?.emit('joinChats', { projectId: payload.projectId, socketId: rootState.settings.socketInstance.id, userId: payload.userId });
+            const socketInstance = rootState.settings?.socketInstance;
+            if (socketInstance) {
+                socketInstance.emit('joinChats', { projectId: payload.projectId, socketId: socketInstance.id, userId: payload.userId });
 
-            rootState.settings?.socketInstance?.on('chatTaskInsert', (data) => {
-                commit('mutateChats', [{ snap: {}, op: "added", data: { ...data.fullDocument } }]);
-            })
-            rootState.settings?.socketInstance?.on('chatTaskUpdate', (data) => {
-                commit('mutateChats', [{ snap: {}, op: "modified", data: { ...data.fullDocument } }]);
-            })
-            rootState.settings?.socketInstance?.on('chatTaskDelete', (data) => {
-                commit('mutateChats', [{ snap: {}, op: "modified", data: { ...data } }]);
-            })
-            rootState.settings?.socketInstance?.on('chatTaskReplace', (data) => {
-                commit('mutateChats', [{ snap: {}, op: "removed", data: { ...data.fullDocument } }]);
-            })
+                // AHE-3834 — always `.off()` before `.on()`. Without this, every
+                // re-dispatch (project switch, reconnect, storeWatch) stacked another
+                // handler on the same socket, so one incoming chat event fired the
+                // mutation N times.
+                socketInstance.off('chatTaskInsert');
+                socketInstance.off('chatTaskUpdate');
+                socketInstance.off('chatTaskDelete');
+                socketInstance.off('chatTaskReplace');
+
+                socketInstance.on('chatTaskInsert', (data) => {
+                    commit('mutateChats', [{ snap: {}, op: "added", data: { ...data.fullDocument } }]);
+                })
+                socketInstance.on('chatTaskUpdate', (data) => {
+                    commit('mutateChats', [{ snap: {}, op: "modified", data: { ...data.fullDocument } }]);
+                })
+                socketInstance.on('chatTaskDelete', (data) => {
+                    commit('mutateChats', [{ snap: {}, op: "modified", data: { ...data } }]);
+                })
+                socketInstance.on('chatTaskReplace', (data) => {
+                    commit('mutateChats', [{ snap: {}, op: "removed", data: { ...data.fullDocument } }]);
+                })
+            }
         } catch (e) {
             reject(e);
         }

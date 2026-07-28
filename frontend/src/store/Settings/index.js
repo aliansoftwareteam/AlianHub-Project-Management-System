@@ -37,6 +37,7 @@ export default {
             }
         ],
         designations: [],
+        projectSkills: [],
         companyUserDetail: {},
         companyOwnerDetail: {},
         companyUsers: [],
@@ -80,6 +81,7 @@ export default {
         companyUserStatus: state => state.companyUserStatus, 
         permissions: state => state.permissions, 
         designations: state => state.designations,
+        projectSkills: state => state.projectSkills,
         companyUserDetail: state => state.companyUserDetail,
         companyOwnerDetail: state => state.companyOwnerDetail,
         companyUsers: state => state.companyUsers,

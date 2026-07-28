@@ -14,6 +14,8 @@ const { briefUpload, extractFromFile, safeUnlink, MAX_BRIEF_BYTES } = require('.
 const sseEmitter = require('./sseEmitter');
 const orchestrator = require('./orchestrator');
 const clarifier = require('./clarifier');
+const { resolveProjectSkills, getActiveSkillSlugs } = require('../settings/ProjectSkills/helper');
+const { normaliseSource, cleanProposalId, numericProposalId, validateProposalId } = require('../Project/helpers/projectSourceRules');
 const { normalizePlanColors } = orchestrator;
 
 const PLAN_TTL_SECONDS = 15 * 60;        // 15 min
@@ -115,10 +117,10 @@ async function loadActiveMembers(companyId) {
     }
 }
 
-async function callLlmForPlan({ description, additionalRequirements, briefText, members, clarifications }) {
+async function callLlmForPlan({ description, additionalRequirements, briefText, members, clarifications, availableSkills }) {
     const provider = getProvider();
     const systemPrompt = buildSystemPrompt();
-    const userMessage = buildUserMessage({ description, additionalRequirements, briefText, members, clarifications });
+    const userMessage = buildUserMessage({ description, additionalRequirements, briefText, members, clarifications, availableSkills });
     // 32000 default: large plans (30+ tasks) with 5-block descriptions
     // routinely run 15-25K output tokens. Claude Sonnet 4.5 supports 64K
     // output and gpt-5 supports 128K, so 32K is well within bounds for
@@ -202,13 +204,14 @@ async function generatePlanForJob({ jobId, uid, companyId, description, addition
     try {
         emit({ event: 'progress', phase: 'plan', step: 'context', status: 'started' });
         const members = await loadActiveMembers(companyId);
+        const availableSkills = await getActiveSkillSlugs(companyId);
         emit({ event: 'progress', phase: 'plan', step: 'context', status: 'done' });
 
         // Generate the full plan in the background; the HTTP request already
         // returned a job id, so slow LLM responses no longer trip the proxy.
         emit({ event: 'progress', phase: 'plan', step: 'ai', status: 'started' });
         const { result, tokens, model } = await callLlmForPlan({
-            description, additionalRequirements, briefText, members, clarifications,
+            description, additionalRequirements, briefText, members, clarifications, availableSkills,
         });
 
         let { plan } = result;
@@ -508,6 +511,25 @@ exports.execute = async (req, res) => {
             return sendError(res, 400, `Plan failed validation: ${issues}`);
         }
         plan = normalizePlanColors(reCheck.data);
+
+        // Applied *after* validation on purpose: `proposalId` is not in
+        // ProjectSchema, so zod strips whatever the LLM emitted and only the
+        // user's step-1 input reaches the project document.
+        if (plan && plan.project) {
+            const source = normaliseSource(req.body && req.body.source);
+            if (!source) return sendError(res, 400, 'A project source is required (upwork, fiverr or other)');
+            plan.project.source = source;
+            plan.project.proposalId = cleanProposalId(req.body && req.body.proposalId);
+            plan.project.proposalIdNumeric = numericProposalId(plan.project.proposalId);
+            const proposalCheck = validateProposalId(source, plan.project.proposalId);
+            if (!proposalCheck.valid) return sendError(res, 400, 'A proposal id is required for Upwork projects');
+            // The review step's final selection wins; fall back to the model's
+            // suggestion. Either way it is filtered against the company list.
+            const requestedSkills = req.body && Array.isArray(req.body.skills)
+                ? req.body.skills
+                : plan.project.skills;
+            plan.project.skills = await resolveProjectSkills(companyId, requestedSkills);
+        }
 
         // Re-sanitize assignee ids against the current company membership in
         // case roster changed since /plan was called. While the roster is

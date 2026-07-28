@@ -196,6 +196,14 @@ const schema = {
             type: Number,
             required: false
         },
+        // AHE — set true when a task's estimate is RE-updated (changed after it was
+        // first set). Surfaced in the Project Timesheet so a TL sees which tasks had
+        // their estimate changed. Permanent for now; a manual clear will be added later.
+        estimateChangedFlag: {
+            type: Boolean,
+            default: false,
+            required: false
+        },
         points: {
             type: Number,
             default: null,
@@ -1760,6 +1768,34 @@ const schema = {
         tagsArray:{
             type: Array,
             required: false
+        },
+        // Id of the won proposal this project came from (bidding tool
+        // `proposals.proposalId`). Free text — not validated against that DB.
+        proposalId: {
+            type: String,
+            required: false,
+            default: ''
+        },
+        // Digits-only form of `proposalId` when one can be derived. The bidding
+        // DB stores 19-digit ids, so this is what the warehouse joins on.
+        proposalIdNumeric: {
+            type: String,
+            required: false,
+            default: ''
+        },
+        // Where the work came from: 'upwork' | 'fiverr' | 'other'. Required on
+        // create; absent on projects that predate the field, which read 'other'.
+        source: {
+            type: String,
+            required: false,
+            default: 'other'
+        },
+        // Slugs from the company's `project_skills` settings list, so renames
+        // are display-only and the value joins to a bid's skills downstream.
+        skills: {
+            type: Array,
+            required: false,
+            default: []
         }
     },
     mainChats: {

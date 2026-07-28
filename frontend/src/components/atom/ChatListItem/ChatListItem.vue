@@ -79,16 +79,9 @@
 import { computed, inject, onMounted, ref, watch } from "vue";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { useStore } from "vuex";
-import { library, dom } from "@fortawesome/fontawesome-svg-core";
-import { far } from "@fortawesome/free-regular-svg-icons";
-import { fab } from "@fortawesome/free-brands-svg-icons"
-import { fas } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
-library.add(far);
-library.add(fab)
-library.add(fas);
-dom.watch();
-const icons = [...new Set([...Object.keys(far).map(key => far[key]),...Object.keys(fab).map(key => fab[key]),...Object.keys(fas).map(key => fas[key])])]
+// AHE-3834 — one-time shared FA registration (was per-row in <script setup>).
+import { ensureFaIcons, findFaIcon } from "@/utils/faIcons";
 
 // COMPONENTS
 import UserProfile from "@/components/atom/UserProfile/UserProfile.vue"
@@ -138,6 +131,11 @@ function getImage(arr = []) {
     receiver.value = getUser(receiverId);
 }
 
+// Register the FA icon packs once, at setup time — matching the timing of the
+// previous per-instance `library.add(...)` so channel icons resolve on first
+// render. Memoized, so every row after the first is a no-op.
+ensureFaIcons();
+
 onMounted(() => {
     if(props.type === 'user') {
         getImage(props?.item?.AssigneeUserId || [])
@@ -151,8 +149,7 @@ watch(() => props.item, () => {
 })
 
 function renderIcon(icon) {
-    const tmpIcon =  icons.find((x) => x.iconName === icon.iconName && x.prefix === icon.prefix);
-    return tmpIcon;
+    return findFaIcon(icon.iconName, icon.prefix);
 }
 </script>
 

@@ -32,22 +32,26 @@ export function useMainChat() {
                 if(!projectId) {
                     throw "NO project";
                 }
-                if(getters["mainChat/chats"]?.data?.length) {
-                    resolve(getters["mainChat/chats"]?.length)
-                } else {
-                    dispatch("mainChat/setChats", {
-                        projectId: projectId,
-                        companyId: companyId.value,
-                        userId: userId.value,
-                        sprintId
-                    })
-                    .then((chats) => {
-                        resolve(chats);
-                    })
-                    .catch((error) => {
-                        reject(error)
-                    })
-                }
+                const cached = getters["mainChat/chats"]?.data?.length;
+                // AHE-3834 — the socket room join + chatTask* listeners live inside
+                // setChats. Previously a cached chat list short-circuited the dispatch
+                // entirely, so leaving Chat (onUnmounted leaves the rooms) and coming
+                // back left the conversation list with NO live updates until a reload.
+                // Now we always dispatch; `from: 'storeWatch'` re-arms the socket
+                // without re-fetching the cached list.
+                dispatch("mainChat/setChats", {
+                    projectId: projectId,
+                    companyId: companyId.value,
+                    userId: userId.value,
+                    sprintId,
+                    ...(cached ? { from: 'storeWatch' } : {})
+                })
+                .then((chats) => {
+                    resolve(cached ? cached : chats);
+                })
+                .catch((error) => {
+                    reject(error)
+                })
             } catch (error) {
                 reject(error);
             }
