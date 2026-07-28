@@ -16,6 +16,26 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.19.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.18.0...v14.19.0) (2026-07-28)
+
+
+### 🚀 Features
+
+* **project-dashboard:** add role-scoped Project Dashboard view ([7cae5ef](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7cae5efa7ae87417057b0224a3d86562222ffbab))
+* **projects:** optional proposal id on projects ([#412](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/issues/412)) ([76e635e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/76e635e25ccf883fd4dfb1bc23b62207070edba8))
+* **projects:** representational "app not enabled" teaser blocks + unlock checklist ([5b8f62a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5b8f62aac8d890361caab9fbe7053c4a380f7a20))
+* **projects:** required skills on projects, managed in company settings ([cee4590](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/cee459054762c92f0a1c085088d29fcf2103231f))
+* **projects:** required source field with Upwork proposal id rules ([3386e2c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3386e2c9c69c0b3e5d4cbd18671502150532838e))
+* **tasks:** reason prompt on estimate change + TL timesheet flag ([42088ff](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/42088ff8d2c5138c9d43e83b458c8635b1da1882))
+* **tracker:** persistent alert when the tracker auto-stops ([f3d7624](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f3d7624d1e2c6ee3e92c87753dcd1bc514d5364c))
+
+
+### 🐛 Bug Fixes
+
+* **chat:** harden main-chat authorization and fix reliability/perf bugs ([3f9d4be](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3f9d4becde0c25fe8958dea3e681acad4acb87cc))
+* **projects:** center and constrain the time log tab app teaser ([e09c679](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e09c679e81dbcfa0c189bfd14782208022e0ab81))
+* **projects:** translate the AI wizard proposal id labels ([6880c0a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6880c0afbba5a4e15c717f19e29fbe4d67d733be))
+
 ## [14.18.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.17.0...v14.18.0) (2026-07-25)
 
 
