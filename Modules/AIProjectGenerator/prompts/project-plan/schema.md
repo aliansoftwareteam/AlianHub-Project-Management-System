@@ -9,6 +9,7 @@
       "description": string,                              // 1-2 sentences summarizing the project
       "projectIcon": { "emoji": string, "backgroundColor": "#RRGGBB" },
       "isPrivateSpace": boolean,                          // default false; server may override
+      "skills": [string],                                 // optional; max 15 slugs, ONLY from the company skills list given to you
 
       "projectStatusData": [
         { "name": string, "textColor": "#RRGGBB", "type": "default_active" | "active" | "close" }

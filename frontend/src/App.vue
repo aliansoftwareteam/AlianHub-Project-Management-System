@@ -345,6 +345,12 @@ async function getFirebaseData() {
                                 console.error("ERROR in set designations: ", error)
                             })
                         }
+                        if(getters['settings/projectSkills'] && !getters['settings/projectSkills'].length) {
+                            dispatch('settings/setProjectSkills', companyId.value)
+                            .catch((error) => {
+                                console.error("ERROR in set project skills: ", error)
+                            })
+                        }
                         if(getters['settings/companyUserStatus'] && !getters['settings/companyUserStatus'].length) {
                             dispatch('settings/setCompanyUserStatus', companyId.value)
                             .catch((error) => {

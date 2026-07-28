@@ -101,6 +101,7 @@ const settingsCollectionDocs = {
     COMPANY_USER_STATUS:'company_user_status',
     ROLES: 'roles',
     DESIGNATIONS: 'designations',
+    PROJECT_SKILLS: "project_skills",
     HOURLY_MILESTONE_RANGE:'hourly_milestone_range',
     HOURLY_MILESTONE_WEEKLY_RANGE:'hourly_milestone_weekly_range'
 }

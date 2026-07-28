@@ -259,6 +259,7 @@ function initializeControllers() {
     require('./Modules/settings/Category/init').init(app);
     require('./Modules/settings/Roles/init').init(app);
     require('./Modules/settings/Designation/init').init(app);
+    require('./Modules/settings/ProjectSkills/init').init(app);
     require('./Modules/settings/CompanyUserStatus/init').init(app);
     require('./Modules/settings/fileExtensions/init').init(app);
     require('./Modules/settings/commonDateFormate/init').init(app);

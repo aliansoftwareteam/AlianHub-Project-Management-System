@@ -96,6 +96,15 @@
                     @click="editProposalId()"
                 >{{projectData.proposalId ? projectData.proposalId : 'N/A'}}</span>
             </div>
+            <div class="d-flex project-right-side-label">
+                <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.skills')}}</h4>
+                <SkillsSelect
+                    class="hover__on-projectrightside"
+                    :modelValue="projectData.skills || []"
+                    :editable="canEditDetails"
+                    @update:modelValue="updateSkills"
+                />
+            </div>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_start_date',projectData?.isGlobalPermission) !== null">
                 <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.start_date')}}</h4>
                 <StartEndDate
@@ -232,6 +241,7 @@ import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPla
 import AppTeaserBlock from '@/components/molecules/AppTeaserBlock/AppTeaserBlock.vue';
 import UserProfile from '@/components/atom/UserProfile/UserProfile.vue';
 import InputText from '@/components/atom/InputText/InputText.vue';
+import SkillsSelect from '@/components/molecules/SkillsSelect/SkillsSelect.vue';
 
 const { checkPermission,checkApps,getAppState } = useCustomComposable();
 const {convertDateFormat} = useConvertDate();
@@ -272,6 +282,7 @@ const proposalIdEditable = ref(false);
 //computed
 const users = computed(() => getters["users/users"]);
 const teams = computed(() => getters["settings/teams"]);
+const projectSkills = computed(() => getters["settings/projectSkills"]);
 const currentCompany = computed(() => getters["settings/selectedCompany"]);
 const companyOwner = computed(() => { return getters["settings/companyOwnerDetail"];});
 const showCustomField = computed(() => checkPermission("project.project_custom_field", props?.projectData?.isGlobalPermission, {gettersVal: getters}));
@@ -844,6 +855,43 @@ const updateProposalId = ({value}) => {
     })
     .catch((err)=>{
         console.error(err,"Error in Project Proposal ID Update");
+        $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
+    })
+}
+
+// update the required skills of project
+const updateSkills = (slugs) => {
+    const object = {
+        updateObject : {
+            skills: slugs
+        }
+    }
+    apiRequest("put",`${env.PROJECT}/${props.projectData._id}`,object).then((res) => {
+        if(res.status === 200){
+            $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
+            const skillNames = slugs.map((slug) => {
+                const match = projectSkills.value.find((s) => s.slug === slug);
+                return match ? match.name : slug;
+            });
+            let historyObj = {
+                'message': `<b>${userData.Employee_Name}</b> has changed <b> Skills</b> as <b>${skillNames.join(', ') || 'N/A'}</b>.`,
+                'key' : 'Project_Skills',
+            }
+            apiRequest("post", env.HANDLE_HISTORY, {
+                "type": 'project',
+                "companyId": companyId.value,
+                "projectId": props.projectData._id,
+                "taskId": null,
+                "object": historyObj,
+                "userData": userData
+            })
+            commit('projectData/projectLocalUpdate', {itemData:  {...props.projectData , ...object.updateObject}});
+        }else{
+            $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
+        }
+    })
+    .catch((err)=>{
+        console.error(err,"Error in Project Skills Update");
         $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
     })
 }
