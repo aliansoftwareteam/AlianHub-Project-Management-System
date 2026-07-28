@@ -1768,6 +1768,13 @@ const schema = {
         tagsArray:{
             type: Array,
             required: false
+        },
+        // Id of the won proposal this project came from (bidding tool
+        // `proposals.proposalId`). Free text — not validated against that DB.
+        proposalId: {
+            type: String,
+            required: false,
+            default: ''
         }
     },
     mainChats: {
