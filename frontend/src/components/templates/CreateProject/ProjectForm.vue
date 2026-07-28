@@ -48,6 +48,20 @@
                 <div class="text-red" v-if="theModel.projectCode.isUniqueProjectCode !== ''">{{$t('PlaceHolder.' + theModel.projectCode.isUniqueProjectCode)}}</div>
             </div>
         </div>
+        <div class="form-group d-flex align-items-center" id="createprojectproposalid_driver">
+            <label :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}" >{{ $t('ProjectDetails.proposal_id') }}</label>
+            <div class="input-field-group">
+                <InputText
+                    class="form-control login-input"
+                    :placeHolder="$t('PlaceHolder.Enter_Proposal_Id')"
+                    autocomplete="off"
+                    v-model.trim="theModel.proposalId.value"
+                    @keyup="updateProposalId()"
+                    maxlength="100"
+                    type="text"
+                />
+            </div>
+        </div>
         <div class="form-group d-flex align-items-center" id="createprojectduedate_driver">
             <label :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}" >{{ $t('Projects.due_date') }}</label>
             <VueDatePicker class="text-capitalize" :placeholder="$t('PlaceHolder.Select_Project_Due_Date')" v-model="theModel.dueDate.value" @input="updateDueDate(event)" auto-apply  :close-on-auto-apply="true" :min-date="new Date()" :enable-time-picker="false"/>
@@ -160,6 +174,10 @@ const  { checkErrors } = useValidation();
         if(keyname == "projectKey"){
             theModel.value.projectCode.value = dataVal.toUpperCase();
         }
+        emit('update:modelValue', theModel.value)
+    }
+    // Sync the optional proposal id with the parent form model
+    const updateProposalId = () => {
         emit('update:modelValue', theModel.value)
     }
     // Regex for validate alpha numeric

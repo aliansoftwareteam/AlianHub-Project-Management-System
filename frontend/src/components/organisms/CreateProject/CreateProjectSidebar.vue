@@ -239,6 +239,12 @@ const  { checkAllFields } = useValidation();
             name: "dueDate",
             error: "",
         },
+        proposalId: {
+            value: "",
+            rules: "",
+            name: "proposal id",
+            error: "",
+        },
         projectProfileField:{
             selectedColor : {
                 value: "",
@@ -689,6 +695,7 @@ const  { checkAllFields } = useValidation();
                 'LeadUserId': Array.from(new Set([companyUser.value.userId,...formData.value.leadUser.value.map((x)=>x.id)])),
                 'DueDate': formData.value.dueDate.value !== '' ? new Date(formData.value.dueDate.value) : "",
                 ...(formData.value.dueDate.value !== '' && { 'dueDateDeadLine': [{'date': new Date(formData.value.dueDate.value) }] }),
+                'proposalId': formData.value.proposalId.value,
                 // STEP 3
                 'isPrivateSpace': formData.value.workSpaceField.privateSpaceValue.value,
                 // STEP 4

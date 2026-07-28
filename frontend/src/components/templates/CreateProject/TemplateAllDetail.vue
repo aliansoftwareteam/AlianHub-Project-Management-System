@@ -92,6 +92,7 @@ const  { checkAllFields } = useValidation();
                     'sprintsfolders': {},
                     'DueDate': formData.value.dueDate.value !== '' ? new Date(formData.value.dueDate.value) : "",
                     ...(formData.value.dueDate.value !== '' && { 'dueDateDeadLine': [{'date': new Date(formData.value.dueDate.value) }] }),
+                    'proposalId': formData.value.proposalId?.value || '',
                     'projectIcon' : proIconData.value,
                     'TemplateName':  templateViewObj.value.TemplateName ? templateViewObj.value.TemplateName : '',
                     'TemplateId' : templateViewObj.value._id ? templateViewObj.value._id : '',

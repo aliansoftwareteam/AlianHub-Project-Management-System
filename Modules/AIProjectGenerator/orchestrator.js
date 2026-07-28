@@ -531,6 +531,8 @@ function buildProjectDoc({ plan, context, companyId, uid, projectIdHint, project
         AssigneeUserId: assignees,
         DueDate: '',
         description: proj.description || '',
+        // Set by the controller from the user's input, never by the LLM.
+        proposalId: proj.proposalId || '',
         projectIcon: normalizeProjectIcon(proj.projectIcon),
         isPrivateSpace: !!proj.isPrivateSpace,
         isGlobalPermission: true,

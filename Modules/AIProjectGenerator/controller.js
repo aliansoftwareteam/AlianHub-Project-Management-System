@@ -509,6 +509,13 @@ exports.execute = async (req, res) => {
         }
         plan = normalizePlanColors(reCheck.data);
 
+        // Applied *after* validation on purpose: `proposalId` is not in
+        // ProjectSchema, so zod strips whatever the LLM emitted and only the
+        // user's step-1 input reaches the project document.
+        if (plan && plan.project) {
+            plan.project.proposalId = String((req.body && req.body.proposalId) || '').trim().slice(0, 100);
+        }
+
         // Re-sanitize assignee ids against the current company membership in
         // case roster changed since /plan was called. While the roster is
         // loaded, resolve the current user's display name from `uid` so every
