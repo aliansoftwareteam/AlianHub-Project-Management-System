@@ -15,6 +15,7 @@ const sseEmitter = require('./sseEmitter');
 const orchestrator = require('./orchestrator');
 const clarifier = require('./clarifier');
 const { resolveProjectSkills, getActiveSkillSlugs } = require('../settings/ProjectSkills/helper');
+const { normaliseSource, cleanProposalId, numericProposalId, validateProposalId } = require('../Project/helpers/projectSourceRules');
 const { normalizePlanColors } = orchestrator;
 
 const PLAN_TTL_SECONDS = 15 * 60;        // 15 min
@@ -515,7 +516,13 @@ exports.execute = async (req, res) => {
         // ProjectSchema, so zod strips whatever the LLM emitted and only the
         // user's step-1 input reaches the project document.
         if (plan && plan.project) {
-            plan.project.proposalId = String((req.body && req.body.proposalId) || '').trim().slice(0, 100);
+            const source = normaliseSource(req.body && req.body.source);
+            if (!source) return sendError(res, 400, 'A project source is required (upwork, fiverr or other)');
+            plan.project.source = source;
+            plan.project.proposalId = cleanProposalId(req.body && req.body.proposalId);
+            plan.project.proposalIdNumeric = numericProposalId(plan.project.proposalId);
+            const proposalCheck = validateProposalId(source, plan.project.proposalId);
+            if (!proposalCheck.valid) return sendError(res, 400, 'A proposal id is required for Upwork projects');
             // The review step's final selection wins; fall back to the model's
             // suggestion. Either way it is filtered against the company list.
             const requestedSkills = req.body && Array.isArray(req.body.skills)
