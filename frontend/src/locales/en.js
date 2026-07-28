@@ -2291,6 +2291,8 @@ export default {
         ai_answer_questions: "Answer a couple of quick questions so the description is accurate:",
         ai_generating: "Generating…",
         ai_failed: "Couldn't generate a description. Please try again.",
+        ai_optional: "— optional",
+        ai_proposal_id_hint: "The won proposal this project came from. Used to tie the project back to the bid it originated from.",
     },
     ScreenshotRetention: {
         heading: "Auto-delete old screenshots",

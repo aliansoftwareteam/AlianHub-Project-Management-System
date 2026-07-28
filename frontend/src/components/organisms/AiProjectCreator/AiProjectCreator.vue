@@ -94,14 +94,14 @@
                     </div>
 
                     <div class="aipg-card">
-                        <label class="aipg-field-label">Proposal ID <span class="aipg-muted">— optional</span></label>
-                        <p class="aipg-helper">The won proposal this project came from. Used to tie the project back to the bid it originated from.</p>
+                        <label class="aipg-field-label">{{ $t('ProjectDetails.proposal_id') }} <span class="aipg-muted">{{ $t('AI.ai_optional') }}</span></label>
+                        <p class="aipg-helper">{{ $t('AI.ai_proposal_id_hint') }}</p>
                         <input
                             v-model.trim="proposalId"
                             class="aipg-input"
                             type="text"
                             maxlength="100"
-                            placeholder="Enter Proposal ID"
+                            :placeholder="$t('PlaceHolder.Enter_Proposal_Id')"
                             :disabled="loading"/>
                     </div>
 
