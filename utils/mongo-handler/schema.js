@@ -1775,6 +1775,13 @@ const schema = {
             type: String,
             required: false,
             default: ''
+        },
+        // Slugs from the company's `project_skills` settings list, so renames
+        // are display-only and the value joins to a bid's skills downstream.
+        skills: {
+            type: Array,
+            required: false,
+            default: []
         }
     },
     mainChats: {

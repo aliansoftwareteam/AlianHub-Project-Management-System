@@ -89,7 +89,7 @@ export function useAiProjectGenerator() {
         });
     }
 
-    async function execute({ plan, edits, userName, isPrivateSpace, proposalId }) {
+    async function execute({ plan, edits, userName, isPrivateSpace, proposalId, skills }) {
         // We send the full plan back to the server so the flow is stateless —
         // no dependency on an in-memory cache that would be lost on a backend
         // restart. The server re-validates the plan before executing.
@@ -99,6 +99,7 @@ export function useAiProjectGenerator() {
             userName: userName || '',
             isPrivateSpace: !!isPrivateSpace,
             proposalId: proposalId || '',
+            skills: Array.isArray(skills) ? skills : [],
         });
         return res.data;
     }

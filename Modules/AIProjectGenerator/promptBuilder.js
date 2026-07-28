@@ -125,7 +125,7 @@ function buildSystemPrompt() {
  * @param {string} [args.briefText]          - Extracted text from an uploaded brief
  * @param {Array}  [args.members]            - { id, name, role } member list
  */
-function buildUserMessage({ description, additionalRequirements, briefText, members, clarifications }) {
+function buildUserMessage({ description, additionalRequirements, briefText, members, clarifications, availableSkills }) {
     const sections = [];
 
     const desc = String(description || '').trim();
@@ -155,6 +155,12 @@ function buildUserMessage({ description, additionalRequirements, briefText, memb
         }));
         sections.push(
             `Available members (use these ids exactly in AssigneeUserId / LeadUserId, otherwise leave those arrays empty):\n${JSON.stringify(slim, null, 2)}`,
+        );
+    }
+
+    if (Array.isArray(availableSkills) && availableSkills.length) {
+        sections.push(
+            `The company's project skills (pick the ones this project genuinely needs for "skills", using these exact slugs — never invent a slug, and leave the array empty if none apply):\n${JSON.stringify(availableSkills.slice(0, 120), null, 2)}`,
         );
     }
 

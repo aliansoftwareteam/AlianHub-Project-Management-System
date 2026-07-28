@@ -10,6 +10,7 @@ const { getCachedGlobalTemplateData } = require("../../utils/enterpriseHelper");
 const { removeCache } = require('../../utils/commonFunctions');
 const { updateCompanyFun } = require("../Company/controller/updateCompany");
 const projectTemplate = require("../../utils/projectTemplates.json");
+const { resolveProjectSkills } = require("../settings/ProjectSkills/helper");
 
 exports.checkProjectPlan = (req) => {
     return new Promise(async(resolve,reject) => {
@@ -407,6 +408,7 @@ exports.createProject = async (req) => {
                             }
                         }
                     }
+                    createProjectObject.skills = await resolveProjectSkills(req.body.CompanyId, createProjectObject.skills);
                     createProjectObject.DueDate = createProjectObject.DueDate ? new Date(createProjectObject.DueDate) : '';
                     createProjectObject.viewColumn = [
                         {

@@ -17,6 +17,7 @@ const {defaultCustomFields} = require("../utils/Tempates/customFields");
 const {defaultProjectTours} = require("../utils/Tempates/projectTours");
 const { addSprintFun } = require('../Modules/Sprints/controller');
 const { updateMainChat } = require('../Modules/MainChats/controller');
+const { toSlug } = require('../Modules/settings/ProjectSkills/skillRules');
 //IMPORT CURRENCY
 exports.importCurrency = (companyName) => {
     return new Promise(async(resolve, reject) => {
@@ -2663,6 +2664,54 @@ exports.importCompanyDesignations = (companyName) => {
             .then(() => {
                 resolve();
             })
+        } catch (error) {
+            reject(error);
+        }
+    });
+}
+
+/**
+ * Vendor-neutral starter skills for a new company. Slugs match the strings the
+ * central dashboard groups bids by, so per-tech reporting lines up without a
+ * mapping table. `totalStatus` is the key allocator, as in the other lists.
+ */
+exports.importProjectSkills = (companyName) => {
+    const names = [
+        'Shopify', 'Shopify App Development', 'WordPress', 'Webflow',
+        'React', 'Vue.js', 'Angular', 'Node.js', 'Laravel', 'PHP',
+        'Python', 'Django', '.NET', 'React Native', 'Flutter', 'iOS',
+        'Android', 'UI/UX Design', 'Web Design', 'Graphic Design',
+        'AI/ML', 'Data Engineering', 'DevOps', 'QA/Testing'
+    ];
+    const skills = names.map((name, index) => ({
+        key: index + 1,
+        name,
+        slug: toSlug(name),
+        active: true
+    }));
+    // $setOnInsert, not $set: this also gets run by hand to backfill older
+    // companies, and a re-run must not flatten an edited list.
+    const obj = {
+        type : SCHEMA_TYPE.SETTINGS,
+        data: [
+            {name : settingsCollectionDocs.PROJECT_SKILLS},
+            {
+                $setOnInsert: {
+                    name: settingsCollectionDocs.PROJECT_SKILLS,
+                    settings: skills,
+                    totalStatus: skills.length
+                }
+            },
+            { upsert: true }
+        ]
+    }
+    return new Promise((resolve, reject) => {
+        try {
+            MongoDbCrudOpration(companyName, obj, "findOneAndUpdate")
+            .then(() => {
+                resolve();
+            })
+            .catch((error) => reject(error));
         } catch (error) {
             reject(error);
         }

@@ -1,6 +1,7 @@
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration,validateObjectId } = require("../../../utils/mongo-handler/mongoQueries");
 const {removeCache} = require('../../../utils/commonFunctions');
+const { resolveProjectSkills } = require('../../settings/ProjectSkills/helper');
 
 exports.updateProjectInternal = async (companyId, projectId, updateObject, key, arrayFilters) => {
     return new Promise((resolve, reject) => {
@@ -94,6 +95,15 @@ exports.updateProject = async (req, res) => {
         }
         if(!companyId){
             return res.status(400).json({ message: "CompanyId is Required" });
+        }
+        // Single write path for every client, so `skills` is validated here.
+        // $addToSet/$push send a bare value that would land as a nested array
+        // and break the reporting join — reject rather than coerce.
+        if (Object.prototype.hasOwnProperty.call(updateObject, 'skills')) {
+            if (key && key !== '$set') {
+                return res.status(400).json({ message: "Skills must be sent as a full array with $set" });
+            }
+            updateObject.skills = await resolveProjectSkills(companyId, updateObject.skills);
         }
         exports.updateProjectInternal(companyId, projectId, updateObject, key, arrayFilters).then((project) => {
             return res.status(200).json(project);

@@ -93,6 +93,7 @@ const  { checkAllFields } = useValidation();
                     'DueDate': formData.value.dueDate.value !== '' ? new Date(formData.value.dueDate.value) : "",
                     ...(formData.value.dueDate.value !== '' && { 'dueDateDeadLine': [{'date': new Date(formData.value.dueDate.value) }] }),
                     'proposalId': formData.value.proposalId?.value || '',
+                    'skills': formData.value.skills?.value || [],
                     'projectIcon' : proIconData.value,
                     'TemplateName':  templateViewObj.value.TemplateName ? templateViewObj.value.TemplateName : '',
                     'TemplateId' : templateViewObj.value._id ? templateViewObj.value._id : '',

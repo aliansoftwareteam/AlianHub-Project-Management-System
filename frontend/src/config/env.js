@@ -207,6 +207,7 @@ module.exports.ACTIVITYLOG = '/api/v1/activity-log'
 module.exports.SETTING_CATEGORY = '/api/v1/setting/category';
 module.exports.SETTING_ROLES = '/api/v1/setting/roles';
 module.exports.SETTING_DESIGNATION = '/api/v1/setting/designation';
+module.exports.SETTING_PROJECT_SKILLS = '/api/v1/setting/skills';
 module.exports.SETTING_COMPANY_USER_STATUS = '/api/v1/setting/companyUserStatus';
 module.exports.FILE_EXTENSIONS = '/api/v1/fileExtensions';
 module.exports.COMMON_DATE_FORMATE = '/api/v1/commonDateFormate';

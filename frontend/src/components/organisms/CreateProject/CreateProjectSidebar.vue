@@ -245,6 +245,12 @@ const  { checkAllFields } = useValidation();
             name: "proposal id",
             error: "",
         },
+        skills: {
+            value: [],
+            rules: "",
+            name: "skills",
+            error: "",
+        },
         projectProfileField:{
             selectedColor : {
                 value: "",
@@ -696,6 +702,7 @@ const  { checkAllFields } = useValidation();
                 'DueDate': formData.value.dueDate.value !== '' ? new Date(formData.value.dueDate.value) : "",
                 ...(formData.value.dueDate.value !== '' && { 'dueDateDeadLine': [{'date': new Date(formData.value.dueDate.value) }] }),
                 'proposalId': formData.value.proposalId.value,
+                'skills': formData.value.skills.value,
                 // STEP 3
                 'isPrivateSpace': formData.value.workSpaceField.privateSpaceValue.value,
                 // STEP 4

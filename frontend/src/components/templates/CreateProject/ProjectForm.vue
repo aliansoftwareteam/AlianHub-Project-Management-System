@@ -56,10 +56,16 @@
                     :placeHolder="$t('PlaceHolder.Enter_Proposal_Id')"
                     autocomplete="off"
                     v-model.trim="theModel.proposalId.value"
-                    @keyup="updateProposalId()"
+                    @keyup="syncModel()"
                     maxlength="100"
                     type="text"
                 />
+            </div>
+        </div>
+        <div class="form-group d-flex align-items-center" id="createprojectskills_driver">
+            <label :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}" >{{ $t('ProjectDetails.skills') }}</label>
+            <div class="input-field-group">
+                <SkillsSelect v-model="theModel.skills.value" :bordered="true" :showAll="true" @changed="syncModel()"/>
             </div>
         </div>
         <div class="form-group d-flex align-items-center" id="createprojectduedate_driver">
@@ -96,6 +102,7 @@ import InputText from "@/components/atom/InputText/InputText.vue";
 import { useValidation } from "@/composable/Validation.js";
 // import DueDateCompo from "@/components/molecules/DueDateCompo/DueDateCompo.vue"
 import Assignee from '@/components/molecules/Assignee/Assignee.vue';
+import SkillsSelect from '@/components/molecules/SkillsSelect/SkillsSelect.vue';
 import VueDatePicker from '@vuepic/vue-datepicker';
 import '@vuepic/vue-datepicker/dist/main.css';
 const  { checkErrors } = useValidation();
@@ -176,8 +183,8 @@ const  { checkErrors } = useValidation();
         }
         emit('update:modelValue', theModel.value)
     }
-    // Sync the optional proposal id with the parent form model
-    const updateProposalId = () => {
+    // Push optional-field edits (proposal id, skills) to the parent form model
+    const syncModel = () => {
         emit('update:modelValue', theModel.value)
     }
     // Regex for validate alpha numeric
