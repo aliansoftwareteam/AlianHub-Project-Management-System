@@ -1,1 +1,4 @@
-npx lint-staged
+# husky puts node_modules/.bin on PATH, so call the binary directly.
+# Don't reintroduce `npx`: it resolves through the Windows PATH and exits 127
+# under nvm-for-Windows / GUI git clients even when npx exists.
+lint-staged
