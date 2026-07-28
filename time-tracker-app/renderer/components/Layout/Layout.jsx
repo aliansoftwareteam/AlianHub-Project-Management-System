@@ -122,6 +122,19 @@ const Layout = ({ children }) => {
     }
   },[])
 
+  // AHE-3835 — report the actively-tracked task to main so the "tracking stopped"
+  // alert can name it (lock/sleep) and offer one-click resume. Read-only; does
+  // not affect tracking behaviour.
+  useEffect(() => {
+    if (timeLog.trackerStart && timeLog.taskId) {
+      window.ipc.send('tracker:context', {
+        taskId: timeLog.taskId,
+        taskName: timeLog.taskName || '',
+        comment: timeLog.comment || '',
+      });
+    }
+  }, [timeLog.trackerStart, timeLog.taskId]);
+
   const replayQueue = async () => {
     const queue = await getQueue();
     for (const req of queue) {
