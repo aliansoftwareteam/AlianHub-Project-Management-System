@@ -930,6 +930,7 @@ export default {
         Calendar: "Calendar",
         Activity: "Activity",
         Workload: "Workload",
+        Dashboard: "Dashboard",
         Gantt: "Gantt",
         Table: "Table",
         Timeline: "Timeline",
@@ -1006,6 +1007,8 @@ export default {
             "A configurable dashboard of project widgets — status, priority, progress, overdue and upcoming work.",
         map_view:
             "Pin tasks onto a world map to see where your work happens — placements are saved to your browser.",
+        dashboard_view:
+            "A project overview at a glance — task totals, completion, and estimated vs remaining hours, scoped to your role.",
         list_view:
             "Use List view to organize your tasks in anyway imaginable – sort, filter, group, and customize columns.",
         kanban_view:
@@ -1034,6 +1037,29 @@ export default {
         embed_URL: "Embed URL",
         embed_HTML: "Embed HTML",
         private_view: "Private view",
+    },
+    projectDashboard: {
+        total_tasks: "Total Tasks",
+        completed_tasks: "Completed Tasks",
+        unassigned_tasks: "Unassigned Tasks",
+        completion_ratio: "Task Completion",
+        completed: "Completed",
+        remaining: "Remaining",
+        overall_completion: "Overall Completion",
+        by_effort: "By logged vs estimated hours",
+        estimate_hours: "Estimate Hours",
+        logged: "Logged",
+        failed: "Couldn't load the dashboard",
+        retry: "Retry",
+        by_person: "By Person",
+        person: "Person",
+        tasks: "Tasks",
+        estimated: "Estimated",
+        overdue: "Overdue",
+        completion: "Completion",
+        showing: "Showing",
+        click_to_filter: "Click a person to filter",
+        calc_note: "Counts include tasks and subtasks, and each task is counted once in the totals. In the By-Person breakdown a task shared by several people appears under each of them, so those rows can add up to more than the total. Unassigned tasks are grouped under \"Unassigned\". Estimated / Logged / Remaining hours roll up from parent tasks.",
     },
     Filters: {
         filter: "Filters",
