@@ -82,10 +82,19 @@ exports.updateMainChat = (companyId, chatObj) => {
 exports.setChats = async (req, res) => {
     try {
         const { findQuery } = req.body;
-        let query =  replaceObjectKey(findQuery,['objId'])
+        const parsed = replaceObjectKey(findQuery, ['objId']);
+        const clientFilter = (Array.isArray(parsed) && parsed[0] && typeof parsed[0] === 'object') ? parsed[0] : {};
+        // SEC (AHE-3834) — never run the client's query verbatim. Only ever return the
+        // CALLER's own main-chat conversations in the requested project: force
+        // mainChat + AssigneeUserId=req.uid, and keep only ProjectID + the updatedAt
+        // (tab-sync) filter from the request. Matches every legit caller; blocks
+        // reading others' DMs or dumping all tasks in the company.
+        const safeFilter = { mainChat: true, AssigneeUserId: req.uid };
+        if (clientFilter.ProjectID) safeFilter.ProjectID = clientFilter.ProjectID;
+        if (clientFilter.updatedAt) safeFilter.updatedAt = clientFilter.updatedAt;
         const setChatsObj = {
             type: SCHEMA_TYPE.TASKS,
-            data: query
+            data: [safeFilter]
         };
         // BUG-019 / #73 fix: `setChat = await ...` without a declaration
         // keyword created an implicit global. In non-strict mode that's a
