@@ -2,6 +2,7 @@ const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration,validateObjectId } = require("../../../utils/mongo-handler/mongoQueries");
 const {removeCache} = require('../../../utils/commonFunctions');
 const { resolveProjectSkills } = require('../../settings/ProjectSkills/helper');
+const { PROJECT_SOURCES, normaliseSource, sourceOrDefault, cleanProposalId, numericProposalId, validateProposalId } = require('../helpers/projectSourceRules');
 
 exports.updateProjectInternal = async (companyId, projectId, updateObject, key, arrayFilters) => {
     return new Promise((resolve, reject) => {
@@ -82,6 +83,43 @@ exports.updateProjectInternal = async (companyId, projectId, updateObject, key, 
     })
 };
 
+/**
+ * Normalise `source` / `proposalId` in place and enforce the Upwork rule against
+ * the project's *resulting* state, not just what this request carries — clearing
+ * the proposal id on an Upwork project has to fail the same way as switching to
+ * Upwork without one. Costs one read, and only when either field is touched.
+ */
+const guardSourceUpdate = async (companyId, projectId, updateObject, touchesSource, touchesProposalId) => {
+    if (touchesSource) {
+        const source = normaliseSource(updateObject.source);
+        if (!source) return { error: "Source must be one of: " + PROJECT_SOURCES.join(', ') };
+        updateObject.source = source;
+    }
+    if (touchesProposalId) {
+        updateObject.proposalId = cleanProposalId(updateObject.proposalId);
+        updateObject.proposalIdNumeric = numericProposalId(updateObject.proposalId);
+    }
+
+    // Whichever field this request doesn't carry has to come from the document.
+    let stored = null;
+    if (!touchesSource || !touchesProposalId) {
+        stored = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.PROJECTS,
+            data: [{ _id: projectId }, { source: 1, proposalId: 1 }]
+        }, 'findOne');
+    }
+
+    const effectiveSource = touchesSource ? updateObject.source : sourceOrDefault(stored && stored.source);
+    if (effectiveSource !== 'upwork') return {};
+
+    const effectiveProposalId = touchesProposalId
+        ? updateObject.proposalId
+        : cleanProposalId(stored && stored.proposalId);
+
+    const check = validateProposalId('upwork', effectiveProposalId);
+    return check.valid ? {} : { error: "A proposal id is required for Upwork projects" };
+};
+
 exports.updateProject = async (req, res) => {
     try {
         const { id: projectId } = req.params;
@@ -99,6 +137,12 @@ exports.updateProject = async (req, res) => {
         // Single write path for every client, so `skills` is validated here.
         // $addToSet/$push send a bare value that would land as a nested array
         // and break the reporting join — reject rather than coerce.
+        const touchesSource = Object.prototype.hasOwnProperty.call(updateObject, 'source');
+        const touchesProposalId = Object.prototype.hasOwnProperty.call(updateObject, 'proposalId');
+        if (touchesSource || touchesProposalId) {
+            const guard = await guardSourceUpdate(companyId, projectId, updateObject, touchesSource, touchesProposalId);
+            if (guard.error) return res.status(400).json({ message: guard.error });
+        }
         if (Object.prototype.hasOwnProperty.call(updateObject, 'skills')) {
             if (key && key !== '$set') {
                 return res.status(400).json({ message: "Skills must be sent as a full array with $set" });

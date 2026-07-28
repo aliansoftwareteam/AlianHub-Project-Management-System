@@ -1776,6 +1776,20 @@ const schema = {
             required: false,
             default: ''
         },
+        // Digits-only form of `proposalId` when one can be derived. The bidding
+        // DB stores 19-digit ids, so this is what the warehouse joins on.
+        proposalIdNumeric: {
+            type: String,
+            required: false,
+            default: ''
+        },
+        // Where the work came from: 'upwork' | 'fiverr' | 'other'. Required on
+        // create; absent on projects that predate the field, which read 'other'.
+        source: {
+            type: String,
+            required: false,
+            default: 'other'
+        },
         // Slugs from the company's `project_skills` settings list, so renames
         // are display-only and the value joins to a bid's skills downstream.
         skills: {

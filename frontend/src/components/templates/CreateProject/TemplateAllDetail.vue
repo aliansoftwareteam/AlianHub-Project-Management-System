@@ -20,6 +20,7 @@
 <script setup>
 import { useStore } from "vuex";
 import ProjectForm from '@/components/templates/CreateProject/ProjectForm.vue';
+import { checkSourceFields } from '@/utils/projectSource';
 import ProjectProfileForm from '@/components/templates/CreateProject/ProjectProfileForm.vue';
 import ProjectWorkspace from '@/components/templates/CreateProject/ProjectWorkspace.vue';
 import { ref, watch, inject, computed, nextTick } from "vue";
@@ -76,8 +77,10 @@ const  { checkAllFields } = useValidation();
         return userData;
     }
     function submitData(){
+        // Before checkAllFields so every missing field surfaces in one pass.
+        const sourceValid = checkSourceFields(formData.value, t);
         checkAllFields({projectName : formData.value.projectName,projectCode:formData.value.projectCode}).then(async (valid)=>{
-            if(valid){
+            if(valid && sourceValid){
                 isSpinner.value = true;
                 emit('update-processing', true);
                 const obj = {
@@ -94,6 +97,7 @@ const  { checkAllFields } = useValidation();
                     ...(formData.value.dueDate.value !== '' && { 'dueDateDeadLine': [{'date': new Date(formData.value.dueDate.value) }] }),
                     'proposalId': formData.value.proposalId?.value || '',
                     'skills': formData.value.skills?.value || [],
+                    'source': formData.value.source?.value || '',
                     'projectIcon' : proIconData.value,
                     'TemplateName':  templateViewObj.value.TemplateName ? templateViewObj.value.TemplateName : '',
                     'TemplateId' : templateViewObj.value._id ? templateViewObj.value._id : '',

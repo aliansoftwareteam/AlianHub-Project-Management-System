@@ -102,8 +102,17 @@
                     </div>
 
                     <div class="aipg-card">
-                        <label class="aipg-field-label">{{ $t('ProjectDetails.proposal_id') }} <span class="aipg-muted">{{ $t('AI.ai_optional') }}</span></label>
-                        <p class="aipg-helper">{{ $t('AI.ai_proposal_id_hint') }}</p>
+                        <label class="aipg-field-label">{{ $t('ProjectDetails.source') }} <span class="aipg-required">*</span></label>
+                        <div class="aipg-skills-select">
+                            <ProjectSourceSelect v-model="source"/>
+                        </div>
+
+                        <label class="aipg-field-label aipg-field-label-stacked">
+                            {{ $t('ProjectDetails.proposal_id') }}
+                            <span class="aipg-required" v-if="source === 'upwork'">*</span>
+                            <span class="aipg-muted" v-else>{{ $t('AI.ai_optional') }}</span>
+                        </label>
+                        <p class="aipg-helper">{{ source === 'upwork' ? $t('Projects.proposal_id_format_hint') : $t('AI.ai_proposal_id_hint') }}</p>
                         <input
                             v-model.trim="proposalId"
                             class="aipg-input"
@@ -370,10 +379,13 @@ import ClarifyStep from './clarify/ClarifyStep.vue';
 import { useAiProjectGenerator } from '@/composable/aiProjectGenerator';
 import { useStore } from 'vuex';
 import SkillsSelect from '@/components/molecules/SkillsSelect/SkillsSelect.vue';
+import ProjectSourceSelect from '@/components/molecules/ProjectSourceSelect/ProjectSourceSelect.vue';
+import { PROJECT_SOURCES, checkProposalId } from '@/utils/projectSource';
+import { useI18n } from 'vue-i18n';
 
 export default defineComponent({
     name: 'AiProjectCreator',
-    components: { Sidebar, ClarifyStep, SkillsSelect },
+    components: { Sidebar, ClarifyStep, SkillsSelect, ProjectSourceSelect },
     props: {
         visible: { type: Boolean, default: false },
     },
@@ -382,6 +394,7 @@ export default defineComponent({
         const clientWidth = inject('$clientWidth') || ref(window.innerWidth);
         const api = useAiProjectGenerator();
         const store = useStore();
+        const { t } = useI18n();
 
         const step = ref('input'); // input | clarify | preview | executing | done | error
         const loading = ref(false);
@@ -420,6 +433,7 @@ export default defineComponent({
         const isPrivateSpace = ref(false);
         // Sent straight to /execute — kept out of the plan so the LLM can't invent one.
         const proposalId = ref('');
+        const source = ref('');
         // Step-1 picks, merged with the model's suggestions once the plan lands.
         const skills = ref([]);
         const briefFile = ref(null);
@@ -774,6 +788,18 @@ export default defineComponent({
 
         async function onApprovePlan() {
             if (!plan.value) return;
+            // Enforced here rather than before plan generation: the AI doesn't
+            // need either value, so blocking step 1 would be friction for nothing.
+            if (!PROJECT_SOURCES.includes(source.value)) {
+                error.value = t('Projects.source_required');
+                step.value = 'input';
+                return;
+            }
+            if (checkProposalId(source.value, proposalId.value) === 'required') {
+                error.value = t('Projects.proposal_id_required_upwork');
+                step.value = 'input';
+                return;
+            }
             loading.value = true;
             error.value = '';
             try {
@@ -783,6 +809,7 @@ export default defineComponent({
                     userName: '',
                     isPrivateSpace: isPrivateSpace.value,
                     proposalId: proposalId.value,
+                    source: source.value,
                     skills: skills.value,
                 });
                 if (!result || !result.status || !result.jobId) {
@@ -891,6 +918,7 @@ export default defineComponent({
             briefUploading.value = false;
             isPrivateSpace.value = false;
             proposalId.value = '';
+            source.value = '';
             skills.value = [];
             // Reset clarify state too so re-opening the modal is a clean slate.
             clarifyLoading.value = false;
@@ -914,7 +942,7 @@ export default defineComponent({
 
         return {
             clientWidth, step, loading, briefUploading, error, rolledBack,
-            description, isPrivateSpace, proposalId, skills, briefFile, briefId, briefStats,
+            description, isPrivateSpace, proposalId, source, skills, briefFile, briefId, briefStats,
             plan, planId, editableProjectName,
             jobId, progress, createdProjectId,
             placeholderText,
@@ -1373,6 +1401,9 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
     color: #475569;
     font-size: 13px;
 }
+.aipg-required { color: #dc2626; }
+/* Second field in a shared card: separated by space, not another border. */
+.aipg-field-label-stacked { margin-top: 18px; }
 .aipg-plan-skills,
 .aipg-skills-select {
     margin-top: 10px;   /* same helper-to-control gap as .aipg-file-drop */
