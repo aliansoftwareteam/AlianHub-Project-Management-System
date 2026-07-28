@@ -179,6 +179,7 @@ function initializeControllers() {
     require('./Modules/Scim/init').init(app);
     require('./Modules/Pto/init').init(app);
     require('./Modules/Portfolio/init').init(app);
+    require('./Modules/ProjectDashboard/init').init(app);
     require('./Modules/CustomReports/init').init(app);
     require('./Modules/VarianceReport/init').init(app);
     require('./Modules/CapacityPlanning/init').init(app);

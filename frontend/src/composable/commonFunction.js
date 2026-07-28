@@ -202,6 +202,11 @@ export const projectComponentsIcons = (key) => {
             icon: require("@/assets/images/svg/component-inactive-icons/comp_map_inactive.svg"),
             activeIcon: require("@/assets/images/svg/component-active-icons/comp_map_active.svg"),
             keyName: "MapView"
+        },
+        {
+            icon: require("@/assets/images/svg/component-inactive-icons/comp_dashboard_inactive.svg"),
+            activeIcon: require("@/assets/images/svg/component-active-icons/comp_dashboard_active.svg"),
+            keyName: "ProjectDashboard"
         }
     ];
 

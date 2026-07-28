@@ -183,6 +183,7 @@ module.exports.PROJECT_STATUS_SETTING_TEMPLATE = '/api/v1/setting/projectStatus'
 module.exports.RULES = '/api/v1/securityPermissions';
 module.exports.PROJECTS_APPS = '/api/v1/projects-apps';
 module.exports.PROJECTS_TABS = '/api/v1/projectTabs';
+module.exports.PROJECT_DASHBOARD = '/api/v1/project-dashboard';
 module.exports.TIMESHEET = '/api/v1/timesheet';
 module.exports.TIMESHEET_APPROVAL = '/api/v2/timesheet-approval';
 module.exports.SSO_CONFIG = '/api/v2/sso/config';

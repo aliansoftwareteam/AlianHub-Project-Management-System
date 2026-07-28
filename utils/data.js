@@ -1823,6 +1823,14 @@ exports.importProjectTabComponents = (companyName) => {
             viewStatus: false
         },
         {
+            name: "Dashboard",
+            sortIndex: 8,
+            keyName: "ProjectDashboard",
+            value: "dashboard",
+            setAsDefault: false,
+            viewStatus: false
+        },
+        {
             name: "Table",
             sortIndex: 9,
             keyName: "TableView",
