@@ -2685,11 +2685,15 @@ exports.importCompanyDesignations = (companyName) => {
  */
 exports.importProjectSkills = (companyName) => {
     const names = [
-        'Shopify', 'Shopify App Development', 'WordPress', 'Webflow',
-        'React', 'Vue.js', 'Angular', 'Node.js', 'Laravel', 'PHP',
-        'Python', 'Django', '.NET', 'React Native', 'Flutter', 'iOS',
-        'Android', 'UI/UX Design', 'Web Design', 'Graphic Design',
-        'AI/ML', 'Data Engineering', 'DevOps', 'QA/Testing'
+        "Shopify","Shopify App Development","WordPress","Webflow",
+        "React","Vue.js","Angular","Node.js","Laravel","PHP","Python",
+        "Django",".NET","React Native","Flutter","iOS","Android",
+        "UI/UX Design","Web Design","Graphic Design","AI/ML","Data Engineering",
+        "DevOps","QA/Testing","Next.js","Nuxt.js","Electron","Payment Gateway Integration",
+        "AWS","Azure","Google Cloud","Firebase","MongoDB","MySQL","PostgreSQL","Redis",
+        "Docker","CI/CD","Headless CMS","SEO","Astro.js","JavaScript","TypeScript",
+        "Jquery","AI Integration","Monolithic Architecture","Microservices Architecture",
+        "Serverless Architecture"
     ];
     const skills = names.map((name, index) => ({
         key: index + 1,
