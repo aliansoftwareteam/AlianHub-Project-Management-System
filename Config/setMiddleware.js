@@ -167,6 +167,9 @@ const verifyJWTTokenWithCRoute = [
     // above. Safe: nothing public lives under /api/v1/ai/project (the SSE
     // stream is /api/v1/ai-progress, a different prefix).
     '/api/v1/ai/project',
+    // Talk to Text speech-to-text (Modules/AI/transcribe) — JWT + companyId so
+    // only authenticated users can spend the STT quota.
+    '/api/v1/ai/transcribe',
     // Personal API tokens (Modules/ApiTokens). app.use prefix-matching
     // covers /:id, /:id/logs and /me too. Routes were previously
     // unauthenticated (trusted body userData) — now JWT-protected; the

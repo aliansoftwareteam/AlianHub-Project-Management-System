@@ -340,9 +340,10 @@ span.font-size-12.font-weight-400 {
     background: transparent !important;
     line-height: 19.24px !important;
 }
-.cutsom-select-search {
-    display: none;
-}
+/* Removed `.cutsom-select-search { display: none }`: this stylesheet is imported
+   NON-scoped, so the rule leaked app-wide and hid the reusable Select.vue's
+   built-in search box everywhere (making its `enableSearch` prop a no-op).
+   TaskFilter doesn't use Select.vue, so the rule was dead code here. */
 .checkbox-dropdown-wrapper {
     overflow: auto;
     max-height: 210px;
