@@ -201,6 +201,7 @@
                 <div v-if="Object.keys(task || {}).length && !isMainSpinner" class="d-flex align-items-center estimated-with-ai">
                     <EstimatedTimeInput
                         :task="task"
+                        :editable="canEditEstimatedHours"
                         @update:totalEstimatedTime="(val) => updateTotalEstimatedTime(val)"
                     />
                     <!--
@@ -208,10 +209,13 @@
                       title attribute matches the project's existing tooltip
                       convention (see BulkActionBar.vue / CheckList.vue).
                       Disabled + spinner state while a request is in flight.
-                      Shown whenever the Estimated row is visible — the per-user
-                      edit-permission gate (`=== true`) was removed on request.
+                      Hidden unless the user can actually write the estimate:
+                      the old gate was `=== true`, which wrongly excluded the
+                      Own/Everyone values too and so was dropped; this uses the
+                      correct writable test instead of no test at all.
                     -->
                     <button
+                        v-if="canEditEstimatedHours"
                         type="button"
                         class="ai-estimate-btn"
                         :class="{ 'is-loading': isAiEstimateLoading }"
@@ -413,6 +417,18 @@ const isSpinner = ref(false);
 // In-flight flag for the manual AI-estimate request — drives both the
 // button's spinner state and the click-debounce.
 const isAiEstimateLoading = ref(false);
+
+// task_estimated_hours is a "selection field" permission, so its stored value
+// is null (None) | false (Read) | 1 (Own) | 2 (Everyone) | true (Read & Write).
+// Writable therefore means true/1/2 — mirroring isWritable() in
+// Config/permissionGuard.js. The plain `=== true` test used by the other rows
+// is wrong for this key because it also locks out Own/Everyone, which is why
+// the AI button's gate had previously been dropped altogether. Read (false)
+// must keep the value visible but non-editable.
+const canEditEstimatedHours = computed(() => {
+    const permission = checkPermission('task.task_estimated_hours', project.value?.isGlobalPermission);
+    return permission === true || permission === 1 || permission === 2;
+});
 watch(() => props.task,(val) => {
     taskLeaderData.value = getUser(val?.Task_Leader);
 });
@@ -819,6 +835,12 @@ const estimateReasonText = ref('');
 const estimateReasonError = ref(false);
 
 const updateTotalEstimatedTime = (value) => {
+    // Defence in depth: the input is display-only and the AI button is hidden
+    // without write access, so this should be unreachable — but never persist
+    // an estimate for a read-only (or None) permission.
+    if (!canEditEstimatedHours.value) {
+        return;
+    }
     const previous = Number(props.task.totalEstimatedTime) || 0;
     if (previous > 0 && value !== previous) {
         // Re-update — prompt for a reason before persisting.
@@ -895,6 +917,9 @@ const displayTime = (time) => {
 // the same channel that drives `props.task`.
 const generateAiEstimate = async () => {
     if (isAiEstimateLoading.value) return;
+    // The trigger is hidden without write access; this also blocks the request
+    // itself, since it writes the estimate straight through the API.
+    if (!canEditEstimatedHours.value) return;
     const taskId = props.task && props.task._id;
     if (!taskId) {
         $toast.error('Task is not available', { position: 'top-right' });
