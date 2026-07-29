@@ -19,14 +19,14 @@
                 <small v-if="clientWidth > 990">(Ctrl + K)</small>
             </template>
         </small>
-        <div class="d-flex align-items-center justify-content-between z-index-5" v-if="clientWidth > 990">
+        <div class="d-flex align-items-center justify-content-between z-index-5 header__actions" v-if="clientWidth > 990">
             <!-- COMPANY SELECTION -->
             <div class="d-flex" id="company_dropdown_driver">
             <span v-if="rules && Object.keys(rules).length" class="company-text">{{$t('settingslider.Company')}}</span>
             <template v-if="rules && Object.keys(rules).length">
                 <DropDown id="company_selection" v-if="filteredCompanies.length" class="company_name_displayed">
                     <template #button>
-                        <div class="cursor-pointer text-capitalize dropdown_wrapper pr-22px text-ellipsis" :title="selectedCompany && selectedCompany.Cst_CompanyName ? selectedCompany.Cst_CompanyName : 'N/A'" :class="{'mr-2' : clientWidth > 1440, 'mr-1' : clientWidth<=1440}">
+                        <div class="cursor-pointer text-capitalize dropdown_wrapper pr-22px text-ellipsis" :title="selectedCompany && selectedCompany.Cst_CompanyName ? selectedCompany.Cst_CompanyName : 'N/A'">
                             {{selectedCompany && selectedCompany.Cst_CompanyName ? selectedCompany.Cst_CompanyName : "N/A"}}
                         </div>
                     </template>
@@ -45,39 +45,42 @@
                         </DropDownOption>
                     </template>
                 </DropDown>
-                <div class="text-capitalize font-size-13 font-weight-500 text-ellipsis company_name_displayed" :class="{'mr-2' : clientWidth > 1440, 'mr-1' : clientWidth<=1440}" v-else :title="selectedCompany && selectedCompany.Cst_CompanyName ? selectedCompany.Cst_CompanyName : 'N/A'">
+                <div class="text-capitalize font-size-13 font-weight-500 text-ellipsis company_name_displayed" v-else :title="selectedCompany && selectedCompany.Cst_CompanyName ? selectedCompany.Cst_CompanyName : 'N/A'">
                     {{selectedCompany && selectedCompany.Cst_CompanyName ? selectedCompany.Cst_CompanyName : "N/A"}}
                 </div>
             </template>
             </div>
-            <router-link class="position-re" :class="{'mr-2' : clientWidth > 1440, 'pr-1' : clientWidth<=1440}" :to="{name: 'chats', params: {cid: companyId}}" v-if="checkPermission('chat') == true">
+            <router-link class="position-re" :to="{name: 'chats', params: {cid: companyId}}" v-if="checkPermission('chat') == true">
                 <img src="@/assets/images/svg/chat_icon.svg" class="cursor-pointer" id="chat_driver"/>
                 <span v-if="totalMainCounts" class="notification-tick blinking"></span>
             </router-link>
-            <div class="position-re" :class="{'mr-2' : clientWidth > 1440, 'mr-1' : clientWidth<=1440}" v-if="rules && Object.keys(rules).length">
+            <div class="position-re" v-if="rules && Object.keys(rules).length">
                 <img src="@/assets/images/svg/header_notification.svg" class="cursor-pointer" id="notification_driver" @click="openNotificationsDropdown()">
                 <span :class="{'notification-tick': totalNotification}" class="blinking"></span>
             </div>
-            <div class="position-re" :class="{'pr-2' : clientWidth > 1440, 'pr-1' : clientWidth<=1440}" v-if="rules && Object.keys(rules).length">
-                <img src="@/assets/images/comment_mention.png" class="cursor-pointer" id="mention_driver" @click="getMentions(!mentions.length), showNotification = 1, notificationVisible = true">
+            <div class="position-re" v-if="rules && Object.keys(rules).length">
+                <img src="@/assets/images/svg/mention_icon.svg" class="cursor-pointer" id="mention_driver" @click="getMentions(!mentions.length), showNotification = 1, notificationVisible = true">
                 <span :class="{'notification-tick': totalMentions > 0}" class="blinking"></span>
             </div>
-            <div class="position-re" :class="{'mr-2' : clientWidth > 1440, 'mr-1' : clientWidth<=1440}" v-if="rules && Object.keys(rules).length">
+            <div class="position-re" v-if="rules && Object.keys(rules).length">
                 <img src="@/assets/images/svg/notepad_icon.svg" class="cursor-pointer" id="notepad_driver" :title="$t('Notepad.title')" @click="notepadVisible = true">
             </div>
-            <div class="position-re" :class="{'mr-2' : clientWidth > 1440, 'mr-1' : clientWidth<=1440}" v-if="rules && Object.keys(rules).length">
+            <div class="position-re" v-if="rules && Object.keys(rules).length">
                 <img src="@/assets/images/svg/clips_icon.svg" class="cursor-pointer" id="clips_driver" :title="$t('Clips.title')" @click="clipsVisible = true">
             </div>
-            <div class="position-re" :class="{'pr-2' : clientWidth > 1440, 'pr-1' : clientWidth<=1440}" v-if="rules && Object.keys(rules).length && (companyUser.roleType === 1 || companyUser.roleType === 2)">
+            <div class="position-re" v-if="rules && Object.keys(rules).length">
+                <img src="@/assets/images/svg/mic_icon.svg" class="cursor-pointer" id="talk_to_text_driver" :title="$t('TalkToText.title')" @click="talkToTextVisible = true">
+            </div>
+            <div class="position-re" v-if="rules && Object.keys(rules).length && (companyUser.roleType === 1 || companyUser.roleType === 2)">
                 <img src="@/assets/images/svg/tour_image.svg" class="cursor-pointer" id="tour_icon" @click="getTourDetails(),tourVisible = true">
             </div>
-            <div :class="{'pr-2' : clientWidth > 1440, 'pr-1' : clientWidth<=1440}">
+            <div>
                 <a :href="brandSettings && brandSettings?.helpLink ? brandSettings?.helpLink : 'javascript:void(0)'" :target="brandSettings && brandSettings?.helpLink  ? '_blank' : ''" class="help__icon">
                     <img :src="questionMarkIcon" alt="help" class="question__icon">
                 </a>
             </div>
             <div id="profile_menu_driver">
-            <DropDown class="pr-1" :id="'profile_menu'">
+            <DropDown :id="'profile_menu'">
                 <template #button>
                     <div class="header-profile-wrapper" ref="profile_menu_dd">
                         <UserProfile
@@ -114,6 +117,8 @@
              router-view in App.vue) so an in-progress recording survives task
              open/close + route changes. Controlled by the useClipRecorder composable. -->
         <ClipRecorder />
+
+        <TalkToTextPopover v-model="talkToTextVisible" />
 
         <Sidebar
             title="Test"
@@ -352,6 +357,7 @@ import Sidebar from "@/components/molecules/Sidebar/Sidebar.vue";
 import NotepadPanel from "@/components/molecules/Notepad/NotepadPanel.vue";
 import ClipsPanel from "@/components/molecules/Clips/ClipsPanel.vue";
 import ClipRecorder from "@/components/molecules/ClipRecorder/ClipRecorder.vue";
+import TalkToTextPopover from "@/components/molecules/TalkToText/TalkToTextPopover.vue";
 import DropDown from "@/components/molecules/DropDown/DropDown.vue";
 import DropDownOption from "@/components/molecules/DropDownOption/DropDownOption.vue";
 import DropDownRouterOption from "@/components/molecules/DropDownRouterOption/DropDownRouterOption.vue";
@@ -456,6 +462,7 @@ const notificationVisible = ref(false);
 const tourVisible = ref(false);
 const notepadVisible = ref(false);
 const clipsVisible = ref(false);
+const talkToTextVisible = ref(false);
 const myCounts = computed(() => getters["users/myCounts"]?.data || {})
 const totalNotification = computed(() => myCounts.value?.notification_counts);
 const totalMentions = computed(() => myCounts.value?.mention_counts)
