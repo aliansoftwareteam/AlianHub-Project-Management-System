@@ -16,6 +16,18 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.20.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.19.0...v14.20.0) (2026-07-30)
+
+
+### 🚀 Features
+
+* add read-only permission level for task estimated hours ([b67118b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b67118b9399f15468c94c6dc0e1c09402867494e))
+* add read-only permission level for task estimated hours ([1c85018](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1c85018f31dc5e6deb4fe16af42f5ac4f976db0d))
+* add Talk to Text voice-to-task with uniform header icons ([cf5064f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/cf5064f7f7cb4ecaf6a14fa689efcab7d4c812e2))
+* add Talk to Text voice-to-task with uniform header icons ([3d9a981](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3d9a981f971de1e4ff11b39566f14b4ae9fa74a7))
+* **project-skills:** expand the seeded skill catalog ([956346d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/956346d1caa16648100827b6691e868dd19b64cd))
+* **skills-select:** add search filter to the skills dropdown ([d53fd03](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d53fd03bc22182b5146f496eae7d5146c07d0318))
+
 ## [14.19.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.18.0...v14.19.0) (2026-07-28)
 
 
