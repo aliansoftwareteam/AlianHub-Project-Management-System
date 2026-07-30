@@ -11,14 +11,7 @@
 
         <div class="mc-head-id">
             <span class="mc-head-name">{{ title }}</span>
-            <!-- Typing takes the subtitle's place while it lasts, the way WhatsApp does
-                 it — one line that changes, rather than a second line appearing and
-                 nudging the header taller. -->
-            <span v-if="typingLabel" class="mc-head-sub mc-typing">
-                {{ typingLabel }}
-                <i class="mc-typing-dots"><b></b><b></b><b></b></i>
-            </span>
-            <span v-else-if="subtitle" class="mc-head-sub">{{ subtitle }}</span>
+            <span v-if="subtitle" class="mc-head-sub">{{ subtitle }}</span>
         </div>
 
         <div class="mc-head-actions">
@@ -76,8 +69,6 @@ defineProps({
     icon: { type: Object, default: () => ({}) },
     // '' | 'info' | 'search' | 'pinned' — which right-hand pane the parent has open.
     activePane: { type: String, default: '' },
-    // Resolved by the parent, which knows the names; '' when nobody is typing.
-    typingLabel: { type: String, default: '' },
 });
 
 defineEmits(['search', 'info', 'pinned']);

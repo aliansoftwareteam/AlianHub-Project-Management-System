@@ -11,7 +11,6 @@
             :is-channel="isChannel"
             :icon="icon"
             :active-pane="rightPane"
-            :typing-label="typingLabel"
             @search="toggleRightPane('search')"
             @pinned="toggleRightPane('pinned')"
             @info="toggleRightPane('info')"
@@ -31,6 +30,8 @@
             :empty-title="emptyTitle"
             :unread-anchor-id="unreadAnchorId"
             :unread-count="unreadAtOpen"
+            :typing-ids="typingIds"
+            :typing-label="typingLabel"
             @load-older="loadOlder"
             @reply="replyTo = $event"
             @copy="copyMessage"
@@ -218,15 +219,18 @@ const emptyTitle = computed(() => (props.isChannel
     ? t('MainChat.empty_channel')
     : t('MainChat.empty_direct')));
 
+const typingIds = computed(() => Object.keys(typingUsers.value || {}));
+
 /**
- * "typing…" for the header.
+ * Hover text for the typing bubble. The bubble itself carries avatars rather than a
+ * sentence — this is what makes it readable to a screen reader and on hover.
  *
- * A direct message needs no name — there is only one other person, and WhatsApp shows
- * the bare verb. A channel does, because knowing WHO is about to speak is the useful
- * part; past two it becomes noise, so it collapses to a count.
+ * A direct message needs no name: there is only one other person. A channel does,
+ * because knowing WHO is about to speak is the useful part; past two it becomes noise,
+ * so it collapses to a count.
  */
 const typingLabel = computed(() => {
-    const ids = Object.keys(typingUsers.value || {});
+    const ids = typingIds.value;
     if (!ids.length) return '';
 
     if (!props.isChannel) return t('MainChat.typing');

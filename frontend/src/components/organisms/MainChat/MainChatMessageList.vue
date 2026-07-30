@@ -57,6 +57,29 @@
                     @edit="$emit('edit', $event)"
                 />
             </template>
+
+            <!--
+              Live typing, at the END of the transcript rather than in the header — it
+              belongs to the flow of the conversation, which is where every current
+              messenger puts it. Avatars identify who without a line of text; the bubble
+              is shaped like an incoming message so it reads as "about to arrive".
+            -->
+            <Transition name="mc-typing">
+                <div v-if="typingIds.length" class="mc-typing-row" :title="typingLabel">
+                    <span class="mc-typing-avs">
+                        <MainChatAvatar
+                            v-for="id in typingIds.slice(0, 3)"
+                            :key="id"
+                            :name="typerName(id)"
+                            :src="typerSrc(id)"
+                            :size="28"
+                        />
+                    </span>
+                    <span class="mc-typing-bub">
+                        <i class="mc-typing-dots"><b></b><b></b><b></b></i>
+                    </span>
+                </div>
+            </Transition>
         </template>
 
     </div>
@@ -97,6 +120,7 @@ import { useI18n } from 'vue-i18n';
 import { useStore } from 'vuex';
 import { useGetterFunctions } from '@/composable';
 import MainChatMessage from './MainChatMessage.vue';
+import MainChatAvatar from './MainChatAvatar.vue';
 import MainChatIcon from './MainChatIcon.vue';
 
 const GROUP_WINDOW = 5 * 60 * 1000; // 5 minutes
@@ -116,6 +140,10 @@ const props = defineProps({
     // sending a message, or paging in older ones, cannot make the line drift.
     unreadAnchorId: { type: String, default: '' },
     unreadCount: { type: Number, default: 0 },
+    // Ids of people currently typing, resolved to names/avatars here since this
+    // component already does that for message senders.
+    typingIds: { type: Array, default: () => [] },
+    typingLabel: { type: String, default: '' },
 });
 
 const emit = defineEmits(['load-older', 'reply', 'copy', 'remove', 'retry', 'preview', 'react', 'pin', 'mark-unread', 'edit']);
@@ -250,6 +278,26 @@ function senderName(message) {
     if (isFormerMember(user)) return t('MainChat.former_member');
     return user.Employee_Name || '';
 }
+
+function typerName(id) {
+    const user = getUser(id) || {};
+    return user.Employee_Name || '';
+}
+
+function typerSrc(id) {
+    const user = getUser(id) || {};
+    if (usersLoaded.value && user.ghostUser) return '';
+    return user.Employee_profileImageURL || '';
+}
+
+/**
+ * The bubble appears at the bottom, so it grows the content — follow it only if the
+ * reader was already there. Same contract the message watcher honours: never yank the
+ * viewport of someone reading history.
+ */
+watch(() => props.typingIds.length, (now, before) => {
+    if (now > (before || 0) && atBottom.value) nextTick(() => scrollToBottom(true));
+});
 
 function senderSrc(message) {
     const user = getUser(message.userId) || {};
