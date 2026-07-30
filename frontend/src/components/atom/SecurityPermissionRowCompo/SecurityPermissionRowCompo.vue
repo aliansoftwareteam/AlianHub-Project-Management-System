@@ -22,8 +22,22 @@
         <td v-for="(hItem, hIndex) in withoutOwnerRoles.filter((x) => x.key !== 2)" :key="hIndex">
             <div class="d-flex justify-content-around">
                 <template v-for="(permission, pIndex) in permissions">
-                    <div :style="[{'padding-left': pIndex === 0 ? '10px' : ''},{'width':'auto','margin-right': '19px'}]" v-if="item.key !== 'milestone_report' && (advancedPermissionBody.filter((x) => !item.isParent && item.parentId === x._id && x.key === 'sheet_settings').length || item.key === 'task_estimated_hours' || item.key === 'show_tasks') || (item.key === 'per_user_generate_limit' && pIndex === 2) || item.selectionField === true" :key="`${hIndex}_${permission.key}'_${bIndex}_${pIndex}`">
+                    <div class="securityPermission__equalCell" v-if="item.key !== 'milestone_report' && (advancedPermissionBody.filter((x) => !item.isParent && item.parentId === x._id && x.key === 'sheet_settings').length || item.key === 'task_estimated_hours' || item.key === 'show_tasks') || (item.key === 'per_user_generate_limit' && pIndex === 2) || item.selectionField === true" :key="`${hIndex}_${permission.key}'_${bIndex}_${pIndex}`">
                         <template v-if="pIndex === 0 && item.key !== 'per_user_generate_limit'">
+                            <input type="radio" :disabled="!planCondition || item.roles.filter((x) => x.key === hItem.key)[0].disabled" v-if="item.roles.filter((x) => x.key === hItem.key)[0].disabled"/>
+                            <input type="radio" :disabled="!planCondition || item.roles.filter((x) => x.key === hItem.key)[0].disabled" v-else @click="changeRule(permission.key, item, hItem)" :checked="item.roles.filter((x) => x.key === hItem.key).length && item.roles.filter((x) => x.key === hItem.key)[0].permission === permission.key" :name="hItem.name+bIndex+permission.key" :value="permission.key"/>
+                        </template>
+                        <template v-else-if="pIndex === 1 && item.key === 'task_estimated_hours'">
+                            <!-- Read column for Task Estimated Hours. This row previously
+                                 rendered only None (pIndex 0) and the Own/Everyone selector
+                                 (pIndex 2), leaving the Read cell empty so the level could
+                                 never be granted. The value scheme has room for it:
+                                 None = null, Read = false, Own = 1, Everyone = 2. The API
+                                 already treats false as read-only (permissionGuard.js
+                                 isWritable/isReadable) and the task detail shows the field
+                                 whenever the permission !== null, so only this radio was
+                                 missing. Gated on this key so no other selection-field
+                                 row gains a Read option. -->
                             <input type="radio" :disabled="!planCondition || item.roles.filter((x) => x.key === hItem.key)[0].disabled" v-if="item.roles.filter((x) => x.key === hItem.key)[0].disabled"/>
                             <input type="radio" :disabled="!planCondition || item.roles.filter((x) => x.key === hItem.key)[0].disabled" v-else @click="changeRule(permission.key, item, hItem)" :checked="item.roles.filter((x) => x.key === hItem.key).length && item.roles.filter((x) => x.key === hItem.key)[0].permission === permission.key" :name="hItem.name+bIndex+permission.key" :value="permission.key"/>
                         </template>
@@ -76,7 +90,7 @@
                             </template>
                         </template>
                     </div>
-                    <div v-else-if="item.key !== 'per_user_generate_limit'" :key="`${hIndex}_${permission.key}'_${bIndex}_${pIndex}`" class="mr-8px w-auto">
+                    <div v-else-if="item.key !== 'per_user_generate_limit'" :key="`${hIndex}_${permission.key}'_${bIndex}_${pIndex}`" class="securityPermission__equalCell">
                         <input type="radio" :disabled="!planCondition || item.roles.filter((x) => x.key === hItem.key)[0].disabled" v-if="item.roles.filter((x) => x.key === hItem.key)[0].disabled"/>
                         <input type="radio" :disabled="!planCondition || item.roles.filter((x) => x.key === hItem.key)[0].disabled" v-else @click="changeRule(permission.key, item, hItem)" :checked="item.roles.filter((x) => x.key === hItem.key).length && item.roles.filter((x) => x.key === hItem.key)[0].permission === permission.key" :name="hItem.name+bIndex+permission.key" :value="permission.key"/>
                     </div>

@@ -28,7 +28,9 @@
                 </div>
             </template>
             <template #options>
-                <div v-for="skill in options" :key="skill.slug"
+                <input v-if="options.length" v-model="search" type="text" class="skills-select__search font-size-13"
+                    :placeholder="$t('Projects.search')" @click.stop/>
+                <div v-for="skill in filtered" :key="skill.slug"
                     class="skills-select__option d-flex align-items-center cursor-pointer"
                     :class="{'skills-select__option--disabled': !isSelected(skill.slug) && atLimit}"
                     @click.stop="toggle(skill.slug)">
@@ -37,6 +39,7 @@
                     <span class="skills-select__option-name text-ellipsis" :title="skill.slug">{{ skill.name }}</span>
                 </div>
                 <div v-if="!options.length" class="skills-select__empty font-size-12">{{ $t('ProjectDetails.no_skills_configured') }}</div>
+                <div v-else-if="!filtered.length" class="skills-select__empty font-size-12">{{ $t('ProjectSlider.no_result_found') }}</div>
                 <div v-if="atLimit" class="skills-select__empty font-size-12">{{ $t('ProjectDetails.skills_limit', {count: maxSkills}) }}</div>
             </template>
         </DropDown>
@@ -95,6 +98,7 @@ const { getters } = useStore();
 // finalisation instead of one per skill.
 const draft = ref([...props.modelValue]);
 const isOpen = ref(false);
+const search = ref('');
 
 const sameSlugs = (a, b) => a.length === b.length && a.every((slug, i) => slug === b[i]);
 
@@ -108,6 +112,7 @@ watch(() => props.modelValue, (val) => {
 
 const onVisibilityChange = (open) => {
     isOpen.value = open;
+    search.value = '';
     if (open) {
         // Fresh snapshot, so an abandoned edit doesn't leak into the next one.
         draft.value = [...(props.modelValue || [])];
@@ -124,6 +129,13 @@ const options = computed(() => {
     const active = allSkills.value.filter((s) => s.active !== false);
     const staleTagged = allSkills.value.filter((s) => s.active === false && draft.value.includes(s.slug));
     return [...active, ...staleTagged];
+});
+
+// Matches name or slug, so pasting a slug from a report finds the skill too.
+const filtered = computed(() => {
+    const term = search.value.trim().toLowerCase();
+    if (!term) return options.value;
+    return options.value.filter((s) => `${s.name} ${s.slug}`.toLowerCase().includes(term));
 });
 
 // Slugs to display names, keeping the project's ordering. Unmatched slugs show as-is.
@@ -201,6 +213,23 @@ const toggle = (slug) => {
 .skills-select__placeholder {
     color: #818181;
     font-size: 13px;
+}
+/* Sticky so it survives scrolling the list inside the dropdown's max-height. */
+.skills-select__search {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #DFE1E6;
+    border-radius: 6px;
+    padding: 4px 8px;
+    margin-bottom: 4px;
+    background: #ffffff;
+    outline: none;
+}
+.skills-select__search:focus {
+    border-color: #2F3990;
 }
 .skills-select__option {
     gap: 8px;
