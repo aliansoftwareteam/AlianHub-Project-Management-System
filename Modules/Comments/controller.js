@@ -271,7 +271,7 @@ exports.getPaginatedMessages = async (req, res) => {
  */
 exports.searchMessageFromMainChat = async (req, res) => {
     try {
-        const { searchText, projectId, sprintId, taskId, skip = 0, limit = 25, isPinnedMessage } = req.query;
+        const { searchText, projectId, sprintId, taskId, skip = 0, limit = 25, isPinnedMessage, sort = 'asc' } = req.query;
 
         const query = {
             type: SCHEMA_TYPE.COMMENTS,
@@ -284,6 +284,12 @@ exports.searchMessageFromMainChat = async (req, res) => {
                     ...(searchText && searchText !== ''
                         ? {
                               $or: [
+                                  // mediaName is the GENERATED storage filename
+                                  // ("My_Report_1739..pdf"), so searching the name the
+                                  // user actually sees only matched by luck — spaces and
+                                  // punctuation are rewritten on upload. Search the
+                                  // original name too.
+                                  { mediaOriginalName: { $regex: escapeRegex(searchText), $options: "i" } },
                                   { mediaName: { $regex: escapeRegex(searchText), $options: "i" } },
                                   { message: { $regex: escapeRegex(searchText), $options: "i" } }
                               ]
@@ -296,7 +302,10 @@ exports.searchMessageFromMainChat = async (req, res) => {
                     isDeleted: { $ne: true }
                 },
                 {},
-                { sort: { createdAt: 1 } },
+                // Oldest-first stays the default so the existing pinned-messages /
+                // filter sidebar is unaffected; free-text search opts into
+                // newest-first, where the recent hit is the one you want.
+                { sort: { createdAt: sort === 'desc' ? -1 : 1 } },
                 { skip: parseInt(skip) },
                 { limit: parseInt(limit) }
             ]
