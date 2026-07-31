@@ -17,7 +17,12 @@ export function useMainChat() {
                         resolve(true)
                     })
                     .catch((error) => {
+                        // The projects endpoint answers 404 when a company has no
+                        // chat projects yet, so this path is reachable in normal
+                        // use. Previously it neither resolved nor rejected, so the
+                        // promise hung forever and every awaiting caller stalled.
                         console.error("ERROR in set project chat:", error);
+                        reject(error);
                     })
                 }
             } catch (error) {

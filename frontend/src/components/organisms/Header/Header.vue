@@ -50,7 +50,7 @@
                 </div>
             </template>
             </div>
-            <router-link class="position-re" :to="{name: 'chats', params: {cid: companyId}}" v-if="checkPermission('chat') == true">
+            <router-link class="position-re" :to="{name: 'chats', params: {cid: companyId}}" v-if="canOpenChat">
                 <img src="@/assets/images/svg/chat_icon.svg" class="cursor-pointer" id="chat_driver"/>
                 <span v-if="totalMainCounts" class="notification-tick blinking"></span>
             </router-link>
@@ -217,7 +217,7 @@
                                 </DropDown>
                             </div>
                         </template>
-                        <router-link  v-if="rules && Object.keys(rules).length && checkPermission('chat') == true" class="p-1 cursor-pointer border-radius-7-px mobile-menu-list" @click="visible = false" :class="{'active-list-mobile' : $route.name.includes('chat')}" :to="{name: 'chats', params: {cid: companyId}}">
+                        <router-link  v-if="canOpenChat" class="p-1 cursor-pointer border-radius-7-px mobile-menu-list" @click="visible = false" :class="{'active-list-mobile' : $route.name.includes('chat')}" :to="{name: 'chats', params: {cid: companyId}}">
                             {{$t('Header.Chat')}}
                         </router-link>
                         <div  v-if="rules && Object.keys(rules).length" class="p-1 cursor-pointer border-radius-7-px mobile-menu-list" @click="openNotificationsDropdown(true)">
@@ -542,6 +542,27 @@ watchEffect(async () => {
 })
 const rules = computed(() => {
     return getters['settings/rules']
+})
+
+/**
+ * May this user open the Chat module?
+ *
+ * `checkPermission('chat')` reads the PARENT "Chat" row — the module gate. The finer
+ * keys (one_to_one_chat, chat_category, chat_channel) govern what you can do once
+ * inside, not whether you get in.
+ *
+ * The old test was `== true`, i.e. Read & Write only, so a role granted **Read** on
+ * Chat had the icon hidden and no way into a module it was explicitly allowed to
+ * read. Only None hides it now. Owner/Admin still short-circuit to true inside
+ * checkPermission.
+ *
+ * The `rules` guard matches every other icon in this row: before the rule set loads
+ * checkPermission returns null for everyone, so without it the icon flickers in.
+ */
+const canOpenChat = computed(() => {
+    if (!rules.value || !Object.keys(rules.value).length) return false;
+    const permission = checkPermission('chat');
+    return permission !== null && permission !== undefined;
 })
 
 const logout = () => {

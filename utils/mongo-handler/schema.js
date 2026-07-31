@@ -188,6 +188,21 @@ const schema = {
             type: String,
             required: false
         },
+        // Marks this task as a one-to-one main-chat conversation (a task in the
+        // hidden `default` chat project) rather than a normal task.
+        //
+        // This schema is built with `strict: true` (P1-SEC-11, see
+        // createSchema.js), so an UNDECLARED field is silently dropped on save.
+        // `mainChat` was set by the chat creator but never declared here, so it
+        // never persisted — and the one-to-one list filters on exactly this flag
+        // (`{ mainChat: true, AssigneeUserId }` in Modules/MainChats/controller.js
+        // setChats). The conversation therefore worked in-session but vanished
+        // from the list on reload. Channels were unaffected because they are
+        // sprints, not tasks. Declaring it makes the flag stick.
+        mainChat: {
+            type: Boolean,
+            required: false
+        },
         totalEstimatedTime:{
             type: Number,
             required: false
