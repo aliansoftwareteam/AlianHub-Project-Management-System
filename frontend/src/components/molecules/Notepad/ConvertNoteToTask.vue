@@ -53,6 +53,10 @@ import { useGetterFunctions } from "@/composable";
 import { taskPlanPermission } from "@/composable/commonFunction";
 import { deriveTaskName } from "@/utils/notepadConvert";
 
+// Must match the editor the task description is rendered with
+// (frontend/package.json → @editorjs/editorjs).
+const EDITORJS_VERSION = "2.30.7";
+
 const { t } = useI18n();
 const $toast = useToast();
 const { getters, dispatch } = useStore();
@@ -206,6 +210,21 @@ function convert() {
             };
             if (sprint.folderId) {
                 obj.folderObjId = sprint.folderId;
+            }
+
+            // Carry the note's body across as the task description. Editor.js is
+            // the task description format (descriptionBlock), with rawDescription
+            // as the plain-text mirror used by search and previews — same shape
+            // the AI generator writes (Modules/AIProjectGenerator/orchestrator.js).
+            const noteBody = props.note && typeof props.note.content === "string" ? props.note.content : "";
+            const bodyLines = noteBody.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+            if (bodyLines.length) {
+                obj.descriptionBlock = {
+                    time: Date.now(),
+                    version: EDITORJS_VERSION,
+                    blocks: bodyLines.map((text) => ({ type: "paragraph", data: { text } })),
+                };
+                obj.rawDescription = bodyLines.join("\n");
             }
 
             const projectData = {
