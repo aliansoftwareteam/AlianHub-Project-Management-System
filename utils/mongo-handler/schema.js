@@ -509,6 +509,9 @@ const schema = {
         size: { type: Number, required: false },
         durationSec: { type: Number, required: false },
         source: { type: String, required: false },
+        // Stamped by the client after a clip has been turned into a task through
+        // the existing task-create flow, mirroring notes.convertedTaskId.
+        convertedTaskId: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0 },
     },
     // Timesheet approval submissions — one per user per period (week/month) — managed by Modules/TimesheetApproval

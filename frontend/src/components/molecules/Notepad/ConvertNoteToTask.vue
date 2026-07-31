@@ -2,7 +2,7 @@
     <div class="convert__overlay" @click.self="close">
         <div class="convert__dialog">
             <div class="d-flex align-items-center justify-content-between convert__head">
-                <span class="font-size-15 font-weight-700">{{ $t('Notepad.convert_title') }}</span>
+                <span class="font-size-15 font-weight-700">{{ dialogTitle || $t('Notepad.convert_title') }}</span>
                 <span class="cursor-pointer font-size-16 convert__close" @click="close">&#10005;</span>
             </div>
 
@@ -67,9 +67,22 @@ const companyId = inject("$companyId");
 const userId = inject("$userId");
 
 const props = defineProps({
+    // Source object. Only `title` and `content` are read, so any feature that can
+    // supply those can reuse this dialog (Clips passes a clip this way).
     note: {
         type: Object,
         required: true,
+    },
+    // Heading override, so the dialog can read "Convert clip to task" etc.
+    dialogTitle: {
+        type: String,
+        default: "",
+    },
+    // Optional task-attachment record to attach to the created task — used by
+    // Clips so the recording is playable from the task itself.
+    attachment: {
+        type: Object,
+        default: null,
     },
 });
 
@@ -225,6 +238,13 @@ function convert() {
                     blocks: bodyLines.map((text) => ({ type: "paragraph", data: { text } })),
                 };
                 obj.rawDescription = bodyLines.join("\n");
+            }
+
+            // Carry a media attachment across when one was supplied (Clips), so the
+            // recording is playable from the task without re-uploading anything —
+            // the file already lives in storage.
+            if (props.attachment && props.attachment.url) {
+                obj.attachments = [{ ...props.attachment }];
             }
 
             const projectData = {
