@@ -256,6 +256,28 @@
     background: #E3F3EC;
     color: #166B4E;
 }
+.grp__for {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 7px;
+    background: #EAEEFF;
+    color: #2F3990;
+    border-radius: 999px;
+    font-weight: 500;
+}
+.grp__pending {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 7px;
+    background: #FBF0DC;
+    color: #8A5A0B;
+    border-radius: 999px;
+}
+/* Read-only checkbox in the "Assigned by me" view — shows state, not clickable. */
+.grp__check--static {
+    cursor: default;
+    opacity: 0.75;
+}
 
 /* Row menu */
 .grp__menubtn {

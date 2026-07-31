@@ -13,20 +13,27 @@ const socketEmitter = require('../../event/socketEventEmitter');
 
 const handleReminderChange = (changeData) => {
     if (!changeData || changeData.module !== 'generalReminder') return;
-    const ownerId = changeData.data && changeData.data.userId;
+    const doc = changeData.data || {};
+    const ownerId = doc.userId;
     if (!ownerId) return;
 
-    const identifier = `generalReminder_${ownerId}`;
-    // O(1) prefix lookup into the room index.
-    const relatedRooms = findRoomsByPrefix(identifier);
-    if (!relatedRooms.length) return;
+    // Notify the recipient, and — when the reminder was raised for someone else
+    // — the author too, so their "Assigned by me" list stays live.
+    const targets = new Set([String(ownerId)]);
+    if (doc.createdBy && String(doc.createdBy) !== String(ownerId)) {
+        targets.add(String(doc.createdBy));
+    }
 
-    const emitData = { type: changeData.type, fullDocument: changeData.data };
+    const emitData = { type: changeData.type, fullDocument: doc };
 
-    relatedRooms.forEach((data) => {
-        // The socket may have left between index write and emit.
-        if (!data.socket.rooms.has(data.roomName)) return;
-        data.namespace.to(data.roomName).emit('generalReminderUpdate', emitData);
+    targets.forEach((uid) => {
+        // O(1) prefix lookup into the room index.
+        const relatedRooms = findRoomsByPrefix(`generalReminder_${uid}`);
+        relatedRooms.forEach((data) => {
+            // The socket may have left between index write and emit.
+            if (!data.socket.rooms.has(data.roomName)) return;
+            data.namespace.to(data.roomName).emit('generalReminderUpdate', emitData);
+        });
     });
 };
 

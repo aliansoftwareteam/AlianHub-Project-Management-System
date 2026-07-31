@@ -39,6 +39,7 @@
                     :class="{ 'is-done': item.isDone, 'is-overdue': isOverdue(item) }"
                 >
                     <button
+                        v-if="!isAssignedView"
                         type="button"
                         class="grp__check cursor-pointer"
                         :class="{ 'is-on': item.isDone }"
@@ -47,6 +48,9 @@
                     >
                         <svg v-if="item.isDone" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
                     </button>
+                    <span v-else class="grp__check grp__check--static" :class="{ 'is-on': item.isDone }" aria-hidden="true">
+                        <svg v-if="item.isDone" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
+                    </span>
 
                     <div class="grp__main">
                         <div class="grp__itemtitle" :title="item.title">{{ item.title }}</div>
@@ -57,7 +61,9 @@
                                 {{ formatWhen(item.remindAt) }}
                             </span>
                             <span v-if="notifyText(item)" class="grp__notify">{{ notifyText(item) }}</span>
+                            <span v-if="isAssignedView" class="grp__for">{{ $t('Reminders.for_user', { name: recipientName(item) }) }}</span>
                             <span v-if="item.fired" class="grp__fired">{{ $t('Reminders.sent') }}</span>
+                            <span v-else-if="isAssignedView" class="grp__pending">{{ $t('Reminders.pending') }}</span>
                         </div>
 
                         <!-- Attachments — each opens via a freshly signed storage URL. -->
@@ -77,7 +83,7 @@
                         </div>
                     </div>
 
-                    <button type="button" class="grp__menubtn cursor-pointer" :title="$t('Reminders.options')" @click.stop="toggleMenu(item, $event)">
+                    <button v-if="!isAssignedView" type="button" class="grp__menubtn cursor-pointer" :title="$t('Reminders.options')" @click.stop="toggleMenu(item, $event)">
                         <img :src="horizontalDots" alt="options" class="vertical-middle">
                     </button>
 
@@ -145,7 +151,20 @@ const filters = computed(() => ([
     { value: 'upcoming', label: t('Reminders.filter_upcoming') },
     { value: 'done', label: t('Reminders.filter_done') },
     { value: 'all', label: t('Reminders.filter_all') },
+    { value: 'assigned', label: t('Reminders.filter_assigned') },
 ]));
+
+// In the "Assigned by me" view the rows belong to someone else, so every
+// mutation (complete / edit / delete / snooze) is owner-scoped on the API and
+// would silently no-op. Render those rows read-only instead of offering
+// controls that don't work.
+const isAssignedView = computed(() => filter.value === 'assigned');
+
+const allUsers = computed(() => store.getters['users/users'] || []);
+function recipientName(item) {
+    const u = allUsers.value.find((x) => String(x._id) === String(item.userId));
+    return (u && u.Employee_Name) || t('Reminders.another_user');
+}
 
 function close() {
     emit('update:modelValue', false);
@@ -344,6 +363,13 @@ let joinedSocket = null;
 
 function matchesFilter(item) {
     if (!item || Number(item.deletedStatusKey) === 1) return false;
+    const me = String(userId?.value || userId || '');
+    if (filter.value === 'assigned') {
+        // Only what I raised for somebody else.
+        return String(item.createdBy) === me && String(item.userId) !== me;
+    }
+    // Every other view is "my own" reminders.
+    if (String(item.userId) !== me) return false;
     if (filter.value === 'upcoming') return !item.isDone;
     if (filter.value === 'done') return !!item.isDone;
     return true;

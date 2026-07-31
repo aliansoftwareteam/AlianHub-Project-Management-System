@@ -111,9 +111,15 @@ exports.listMine = async (req, res) => {
         if (!companyId || !userId) {
             return res.send({ status: false, statusText: 'companyId and userId are required' });
         }
-        const query = { userId: String(userId), deletedStatusKey: 0 };
-        if (req.query && req.query.filter === 'upcoming') query.isDone = false;
-        if (req.query && req.query.filter === 'done') query.isDone = true;
+        const filter = (req.query && req.query.filter) || '';
+        // "assigned" = reminders this user raised FOR SOMEBODY ELSE. Without it
+        // a reminder created for a teammate disappears from the author's view
+        // entirely, with no way to confirm it was created or delivered.
+        const query = filter === 'assigned'
+            ? { createdBy: String(userId), userId: { $ne: String(userId) }, deletedStatusKey: 0 }
+            : { userId: String(userId), deletedStatusKey: 0 };
+        if (filter === 'upcoming') query.isDone = false;
+        if (filter === 'done') query.isDone = true;
         const reminders = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.GENERAL_REMINDERS,
             data: [query, null, { sort: { remindAt: 1 } }],
