@@ -69,6 +69,9 @@
                 <img src="@/assets/images/svg/clips_icon.svg" class="cursor-pointer" id="clips_driver" :title="$t('Clips.title')" @click="clipsVisible = true">
             </div>
             <div class="position-re" v-if="rules && Object.keys(rules).length">
+                <img src="@/assets/images/svg/reminder_icon.svg" class="cursor-pointer" id="reminder_driver" :title="$t('Reminders.header_tooltip')" @click="reminderVisible = true">
+            </div>
+            <div class="position-re" v-if="rules && Object.keys(rules).length">
                 <img src="@/assets/images/svg/mic_icon.svg" class="cursor-pointer" id="talk_to_text_driver" :title="$t('TalkToText.title')" @click="talkToTextVisible = true">
             </div>
             <div class="position-re" v-if="rules && Object.keys(rules).length && (companyUser.roleType === 1 || companyUser.roleType === 2)">
@@ -112,6 +115,8 @@
         <NotepadPanel v-model="notepadVisible" />
 
         <ClipsPanel v-model="clipsVisible" />
+
+        <ReminderPanel v-model="reminderVisible" />
 
         <!-- Single GLOBAL clip recorder: mounted here at the app shell (sibling of
              router-view in App.vue) so an in-progress recording survives task
@@ -356,6 +361,7 @@ import WasabiIamgeCompp from "@/components/atom/WasabiIamgeCompp/WasabiIamgeComp
 import Sidebar from "@/components/molecules/Sidebar/Sidebar.vue";
 import NotepadPanel from "@/components/molecules/Notepad/NotepadPanel.vue";
 import ClipsPanel from "@/components/molecules/Clips/ClipsPanel.vue";
+import ReminderPanel from "@/components/molecules/GeneralReminder/ReminderPanel.vue";
 import ClipRecorder from "@/components/molecules/ClipRecorder/ClipRecorder.vue";
 import TalkToTextPopover from "@/components/molecules/TalkToText/TalkToTextPopover.vue";
 import DropDown from "@/components/molecules/DropDown/DropDown.vue";
@@ -462,6 +468,7 @@ const notificationVisible = ref(false);
 const tourVisible = ref(false);
 const notepadVisible = ref(false);
 const clipsVisible = ref(false);
+const reminderVisible = ref(false);
 const talkToTextVisible = ref(false);
 const myCounts = computed(() => getters["users/myCounts"]?.data || {})
 const totalNotification = computed(() => myCounts.value?.notification_counts);

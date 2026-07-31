@@ -21,7 +21,6 @@
                 :sprint="sprints[0]"
                 @cancel="createTask = false"
                 :assigneeOptions="project.AssigneeUserId"
-                :addDefaultAssignee="project?._id === '6571e7195470e64b1203295c'"
                 :groupBy="grouped"
             />
         </div>
