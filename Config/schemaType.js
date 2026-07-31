@@ -71,6 +71,8 @@ const SCHEMA_TYPE = {
     RECURRING_TASKS: "recurring_tasks",
     REMINDERS: "reminders",
     NOTES: "notes",
+    GENERAL_REMINDERS: "general_reminders",
+    GENERAL_REMINDER_QUEUE: "general_reminder_queue",
     CLIPS: "clips",
     TIMESHEET_APPROVAL: "timesheet_approval",
     BILLING_RATES: "billing_rates",

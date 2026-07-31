@@ -141,6 +141,9 @@ module.exports.GET_BUCKET_SIZE = '/api/v1/getBucketSize';
 //FILES ROUTES
 module.exports.REMOVE_FILE = '/api/v1/storage/removeFile';
 module.exports.GET_SIGNED_OR_PUBLIC_URL = '/api/v1/generateSignedUrl';
+// General-purpose (standalone) reminders — Modules/GeneralReminders. Distinct
+// from the task-scoped reminder flow at /api/v1/reminders.
+module.exports.GENERAL_REMINDERS = '/api/v1/general-reminders';
 module.exports.UPLOAD_FILE = '/api/v1/storage/uploadFile';
 module.exports.UPLOAD_FILE_64 = '/api/v1/storage/uploadFileBase64';
 module.exports.GETPROMPTS = '/api/v1/getPrompts';

@@ -426,6 +426,47 @@ const schema = {
         createdBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0 },
     },
+    // Due-index for general reminders, stored in the GLOBAL database.
+    //
+    // Reminders themselves live in per-company databases, so finding what is due
+    // would otherwise mean opening a connection to EVERY company every minute —
+    // which pins one live connection per tenant and never lets them idle out.
+    // This index holds one tiny pointer row per pending reminder, so the
+    // scheduler reads the global DB once and only connects to the companies that
+    // actually have work. Rows are removed when a reminder fires, completes or
+    // is deleted. It is a derived cache: it can be rebuilt from the per-company
+    // collections and never holds reminder content.
+    general_reminder_queue: {
+        companyId: { type: String, required: true },
+        reminderId: { type: String, required: true },
+        notifyAt: { type: Date, required: true },
+    },
+    // Standalone, general-purpose reminders — the header "Reminder" dialog.
+    // Deliberately a separate collection from `reminders` above (which is the
+    // task-scoped "Remind me" flow) because these are not tied to a task and
+    // carry their own title, description, notify lead-time, attachments and
+    // recipient. Managed by Modules/GeneralReminders.
+    general_reminders: {
+        title: { type: String, required: true },
+        description: { type: String, required: false },
+        // Who the reminder is for ("For me" = the creator).
+        userId: { type: String, required: true },
+        createdBy: { type: String, required: false },
+        companyId: { type: String, required: false },
+        remindAt: { type: Date, required: true },
+        // Lead time in minutes before remindAt. 0 = on due date, -1 = don't notify.
+        notifyBefore: { type: Number, default: 0 },
+        // Denormalised firing moment (remindAt - notifyBefore) so the cron can use
+        // a single indexed range query.
+        notifyAt: { type: Date, required: false },
+        // [{ name, url, extension, size }]
+        attachments: { type: Array, default: [] },
+        fired: { type: Boolean, default: false },
+        firedAt: { type: Date, required: false },
+        isDone: { type: Boolean, default: false },
+        completedAt: { type: Date, required: false },
+        deletedStatusKey: { type: Number, default: 0 },
+    },
     // Personal notepad (COLLAB-06) — quick per-user notes, convertible to tasks.
     // Managed by Modules/Notes. convertedTaskId is stamped (frontend) once a note
     // has been turned into a task via the existing task-create flow.
