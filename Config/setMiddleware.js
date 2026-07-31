@@ -125,6 +125,7 @@ const verifyJWTTokenWithCRoute = [
     '/api/v1/comments',
     '/api/v1/main-chats',
     '/api/v1/notes',
+    '/api/v1/general-reminders',
     '/api/v1/app-notification',
     '/api/v1/activity-log',
     '/api/v1/setting/category',
