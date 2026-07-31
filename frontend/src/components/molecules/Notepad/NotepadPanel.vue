@@ -1,57 +1,146 @@
+<!--
+    Notepad — anchored popover with a two-level flow, modelled on ClickUp:
+
+      list view   : searchable note rows (title + one-line preview) with hover
+                    actions, an overflow menu (show archived / sort) and a
+                    "+ New note" footer.
+      detail view : the note's own editor, reached by clicking a row, with a
+                    back arrow in the header.
+
+    Replaces the previous full-height sidebar.
+-->
 <template>
-    <div v-if="modelValue" class="notepad__overlay" @click.self="close">
-        <div class="notepad__panel" @click="openMenuId = null">
-            <div class="notepad__head">
-                <span class="notepad__title">{{ $t('Notepad.title') }}</span>
-                <div class="notepad__head-actions">
-                    <button class="notepad__add" :disabled="isBusy" @click="addNote">+ {{ $t('Notepad.add') }}</button>
-                    <button class="notepad__close" @click="close" aria-label="Close">&#10005;</button>
+    <div v-if="modelValue" class="np__overlay" @click.self="close">
+        <div class="np__pop" @click="closeRowMenu">
+            <!-- ── Header ─────────────────────────────────────────────── -->
+            <div class="np__head">
+                <button v-if="openNote" type="button" class="np__hbtn" :title="$t('Notepad.back')" @click.stop="closeNote">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+                </button>
+                <!-- In the detail view the header title IS the note's title field,
+                     editable in place — there is no separate title input below. -->
+                <input
+                    v-if="openNote"
+                    ref="titleInput"
+                    v-model="openNote.title"
+                    class="np__htitleinput"
+                    :placeholder="$t('Notepad.title_placeholder')"
+                    :maxlength="250"
+                    @input="scheduleSave(openNote)"
+                    @blur="saveNow(openNote)"
+                    @keyup.enter="focusBody"
+                />
+                <span v-else class="np__htitle">{{ $t('Notepad.title') }}</span>
+
+                <button v-if="!openNote" type="button" class="np__hbtn" :class="{ 'is-on': showSearch }" :title="$t('Notepad.search')" @click.stop="toggleSearch">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+                </button>
+                <div class="np__hmenuwrap">
+                    <button type="button" class="np__hbtn" :title="$t('Notepad.options')" @click.stop="showHeadMenu = !showHeadMenu">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg>
+                    </button>
+                    <div v-if="showHeadMenu" class="np__hmenu" @click.stop>
+                        <button type="button" class="np__hmitem" @click="toggleArchivedView">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"></rect><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"></path></svg>
+                            {{ viewArchived ? $t('Notepad.show_active') : $t('Notepad.show_archived') }}
+                        </button>
+                        <div class="np__hmitem np__hmitem--static">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 15l5 5 5-5M7 9l5-5 5 5"></path></svg>
+                            <span class="np__hmlabel">{{ $t('Notepad.sort_recent') }}</span>
+                            <button type="button" class="np__switch" :class="{ 'is-on': sortRecent }" :aria-pressed="sortRecent" @click.stop="sortRecent = !sortRecent">
+                                <span class="np__knob"></span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
+                <button type="button" class="np__hbtn" :title="$t('Reminders.close')" @click.stop="close">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+                </button>
             </div>
 
-            <p class="notepad__hint">{{ $t('Notepad.hint') }}</p>
-
-            <div v-if="isLoading" class="notepad__state">{{ $t('Notepad.loading') }}</div>
-            <div v-else-if="!notes.length" class="notepad__state notepad__state--empty">{{ $t('Notepad.empty') }}</div>
-
-            <div v-else class="notepad__list">
-                <div
-                    v-for="note in notes"
-                    :key="note._id"
-                    class="notepad__note"
-                    :class="{ 'notepad__note--menu-open': openMenuId === note._id, 'notepad__note--converted': note.convertedTaskId }"
-                >
-                    <div class="notepad__note-head">
-                        <span v-if="note.convertedTaskId" class="notepad__badge" :title="$t('Notepad.converted_badge')">&#10003; {{ $t('Notepad.converted_badge') }}</span>
-                        <span v-else></span>
-                        <button class="notepad__menu-btn" :title="$t('Notepad.options')" @click.stop="toggleMenu(note)">
-                            <img :src="horizontalDots" alt="options" class="vertical-middle">
-                        </button>
-                    </div>
-
-                    <div v-if="openMenuId === note._id" class="notepad__menu" @click.stop>
-                        <div class="notepad__menu-item" @click="startConvert(note)">{{ $t('Notepad.convert_action') }}</div>
-                        <div class="notepad__menu-item notepad__menu-item--danger" @click="remove(note)">{{ $t('Notepad.delete') }}</div>
-                    </div>
-
-                    <input
-                        v-model="note.title"
-                        class="notepad__note-title"
-                        :placeholder="$t('Notepad.title_placeholder')"
-                        :maxlength="250"
-                        @input="scheduleSave(note)"
-                        @blur="saveNow(note)"
-                    />
+            <!-- ── Detail view ────────────────────────────────────────── -->
+            <template v-if="openNote">
+                <div class="np__editor">
                     <textarea
-                        v-model="note.content"
-                        class="notepad__text"
-                        :placeholder="$t('Notepad.placeholder')"
-                        rows="4"
-                        @input="scheduleSave(note)"
-                        @blur="saveNow(note)"
+                        ref="editorArea"
+                        v-model="openNote.content"
+                        class="np__etext"
+                        :placeholder="$t('Notepad.editor_placeholder')"
+                        @input="scheduleSave(openNote)"
+                        @blur="saveNow(openNote)"
                     ></textarea>
+                </div>
+                <div class="np__efoot">
+                    <span class="np__saved">{{ savingId === openNote._id ? $t('Notepad.saving') : $t('Notepad.saved') }}</span>
+                    <button type="button" class="np__eaction" :title="$t('Notepad.convert_action')" @click.stop="startConvert(openNote)">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                    </button>
+                    <button type="button" class="np__eaction" :title="$t('Notepad.archive')" @click.stop="archive(openNote, true)">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"></rect><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"></path></svg>
+                    </button>
+                    <button type="button" class="np__eaction np__eaction--danger" :title="$t('Notepad.delete')" @click.stop="askDelete(openNote)">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>
+                    </button>
+                </div>
+            </template>
 
-                    <button class="notepad__convert-btn" @click.stop="startConvert(note)">{{ $t('Notepad.convert_action') }}</button>
+            <!-- ── List view ──────────────────────────────────────────── -->
+            <template v-else>
+                <div v-if="showSearch" class="np__searchbar">
+                    <input ref="searchInput" v-model="search" class="np__searchinput" :placeholder="$t('Notepad.search_placeholder')" />
+                </div>
+
+                <div v-if="isLoading" class="np__state">{{ $t('Notepad.loading') }}</div>
+                <div v-else-if="!visibleNotes.length" class="np__state">
+                    {{ search ? $t('Notepad.no_results') : (viewArchived ? $t('Notepad.empty_archived') : $t('Notepad.empty')) }}
+                </div>
+
+                <div v-else class="np__list" @scroll="closeRowMenu">
+                    <div
+                        v-for="note in visibleNotes"
+                        :key="note._id"
+                        class="np__row"
+                        @click="openNoteDetail(note)"
+                    >
+                        <div class="np__rowmain">
+                            <div class="np__rtitle">{{ noteLabel(note) }}</div>
+                            <div class="np__rpreview">{{ preview(note) }}</div>
+                        </div>
+
+                        <div class="np__rowactions" @click.stop>
+                            <button type="button" class="np__ra" :title="$t('Notepad.edit')" @click="openNoteDetail(note)">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg>
+                            </button>
+                            <button type="button" class="np__ra" :title="$t('Notepad.convert_action')" @click="startConvert(note)">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                            </button>
+                            <button type="button" class="np__ra" :title="viewArchived ? $t('Notepad.restore') : $t('Notepad.archive')" @click="archive(note, !viewArchived)">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"></rect><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"></path></svg>
+                            </button>
+                            <button type="button" class="np__ra np__ra--danger" :title="$t('Notepad.delete')" @click="askDelete(note)">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button" class="np__new" :disabled="isBusy" @click.stop="addNote">
+                    <span class="np__plus">+</span> {{ $t('Notepad.add') }}
+                </button>
+            </template>
+        </div>
+
+        <!-- ── Delete confirmation ────────────────────────────────────── -->
+        <div v-if="pendingDelete" class="np__confirmwrap" @click.self="pendingDelete = null">
+            <div class="np__confirm">
+                <span class="np__cicon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>
+                </span>
+                <h3 class="np__ctitle">{{ $t('Notepad.confirm_delete_title') }}</h3>
+                <p class="np__cdesc">{{ $t('Notepad.confirm_delete_desc') }}</p>
+                <div class="np__cactions">
+                    <button type="button" class="np__cbtn" @click="pendingDelete = null">{{ $t('Projects.cancel') }}</button>
+                    <button type="button" class="np__cbtn np__cbtn--danger" @click="confirmDelete">{{ $t('Notepad.delete') }}</button>
                 </div>
             </div>
         </div>
@@ -67,15 +156,12 @@
 
 <script setup>
 // PACKAGES
-import { defineProps, defineEmits, inject, ref, watch } from "vue";
+import { computed, inject, nextTick, ref, watch } from "vue";
 import { useToast } from "vue-toast-notification";
 import { useI18n } from "vue-i18n";
 
 // COMPONENTS
 import ConvertNoteToTask from "@/components/molecules/Notepad/ConvertNoteToTask.vue";
-
-// IMAGE
-import horizontalDots from "@/assets/images/svg/horizontalDots.svg";
 
 // UTILS
 import { apiRequest } from "@/services";
@@ -85,12 +171,8 @@ const $toast = useToast();
 const userId = inject("$userId");
 
 const props = defineProps({
-    modelValue: {
-        type: Boolean,
-        default: false,
-    },
+    modelValue: { type: Boolean, default: false },
 });
-
 const emit = defineEmits(["update:modelValue"]);
 
 const SAVE_DEBOUNCE_MS = 600;
@@ -98,29 +180,84 @@ const SAVE_DEBOUNCE_MS = 600;
 const notes = ref([]);
 const isLoading = ref(false);
 const isBusy = ref(false);
-const openMenuId = ref(null);
 const convertNote = ref(null);
+const openNote = ref(null);
+const pendingDelete = ref(null);
+const showHeadMenu = ref(false);
+const showSearch = ref(false);
+const search = ref("");
+const viewArchived = ref(false);
+const sortRecent = ref(true);
+const savingId = ref("");
+const searchInput = ref(null);
+const editorArea = ref(null);
+const titleInput = ref(null);
 const saveTimers = {};
+
+// Enter in the header title drops focus into the body, so a new note can be
+// typed start-to-finish without reaching for the mouse.
+function focusBody() {
+    if (editorArea.value) editorArea.value.focus();
+}
 
 function close() {
     emit("update:modelValue", false);
 }
 
-watch(() => props.modelValue, (open) => {
-    if (open) {
-        openMenuId.value = null;
-        convertNote.value = null;
-        fetchNotes();
+function closeRowMenu() {
+    showHeadMenu.value = false;
+}
+
+// A note with no title still needs a label in the list and header — fall back to
+// the first line of its content, then to a generic placeholder.
+function noteLabel(note) {
+    const title = (note && note.title ? String(note.title) : "").trim();
+    if (title) return title;
+    const first = (note && note.content ? String(note.content) : "").split(/\r?\n/).find((l) => l.trim());
+    return (first && first.trim()) || t("Notepad.untitled");
+}
+
+// One-line preview for the row: content minus whatever is already the label.
+function preview(note) {
+    const body = (note && note.content ? String(note.content) : "").replace(/\s+/g, " ").trim();
+    if (!body) return t("Notepad.no_content");
+    return body.length > 120 ? `${body.slice(0, 120)}…` : body;
+}
+
+const visibleNotes = computed(() => {
+    const term = search.value.trim().toLowerCase();
+    let list = notes.value.slice();
+    if (term) {
+        list = list.filter((n) => `${n.title || ""} ${n.content || ""}`.toLowerCase().includes(term));
     }
+    if (sortRecent.value) {
+        list.sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
+    } else {
+        list.sort((a, b) => noteLabel(a).localeCompare(noteLabel(b)));
+    }
+    return list;
 });
 
-function toggleMenu(note) {
-    openMenuId.value = openMenuId.value === note._id ? null : note._id;
+function toggleSearch() {
+    showSearch.value = !showSearch.value;
+    if (!showSearch.value) {
+        search.value = "";
+    } else {
+        nextTick(() => searchInput.value && searchInput.value.focus());
+    }
+}
+
+function toggleArchivedView() {
+    viewArchived.value = !viewArchived.value;
+    showHeadMenu.value = false;
+    openNote.value = null;
+    fetchNotes();
 }
 
 function fetchNotes() {
     isLoading.value = true;
-    apiRequest("get", "/api/v1/notes")
+    const qs = viewArchived.value ? "?archived=1" : "";
+    apiRequest("get", `/api/v1/notes${qs}`)
         .then((response) => {
             notes.value = response.data && response.data.status ? (response.data.data || []) : [];
         })
@@ -134,7 +271,10 @@ function addNote() {
     apiRequest("post", "/api/v1/notes", { title: "", content: "", userData: { id: userId.value } })
         .then((response) => {
             if (response.data && response.data.status) {
-                notes.value.unshift(response.data.data);
+                const created = response.data.data;
+                notes.value.unshift(created);
+                // Straight into the editor, as ClickUp does.
+                openNoteDetail(created);
             } else {
                 $toast.error((response.data && response.data.statusText) || t("Toast.something_went_wrong"), { position: "top-right" });
             }
@@ -143,9 +283,27 @@ function addNote() {
         .finally(() => { isBusy.value = false; });
 }
 
+function openNoteDetail(note) {
+    showHeadMenu.value = false;
+    openNote.value = note;
+    // A fresh note starts in the header title; an existing one goes straight to
+    // the body, which is what you usually want to add to.
+    const isNew = !(note && note.title && String(note.title).trim());
+    nextTick(() => {
+        if (isNew && titleInput.value) titleInput.value.focus();
+        else if (editorArea.value) editorArea.value.focus();
+    });
+}
+
+function closeNote() {
+    if (openNote.value) saveNow(openNote.value);
+    openNote.value = null;
+}
+
 // Debounced per-note save, keyed by id so editing one note never cancels a
-// pending save on another (same approach as StickiesPanel).
+// pending save on another.
 function scheduleSave(note) {
+    savingId.value = note._id;
     if (saveTimers[note._id]) clearTimeout(saveTimers[note._id]);
     saveTimers[note._id] = setTimeout(() => saveNow(note), SAVE_DEBOUNCE_MS);
 }
@@ -157,11 +315,53 @@ function saveNow(note) {
         delete saveTimers[note._id];
     }
     apiRequest("patch", `/api/v1/notes/${note._id}`, { title: note.title, content: note.content })
-        .catch((error) => console.error("ERROR in save note: ", error));
+        .then(() => { note.updatedAt = new Date().toISOString(); })
+        .catch((error) => console.error("ERROR in save note: ", error))
+        .finally(() => { if (savingId.value === note._id) savingId.value = ""; });
+}
+
+// Archive / restore, stored on deletedStatusKey by the API (2 = archived).
+function archive(note, archived) {
+    apiRequest("patch", `/api/v1/notes/${note._id}`, { archived })
+        .then((response) => {
+            if (response.data && response.data.status) {
+                notes.value = notes.value.filter((n) => n._id !== note._id);
+                if (openNote.value && openNote.value._id === note._id) openNote.value = null;
+                $toast.success(t(archived ? "Notepad.archived_toast" : "Notepad.restored_toast"), { position: "top-right" });
+            } else {
+                $toast.error(t("Toast.something_went_wrong"), { position: "top-right" });
+            }
+        })
+        .catch((error) => console.error("ERROR in archive note: ", error));
+}
+
+function askDelete(note) {
+    showHeadMenu.value = false;
+    pendingDelete.value = note;
+}
+
+function confirmDelete() {
+    const note = pendingDelete.value;
+    pendingDelete.value = null;
+    if (!note) return;
+    if (saveTimers[note._id]) {
+        clearTimeout(saveTimers[note._id]);
+        delete saveTimers[note._id];
+    }
+    apiRequest("delete", `/api/v1/notes/${note._id}`)
+        .then((response) => {
+            if (response.data && response.data.status) {
+                notes.value = notes.value.filter((n) => n._id !== note._id);
+                if (openNote.value && openNote.value._id === note._id) openNote.value = null;
+            } else {
+                $toast.error((response.data && response.data.statusText) || t("Toast.something_went_wrong"), { position: "top-right" });
+            }
+        })
+        .catch((error) => console.error("ERROR in delete note: ", error));
 }
 
 function startConvert(note) {
-    openMenuId.value = null;
+    showHeadMenu.value = false;
     saveNow(note);
     convertNote.value = note;
 }
@@ -177,231 +377,18 @@ function onConverted({ taskId }) {
         .catch((error) => console.error("ERROR in stamp converted note: ", error));
 }
 
-function remove(note) {
-    openMenuId.value = null;
-    if (saveTimers[note._id]) {
-        clearTimeout(saveTimers[note._id]);
-        delete saveTimers[note._id];
+watch(() => props.modelValue, (open) => {
+    if (open) {
+        showHeadMenu.value = false;
+        showSearch.value = false;
+        search.value = "";
+        openNote.value = null;
+        pendingDelete.value = null;
+        convertNote.value = null;
+        viewArchived.value = false;
+        fetchNotes();
     }
-    apiRequest("delete", `/api/v1/notes/${note._id}`)
-        .then((response) => {
-            if (response.data && response.data.status) {
-                notes.value = notes.value.filter((n) => n._id !== note._id);
-            } else {
-                $toast.error((response.data && response.data.statusText) || t("Toast.something_went_wrong"), { position: "top-right" });
-            }
-        })
-        .catch((error) => console.error("ERROR in delete note: ", error));
-}
+});
 </script>
 
-<style scoped>
-.notepad__overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(17, 24, 39, 0.38);
-    backdrop-filter: blur(2px);
-    z-index: 1000;
-    display: flex;
-    justify-content: flex-end;
-    font-family: 'Roboto', sans-serif;
-}
-.notepad__panel {
-    background: #f6f8fc;
-    width: min(420px, 94vw);
-    height: 100%;
-    padding: 20px 18px 26px;
-    overflow-y: auto;
-    border-radius: 18px 0 0 18px;
-    box-shadow: -16px 0 48px rgba(20, 30, 60, 0.20);
-    animation: notepad-slide-in 0.22s ease;
-}
-@keyframes notepad-slide-in {
-    from { transform: translateX(26px); opacity: 0.5; }
-    to { transform: translateX(0); opacity: 1; }
-}
-/* Header */
-.notepad__head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-.notepad__title {
-    font-size: 18px;
-    font-weight: 700;
-    color: #1b2233;
-    letter-spacing: -0.2px;
-}
-.notepad__head-actions { display: flex; align-items: center; gap: 8px; }
-.notepad__add {
-    border: none;
-    cursor: pointer;
-    color: #fff;
-    background: linear-gradient(120deg, #4d7cff, #6a5cff);
-    border-radius: 9px;
-    padding: 7px 14px;
-    font-size: 12.5px;
-    font-weight: 600;
-    box-shadow: 0 4px 12px rgba(77, 124, 255, 0.34);
-    transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
-}
-.notepad__add:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(77, 124, 255, 0.42); }
-.notepad__add:active { transform: translateY(0); }
-.notepad__add:disabled { opacity: 0.55; cursor: default; box-shadow: none; transform: none; }
-.notepad__close {
-    border: none;
-    background: transparent;
-    color: #9aa1b2;
-    font-size: 15px;
-    cursor: pointer;
-    width: 30px;
-    height: 30px;
-    border-radius: 8px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.12s ease, color 0.12s ease;
-}
-.notepad__close:hover { background: #fdeaea; color: #e84a4a; }
-.notepad__hint { margin: 4px 0 16px; color: #8b91a0; font-size: 11.5px; line-height: 1.5; }
-/* States */
-.notepad__state {
-    color: #9aa1b2;
-    font-size: 12.5px;
-    text-align: center;
-    padding: 40px 16px;
-}
-.notepad__state--empty {
-    border: 1px dashed #d7dbe6;
-    border-radius: 14px;
-    background: #fff;
-}
-/* List + cards */
-.notepad__list { display: flex; flex-direction: column; gap: 14px; }
-.notepad__note {
-    position: relative;
-    border: 1px solid #ebedf3;
-    border-radius: 14px;
-    padding: 12px 14px 14px;
-    background: #fff;
-    box-shadow: 0 1px 2px rgba(20, 30, 60, 0.05);
-    display: flex;
-    flex-direction: column;
-    transition: box-shadow 0.16s ease, transform 0.16s ease, border-color 0.16s ease;
-}
-.notepad__note::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 14px;
-    bottom: 14px;
-    width: 3px;
-    border-radius: 3px;
-    background: linear-gradient(#4d7cff, #6a5cff);
-    opacity: 0.85;
-}
-.notepad__note:hover {
-    box-shadow: 0 8px 22px rgba(20, 30, 60, 0.10);
-    transform: translateY(-1px);
-    border-color: #dfe3ee;
-}
-.notepad__note--menu-open { z-index: 5; }
-.notepad__note--converted::before { background: linear-gradient(#2e7d32, #43a047); }
-.notepad__note-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-height: 20px;
-    margin-bottom: 4px;
-}
-.notepad__badge {
-    font-size: 10px;
-    font-weight: 700;
-    color: #1e7a35;
-    background: #e7f7ec;
-    border: 1px solid #c7ebcf;
-    border-radius: 20px;
-    padding: 2px 9px;
-    letter-spacing: 0.2px;
-}
-.notepad__menu-btn {
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    padding: 2px;
-    line-height: 1;
-    width: 26px;
-    height: 24px;
-    border-radius: 7px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.12s ease;
-}
-.notepad__menu-btn:hover { background: #f0f2f7; }
-.notepad__menu {
-    position: absolute;
-    top: 30px;
-    right: 10px;
-    z-index: 10;
-    background: #fff;
-    border: 1px solid #ececf0;
-    border-radius: 10px;
-    box-shadow: 0 10px 28px rgba(20, 30, 60, 0.18);
-    padding: 6px;
-    min-width: 158px;
-}
-.notepad__menu-item {
-    font-size: 13px;
-    color: #3a3f4d;
-    padding: 8px 10px;
-    border-radius: 7px;
-    cursor: pointer;
-    transition: background 0.1s ease;
-}
-.notepad__menu-item:hover { background: #f4f6fb; }
-.notepad__menu-item--danger { color: #e84a4a; }
-.notepad__menu-item--danger:hover { background: #fdeaea; }
-.notepad__note-title {
-    background: transparent;
-    border: none;
-    outline: none;
-    width: 100%;
-    font-size: 14px;
-    font-weight: 700;
-    color: #20263a;
-    padding: 2px 0;
-    margin-bottom: 2px;
-}
-.notepad__note-title::placeholder { color: #b6bccb; font-weight: 600; }
-.notepad__text {
-    background: transparent;
-    border: none;
-    resize: vertical;
-    outline: none;
-    width: 100%;
-    font-size: 13px;
-    color: #515869;
-    line-height: 1.5;
-    min-height: 64px;
-    padding: 2px 0;
-}
-.notepad__text::placeholder { color: #b6bccb; }
-.notepad__convert-btn {
-    align-self: flex-start;
-    margin-top: 10px;
-    background: #eef2ff;
-    color: #3856d6;
-    border: none;
-    border-radius: 8px;
-    padding: 6px 14px;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.12s ease, color 0.12s ease;
-}
-.notepad__convert-btn:hover { background: #e0e7ff; color: #2b44b8; }
-.notepad__panel::-webkit-scrollbar { width: 7px; }
-.notepad__panel::-webkit-scrollbar-thumb { background: #d3d8e4; border-radius: 7px; }
-.notepad__panel::-webkit-scrollbar-track { background: transparent; }
-</style>
+<style scoped src="./panel.css"></style>
