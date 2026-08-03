@@ -1,4 +1,5 @@
 const {
+    isSelf,
     joinRoom,
     leaveRoom,
     upsertRoom,
@@ -41,6 +42,11 @@ const handleTaskChange = (changeData, includeUpdatedFields = false) => {
 
 exports.chatSocketHandler = ({ socket, namespace }) => {
     socket.on('joinChats', (data) => {
+        // The emit side addresses `chat_<projectId>_<participantId>` for each side of a
+        // direct conversation, so this room carries the other party's conversation
+        // documents. The participant id must therefore be the authenticated caller's.
+        if (!data || !isSelf(socket, data.userId)) return;
+
         const roomName = `chat_${data.projectId}_${data.userId}**${data.socketId}`;
         joinRoom(socket, roomName);
         upsertRoom({ roomName, socketId: data.socketId, namespace, socket });

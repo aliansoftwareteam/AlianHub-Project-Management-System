@@ -5,6 +5,7 @@
 // Scoped to the `generalReminder` module only (SOCKET-PERFORMANCE-PLAN #2), so
 // this handler never wakes for task/comment/company traffic.
 const {
+    isSelf,
     joinRoom,
     upsertRoom,
     findRoomsByPrefix,
@@ -40,6 +41,14 @@ const handleReminderChange = (changeData) => {
 exports.generalReminderSocketHandler = ({ socket, namespace }) => {
     socket.on('joinGeneralReminder', (data) => {
         if (!data || !data.uid) return;
+
+        // The room is keyed by user id and carries the FULL reminder document, so the
+        // id has to be the authenticated caller's — otherwise anyone who knows a
+        // colleague's user id (they are visible on every assignee and mention) could
+        // subscribe to their private reminders. socketinit.js already put the verified
+        // JWT on socket.user; this is the check that was missing, not the identity.
+        if (!isSelf(socket, data.uid)) return;
+
         const roomName = `generalReminder_${data.uid}**${data.socketId}`;
         joinRoom(socket, roomName);
         upsertRoom({

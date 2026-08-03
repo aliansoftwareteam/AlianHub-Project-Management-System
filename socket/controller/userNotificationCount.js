@@ -1,4 +1,5 @@
 const {
+    isSelf,
     joinRoom,
     leaveRoom,
     upsertRoom,
@@ -29,6 +30,10 @@ const handleUserNotificationChange = (changeData) => {
 
 exports.userNotificationCountHandler = ({ socket, namespace }) => {
     socket.on('joinUserIdNotification', (data) => {
+        // Keyed by user id and carries that user's counter document — so the id must
+        // be the authenticated caller's, not whatever the client asked for.
+        if (!data || !isSelf(socket, data.uid)) return;
+
         const roomName = `userIdNotification_${data.uid}**${data.socketId}`;
         joinRoom(socket, roomName);
         upsertRoom({

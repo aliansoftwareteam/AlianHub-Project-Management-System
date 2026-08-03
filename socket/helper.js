@@ -24,6 +24,25 @@
 // (duplicate entries on tab refresh / reconnect that previously caused
 // events to fire multiple times for the same room).
 
+/**
+ * Is `claimedUid` actually this socket's authenticated user?
+ *
+ * Several rooms are keyed by user id — `userIdNotification_<uid>`,
+ * `generalReminder_<uid>`, `chat_<pid>_<uid>` — and whatever is pushed to them is
+ * that user's private data. The id arrives from the CLIENT, so without this check
+ * anyone could subscribe to a colleague's room simply by knowing their user id, which
+ * is visible on every assignee, mention and avatar in the app.
+ *
+ * socketinit.js already verifies the JWT and puts the decoded payload on
+ * `socket.user`; the token is signed with `{ uid }` (Config/jwt.js → generateJWTToken).
+ * Fails closed: no authenticated identity means no join.
+ */
+exports.isSelf = (socket, claimedUid) => {
+    const authenticated = socket && socket.user && socket.user.uid;
+    if (!authenticated || !claimedUid) return false;
+    return String(authenticated) === String(claimedUid);
+};
+
 exports.joinRoom = (soket, roomName) => {
     soket.join(roomName);
 };
