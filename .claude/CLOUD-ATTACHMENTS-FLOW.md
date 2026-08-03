@@ -121,9 +121,9 @@ the one place the existing `integration_connections` shape doesn't fit as-is —
 it's company-scoped for things like Slack. A cloud connection needs
 `(companyId, userId, provider)` as its identity.
 
-App credentials (client id / secret) stay workspace-level — one app registration
-per provider, shared by everyone on the instance — but any member may enter or
-change them. Only the per-user grant is private to its owner.
+App credentials live in that same per-user row, so the identity of both the
+credentials and the grant is `(companyId, userId, provider)`. Nothing about this
+feature is company-wide.
 
 ---
 
@@ -291,15 +291,20 @@ exactly as it does today.
 > to configure them, not two. (That hub also has no navigation link anywhere in
 > the app, so it is only reachable by typing the URL.)
 
-**No role restrictions.** Any member can register the app credentials and any
-member can connect their own account. This is a self-hosted, open-source app and
-this is an optional extra attachment source — gating setup behind a role would
-just mean nobody can switch it on until an admin is around.
+**Everything is per user, and private to them.** Each person enters their own app
+credentials and connects their own account. No role restrictions, and no shared
+state: one member never sees, edits or breaks another's setup, and two people can
+link the same drive account independently.
 
-The one thing worth knowing: the app credentials are shared per workspace, so
-removing them clears them for everyone and disconnects every linked account.
-The UI confirms before doing it. Individual **Disconnect my account** only ever
-affects the person clicking it.
+That is a correction of an earlier revision which kept the credentials in
+`integration_connections`, shared per workspace. The symptom: a fresh member
+opened Settings and found the owner's saved credentials already filled in, and
+could edit or delete them for everybody. For an optional attachment source on a
+self-hosted app that is simply the wrong model.
+
+So the credentials now live in the SAME row as the grant —
+`cloud_storage_connections`, keyed `(userId, provider)` — and every read and write
+is scoped to `req.uid`. Removing your credentials disconnects only you.
 
 **Per provider, once per workspace:**
 

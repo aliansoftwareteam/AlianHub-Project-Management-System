@@ -1,12 +1,18 @@
 // AHE-3838 — cloud file storage (Google Drive / Dropbox).
 //
-// Split of responsibilities:
-//   integration_connections     the COMPANY's app registration per provider
-//                               (client id/secret), managed in Settings →
-//                               Integrations. One per workspace.
-//   cloud_storage_connections   one row per (user, provider) holding that
-//                               person's OAuth grant. Every user has their own
-//                               Drive, so the grant cannot be company-wide.
+// Everything here is PER USER. One row in cloud_storage_connections per
+// (user, provider) holds both that person's app registration (client id/secret,
+// api key, app id) and their OAuth grant.
+//
+// Deliberately not company-scoped. An earlier revision kept the credentials in
+// integration_connections, shared per workspace — which meant a fresh member
+// opened Settings and saw the owner's saved credentials, and could edit or
+// delete them for everybody. For an optional, self-hosted attachment source that
+// is simply wrong: each person sets up their own, and two people may point at the
+// same drive account independently without interfering.
+//
+// So a user can only ever read or write their own row, and there is no shared
+// state left to trample.
 //
 // The browser never receives a refresh token. It asks for a short-lived access
 // token only at the moment it opens a picker.
@@ -17,7 +23,6 @@ const path = require('path');
 const os = require('os');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
-const { removeCache } = require('../../utils/commonFunctions');
 const { buildCorsAllowList, isOriginAllowed } = require('../../utils/cors');
 const logger = require('../../Config/loggerConfig');
 const P = require('./helpers/cloudProviders');
@@ -72,24 +77,24 @@ const resolveReturnOrigin = (req) => {
 // redirect URI in each provider's developer console, per environment.
 const redirectUri = () => `${apiBase()}/api/v1/cloud-oauth/callback`;
 
-// ── workspace app credentials ───────────────────────────────────────────────
-
-const loadAppConfig = async (companyId, provider) => {
-    const row = await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS,
-        data: [{ type: String(provider), deletedStatusKey: { $ne: 1 } }],
-    }, 'findOne');
-    if (!row) return null;
-    const cfg = (row.config && (row.config.toObject ? row.config.toObject() : row.config)) || {};
-    return { enabled: row.enabled !== false, config: cfg };
-};
-
-// ── per-user connections ────────────────────────────────────────────────────
+// ── per-user credentials + grant (one row, one owner) ───────────────────────
 
 const loadConnection = (companyId, userId, provider) => MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.CLOUD_STORAGE_CONNECTIONS,
     data: [{ userId: String(userId), provider: String(provider), deletedStatusKey: { $ne: 1 } }],
 }, 'findOne');
+
+/**
+ * This user's own app config for a provider, or {} if they haven't set one up.
+ * Never falls back to anyone else's — that fallback is exactly the leak this
+ * design removes.
+ */
+const loadAppConfig = async (companyId, userId, provider) => {
+    const row = await loadConnection(companyId, userId, provider);
+    if (!row) return { config: {}, row: null };
+    const cfg = (row.config && (row.config.toObject ? row.config.toObject() : row.config)) || {};
+    return { config: cfg, row };
+};
 
 const upsertConnection = (companyId, userId, provider, patch) => MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.CLOUD_STORAGE_CONNECTIONS,
@@ -99,6 +104,15 @@ const upsertConnection = (companyId, userId, provider, patch) => MongoDbCrudOpra
         { upsert: true, setDefaultsOnInsert: true, returnDocument: 'after' },
     ],
 }, 'findOneAndUpdate');
+
+/**
+ * Did the identity of the app registration change? Only these fields invalidate
+ * an existing grant — editing e.g. the API key or App ID does not.
+ */
+const credentialsChanged = (provider, before = {}, after = {}) => {
+    const keys = provider === 'dropbox' ? ['app_key'] : ['client_id', 'client_secret'];
+    return keys.some((k) => String(before[k] || '') !== String(after[k] || ''));
+};
 
 /**
  * GET /api/v1/cloud-storage/settings
@@ -120,44 +134,35 @@ exports.getSettings = async (req, res) => {
         const rows = [];
         for (const key of P.PROVIDER_KEYS) {
             const described = P.describe(key);
-            let app = null;
-            try { app = await loadAppConfig(companyId, key); } catch (e) {
-                logger.error(`${LOG_PREFIX} app config read failed (${key}): ${e.message}`);
-            }
-            const cfg = (app && app.config) || {};
-            const configured = !!(app && app.enabled && P.isConfigured(key, cfg));
+            let cfg = {};
             let connection = null;
-            if (configured) {
-                try { connection = await loadConnection(companyId, userId, key); } catch (e) {
-                    logger.error(`${LOG_PREFIX} connection read failed (${key}): ${e.message}`);
-                }
+            try {
+                const own = await loadAppConfig(companyId, userId, key);
+                cfg = own.config;
+                connection = own.row;
+            } catch (e) {
+                logger.error(`${LOG_PREFIX} own config read failed (${key}): ${e.message}`);
             }
+            const configured = P.isConfigured(key, cfg);
             rows.push({
                 ...described,
                 ...P.redactAppConfig(key, cfg),
                 configured,
-                enabled: !app || app.enabled !== false,
-                connected: described.oauth ? !!(connection && connection.status === 'connected') : configured,
+                // Dropbox's Chooser needs no grant, so configured == usable there.
+                connected: described.oauth
+                    ? !!(configured && connection && connection.status === 'connected' && connection.accessToken)
+                    : configured,
                 connectionStatus: (connection && connection.status) || '',
                 accountEmail: (connection && connection.accountEmail) || '',
             });
         }
-        // canManage is unconditional — kept in the payload so the UI has one
-        // switch to read rather than assuming.
-        return res.send({ status: true, data: { canManage: true, redirectUri: redirectUri(), providers: rows } });
+        return res.send({ status: true, data: { redirectUri: redirectUri(), providers: rows } });
     } catch (e) {
         logger.error(`${LOG_PREFIX} getSettings: ${e.message}`);
         return res.send({ status: false, statusText: e.message });
     }
 };
 
-/**
- * PUT /api/v1/cloud-storage/settings/:provider  { config: {...} }
- *
- * Save the app registration for one provider. Any member may do this: the
- * feature is optional and self-hosted, so gating setup behind a role just means
- * nobody can turn it on until an admin happens to be available.
- */
 exports.saveSettings = async (req, res) => {
     try {
         const companyId = companyOf(req);
@@ -165,34 +170,26 @@ exports.saveSettings = async (req, res) => {
         const provider = String(req.params.provider || '');
         if (!P.isProvider(provider)) return res.send({ status: false, statusText: 'Unknown provider.' });
         if (!companyId || !userId) return res.send({ status: false, statusText: 'companyId and an authenticated user are required.' });
-        const existing = await loadAppConfig(companyId, provider);
-        const check = P.sanitizeAppConfig(provider, (req.body || {}).config, (existing && existing.config) || {});
+
+        const existing = await loadAppConfig(companyId, userId, provider);
+        const check = P.sanitizeAppConfig(provider, (req.body || {}).config, existing.config);
         if (!check.valid) return res.send({ status: false, statusText: check.reason });
 
-        const saved = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS,
-            data: [
-                { type: provider },
-                {
-                    $set: {
-                        type: provider,
-                        name: P.byKey(provider).name,
-                        config: check.config,
-                        status: 'connected',
-                        enabled: true,
-                        deletedStatusKey: 0,
-                        createdBy: String(userId),
-                        connectedAt: new Date(),
-                    },
-                },
-                { upsert: true, setDefaultsOnInsert: true, returnDocument: 'after' },
-            ],
-        }, 'findOneAndUpdate');
-        // The marketplace caches this collection per company; clear it so the two
-        // views can't disagree about what is connected.
-        removeCache(`integration_connections:${companyId}`);
-        logger.info(`${LOG_PREFIX} ${provider} app credentials saved by ${userId}`);
-        return res.send({ status: true, statusText: 'Saved.', data: { provider, ...P.redactAppConfig(provider, (saved && saved.config) || check.config) } });
+        const saved = await upsertConnection(companyId, userId, provider, {
+            config: check.config,
+            // Changing the client id/secret invalidates any grant obtained under
+            // the old app, so a re-save that alters them clears the tokens rather
+            // than leaving a connection that cannot refresh.
+            ...(credentialsChanged(provider, existing.config, check.config)
+                ? { accessToken: '', refreshToken: '', expiresAt: null, status: 'disconnected', accountEmail: '', accountName: '' }
+                : {}),
+        });
+        logger.info(`${LOG_PREFIX} ${provider} credentials saved by user ${userId}`);
+        return res.send({
+            status: true,
+            statusText: 'Saved.',
+            data: { provider, ...P.redactAppConfig(provider, (saved && saved.config) || check.config) },
+        });
     } catch (e) {
         logger.error(`${LOG_PREFIX} saveSettings: ${e.message}`);
         return res.send({ status: false, statusText: e.message });
@@ -202,14 +199,9 @@ exports.saveSettings = async (req, res) => {
 /**
  * DELETE /api/v1/cloud-storage/settings/:provider
  *
- * Remove the app credentials. Any member may do this, for the same reason they
- * may add them.
- *
- * Also drops every user's grant for that provider: the tokens were issued to an
- * app registration that is being removed, so leaving them would strand rows whose
- * refresh can never succeed again. Worth knowing before clicking — this affects
- * everyone using that provider, not just the person removing it, which is why the
- * UI asks for confirmation.
+ * Forget THIS user's credentials and grant for a provider. Nobody else is
+ * touched — an earlier revision cascaded across every user because the
+ * credentials were shared; now there is nothing shared to cascade to.
  */
 exports.clearSettings = async (req, res) => {
     try {
@@ -218,16 +210,15 @@ exports.clearSettings = async (req, res) => {
         const provider = String(req.params.provider || '');
         if (!P.isProvider(provider)) return res.send({ status: false, statusText: 'Unknown provider.' });
         if (!companyId || !userId) return res.send({ status: false, statusText: 'companyId and an authenticated user are required.' });
-        await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS,
-            data: [{ type: provider }, { $set: { config: {}, enabled: false, status: 'disconnected', deletedStatusKey: 1 } }],
-        }, 'updateOne');
+
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.CLOUD_STORAGE_CONNECTIONS,
-            data: [{ provider }, { $set: { deletedStatusKey: 1, accessToken: '', refreshToken: '', status: 'disconnected' } }],
-        }, 'updateMany');
-        removeCache(`integration_connections:${companyId}`);
-        logger.info(`${LOG_PREFIX} ${provider} app credentials removed by ${userId}`);
+            data: [
+                { userId: String(userId), provider },
+                { $set: { config: {}, accessToken: '', refreshToken: '', expiresAt: null, status: 'disconnected', accountEmail: '', accountName: '', deletedStatusKey: 1 } },
+            ],
+        }, 'updateOne');
+        logger.info(`${LOG_PREFIX} ${provider} credentials removed by user ${userId}`);
         return res.send({ status: true, statusText: 'Removed.' });
     } catch (e) {
         logger.error(`${LOG_PREFIX} clearSettings: ${e.message}`);
@@ -253,17 +244,16 @@ exports.listProviders = async (req, res) => {
         const out = [];
         for (const key of P.PROVIDER_KEYS) {
             const meta = P.byKey(key);
-            let app = null;
-            try { app = await loadAppConfig(companyId, key); } catch (e) {
-                logger.error(`${LOG_PREFIX} app config read failed (${key}): ${e.message}`);
-            }
-            const configured = !!(app && app.enabled && P.isConfigured(key, app.config));
+            let cfg = {};
             let connection = null;
-            if (configured) {
-                try { connection = await loadConnection(companyId, userId, key); } catch (e) {
-                    logger.error(`${LOG_PREFIX} connection read failed (${key}): ${e.message}`);
-                }
+            try {
+                const own = await loadAppConfig(companyId, userId, key);
+                cfg = own.config;
+                connection = own.row;
+            } catch (e) {
+                logger.error(`${LOG_PREFIX} own config read failed (${key}): ${e.message}`);
             }
+            const configured = P.isConfigured(key, cfg);
             out.push({
                 provider: key,
                 name: meta.name,
@@ -271,10 +261,12 @@ exports.listProviders = async (req, res) => {
                 // as the workspace app key exists.
                 requiresConnect: !!meta.oauth,
                 configured,
-                connected: meta.oauth ? !!(connection && connection.status === 'connected') : configured,
+                connected: meta.oauth
+                    ? !!(configured && connection && connection.status === 'connected' && connection.accessToken)
+                    : configured,
                 status: (connection && connection.status) || (configured ? 'available' : 'not_configured'),
                 accountEmail: (connection && connection.accountEmail) || '',
-                config: configured ? P.publicConfig(key, app.config) : {},
+                config: configured ? P.publicConfig(key, cfg) : {},
             });
         }
         return res.send({ status: true, data: out });
@@ -297,9 +289,9 @@ exports.authUrl = async (req, res) => {
         if (!companyId || !userId) return res.send({ status: false, statusText: 'companyId and an authenticated user are required.' });
         if (!apiBase()) return res.send({ status: false, statusText: 'APIURL is not configured on the server, so the OAuth redirect URI cannot be built.' });
 
-        const app = await loadAppConfig(companyId, provider);
-        if (!app || !app.enabled || !P.isConfigured(provider, app.config)) {
-            return res.send({ status: false, statusText: `${P.byKey(provider).name} is not set up for this workspace yet.` });
+        const own = await loadAppConfig(companyId, userId, provider);
+        if (!P.isConfigured(provider, own.config)) {
+            return res.send({ status: false, statusText: `Add your ${P.byKey(provider).name} credentials first.` });
         }
         const state = R.encodeState({
             companyId,
@@ -308,7 +300,7 @@ exports.authUrl = async (req, res) => {
             returnTo: req.query && req.query.returnTo,
             returnOrigin: resolveReturnOrigin(req),
         });
-        const url = P.buildAuthUrl({ provider, config: app.config, redirectUri: redirectUri(), state });
+        const url = P.buildAuthUrl({ provider, config: own.config, redirectUri: redirectUri(), state });
         return res.send({ status: true, data: { url, redirectUri: redirectUri() } });
     } catch (e) {
         logger.error(`${LOG_PREFIX} authUrl: ${e.message}`);
@@ -345,12 +337,12 @@ exports.oauthCallback = async (req, res) => {
         if (!code) return fail('No authorization code was returned.', decoded.returnTo, returnOrigin);
 
         const { companyId, userId, provider } = decoded;
-        const app = await loadAppConfig(companyId, provider);
-        if (!app || !P.isConfigured(provider, app.config)) return fail('This provider is no longer set up.', decoded.returnTo, returnOrigin);
+        const own = await loadAppConfig(companyId, userId, provider);
+        if (!P.isConfigured(provider, own.config)) return fail('Your credentials for this provider are no longer set up.', decoded.returnTo, returnOrigin);
 
         const tokenRes = await axios.post(
-            P.tokenUrlFor(provider, app.config),
-            P.tokenRequestBody({ provider, config: app.config, code, redirectUri: redirectUri() }),
+            P.tokenUrlFor(provider),
+            P.tokenRequestBody({ provider, config: own.config, code, redirectUri: redirectUri() }),
             { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 20000 },
         );
         const tok = tokenRes.data || {};
@@ -406,23 +398,22 @@ exports.oauthCallback = async (req, res) => {
  * onto a response.
  */
 const getAccessToken = async (companyId, userId, provider) => {
-    const app = await loadAppConfig(companyId, provider);
-    if (!app || !app.enabled || !P.isConfigured(provider, app.config)) {
-        return { error: `${P.byKey(provider).name} is not set up for this workspace yet.` };
+    const { config, row: conn } = await loadAppConfig(companyId, userId, provider);
+    if (!P.isConfigured(provider, config)) {
+        return { error: `Add your ${P.byKey(provider).name} credentials first.` };
     }
-    const conn = await loadConnection(companyId, userId, provider);
     if (!conn) return { error: 'not_connected' };
 
     const current = decryptToken(conn.accessToken);
-    if (current && !R.isExpired(conn.expiresAt)) return { token: current, config: app.config };
+    if (current && !R.isExpired(conn.expiresAt)) return { token: current, config };
 
     const refresh = decryptToken(conn.refreshToken);
     if (!refresh) return { error: 'reauth_required' };
 
     try {
         const tokenRes = await axios.post(
-            P.tokenUrlFor(provider, app.config),
-            P.tokenRequestBody({ provider, config: app.config, refreshToken: refresh }),
+            P.tokenUrlFor(provider),
+            P.tokenRequestBody({ provider, config, refreshToken: refresh }),
             { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 20000 },
         );
         const tok = tokenRes.data || {};
@@ -436,7 +427,7 @@ const getAccessToken = async (companyId, userId, provider) => {
         // Providers sometimes rotate the refresh token on use.
         if (tok.refresh_token) patch.refreshToken = encryptToken(tok.refresh_token);
         await upsertConnection(companyId, userId, provider, patch);
-        return { token: tok.access_token, config: app.config };
+        return { token: tok.access_token, config };
     } catch (e) {
         const detail = (e.response && e.response.data && (e.response.data.error_description || e.response.data.error)) || e.message;
         logger.error(`${LOG_PREFIX} refresh failed (${provider}, user ${userId}): ${detail}`);
@@ -464,9 +455,9 @@ exports.pickerToken = async (req, res) => {
         if (!meta.oauth) {
             // Dropbox: nothing to hand out — the Chooser authenticates the user
             // itself against the public app key.
-            const app = await loadAppConfig(companyId, provider);
-            if (!app || !P.isConfigured(provider, app.config)) return res.send({ status: false, statusText: `${meta.name} is not set up for this workspace yet.` });
-            return res.send({ status: true, data: { token: '', config: P.publicConfig(provider, app.config) } });
+            const own = await loadAppConfig(companyId, userId, provider);
+            if (!P.isConfigured(provider, own.config)) return res.send({ status: false, statusText: `Add your ${meta.name} credentials first.` });
+            return res.send({ status: true, data: { token: '', config: P.publicConfig(provider, own.config) } });
         }
 
         const result = await getAccessToken(companyId, userId, provider);

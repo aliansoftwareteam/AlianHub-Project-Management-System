@@ -182,11 +182,10 @@
                                                 type="button" class="intg-link intg-danger" @click="disconnectCloud(p)"
                                             >{{ $t('Integrations.cloud_disconnect') }}</button>
                                             <button
-                                                v-if="cloudCanManage"
                                                 type="button" class="intg-link" @click="toggleCloudForm(p)"
                                             >{{ cloudEditing === p.provider ? $t('Integrations.cancel') : (p.configured ? $t('Integrations.edit') : $t('Integrations.cloud_setup')) }}</button>
                                             <button
-                                                v-if="cloudCanManage && p.configured"
+                                                v-if="p.configured"
                                                 type="button" class="intg-link intg-danger" @click="removeCloud(p)"
                                             >{{ $t('Integrations.delete') }}</button>
                                         </div>
@@ -427,10 +426,6 @@ const copySecret = async () => {
 //   the app registration  workspace-wide, owner/admin only
 //   the account grant     per user, because everyone has their own drive
 const cloudProviders = ref([]);
-// Always true — the server no longer gates setup behind a role. Kept as a single
-// switch the template reads, rather than scattering assumptions about who may
-// configure what.
-const cloudCanManage = ref(true);
 const cloudRedirectUri = ref('');
 const cloudEditing = ref('');
 const cloudForm = ref({});
@@ -439,7 +434,6 @@ const loadCloudSettings = async () => {
     try {
         const data = await fetchCloudSettings();
         cloudProviders.value = data.providers || [];
-        cloudCanManage.value = !!data.canManage;
         cloudRedirectUri.value = data.redirectUri || '';
     } catch (error) {
         // Non-fatal: the webhooks half of this page must still work.
@@ -471,9 +465,7 @@ const saveCloud = async (p) => {
 };
 
 const removeCloud = async (p) => {
-    // This clears the credentials for everyone and drops every user's connection
-    // to that provider, so it is not a per-user action despite living in a
-    // per-user-looking row. Confirm before doing it.
+    // Only ever the caller's own credentials and grant — nobody else is affected.
     if (!window.confirm(t('Integrations.cloud_confirm_remove', { provider: p.name }))) return;
     isSpinner.value = true;
     try {

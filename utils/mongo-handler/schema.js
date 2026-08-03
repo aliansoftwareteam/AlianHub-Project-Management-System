@@ -695,8 +695,17 @@ const schema = {
     // Tokens are AES-256-GCM ciphertext (Modules/CloudStorage/helpers/cloudCrypto),
     // never plaintext, and are never returned to the browser.
     cloudStorageConnections: {
-        provider: { type: String, required: true },      // google_drive | onedrive | dropbox
+        provider: { type: String, required: true },      // google_drive | dropbox
         userId: { type: String, required: true },
+        // The user's OWN app registration for this provider (client id/secret,
+        // api key, app id / app key). Per-user, not per-company: one member must
+        // never see or overwrite another's credentials, and two people may point
+        // at the same drive account independently.
+        //
+        // MUST stay declared — this sub-schema is strict: true, so an undeclared
+        // path is silently dropped on save and only shows up as data that
+        // vanishes after a reload.
+        config: { type: Object, default: {}, required: false },
         accountEmail: { type: String, required: false },
         accountName: { type: String, required: false },
         accessToken: { type: String, required: false },  // encrypted
