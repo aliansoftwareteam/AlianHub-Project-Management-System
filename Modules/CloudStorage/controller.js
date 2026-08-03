@@ -510,10 +510,13 @@ exports.pickerToken = async (req, res) => {
  * something that is often simply "this file has no preview".
  */
 exports.thumbnail = async (req, res) => {
+    // Read outside the try: the catch logs it, and a const declared inside the try
+    // is not in scope there — referencing it threw a ReferenceError, which rejected
+    // the handler and brought the process down via unhandledRejection.
+    const provider = String((req.params || {}).provider || '');
     try {
         const companyId = companyOf(req);
         const userId = userOf(req);
-        const provider = String(req.params.provider || '');
         const fileId = R.clip((req.query || {}).fileId, 512);
         if (!P.isProvider(provider)) return res.send({ status: false, statusText: 'Unknown provider.' });
         if (!companyId || !userId) return res.send({ status: false, statusText: 'companyId and an authenticated user are required.' });
