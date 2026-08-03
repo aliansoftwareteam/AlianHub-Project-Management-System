@@ -48,6 +48,12 @@ function sanitizeNotePayload(body) {
     if (b.convertedTaskId !== undefined) {
         out.convertedTaskId = b.convertedTaskId ? String(b.convertedTaskId) : '';
     }
+    // Archive / restore. Expressed as a boolean by the client and stored on the
+    // existing deletedStatusKey using this app's convention (0 = active,
+    // 1 = deleted, 2 = archived), so no schema change is needed.
+    if (b.archived !== undefined) {
+        out.deletedStatusKey = (b.archived === true || b.archived === 'true') ? 2 : 0;
+    }
     return out;
 }
 

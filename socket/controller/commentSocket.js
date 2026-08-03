@@ -21,6 +21,35 @@ exports.commentSocketHandler = ({ socket, namespace }) => {
         removeRoom(roomName);
         leaveRoom(socket, roomName);
     });
+
+    /**
+     * Relay a typing signal to the other people in a conversation.
+     *
+     * Deliberately NOT persisted and NOT routed through the change-stream/socketEmitter
+     * path the comment events use — this is transient presence, it must not touch the
+     * database, and a dropped one is harmless (the receiver expires it on a timer).
+     *
+     * Addressed to each subscriber's socket directly rather than via
+     * `namespace.to(roomName)`: the room name embeds a socket id, so a room can outlive
+     * the membership it was registered with, and a missed indicator is not worth
+     * inheriting that failure mode.
+     */
+    socket.on('commentTyping', (data) => {
+        if (!data || !data.roomPrefix) return;
+
+        const payload = {
+            roomPrefix: data.roomPrefix,
+            userId: data.userId,
+            typing: !!data.typing,
+        };
+
+        findRoomsByPrefix(data.roomPrefix).forEach((entry) => {
+            // Never echo to the author — including their own other tabs, which the
+            // client also guards against by user id.
+            if (!entry.socket || entry.socket === socket || entry.socket.disconnected) return;
+            entry.socket.emit('commentTyping', payload);
+        });
+    });
 };
 
 function setEventName(type) {

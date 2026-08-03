@@ -40,9 +40,14 @@ exports.toggleReaction = async (req, res) => {
             ? { $pull: { reactions: { emoji, userId } } }
             : { $push: { reactions: { emoji, userId, createdAt: new Date() } } };
 
+        // `timestamps: false`: a reaction is metadata about a message, not an edit
+        // of it. Without this Mongoose bumps `updatedAt`, and every UI that infers
+        // "edited" from `createdAt !== updatedAt` (the chat bubble and the comment
+        // renderer both do) labelled a message as edited the moment anyone reacted
+        // to it. The pin update already suppresses timestamps for the same reason.
         const updated = await MongoDbCrudOpration(companyId, {
             type: schemaType,
-            data: [{ _id: targetObjId }, updateObj, { returnDocument: 'after' }],
+            data: [{ _id: targetObjId }, updateObj, { returnDocument: 'after', timestamps: false }],
         }, 'findOneAndUpdate');
 
         const updatedFields = { reactions: updated?.reactions || [] };

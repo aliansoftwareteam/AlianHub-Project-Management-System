@@ -55,9 +55,16 @@ exports.listMine = async (req, res) => {
         if (!companyId || !userId) {
             return res.send({ status: false, statusText: 'companyId and userId are required' });
         }
+        // ?archived=1 lists archived notes (deletedStatusKey 2) instead of active
+        // ones. Deleted notes (1) are never returned by either view.
+        const wantArchived = req.query && (req.query.archived === '1' || req.query.archived === 'true');
         const notes = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.NOTES,
-            data: [{ userId: String(userId), deletedStatusKey: 0 }, null, { sort: { updatedAt: -1 } }],
+            data: [
+                { userId: String(userId), deletedStatusKey: wantArchived ? 2 : 0 },
+                null,
+                { sort: { updatedAt: -1 } },
+            ],
         }, 'find');
         res.send({ status: true, data: notes || [] });
     } catch (error) {

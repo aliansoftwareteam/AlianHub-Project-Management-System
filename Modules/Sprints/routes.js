@@ -3,7 +3,7 @@ const burndown = require('./burndown');
 const { requirePermission } = require('../../Config/permissionGuard');
 
 // Whitelist of functions allowed to be called via PATCH /sprint/:id
-const ALLOWED_SPRINT_TYPES = ['editSprintName', 'updateSprint'];
+const ALLOWED_SPRINT_TYPES = ['editSprintName', 'updateSprint', 'deleteChannel'];
 
 // Whitelist of functions allowed to be called via PATCH /folder/:id
 const ALLOWED_FOLDER_TYPES = ['editFolderName', 'updateFolder'];

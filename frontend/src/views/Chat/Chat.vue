@@ -14,25 +14,30 @@
             v-if="clientWidth > responseWidth"
             class="mainchatcomponent"
             :selectedChat="selectedChat"
-            @selectedChat="selectedChat = $event"
+            @selectedChat="onSelectedChat($event)"
             :projects="projects"
             :loadingChats="loadingChats"
+            @loading="sidebarBusy = $event"
         />
         <Sidebar v-else v-model:visible="visible" title="Chats" :left="true" width="395px" :unMount="false" :hideHeader="true">
             <template #body>
                 <MainChatSidebarVue
                     :selectedChat="selectedChat"
-                    @selectedChat="selectedChat = $event"
+                    @selectedChat="onSelectedChat($event)"
                     :projects="projects"
                     @hide="visible = !visible"
                     :loadingChats="loadingChats"
+                    @loading="sidebarBusy = $event"
                 />
             </template>
         </Sidebar>
         <!-- RIGHT SECTION -->
         <template v-if="allowChannelFeature">
-            <div :style="`width: calc(100%${clientWidth > responseWidth ?' - 400px' : ''});`">
-                <div class="border-bottom d-flex align-items-center justify-content-between selected__chat-div  p0x-10px" v-if="selectedChat?.id || loadingChats">
+            <div :style="`width: calc(100%${clientWidth > responseWidth ?' - 350px' : ''});`">
+                <!-- Legacy conversation header. The new module renders its own
+                     (MainChatHeader), so this must stay hidden when v2 is active or
+                     the page shows two stacked headers. -->
+                <div class="border-bottom d-flex align-items-center justify-content-between selected__chat-div  p0x-10px" v-if="!useNewChatUI && (selectedChat?.id || loadingChats)">
                     <template v-if="!loadingChats">
                         <div class="d-flex">
                             <img :src="sidebarArrowIcon" alt="sidebarArrowIcon" @click="visible =! visible" v-if="clientWidth <= responseWidth" class="mr-10px">
@@ -87,7 +92,7 @@
                     </template>
                 </div>
                 <template v-if="loadingChats">
-                    <div class="bg-light-gray commments__component-wrapper position-re">
+                    <div class="bg-light-gray commments__component-wrapper position-re" :class="{'commments__component-wrapper--full': useNewChatUI}">
                         <div class="d-grid flex-column w-100">
                             <div class="d-flex w-100 pl-10px">
                                 <div>
@@ -118,9 +123,29 @@
                     </div>
                 </template>
                 <template v-else>
-                    <div class="bg-light-gray commments__component-wrapper" v-if="selectedChat?.id && selectedProject?._id">
+                    <div class="bg-light-gray commments__component-wrapper" :class="{'commments__component-wrapper--full': useNewChatUI}" v-if="selectedChat?.id && selectedProject?._id">
+                        <!-- New Main Chat module (components/organisms/MainChat): owns the
+                             chat UI on its own, separate from the shared Comments component
+                             below (which task + project comments also use, and which is
+                             deliberately left untouched). Opt in with
+                             localStorage `alianhub.mainChatUI` = "v2". -->
+                        <MainChatPanel
+                            v-if="useNewChatUI && selectedChat?.id && !loadingChats"
+                            :key="`mc_${selectedProject?._id}_${selectedChat?.id}`"
+                            :taskId="selectedProject?.default ? selectedChat?.id : 'default'"
+                            :sprintId="selectedProject?.default ? selectedChat?.sprintId : selectedChat?.id"
+                            :newChat="selectedChat?.newChat || false"
+                            :watchers="[...(selectedProject?.default ? (selectedChat.AssigneeUserId || []) : ((selectedChat?.private ? selectedChat?.AssigneeUserId : users) || []))]"
+                            :isChannel="!selectedProject?.default"
+                            :icon="selectedProject?.default ? {} : (selectedChat || {})"
+                            :title="selectedProject?.default ? (getUser(selectedChat?.receiverId)?.Employee_Name || '') : (selectedChat?.name || '')"
+                            :subtitle="selectedProject?.default ? '' : (selectedChat?.private ? $t('MainChat.private_channel') : '')"
+                            :avatarSrc="selectedProject?.default ? (getUser(selectedChat?.receiverId)?.Employee_profileImageURL || '') : ''"
+                            :sendMessageAllowed="sendMessageAllowed"
+                            @created="onChatCreated"
+                        />
                         <Comments
-                            v-if="selectedChat?.id && !loadingChats"
+                            v-else-if="selectedChat?.id && !loadingChats"
                             :taskId="selectedProject?.default ? selectedChat?.id : 'default'"
                             :sprintId="selectedProject?.default ? selectedChat.sprintId : selectedChat?.id"
                             :userIds="[...(selectedProject?.default ? (selectedChat.AssigneeUserId || []) : ((selectedChat?.private ? selectedChat?.AssigneeUserId : users) || []))]"
@@ -128,10 +153,15 @@
                             :mainChat="true"
                             :newChat="selectedChat?.newChat || false"
                             :title="selectedProject.default ? getUser(userId)?.Employee_Name : selectedChat?.name"
-                            :sendMessageAllowed="selectedChat?.sendMessage == false ? false : true"
+                            :sendMessageAllowed="sendMessageAllowed"
                             :selectedChat="selectedChat"
                         />
                     </div>
+                    <!-- Switching Chats <-> Channels clears the selection while the new
+                         project's conversations resolve. Hold a neutral panel during
+                         that window, otherwise the "welcome" screen flashes for a few
+                         hundred ms as though the user had no chats at all. -->
+                    <div v-else-if="chatPaneBusy" class="bg-light-gray w-100 h-100"></div>
                     <div v-else class="bg-light-gray flex-column d-flex align-items-center justify-content-center text-center w-100 h-100 position-re">
                         <div class="position-ab bg-white pl-15px pr-15px pt-10px pb-10px border-right-radius-5-px box-shadow-2" style="top: 10px; left: 0px;" v-if="!visible && clientWidth <= responseWidth">
                             <img :src="sidebarArrowIcon" alt="sidebarArrowIcon" @click="visible =! visible">
@@ -189,7 +219,7 @@
 // PACKAGES
 import { computed, defineComponent, inject, onMounted, onUnmounted, provide, ref, watch } from "vue";
 import { useConvertDate, useGetterFunctions,useCustomComposable } from "@/composable";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import {useMainChat} from "./helper"
 import { useStore } from "vuex";
 import { useToast } from "vue-toast-notification";
@@ -207,6 +237,7 @@ import MainChatSidebarVue from "@/components/organisms/MainChatSidebar/MainChatS
 import Sidebar from "@/components/molecules/Sidebar/Sidebar.vue"
 import Skelaton from "@/components/atom/Skelaton/Skelaton.vue"
 import Comments from '@/views/Projects/Comments/Comments.vue'
+import MainChatPanel from '@/components/organisms/MainChat/MainChatPanel.vue'
 import UserProfile from "@/components/atom/UserProfile/UserProfile.vue"
 import Assignee from "@/components/molecules/Assignee/Assignee.vue"
 import TaskAudioFiles from '@/components/molecules/TaskAudioFiles/TaskAudioFiles.vue'
@@ -226,6 +257,7 @@ const {getUser} = useGetterFunctions();
 const {convertDateFormat} = useConvertDate();
 const {getters,commit} = useStore();
 const route = useRoute();
+const router = useRouter();
 const $toast = useToast();
 const {getProjects, dispatchChats} = useMainChat();
 const {checkPermission} = useCustomComposable();
@@ -266,10 +298,69 @@ const selectedMessageType = ref('search');
 const projects = ref([]);
 const snapRef = ref(null);
 const loadingChats = ref(true);
+// True while the sidebar is resolving a project's conversations.
+const sidebarBusy = ref(false);
+// True from the moment a tab switch clears the selection until something is
+// selected again. `sidebarBusy` alone was not enough: setProject() nulls the
+// selection synchronously, and the fetch that raises sidebarBusy only starts a
+// few ticks later (route push -> watcher -> getSprintFolderData), so the welcome
+// screen still flashed in that gap.
+const switchingProject = ref(false);
+let switchingTimer = null;
+
+const chatPaneBusy = computed(() => loadingChats.value || sidebarBusy.value || switchingProject.value);
+
+function onSelectedChat(chat) {
+    selectedChat.value = chat;
+    clearTimeout(switchingTimer);
+
+    if (chat && chat.id) {
+        switchingProject.value = false;
+        return;
+    }
+
+    // Selection cleared -> a switch is in flight. The backstop matters: a project
+    // with no conversations at all never selects anything, and the welcome screen
+    // is the correct thing to show there — it must not be suppressed forever.
+    switchingProject.value = true;
+    switchingTimer = setTimeout(() => { switchingProject.value = false; }, 1500);
+}
+
+// New Main Chat surface (components/organisms/MainChat), reached from the header
+// chat icon like any other chat route. Unread counts and push notifications are
+// ported, so the recipient side behaves as before. Escape hatch, no rebuild
+// needed, if anything looks off:
+//     localStorage.setItem('alianhub.mainChatUI', 'legacy')  // previous UI
+//     localStorage.removeItem('alianhub.mainChatUI')         // new UI
+// Still to come: reactions, edit, pin, @-mention autocomplete, audio record and
+// in-conversation search — the legacy surface remains mounted below for those.
+const useNewChatUI = computed(() => {
+    try {
+        return localStorage.getItem('alianhub.mainChatUI') !== 'legacy';
+    } catch (error) {
+        return true;
+    }
+});
+
+// A brand-new one-to-one has no task until the first message creates it; point
+// the route at the real conversation so a refresh lands in the same place.
+function onChatCreated(taskId) {
+    if (!taskId) return;
+    selectedChat.value = { ...(selectedChat.value || {}), id: taskId, newChat: false };
+    router.push({ ...route, params: { ...route.params, sid: taskId } });
+}
 const sidebarTitle = ref('');
 const socket= inject("$socket");
 
-const users = computed(()=> getters["settings/companyUsers"]?.map((x) => x.userId))
+// Members of a public channel. Deleted members are excluded at the source:
+// settings/companyUsers keeps them (flagged isDelete), which is how removed people
+// were turning up as channel members — and in the unread / notification fan-out
+// this list also drives. isDelete is used rather than getUser().ghostUser because
+// it carries no load-order hazard: ghostUser reads true for EVERYONE until the
+// users store arrives, which would briefly empty the watcher list.
+const users = computed(()=> (getters["settings/companyUsers"] || [])
+    .filter((x) => x?.isDelete !== true)
+    .map((x) => x.userId))
 const teams = computed(() => getters["settings/teams"])
 const currentPlan = computed(() => getters['settings/selectedCompany']?.planFeature);
 const allowChatFeature = computed(() => currentPlan.value && currentPlan.value?.chat);
@@ -279,9 +370,53 @@ provide("selectedChat", selectedChat);
 
 const mainChatProjectGetter = computed(() => getters["mainChat/mainChatProjects"])
 
+/* ------------------------------------------------------------------ *
+ * One-to-one chat permission
+ *
+ * checkPermission returns the raw permission: true = Read & Write, false = Read,
+ * null/undefined = None (and always true for Owner/Admin).
+ *
+ * Read used to be indistinguishable from None here — anything other than `true`
+ * filtered the direct-message project out entirely, so a role granted Read lost the
+ * Chats tab completely. Read now means what it says: the conversations are visible,
+ * but the composer is closed.
+ * ------------------------------------------------------------------ */
+const oneToOnePermission = computed(() => checkPermission('chat.one_to_one_chat'));
+const canViewDirectMessages = computed(() => oneToOnePermission.value === true || oneToOnePermission.value === false);
+const canSendDirectMessages = computed(() => oneToOnePermission.value === true);
+
+provide("canSendDirectMessages", canSendDirectMessages);
+
+/** Chat projects this user may see: the DM project is dropped only on None. */
+function visibleChatProjects(list) {
+    const projectList = list || [];
+    return (canViewDirectMessages.value ? projectList : projectList.filter((e) => e.default === false)) || [];
+}
+
+/**
+ * May the current user post in the open conversation?
+ *
+ * Direct messages answer to the one-to-one permission; a channel answers to its own
+ * "members may send messages" flag, which is unchanged.
+ */
+const sendMessageAllowed = computed(() => {
+    if (selectedProject.value?.default) return canSendDirectMessages.value;
+    if (selectedChat.value?.sendMessage !== false) return true;
+
+    // The switch reads "Allows MEMBERS to send messages in this channel", so Owner and
+    // Admin keep posting rights — otherwise an owner turning it off silences themselves
+    // too, which is what makes the setting look broken.
+    //
+    // Only roleType 1 (Owner) and 2 (Admin) are fixed. The shared comment component
+    // also lists 7, but roles beyond 3 are company-created and 7 means something
+    // different in every company, so it is deliberately not copied here.
+    const roleType = getters['settings/companyUserDetail']?.roleType;
+    return roleType === 1 || roleType === 2;
+});
+
 onMounted(() => {
     if(mainChatProjectGetter.value?.data?.length) {
-        projects.value = (checkPermission('chat.one_to_one_chat') === true ? mainChatProjectGetter.value?.data : mainChatProjectGetter.value?.data.filter((e)=>e.default === false)) || [];
+        projects.value = visibleChatProjects(mainChatProjectGetter.value?.data);
         initalProcess(true);
     } else {
         handleSnapshot();
@@ -296,7 +431,7 @@ onMounted(() => {
 
 watch(mainChatProjectGetter, (newVal, oldVal) => {
     if(newVal?.data?.length && JSON.stringify(newVal) !== JSON.stringify(oldVal)) {
-        projects.value = (checkPermission('chat.one_to_one_chat') === true ? newVal?.data : newVal?.data.filter((e)=>e.default === false)) || [];
+        projects.value = visibleChatProjects(newVal?.data);
         initalProcess();
     }
 })
@@ -356,6 +491,7 @@ async function initalProcess(inital = false) {
 }
 
 onUnmounted(() => {
+    clearTimeout(switchingTimer);
     if(snapRef.value && snapRef.value !== null) {
         snapRef.value();
     }
@@ -481,7 +617,11 @@ function toggleChatSidebar(type = '') {
 
 <style scoped>
 .mainchatcomponent{
-    max-width: 400px;
+    /* fixed 350px, matching the right-hand details pane. Both panes must agree
+       with the conversation column's calc() below or the layout drifts. */
+    flex: 0 0 350px;
+    width: 350px;
+    max-width: 350px;
 }
 .selected__chat-div{
     height: 50px;
@@ -494,6 +634,12 @@ function toggleChatSidebar(type = '') {
 }
 .commments__component-wrapper{
     height: calc(100% - 51px);
+}
+/* The 51px above is the legacy conversation header's allowance. The new module
+   renders its own header INSIDE the panel, so subtracting it there left an empty
+   strip below the composer. */
+.commments__component-wrapper--full{
+    height: 100%;
 }
 .nochat__text{
     max-width: 496px;

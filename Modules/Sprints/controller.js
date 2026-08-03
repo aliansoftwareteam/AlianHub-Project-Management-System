@@ -258,6 +258,56 @@ exports.editSprintName = (req, res) => {
     }
 };
 
+/**
+ * Soft-delete a main-chat channel.
+ *
+ * Deliberately NOT folded into updateSprint (which project sprints share): the
+ * company's channel quota has to come back down. addSprintFun increments
+ * projectCount.channels and .privateChannels/.publicChannels on create and only
+ * decrements them when the create itself fails — so without this a deleted channel
+ * would keep counting against the plan limit forever.
+ *
+ * Messages are left in place. Comments are keyed by sprintId and this is a soft
+ * delete, so removing them would be destructive and unrecoverable.
+ */
+exports.deleteChannel = (req, res) => {
+    try {
+        const { companyId } = req.body;
+        const { id } = req.params;
+
+        const object = {
+            type: SCHEMA_TYPE.SPRINTS,
+            data: [
+                { _id: new mongoose.Types.ObjectId(id) },
+                { $set: { deletedStatusKey: 1 } },
+                { returnDocument: 'after' }
+            ]
+        };
+
+        MongoQ.MongoDbCrudOpration(companyId, object, "findOneAndUpdate").then((response) => {
+            if (!response) {
+                res.send({ status: false, statusText: "Channel not found" });
+                return;
+            }
+
+            res.send({ status: true, statusText: "Sprint_deleted_successfully", data: response });
+
+            // Read the private flag off the STORED document, not the request body, so
+            // a stale or forged value cannot decrement the wrong quota bucket.
+            exports.updateChannelsCounts(companyId, !!response.private, 'dec')
+            .catch((error) => {
+                logger.error(`DELETE CHANNEL COUNT ERROR : ${error}`);
+            });
+        }).catch((error) => {
+            logger.error(`DELETE CHANNEL ERROR : ${error}`);
+            res.send({ status: false, statusText: error.message });
+        });
+    } catch (error) {
+        logger.error(error.message);
+        res.send({ status: false, statusText: error.message });
+    }
+};
+
 exports.updateSprint = (req, res) => {
     exports.updateSprintFun(req).then((data) => {
         res.json(data);

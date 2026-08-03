@@ -1,0 +1,337 @@
+/* Reminders list panel. Scoped to this component — no global selectors. */
+
+.grp__overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 19;
+    background: rgba(23, 24, 36, 0.28);
+}
+
+.grp__panel {
+    position: absolute;
+    top: 52px;
+    right: 16px;
+    width: 380px;
+    max-width: calc(100vw - 24px);
+    max-height: calc(100vh - 80px);
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border: 1px solid #E6E7EF;
+    border-radius: 12px;
+    box-shadow: 0 16px 44px rgba(23, 24, 36, 0.2);
+    overflow: hidden;
+}
+
+/* Header */
+.grp__head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 13px 14px;
+    border-bottom: 1px solid #EDEDF3;
+}
+.grp__title {
+    font-size: 14.5px;
+    font-weight: 600;
+    color: #191A2B;
+}
+.grp__headactions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+}
+.grp__add {
+    padding: 5px 11px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #fff;
+    background: #2F3990;
+    border: 0;
+    border-radius: 7px;
+}
+.grp__add:hover {
+    background: #262E75;
+}
+.grp__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+    color: #8A8CA6;
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+}
+.grp__close:hover {
+    background: #F2F2F8;
+    color: #191A2B;
+}
+
+/* Filters */
+.grp__filters {
+    display: flex;
+    gap: 6px;
+    padding: 10px 14px;
+    border-bottom: 1px solid #EDEDF3;
+}
+.grp__filter {
+    padding: 4px 11px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #6B6B70;
+    background: #F4F4FA;
+    border: 0;
+    border-radius: 999px;
+}
+.grp__filter:hover {
+    background: #EAEEFF;
+    color: #2F3990;
+}
+.grp__filter.is-active {
+    background: #2F3990;
+    color: #fff;
+}
+
+/* States */
+.grp__state {
+    padding: 26px 14px;
+    font-size: 13px;
+    color: #84869B;
+    text-align: center;
+}
+
+/* List */
+.grp__list {
+    overflow-y: auto;
+    padding: 6px;
+}
+.grp__item {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 10px;
+    border-radius: 9px;
+}
+.grp__item:hover {
+    background: #FAFAFD;
+}
+.grp__item.is-done .grp__itemtitle {
+    text-decoration: line-through;
+    color: #9092AC;
+}
+/* Reset the button chrome first — default padding/line-height squashes the
+   tick SVG inside the 18px box and makes it look clipped. */
+.grp__check {
+    flex: none;
+    box-sizing: border-box;
+    -webkit-appearance: none;
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    margin: 2px 0 0;
+    line-height: 1;
+    color: #fff;
+    background: #fff;
+    border: 1.5px solid #C9CDE0;
+    border-radius: 4px;
+    transition: background 0.12s ease, border-color 0.12s ease;
+}
+.grp__check svg {
+    display: block;
+    width: 11px;
+    height: 11px;
+}
+.grp__check:hover {
+    border-color: #2F3990;
+}
+.grp__check.is-on {
+    background: #2F3990;
+    border-color: #2F3990;
+}
+.grp__main {
+    flex: 1;
+    min-width: 0;
+}
+.grp__itemtitle {
+    font-size: 13.5px;
+    font-weight: 500;
+    color: #191A2B;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.grp__itemdesc {
+    margin-top: 2px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: #6B6B70;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.grp__meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 5px;
+    font-size: 11.5px;
+    color: #84869B;
+}
+.grp__when {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.is-overdue .grp__when {
+    color: #9B2C2C;
+    font-weight: 500;
+}
+/* Attachment links */
+.grp__files {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+}
+.grp__file {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 100%;
+    padding: 3px 8px;
+    font-size: 11.5px;
+    color: #2F3990;
+    background: #EAEEFF;
+    border: 0;
+    border-radius: 999px;
+}
+.grp__file:hover {
+    background: #DDE3FF;
+}
+.grp__file:disabled {
+    opacity: 0.55;
+    cursor: default;
+}
+.grp__file .grp__filename {
+    max-width: 150px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Menu section label */
+.grp__menulabel {
+    padding: 5px 9px 3px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #9092AC;
+}
+.grp__menuitem--sub {
+    padding-left: 16px;
+}
+
+.grp__notify,
+.grp__fired {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 7px;
+    background: #F4F4FA;
+    border-radius: 999px;
+}
+.grp__fired {
+    background: #E3F3EC;
+    color: #166B4E;
+}
+.grp__for {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 7px;
+    background: #EAEEFF;
+    color: #2F3990;
+    border-radius: 999px;
+    font-weight: 500;
+}
+.grp__pending {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 7px;
+    background: #FBF0DC;
+    color: #8A5A0B;
+    border-radius: 999px;
+}
+/* Read-only checkbox in the "Assigned by me" view — shows state, not clickable. */
+.grp__check--static {
+    cursor: default;
+    opacity: 0.75;
+}
+
+/* Row menu */
+.grp__menubtn {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    background: transparent;
+    border: 0;
+    border-radius: 5px;
+    opacity: 0;
+}
+.grp__item:hover .grp__menubtn {
+    opacity: 1;
+}
+.grp__menubtn:hover {
+    background: #EDEDF3;
+}
+/* Fixed, not absolute: the row lives inside .grp__list which scrolls, and a
+   scroll container clips absolutely-positioned children. Coordinates are
+   computed from the trigger button in toggleMenu(). */
+.grp__menu {
+    position: fixed;
+    z-index: 25;
+    min-width: 172px;
+    padding: 4px;
+    background: #fff;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(23, 24, 36, 0.14);
+}
+.grp__menuitem {
+    padding: 7px 9px;
+    font-size: 12.5px;
+    color: #191A2B;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.grp__menuitem:hover {
+    background: #F4F4FA;
+}
+.grp__menuitem--danger {
+    color: #9B2C2C;
+}
+.grp__menuitem--danger:hover {
+    background: #FBEBEB;
+}
+
+@media (max-width: 640px) {
+    .grp__panel {
+        right: 8px;
+        left: 8px;
+        width: auto;
+    }
+}

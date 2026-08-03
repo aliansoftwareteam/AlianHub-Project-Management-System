@@ -133,9 +133,12 @@ const props = defineProps({
         type: Object,
         default: null
     },
+    // Pre-fill the creator as assignee when the inline task row opens. Defaults
+    // to true so a new task is self-assigned instead of starting unassigned;
+    // pass false to opt a call site out.
     addDefaultAssignee: {
         type: Boolean,
-        default: false
+        default: true
     },
     startDate: {
         type: Date

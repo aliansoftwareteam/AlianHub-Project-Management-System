@@ -50,7 +50,7 @@
                 </div>
             </template>
             </div>
-            <router-link class="position-re" :to="{name: 'chats', params: {cid: companyId}}" v-if="checkPermission('chat') == true">
+            <router-link class="position-re" :to="{name: 'chats', params: {cid: companyId}}" v-if="canOpenChat">
                 <img src="@/assets/images/svg/chat_icon.svg" class="cursor-pointer" id="chat_driver"/>
                 <span v-if="totalMainCounts" class="notification-tick blinking"></span>
             </router-link>
@@ -67,6 +67,9 @@
             </div>
             <div class="position-re" v-if="rules && Object.keys(rules).length">
                 <img src="@/assets/images/svg/clips_icon.svg" class="cursor-pointer" id="clips_driver" :title="$t('Clips.title')" @click="clipsVisible = true">
+            </div>
+            <div class="position-re" v-if="rules && Object.keys(rules).length">
+                <img src="@/assets/images/svg/reminder_icon.svg" class="cursor-pointer" id="reminder_driver" :title="$t('Reminders.header_tooltip')" @click="reminderVisible = true">
             </div>
             <div class="position-re" v-if="rules && Object.keys(rules).length">
                 <img src="@/assets/images/svg/mic_icon.svg" class="cursor-pointer" id="talk_to_text_driver" :title="$t('TalkToText.title')" @click="talkToTextVisible = true">
@@ -112,6 +115,8 @@
         <NotepadPanel v-model="notepadVisible" />
 
         <ClipsPanel v-model="clipsVisible" />
+
+        <ReminderPanel v-model="reminderVisible" />
 
         <!-- Single GLOBAL clip recorder: mounted here at the app shell (sibling of
              router-view in App.vue) so an in-progress recording survives task
@@ -212,7 +217,7 @@
                                 </DropDown>
                             </div>
                         </template>
-                        <router-link  v-if="rules && Object.keys(rules).length && checkPermission('chat') == true" class="p-1 cursor-pointer border-radius-7-px mobile-menu-list" @click="visible = false" :class="{'active-list-mobile' : $route.name.includes('chat')}" :to="{name: 'chats', params: {cid: companyId}}">
+                        <router-link  v-if="canOpenChat" class="p-1 cursor-pointer border-radius-7-px mobile-menu-list" @click="visible = false" :class="{'active-list-mobile' : $route.name.includes('chat')}" :to="{name: 'chats', params: {cid: companyId}}">
                             {{$t('Header.Chat')}}
                         </router-link>
                         <div  v-if="rules && Object.keys(rules).length" class="p-1 cursor-pointer border-radius-7-px mobile-menu-list" @click="openNotificationsDropdown(true)">
@@ -356,6 +361,7 @@ import WasabiIamgeCompp from "@/components/atom/WasabiIamgeCompp/WasabiIamgeComp
 import Sidebar from "@/components/molecules/Sidebar/Sidebar.vue";
 import NotepadPanel from "@/components/molecules/Notepad/NotepadPanel.vue";
 import ClipsPanel from "@/components/molecules/Clips/ClipsPanel.vue";
+import ReminderPanel from "@/components/molecules/GeneralReminder/ReminderPanel.vue";
 import ClipRecorder from "@/components/molecules/ClipRecorder/ClipRecorder.vue";
 import TalkToTextPopover from "@/components/molecules/TalkToText/TalkToTextPopover.vue";
 import DropDown from "@/components/molecules/DropDown/DropDown.vue";
@@ -462,6 +468,7 @@ const notificationVisible = ref(false);
 const tourVisible = ref(false);
 const notepadVisible = ref(false);
 const clipsVisible = ref(false);
+const reminderVisible = ref(false);
 const talkToTextVisible = ref(false);
 const myCounts = computed(() => getters["users/myCounts"]?.data || {})
 const totalNotification = computed(() => myCounts.value?.notification_counts);
@@ -535,6 +542,27 @@ watchEffect(async () => {
 })
 const rules = computed(() => {
     return getters['settings/rules']
+})
+
+/**
+ * May this user open the Chat module?
+ *
+ * `checkPermission('chat')` reads the PARENT "Chat" row — the module gate. The finer
+ * keys (one_to_one_chat, chat_category, chat_channel) govern what you can do once
+ * inside, not whether you get in.
+ *
+ * The old test was `== true`, i.e. Read & Write only, so a role granted **Read** on
+ * Chat had the icon hidden and no way into a module it was explicitly allowed to
+ * read. Only None hides it now. Owner/Admin still short-circuit to true inside
+ * checkPermission.
+ *
+ * The `rules` guard matches every other icon in this row: before the rule set loads
+ * checkPermission returns null for everyone, so without it the icon flickers in.
+ */
+const canOpenChat = computed(() => {
+    if (!rules.value || !Object.keys(rules.value).length) return false;
+    const permission = checkPermission('chat');
+    return permission !== null && permission !== undefined;
 })
 
 const logout = () => {
