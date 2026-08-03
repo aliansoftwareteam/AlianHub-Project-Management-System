@@ -18,6 +18,7 @@ const os = require('os');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { removeCache } = require('../../utils/commonFunctions');
+const { buildCorsAllowList, isOriginAllowed } = require('../../utils/cors');
 const logger = require('../../Config/loggerConfig');
 const P = require('./helpers/cloudProviders');
 const R = require('./helpers/cloudStorageRules');
@@ -36,6 +37,36 @@ const companyOf = (req) => req.headers['companyid'] || (req.body && req.body.com
 const userOf = (req) => String(req.uid || '');
 
 const apiBase = () => String(process.env.APIURL || '').replace(/\/+$/, '');
+
+/**
+ * Where to send the user after consent.
+ *
+ * The callback necessarily lands on the API origin (that is the registered
+ * redirect URI), but in development the SPA runs on a DIFFERENT origin — :8080
+ * with a dev-server proxy — so redirecting to APIURL would drop the user on
+ * :4000, a separate origin with its own localStorage, looking logged out.
+ *
+ * So the caller tells us where it came from, and we only honour it if it is on
+ * the CORS allow-list we already maintain (WEBURL / APIURL / CORS_ORIGINS).
+ * Validating here rather than at redirect time is what stops this becoming an
+ * open redirect — after this point the value is inside a signed token.
+ */
+const resolveReturnOrigin = (req) => {
+    const candidates = [
+        req.query && req.query.origin,
+        req.headers && req.headers.origin,
+        // Same-origin GETs often omit the Origin header; Referer still carries it.
+        (() => {
+            try { return new URL(String((req.headers || {}).referer || '')).origin; } catch (e) { return ''; }
+        })(),
+    ];
+    const allowList = buildCorsAllowList();
+    for (const candidate of candidates) {
+        const value = String(candidate || '').replace(/\/+$/, '');
+        if (value && isOriginAllowed(value, allowList) && /^https?:\/\//i.test(value)) return value;
+    }
+    return apiBase();
+};
 // Deliberately outside the JWT-protected /api/v1/cloud-storage prefix — see
 // routes.js. Whatever this resolves to must also be registered as an authorised
 // redirect URI in each provider's developer console, per environment.
@@ -288,7 +319,13 @@ exports.authUrl = async (req, res) => {
         if (!app || !app.enabled || !P.isConfigured(provider, app.config)) {
             return res.send({ status: false, statusText: `${P.byKey(provider).name} is not set up for this workspace yet.` });
         }
-        const state = R.encodeState({ companyId, userId, provider, returnTo: req.query && req.query.returnTo });
+        const state = R.encodeState({
+            companyId,
+            userId,
+            provider,
+            returnTo: req.query && req.query.returnTo,
+            returnOrigin: resolveReturnOrigin(req),
+        });
         const url = P.buildAuthUrl({ provider, config: app.config, redirectUri: redirectUri(), state });
         return res.send({ status: true, data: { url, redirectUri: redirectUri() } });
     } catch (e) {
@@ -305,8 +342,10 @@ exports.authUrl = async (req, res) => {
  * is verified before anything is written.
  */
 exports.oauthCallback = async (req, res) => {
-    const fail = (message, returnTo) => {
-        const target = `${apiBase()}${R.safeReturnPath(returnTo) || '/'}`;
+    // `origin` comes from the signed state, so it is one of the allow-listed
+    // values resolveReturnOrigin() approved when the flow started.
+    const fail = (message, returnTo, origin) => {
+        const target = `${origin || apiBase()}${R.safeReturnPath(returnTo) || '/'}`;
         const sep = target.includes('?') ? '&' : '?';
         return res.redirect(`${target}${sep}cloudStorage=error&reason=${encodeURIComponent(String(message).slice(0, 200))}`);
     };
@@ -317,14 +356,15 @@ exports.oauthCallback = async (req, res) => {
         // steer the redirect.
         if (!decoded) {
             logger.error(`${LOG_PREFIX} callback rejected: invalid or expired state`);
-            return fail('The sign-in link expired. Please try connecting again.', '');
+            return fail('The sign-in link expired. Please try connecting again.', '', '');
         }
-        if (error) return fail(String(error), decoded.returnTo);
-        if (!code) return fail('No authorization code was returned.', decoded.returnTo);
+        const returnOrigin = decoded.returnOrigin || apiBase();
+        if (error) return fail(String(error), decoded.returnTo, returnOrigin);
+        if (!code) return fail('No authorization code was returned.', decoded.returnTo, returnOrigin);
 
         const { companyId, userId, provider } = decoded;
         const app = await loadAppConfig(companyId, provider);
-        if (!app || !P.isConfigured(provider, app.config)) return fail('This provider is no longer set up.', decoded.returnTo);
+        if (!app || !P.isConfigured(provider, app.config)) return fail('This provider is no longer set up.', decoded.returnTo, returnOrigin);
 
         const tokenRes = await axios.post(
             P.tokenUrlFor(provider, app.config),
@@ -332,7 +372,7 @@ exports.oauthCallback = async (req, res) => {
             { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 20000 },
         );
         const tok = tokenRes.data || {};
-        if (!tok.access_token) return fail('The provider did not return an access token.', decoded.returnTo);
+        if (!tok.access_token) return fail('The provider did not return an access token.', decoded.returnTo, returnOrigin);
 
         // Best-effort: label the connection with the account it belongs to, so a
         // user with two Google accounts can tell which one is linked.
@@ -368,13 +408,13 @@ exports.oauthCallback = async (req, res) => {
         await upsertConnection(companyId, userId, provider, patch);
 
         logger.info(`${LOG_PREFIX} ${provider} connected for user ${userId}`);
-        const target = `${apiBase()}${R.safeReturnPath(decoded.returnTo) || '/'}`;
+        const target = `${returnOrigin}${R.safeReturnPath(decoded.returnTo) || '/'}`;
         const sep = target.includes('?') ? '&' : '?';
         return res.redirect(`${target}${sep}cloudStorage=connected&provider=${encodeURIComponent(provider)}`);
     } catch (e) {
         const detail = (e.response && e.response.data && (e.response.data.error_description || e.response.data.error)) || e.message;
         logger.error(`${LOG_PREFIX} oauthCallback: ${detail}`);
-        return fail(detail, '');
+        return fail(detail, '', '');
     }
 };
 

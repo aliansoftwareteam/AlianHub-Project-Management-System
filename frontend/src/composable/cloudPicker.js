@@ -113,8 +113,12 @@ const fetchPickerToken = async (provider) => {
 export const connectCloudProvider = async (provider, returnTo) => {
     // Query string built into the URL: apiRequest's 5th argument is spread into
     // the axios config, so it is not a params bag.
+    //
+    // `origin` is sent explicitly because the dev server proxies /api, making this
+    // a SAME-origin request — browsers omit the Origin header on those, so the
+    // server would otherwise have to guess. It only honours allow-listed values.
     const target = returnTo || (window.location.pathname + window.location.search);
-    const query = `?returnTo=${encodeURIComponent(target)}`;
+    const query = `?returnTo=${encodeURIComponent(target)}&origin=${encodeURIComponent(window.location.origin)}`;
     const res = await apiRequest('get', `${env.CLOUD_STORAGE}/${provider}/auth-url${query}`);
     const payload = res && res.data;
     if (!payload || !payload.status || !payload.data || !payload.data.url) {

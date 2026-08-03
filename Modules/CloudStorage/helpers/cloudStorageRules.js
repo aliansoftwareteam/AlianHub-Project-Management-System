@@ -18,7 +18,7 @@ const STATE_TTL = '10m';
 
 const stateSecret = () => `${process.env.JWT_SECRET || ''}::cloud-storage-state`;
 
-const encodeState = ({ companyId, userId, provider, returnTo }, secret = stateSecret()) => jwt.sign(
+const encodeState = ({ companyId, userId, provider, returnTo, returnOrigin }, secret = stateSecret()) => jwt.sign(
     {
         companyId: String(companyId),
         userId: String(userId),
@@ -26,6 +26,13 @@ const encodeState = ({ companyId, userId, provider, returnTo }, secret = stateSe
         // Only a path is kept — never a full URL. An attacker-supplied absolute
         // URL here would turn the callback into an open redirect.
         returnTo: safeReturnPath(returnTo),
+        // The origin the flow started from, so consent returns the user to the
+        // app they were actually using. In dev the SPA is on :8080 while the API
+        // (and therefore the callback) is on :4000 — without this the user lands
+        // on :4000, a different origin, with different localStorage, and appears
+        // logged out. The CALLER must have validated this against the CORS
+        // allow-list before minting; the signature then makes it tamper-proof.
+        returnOrigin: String(returnOrigin || ''),
     },
     secret,
     { algorithm: 'HS256', audience: STATE_AUDIENCE, expiresIn: STATE_TTL },
