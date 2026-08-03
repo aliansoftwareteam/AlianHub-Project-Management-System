@@ -24,8 +24,6 @@ export const CLOUD_PROVIDERS = {
     dropbox: { key: 'dropbox', label: 'Dropbox', short: 'Dropbox', icon: dropboxIcon, color: '#0061ff' },
 };
 
-export const CLOUD_PROVIDER_LIST = Object.values(CLOUD_PROVIDERS);
-
 /**
  * Is this attachment a link into someone's cloud drive (rather than a file we
  * store)? Unknown `source` values are treated as NOT cloud, so a record written
@@ -39,13 +37,36 @@ export const cloudProviderOf = (attachment) =>
     (isCloudAttachment(attachment) ? CLOUD_PROVIDERS[attachment.source] : null);
 
 /**
+ * Only http(s) may ever reach window.open or an href.
+ *
+ * A link-mode attachment is written through the ordinary task/project update API,
+ * whose `attachments` array is free-form — so the record does NOT have to have
+ * come from a picker. A crafted one carrying
+ * `source: 'google_drive', externalUrl: 'javascript:…'` would otherwise be stored
+ * XSS that fires when any viewer clicks the tile. Validating at the point of use
+ * covers every route the record can arrive by, now or later.
+ */
+export const safeExternalUrl = (value) => {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    try {
+        const parsed = new URL(raw);
+        return (parsed.protocol === 'https:' || parsed.protocol === 'http:') ? raw : '';
+    } catch (e) {
+        return ''; // not absolute, so not something we hand to the browser
+    }
+};
+
+/**
  * Open a linked file in its provider. `noopener,noreferrer` matters here: the
  * target is a third-party origin, and without it the opened tab gets a
  * `window.opener` handle back into the app.
  */
 export const openCloudAttachment = (attachment) => {
-    if (!isCloudAttachment(attachment) || !attachment.externalUrl) return false;
-    window.open(attachment.externalUrl, '_blank', 'noopener,noreferrer');
+    if (!isCloudAttachment(attachment)) return false;
+    const url = safeExternalUrl(attachment.externalUrl);
+    if (!url) return false;
+    window.open(url, '_blank', 'noopener,noreferrer');
     return true;
 };
 
@@ -71,7 +92,8 @@ export const buildCloudAttachment = ({ provider, file, userId, id }) => {
 
         source: provider,
         externalId: String((file && file.id) || ''),
-        externalUrl: String((file && file.url) || ''),
+        // Sanitised on the way in as well as on the way out.
+        externalUrl: safeExternalUrl(file && file.url),
         externalIcon: String((file && file.iconUrl) || ''),
         thumbnailUrl: String((file && file.thumbnailUrl) || ''),
         externalOwner: String((file && file.owner) || ''),

@@ -290,15 +290,6 @@ const thumbnailRequestFor = (provider, fileId) => {
     return null;
 };
 
-/** Metadata endpoint used to learn a file's real name/size/mime before import. */
-const metadataRequestFor = (provider, fileId) => {
-    const id = encodeURIComponent(String(fileId || ''));
-    if (provider === 'google_drive') {
-        return { url: `https://www.googleapis.com/drive/v3/files/${id}?fields=id,name,size,mimeType,webViewLink,iconLink&supportsAllDrives=true` };
-    }
-    return null; // Dropbox: the Chooser already gives us everything we need.
-};
-
 module.exports = {
     PROVIDERS,
     PROVIDER_KEYS,
@@ -316,5 +307,4 @@ module.exports = {
     parseAccount,
     downloadRequestFor,
     thumbnailRequestFor,
-    metadataRequestFor,
 };

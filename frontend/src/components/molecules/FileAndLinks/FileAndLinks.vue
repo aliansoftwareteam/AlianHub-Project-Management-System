@@ -219,7 +219,7 @@
     // Utils
     import { useGetterFunctions } from '@/composable';
     import { download } from "@/utils/StorageOprations/download";
-    import { cloudProviderOf, cloudPreviewUrlFor } from "@/utils/cloudAttachment";
+    import { cloudProviderOf, cloudPreviewUrlFor, safeExternalUrl } from "@/utils/cloudAttachment";
     import { dbCollections } from '@/utils/Collections';
     import { useI18n } from "vue-i18n";
     import { apiRequest } from "../../../services";
@@ -571,8 +571,12 @@
     // AHE-3838 — hand a linked file back to its provider. noopener/noreferrer
     // because the target is a third-party origin.
     const openCloudItem = (item) => {
-        if (!item || !item.cloudUrl) return;
-        window.open(item.cloudUrl, '_blank', 'noopener,noreferrer');
+        if (!item) return;
+        // Same scheme guard as the attachment tile — a javascript: URL stored on
+        // the record must never reach window.open.
+        const url = safeExternalUrl(item.cloudUrl);
+        if (!url) return;
+        window.open(url, '_blank', 'noopener,noreferrer');
     };
 
     // This function is used download seleted document

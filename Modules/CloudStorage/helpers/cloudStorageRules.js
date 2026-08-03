@@ -59,12 +59,8 @@ const safeReturnPath = (value) => {
     return raw.slice(0, 512);
 };
 
-// ── Picked-file normalisation ───────────────────────────────────────────────
-//
-// The three pickers return three different shapes, and the payload comes from
-// the BROWSER, so nothing in it is trusted. Clip every string, coerce the size,
-// and only keep https links — a `javascript:` externalUrl would otherwise become
-// a stored XSS vector the moment someone clicks the tile.
+// ── URL / string safety ────────────────────────────────────────────────────
+
 const clip = (value, max = 512) => String(value === null || value === undefined ? '' : value).slice(0, max);
 
 const isHttpsUrl = (value) => /^https:\/\/[^\s]+$/i.test(String(value || ''));
@@ -103,52 +99,7 @@ const isDropboxContentUrl = (value) => {
     return host.endsWith('.dl.dropboxusercontent.com');
 };
 
-const MAX_FILES_PER_PICK = 20;
-
-const normalizePickedFile = (raw) => {
-    const f = raw && typeof raw === 'object' ? raw : {};
-    const name = clip(f.name || f.filename || '', 255).trim();
-    if (!name) return null;
-    const id = clip(f.id || f.externalId || '', 512);
-    if (!id) return null;
-    const url = clip(f.url || f.link || f.webViewLink || '', 2048);
-    const size = Number(f.size || f.bytes || 0);
-    return {
-        id,
-        name,
-        size: Number.isFinite(size) && size >= 0 ? size : 0,
-        mimeType: clip(f.mimeType || f.mime_type || '', 255),
-        url: isHttpsUrl(url) ? url : '',
-        iconUrl: isHttpsUrl(f.iconUrl || f.iconLink) ? clip(f.iconUrl || f.iconLink, 2048) : '',
-        thumbnailUrl: isHttpsUrl(f.thumbnailUrl || f.thumbnailLink) ? clip(f.thumbnailUrl || f.thumbnailLink, 2048) : '',
-        owner: clip(f.owner || '', 255),
-    };
-};
-
-const normalizePickedFiles = (list) => (Array.isArray(list) ? list : [])
-    .slice(0, MAX_FILES_PER_PICK)
-    .map(normalizePickedFile)
-    .filter(Boolean);
-
-// ── Connection shaping ─────────────────────────────────────────────────────
-//
-// What the browser is allowed to know about a stored connection. Deliberately an
-// allow-list: accessToken/refreshToken must never leave the server, so they are
-// never named here.
-const redactConnection = (conn) => {
-    if (!conn) return null;
-    const o = conn.toObject ? conn.toObject() : conn;
-    return {
-        provider: o.provider,
-        connected: o.status === 'connected',
-        status: o.status || 'connected',
-        accountEmail: o.accountEmail || '',
-        accountName: o.accountName || '',
-        connectedAt: o.connectedAt || null,
-        lastUsedAt: o.lastUsedAt || null,
-    };
-};
-
+// ── Token freshness ────────────────────────────────────────────────────────
 /** Treat a token as stale slightly early, so it can't expire mid-request. */
 const EXPIRY_SKEW_MS = 60 * 1000;
 const isExpired = (expiresAt, now = new Date()) => {
@@ -168,10 +119,6 @@ module.exports = {
     isDropboxContentUrl,
     DROPBOX_CONTENT_HOSTS,
     clip,
-    MAX_FILES_PER_PICK,
-    normalizePickedFile,
-    normalizePickedFiles,
-    redactConnection,
     isExpired,
     EXPIRY_SKEW_MS,
 };
