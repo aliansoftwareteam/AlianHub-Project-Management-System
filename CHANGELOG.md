@@ -16,6 +16,22 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.21.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.20.0...v14.21.0) (2026-08-03)
+
+
+### 🚀 Features
+
+* **clips:** rebuild clips as a popover, add convert to task, simplify recording ([3493a47](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3493a47e5c7807cac2d8a41949e2eb43031e9597))
+* **clips:** rebuild clips as a popover, add convert to task, simplify recording ([23209c9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/23209c934ba73b3b308b13ec78b6e65c5e511450))
+* **notepad:** rebuild the notepad as a popover with archive and note editor ([0e1bd6a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0e1bd6a8e208890a7b4e357736b126684845ad1d))
+* **notepad:** rebuild the notepad as a popover with archive and note editor ([fb1fb87](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fb1fb879ed9a2b62fcc7a326bcc59efd90dadcf2))
+* rebuild the main chat module with its own UI and fix live delivery ([e2df6d3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e2df6d3c5d0d7c232d2111aee0b0e99cb7a95441))
+* **reminders:** add "Assigned by me" view for reminders raised for others ([ec30a08](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ec30a088ea20ec7c04c068c40e314ab19e281094))
+* **reminders:** add general-purpose reminders with notifications and email ([0bc2618](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0bc2618f965d8829eb63dbe3477702da8ee34ce5))
+* **reminders:** general-purpose reminders with notifications, email and attachments ([6e71aa7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6e71aa721a980cefd3668736a45d51e84155c2b5))
+* **tasks:** self-assign new tasks by default in the inline create row ([0bd96ff](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0bd96ff6cf0a1c30a7c781b1217dad6048e3ffc9))
+* **tasks:** self-assign new tasks by default in the inline create row ([68ca920](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/68ca92090497347864bd0d6eda0e339268ea74ec))
+
 ## [14.20.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.19.0...v14.20.0) (2026-07-30)
 
 
