@@ -14,6 +14,14 @@ const CATALOG = [
     { key: 'microsoft_teams', name: 'Microsoft Teams', category: 'Chat', icon: '👔', description: 'Post task updates to a Teams channel.', fields: [{ key: 'webhook_url', label: 'Incoming webhook URL', secret: true }] },
     { key: 'zapier', name: 'Zapier', category: 'Automation', icon: '⚡', description: 'Connect to 6000+ apps via a catch hook.', fields: [{ key: 'hook_url', label: 'Zapier catch hook URL', secret: true }] },
     { key: 'custom_iframe', name: 'Custom embed', category: 'Apps', icon: '🪟', description: 'Embed an external tool as an app panel.', multiple: true, fields: [{ key: 'name', label: 'App name' }, { key: 'url', label: 'Embed URL (https)' }] },
+    // AHE-3838 — cloud file storage. These hold the WORKSPACE's app registration
+    // (one per provider, shared by everyone); each user then connects their own
+    // account separately, in cloud_storage_connections. Non-secret fields are
+    // deliberately non-secret: the browser pickers need them, and redact() only
+    // withholds `secret: true` ones.
+    { key: 'google_drive', name: 'Google Drive', category: 'Storage', icon: '📁', description: 'Attach files from Google Drive to tasks and projects.', oauth: true, fields: [{ key: 'client_id', label: 'OAuth client ID' }, { key: 'client_secret', label: 'OAuth client secret', secret: true }, { key: 'api_key', label: 'Picker API key' }] },
+    { key: 'onedrive', name: 'OneDrive', category: 'Storage', icon: '☁️', description: 'Attach files from OneDrive to tasks and projects.', oauth: true, fields: [{ key: 'client_id', label: 'Application (client) ID' }, { key: 'client_secret', label: 'Client secret', secret: true }, { key: 'tenant', label: 'Tenant ID (or "common")' }] },
+    { key: 'dropbox', name: 'Dropbox', category: 'Storage', icon: '🗂️', description: 'Attach files from Dropbox to tasks and projects. Picking files needs only the app key.', fields: [{ key: 'app_key', label: 'Dropbox app key' }, { key: 'app_secret', label: 'App secret (only needed to import copies)', secret: true }] },
 ];
 
 const byKey = (key) => CATALOG.find((c) => c.key === String(key)) || null;

@@ -1,0 +1,202 @@
+// AHE-3838 — pure provider metadata for cloud file storage. No DB, no network,
+// no env reads: everything here is a constant or a pure function, so it is
+// unit-testable and safe to require from anywhere.
+//
+// Three providers, two auth shapes:
+//
+//   google_drive / onedrive — full OAuth 2.0 authorization-code flow. We hold a
+//     refresh token server-side and hand the browser a short-lived access token
+//     when it needs to open the picker.
+//
+//   dropbox — the Chooser is a drop-in widget that needs only the public app
+//     key; no OAuth, no tokens stored. OAuth fields exist solely so "import a
+//     copy" can download bytes server-side, and are optional.
+
+const PROVIDERS = {
+    google_drive: {
+        key: 'google_drive',
+        name: 'Google Drive',
+        oauth: true,
+        authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+        tokenUrl: 'https://oauth2.googleapis.com/token',
+        // drive.file grants access ONLY to files the user explicitly picks — not
+        // their whole Drive. It is both the least invasive scope and the one that
+        // avoids Google's restricted-scope verification.
+        scope: 'https://www.googleapis.com/auth/drive.file',
+        userInfoUrl: 'https://www.googleapis.com/oauth2/v3/userinfo',
+        // Fields the browser is allowed to see (the picker needs them).
+        publicFields: ['client_id', 'api_key'],
+        requiredFields: ['client_id', 'client_secret'],
+        // Google needs these two to return a refresh token at all.
+        extraAuthParams: { access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true' },
+    },
+    onedrive: {
+        key: 'onedrive',
+        name: 'OneDrive',
+        oauth: true,
+        // `tenant` is substituted in buildAuthUrl/tokenUrlFor; 'common' allows
+        // both personal and work accounts.
+        authUrl: 'https://login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize',
+        tokenUrl: 'https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token',
+        // offline_access is what yields the refresh token on Microsoft identity.
+        scope: 'offline_access Files.Read Files.Read.All User.Read',
+        userInfoUrl: 'https://graph.microsoft.com/v1.0/me',
+        publicFields: ['client_id', 'tenant'],
+        requiredFields: ['client_id', 'client_secret'],
+        extraAuthParams: { response_mode: 'query' },
+    },
+    dropbox: {
+        key: 'dropbox',
+        name: 'Dropbox',
+        // The Chooser needs no user grant, so this provider is usable with the
+        // app key alone. oauth stays false and connect/disconnect are no-ops.
+        oauth: false,
+        authUrl: 'https://www.dropbox.com/oauth2/authorize',
+        tokenUrl: 'https://api.dropboxapi.com/oauth2/token',
+        scope: 'files.content.read files.metadata.read account_info.read',
+        userInfoUrl: 'https://api.dropboxapi.com/2/users/get_current_account',
+        publicFields: ['app_key'],
+        requiredFields: ['app_key'],
+        extraAuthParams: { token_access_type: 'offline' },
+    },
+};
+
+const PROVIDER_KEYS = Object.keys(PROVIDERS);
+
+const byKey = (key) => PROVIDERS[String(key || '')] || null;
+const isProvider = (key) => !!byKey(key);
+
+/**
+ * The workspace credential key differs per provider (client_id vs app_key), so
+ * "is this provider set up?" has to consult requiredFields rather than assume.
+ */
+const isConfigured = (providerKey, config) => {
+    const p = byKey(providerKey);
+    if (!p) return false;
+    const cfg = config && typeof config === 'object' ? config : {};
+    return p.requiredFields.every((f) => String(cfg[f] || '').trim().length > 0);
+};
+
+/** Only the fields the browser genuinely needs. Never leaks a *_secret. */
+const publicConfig = (providerKey, config) => {
+    const p = byKey(providerKey);
+    if (!p) return {};
+    const cfg = config && typeof config === 'object' ? config : {};
+    const out = {};
+    for (const f of p.publicFields) {
+        if (String(cfg[f] || '').length) out[f] = String(cfg[f]);
+    }
+    return out;
+};
+
+// OneDrive's endpoints are tenant-scoped; the other two ignore the placeholder.
+const withTenant = (url, config) =>
+    String(url).replace('{tenant}', String((config && config.tenant) || 'common').trim() || 'common');
+
+const authUrlFor = (providerKey, config) => withTenant((byKey(providerKey) || {}).authUrl, config);
+const tokenUrlFor = (providerKey, config) => withTenant((byKey(providerKey) || {}).tokenUrl, config);
+
+/**
+ * Build the consent URL. `state` must already be signed — see
+ * cloudStorageRules.encodeState; this function does not authenticate anything.
+ */
+const buildAuthUrl = ({ provider, config, redirectUri, state }) => {
+    const p = byKey(provider);
+    if (!p) return '';
+    const cfg = config || {};
+    const params = new URLSearchParams({
+        client_id: String(cfg.client_id || cfg.app_key || ''),
+        redirect_uri: String(redirectUri || ''),
+        response_type: 'code',
+        scope: p.scope,
+        state: String(state || ''),
+        ...(p.extraAuthParams || {}),
+    });
+    return `${authUrlFor(provider, cfg)}?${params.toString()}`;
+};
+
+/** Form body for the code→token and refresh→token exchanges. */
+const tokenRequestBody = ({ provider, config, code, refreshToken, redirectUri }) => {
+    const cfg = config || {};
+    const body = {
+        client_id: String(cfg.client_id || cfg.app_key || ''),
+        client_secret: String(cfg.client_secret || cfg.app_secret || ''),
+    };
+    if (refreshToken) {
+        body.grant_type = 'refresh_token';
+        body.refresh_token = String(refreshToken);
+    } else {
+        body.grant_type = 'authorization_code';
+        body.code = String(code || '');
+        body.redirect_uri = String(redirectUri || '');
+    }
+    return new URLSearchParams(body).toString();
+};
+
+/**
+ * Normalise the wildly different /me shapes into { email, name }.
+ */
+const parseAccount = (provider, raw) => {
+    const d = raw && typeof raw === 'object' ? raw : {};
+    if (provider === 'google_drive') {
+        return { email: String(d.email || ''), name: String(d.name || '') };
+    }
+    if (provider === 'onedrive') {
+        return { email: String(d.mail || d.userPrincipalName || ''), name: String(d.displayName || '') };
+    }
+    if (provider === 'dropbox') {
+        return { email: String(d.email || ''), name: String((d.name && d.name.display_name) || '') };
+    }
+    return { email: '', name: '' };
+};
+
+/**
+ * Where the server downloads the bytes from, for "import a copy". Google needs
+ * ?alt=media; Graph exposes /content; Dropbox takes the path in a header, which
+ * the caller handles (returns null here so the caller knows to special-case it).
+ */
+const downloadRequestFor = (provider, fileId) => {
+    const id = encodeURIComponent(String(fileId || ''));
+    if (provider === 'google_drive') {
+        return { url: `https://www.googleapis.com/drive/v3/files/${id}?alt=media&supportsAllDrives=true`, headers: {} };
+    }
+    if (provider === 'onedrive') {
+        return { url: `https://graph.microsoft.com/v1.0/me/drive/items/${id}/content`, headers: {} };
+    }
+    if (provider === 'dropbox') {
+        return {
+            url: 'https://content.dropboxapi.com/2/files/download',
+            method: 'POST',
+            headers: { 'Dropbox-API-Arg': JSON.stringify({ path: String(fileId || '') }) },
+        };
+    }
+    return null;
+};
+
+/** Metadata endpoint used to learn a file's real name/size/mime before import. */
+const metadataRequestFor = (provider, fileId) => {
+    const id = encodeURIComponent(String(fileId || ''));
+    if (provider === 'google_drive') {
+        return { url: `https://www.googleapis.com/drive/v3/files/${id}?fields=id,name,size,mimeType,webViewLink,iconLink&supportsAllDrives=true` };
+    }
+    if (provider === 'onedrive') {
+        return { url: `https://graph.microsoft.com/v1.0/me/drive/items/${id}` };
+    }
+    return null; // Dropbox: the Chooser already gives us everything we need.
+};
+
+module.exports = {
+    PROVIDERS,
+    PROVIDER_KEYS,
+    byKey,
+    isProvider,
+    isConfigured,
+    publicConfig,
+    authUrlFor,
+    tokenUrlFor,
+    buildAuthUrl,
+    tokenRequestBody,
+    parseAccount,
+    downloadRequestFor,
+    metadataRequestFor,
+};

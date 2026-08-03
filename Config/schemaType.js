@@ -87,6 +87,7 @@ const SCHEMA_TYPE = {
     CALENDAR_FEEDS: "calendar_feeds",
     AUTOMATION_RULES: "automation_rules",
     INTEGRATION_CONNECTIONS: "integration_connections",
+    CLOUD_STORAGE_CONNECTIONS: "cloud_storage_connections",
 }
 
 module.exports = {

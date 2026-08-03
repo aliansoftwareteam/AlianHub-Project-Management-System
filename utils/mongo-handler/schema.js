@@ -689,6 +689,28 @@ const schema = {
         connectedAt: { type: Date, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // AHE-3838 — one row per (user, cloud storage provider). Distinct from
+    // integrationConnections above, which holds the COMPANY's app registration:
+    // every person has their own Drive, so the OAuth grant has to be per-user.
+    // Tokens are AES-256-GCM ciphertext (Modules/CloudStorage/helpers/cloudCrypto),
+    // never plaintext, and are never returned to the browser.
+    cloudStorageConnections: {
+        provider: { type: String, required: true },      // google_drive | onedrive | dropbox
+        userId: { type: String, required: true },
+        accountEmail: { type: String, required: false },
+        accountName: { type: String, required: false },
+        accessToken: { type: String, required: false },  // encrypted
+        refreshToken: { type: String, required: false },  // encrypted
+        expiresAt: { type: Date, required: false },
+        scope: { type: String, required: false },
+        // 'connected' | 'reauth_required' — set to reauth_required when the
+        // provider rejects our refresh token, so the UI can prompt instead of
+        // failing every pick with an opaque error.
+        status: { type: String, default: 'connected', required: false },
+        lastUsedAt: { type: Date, required: false },
+        connectedAt: { type: Date, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Wiki pages (Editor.js blocks; versioned) — managed by Modules/Pages
     pages: {
         title: { type: String, required: true },
