@@ -29,6 +29,7 @@ exports.init = (app) => {
     app.get('/api/v1/cloud-storage/providers', ctrl.listProviders);
     app.get('/api/v1/cloud-storage/:provider/auth-url', ctrl.authUrl);
     app.get('/api/v1/cloud-storage/:provider/token', ctrl.pickerToken);
+    app.get('/api/v1/cloud-storage/:provider/thumbnail', ctrl.thumbnail);
     app.post('/api/v1/cloud-storage/:provider/import', importLimiter, ctrl.importFile);
     app.delete('/api/v1/cloud-storage/:provider', ctrl.disconnect);
 };

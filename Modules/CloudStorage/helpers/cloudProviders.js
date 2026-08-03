@@ -264,6 +264,41 @@ const downloadRequestFor = (provider, fileId) => {
     return null;
 };
 
+/**
+ * Where to ask for a preview image of a file.
+ *
+ * Needed because the pickers do NOT hand one back for drive files — Google's
+ * Picker has no `thumbnails` field for DocsView results and its `iconUrl` is a
+ * 16px type glyph, so a real preview has to be fetched from the API.
+ *
+ * These URLs are short-lived by design, which is why we resolve them per render
+ * instead of storing them on the attachment.
+ */
+const thumbnailRequestFor = (provider, fileId) => {
+    const id = encodeURIComponent(String(fileId || ''));
+    if (provider === 'google_drive') {
+        return {
+            url: `https://www.googleapis.com/drive/v3/files/${id}?fields=thumbnailLink,hasThumbnail&supportsAllDrives=true`,
+            pick: (d) => (d && d.hasThumbnail && d.thumbnailLink ? String(d.thumbnailLink) : ''),
+        };
+    }
+    if (provider === 'onedrive') {
+        return {
+            url: `https://graph.microsoft.com/v1.0/me/drive/items/${id}/thumbnails`,
+            pick: (d) => {
+                const set = d && Array.isArray(d.value) ? d.value[0] : null;
+                if (!set) return '';
+                const best = set.large || set.medium || set.small;
+                return (best && best.url) ? String(best.url) : '';
+            },
+        };
+    }
+    // Dropbox: the Chooser already returns a thumbnailLink for images, and its
+    // thumbnail API streams binary rather than handing back a URL — not worth
+    // proxying, so linked Dropbox files without one keep the placeholder.
+    return null;
+};
+
 /** Metadata endpoint used to learn a file's real name/size/mime before import. */
 const metadataRequestFor = (provider, fileId) => {
     const id = encodeURIComponent(String(fileId || ''));
@@ -292,5 +327,6 @@ module.exports = {
     tokenRequestBody,
     parseAccount,
     downloadRequestFor,
+    thumbnailRequestFor,
     metadataRequestFor,
 };

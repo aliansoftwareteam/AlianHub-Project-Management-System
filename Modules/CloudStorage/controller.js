@@ -499,6 +499,47 @@ exports.pickerToken = async (req, res) => {
 };
 
 /**
+ * GET /api/v1/cloud-storage/:provider/thumbnail?fileId=...
+ *
+ * A preview image URL for one linked file. Resolved per render rather than stored
+ * on the attachment, because every provider issues these as short-lived URLs.
+ *
+ * Always answers 200 with `{ url: '' }` when there is no thumbnail to be had —
+ * no access, not an image, provider hiccup. A missing preview is cosmetic, so the
+ * tile should fall back to its placeholder quietly rather than log an error for
+ * something that is often simply "this file has no preview".
+ */
+exports.thumbnail = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        const userId = userOf(req);
+        const provider = String(req.params.provider || '');
+        const fileId = R.clip((req.query || {}).fileId, 512);
+        if (!P.isProvider(provider)) return res.send({ status: false, statusText: 'Unknown provider.' });
+        if (!companyId || !userId) return res.send({ status: false, statusText: 'companyId and an authenticated user are required.' });
+        if (!fileId) return res.send({ status: false, statusText: 'fileId is required.' });
+
+        const request = P.thumbnailRequestFor(provider, fileId);
+        if (!request) return res.send({ status: true, data: { url: '' } });
+
+        const auth = await getAccessToken(companyId, userId, provider);
+        if (auth.error) return res.send({ status: true, data: { url: '' } });
+
+        const response = await axios.get(request.url, {
+            headers: { Authorization: `Bearer ${auth.token}` },
+            timeout: 15000,
+        });
+        const url = request.pick(response.data) || '';
+        // Only hand back an https URL — this value goes straight into an <img src>.
+        return res.send({ status: true, data: { url: R.isHttpsUrl(url) ? url : '' } });
+    } catch (e) {
+        // Debug, not error: "no thumbnail" is a normal outcome for many files.
+        logger.debug(`${LOG_PREFIX} thumbnail lookup failed: ${e.message}`);
+        return res.send({ status: true, data: { url: '' } });
+    }
+};
+
+/**
  * DELETE /api/v1/cloud-storage/:provider — forget this user's grant.
  * Soft delete, matching every other collection in the codebase.
  */

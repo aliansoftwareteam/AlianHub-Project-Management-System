@@ -29,7 +29,7 @@
              non-previewable attachment. -->
         <ImageIcon
             v-if="cloudProvider"
-            :src="props.data.thumbnailUrl || ''"
+            :src="cloudThumbnail"
             :alt="props.data.filename"
             :extension="props.data.extension"
             class="w-100"
@@ -73,6 +73,7 @@ import ImageIcon from "@/components/atom/ImageIcon/ImageIcon.vue"
 import '@/components/atom/Attachments/styleAttachment.css';
 import { storageHelper } from "@/composable/commonFunction";
 import { cloudProviderOf } from "@/utils/cloudAttachment";
+import { resolveCloudThumbnail } from "@/composable/cloudPicker";
 
 
 const {handleStorageImageRequest} = storageHelper();
@@ -108,10 +109,23 @@ const cloudProvider = computed(() => cloudProviderOf(props.data));
 // threw on undefined, so read it defensively.
 const hasHttpUrl = computed(() => String(props.data?.url || '').includes('http'));
 
+// Preview image for a linked file. Starts with whatever the picker gave us
+// (Dropbox does supply one) and is then upgraded by asking the provider's API,
+// because the Google and OneDrive pickers return no usable preview. Resolved per
+// render rather than stored, since these URLs are short-lived. Empty leaves
+// ImageIcon on its placeholder, which is the correct look for a file we can't
+// preview.
+const cloudThumbnail = ref(String(props.data?.thumbnailUrl || ''));
+
 onMounted(() => {
     const fixedDate = new Date(2024,6,9).getTime();
     const today = new Date().setHours(0,0,0,0);
     showThumbnails.value = props.data.type === 'image' ? today >= fixedDate : false;
+
+    if (cloudProvider.value && !cloudThumbnail.value && props.data.externalId) {
+        resolveCloudThumbnail(props.data.source, props.data.externalId)
+            .then((url) => { if (url) cloudThumbnail.value = url; });
+    }
 })
 
 const downloadAttachment = () => {

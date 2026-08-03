@@ -286,6 +286,35 @@ export const pickCloudFiles = async ({ provider, multiple = true }) => {
     throw new Error('Unknown provider.');
 };
 
+// Resolved thumbnails, keyed `provider:fileId`. The pickers don't return a usable
+// preview for drive files, so each one costs a round trip — cache them for the
+// life of the page so scrolling a list or opening Files & Links doesn't refetch.
+// Value is a promise, so N tiles mounting at once share one request.
+const thumbnailCache = new Map();
+
+/**
+ * Preview image URL for a linked file, or '' if it has none.
+ *
+ * Resolved at render time rather than stored on the attachment because every
+ * provider issues these as short-lived URLs — a stored one would eventually 404.
+ * Never throws: a missing preview is cosmetic.
+ */
+export const resolveCloudThumbnail = (provider, fileId) => {
+    if (!provider || !fileId) return Promise.resolve('');
+    const key = `${provider}:${fileId}`;
+    if (thumbnailCache.has(key)) return thumbnailCache.get(key);
+
+    const promise = apiRequest('get', `${env.CLOUD_STORAGE}/${provider}/thumbnail?fileId=${encodeURIComponent(fileId)}`)
+        .then((res) => (res && res.data && res.data.status && res.data.data && res.data.data.url) || '')
+        .catch(() => {
+            // Don't cache a transient failure — let the next mount retry.
+            thumbnailCache.delete(key);
+            return '';
+        });
+    thumbnailCache.set(key, promise);
+    return promise;
+};
+
 /** Ask the server to copy a picked file into our own storage. */
 export const importCloudFile = async ({ provider, fileId, filename, path }) => {
     const res = await apiRequest('post', `${env.CLOUD_STORAGE}/${provider}/import`, { fileId, filename, path });
