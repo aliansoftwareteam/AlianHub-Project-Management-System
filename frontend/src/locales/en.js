@@ -1305,7 +1305,7 @@ export default {
         no_preview_found: "No preview found",
         show_all_pages: "Show all pages",
         drop_here: "Drop Here",
-        // AHE-3838 — cloud attachments (Google Drive / OneDrive / Dropbox)
+        // AHE-3838 — cloud attachments (Google Drive / Dropbox)
         upload_from_computer: "Upload from computer",
         attach_from: "Attach from",
         connect_provider: "Connect {provider}",
@@ -2074,9 +2074,9 @@ export default {
         copied: "Copied to clipboard",
         // AHE-3838 — cloud storage for attachments
         cloud_title: "Cloud storage for attachments",
-        cloud_desc: "Let your team attach files straight from Google Drive, OneDrive or Dropbox. An owner or admin enters the app credentials once for the workspace; each person then connects their own account, because everyone has their own drive.",
+        cloud_desc: "Let your team attach files straight from Google Drive or Dropbox. An owner or admin enters the app credentials once for the workspace; each person then connects their own account, because everyone has their own drive.",
         cloud_redirect_uri: "Redirect URI",
-        cloud_redirect_hint: "Needed by Google Drive and OneDrive only. Paste this exact value into the provider's console as an authorised redirect URI. It differs per environment, so add the staging and production ones too. Dropbox does not use one.",
+        cloud_redirect_hint: "Needed by Google Drive only. Paste this exact value into the provider's console as an authorised redirect URI. It differs per environment, so add the staging and production ones too. Dropbox does not use one.",
         cloud_show_steps: "Setup steps ({count})",
         cloud_hide_steps: "Hide setup steps",
         cloud_ready: "Ready",

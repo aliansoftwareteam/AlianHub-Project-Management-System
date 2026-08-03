@@ -2,11 +2,11 @@
 // no env reads: everything here is a constant or a pure function, so it is
 // unit-testable and safe to require from anywhere.
 //
-// Three providers, two auth shapes:
+// Two providers, two auth shapes:
 //
-//   google_drive / onedrive — full OAuth 2.0 authorization-code flow. We hold a
-//     refresh token server-side and hand the browser a short-lived access token
-//     when it needs to open the picker.
+//   google_drive — full OAuth 2.0 authorization-code flow. We hold a refresh
+//     token server-side and hand the browser a short-lived access token when it
+//     needs to open the picker.
 //
 //   dropbox — the Chooser is a drop-in widget that needs only the public app
 //     key; no OAuth, no tokens stored. OAuth fields exist solely so "import a
@@ -59,36 +59,6 @@ const PROVIDERS = {
         requiredFields: ['client_id', 'client_secret'],
         // Google needs these two to return a refresh token at all.
         extraAuthParams: { access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true' },
-    },
-    onedrive: {
-        key: 'onedrive',
-        name: 'OneDrive',
-        icon: '☁️',
-        fields: [
-            { key: 'client_id', label: 'Application (client) ID', secret: false },
-            { key: 'client_secret', label: 'Client secret', secret: true },
-            { key: 'tenant', label: 'Tenant ID (use "common" for personal + work accounts)', secret: false },
-        ],
-        setupHint: 'portal.azure.com → App registrations → new registration, then add a client secret.',
-        needsRedirectUri: true,
-        requirements: [
-            'portal.azure.com → **App registrations** → New registration.',
-            'Copy the **Application (client) ID**, then Certificates & secrets → new **client secret**.',
-            'Register the app as a **Web** platform and add the redirect URI shown above (one per environment).',
-            'Tenant: use `common` to allow both personal and work accounts, or your directory ID to restrict it.',
-            'API permissions: **Files.Read** and **offline_access** (offline_access is what yields the refresh token).',
-        ],
-        oauth: true,
-        // `tenant` is substituted in buildAuthUrl/tokenUrlFor; 'common' allows
-        // both personal and work accounts.
-        authUrl: 'https://login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize',
-        tokenUrl: 'https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token',
-        // offline_access is what yields the refresh token on Microsoft identity.
-        scope: 'offline_access Files.Read Files.Read.All User.Read',
-        userInfoUrl: 'https://graph.microsoft.com/v1.0/me',
-        publicFields: ['client_id', 'tenant'],
-        requiredFields: ['client_id', 'client_secret'],
-        extraAuthParams: { response_mode: 'query' },
     },
     dropbox: {
         key: 'dropbox',
@@ -222,12 +192,8 @@ const publicConfig = (providerKey, config) => {
     return out;
 };
 
-// OneDrive's endpoints are tenant-scoped; the other two ignore the placeholder.
-const withTenant = (url, config) =>
-    String(url).replace('{tenant}', String((config && config.tenant) || 'common').trim() || 'common');
-
-const authUrlFor = (providerKey, config) => withTenant((byKey(providerKey) || {}).authUrl, config);
-const tokenUrlFor = (providerKey, config) => withTenant((byKey(providerKey) || {}).tokenUrl, config);
+const authUrlFor = (providerKey) => (byKey(providerKey) || {}).authUrl || '';
+const tokenUrlFor = (providerKey) => (byKey(providerKey) || {}).tokenUrl || '';
 
 /**
  * Build the consent URL. `state` must already be signed — see
@@ -274,9 +240,6 @@ const parseAccount = (provider, raw) => {
     if (provider === 'google_drive') {
         return { email: String(d.email || ''), name: String(d.name || '') };
     }
-    if (provider === 'onedrive') {
-        return { email: String(d.mail || d.userPrincipalName || ''), name: String(d.displayName || '') };
-    }
     if (provider === 'dropbox') {
         return { email: String(d.email || ''), name: String((d.name && d.name.display_name) || '') };
     }
@@ -292,9 +255,6 @@ const downloadRequestFor = (provider, fileId) => {
     const id = encodeURIComponent(String(fileId || ''));
     if (provider === 'google_drive') {
         return { url: `https://www.googleapis.com/drive/v3/files/${id}?alt=media&supportsAllDrives=true`, headers: {} };
-    }
-    if (provider === 'onedrive') {
-        return { url: `https://graph.microsoft.com/v1.0/me/drive/items/${id}/content`, headers: {} };
     }
     if (provider === 'dropbox') {
         return {
@@ -324,17 +284,6 @@ const thumbnailRequestFor = (provider, fileId) => {
             pick: (d) => (d && d.hasThumbnail && d.thumbnailLink ? String(d.thumbnailLink) : ''),
         };
     }
-    if (provider === 'onedrive') {
-        return {
-            url: `https://graph.microsoft.com/v1.0/me/drive/items/${id}/thumbnails`,
-            pick: (d) => {
-                const set = d && Array.isArray(d.value) ? d.value[0] : null;
-                if (!set) return '';
-                const best = set.large || set.medium || set.small;
-                return (best && best.url) ? String(best.url) : '';
-            },
-        };
-    }
     // Dropbox: the Chooser already returns a thumbnailLink for images, and its
     // thumbnail API streams binary rather than handing back a URL — not worth
     // proxying, so linked Dropbox files without one keep the placeholder.
@@ -346,9 +295,6 @@ const metadataRequestFor = (provider, fileId) => {
     const id = encodeURIComponent(String(fileId || ''));
     if (provider === 'google_drive') {
         return { url: `https://www.googleapis.com/drive/v3/files/${id}?fields=id,name,size,mimeType,webViewLink,iconLink&supportsAllDrives=true` };
-    }
-    if (provider === 'onedrive') {
-        return { url: `https://graph.microsoft.com/v1.0/me/drive/items/${id}` };
     }
     return null; // Dropbox: the Chooser already gives us everything we need.
 };

@@ -1,11 +1,11 @@
 // AHE-3838 — shared helpers for cloud-linked attachments (Google Drive,
-// OneDrive, Dropbox).
+// Dropbox).
 //
 // An attachment is a plain object inside `task.attachments[]` /
 // `project.attachments[]`. Uploaded files carry a Wasabi/server `url`. A cloud
 // LINKED file carries no bytes of ours at all — instead:
 //
-//   source       'google_drive' | 'onedrive' | 'dropbox'
+//   source       'google_drive' | 'dropbox'
 //   externalId   the provider's file id
 //   externalUrl  where clicking it should go
 //   externalIcon provider-supplied icon URL (optional)
@@ -17,12 +17,10 @@
 // and deliberately carries no `source`.
 
 import googleDriveIcon from '@/assets/images/svg/google_drive.svg';
-import oneDriveIcon from '@/assets/images/svg/onedrive.svg';
 import dropboxIcon from '@/assets/images/svg/dropbox.svg';
 
 export const CLOUD_PROVIDERS = {
     google_drive: { key: 'google_drive', label: 'Google Drive', short: 'Drive', icon: googleDriveIcon, color: '#1a73e8' },
-    onedrive: { key: 'onedrive', label: 'OneDrive', short: 'OneDrive', icon: oneDriveIcon, color: '#0364b8' },
     dropbox: { key: 'dropbox', label: 'Dropbox', short: 'Dropbox', icon: dropboxIcon, color: '#0061ff' },
 };
 
@@ -97,7 +95,7 @@ export const buildCloudAttachment = ({ provider, file, userId, id }) => {
  */
 export const cloudPreviewUrlFor = (attachment) => {
     if (!isCloudAttachment(attachment)) return '';
-    // Whatever the picker handed us wins — Dropbox and OneDrive supply one.
+    // Whatever the picker handed us wins — the Dropbox Chooser supplies one.
     if (attachment.thumbnailUrl) return String(attachment.thumbnailUrl);
     if (attachment.source === 'google_drive' && attachment.externalId) {
         return `https://drive.google.com/thumbnail?id=${encodeURIComponent(attachment.externalId)}&sz=w400`;

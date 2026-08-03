@@ -1,4 +1,4 @@
-// AHE-3838 — cloud file storage (Google Drive / OneDrive / Dropbox).
+// AHE-3838 — cloud file storage (Google Drive / Dropbox).
 //
 // Split of responsibilities:
 //   integration_connections     the COMPANY's app registration per provider

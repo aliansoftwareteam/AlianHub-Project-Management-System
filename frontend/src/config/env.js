@@ -205,7 +205,7 @@ module.exports.EMAIL_IN = '/api/v1/email-in';
 module.exports.CALENDAR_FEED = '/api/v1/calendar';
 module.exports.AUTOMATIONS = '/api/v1/automations';
 module.exports.INTEGRATIONS = '/api/v1/integrations';
-// AHE-3838 — cloud storage attachments (Google Drive / OneDrive / Dropbox).
+// AHE-3838 — cloud storage attachments (Google Drive / Dropbox).
 module.exports.CLOUD_STORAGE = '/api/v1/cloud-storage';
 module.exports.EXPORT_CSV = '/api/v1/export/csv';
 module.exports.EXPORT_XLSX = '/api/v1/export/xlsx';

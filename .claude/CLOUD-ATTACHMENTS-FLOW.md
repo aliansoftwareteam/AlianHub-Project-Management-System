@@ -1,12 +1,23 @@
-# Cloud attachments — Google Drive / OneDrive / Dropbox
+# Cloud attachments — Google Drive / Dropbox
 
 **Task:** AHE-3838 · **Status:** ✅ built (local branch `feat/cloud-storage-attachments`, 4 commits, unpushed)
 
 > **Both modes shipped.** Link is the default; "Import a copy" is a checkbox on
 > the same menu. See §10 for what you must register before it can be tested.
 
+> **OneDrive was removed** (2026-08-03). It was implemented but could never be
+> verified: registering an Entra app now requires a directory, and a personal
+> Microsoft account has none — the only routes to one are an Azure sign-up that
+> demands a payment method or the M365 Developer Program. Rather than ship a
+> provider nobody had ever run, the code was deleted outright. Adding it back
+> means a new entry in `Modules/CloudStorage/helpers/cloudProviders.js`
+> (auth/token URLs, `Files.Read offline_access` scope, Graph download +
+> `/thumbnails` endpoints) and an `openOneDrivePicker` in `cloudPicker.js`; the
+> generic settings, OAuth, link, preview and import plumbing all already handle
+> an extra provider without change.
+
 Goal: alongside "upload a file", let a user attach a file that already lives in
-their Google Drive, OneDrive or Dropbox — the way ClickUp does it.
+their Google Drive or Dropbox — the way ClickUp does it.
 
 ---
 
@@ -46,7 +57,7 @@ This is the fork in the road. Everything else follows from it.
 |---|---|---|
 | What we store | a reference: file id + web link + name | the actual bytes, in Wasabi |
 | Wasabi cost | none | same as a normal upload |
-| Opening it | opens in Drive/OneDrive/Dropbox | opens in our existing previewer |
+| Opening it | opens in Drive/Dropbox | opens in our existing previewer |
 | Stays in sync | yes — edits in Drive are live | no, frozen at attach time |
 | **Teammates can see it** | **only if the cloud file is shared with them** | always |
 | If the owner deletes it in Drive | attachment breaks | unaffected |
@@ -73,12 +84,11 @@ get metadata back. We never list folders, never proxy their API for browsing.
 |---|---|---|
 | **Dropbox** | Dropbox Chooser (drop-ins) | **just an app key** — no OAuth, no token storage |
 | **Google Drive** | Google Picker API | OAuth token, `drive.file` scope only |
-| **OneDrive** | OneDrive File Picker SDK | MSAL token |
 
 **Start with Dropbox.** The Chooser needs only a public app key, returns a direct
 link, and requires no token storage or refresh logic at all — so it proves the
-whole attachment path end to end with none of the OAuth work. Google and OneDrive
-then reuse that same path and only add the auth piece.
+whole attachment path end to end with none of the OAuth work. Google reuses that
+same path and only adds the auth piece.
 
 `drive.file` scope matters: it grants access **only to files the user explicitly
 picked**, not their whole Drive. It's the narrow scope and the easy one to get
@@ -166,7 +176,7 @@ Link mode adds keys to the existing record and leaves `url` empty:
   createdAt, userId,
   type: "application",
 
-  source: "google_drive",        // "dropbox" | "onedrive" | absent = our own upload
+  source: "google_drive",        // "dropbox" | absent = our own upload
   externalId: "1AbC…",           // provider file id
   externalUrl: "https://docs.google.com/…",   // where clicking it goes
   externalIcon: "https://…/xlsx.png",         // provider's icon
@@ -186,8 +196,8 @@ this from touching the existing flow.
 
 - **[Attachments.vue](../frontend/src/components/atom/Attachments/Attachments.vue)** —
   the `+` is currently a bare `<label for="UploadedFile">` wrapping a file input.
-  Becomes a small menu: *Upload from computer* / *Google Drive* / *OneDrive* /
-  *Dropbox*. Only connected providers listed.
+  Becomes a small menu: *Upload from computer* / *Google Drive* / *Dropbox*.
+  Only configured providers listed.
 - **[AttachmentImage.vue](../frontend/src/components/atom/Attachments/AttachmentImage.vue)** —
   show the provider badge on the tile when `source` is set.
 - **Click behaviour** — `source` set → open `externalUrl` in a new tab; no
@@ -285,7 +295,6 @@ connect their own account once an admin has entered them.
 |---|---|---|
 | **Dropbox** | `app_key` | dropbox.com/developers → Create app → App key. **No OAuth needed** — start here. |
 | **Google Drive** | `client_id`, `client_secret`, `api_key` | console.cloud.google.com → OAuth client (Web) + enable Picker API for the key |
-| **OneDrive** | `client_id`, `client_secret`, `tenant` | portal.azure.com → App registrations (`tenant` = `common` for personal + work) |
 
 **Redirect URI** — the settings section displays the exact value with a copy
 button. Register it in the Google/Microsoft console, once per environment:
@@ -324,7 +333,7 @@ key, indistinguishable from an upload).
 | | localhost | staging |
 |---|---|---|
 | Dropbox link | ✅ | ✅ |
-| Google / OneDrive link | ✅ (register the localhost redirect URI) | ✅ |
+| Google Drive link | ✅ (register the localhost redirect URI) | ✅ |
 | Import a copy | ✅ | ✅ |
 
 Staging is still where the environment-specific wiring gets proven: the

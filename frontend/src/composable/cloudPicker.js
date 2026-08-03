@@ -13,7 +13,6 @@
 //               the widget. No token ever reaches us.
 //   google    — Picker needs an OAuth access token, which the server mints from
 //               the stored refresh token.
-//   onedrive  — same as google.
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 
@@ -66,8 +65,8 @@ export const fetchCloudProviders = async () => {
 // ── workspace settings (Settings → Integrations) ────────────────────────────
 
 /**
- * Field definitions + stored values for all three providers, plus whether the
- * caller may edit them. Secret values are never returned — only a flag saying
+ * Field definitions + stored values for every provider, plus whether the caller
+ * may edit them. Secret values are never returned — only a flag saying
  * one is stored.
  */
 export const fetchCloudSettings = async () => {
@@ -124,8 +123,8 @@ export const connectCloudProvider = async (provider, returnTo) => {
     if (!payload || !payload.status || !payload.data || !payload.data.url) {
         throw new Error((payload && payload.statusText) || 'Could not start sign-in.');
     }
-    // Full-page redirect, not a popup: the consent screens of all three providers
-    // refuse to render inside one in several configurations.
+    // Full-page redirect, not a popup: provider consent screens refuse to render
+    // inside one in several configurations.
     window.location.assign(payload.data.url);
     return true;
 };
@@ -232,39 +231,6 @@ const openGooglePicker = ({ token, apiKey, appId, multiple }) => new Promise((re
     }).catch(reject);
 });
 
-// ── OneDrive ────────────────────────────────────────────────────────────────
-
-const openOneDrivePicker = ({ token, clientId, multiple }) => new Promise((resolve, reject) => {
-    loadScript('https://js.live.net/v7.5/OneDrive.js').then(() => {
-        if (!window.OneDrive || typeof window.OneDrive.open !== 'function') {
-            reject(new Error('The OneDrive picker is unavailable.'));
-            return;
-        }
-        window.OneDrive.open({
-            clientId,
-            action: 'share',      // returns a shareable link rather than raw content
-            multiSelect: !!multiple,
-            advanced: {
-                // Reuse the token the server already refreshed instead of running a
-                // second, independent MSAL login inside the widget.
-                accessToken: token,
-                redirectUri: window.location.origin,
-            },
-            success: (response) => resolve(((response && response.value) || []).map((v) => ({
-                id: v.id,
-                name: v.name,
-                size: Number(v.size || 0),
-                mimeType: (v.file && v.file.mimeType) || '',
-                url: (v.permissions && v.permissions[0] && v.permissions[0].link && v.permissions[0].link.webUrl) || v.webUrl || '',
-                iconUrl: '',
-                thumbnailUrl: (v.thumbnails && v.thumbnails[0] && v.thumbnails[0].medium && v.thumbnails[0].medium.url) || '',
-            }))),
-            cancel: () => resolve([]),
-            error: (e) => reject(new Error((e && e.message) || 'The OneDrive picker failed.')),
-        });
-    }).catch(reject);
-});
-
 // ── public entry point ──────────────────────────────────────────────────────
 
 /**
@@ -298,9 +264,6 @@ export const pickCloudFiles = async ({ provider, multiple = true, mode = 'link' 
             appId: (config && config.app_id) || '',
             multiple,
         });
-    }
-    if (provider === 'onedrive') {
-        return openOneDrivePicker({ token, clientId: (config && config.client_id) || '', multiple });
     }
     throw new Error('Unknown provider.');
 };
