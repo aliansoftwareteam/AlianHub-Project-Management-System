@@ -627,6 +627,18 @@ onMounted(() => {
 .intg-cloud-redirect-lbl { font-size: 12.5px; font-weight: 600; color: #1F212A; }
 .intg-cloud-redirect .intg-hint { flex-basis: 100%; margin: 0; }
 .intg-cloud-row { display: block; }
+/* Keep the actions pinned top-right regardless of how long the provider's hint
+   is. `.intg-row-top` wraps by default and `.intg-row-main` has no flex-basis, so
+   Google's longer setup hint pushed the buttons onto their own line while
+   Dropbox's shorter one happened to fit — the two rows disagreed. Scoped to cloud
+   rows so the webhook rows above keep their existing wrapping behaviour. */
+.intg-cloud-row .intg-row-top { flex-wrap: nowrap; align-items: flex-start; }
+.intg-cloud-row .intg-row-main { flex: 1 1 auto; min-width: 0; }
+.intg-cloud-row .intg-row-actions { flex: 0 0 auto; align-items: flex-start; white-space: nowrap; }
+@media (max-width: 640px) {
+    /* Too narrow to hold both columns — let it stack rather than crush the text. */
+    .intg-cloud-row .intg-row-top { flex-wrap: wrap; }
+}
 .intg-cloud-ic {
     display: inline-flex;
     align-items: center;
