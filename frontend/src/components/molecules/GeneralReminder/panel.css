@@ -1,10 +1,15 @@
 /* Reminders list panel. Scoped to this component — no global selectors. */
 
+/* Transparent, matching Notepad and Clips: this is a header POPOVER, not a modal.
+   It only exists to catch the outside click that closes the panel, so dimming the
+   page behind it made a lightweight panel feel like it had taken over the app —
+   and made Reminders behave unlike its two siblings in the same header row.
+   z-index matches theirs too, so the three stack consistently. */
 .grp__overlay {
     position: fixed;
     inset: 0;
-    z-index: 19;
-    background: rgba(23, 24, 36, 0.28);
+    z-index: 1000;
+    background: transparent;
 }
 
 .grp__panel {
