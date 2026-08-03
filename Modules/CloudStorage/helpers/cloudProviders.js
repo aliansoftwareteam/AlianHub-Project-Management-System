@@ -33,6 +33,19 @@ const PROVIDERS = {
             { key: 'app_id', label: 'Cloud project number (App ID) — needed for previews and importing', secret: false },
         ],
         setupHint: 'console.cloud.google.com → enable the Picker API and Drive API, create an API key and an OAuth client ID (Web application). The project number is on the project dashboard.',
+        // Shown in the settings row so the whole checklist is visible without
+        // leaving the page. Every line here is something that silently breaks a
+        // specific capability if skipped — learned the hard way during AHE-3838.
+        needsRedirectUri: true,
+        requirements: [
+            'Enable **Google Picker API** — without it the file picker will not open.',
+            'Enable **Google Drive API** — needed for previews and for importing copies.',
+            'Create an **OAuth client ID (Web application)** → client ID + client secret.',
+            'Create an **API key** → used as the Picker API key.',
+            'Copy the **project number** from the project dashboard into App ID. Skip it and picking still works, but previews and imports fail with "File not found".',
+            'Add the redirect URI shown above to the client\'s **Authorised redirect URIs** (one per environment).',
+            'On the **OAuth consent screen**, add the scope `drive.file`, and while the app is in Testing add yourself under Test users.',
+        ],
         oauth: true,
         authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
         tokenUrl: 'https://oauth2.googleapis.com/token',
@@ -57,6 +70,14 @@ const PROVIDERS = {
             { key: 'tenant', label: 'Tenant ID (use "common" for personal + work accounts)', secret: false },
         ],
         setupHint: 'portal.azure.com → App registrations → new registration, then add a client secret.',
+        needsRedirectUri: true,
+        requirements: [
+            'portal.azure.com → **App registrations** → New registration.',
+            'Copy the **Application (client) ID**, then Certificates & secrets → new **client secret**.',
+            'Register the app as a **Web** platform and add the redirect URI shown above (one per environment).',
+            'Tenant: use `common` to allow both personal and work accounts, or your directory ID to restrict it.',
+            'API permissions: **Files.Read** and **offline_access** (offline_access is what yields the refresh token).',
+        ],
         oauth: true,
         // `tenant` is substituted in buildAuthUrl/tokenUrlFor; 'common' allows
         // both personal and work accounts.
@@ -78,6 +99,17 @@ const PROVIDERS = {
             { key: 'app_secret', label: 'App secret (only needed to import copies)', secret: true },
         ],
         setupHint: 'dropbox.com/developers → Create app → Scoped access. Only the App key is required.',
+        // No OAuth, so no redirect URI — but the domain allow-list is mandatory and
+        // is the one step whose omission produces Dropbox's opaque
+        // "App is misconfigured" screen instead of a useful error.
+        needsRedirectUri: false,
+        requirements: [
+            'dropbox.com/developers → **Create app** → Scoped access → **Full Dropbox**.',
+            'Copy the **App key** from the app\'s Settings tab.',
+            'On the same tab, add your domain to **Chooser / Saver / Embedder domains** — e.g. `localhost` for dev, plus your staging and production hostnames. Bare hostname, no protocol or port. Miss this and the picker shows "App is misconfigured".',
+            'No redirect URI, consent screen or API scopes needed — the picker signs the user in itself.',
+            'The **App secret** is only needed for importing copies; linking works without it.',
+        ],
         // The Chooser needs no user grant, so this provider is usable with the
         // app key alone. oauth stays false and connect/disconnect are no-ops.
         oauth: false,
@@ -122,6 +154,8 @@ const describe = (providerKey) => {
         icon: p.icon || '',
         oauth: !!p.oauth,
         setupHint: p.setupHint || '',
+        needsRedirectUri: !!p.needsRedirectUri,
+        requirements: (p.requirements || []).slice(),
         fields: (p.fields || []).map((f) => ({ key: f.key, label: f.label, secret: !!f.secret })),
         requiredFields: p.requiredFields.slice(),
     };

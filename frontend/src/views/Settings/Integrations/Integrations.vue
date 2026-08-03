@@ -163,6 +163,11 @@
                                                     <span v-else-if="p.configured">{{ $t('Integrations.cloud_no_signin_needed') }}</span>
                                                     <span v-else>{{ p.setupHint }}</span>
                                                 </div>
+                                                <button
+                                                    v-if="p.requirements && p.requirements.length"
+                                                    type="button" class="intg-link intg-cloud-stepstoggle"
+                                                    @click="toggleCloudSteps(p)"
+                                                >{{ isCloudStepsOpen(p) ? $t('Integrations.cloud_hide_steps') : $t('Integrations.cloud_show_steps', { count: p.requirements.length }) }}</button>
                                             </div>
                                         </div>
                                         <div class="intg-row-actions">
@@ -186,6 +191,18 @@
                                             >{{ $t('Integrations.delete') }}</button>
                                         </div>
                                     </div>
+
+                                    <!-- Per-provider setup checklist. Each line is
+                                         something whose omission silently breaks a
+                                         specific capability. -->
+                                    <ol v-if="isCloudStepsOpen(p) && p.requirements && p.requirements.length" class="intg-cloud-reqs">
+                                        <li v-for="(req, i) in p.requirements" :key="i" v-html="formatRequirement(req)"></li>
+                                        <li v-if="p.needsRedirectUri" class="intg-cloud-reqs__uri">
+                                            {{ $t('Integrations.cloud_redirect_uri') }}:
+                                            <code>{{ cloudRedirectUri }}</code>
+                                            <button type="button" class="intg-link" @click="copyRedirectUri">{{ $t('Integrations.copy') }}</button>
+                                        </li>
+                                    </ol>
 
                                     <div v-if="cloudEditing === p.provider" class="intg-cloud-form">
                                         <div v-for="f in p.fields" :key="f.key" class="inputfield position-re">
@@ -486,6 +503,27 @@ const disconnectCloud = async (p) => {
     }
 };
 
+// Setup steps are collapsed for a provider that's already working, and open by
+// default for one that still needs configuring — that's when you need them.
+const cloudStepsOpen = ref({});
+const toggleCloudSteps = (p) => { cloudStepsOpen.value[p.provider] = !isCloudStepsOpen(p); };
+const isCloudStepsOpen = (p) => {
+    const explicit = cloudStepsOpen.value[p.provider];
+    return explicit === undefined ? !p.configured : explicit;
+};
+
+/**
+ * Render the light markup used in provider requirement strings: **bold** and
+ * `code`. HTML is escaped FIRST, so even though these strings are our own
+ * constants today, the renderer can never emit markup that came from data.
+ */
+const formatRequirement = (text) => String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>');
+
 const copyRedirectUri = async () => {
     try {
         await navigator.clipboard.writeText(cloudRedirectUri.value);
@@ -623,4 +661,33 @@ onMounted(() => {
     border-radius: 8px;
 }
 .intg-cloud-form .inputfield { margin-bottom: 12px; }
+
+.intg-cloud-stepstoggle {
+    margin-top: 4px;
+    padding: 0;
+    font-size: 12px;
+}
+.intg-cloud-reqs {
+    margin: 10px 0 0;
+    padding: 12px 14px 12px 32px;
+    background: #FBFCFF;
+    border: 1px solid #EDEFF5;
+    border-radius: 8px;
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: #4A4B63;
+}
+.intg-cloud-reqs li { margin-bottom: 5px; }
+.intg-cloud-reqs li:last-child { margin-bottom: 0; }
+.intg-cloud-reqs strong { color: #1F212A; font-weight: 600; }
+.intg-cloud-reqs code {
+    padding: 1px 5px;
+    background: #EEF0FE;
+    border-radius: 4px;
+    font-size: 11.5px;
+    color: #2F3990;
+    word-break: break-all;
+}
+.intg-cloud-reqs__uri { padding-top: 4px; }
+.intg-cloud-reqs__uri .intg-link { margin-left: 6px; }
 </style>
