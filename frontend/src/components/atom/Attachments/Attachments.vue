@@ -92,6 +92,7 @@ import JSZip from "jszip";
 import ImagesPreviewer from "@/components/organisms/ImagePreviewer/ImagesPreviewer.vue";
 import * as env from "@/config/env";
 import { storageHelper } from "@/composable/commonFunction";
+import { isCloudAttachment, openCloudAttachment } from "@/utils/cloudAttachment";
 import Skelaton from "../Skelaton/Skelaton.vue";
 const { handleStorageImageRequest } = storageHelper();
 const { t } = useI18n();
@@ -326,7 +327,24 @@ const handleDragOver = (event) => {
 };
 
 const handleAttachmentClick = (event, index) => {
-    openPreviewer(index);
+    // A cloud-linked file has no bytes on our side, so there is nothing for the
+    // previewer to show — hand off to the provider instead.
+    const attachment = visibleAttachments.value[index];
+    if (isCloudAttachment(attachment)) {
+        if (!openCloudAttachment(attachment)) {
+            $toast.error(t('Attachments.cloud_link_missing'), { position: 'top-right' });
+        }
+        return;
+    }
+    // `transformedAttachments` (the previewer's list) skips cloud links, so the
+    // tile index is not the previewer index once one is present. Count the
+    // previewable tiles ahead of this one instead of assuming they line up —
+    // otherwise the previewer opens on the wrong file.
+    const previewIndex = visibleAttachments.value
+        .slice(0, index)
+        .filter((item) => !isCloudAttachment(item))
+        .length;
+    openPreviewer(previewIndex);
 };
 
 const openPreviewer = (index) => {
@@ -339,8 +357,18 @@ const closePreviewer = () => {
 };
 
 async function downloadAllImages() {
+    // Cloud-linked files can't go in the zip — we hold a link, not the bytes.
+    // Say so rather than quietly shipping a zip that's missing files.
+    const all = props.selectedData?.attachments ?? [];
+    const downloadable = all.filter((attachment) => !isCloudAttachment(attachment));
+    const skipped = all.length - downloadable.length;
+    if (skipped > 0) {
+        $toast.info(t('Attachments.cloud_skipped_in_zip', { count: skipped }), { position: 'top-right' });
+    }
+    if (!downloadable.length) return;
+
     if (!env?.STORAGE_TYPE || env.STORAGE_TYPE !== 'server') {
-        const attachments = props.selectedData?.attachments ?? [];
+        const attachments = downloadable;
         const zip = new JSZip();
 
         const filenameMap = new Map();
@@ -388,7 +416,7 @@ async function downloadAllImages() {
             saveAs(zipBlob, `${zipName}_attachments.zip`);
         });
     } else {
-        const attachments = props.selectedData?.attachments ?? [];
+        const attachments = downloadable;
         const zip = new JSZip();
 
         const filenameMap = new Map();
@@ -457,8 +485,12 @@ function saveAs(blob, filename) {
 }
 
 async function fetchAttachmentUrls(attachments) {
+    // Cloud-linked files are dropped here rather than presigned: there is no
+    // Wasabi object behind them, so handleStorageImageRequest would fail, and
+    // the previewer can't render a third-party link anyway. handleAttachmentClick
+    // maps tile index → previewer index to account for the gap.
     return await Promise.all(
-        attachments.map(async (attachment) => {
+        attachments.filter((attachment) => !isCloudAttachment(attachment)).map(async (attachment) => {
             const baseName = attachment.filename.replace(/\.[^/.]+$/, "");
             let properUrl = attachment.url;
 
