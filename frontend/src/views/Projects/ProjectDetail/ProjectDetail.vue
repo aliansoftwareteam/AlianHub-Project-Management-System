@@ -35,6 +35,7 @@
                 :extensions="fileExtentions"
                 :attachments="projectData.attachments"
                 @update:add="(files) => newAttachments(files)"
+                @update:cloud-add="(payload) => newCloudAttachments(payload)"
                 @update:delete="(file) => deleteAttachments(file)"
                 :isSpinner="isSpinner"
                 :selectedData="projectData"
@@ -95,6 +96,7 @@
     import Swal from 'sweetalert2';
     import { useCustomComposable, useGetterFunctions } from '@/composable';
     import {storageQueryBuilder,generateFileName} from '@/utils/storageQueryBuild.js';
+    import { buildCloudAttachment, isCloudAttachment, CLOUD_PROVIDERS } from '@/utils/cloudAttachment';
     import { useI18n } from 'vue-i18n';
     import ProjectDetailRightSide from '@/components/organisms/ProjectDetailRightSide/ProjectDetailRightSide.vue';
     import { projectAttachmentAdd , projectAttachmentChange } from '@/utils/NotificationTemplate';
@@ -154,6 +156,63 @@
             });
         }
     }
+
+    /**
+     * AHE-3838 — attach files LINKED from a cloud drive to the project. No upload:
+     * the bytes stay with the provider, so only the attachment record is written,
+     * via the same $push + history calls the upload path uses.
+     *
+     * No checkBucketStorage() here on purpose — a link stores nothing of ours and
+     * must not draw down the company's storage quota.
+     */
+    const newCloudAttachments = async ({ provider, files } = {}) => {
+        if (!provider || !files || !files.length) return;
+        const projectdata = JSON.parse(JSON.stringify(projectData.value));
+        isSpinner.value = true;
+        let attached = 0;
+
+        // Sequential: each $push re-reads the project document, so parallel writes
+        // would lose records.
+        for (const file of files) {
+            const record = buildCloudAttachment({ provider, file, userId: userId.value, id: makeUniqueId(17) });
+            try {
+                await apiRequest("put", `${env.PROJECT}/${projectdata._id}`, {
+                    updateObject: { attachments: record },
+                    key: '$push',
+                });
+                projectData.value.attachments.push(record);
+                commit('projectData/projectLocalUpdate', { op: "modified", itemData: { ...projectData.value } });
+                attached += 1;
+
+                // History is best-effort — a failure here must not make a
+                // successful attach look failed.
+                try {
+                    await apiRequest("post", env.HANDLE_HISTORY, {
+                        "type": 'project',
+                        "companyId": companyId.value,
+                        "projectId": projectdata._id,
+                        "taskId": null,
+                        "object": {
+                            key: "Project_Attachment",
+                            message: `<b>${userData.Employee_Name}</b> has attached <b>${record.filename}</b> on <b>${sanitizeInput(projectdata.ProjectName)}</b>.`,
+                        },
+                        "userData": userData,
+                    });
+                } catch (error) {
+                    console.error("ERROR in cloud attachment history", error);
+                }
+            } catch (error) {
+                console.error("Error attaching cloud file to project: ", error);
+            }
+        }
+
+        isSpinner.value = false;
+        if (attached > 0) {
+            $toast.success(t('Attachments.cloud_attached', { provider: CLOUD_PROVIDERS[provider]?.label || provider }), { position: 'top-right' });
+        } else {
+            $toast.error(t('Attachments.cloud_attach_failed'), { position: 'top-right' });
+        }
+    };
 
     const newAttachments = (files) => {
         if(!files.length) {
@@ -318,60 +377,75 @@
             if (result.isConfirmed) {
                 isSpinner.value = true;
 
+                // Dropping the attachment record. Body unchanged — only the
+                // storage-delete step that used to wrap it is now conditional.
+                const removeRecord = () => {
+                    const params = {
+                        updateObject: {
+                            attachments: { id: attachment.id }
+                        },
+                        key: '$pull'
+                    }
+
+                    apiRequest("put", `${env.PROJECT}/${projectData.value._id}`, params).then(() => {
+                        isSpinner.value = false;
+
+                        const indx = projectData.value.attachments.findIndex((x) => x.id === attachment.id)
+                        if (indx !== -1) {
+                            projectData.value.attachments.splice(indx, 1)
+                        }
+                        commit('projectData/projectLocalUpdate', { op: "modified", itemData: { ...projectData.value } });
+                        let historyObj = {
+                            key : "Project_Attachment",
+                            message : `<b>${userData.Employee_Name}</b> has deleted <b>${attachment.filename}</b> on <b>${sanitizeInput(projectData.value.ProjectName)}</b>.`
+                        }
+                        apiRequest("post", env.HANDLE_HISTORY, {
+                            "type": 'project',
+                            "companyId": companyId.value,
+                            "projectId": projectData.value._id,
+                            "taskId": null,
+                            "object": historyObj,
+                            "userData": userData
+                        })
+                        let notifyObj = {
+                                removeFileName: attachment.filename,
+                                ProjectName : projectData.ProjectName
+                            }
+                            let notificationObject = {
+                                message: projectAttachmentChange(notifyObj),
+                                key: "attachments",
+                            };
+                            
+                            apiRequest("post", env.HANDLE_NOTIFICATION, {
+                                type: 'project',
+                                companyId: companyId.value,
+                                projectId: projectData._id,
+                                object: notificationObject,
+                                userData: userData,
+                                changeType:'name',
+                                changeData: notifyObj
+                            })
+                            .catch((error) => {
+                                console.error("ERROR in update notification", error);
+                            })
+                        $toast.success(t('Toast.Attchments_deleted_successfully'),{position: 'top-right'});
+                    })
+                };
+
+                // AHE-3838 — a cloud-linked attachment owns no object in our
+                // storage and its `url` is empty, so asking the storage layer to
+                // delete it would just fail and strand the record. Removing the
+                // link never touches the file in the user's drive.
+                if (isCloudAttachment(attachment)) {
+                    removeRecord();
+                    return;
+                }
+
                 let axiousObject = storageQueryBuilder('delete',companyId.value,((env.STORAGE_TYPE && env.STORAGE_TYPE === 'server') ? (attachment.url + "&thubmkey=attachmentIcon") : attachment.url));
 
                 apiRequest(axiousObject.method, axiousObject.route, axiousObject.data).then(async (response)=>{
                     if (response.data.status === true) {
-                        const params = {
-                            updateObject: {
-                                attachments: { id: attachment.id }
-                            },
-                            key: '$pull'
-                        }
-
-                        apiRequest("put", `${env.PROJECT}/${projectData.value._id}`, params).then(() => {
-                            isSpinner.value = false;
-
-                            const indx = projectData.value.attachments.findIndex((x) => x.id === attachment.id)
-                            if (indx !== -1) {
-                                projectData.value.attachments.splice(indx, 1)
-                            }
-                            commit('projectData/projectLocalUpdate', { op: "modified", itemData: { ...projectData.value } });
-                            let historyObj = {
-                                key : "Project_Attachment",
-                                message : `<b>${userData.Employee_Name}</b> has deleted <b>${attachment.filename}</b> on <b>${sanitizeInput(projectData.value.ProjectName)}</b>.`
-                            }
-                            apiRequest("post", env.HANDLE_HISTORY, {
-                                "type": 'project',
-                                "companyId": companyId.value,
-                                "projectId": projectData.value._id,
-                                "taskId": null,
-                                "object": historyObj,
-                                "userData": userData
-                            })
-                            let notifyObj = {
-                                    removeFileName: attachment.filename,
-                                    ProjectName : projectData.ProjectName
-                                }
-                                let notificationObject = {
-                                    message: projectAttachmentChange(notifyObj),
-                                    key: "attachments",
-                                };
-                                
-                                apiRequest("post", env.HANDLE_NOTIFICATION, {
-                                    type: 'project',
-                                    companyId: companyId.value,
-                                    projectId: projectData._id,
-                                    object: notificationObject,
-                                    userData: userData,
-                                    changeType:'name',
-                                    changeData: notifyObj
-                                })
-                                .catch((error) => {
-                                    console.error("ERROR in update notification", error);
-                                })
-                            $toast.success(t('Toast.Attchments_deleted_successfully'),{position: 'top-right'});
-                        })
+                        removeRecord();
                     } else {
                         isSpinner.value = false;
                         $toast.error(t('Toast.something_went_wrong'),{position: 'top-right'});

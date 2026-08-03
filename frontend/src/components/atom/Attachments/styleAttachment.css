@@ -1,3 +1,61 @@
+/* AHE-3838 — "attach from" source menu on the + button. Only rendered when the
+   workspace has a cloud provider configured; otherwise + stays a plain label. */
+.attach-add {
+    display: inline-flex;
+    align-items: center;
+}
+.attach-sourcemenu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 20;
+    min-width: 208px;
+    padding: 4px;
+    background: #fff;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(23, 24, 36, 0.14);
+}
+.attach-sourcemenu__item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 7px 9px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: #191A2B;
+    text-align: left;
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.attach-sourcemenu__item:hover:not(:disabled) {
+    background: #F4F4FA;
+}
+.attach-sourcemenu__item:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+.attach-sourcemenu__item img {
+    width: 16px;
+    height: 16px;
+    flex: none;
+    object-fit: contain;
+}
+.attach-sourcemenu__hint {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: 500;
+    color: #8A8CA6;
+}
+.attach-sourcemenu__sep {
+    height: 1px;
+    margin: 4px 6px;
+    background: #EDEDF3;
+}
+
 .vue-pdf-embed canvas {
     /* height: fit-content !important; */
     width: 80% !important;

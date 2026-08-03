@@ -121,15 +121,27 @@
                                         <img :src="item.attached" alt="link" :title='item.fileName'>
                                     </span>
                                     <span v-else class="files-img">
+                                        <!-- AHE-3838 — a cloud-linked file has no
+                                             object in our storage, so neither the
+                                             Wasabi component nor its `attached`
+                                             URL applies. Show the provider icon. -->
                                         <ImageIcon
-                                            v-if="item.attached.includes('http')"
+                                            v-if="item.cloudProvider"
+                                            :key="item.id + `${index}`"
+                                            :src="item.cloudThumbnail || item.cloudIcon || ''"
+                                            :alt="item.fileName"
+                                            :extension="item.extension"
+                                            class="files__image"
+                                        />
+                                        <ImageIcon
+                                            v-else-if="item.attached.includes('http')"
                                             :key="item.id + `${index}`"
                                             :src="item.attached"
                                             :alt="item.fileName"
                                             :extension="item.extension"
                                             class="files__image"
                                         />
-                                        <WasabiIamgeCompp 
+                                        <WasabiIamgeCompp
                                             v-else
                                             :data="{...item, url:item.attached}"
                                             @downloadUrl="(eve) => {downloadurl(eve, item)}"
@@ -144,7 +156,18 @@
                                         <h4 class="font-size-14 font-weight-500 m-0 gray81 pt-5px">{{item?.userDetail?.Employee_Name}}</h4>
                                         <div class="d-flex  file-link-date">
                                             <div>
-                                                <img class="cursor-pointer mr-15px" src="@/assets/images/svg/downloadVector.svg" @click="downloadDocument(item.downloadUrl, item.fileName, item), item.isSpinner = true">
+                                                <!-- Linked cloud file: we hold a link, not the bytes, so
+                                                     offer "open in provider" rather than a download that
+                                                     cannot succeed. -->
+                                                <img
+                                                    v-if="item.cloudProvider"
+                                                    class="cursor-pointer mr-15px files__cloudicon"
+                                                    :src="item.cloudProviderIcon"
+                                                    :alt="item.cloudProviderName"
+                                                    :title="`Open in ${item.cloudProviderName}`"
+                                                    @click="openCloudItem(item)"
+                                                />
+                                                <img v-else class="cursor-pointer mr-15px" src="@/assets/images/svg/downloadVector.svg" @click="downloadDocument(item.downloadUrl, item.fileName, item), item.isSpinner = true">
                                                 <img v-show="item.getFrom === 'comments'" @click="highlightComment(item)" class="cursor-pointer" :src="messageReply">
                                             </div>
                                             <span v-if="!getDateAndTime(item.createTime).includes('Invalid date')" class="font-size-13 gray81 font-weight-400">
@@ -196,6 +219,7 @@
     // Utils
     import { useGetterFunctions } from '@/composable';
     import { download } from "@/utils/StorageOprations/download";
+    import { cloudProviderOf } from "@/utils/cloudAttachment";
     import { dbCollections } from '@/utils/Collections';
     import { useI18n } from "vue-i18n";
     import { apiRequest } from "../../../services";
@@ -476,6 +500,10 @@
             attachments.value.forEach(x => {
                 let bfileSize = x.size ? x.size : 0;
                 let convertedKbSize = parseFloat(parseInt(bfileSize) / Math.pow(1024, 1)).toFixed(2) + 'KB';
+                // AHE-3838 — carry the cloud fields through so the row can render
+                // a provider icon and an open-in-provider action. All empty for
+                // ordinary uploads, which therefore behave exactly as before.
+                const provider = cloudProviderOf(x);
                 let obj = {
                     'id': x.id ? x.id : '',
                     'userId': x.userId ? x.userId : '',
@@ -488,7 +516,13 @@
                     'getFrom': 'attachment',
                     'userDetail': getUser(x.userId),
                     'isSpinner': false,
-                    'downloadUrl': x.downloadUrl
+                    'downloadUrl': x.downloadUrl,
+                    'cloudProvider': provider ? provider.key : '',
+                    'cloudProviderName': provider ? provider.label : '',
+                    'cloudProviderIcon': provider ? provider.icon : '',
+                    'cloudIcon': x.externalIcon || '',
+                    'cloudThumbnail': x.thumbnailUrl || '',
+                    'cloudUrl': x.externalUrl || ''
                 };
                 attachmmentList.value.push(obj);
                 userIds.value.push(x.userId);
@@ -533,6 +567,13 @@
         emit('closeSidebar',false);
         router.replace({ name: route.value, params: {...route.params}, query, hash: `#${data.id}` });
     }
+
+    // AHE-3838 — hand a linked file back to its provider. noopener/noreferrer
+    // because the target is a third-party origin.
+    const openCloudItem = (item) => {
+        if (!item || !item.cloudUrl) return;
+        window.open(item.cloudUrl, '_blank', 'noopener,noreferrer');
+    };
 
     // This function is used download seleted document
     const downloadDocument = (url, name, obj) => {
