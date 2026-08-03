@@ -533,9 +533,19 @@ exports.thumbnail = async (req, res) => {
         // Only hand back an https URL — this value goes straight into an <img src>.
         return res.send({ status: true, data: { url: R.isHttpsUrl(url) ? url : '' } });
     } catch (e) {
-        // Debug, not error: "no thumbnail" is a normal outcome for many files.
-        logger.debug(`${LOG_PREFIX} thumbnail lookup failed: ${e.message}`);
-        return res.send({ status: true, data: { url: '' } });
+        // Loud, and with the provider's own words. Logging this at debug hid a
+        // real misconfiguration behind a blank tile: with drive.file scope, Drive
+        // returns 404 for a picked file unless the Picker was built with
+        // setAppId(<project number>), so "no preview" looked like "this file has
+        // no preview" when it actually meant "the app was never granted the file".
+        const detail = (e.response && e.response.data && e.response.data.error
+            && (e.response.data.error.message || e.response.data.error))
+            || e.message;
+        const status = (e.response && e.response.status) || '';
+        logger.error(`${LOG_PREFIX} thumbnail lookup failed (${provider} ${status}): ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`);
+        // Still a 200 with an empty url — a missing preview must not break the
+        // tile — but `reason` makes it visible in devtools instead of silent.
+        return res.send({ status: true, data: { url: '', reason: typeof detail === 'string' ? detail : 'lookup failed' } });
     }
 };
 
@@ -622,8 +632,21 @@ exports.importFile = async (req, res) => {
         logger.info(`${LOG_PREFIX} imported ${filename} (${buffer.length} bytes) from ${provider} for user ${userId}`);
         return res.send({ status: true, statusText: 'Imported.', data: { url: storedPath, size: buffer.length, filename } });
     } catch (e) {
-        const detail = (e.response && e.response.data && (e.response.data.error_description || e.response.data.error_summary || e.response.data.error)) || e.message;
-        logger.error(`${LOG_PREFIX} importFile: ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`);
+        // arraybuffer responseType means an error body arrives as bytes, not JSON —
+        // decode it or the reason is lost and all you get is "status code 404".
+        let payload = e.response && e.response.data;
+        if (payload && (Buffer.isBuffer(payload) || payload instanceof ArrayBuffer)) {
+            try { payload = JSON.parse(Buffer.from(payload).toString('utf8')); } catch (_e) { payload = null; }
+        }
+        let detail = (payload && (payload.error_description || payload.error_summary
+            || (payload.error && (payload.error.message || payload.error)))) || e.message;
+        const status = (e.response && e.response.status) || '';
+        // 404 here almost always means the app was never granted the file, not that
+        // the file is missing — see the app_id note in cloudProviders.
+        if (String(status) === '404' && String(req.params.provider) === 'google_drive') {
+            detail = `${detail} — Drive returned 404 for a picked file. This usually means the Google Drive "Cloud project number (App ID)" is missing in Settings → Integrations: without it, drive.file never grants this app access to the file you picked.`;
+        }
+        logger.error(`${LOG_PREFIX} importFile (${status}): ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`);
         return res.send({ status: false, statusText: typeof detail === 'string' ? detail : 'Import failed.' });
     } finally {
         if (tmpPath) { try { fs.unlinkSync(tmpPath); } catch (_e) { /* already gone */ } }

@@ -189,7 +189,7 @@ const loadGooglePicker = () => loadScript('https://apis.google.com/js/api.js').t
     window.gapi.load('picker', { callback: () => resolve(), onerror: () => reject(new Error('Could not load the Google Picker.')) });
 }));
 
-const openGooglePicker = ({ token, apiKey, multiple }) => new Promise((resolve, reject) => {
+const openGooglePicker = ({ token, apiKey, appId, multiple }) => new Promise((resolve, reject) => {
     loadGooglePicker().then(() => {
         const picker = window.google.picker;
         const view = new picker.DocsView(picker.ViewId.DOCS)
@@ -215,6 +215,10 @@ const openGooglePicker = ({ token, apiKey, multiple }) => new Promise((resolve, 
             });
         // The developer key is optional but Google throttles keyless picker use.
         if (apiKey) builder.setDeveloperKey(apiKey);
+        // setAppId is what makes a drive.file pick actually grant our app access
+        // to that file. Omit it and picking still works, but every later Drive API
+        // call for the file 404s — no thumbnails, no importing.
+        if (appId) builder.setAppId(appId);
         if (multiple) builder.enableFeature(picker.Feature.MULTISELECT_ENABLED);
         builder.build().setVisible(true);
     }).catch(reject);
@@ -278,7 +282,12 @@ export const pickCloudFiles = async ({ provider, multiple = true }) => {
         throw err;
     }
     if (provider === 'google_drive') {
-        return openGooglePicker({ token, apiKey: (config && config.api_key) || '', multiple });
+        return openGooglePicker({
+            token,
+            apiKey: (config && config.api_key) || '',
+            appId: (config && config.app_id) || '',
+            multiple,
+        });
     }
     if (provider === 'onedrive') {
         return openOneDrivePicker({ token, clientId: (config && config.client_id) || '', multiple });

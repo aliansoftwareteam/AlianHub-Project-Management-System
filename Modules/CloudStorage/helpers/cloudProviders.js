@@ -23,8 +23,16 @@ const PROVIDERS = {
             { key: 'client_id', label: 'OAuth client ID', secret: false },
             { key: 'client_secret', label: 'OAuth client secret', secret: true },
             { key: 'api_key', label: 'Picker API key', secret: false },
+            // REQUIRED for anything that touches the file after picking.
+            //
+            // With drive.file scope, Drive only grants the app access to a picked
+            // file if the Picker was built with setAppId(<project number>). Without
+            // it the pick still succeeds and the link works, but every later Drive
+            // API call for that file returns 404 "File not found" — which is
+            // exactly what broke thumbnails and importing.
+            { key: 'app_id', label: 'Cloud project number (App ID) — needed for previews and importing', secret: false },
         ],
-        setupHint: 'console.cloud.google.com → enable the Picker API, create an API key and an OAuth client ID (Web application).',
+        setupHint: 'console.cloud.google.com → enable the Picker API and Drive API, create an API key and an OAuth client ID (Web application). The project number is on the project dashboard.',
         oauth: true,
         authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
         tokenUrl: 'https://oauth2.googleapis.com/token',
@@ -34,7 +42,7 @@ const PROVIDERS = {
         scope: 'https://www.googleapis.com/auth/drive.file',
         userInfoUrl: 'https://www.googleapis.com/oauth2/v3/userinfo',
         // Fields the browser is allowed to see (the picker needs them).
-        publicFields: ['client_id', 'api_key'],
+        publicFields: ['client_id', 'api_key', 'app_id'],
         requiredFields: ['client_id', 'client_secret'],
         // Google needs these two to return a refresh token at all.
         extraAuthParams: { access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true' },
