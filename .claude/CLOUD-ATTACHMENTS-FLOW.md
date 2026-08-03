@@ -121,8 +121,9 @@ the one place the existing `integration_connections` shape doesn't fit as-is —
 it's company-scoped for things like Slack. A cloud connection needs
 `(companyId, userId, provider)` as its identity.
 
-App credentials (client id / secret) stay company-level or in `.env` — one app
-registration per provider, shared by all users of the instance.
+App credentials (client id / secret) stay workspace-level — one app registration
+per provider, shared by everyone on the instance — but any member may enter or
+change them. Only the per-user grant is private to its owner.
 
 ---
 
@@ -281,13 +282,24 @@ instance that never sets one up keeps the original single-click `+`.
 **Where:** `/<cid>/settings/integrations` → **Settings → Integrations**, in the
 new **"Cloud storage for attachments"** section below the webhooks list.
 
+**Entirely optional.** Nothing about the existing upload flow changes, and the
+section can be ignored forever. Uploading from your computer keeps working
+exactly as it does today.
+
 > Not the Integrations & Automation Hub at `/<cid>/integrations` — the cloud
 > providers were deliberately removed from that marketplace so there is one place
 > to configure them, not two. (That hub also has no navigation link anywhere in
 > the app, so it is only reachable by typing the URL.)
 
-Saving credentials requires **owner or admin** (roleType 1/2). Any member can
-connect their own account once an admin has entered them.
+**No role restrictions.** Any member can register the app credentials and any
+member can connect their own account. This is a self-hosted, open-source app and
+this is an optional extra attachment source — gating setup behind a role would
+just mean nobody can switch it on until an admin is around.
+
+The one thing worth knowing: the app credentials are shared per workspace, so
+removing them clears them for everyone and disconnects every linked account.
+The UI confirms before doing it. Individual **Disconnect my account** only ever
+affects the person clicking it.
 
 **Per provider, once per workspace:**
 

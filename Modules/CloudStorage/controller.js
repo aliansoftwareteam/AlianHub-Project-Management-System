@@ -72,27 +72,6 @@ const resolveReturnOrigin = (req) => {
 // redirect URI in each provider's developer console, per environment.
 const redirectUri = () => `${apiBase()}/api/v1/cloud-oauth/callback`;
 
-/**
- * Owner (1) or Admin (2) only. The app credentials are workspace-wide and one of
- * them is a client SECRET, so an ordinary member must not be able to change (or
- * replace) them. Same lookup pattern as Modules/ScreenshotRetention — role comes
- * from the per-tenant company_users record, never from the request, and any
- * lookup failure denies.
- */
-const isCompanyAdmin = async (companyId, userId) => {
-    if (!companyId || !userId) return false;
-    try {
-        const record = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.COMPANY_USERS,
-            data: [{ userId: String(userId) }, { _id: 1, roleType: 1, userId: 1 }],
-        }, 'findOne');
-        return !!record && [1, 2].includes(Number(record.roleType));
-    } catch (e) {
-        logger.error(`${LOG_PREFIX} role check failed (company ${companyId}, user ${userId}): ${e.message}`);
-        return false;
-    }
-};
-
 // ── workspace app credentials ───────────────────────────────────────────────
 
 const loadAppConfig = async (companyId, provider) => {
@@ -125,9 +104,12 @@ const upsertConnection = (companyId, userId, provider, patch) => MongoDbCrudOpra
  * GET /api/v1/cloud-storage/settings
  *
  * Everything the Settings → Integrations section needs: the field definitions,
- * the stored non-secret values, which secrets are set, and whether the caller may
- * edit. Readable by any member (so they can see what's available and connect
- * their own account); only admins get canManage: true.
+ * the stored non-secret values and which secrets are set.
+ *
+ * Open to every member. This is an OPTIONAL extra attachment source on a
+ * self-hosted, open-source app — anyone willing to register an app with a
+ * provider may set it up, and anyone with an account may connect it. Uploading
+ * from your computer is always there for whoever doesn't want to.
  */
 exports.getSettings = async (req, res) => {
     try {
@@ -135,7 +117,6 @@ exports.getSettings = async (req, res) => {
         const userId = userOf(req);
         if (!companyId || !userId) return res.send({ status: false, statusText: 'companyId and an authenticated user are required.' });
 
-        const canManage = await isCompanyAdmin(companyId, userId);
         const rows = [];
         for (const key of P.PROVIDER_KEYS) {
             const described = P.describe(key);
@@ -161,7 +142,9 @@ exports.getSettings = async (req, res) => {
                 accountEmail: (connection && connection.accountEmail) || '',
             });
         }
-        return res.send({ status: true, data: { canManage, redirectUri: redirectUri(), providers: rows } });
+        // canManage is unconditional — kept in the payload so the UI has one
+        // switch to read rather than assuming.
+        return res.send({ status: true, data: { canManage: true, redirectUri: redirectUri(), providers: rows } });
     } catch (e) {
         logger.error(`${LOG_PREFIX} getSettings: ${e.message}`);
         return res.send({ status: false, statusText: e.message });
@@ -170,7 +153,10 @@ exports.getSettings = async (req, res) => {
 
 /**
  * PUT /api/v1/cloud-storage/settings/:provider  { config: {...} }
- * Save this workspace's app registration for one provider. Admin only.
+ *
+ * Save the app registration for one provider. Any member may do this: the
+ * feature is optional and self-hosted, so gating setup behind a role just means
+ * nobody can turn it on until an admin happens to be available.
  */
 exports.saveSettings = async (req, res) => {
     try {
@@ -179,10 +165,6 @@ exports.saveSettings = async (req, res) => {
         const provider = String(req.params.provider || '');
         if (!P.isProvider(provider)) return res.send({ status: false, statusText: 'Unknown provider.' });
         if (!companyId || !userId) return res.send({ status: false, statusText: 'companyId and an authenticated user are required.' });
-        if (!(await isCompanyAdmin(companyId, userId))) {
-            return res.send({ status: false, statusText: 'Only an owner or admin can change these credentials.' });
-        }
-
         const existing = await loadAppConfig(companyId, provider);
         const check = P.sanitizeAppConfig(provider, (req.body || {}).config, (existing && existing.config) || {});
         if (!check.valid) return res.send({ status: false, statusText: check.reason });
@@ -219,11 +201,15 @@ exports.saveSettings = async (req, res) => {
 
 /**
  * DELETE /api/v1/cloud-storage/settings/:provider
- * Remove the workspace credentials. Admin only.
+ *
+ * Remove the app credentials. Any member may do this, for the same reason they
+ * may add them.
  *
  * Also drops every user's grant for that provider: the tokens were issued to an
  * app registration that is being removed, so leaving them would strand rows whose
- * refresh can never succeed again.
+ * refresh can never succeed again. Worth knowing before clicking — this affects
+ * everyone using that provider, not just the person removing it, which is why the
+ * UI asks for confirmation.
  */
 exports.clearSettings = async (req, res) => {
     try {
@@ -232,10 +218,6 @@ exports.clearSettings = async (req, res) => {
         const provider = String(req.params.provider || '');
         if (!P.isProvider(provider)) return res.send({ status: false, statusText: 'Unknown provider.' });
         if (!companyId || !userId) return res.send({ status: false, statusText: 'companyId and an authenticated user are required.' });
-        if (!(await isCompanyAdmin(companyId, userId))) {
-            return res.send({ status: false, statusText: 'Only an owner or admin can change these credentials.' });
-        }
-
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS,
             data: [{ type: provider }, { $set: { config: {}, enabled: false, status: 'disconnected', deletedStatusKey: 1 } }],

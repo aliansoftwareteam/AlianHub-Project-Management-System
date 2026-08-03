@@ -222,7 +222,6 @@
                                     </div>
                                 </div>
 
-                                <p v-if="!cloudCanManage" class="intg-hint">{{ $t('Integrations.cloud_admin_only') }}</p>
                             </div>
                         </div>
                     </div>
@@ -428,7 +427,10 @@ const copySecret = async () => {
 //   the app registration  workspace-wide, owner/admin only
 //   the account grant     per user, because everyone has their own drive
 const cloudProviders = ref([]);
-const cloudCanManage = ref(false);
+// Always true — the server no longer gates setup behind a role. Kept as a single
+// switch the template reads, rather than scattering assumptions about who may
+// configure what.
+const cloudCanManage = ref(true);
 const cloudRedirectUri = ref('');
 const cloudEditing = ref('');
 const cloudForm = ref({});
@@ -469,6 +471,10 @@ const saveCloud = async (p) => {
 };
 
 const removeCloud = async (p) => {
+    // This clears the credentials for everyone and drops every user's connection
+    // to that provider, so it is not a per-user action despite living in a
+    // per-user-looking row. Confirm before doing it.
+    if (!window.confirm(t('Integrations.cloud_confirm_remove', { provider: p.name }))) return;
     isSpinner.value = true;
     try {
         await clearCloudSettings(p.provider);
