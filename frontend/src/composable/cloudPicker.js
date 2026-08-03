@@ -168,6 +168,21 @@ const openDropboxChooser = ({ appKey, multiple }) => new Promise((resolve, rejec
 
 // ── Google Drive ────────────────────────────────────────────────────────────
 
+/**
+ * Biggest entry from the Picker's `thumbnails` array ([{url,width,height}]).
+ *
+ * This is a real preview image. It is NOT the same as `iconUrl`, which is a
+ * 16px file-TYPE glyph — stretching that into a 131x100 tile produced a blurry
+ * coloured blob, so the tile must never fall back to it.
+ */
+const largestThumbnail = (thumbnails) => {
+    if (!Array.isArray(thumbnails) || !thumbnails.length) return '';
+    const best = thumbnails
+        .filter((t) => t && t.url)
+        .sort((a, b) => Number(b.width || 0) - Number(a.width || 0))[0];
+    return (best && best.url) || '';
+};
+
 const loadGooglePicker = () => loadScript('https://apis.google.com/js/api.js').then(() => new Promise((resolve, reject) => {
     if (!window.gapi) return reject(new Error('The Google API script did not initialise.'));
     if (window.google && window.google.picker) return resolve();
@@ -195,7 +210,7 @@ const openGooglePicker = ({ token, apiKey, multiple }) => new Promise((resolve, 
                     // shortcut-type results that omit it.
                     url: d.url || `https://drive.google.com/open?id=${encodeURIComponent(d.id)}`,
                     iconUrl: d.iconUrl || '',
-                    thumbnailUrl: '',
+                    thumbnailUrl: largestThumbnail(d.thumbnails),
                 })));
             });
         // The developer key is optional but Google throttles keyless picker use.

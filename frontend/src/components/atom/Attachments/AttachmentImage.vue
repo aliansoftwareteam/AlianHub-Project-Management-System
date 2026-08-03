@@ -21,11 +21,15 @@
             </li>
         </ul>
 
-        <!-- Cloud-linked: provider thumbnail when it gave us one, else the
-             provider's own file icon, else the generic extension tile. -->
+        <!-- Cloud-linked: the provider's real preview image if it gave us one.
+             Deliberately NOT externalIcon as a fallback — that is a 16px file-TYPE
+             glyph, and stretching it across the tile rendered a blurry coloured
+             blob. With no thumbnail, an empty src lets ImageIcon fall through to
+             its extension placeholder, so a linked file looks like any other
+             non-previewable attachment. -->
         <ImageIcon
             v-if="cloudProvider"
-            :src="props.data.thumbnailUrl || props.data.externalIcon || ''"
+            :src="props.data.thumbnailUrl || ''"
             :alt="props.data.filename"
             :extension="props.data.extension"
             class="w-100"

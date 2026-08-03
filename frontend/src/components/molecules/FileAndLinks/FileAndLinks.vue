@@ -128,7 +128,7 @@
                                         <ImageIcon
                                             v-if="item.cloudProvider"
                                             :key="item.id + `${index}`"
-                                            :src="item.cloudThumbnail || item.cloudIcon || ''"
+                                            :src="item.cloudThumbnail || ''"
                                             :alt="item.fileName"
                                             :extension="item.extension"
                                             class="files__image"
