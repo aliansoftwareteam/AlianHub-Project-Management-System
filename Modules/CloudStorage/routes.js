@@ -19,6 +19,13 @@ exports.init = (app) => {
     app.get('/api/v1/cloud-oauth/callback', callbackLimiter, ctrl.oauthCallback);
 
     // JWT + companyId (setMiddleware protects /api/v1/cloud-storage).
+    //
+    // The /settings routes are registered BEFORE the /:provider ones so
+    // "settings" is never captured as a provider name.
+    app.get('/api/v1/cloud-storage/settings', ctrl.getSettings);
+    app.put('/api/v1/cloud-storage/settings/:provider', ctrl.saveSettings);
+    app.delete('/api/v1/cloud-storage/settings/:provider', ctrl.clearSettings);
+
     app.get('/api/v1/cloud-storage/providers', ctrl.listProviders);
     app.get('/api/v1/cloud-storage/:provider/auth-url', ctrl.authUrl);
     app.get('/api/v1/cloud-storage/:provider/token', ctrl.pickerToken);

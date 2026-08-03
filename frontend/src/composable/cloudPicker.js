@@ -63,6 +63,40 @@ export const fetchCloudProviders = async () => {
     }
 };
 
+// ── workspace settings (Settings → Integrations) ────────────────────────────
+
+/**
+ * Field definitions + stored values for all three providers, plus whether the
+ * caller may edit them. Secret values are never returned — only a flag saying
+ * one is stored.
+ */
+export const fetchCloudSettings = async () => {
+    const res = await apiRequest('get', `${env.CLOUD_STORAGE}/settings`);
+    const payload = res && res.data;
+    if (!payload || !payload.status) {
+        throw new Error((payload && payload.statusText) || 'Could not load cloud storage settings.');
+    }
+    return payload.data || { canManage: false, providers: [] };
+};
+
+export const saveCloudSettings = async (provider, config) => {
+    const res = await apiRequest('put', `${env.CLOUD_STORAGE}/settings/${provider}`, { config });
+    const payload = res && res.data;
+    if (!payload || !payload.status) {
+        throw new Error((payload && payload.statusText) || 'Could not save.');
+    }
+    return payload.data || {};
+};
+
+export const clearCloudSettings = async (provider) => {
+    const res = await apiRequest('delete', `${env.CLOUD_STORAGE}/settings/${provider}`);
+    const payload = res && res.data;
+    if (!payload || !payload.status) {
+        throw new Error((payload && payload.statusText) || 'Could not remove.');
+    }
+    return true;
+};
+
 /** Short-lived access token (+ browser-safe config) for one provider. */
 const fetchPickerToken = async (provider) => {
     const res = await apiRequest('get', `${env.CLOUD_STORAGE}/${provider}/token`);

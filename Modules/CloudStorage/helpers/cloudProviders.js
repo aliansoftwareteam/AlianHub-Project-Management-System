@@ -16,6 +16,15 @@ const PROVIDERS = {
     google_drive: {
         key: 'google_drive',
         name: 'Google Drive',
+        icon: '📁',
+        // Rendered by the settings form. `secret: true` values are write-only —
+        // never returned to the client, only a "is it set" flag.
+        fields: [
+            { key: 'client_id', label: 'OAuth client ID', secret: false },
+            { key: 'client_secret', label: 'OAuth client secret', secret: true },
+            { key: 'api_key', label: 'Picker API key', secret: false },
+        ],
+        setupHint: 'console.cloud.google.com → enable the Picker API, create an API key and an OAuth client ID (Web application).',
         oauth: true,
         authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
         tokenUrl: 'https://oauth2.googleapis.com/token',
@@ -33,6 +42,13 @@ const PROVIDERS = {
     onedrive: {
         key: 'onedrive',
         name: 'OneDrive',
+        icon: '☁️',
+        fields: [
+            { key: 'client_id', label: 'Application (client) ID', secret: false },
+            { key: 'client_secret', label: 'Client secret', secret: true },
+            { key: 'tenant', label: 'Tenant ID (use "common" for personal + work accounts)', secret: false },
+        ],
+        setupHint: 'portal.azure.com → App registrations → new registration, then add a client secret.',
         oauth: true,
         // `tenant` is substituted in buildAuthUrl/tokenUrlFor; 'common' allows
         // both personal and work accounts.
@@ -48,6 +64,12 @@ const PROVIDERS = {
     dropbox: {
         key: 'dropbox',
         name: 'Dropbox',
+        icon: '🗂️',
+        fields: [
+            { key: 'app_key', label: 'App key', secret: false },
+            { key: 'app_secret', label: 'App secret (only needed to import copies)', secret: true },
+        ],
+        setupHint: 'dropbox.com/developers → Create app → Scoped access. Only the App key is required.',
         // The Chooser needs no user grant, so this provider is usable with the
         // app key alone. oauth stays false and connect/disconnect are no-ops.
         oauth: false,
@@ -75,6 +97,75 @@ const isConfigured = (providerKey, config) => {
     if (!p) return false;
     const cfg = config && typeof config === 'object' ? config : {};
     return p.requiredFields.every((f) => String(cfg[f] || '').trim().length > 0);
+};
+
+/**
+ * Describe a provider for the settings form. Shape mirrors the Integrations
+ * catalog so the form stays generic, but this module owns its own list — the
+ * cloud providers are deliberately absent from that catalog (one place to
+ * configure them, not two).
+ */
+const describe = (providerKey) => {
+    const p = byKey(providerKey);
+    if (!p) return null;
+    return {
+        provider: p.key,
+        name: p.name,
+        icon: p.icon || '',
+        oauth: !!p.oauth,
+        setupHint: p.setupHint || '',
+        fields: (p.fields || []).map((f) => ({ key: f.key, label: f.label, secret: !!f.secret })),
+        requiredFields: p.requiredFields.slice(),
+    };
+};
+
+/**
+ * Sanitise a submitted app config: keep only declared fields, clip values, and
+ * treat an omitted/blank SECRET as "leave the stored one alone". Without that
+ * last rule, re-saving the form (which never receives the stored secret back)
+ * would silently wipe it.
+ */
+const sanitizeAppConfig = (providerKey, submitted, existing = {}) => {
+    const p = byKey(providerKey);
+    if (!p) return { valid: false, reason: 'Unknown provider.', config: {} };
+    const raw = submitted && typeof submitted === 'object' && !Array.isArray(submitted) ? submitted : {};
+    const prev = existing && typeof existing === 'object' ? existing : {};
+    const out = {};
+    for (const f of p.fields || []) {
+        const incoming = raw[f.key];
+        const provided = incoming !== undefined && incoming !== null && String(incoming).trim().length > 0;
+        if (provided) {
+            out[f.key] = String(incoming).trim().slice(0, 512);
+        } else if (f.secret && prev[f.key]) {
+            out[f.key] = prev[f.key];      // keep the secret we already hold
+        }
+    }
+    const missing = p.requiredFields.filter((f) => !String(out[f] || '').trim().length);
+    if (missing.length) {
+        const labels = missing.map((k) => {
+            const field = (p.fields || []).find((x) => x.key === k);
+            return (field && field.label) || k;
+        });
+        return { valid: false, reason: `Required: ${labels.join(', ')}.`, config: out };
+    }
+    return { valid: true, reason: '', config: out };
+};
+
+/**
+ * App config as the settings form may see it: plain values for normal fields,
+ * and a booleans-only `secrets` map for the write-only ones.
+ */
+const redactAppConfig = (providerKey, config) => {
+    const p = byKey(providerKey);
+    if (!p) return { config: {}, secrets: {} };
+    const cfg = config && typeof config === 'object' ? config : {};
+    const out = {};
+    const secrets = {};
+    for (const f of p.fields || []) {
+        if (f.secret) secrets[f.key] = !!String(cfg[f.key] || '').length;
+        else out[f.key] = String(cfg[f.key] || '');
+    }
+    return { config: out, secrets };
 };
 
 /** Only the fields the browser genuinely needs. Never leaks a *_secret. */
@@ -191,6 +282,9 @@ module.exports = {
     byKey,
     isProvider,
     isConfigured,
+    describe,
+    sanitizeAppConfig,
+    redactAppConfig,
     publicConfig,
     authUrlFor,
     tokenUrlFor,
