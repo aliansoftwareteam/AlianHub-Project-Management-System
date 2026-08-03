@@ -314,15 +314,22 @@ once. Dropbox skips this step entirely.
 
 ---
 
-## 11. What can and cannot be verified locally
+## 11. What can be verified locally
+
+Everything, including import — the local `.env` has working Wasabi credentials, so
+"Import a copy" stores files locally exactly as it will on staging (confirmed
+2026-08-03: an imported Drive file landed on a real Wasabi path with no `source`
+key, indistinguishable from an upload).
 
 | | localhost | staging |
 |---|---|---|
 | Dropbox link | ✅ | ✅ |
-| Google / OneDrive link | ✅ (redirect URI must be registered for localhost) | ✅ |
-| **Import a copy** | ❌ **Wasabi does not work on localhost** | ✅ |
+| Google / OneDrive link | ✅ (register the localhost redirect URI) | ✅ |
+| Import a copy | ✅ | ✅ |
 
-So import has to be verified on staging. Link mode is fully testable locally.
+Staging is still where the environment-specific wiring gets proven: the
+CI-built frontend env vars, the production bucket, and each environment's own
+redirect URI.
 
 ---
 
