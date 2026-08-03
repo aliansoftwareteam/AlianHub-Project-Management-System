@@ -195,8 +195,9 @@ this from touching the existing flow.
   we don't have their bytes.
 - **Download All** — currently zips Wasabi files. Linked files must be **skipped
   with a note**, not silently dropped.
-- **Integrations settings page** — three new cards, each per-user Connect /
-  Disconnect.
+- **Settings → Integrations** — a "Cloud storage for attachments" section:
+  workspace credentials (owner/admin only) plus a per-user Connect / Disconnect,
+  and the redirect URI to copy.
 
 ---
 
@@ -228,8 +229,9 @@ this from touching the existing flow.
 | 2–5 | Per-user OAuth + picker tokens (backend) | `081575e` |
 | 2–5 | All three pickers + link mode wired end to end | `d2c3c01` |
 | 6 | "Import a copy" | `5371f1e` |
+| — | moved config from the marketplace to Settings → Integrations | `ed66cd5` |
 
-Built as four commits on `feat/cloud-storage-attachments`, nothing pushed.
+Built on `feat/cloud-storage-attachments`, nothing pushed.
 
 ### Files
 
@@ -239,11 +241,12 @@ Built as four commits on `feat/cloud-storage-attachments`, nothing pushed.
 `frontend/src/composable/cloudPicker.js`; three brand SVGs.
 
 **Modified** — `Attachments.vue`, `AttachmentImage.vue`, `styleAttachment.css`,
-`FileAndLinks.vue`, `TaskDetailTab.vue`, `ProjectDetail.vue`, `en.js`,
-`config/env.js`, `integrationsRules.js` (3 catalog entries), `index.js`,
+`FileAndLinks.vue`, `TaskDetailTab.vue`, `ProjectDetail.vue`,
+`Settings/Integrations/Integrations.vue`, `en.js`, `config/env.js`, `index.js`,
 `setMiddleware.js`, and the five collection-registration points
 (`collections.js`, `schemaType.js`, `schema.js`, `createSchema.js`,
-`mongoQueries.js`).
+`mongoQueries.js`). `integrationsRules.js` carries only a comment explaining why
+the cloud providers are absent from that catalog.
 
 ### Why existing behaviour is unaffected
 
@@ -265,8 +268,18 @@ Built as four commits on `feat/cloud-storage-attachments`, nothing pushed.
 Nothing appears in the UI until a provider is configured — by design, so an
 instance that never sets one up keeps the original single-click `+`.
 
-**Per provider, once per workspace** — Settings → Integrations → the new
-Storage cards:
+**Where:** `/<cid>/settings/integrations` → **Settings → Integrations**, in the
+new **"Cloud storage for attachments"** section below the webhooks list.
+
+> Not the Integrations & Automation Hub at `/<cid>/integrations` — the cloud
+> providers were deliberately removed from that marketplace so there is one place
+> to configure them, not two. (That hub also has no navigation link anywhere in
+> the app, so it is only reachable by typing the URL.)
+
+Saving credentials requires **owner or admin** (roleType 1/2). Any member can
+connect their own account once an admin has entered them.
+
+**Per provider, once per workspace:**
 
 | Provider | Fields to fill | Where to get them |
 |---|---|---|
@@ -274,8 +287,8 @@ Storage cards:
 | **Google Drive** | `client_id`, `client_secret`, `api_key` | console.cloud.google.com → OAuth client (Web) + enable Picker API for the key |
 | **OneDrive** | `client_id`, `client_secret`, `tenant` | portal.azure.com → App registrations (`tenant` = `common` for personal + work) |
 
-**Redirect URI** — register this exact value in the Google/Microsoft console, once
-per environment:
+**Redirect URI** — the settings section displays the exact value with a copy
+button. Register it in the Google/Microsoft console, once per environment:
 
 ```
 <APIURL>/api/v1/cloud-oauth/callback
@@ -284,6 +297,10 @@ per environment:
 So `http://localhost:4000/api/v1/cloud-oauth/callback` for local, and the staging
 and production equivalents. A mismatch here is the single most common cause of a
 consent screen erroring out.
+
+**Editing later:** secret fields come back blank (they are never sent to the
+browser) and a blank one means *keep the stored value*. So changing a client id
+does not wipe the client secret.
 
 **Optional env:**
 
