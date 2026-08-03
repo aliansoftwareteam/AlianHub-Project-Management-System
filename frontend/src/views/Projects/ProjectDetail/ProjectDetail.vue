@@ -199,6 +199,8 @@
                         fileId: file.id,
                         filename: file.name,
                         path: `Project/${projectdata._id}/ProjectAttachment/${storedName}`,
+                        // Dropbox only — see TaskDetailTab.
+                        downloadUrl: file.downloadUrl || '',
                     });
                     record = {
                         filename: file.name,

@@ -605,20 +605,53 @@ exports.importFile = async (req, res) => {
             return res.send({ status: false, statusText: 'path is not valid.' });
         }
 
-        const auth = await getAccessToken(companyId, userId, provider);
-        if (auth.error) return res.send({ status: false, statusText: auth.error, code: auth.error });
+        // Dropbox's Chooser issues no OAuth token, so importing uses the temporary
+        // `direct` link it returns instead. That URL comes from the browser, so it
+        // is matched against a host allow-list first — see isDropboxContentUrl.
+        // Every other provider goes through the stored grant.
+        const suppliedUrl = R.clip(body.downloadUrl, 2048);
+        const useSuppliedUrl = provider === 'dropbox' && suppliedUrl;
+        if (useSuppliedUrl && !R.isDropboxContentUrl(suppliedUrl)) {
+            logger.error(`${LOG_PREFIX} import rejected a non-Dropbox download URL from user ${userId}`);
+            return res.send({ status: false, statusText: 'That download link is not a Dropbox URL.' });
+        }
 
-        const request = P.downloadRequestFor(provider, fileId);
-        if (!request) return res.send({ status: false, statusText: 'This provider cannot be imported from.' });
+        let request;
+        let authHeader = {};
+        if (useSuppliedUrl) {
+            request = { url: suppliedUrl, method: 'get', headers: {} };
+        } else {
+            const auth = await getAccessToken(companyId, userId, provider);
+            if (auth.error) {
+                // Dropbox reaching here means link mode was used for the pick, so
+                // there is no direct URL and no grant to fall back on.
+                const statusText = (provider === 'dropbox' && auth.error === 'not_connected')
+                    ? 'Dropbox import needs the file to be re-picked with "Import a copy" ticked.'
+                    : auth.error;
+                return res.send({ status: false, statusText, code: auth.error });
+            }
+            request = P.downloadRequestFor(provider, fileId);
+            if (!request) return res.send({ status: false, statusText: 'This provider cannot be imported from.' });
+            authHeader = { Authorization: `Bearer ${auth.token}` };
+        }
 
         const download = await axios({
             method: request.method || 'get',
             url: request.url,
-            headers: { ...(request.headers || {}), Authorization: `Bearer ${auth.token}` },
+            headers: { ...(request.headers || {}), ...authHeader },
             responseType: 'arraybuffer',
             timeout: 120000,
             maxContentLength: MAX_IMPORT_BYTES,
             maxBodyLength: MAX_IMPORT_BYTES,
+            // Dropbox redirects to a per-user content host; do NOT let a redirect
+            // walk us off the allow-listed origin onto something arbitrary.
+            maxRedirects: 5,
+            beforeRedirect: useSuppliedUrl
+                ? (options) => {
+                    const next = `${options.protocol}//${options.hostname}${options.path || ''}`;
+                    if (!R.isDropboxContentUrl(next)) throw new Error('Refused a redirect away from Dropbox.');
+                }
+                : undefined,
         });
 
         const buffer = Buffer.from(download.data);

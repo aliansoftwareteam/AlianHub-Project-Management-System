@@ -417,6 +417,9 @@ const newCloudAttachments = async ({ provider, files, mode = 'link' } = {}) => {
                     fileId: file.id,
                     filename: file.name,
                     path: `Project/${props.task.ProjectID}/Sprint/${props.task._id}/Attachment/${storedName}`,
+                    // Dropbox only: the temporary direct link the Chooser returned,
+                    // since it gives us no token to authenticate a download with.
+                    downloadUrl: file.downloadUrl || '',
                 });
                 const extension = storedName.substring(storedName.lastIndexOf(".") + 1);
                 record = {

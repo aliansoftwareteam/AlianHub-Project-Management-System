@@ -137,7 +137,7 @@ export const disconnectCloudProvider = async (provider) => {
 
 // ── Dropbox ─────────────────────────────────────────────────────────────────
 
-const openDropboxChooser = ({ appKey, multiple }) => new Promise((resolve, reject) => {
+const openDropboxChooser = ({ appKey, multiple, mode }) => new Promise((resolve, reject) => {
     loadScript('https://www.dropbox.com/static/api/2/dropins.js', {
         id: 'dropboxjs',
         'data-app-key': appKey,
@@ -146,12 +146,17 @@ const openDropboxChooser = ({ appKey, multiple }) => new Promise((resolve, rejec
             reject(new Error('The Dropbox Chooser is unavailable.'));
             return;
         }
+        // linkType depends on what we're about to do with the file:
+        //   preview — a shareable link that renders in Dropbox and does not
+        //             expire. Right for LINK mode, where we store it.
+        //   direct  — a raw content URL that expires in ~4 hours. Useless to
+        //             store, but exactly what IMPORT needs: the Chooser gives us
+        //             no OAuth token, so this link is the only way the server can
+        //             fetch the bytes at all.
+        const isImport = mode === 'import';
         window.Dropbox.choose({
             multiselect: !!multiple,
-            // 'preview' returns a shareable link that renders in Dropbox — the
-            // link-mode behaviour we want. 'direct' links expire after 4 hours,
-            // so they are useless for a stored attachment.
-            linkType: 'preview',
+            linkType: isImport ? 'direct' : 'preview',
             success: (files) => resolve((files || []).map((f) => ({
                 id: f.id || f.link,
                 name: f.name,
@@ -160,6 +165,9 @@ const openDropboxChooser = ({ appKey, multiple }) => new Promise((resolve, rejec
                 url: f.link,
                 iconUrl: f.icon || '',
                 thumbnailUrl: (f.thumbnailLink || ''),
+                // Only meaningful for import, and deliberately not stored on the
+                // attachment — it would be dead within hours.
+                downloadUrl: isImport ? f.link : '',
             }))),
             cancel: () => resolve([]),
         });
@@ -267,12 +275,14 @@ const openOneDrivePicker = ({ token, clientId, multiple }) => new Promise((resol
  * to (re)authorise, so the caller can offer a Connect action instead of showing a
  * meaningless error.
  */
-export const pickCloudFiles = async ({ provider, multiple = true }) => {
+export const pickCloudFiles = async ({ provider, multiple = true, mode = 'link' }) => {
     if (provider === 'dropbox') {
         const { config } = await fetchPickerToken('dropbox');
         const appKey = (config && config.app_key) || '';
         if (!appKey) throw new Error('Dropbox is not set up for this workspace yet.');
-        return openDropboxChooser({ appKey, multiple });
+        // Dropbox needs to know the mode up front: the kind of link the Chooser
+        // returns is decided when it opens, not afterwards.
+        return openDropboxChooser({ appKey, multiple, mode });
     }
 
     const { token, config } = await fetchPickerToken(provider);
@@ -325,8 +335,8 @@ export const resolveCloudThumbnail = (provider, fileId) => {
 };
 
 /** Ask the server to copy a picked file into our own storage. */
-export const importCloudFile = async ({ provider, fileId, filename, path }) => {
-    const res = await apiRequest('post', `${env.CLOUD_STORAGE}/${provider}/import`, { fileId, filename, path });
+export const importCloudFile = async ({ provider, fileId, filename, path, downloadUrl }) => {
+    const res = await apiRequest('post', `${env.CLOUD_STORAGE}/${provider}/import`, { fileId, filename, path, downloadUrl });
     const payload = res && res.data;
     if (!payload || !payload.status) {
         const err = new Error((payload && payload.statusText) || 'Import failed.');

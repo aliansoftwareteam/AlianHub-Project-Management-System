@@ -69,6 +69,40 @@ const clip = (value, max = 512) => String(value === null || value === undefined 
 
 const isHttpsUrl = (value) => /^https:\/\/[^\s]+$/i.test(String(value || ''));
 
+/**
+ * Is this a Dropbox content URL the server may fetch?
+ *
+ * Dropbox's Chooser is the one provider that gives us no OAuth token, so importing
+ * has to work from the temporary `direct` link the widget returns — which means the
+ * URL arrives from the BROWSER. Handing a client-supplied URL to server-side axios
+ * is textbook SSRF (file://, http://169.254.169.254/, an internal admin port), so
+ * it is matched against an explicit host allow-list rather than merely checked for
+ * "looks like https".
+ *
+ * Parsed with URL() so tricks like `https://dl.dropboxusercontent.com@evil.com/`
+ * resolve to their real host (evil.com) and are rejected.
+ */
+const DROPBOX_CONTENT_HOSTS = new Set([
+    'dl.dropboxusercontent.com',
+    'www.dropbox.com',
+    'dropbox.com',
+    'content.dropboxapi.com',
+]);
+
+const isDropboxContentUrl = (value) => {
+    const raw = String(value || '');
+    if (!isHttpsUrl(raw)) return false;
+    let parsed;
+    try { parsed = new URL(raw); } catch (e) { return false; }
+    if (parsed.protocol !== 'https:') return false;
+    // Credentials in the URL are only ever an attempt to disguise the host.
+    if (parsed.username || parsed.password) return false;
+    const host = parsed.hostname.toLowerCase();
+    if (DROPBOX_CONTENT_HOSTS.has(host)) return true;
+    // Per-user content subdomains, e.g. uc1234abcd.dl.dropboxusercontent.com
+    return host.endsWith('.dl.dropboxusercontent.com');
+};
+
 const MAX_FILES_PER_PICK = 20;
 
 const normalizePickedFile = (raw) => {
@@ -131,6 +165,8 @@ module.exports = {
     decodeState,
     safeReturnPath,
     isHttpsUrl,
+    isDropboxContentUrl,
+    DROPBOX_CONTENT_HOSTS,
     clip,
     MAX_FILES_PER_PICK,
     normalizePickedFile,

@@ -236,11 +236,14 @@ const chooseCloudSource = async (provider) => {
         return;
     }
     cloudBusy.value = provider.provider;
+    const mode = importCopy.value ? 'import' : 'link';
     try {
-        const files = await pickCloudFiles({ provider: provider.provider, multiple: true });
+        // The mode is passed in, not just emitted afterwards: Dropbox's Chooser
+        // decides which kind of link it returns at the moment it opens.
+        const files = await pickCloudFiles({ provider: provider.provider, multiple: true, mode });
         closeSourceMenu();
         if (!files || !files.length) return;   // cancelled
-        emit('update:cloud-add', { provider: provider.provider, files, mode: importCopy.value ? 'import' : 'link' });
+        emit('update:cloud-add', { provider: provider.provider, files, mode });
     } catch (error) {
         closeSourceMenu();
         if (error?.code === 'not_connected' || error?.code === 'reauth_required') {
