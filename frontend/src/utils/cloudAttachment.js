@@ -80,6 +80,31 @@ export const buildCloudAttachment = ({ provider, file, userId, id }) => {
     };
 };
 
+/**
+ * Preview image for a linked file, or '' if we can't derive one.
+ *
+ * Why not the same mechanism uploads use: for an upload the app GENERATES its own
+ * thumbnails at upload time (thumbnail.json sizes, the `attachmentIcon` key) and
+ * serves them from our storage. A linked file has no bytes on our side, so there
+ * is nothing to generate from — the preview has to come from the provider.
+ *
+ * For Drive we hit `drive.google.com/thumbnail?id=…`, which renders using the
+ * VIEWER'S OWN Google session in the browser. No OAuth token, no Drive API, no
+ * scope, no App ID — and it therefore also works for links attached before any of
+ * that was configured. If the viewer has no access the image simply fails to load
+ * and ImageIcon falls back to its placeholder, which is the same permission model
+ * link mode already has.
+ */
+export const cloudPreviewUrlFor = (attachment) => {
+    if (!isCloudAttachment(attachment)) return '';
+    // Whatever the picker handed us wins — Dropbox and OneDrive supply one.
+    if (attachment.thumbnailUrl) return String(attachment.thumbnailUrl);
+    if (attachment.source === 'google_drive' && attachment.externalId) {
+        return `https://drive.google.com/thumbnail?id=${encodeURIComponent(attachment.externalId)}&sz=w400`;
+    }
+    return '';
+};
+
 // Mirror of the `type` field on uploaded attachments, which is the leading
 // segment of the MIME type ("image", "video", "application", …). Google Docs
 // native files report vendor MIME types with no useful prefix, so they land on

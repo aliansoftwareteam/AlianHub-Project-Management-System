@@ -72,7 +72,7 @@ import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
 import ImageIcon from "@/components/atom/ImageIcon/ImageIcon.vue"
 import '@/components/atom/Attachments/styleAttachment.css';
 import { storageHelper } from "@/composable/commonFunction";
-import { cloudProviderOf } from "@/utils/cloudAttachment";
+import { cloudProviderOf, cloudPreviewUrlFor } from "@/utils/cloudAttachment";
 import { resolveCloudThumbnail } from "@/composable/cloudPicker";
 
 
@@ -109,13 +109,11 @@ const cloudProvider = computed(() => cloudProviderOf(props.data));
 // threw on undefined, so read it defensively.
 const hasHttpUrl = computed(() => String(props.data?.url || '').includes('http'));
 
-// Preview image for a linked file. Starts with whatever the picker gave us
-// (Dropbox does supply one) and is then upgraded by asking the provider's API,
-// because the Google and OneDrive pickers return no usable preview. Resolved per
-// render rather than stored, since these URLs are short-lived. Empty leaves
-// ImageIcon on its placeholder, which is the correct look for a file we can't
-// preview.
-const cloudThumbnail = ref(String(props.data?.thumbnailUrl || ''));
+// Preview image for a linked file. For Drive this is derivable from the file id
+// and renders off the viewer's own Google session, so no round trip is needed;
+// other providers fall back to asking their API on mount. Empty leaves ImageIcon
+// on its placeholder, the correct look for a file we cannot preview.
+const cloudThumbnail = ref(cloudPreviewUrlFor(props.data));
 
 onMounted(() => {
     const fixedDate = new Date(2024,6,9).getTime();

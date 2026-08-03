@@ -219,7 +219,7 @@
     // Utils
     import { useGetterFunctions } from '@/composable';
     import { download } from "@/utils/StorageOprations/download";
-    import { cloudProviderOf } from "@/utils/cloudAttachment";
+    import { cloudProviderOf, cloudPreviewUrlFor } from "@/utils/cloudAttachment";
     import { dbCollections } from '@/utils/Collections';
     import { useI18n } from "vue-i18n";
     import { apiRequest } from "../../../services";
@@ -521,7 +521,7 @@
                     'cloudProviderName': provider ? provider.label : '',
                     'cloudProviderIcon': provider ? provider.icon : '',
                     'cloudIcon': x.externalIcon || '',
-                    'cloudThumbnail': x.thumbnailUrl || '',
+                    'cloudThumbnail': cloudPreviewUrlFor(x),
                     'cloudUrl': x.externalUrl || ''
                 };
                 attachmmentList.value.push(obj);
