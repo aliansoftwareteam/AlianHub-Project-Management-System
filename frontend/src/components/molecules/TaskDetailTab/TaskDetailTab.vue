@@ -145,7 +145,8 @@ import taskClass from '@/utils/TaskOperations';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import AppTeaserBlock from '@/components/molecules/AppTeaserBlock/AppTeaserBlock.vue';
 import {storageQueryBuilder,generateFileName} from '@/utils/storageQueryBuild.js';
-import { buildCloudAttachment, isCloudAttachment, CLOUD_PROVIDERS } from '@/utils/cloudAttachment';
+import { buildCloudAttachment, isCloudAttachment, cloudTypeOf, CLOUD_PROVIDERS } from '@/utils/cloudAttachment';
+import { importCloudFile } from '@/composable/cloudPicker';
 import { useClipRecorder } from '@/composables/useClipRecorder';
 import { useI18n } from 'vue-i18n';
 
@@ -379,8 +380,15 @@ const newAttachments = (files) => {
  * Deliberately no checkBucketStorage() call — a link stores nothing of ours, so
  * it must not consume the company's storage quota.
  */
-const newCloudAttachments = async ({ provider, files } = {}) => {
+const newCloudAttachments = async ({ provider, files, mode = 'link' } = {}) => {
     if (!provider || !files || !files.length) return;
+
+    // Importing copies bytes into our storage, so unlike linking it DOES consume
+    // the company's quota and has to be checked first.
+    if (mode === 'import' && checkBucketStorage(files.map((f) => f?.size || 0), { gettersVal: getters }) !== true) {
+        return;
+    }
+
     const findIndex = allProjectsArrayFilter.value.findIndex((ele) => ele.id === props?.task?.ProjectID);
     const userInfo = {
         id: user.id,
@@ -398,13 +406,39 @@ const newCloudAttachments = async ({ provider, files } = {}) => {
     // task's attachments array, so concurrent calls would drop records.
     for (const file of files) {
         try {
+            let record;
+            if (mode === 'import') {
+                // Server pulls the bytes and stores them exactly where an upload
+                // would have. The result is an ORDINARY attachment — no `source`,
+                // nothing cloud-specific about it from here on.
+                const storedName = generateFileName(file.name, env.STORAGE_TYPE);
+                const imported = await importCloudFile({
+                    provider,
+                    fileId: file.id,
+                    filename: file.name,
+                    path: `Project/${props.task.ProjectID}/Sprint/${props.task._id}/Attachment/${storedName}`,
+                });
+                const extension = storedName.substring(storedName.lastIndexOf(".") + 1);
+                record = {
+                    filename: file.name,
+                    extension,
+                    size: imported.size || file.size || 0,
+                    id: makeUniqueId(17),
+                    createdAt: new Date(),
+                    userId: userId.value,
+                    type: cloudTypeOf(file.mimeType),
+                    url: imported.url,
+                };
+            } else {
+                record = buildCloudAttachment({ provider, file, userId: userId.value, id: makeUniqueId(17) });
+            }
             await taskClass.updateAttachments({
                 companyId: companyId.value,
                 sprintId: props.task.sprintId,
                 taskId: props.task._id,
                 taskData: props.task,
                 operation: "add",
-                data: buildCloudAttachment({ provider, file, userId: userId.value, id: makeUniqueId(17) }),
+                data: record,
                 userData: userInfo,
                 projectData: projectInfo,
             });
@@ -416,9 +450,12 @@ const newCloudAttachments = async ({ provider, files } = {}) => {
     isSpinner.value = false;
 
     if (attached > 0) {
-        $toast.success(t('Attachments.cloud_attached', { provider: CLOUD_PROVIDERS[provider]?.label || provider }), { position: 'top-right' });
+        const label = CLOUD_PROVIDERS[provider]?.label || provider;
+        $toast.success(t('Attachments.cloud_attached', { provider: label }), { position: 'top-right' });
     } else {
-        $toast.error(t('Attachments.cloud_attach_failed'), { position: 'top-right' });
+        $toast.error(mode === 'import'
+            ? t('Attachments.import_failed', { provider: CLOUD_PROVIDERS[provider]?.label || provider })
+            : t('Attachments.cloud_attach_failed'), { position: 'top-right' });
     }
 };
 

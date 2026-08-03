@@ -96,7 +96,8 @@
     import Swal from 'sweetalert2';
     import { useCustomComposable, useGetterFunctions } from '@/composable';
     import {storageQueryBuilder,generateFileName} from '@/utils/storageQueryBuild.js';
-    import { buildCloudAttachment, isCloudAttachment, CLOUD_PROVIDERS } from '@/utils/cloudAttachment';
+    import { buildCloudAttachment, isCloudAttachment, cloudTypeOf, CLOUD_PROVIDERS } from '@/utils/cloudAttachment';
+    import { importCloudFile } from '@/composable/cloudPicker';
     import { useI18n } from 'vue-i18n';
     import ProjectDetailRightSide from '@/components/organisms/ProjectDetailRightSide/ProjectDetailRightSide.vue';
     import { projectAttachmentAdd , projectAttachmentChange } from '@/utils/NotificationTemplate';
@@ -158,15 +159,28 @@
     }
 
     /**
-     * AHE-3838 — attach files LINKED from a cloud drive to the project. No upload:
-     * the bytes stay with the provider, so only the attachment record is written,
-     * via the same $push + history calls the upload path uses.
+     * AHE-3838 — attach files picked from a cloud drive to the project.
      *
-     * No checkBucketStorage() here on purpose — a link stores nothing of ours and
-     * must not draw down the company's storage quota.
+     *   mode 'link'   (default) store a reference; the bytes stay with the
+     *                 provider. No upload, and deliberately no
+     *                 checkBucketStorage — a link stores nothing of ours, so it
+     *                 must not draw down the company's storage quota.
+     *   mode 'import' the server copies the bytes into our storage and the
+     *                 record becomes an ordinary attachment with no `source`.
+     *                 This one DOES consume quota, so it is checked.
+     *
+     * Either way the record is written with the same $push + history calls the
+     * upload path uses.
      */
-    const newCloudAttachments = async ({ provider, files } = {}) => {
+    const newCloudAttachments = async ({ provider, files, mode = 'link' } = {}) => {
         if (!provider || !files || !files.length) return;
+
+        // Importing copies bytes into our storage, so unlike linking it DOES
+        // consume the company's quota and has to be checked first.
+        if (mode === 'import' && checkBucketStorage(files.map((f) => f?.size || 0), { gettersVal: getters }) !== true) {
+            return;
+        }
+
         const projectdata = JSON.parse(JSON.stringify(projectData.value));
         isSpinner.value = true;
         let attached = 0;
@@ -174,8 +188,31 @@
         // Sequential: each $push re-reads the project document, so parallel writes
         // would lose records.
         for (const file of files) {
-            const record = buildCloudAttachment({ provider, file, userId: userId.value, id: makeUniqueId(17) });
             try {
+                let record;
+                if (mode === 'import') {
+                    // Server pulls the bytes into our storage; the result is an
+                    // ORDINARY attachment with no `source`.
+                    const storedName = generateFileName(file.name, env.STORAGE_TYPE);
+                    const imported = await importCloudFile({
+                        provider,
+                        fileId: file.id,
+                        filename: file.name,
+                        path: `Project/${projectdata._id}/ProjectAttachment/${storedName}`,
+                    });
+                    record = {
+                        filename: file.name,
+                        extension: storedName.substring(storedName.lastIndexOf(".") + 1),
+                        size: imported.size || file.size || 0,
+                        id: makeUniqueId(17),
+                        createdAt: new Date(),
+                        userId: userId.value,
+                        type: cloudTypeOf(file.mimeType),
+                        url: imported.url,
+                    };
+                } else {
+                    record = buildCloudAttachment({ provider, file, userId: userId.value, id: makeUniqueId(17) });
+                }
                 await apiRequest("put", `${env.PROJECT}/${projectdata._id}`, {
                     updateObject: { attachments: record },
                     key: '$push',
@@ -207,10 +244,13 @@
         }
 
         isSpinner.value = false;
+        const label = CLOUD_PROVIDERS[provider]?.label || provider;
         if (attached > 0) {
-            $toast.success(t('Attachments.cloud_attached', { provider: CLOUD_PROVIDERS[provider]?.label || provider }), { position: 'top-right' });
+            $toast.success(t('Attachments.cloud_attached', { provider: label }), { position: 'top-right' });
         } else {
-            $toast.error(t('Attachments.cloud_attach_failed'), { position: 'top-right' });
+            $toast.error(mode === 'import'
+                ? t('Attachments.import_failed', { provider: label })
+                : t('Attachments.cloud_attach_failed'), { position: 'top-right' });
         }
     };
 

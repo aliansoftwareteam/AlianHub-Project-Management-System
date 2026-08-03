@@ -75,6 +75,15 @@
                                 <span v-if="!p.connected" class="attach-sourcemenu__hint">{{ $t('Attachments.connect_provider', { provider: '' }).trim() }}</span>
                                 <span v-else-if="cloudBusy === p.provider" class="attach-sourcemenu__hint">…</span>
                             </button>
+                            <!-- Link vs import. Linking is the default (nothing is
+                                 copied, edits in the drive stay live); importing
+                                 takes a snapshot into our storage so teammates can
+                                 always open it regardless of drive sharing. -->
+                            <div class="attach-sourcemenu__sep"></div>
+                            <label class="attach-sourcemenu__mode">
+                                <input type="checkbox" v-model="importCopy" />
+                                <span>{{ $t('Attachments.import_copy') }}</span>
+                            </label>
                         </div>
                     </template>
                 </div>
@@ -194,6 +203,13 @@ let observer = null;
 const cloudProviders = ref([]);
 const showSourceMenu = ref(false);
 const cloudBusy = ref('');
+// Link is the default. Remembered per browser so someone who always wants copies
+// doesn't have to re-tick it on every attach.
+const IMPORT_COPY_KEY = 'alianhub:cloudAttachImportCopy';
+const importCopy = ref(localStorage.getItem(IMPORT_COPY_KEY) === '1');
+watch(importCopy, (val) => {
+    try { localStorage.setItem(IMPORT_COPY_KEY, val ? '1' : '0'); } catch (e) { /* private mode */ }
+});
 
 const providerIcon = (key) => (CLOUD_PROVIDERS[key] ? CLOUD_PROVIDERS[key].icon : '');
 
@@ -224,7 +240,7 @@ const chooseCloudSource = async (provider) => {
         const files = await pickCloudFiles({ provider: provider.provider, multiple: true });
         closeSourceMenu();
         if (!files || !files.length) return;   // cancelled
-        emit('update:cloud-add', { provider: provider.provider, files });
+        emit('update:cloud-add', { provider: provider.provider, files, mode: importCopy.value ? 'import' : 'link' });
     } catch (error) {
         closeSourceMenu();
         if (error?.code === 'not_connected' || error?.code === 'reauth_required') {
