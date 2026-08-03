@@ -302,7 +302,7 @@
                                 @manageFilterUsers="manageFilterUsers"
                                 @changeAssignee="(type, $event) => changeAssignee(type, $event)"
                                 @openAi="openAiSidebar = true"
-                                @openAiAssist="showAiTaskCreator = true"
+                                @openAiAssist="openAiTaskCreator()"
                                 @update:showArchived="(v) => showArchived = v"
                                 @openCalendar="calendartoggle = true; rangeObjectFRun(calendarDate ? new Date(calenderSelectDate) : new Date())"
                                 @handleStartEndDate="handleStartEndDate"
@@ -536,8 +536,21 @@ const showAiTaskCreator = ref(false);
 // Folder sprints are labelled "Folder / Sprint": two folders can easily hold a
 // sprint of the same name, and without the prefix they'd be indistinguishable.
 //
-// Active default = the sprint being viewed (route param), else the first.
-const aiSprints = computed(() => {
+// Built into a REF when the modal opens — deliberately not a computed.
+//
+// As a computed consumed by the template it joined this view's render effect, and
+// walking `sprintsfolders` registered a reactive dependency on every folder and
+// every sprint nested inside one. Clicking a sprint mutates that state
+// (expansion / selection), which then invalidated the render effect and cascaded
+// into the project-list watchers further down: the list re-filtered and the
+// selection fell back to the first project. The original version read only root
+// `sprintsObj`, so it never observed folder state and the problem did not exist.
+//
+// A ref filled on open owns no reactive dependencies, so nothing here can feed
+// back into rendering.
+const aiSprints = ref([]);
+
+const buildAiSprints = () => {
     const project = projectData.value;
     if (!project) return [];
 
@@ -565,7 +578,21 @@ const aiSprints = computed(() => {
     });
 
     return out;
-});
+};
+
+/**
+ * Fill the list, then open. Order matters: AiTaskCreator's own open-watcher calls
+ * reset(), which seeds its selection from `props.sprints[0]` — so the list has to
+ * be there before the flag flips, rather than racing two watchers on the same
+ * tick. Building it here also means the project's sprint maps are read at exactly
+ * one moment, never during rendering.
+ */
+const openAiTaskCreator = () => {
+    aiSprints.value = buildAiSprints();
+    showAiTaskCreator.value = true;
+};
+
+// Active default = the sprint being viewed (route param), else the first.
 const aiActiveSprintId = computed(() => {
     const rid = route.params && route.params.sprintId;
     if (rid && aiSprints.value.some((s) => s.id === String(rid))) return String(rid);
