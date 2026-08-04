@@ -21,48 +21,33 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ### 🚀 Features
 
-* **attachments:** add "import a copy" for cloud files ([5371f1e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5371f1e96f101b44677126ddd66376751c3dea88))
-* **attachments:** attach files from Drive, OneDrive and Dropbox ([d2c3c01](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d2c3c01b1a2d27ab797079598b45a89e9cdfa51b))
-* **attachments:** attach files from Google Drive and Dropbox (AHE-3838) ([8de543f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8de543f124a420354eb149115e4e2677a21f25e8))
-* **attachments:** render cloud-linked attachments (AHE-3838 step 1) ([a564c5b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a564c5bfeaa8f194d836db6783a92d4ca32f8ef9))
-* **cloud-storage:** per-user OAuth + picker tokens for Drive/OneDrive/Dropbox ([081575e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/081575e9152de119983300078f070500c3a255c4))
-* **cloud-storage:** show the full setup checklist per provider ([0bcf852](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0bcf8521ab4584f90984537fc85591cb7c9aaea3))
-* **cloud-storage:** support "import a copy" from Dropbox ([0e6f6a5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0e6f6a5460cca4aefb9d387c8c05486d33886fc4))
+* **attachments:** attach files from Google Drive and Dropbox (AHE-3838) ([8de543f124a420354eb149115e4e2677a21f25e8](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8de543f124a420354eb149115e4e2677a21f25e8))
+* **attachments:** add "import a copy" for cloud files ([5371f1e96f101b44677126ddd66376751c3dea88](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5371f1e96f101b44677126ddd66376751c3dea88))
+* **cloud-storage:** per-user OAuth and picker tokens, private to each user ([081575e9152de119983300078f070500c3a255c4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/081575e9152de119983300078f070500c3a255c4))
+* **cloud-storage:** show the full setup checklist per provider ([0bcf8521ab4584f90984537fc85591cb7c9aaea3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0bcf8521ab4584f90984537fc85591cb7c9aaea3))
 
 
 ### 🐛 Bug Fixes
 
-* **ai-assist:** build the sprint list on open, not as a render-time computed ([cfc12e5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/cfc12e5c6f957478dc9c78a62d8f1801379e95ee))
-* **ai-assist:** list sprints inside folders in the Plan with AI picker ([cd501ee](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/cd501ee47c46727f47c287b1ce255527fcc9f529))
-* **ai-assist:** list sprints inside folders in the Plan with AI picker ([ce6e55d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ce6e55dab1db81039b04a3219b9c7b23027e79a5))
-* **attachments:** derive Drive previews from the file id, no API call ([2b8f8e5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2b8f8e530c826f0790aa352bcdeddf6ebda3c5b1))
-* **attachments:** fetch linked-file previews from the provider API ([da8d4f0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/da8d4f01c542ea894521defb0c1acf7cbe06205c))
-* **attachments:** reject non-http schemes on a linked file's URL ([4958911](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/495891181e2b7b325f827a360fe50fbc4da2506c))
-* **attachments:** use the provider's real thumbnail, not its type glyph ([4c7eb26](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4c7eb26e9b05515bd706a3233f1df69d93513c4f))
-* **cloud-storage:** crash in the thumbnail handler's catch block ([099934b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/099934b53c2d3ffe802322e416fd2882e2299744))
-* **cloud-storage:** error boundary so this feature can never crash the server ([3901031](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/390103162df6548618be88a786fe0dc732abc7b8))
-* **cloud-storage:** make credentials per-user, not shared per workspace ([7af69b3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7af69b3d1dca656119bb751aefc9c167cd5392d8))
-* **cloud-storage:** pass setAppId so drive.file grants access to picked files ([638a41c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/638a41ce40db97e04437611f7c4343de8faee75c))
-* **cloud-storage:** pin the Set up button top-right on every provider row ([6cca976](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6cca97644c284e5d9b7db82d9b57f3d256b87d93))
-* **cloud-storage:** return to the origin consent started from ([1f786dc](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1f786dc053515920429b610dbc224e113f9d76f9))
-* drop the dimmed backdrop from the reminders popover ([2bd98a3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2bd98a37a3456b2936faed05d0a1b81d9acdec83))
-* drop the dimmed backdrop from the reminders popover ([2ae9a88](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2ae9a88fc79f33ea5ddfc270b34deda1119e4b01))
-* **epics:** compute epic progress from tasks instead of a stale counter ([f309a15](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f309a15f223c74bb98cb96e0352e3ebe08e1d5af))
-* **epics:** compute epic progress from tasks instead of a stale counter (AHE-3853) ([48613c8](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/48613c8fdfd8a9e17c104e88e89969402476b6df))
+* **ai-assist:** list sprints inside folders in the Plan with AI picker ([ce6e55dab1db81039b04a3219b9c7b23027e79a5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ce6e55dab1db81039b04a3219b9c7b23027e79a5))
+* **ai-assist:** build the sprint list on open, not as a render-time computed ([cfc12e5c6f957478dc9c78a62d8f1801379e95ee](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/cfc12e5c6f957478dc9c78a62d8f1801379e95ee))
+* **attachments:** derive Drive previews from the file id, no API call ([2b8f8e530c826f0790aa352bcdeddf6ebda3c5b1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2b8f8e530c826f0790aa352bcdeddf6ebda3c5b1))
+* **attachments:** reject non-http schemes on a linked file's URL ([495891181e2b7b325f827a360fe50fbc4da2506c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/495891181e2b7b325f827a360fe50fbc4da2506c))
+* **attachments:** use the provider's real thumbnail, not its type glyph ([4c7eb26e9b05515bd706a3233f1df69d93513c4f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4c7eb26e9b05515bd706a3233f1df69d93513c4f))
+* **cloud-storage:** crash in the thumbnail handler's catch block ([099934b53c2d3ffe802322e416fd2882e2299744](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/099934b53c2d3ffe802322e416fd2882e2299744))
+* **cloud-storage:** error boundary so this feature can never crash the server ([390103162df6548618be88a786fe0dc732abc7b8](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/390103162df6548618be88a786fe0dc732abc7b8))
+* **cloud-storage:** make credentials per-user, not shared per workspace ([7af69b3d1dca656119bb751aefc9c167cd5392d8](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7af69b3d1dca656119bb751aefc9c167cd5392d8))
+* **cloud-storage:** pass setAppId so drive.file grants access to picked files ([638a41ce40db97e04437611f7c4343de8faee75c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/638a41ce40db97e04437611f7c4343de8faee75c))
+* **cloud-storage:** pin the Set up button top-right on every provider row ([6cca97644c284e5d9b7db82d9b57f3d256b87d93](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6cca97644c284e5d9b7db82d9b57f3d256b87d93))
+* **cloud-storage:** return to the origin consent started from ([1f786dc053515920429b610dbc224e113f9d76f9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1f786dc053515920429b610dbc224e113f9d76f9))
+* **epics:** compute epic progress from tasks instead of a stale counter (AHE-3853) ([48613c8fdfd8a9e17c104e88e89969402476b6df](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/48613c8fdfd8a9e17c104e88e89969402476b6df))
+* drop the dimmed backdrop from the reminders popover ([2ae9a88fc79f33ea5ddfc270b34deda1119e4b01](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2ae9a88fc79f33ea5ddfc270b34deda1119e4b01))
 
 
 ### ♻️ Refactors
 
-* **cloud-storage:** configure providers on Settings → Integrations ([ed66cd5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ed66cd501a478e50cc9e253ddf029fcc29265a12))
-* **cloud-storage:** drop the owner/admin gate — anyone may set this up ([af0fee1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/af0fee16e4454ed06da088666709c2d5c054beb4))
-* **cloud-storage:** remove OneDrive, keep Google Drive and Dropbox ([24ae6e2](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/24ae6e291be29691ed0f14be482ff2677f603922))
-
-
-### 📘 Documentation
-
-* **cloud-storage:** import is testable locally after all ([0f4fbf2](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0f4fbf2d4857262ad93bc23ae509e158293cec68))
-* **cloud-storage:** point setup at Settings → Integrations ([56c8da0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/56c8da0165f012ca0f5633d4bcdf88dcaaa60efb))
-* **cloud-storage:** record what was built and the setup it needs ([94c23be](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/94c23beebdf08316575bfbd1e4aa02a315394ef1))
+* **cloud-storage:** configure providers on Settings → Integrations ([ed66cd501a478e50cc9e253ddf029fcc29265a12](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ed66cd501a478e50cc9e253ddf029fcc29265a12))
+* **cloud-storage:** anyone may connect their own account — no owner/admin gate ([af0fee16e4454ed06da088666709c2d5c054beb4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/af0fee16e4454ed06da088666709c2d5c054beb4))
 
 ## [14.21.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.20.0...v14.21.0) (2026-08-03)
 
