@@ -8,8 +8,16 @@
         </div>
         <div class="message d-flex align-items-center mt-1" :style="{marginTop: (!showMessageTime ? '5px' : '')}" :class="{'right-message': message.sent, 'justify-content-between': !message.sent}">
             <div class="d-flex" :style="{paddingLeft: (!message.sent && !showUser ? '35px' : '')}">
+                <!-- An agent wrote this one. Its userId holds the agent's id, which
+                     getUser() cannot resolve, so it gets its own avatar rather than
+                     a blank one — and is visibly not a person. -->
+                <span
+                    v-if="!message.sent && showUser && message.agentId"
+                    class="comment__agent-avatar mr-10px"
+                    :title="message.agentName || $t('Agents.assignee_group')"
+                >{{ agentEmoji }}</span>
                 <UserProfile
-                    v-if="!message.sent && showUser"
+                    v-else-if="!message.sent && showUser"
                     :showDot="false"
                     class="cursor-pointer profile-image message__profile-image mr-10px"
                     :data="{
@@ -23,7 +31,11 @@
                 <div>
                     <div class="cursor-default mb-5px" :class="{'text-right': message.sent, 'text-left': !message.sent}">
                         <span v-if="showUser" class="font-size-14 font-weight-700 mr-5px color63 show__user">
-                            {{!message.sent ? getUser(message.userId).Employee_Name : ''}}
+                            <template v-if="message.agentId">
+                                {{ message.agentName || $t('Agents.assignee_group') }}
+                                <span class="comment__agent-tag">{{ $t('Agents.agent_tag') }}</span>
+                            </template>
+                            <template v-else>{{!message.sent ? getUser(message.userId).Employee_Name : ''}}</template>
                         </span>
                         <span class="font-size-12 font-weight-300 gray text-lowercase show" v-if="showMessageTime">
                             {{getDateType(new Date(message.createdAt).getTime())}}
@@ -175,7 +187,7 @@
 
 <script setup>
 // PACKAGES
-import { defineComponent, defineProps, inject, onMounted, ref, watch } from 'vue';
+import { computed, defineComponent, defineProps, inject, onMounted, ref, watch } from 'vue';
 import { useConvertDate, useCustomComposable, useGetterFunctions } from '@/composable';
 
 // COMPONENTS
@@ -248,6 +260,12 @@ const props = defineProps({
         default: 0
     }
 })
+
+// Read off the comment rather than looked up, so an agent's old comments still
+// render after it is renamed or deleted. Falls back for rows written before the
+// emoji was stored.
+const agentEmoji = computed(() => props.message?.agentEmoji || '🤖');
+
 
 const showMore = ref(false);
 
@@ -367,4 +385,33 @@ onMounted(async () => {
 }
 
 
+
+/* An agent comment: emoji avatar plus a small tag, so it is never mistaken for a
+   person. The dashed ring matches the assignee chip for the same reason. */
+.comment__agent-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    flex: none;
+    border-radius: 50%;
+    background: #EEF0FE;
+    border: 1px dashed #A9B2EE;
+    font-size: 14px;
+    line-height: 1;
+}
+.comment__agent-tag {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: #EEF0FE;
+    color: #6473E8;
+    font-size: 9.5px;
+    font-weight: 650;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    vertical-align: 1px;
+}
 </style>

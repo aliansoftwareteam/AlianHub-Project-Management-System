@@ -237,6 +237,12 @@
             isVisible:true,
             activeIcon: require("@/assets/images/svg/integrationPuzzleActive.svg")
         },{
+            label: "Automation Agents",
+            to: {name: "AutomationAgents"},
+            icon: require("@/assets/images/svg/integrationPuzzle.svg"),
+            isVisible:true,
+            activeIcon: require("@/assets/images/svg/integrationPuzzleActive.svg")
+        },{
             label: "Company",
             to: {name: "Company"},
             icon: require("@/assets/images/svg/Workspace.svg"),

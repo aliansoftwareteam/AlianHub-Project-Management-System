@@ -130,6 +130,15 @@ export default [
                 component: () => import(/* webpackChunkName: Two Factor Auth */ '@/views/Settings/TwoFactorAuth/TwoFactorAuth.vue')
             },
             {
+                path: "agents",
+                name: "AutomationAgents",
+                meta: {
+                    title: "Automation Agents",
+                    requiresAuth: true
+                },
+                component: () => import(/* webpackChunkName: "AutomationAgents" */ '@/views/Settings/Agents/Agents.vue')
+            },
+            {
                 path: "integrations",
                 name: "Integrations",
                 meta: {

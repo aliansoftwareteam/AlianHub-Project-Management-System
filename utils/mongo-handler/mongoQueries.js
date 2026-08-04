@@ -86,7 +86,9 @@ const {
     calendarFeedsSchema,
     automationRulesSchema,
     integrationConnectionsSchema,
-    cloudStorageConnectionsSchema
+    cloudStorageConnectionsSchema,
+    agentsSchema,
+    agentRunsSchema
 } = require('./createSchema');
 
 
@@ -264,6 +266,10 @@ exports.checkType = (type) => {
             return integrationConnectionsSchema
         case SCHEMA_TYPE.CLOUD_STORAGE_CONNECTIONS:
             return cloudStorageConnectionsSchema
+        case SCHEMA_TYPE.AGENTS:
+            return agentsSchema
+        case SCHEMA_TYPE.AGENT_RUNS:
+            return agentRunsSchema
         default:
             return ""
     }
@@ -444,6 +450,10 @@ exports.tableType = (type) => {
                 return `${dbCollections.INTEGRATION_CONNECTIONS}`
         case SCHEMA_TYPE.CLOUD_STORAGE_CONNECTIONS:
                 return `${dbCollections.CLOUD_STORAGE_CONNECTIONS}`
+        case SCHEMA_TYPE.AGENTS:
+                return `${dbCollections.AGENTS}`
+        case SCHEMA_TYPE.AGENT_RUNS:
+                return `${dbCollections.AGENT_RUNS}`
         default:
             return ""
     }

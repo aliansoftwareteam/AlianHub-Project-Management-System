@@ -207,6 +207,8 @@ module.exports.AUTOMATIONS = '/api/v1/automations';
 module.exports.INTEGRATIONS = '/api/v1/integrations';
 // AHE-3838 — cloud storage attachments (Google Drive / Dropbox).
 module.exports.CLOUD_STORAGE = '/api/v1/cloud-storage';
+// Custom agents (Automation Agents settings + the scope-walk lookup).
+module.exports.AGENTS = '/api/v1/agents';
 module.exports.EXPORT_CSV = '/api/v1/export/csv';
 module.exports.EXPORT_XLSX = '/api/v1/export/xlsx';
 module.exports.MAIN_CHATS = '/api/v1/main-chats'

@@ -63,7 +63,12 @@
                     @removed="changeAssignee('remove', $event)"
                     :isDisplayTeam="true"
                     :multiSelect="checkApps('MultipleAssignees')"
-                />
+                                    :enableAgents="true"
+                    :agents="agentsForTask(task)"
+                    :selectedAgents="selectedAgentsFor(task)"
+                    @agentSelected="assignAgent(task, $event, true)"
+                    @agentRemoved="assignAgent(task, $event, false)"
+                    />
                 <Assignee
                     v-else
                     :users="task.AssigneeUserId"
@@ -134,6 +139,12 @@ import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toast-notification";
 import { useI18n } from "vue-i18n";
+import { useTaskAgents } from '@/composable/taskAgents';
+
+// Agents are assignable exactly like people, in every view. The composable
+// fetches the list once for the whole page and resolves which apply to each
+// task locally, so a long list does not fire one request per row.
+const { agentsForTask, selectedAgentsFor, assignAgent } = useTaskAgents();
 const { t } = useI18n();
 
 // UTILS

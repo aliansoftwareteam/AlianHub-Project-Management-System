@@ -131,6 +131,11 @@
                             @removed="changeAssignee('remove', $event)"
                             :isDisplayTeam="true"
                             :multiSelect="checkApps('MultipleAssignees')"
+                            :enableAgents="true"
+                            :agents="agentsForTask(element)"
+                            :selectedAgents="selectedAgentsFor(element)"
+                            @agentSelected="assignAgent(element, $event, true)"
+                            @agentRemoved="assignAgent(element, $event, false)"
                         />
                         <Assignee
                             v-else
@@ -234,6 +239,10 @@
     import Assignee from "@/components/molecules/Assignee/Assignee.vue"
     import {useConvertDate,useCustomComposable,useGetterFunctions } from "@/composable";
     import { useTaskSelection } from "@/composable/useTaskSelection.js";
+    // Agents are assignable exactly like people, in every view. The composable fetches
+    // the list once for the whole page and resolves which apply to each task locally,
+    // so a board of sixty cards does not fire sixty requests.
+    import { useTaskAgents } from "@/composable/taskAgents";
     import CreateTagPopup from "@/components/molecules/TagList/CreateTagPopup.vue";
     import DropDown from '@/components/molecules/DropDown/DropDown.vue'
     import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue'
@@ -261,6 +270,7 @@
     const {getters,commit} = useStore();
     const isSubtaskCreate = ref(false);
     const {getUser} = useGetterFunctions();
+    const { agentsForTask, selectedAgentsFor, assignAgent } = useTaskAgents();
     const projectData = inject("selectedProject");
     const $toast = useToast()
     const tagChipArray = ref([])

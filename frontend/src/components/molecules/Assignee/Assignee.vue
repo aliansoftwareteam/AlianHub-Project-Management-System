@@ -36,14 +36,24 @@
                 </template>
             </DropDown>
 
+            <!-- Attached agents, shown as their emoji rather than an initials
+                 avatar so an agent is never mistaken for a person at a glance. -->
+            <span
+                v-for="agent in attachedAgents"
+                :key="'agt_' + agent._id"
+                class="assignee__agent ml--5px"
+                :title="agent.name"
+                :style="{width: imageWidth, height: imageWidth}"
+            >{{ agent.emoji || '🤖' }}</span>
+
             <img v-if="addUser && (showAddUser || !detailedUsers.length)" :src="addUserIcon" alt="add user" :title="$t('Members.adduser')" class="cursor-pointer add__user" @click.stop="addUser ? openSidebar() : ''" :style="{marginLeft: (detailedUsers.length ? '5px' : '0px'), width: imageWidth, height: imageWidth}" />
-            <span v-if="!addUser && !detailedUsers.length" class="font-size-13">N/A</span>
+            <span v-if="!addUser && !detailedUsers.length && !attachedAgents.length" class="font-size-13">N/A</span>
         </div>
 
         <Sidebar
             :top="clientWidth<=767 ? '0px' : '46px' "
             :title="$t('Projects.list_of_user')"
-            :value="detailedUsers.map((x) => ({value: x.id, label: x.title ,id: x.id, image: x.image, isOnline: x.isOnline,designation:x.designation}))"
+            :value="[...detailedUsers.map((x) => ({value: x.id, label: x.title ,id: x.id, image: x.image, isOnline: x.isOnline,designation:x.designation})), ...attachedAgentOptions]"
             v-model:visible="visible"
             :options="detailedOptions"
             :multi-select="props.multiSelect"
@@ -91,7 +101,10 @@ defineComponent({
     }
 })
 
-const emit = defineEmits(["selected", "removed"])
+// Agents get their OWN events. A parent that has not opted in cannot receive them,
+// and a parent that has cannot mistake an agent for a user — which matters because
+// `selected` feeds straight into AssigneeUserId at most call sites.
+const emit = defineEmits(["selected", "removed", "agentSelected", "agentRemoved"])
 
 // PROPS
 const props = defineProps({
@@ -142,6 +155,26 @@ const props = defineProps({
     tourId: {
         type: String,
         default: ''
+    },
+    // ── automation agents ──────────────────────────────────────────────
+    // Off by default, and that default is the safety guarantee: this component
+    // has 27 call sites (tasks, subtasks, checklists, projects, sprints, teams,
+    // channels). Only the ones that opt in can show or emit an agent, so the
+    // other 26 are unaffected by construction rather than by inspection.
+    enableAgents: {
+        type: Boolean,
+        default: false
+    },
+    // Agents that apply here, from GET /api/v1/agents/available. The parent
+    // fetches them, because only it knows which entity is being looked at.
+    agents: {
+        type: Array,
+        default: () => []
+    },
+    // Ids of the agents currently attached — the task's assignedAgentIds.
+    selectedAgents: {
+        type: Array,
+        default: () => []
     }
 })
 
@@ -195,7 +228,29 @@ const unselectedUser = computed(() => {
     return props.options.filter(user => !props.users.includes(user));
 })
 
+// Agent ids live in a different namespace from user ids, so they are routed before
+// the user path is even considered — an agent must never reach `selected`.
+const agentIdSet = computed(() => new Set((props.selectedAgents || []).map((x) => String(x))));
+
+const attachedAgents = computed(() => {
+    if (!props.enableAgents) return [];
+    return (props.agents || []).filter((a) => a && agentIdSet.value.has(String(a._id)));
+});
+
+// Shape the attached agents the way Select expects, so they render as ticked.
+const attachedAgentOptions = computed(() => attachedAgents.value.map((a) => ({
+    value: String(a._id),
+    id: String(a._id),
+    label: `${a.emoji || '🤖'} ${a.name}`,
+    image: '',
+    type: 'agent'
+})));
+
 function selectFun(event) {
+    if (props.enableAgents && event?.type === 'agent') {
+        agentIdSet.value.has(String(event.id)) ? emit('agentRemoved', event) : emit('agentSelected', event)
+        return
+    }
     selectedUser.value.includes(event.id) ? emit('removed', event) : emit('selected', event)
 }
 // Temporary team assign hide
@@ -227,6 +282,25 @@ const detailedOptions = computed(() => {
         // Temporary team assign hide
         // res[isDisplayTeam.value ? 1: 0].options.push(x);
     })
+
+    // Agents as their own group, the way ClickUp does it — never merged into the
+    // people list, so nothing that reads "assignees" starts seeing non-people.
+    if (props.enableAgents && (props.agents || []).length) {
+        res.push({
+            label: t('Agents.assignee_group'),
+            options: (props.agents || []).map((a) => ({
+                id: String(a._id),
+                value: String(a._id),
+                // The emoji carries the distinction in the row itself, so it reads
+                // as an agent even when the group heading has scrolled away.
+                label: `${a.emoji || '🤖'} ${a.name}`,
+                image: '',
+                designation: '',
+                type: 'agent'
+            }))
+        })
+    }
+
     // Temporary team assign hide
     // if (isDisplayTeam.value) {
     //     res[0].options = teams.value.filter((tf) => unselectedUser.value.indexOf('tId_'+tf._id) !== -1 || selectedUser.value.indexOf('tId_'+tf._id) !== -1).map((tRow) => ({
@@ -285,5 +359,19 @@ function openSidebar () {
 }
 .add__user{
     min-width: 25px;
+}
+/* An attached agent, shown as its emoji. Dashed border so it reads as a different
+   kind of thing from a person's avatar without needing a colour to carry it. */
+.assignee__agent{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 25px;
+    border-radius: 50%;
+    background: #EEF0FE;
+    border: 1px dashed #A9B2EE;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
 }
 </style>

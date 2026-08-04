@@ -221,6 +221,9 @@ const verifyJWTTokenWithCRoute = [
     // this prefix — it lives at /api/v1/cloud-oauth/callback because a provider
     // redirect carries no JWT; its signed `state` authenticates it instead.
     '/api/v1/cloud-storage',
+    // Custom agents. Every route needs JWT + companyId; there is no public
+    // surface here, so the whole prefix is protected.
+    '/api/v1/agents',
 ];
 const verifyJWTToken = [
     "/api/v2/company/delete",

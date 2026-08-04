@@ -67,6 +67,11 @@
                         :zIndexAssigne="props.zIndexAssigne"
                         :isDisplayTeam="true"
                         :multiSelect="checkApps('MultipleAssignees')"
+                        :enableAgents="true"
+                        :agents="agentsForTask(task)"
+                        :selectedAgents="selectedAgentsFor(task)"
+                        @agentSelected="assignAgent(task, $event, true)"
+                        @agentRemoved="assignAgent(task, $event, false)"
                     />
                     <Assignee
                         v-else
@@ -298,6 +303,7 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { openInTracker, isTrackerCapableDevice } from '@/utils/trackerDeepLink';
 import Modal from '@/components/atom/Modal/Modal.vue';
+import { useTaskAgents } from '@/composable/taskAgents';
 
 // Icon for the "Generate estimate using AI" sidebar button. Same asset
 // the SubTasks / Checklist / Sprints components use for their AI actions
@@ -432,6 +438,13 @@ const canEditEstimatedHours = computed(() => {
 watch(() => props.task,(val) => {
     taskLeaderData.value = getUser(val?.Task_Leader);
 });
+
+// ── automation agents ──────────────────────────────────────────────────────
+// Shared with List, Board, Table and subtasks via the composable, rather than a
+// second implementation here. This panel had its own copy — a per-task /available
+// request plus its own optimistic mirror — which did the same job in a different
+// way, so a fix to one would not have reached the other.
+const { agentsForTask, selectedAgentsFor, assignAgent } = useTaskAgents();
 
 const companyOwner = computed(() => {return getters["settings/companyOwnerDetail"]});
 const companyUsers = computed(() => getters["settings/companyUsers"]?.map((x) => x.userId));

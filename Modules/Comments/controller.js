@@ -7,6 +7,7 @@ const { replaceObjectKey } = require("../Auth/helper");
 const socketEmitter = require('../../event/socketEventEmitter');
 const { escapeRegex } = require("../../utils/escapeRegex");
 const { parseMentionIds } = require("./helpers/parseMentions");
+const { handleTaskComment } = require("../Agents/commentHook");
 const { handleNotificationtFun } = require("../notification/prepare-notification-data/controllerV2");
 const { getRoleType, isPrivileged } = require("../../Config/permissionGuard");
 
@@ -95,7 +96,27 @@ exports.save = async (req, res) => {
             socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments_project' });
         }
         if (mentionIds.length && response && response._id) {
-            notifyMentions(req.headers['companyid'], response, mentionIds)
+            const companyId = req.headers['companyid'];
+            // Only when something was actually mentioned. An agent answers when it is
+            // named, so a comment with no mentions has no agent work to do and does
+            // not need a lookup — and a plain remark on a task must never draw a
+            // reply from an agent that happens to be attached to it.
+            //
+            // Two jobs: run the agents this comment names, and hand back the
+            // mentioned ids that are people so they are notified exactly as before.
+            // Deliberately not awaited — the comment is saved and the response
+            // already sent.
+            handleTaskComment({ companyId, comment: response, mentionIds })
+                .then(({ humanIds }) => {
+                    if (!humanIds.length) return;
+                    return notifyMentions(companyId, response, humanIds);
+                })
+                .catch((err) => {
+                    // Fail safe to exactly the old behaviour rather than dropping
+                    // someone's notification because the agent lookup failed.
+                    logger.error(`[mentions] agent handling failed: ${err.message}`);
+                    return notifyMentions(companyId, response, mentionIds);
+                })
                 .catch((err) => logger.error(`[mentions] notify failed: ${err.message}`));
         }
         if (response) {
