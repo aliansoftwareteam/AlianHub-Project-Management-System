@@ -159,6 +159,10 @@ const automationRulesSchema = new Schema(schema.automationRules, {strict: true, 
 automationRulesSchema.index({ deletedStatusKey: 1 });
 const integrationConnectionsSchema = new Schema(schema.integrationConnections, {strict: true, timestamps: true});
 integrationConnectionsSchema.index({ type: 1, deletedStatusKey: 1 });
+const cloudStorageConnectionsSchema = new Schema(schema.cloudStorageConnections, {strict: true, timestamps: true});
+// Every lookup is "this user's connection to this provider" — unique so a
+// double-tap on Connect can't leave two rows with divergent refresh tokens.
+cloudStorageConnectionsSchema.index({ userId: 1, provider: 1 }, { unique: true });
 // Global search: one combined text index per collection.
 taskSchema.index({ TaskName: 'text', rawDescription: 'text' });
 projectsSchema.index({ ProjectName: 'text' });
@@ -255,6 +259,7 @@ module.exports = {
     calendarFeedsSchema,
     automationRulesSchema,
     integrationConnectionsSchema,
+    cloudStorageConnectionsSchema,
     historySchema,
     userIdSchema, 
     usersSchema,

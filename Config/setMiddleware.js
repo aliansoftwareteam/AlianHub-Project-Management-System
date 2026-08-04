@@ -217,6 +217,10 @@ const verifyJWTTokenWithCRoute = [
     '/api/v1/calendar/feeds',
     '/api/v1/automations',
     '/api/v1/integrations',
+    // Cloud storage attachments (AHE-3838). The OAuth callback is NOT under
+    // this prefix — it lives at /api/v1/cloud-oauth/callback because a provider
+    // redirect carries no JWT; its signed `state` authenticates it instead.
+    '/api/v1/cloud-storage',
 ];
 const verifyJWTToken = [
     "/api/v2/company/delete",
