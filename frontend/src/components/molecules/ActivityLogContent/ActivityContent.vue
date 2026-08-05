@@ -1,6 +1,13 @@
 <template>
     <div class="d-flex align-items-center">
-        <UserProfile class="log-use-profile" :data="data.userData" :show-dot="false" :width="'30px'" :thumbnail="'30x30'" />
+        <!-- An agent has no user record to draw an avatar from, so it shows its emoji —
+             the same way it appears in assignee stacks, comments and mentions. -->
+        <span
+            v-if="data.userData && data.userData.isAgent"
+            class="log-use-profile activity__agent"
+            :title="data.userData.title"
+        >{{ data.userData.emoji || '🤖' }}</span>
+        <UserProfile v-else class="log-use-profile" :data="data.userData" :show-dot="false" :width="'30px'" :thumbnail="'30x30'" />
         <div class="ml-015 wrapperNameImage">
             <span v-html="convert(data.Message)"></span>
             <span>&nbsp;{{getDateAndTime(data.createdAt == undefined ? new Date().getTime(): new Date(data?.createdAt).getTime())}}</span>

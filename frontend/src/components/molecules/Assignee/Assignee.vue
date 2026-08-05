@@ -1,29 +1,45 @@
 <template>
     <div>
         <div class="d-flex align-items-center" @click.stop.prevent="!showAddUser ? addUser ? openSidebar() : '' : ''" :id="tourId">
-            <UserProfile
-                v-for="user in detailedUsers.filter((x, index) => index < numOfUsers)"
-                :key="user._id"
-                :showDot="showDot"
-                class="cursor-pointer ml--5px"
-                :data="user"
-                :width="imageWidth"
-                :thumbnail="'30x30'"
-            />
+            <!-- People and agents share one queue, so the +N overflow covers both. An
+                 agent shows its emoji rather than an initials avatar, so it is never
+                 mistaken for a person at a glance. -->
+            <template v-for="entry in stackEntries.filter((x, index) => index < numOfUsers)" :key="(entry.type === 'agent' ? 'agt_' : 'usr_') + entry._id">
+                <span
+                    v-if="entry.type === 'agent'"
+                    class="assignee__agent ml--5px"
+                    :title="entry.name"
+                    :style="{width: imageWidth, height: imageWidth}"
+                >{{ entry.emoji }}</span>
+                <UserProfile
+                    v-else
+                    :showDot="showDot"
+                    class="cursor-pointer ml--5px"
+                    :data="entry"
+                    :width="imageWidth"
+                    :thumbnail="'30x30'"
+                />
+            </template>
 
-            <DropDown :id="'Assignee_'+makeUniqueId(6)" v-if="detailedUsers.length > numOfUsers">
+            <DropDown :id="'Assignee_'+makeUniqueId(6)" v-if="stackEntries.length > numOfUsers">
                 <template #button>
                     <div class="d-flex align-items-center justify-content-center profile-image black text-nowrap font-weight-400 ml--5px border-2px-blue font-size-12 bg-colorlightgray position-re" :style="{width: imageWidth, height: imageWidth}">
-                        +{{detailedUsers.length - numOfUsers}}
+                        +{{stackEntries.length - numOfUsers}}
                     </div>
                 </template>
                 <template #options>
                     <DropDownOption
-                        v-for="(user, index) in detailedUsers.filter((x, index) => index >= numOfUsers).map((x) => ({label: x.title ? x.title : x.name, image: x.image, type: x.type, teamColor: x.teamColor || {}, assigneeUsersArray: x.assigneeUsersArray || []}))"
+                        v-for="(user, index) in stackEntries.filter((x, index) => index >= numOfUsers).map((x) => ({label: x.title ? x.title : x.name, image: x.image, type: x.type, emoji: x.emoji, teamColor: x.teamColor || {}, assigneeUsersArray: x.assigneeUsersArray || []}))"
                         :key="'user'+index"
-                    >   
+                    >
                         <div class="d-flex align-items-center" :title="user.label">
+                            <span
+                                v-if="user.type === 'agent'"
+                                class="assignee__agent ml--5px"
+                                :style="{width: imageWidth, height: imageWidth}"
+                            >{{ user.emoji }}</span>
                             <UserProfile
+                                v-else
                                 :showDot="false"
                                 class="cursor-pointer ml--5px"
                                 :data="user"
@@ -36,17 +52,7 @@
                 </template>
             </DropDown>
 
-            <!-- Attached agents, shown as their emoji rather than an initials
-                 avatar so an agent is never mistaken for a person at a glance. -->
-            <span
-                v-for="agent in attachedAgents"
-                :key="'agt_' + agent._id"
-                class="assignee__agent ml--5px"
-                :title="agent.name"
-                :style="{width: imageWidth, height: imageWidth}"
-            >{{ agent.emoji || '🤖' }}</span>
-
-            <img v-if="addUser && (showAddUser || !detailedUsers.length)" :src="addUserIcon" alt="add user" :title="$t('Members.adduser')" class="cursor-pointer add__user" @click.stop="addUser ? openSidebar() : ''" :style="{marginLeft: (detailedUsers.length ? '5px' : '0px'), width: imageWidth, height: imageWidth}" />
+            <img v-if="addUser && (showAddUser || !detailedUsers.length)" :src="addUserIcon" alt="add user" :title="$t('Members.adduser')" class="cursor-pointer add__user" @click.stop="addUser ? openSidebar() : ''" :style="{marginLeft: (stackEntries.length ? '5px' : '0px'), width: imageWidth, height: imageWidth}" />
             <span v-if="!addUser && !detailedUsers.length && !attachedAgents.length" class="font-size-13">N/A</span>
         </div>
 
@@ -64,7 +70,7 @@
             :zIndex="zIndexAssigne"
             @selected="selectFun"
             @itemClicked="selectFun"
-            @removed="$emit('removed', $event)"
+            @removed="removeFun"
         />
     </div>
 </template>
@@ -246,12 +252,43 @@ const attachedAgentOptions = computed(() => attachedAgents.value.map((a) => ({
     type: 'agent'
 })));
 
+// Agents shaped like the entries the avatar stack already renders, so they queue WITH
+// people rather than hanging off the end of the row. `type: 'agent'` is what tells a row
+// to draw the emoji chip instead of a UserProfile.
+const agentStackEntries = computed(() => attachedAgents.value.map((a) => ({
+    _id: String(a._id),
+    id: String(a._id),
+    name: a.name,
+    title: a.name,
+    emoji: a.emoji || '🤖',
+    image: '',
+    type: 'agent',
+})));
+
+// One queue: people first, then agents. The +N overflow now counts both, so ten agents
+// collapse into the dropdown exactly as ten people would instead of stretching the row.
+// `detailedUsers` is deliberately left alone — the sidebar, the N/A case and the add-user
+// button all key off it, and widening it there would change behaviour well beyond this row.
+const stackEntries = computed(() => [...detailedUsers.value, ...agentStackEntries.value]);
+
 function selectFun(event) {
     if (props.enableAgents && event?.type === 'agent') {
         agentIdSet.value.has(String(event.id)) ? emit('agentRemoved', event) : emit('agentSelected', event)
         return
     }
     selectedUser.value.includes(event.id) ? emit('removed', event) : emit('selected', event)
+}
+
+// The sidebar's explicit × emits `removed` directly rather than going through selectFun,
+// so it needs the same agent routing. Forwarding it straight to `removed` sent an agent
+// id down the user path: the parent tried to unassign a user that does not exist, said
+// "Assignee removed successfully", and the agent stayed put.
+function removeFun(event) {
+    if (props.enableAgents && event?.type === 'agent') {
+        emit('agentRemoved', event)
+        return
+    }
+    emit('removed', event)
 }
 // Temporary team assign hide
 // const teams = computed(() => {

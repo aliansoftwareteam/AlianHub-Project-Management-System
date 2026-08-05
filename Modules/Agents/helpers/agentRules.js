@@ -44,21 +44,116 @@ const TRIGGER_EVENTS = Object.freeze(['task.created', 'task.status_changed']);
 // an absent one, because the agent's badge then promises a capability it does not
 // have. Flip a flag to true in the same commit that implements its tool in
 // runner/tools.js — the two must never disagree.
+// `args` is the ONLY documentation the model gets for a write skill, and it must
+// describe exactly what the tool implements — no more. Documenting a parameter the
+// tool does not honour teaches the model to ask for something that will be refused,
+// and the user reads that refusal as the agent being broken.
+//
+// It is defined here rather than in the prompt so the prompt, the validator and the
+// settings page all derive from one place.
 const SKILLS = Object.freeze([
-    { key: 'context.read',    name: 'Read its scope',        write: false, available: true,  desc: 'Read tasks, comments and details inside its own scope.' },
-    { key: 'comment.write',   name: 'Post a comment',        write: false, available: true,  desc: 'Reply on a task. Adds nothing and changes nothing else.' },
-    { key: 'task.update',     name: 'Update a task',         write: true,  available: false, desc: 'Change status, priority, due date or description.' },
-    { key: 'task.create',     name: 'Create a task',         write: true,  available: false, desc: 'Add a new task inside its scope.' },
-    { key: 'subtask.create',  name: 'Create a subtask',      write: true,  available: false, desc: 'Break a task down.' },
-    { key: 'task.assign',     name: 'Assign a task',         write: true,  available: false, desc: 'Set or change assignees.' },
-    { key: 'checklist.write', name: 'Write a checklist',     write: true,  available: false, desc: 'Add checklist items to a task.' },
-    { key: 'tag.write',       name: 'Apply tags',            write: true,  available: false, desc: 'Add or remove tags.' },
+    { key: 'context.read',    name: 'Read its scope',    write: false, available: true,  desc: 'Read tasks, comments and details inside its own scope.' },
+    { key: 'comment.write',   name: 'Post a comment',    write: false, available: true,  desc: 'Reply on a task. Adds nothing and changes nothing else.' },
+    {
+        key: 'task.description', name: 'Rewrite the description', write: true, available: true,
+        desc: 'Replace the task description with a structured one.',
+        // Editor.js blocks, the same shape "Write with AI" and the project generator
+        // produce — a lead paragraph, then What to do, then Acceptance criteria. Asking
+        // for structure gets structure; asking for "a description" gets a wall of text.
+        args: '{ "descriptionBlocks": ['
+            + '{ "type": "paragraph", "data": { "text": "one or two sentences on what this is and why it matters" } }, '
+            + '{ "type": "header", "data": { "text": "What to do", "level": 4 } }, '
+            + '{ "type": "list", "data": { "style": "ordered", "items": ["concrete step", "another step"] } }, '
+            + '{ "type": "header", "data": { "text": "Acceptance criteria", "level": 4 } }, '
+            + '{ "type": "list", "data": { "style": "unordered", "items": ["what must be true to call this done"] } }'
+            + '] }  — omit the Acceptance criteria pair when the task cannot be verified as done. '
+            + 'Only paragraph, header and list blocks. Keep it tight: a few short sections beat a wall of text.',
+    },
+    {
+        key: 'checklist.write', name: 'Add checklist items', write: true, available: true,
+        desc: 'Add items to the task checklist. Cannot tick or remove existing items yet.',
+        args: '{ "items": ["first item", "second item"] }',
+    },
+    {
+        key: 'tag.write', name: 'Apply an existing tag', write: true, available: true,
+        desc: 'Add or remove one of the project\'s existing tags. Cannot create new tags.',
+        args: '{ "tag": "the exact tag name", "operation": "add" | "remove" }',
+    },
+    {
+        key: 'task.priority', name: 'Set the priority', write: true, available: true,
+        desc: 'Raise or lower the task priority.',
+        args: '{ "priority": "HIGH" | "MEDIUM" | "LOW" }',
+    },
+    {
+        key: 'task.dueDate', name: 'Set the due date', write: true, available: true,
+        desc: 'Set or clear the due date.',
+        args: '{ "dueDate": "YYYY-MM-DD" }  — or null to clear it.',
+    },
+    {
+        key: 'task.startDate', name: 'Set the start date', write: true, available: true,
+        desc: 'Set or clear the start date.',
+        args: '{ "startDate": "YYYY-MM-DD" }  — or null to clear it.',
+    },
+    {
+        key: 'task.status', name: 'Change the status', write: true, available: true,
+        desc: 'Move the task to another of the project\'s statuses.',
+        args: '{ "status": "the exact status name, e.g. In Progress" }  — use one of the project\'s own statuses; you cannot invent one.',
+    },
+    {
+        key: 'task.assign', name: 'Assign a task', write: true, available: true,
+        desc: 'Add or remove an assignee.',
+        args: '{ "assignee": "the person\'s full name or email", "operation": "add" | "remove" }'
+            + '  — the full name, not a first name; use the email when two people share a name.',
+    },
+    {
+        key: 'task.estimate', name: 'Set the estimate', write: true, available: true,
+        desc: 'Set or clear the estimated time.',
+        args: '{ "estimate": "2h 30m" }  — also accepts "90m" or a plain number of minutes, or null to clear it.',
+    },
+    // `hidden` keeps these three off the settings page for now. They are implemented,
+    // tested and fully working — only the checkbox is withheld, so nothing new can be
+    // granted while they are held back. Delete the flag to bring one back; there is
+    // nothing else to undo.
+    {
+        key: 'task.storyPoints', name: 'Set story points', write: true, available: true, hidden: true,
+        desc: 'Set or clear the story points.',
+        args: '{ "points": 5 }  — a whole number, or null to clear it.',
+    },
+    {
+        key: 'task.create', name: 'Create a task', write: true, available: true, hidden: true,
+        desc: 'Add a new task beside this one, in the same sprint.',
+        args: '{ "titles": ["first task", "second task"] }  — up to 10. They land in the same project and sprint as this task.',
+    },
+    {
+        key: 'subtask.create', name: 'Create a subtask', write: true, available: true, hidden: true,
+        desc: 'Break this task down into subtasks.',
+        args: '{ "titles": ["first step", "second step"] }  — up to 10. A subtask cannot itself be broken down.',
+    },
 ]);
+
+/**
+ * The skills the settings page offers.
+ *
+ * Hiding is presentation only — deliberately NOT the same thing as `available`. A hidden
+ * skill keeps its tool, stays grantable by the validator, and keeps working for any agent
+ * that already has it, so holding one back cannot break an agent that is using it.
+ */
+const VISIBLE_SKILLS = Object.freeze(SKILLS.filter((s) => !s.hidden));
 
 const SKILL_KEYS = Object.freeze(SKILLS.map((s) => s.key));
 const WRITE_SKILL_KEYS = Object.freeze(SKILLS.filter((s) => s.write).map((s) => s.key));
 // The only keys that may be persisted on an agent.
 const GRANTABLE_SKILL_KEYS = Object.freeze(SKILLS.filter((s) => s.available).map((s) => s.key));
+
+// Every write skill an agent can actually hold — INCLUDING hidden ones.
+//
+// Sent to the settings page so it can decide whether to show the approval control and
+// the "this agent can change your data" warning. Deriving that from the visible list
+// would mean an agent holding only a hidden write skill appeared harmless: no warning,
+// and no way to reach its approval setting.
+const GRANTABLE_WRITE_SKILL_KEYS = Object.freeze(
+    SKILLS.filter((s) => s.write && s.available).map((s) => s.key),
+);
 
 const DEFAULT_LIMITS = Object.freeze({ runsPerDay: 50, tokensPerRun: 8000, requireApproval: true });
 const MAX_RUNS_PER_DAY = 500;
@@ -252,9 +347,11 @@ module.exports = {
     TRIGGER_TYPES,
     TRIGGER_EVENTS,
     SKILLS,
+    VISIBLE_SKILLS,
     SKILL_KEYS,
     WRITE_SKILL_KEYS,
     GRANTABLE_SKILL_KEYS,
+    GRANTABLE_WRITE_SKILL_KEYS,
     DEFAULT_LIMITS,
     MAX_NAME,
     MAX_INSTRUCTIONS,

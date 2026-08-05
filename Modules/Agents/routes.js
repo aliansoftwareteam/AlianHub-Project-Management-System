@@ -33,6 +33,8 @@ exports.init = (app) => {
     app.get('/api/v1/agents/catalogue', safe('catalogue', ctrl.catalogue));
     app.get('/api/v1/agents/available', safe('availableAgents', ctrl.availableAgents));
     app.get('/api/v1/agents/runs', safe('listRuns', ctrl.listRuns));
+    // Before /:id so "runs" is never captured as an agent id.
+    app.post('/api/v1/agents/runs/:runId/decide', safe('decideRun', ctrl.decideRun));
     app.get('/api/v1/agents/usage', safe('usage', ctrl.usage));
     app.get('/api/v1/agents/scope-options', safe('scopeOptions', ctrl.scopeOptions));
     app.post('/api/v1/agents/disable-all', safe('disableAll', ctrl.disableAll));

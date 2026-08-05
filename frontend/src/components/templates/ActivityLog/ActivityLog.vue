@@ -49,8 +49,17 @@ import { useRoute } from "vue-router";
 import {useStore} from 'vuex'
 import { apiRequest } from '../../../services';
 import * as env from '@/config/env';
+import useTaskAgents from '@/composable/taskAgents';
 const { getUser } = useGetterFunctions();
 const defaultpic = inject("$defaultUserAvatar");
+
+// Shared singleton, cached per company — reusing it here adds no request of its own.
+const { agents, load: loadAgents } = useTaskAgents();
+const agentById = computed(() => {
+    const byId = new Map();
+    (agents.value || []).forEach((a) => { if (a && a._id) byId.set(String(a._id), a); });
+    return byId;
+});
 
 const {getters}  = useStore()
 
@@ -122,8 +131,15 @@ function commonGetQuery(loadMore = false) {
     }).toString();
 
     apiRequest("get", `${env.ACTIVITYLOG}?${requestParams}`)
-        .then((response) => {
+        .then(async (response) => {
             const res = response.data;
+
+            // An agent's UserId is not a user id, so getUser() finds nothing and the row
+            // falls back to the default avatar with no name. Awaited here rather than in
+            // onMounted because userData is baked in below — resolving late would leave
+            // the first page showing the wrong icon. The composable caches per company,
+            // so this is a no-op once anything else on the page has loaded agents.
+            await loadAgents(currentCompany.value?._id).catch(() => []);
 
             if (res.length === 0) {
                 isVisibleLoadMoreButton.value = false;
@@ -137,11 +153,23 @@ function commonGetQuery(loadMore = false) {
                 dataObject.displayDate = dataObject.createdAt == undefined 
                     ? moment(new Date()).format('ddd, MMM DD, YYYY hh:mm:ss A') 
                     : moment(new Date(dataObject?.createdAt)).format('ddd, MMM DD, YYYY hh:mm:ss A');
-                const user = getUser(dataObject.UserId);
-                dataObject.userData = {
-                    image: user.Employee_profileImageURL ? user.Employee_profileImageURL : defaultpic,
-                    title: user.Employee_Name
-                };
+                const agent = agentById.value.get(String(dataObject.UserId || ''));
+                if (agent) {
+                    // The emoji stands in for an avatar, matching how an agent is drawn
+                    // everywhere else it appears — assignee stacks, comments, mentions.
+                    dataObject.userData = {
+                        isAgent: true,
+                        emoji: agent.emoji || '🤖',
+                        title: agent.name,
+                        image: ''
+                    };
+                } else {
+                    const user = getUser(dataObject.UserId);
+                    dataObject.userData = {
+                        image: user.Employee_profileImageURL ? user.Employee_profileImageURL : defaultpic,
+                        title: user.Employee_Name
+                    };
+                }
                 activityLog.value.push(dataObject);
             });
 

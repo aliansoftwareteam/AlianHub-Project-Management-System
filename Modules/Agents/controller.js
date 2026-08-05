@@ -303,7 +303,13 @@ exports.catalogue = async (req, res) => {
             status: true,
             data: {
                 canManage,
-                skills: R.SKILLS,
+                // VISIBLE_SKILLS, not SKILLS: a few are implemented but held back from
+                // the form for now. Anything already granted keeps working.
+                skills: R.VISIBLE_SKILLS,
+                // Sent separately because it must include the hidden ones: it decides
+                // whether the form shows the approval control and the data-change
+                // warning, and a hidden skill still changes data.
+                writeSkillKeys: R.GRANTABLE_WRITE_SKILL_KEYS,
                 scopeLevels: R.SCOPE_LEVELS,
                 triggerTypes: R.TRIGGER_TYPES,
                 triggerEvents: R.TRIGGER_EVENTS,
@@ -808,6 +814,143 @@ exports.assignToTask = async (req, res) => {
         });
     } catch (e) {
         logger.error(`${LOG_PREFIX} assignToTask: ${e.message}`);
+        return res.send({ status: false, statusText: e.message });
+    }
+};
+
+/**
+ * Post the agent's own "done" comment after an approved change is applied.
+ *
+ * Best-effort: the change has already happened, so a failure to announce it must not
+ * turn a successful approval into an error. It is logged instead.
+ */
+const postOutcomeComment = async (ctx, { runId, applied = [], failed = [] }) => {
+    const lines = [];
+    // Wording shared with the immediate-apply path in the executor, so an approved
+    // change and a direct one are described in exactly the same words.
+    for (const r of applied) lines.push(executor.describeOutcome(r.skill, r.result));
+    for (const f of failed) {
+        lines.push(`I could not complete ${f.skill}: ${f.error}`);
+    }
+    if (!lines.length) return;
+
+    const text = applied.length && !failed.length
+        ? `${lines.join(' ')}`
+        : `${lines.join('\n')}`;
+
+    try {
+        const out = await executor.applyProposedCall(ctx, { skill: 'comment.write', args: { text, runId } }, ctx.entityId);
+        if (!out.ok) logger.error(`${LOG_PREFIX} could not post the outcome comment: ${out.error}`);
+    } catch (e) {
+        logger.error(`${LOG_PREFIX} outcome comment threw: ${e.message}`);
+    }
+};
+
+/**
+ * POST /api/v1/agents/runs/:runId/decide  { approve: true | false }
+ *
+ * Approve or reject the changes a run PROPOSED instead of making.
+ *
+ * Approving REPLAYS the stored calls rather than asking the model again, so the
+ * person applies exactly the change they were shown — a second model call could
+ * produce something different, which would make the approval meaningless.
+ *
+ * Every replayed call still goes through runner/tools.js, so the allow-list and the
+ * scope check apply again at approval time. An agent whose permissions were narrowed
+ * between proposing and approving is refused, which is the correct outcome.
+ */
+exports.decideRun = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        const userId = userOf(req);
+        const runId = String(req.params.runId || '');
+        const approve = (req.body || {}).approve !== false;
+        if (!companyId || !userId) return res.send({ status: false, statusText: 'companyId and an authenticated user are required.' });
+        if (!R.isObjectIdString(runId)) return res.send({ status: false, statusText: 'A valid run id is required.' });
+
+        const run = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.AGENT_RUNS,
+            data: [{ _id: oid(runId), deletedStatusKey: 0 }],
+        }, 'findOne');
+        if (!run) return res.send({ status: false, statusText: 'That run does not exist.' });
+
+        // Deciding on an agent's work needs the same access as running it.
+        const found = await loadManageableAgent(companyId, userId, String(run.agentId || ''));
+        if (!found.ok) return res.send({ status: false, statusText: found.reason });
+
+        // Idempotent by state, not by hope: approving twice would apply the change
+        // twice, and a description rewritten twice loses whatever came between.
+        if (run.approvalState !== 'pending') {
+            const was = run.approvalState || 'nothing to approve';
+            return res.send({ status: false, statusText: `This has already been dealt with (${was}).` });
+        }
+
+        const pending = (run.toolCalls || []).filter((t) => t && t.skill && String(t.result || '').startsWith('proposed'));
+        if (!pending.length) return res.send({ status: false, statusText: 'That run proposed nothing.' });
+
+        if (!approve) {
+            await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.AGENT_RUNS,
+                data: [{ _id: oid(runId) }, { $set: { approvalState: 'rejected', approvedBy: String(userId), approvedAt: new Date() } }],
+            }, 'updateOne');
+            logger.info(`${LOG_PREFIX} run ${runId} rejected by ${userId}`);
+            return res.send({ status: true, statusText: 'Rejected — nothing was changed.', data: { approved: false } });
+        }
+
+        const taskId = String(run.entityId || '');
+        const ctx = { companyId, agent: found.agent, entityId: taskId, dryRun: false };
+        const results = [];
+        for (const call of pending) {
+            const out = await executor.applyProposedCall(ctx, call, taskId);
+            results.push(out);
+        }
+
+        // Captured BEFORE the rewrite below, which consumes `results` with shift() —
+        // filtering afterwards would silently give an empty list.
+        const succeeded = results.filter((r) => r.ok);
+        const failed = results.filter((r) => !r.ok);
+        const okCount = succeeded.length;
+
+        // The toolCalls are rewritten so the audit trail shows what actually happened
+        // on approval, not the original "proposed" text.
+        const queue = [...results];
+        const rewritten = (run.toolCalls || []).map((t) => {
+            if (!String(t.result || '').startsWith('proposed')) return t;
+            const r = queue.shift();
+            return { ...t, result: r && r.ok ? 'applied on approval' : `refused on approval: ${r && r.error}`, appliedAt: r && r.ok ? new Date() : null };
+        });
+
+        await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.AGENT_RUNS,
+            data: [{ _id: oid(runId) }, {
+                $set: {
+                    approvalState: 'approved',
+                    approvedBy: String(userId),
+                    approvedAt: new Date(),
+                    toolCalls: rewritten,
+                    ...(failed.length ? { error: `${failed.length} of ${pending.length} changes failed on approval.` } : {}),
+                },
+            }],
+        }, 'updateOne');
+
+        logger.info(`${LOG_PREFIX} run ${runId} approved by ${userId}: ${okCount}/${pending.length} applied`);
+
+        // Say so in the thread, not just in a toast.
+        //
+        // A toast is gone in three seconds and never seen by anyone else on the task.
+        // The change itself is silent — a description quietly differs from what it was
+        // — so without this nobody can tell whether the approval actually took effect.
+        await postOutcomeComment(ctx, { runId, applied: succeeded, failed });
+
+        return res.send({
+            status: true,
+            statusText: failed.length
+                ? `Applied ${okCount} of ${pending.length}. ${failed.map((f) => f.error).join(' ')}`
+                : `Applied. ${found.agent.name} has made the change${pending.length > 1 ? 's' : ''}.`,
+            data: { approved: true, applied: okCount, failed: failed.length },
+        });
+    } catch (e) {
+        logger.error(`${LOG_PREFIX} decideRun: ${e.message}`);
         return res.send({ status: false, statusText: e.message });
     }
 };

@@ -2128,7 +2128,7 @@ export default {
         skills: "What it can do",
         skills_hint: "An agent can only do what you tick here — nothing else, whatever its instructions say. Start with the least it needs.",
         write_skills: "Changes data",
-        write_skills_hint: "Not available yet. These are shown so you can see what is planned — an agent cannot be given them until they work, because a permission that does nothing would make the agent look more capable than it is.",
+        write_skills_hint: "These change the task itself. Each one is a separate permission, so an agent can set the due date without being able to touch anything else. Tick only what this agent needs.",
         soon: "Soon",
         write_warning: "This agent will be able to change your data. It will ask for approval before acting unless you turn that off below.",
         require_approval: "Ask me before it changes anything",
@@ -2160,6 +2160,11 @@ export default {
         assigned_failed: "Could not update the agent on this task.",
         // Tag beside an agent's name on a comment it wrote.
         agent_tag: "Agent",
+        // Approval, offered on the comment where the agent proposed the change.
+        awaiting_approval: "Waiting for your approval",
+        approve: "Approve",
+        reject: "Reject",
+        decide_failed: "Could not record that decision.",
         // Shown while a mentioned agent is running, before its reply arrives.
         is_working: "is reading the task",
         // Agents use the same provider as every other AI feature, chosen by LLM_PROVIDER.

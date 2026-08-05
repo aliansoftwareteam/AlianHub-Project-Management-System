@@ -764,6 +764,15 @@ const schema = {
         // "Done" with no comment reads as a failure otherwise. Distinct from
         // `error`, which means the run did not do what it was asked.
         note: { type: String, required: false },
+        // Approval state for a run that PROPOSED changes instead of making them
+        // (limits.requireApproval). The proposed calls, including their full args,
+        // are already in `toolCalls`, so approving is a replay rather than a new
+        // model call — the person approves the exact change they were shown.
+        //
+        // Absent on runs that had nothing to approve.
+        approvalState: { type: String, required: false },   // pending | approved | rejected
+        approvedBy: { type: String, required: false },
+        approvedAt: { type: Date, required: false },
         startedAt: { type: Date, required: false },
         finishedAt: { type: Date, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
@@ -2575,6 +2584,19 @@ const schema = {
         // should still render correctly after the agent is renamed or deleted.
         "agentEmoji": {
             type: String,
+            required: false
+        },
+        // Set when this comment carries a change the agent is WAITING to make, so
+        // the thread can offer Approve / Reject right where the proposal was made
+        // rather than sending someone off to a settings page to find it.
+        //
+        // `agentRunId` points at the agent_runs row holding the proposed calls.
+        "agentRunId": {
+            type: String,
+            required: false
+        },
+        "agentAwaitingApproval": {
+            type: Boolean,
             required: false
         },
         "pinnedMessage": {

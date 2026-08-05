@@ -94,7 +94,7 @@ const status = () => {
  * a readable reason, not as an exception climbing out of the runner and into the
  * process-level unhandledRejection handler.
  */
-const complete = async ({ system, prompt, maxTokens = 1200 }) => {
+const complete = async ({ system, prompt, maxTokens = 1200, jsonMode = false }) => {
     const { provider, reason } = resolve();
     if (!provider) return { ok: false, error: reason, tokensIn: 0, tokensOut: 0 };
 
@@ -108,6 +108,10 @@ const complete = async ({ system, prompt, maxTokens = 1200 }) => {
                 // little variation than a template would.
                 temperature: 0.3,
                 maxTokens,
+                // The runner asks for an action plan as JSON. The shared providers
+                // each implement this natively (response_format / a system-prompt
+                // rider), so it is forwarded rather than reimplemented.
+                jsonMode,
             }),
             new Promise((_, reject) => setTimeout(
                 () => reject(new Error(`The model did not respond within ${Math.round(REQUEST_TIMEOUT_MS / 1000)} seconds.`)),

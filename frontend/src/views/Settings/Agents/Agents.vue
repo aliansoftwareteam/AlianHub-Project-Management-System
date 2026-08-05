@@ -176,9 +176,10 @@
                                                 <p class="agt-hint agt-hint--lead">{{ $t('Agents.write_skills_hint') }}</p>
 
                                                 <div class="agt-skills">
-                                                    <!-- Listed so the roadmap is visible, disabled because the
-                                                         runner cannot perform them yet. Granting one would put a
-                                                         "Can change data" badge on an agent that provably cannot. -->
+                                                    <!-- `is-soon` / the disabled state stay for any skill the runner
+                                                         cannot yet perform: granting one would put a "Can change
+                                                         data" badge on an agent that provably cannot. Nothing is in
+                                                         that state today, so neither renders. -->
                                                     <label
                                                         v-for="s in writeSkills" :key="s.key"
                                                         class="agt-skill agt-skill--write"
@@ -462,7 +463,7 @@ const $toast = useToast();
 const isSpinner = ref(false);
 const agents = ref([]);
 const canManage = ref(false);
-const catalogue = ref({ skills: [], defaultLimits: { runsPerDay: 50, requireApproval: true } });
+const catalogue = ref({ skills: [], writeSkillKeys: [], defaultLimits: { runsPerDay: 50, requireApproval: true } });
 const usage = ref({ runs: 0, failed: 0, tokensIn: 0, tokensOut: 0, costEstimate: 0, byAgent: [] });
 
 const isEditing = ref(false);
@@ -549,7 +550,16 @@ const writeSkills = computed(() => (catalogue.value.skills || []).filter((s) => 
 // Only skills that can actually be granted count toward the approval toggle and
 // the data-change warning — a warning about something impossible teaches people
 // to dismiss warnings.
-const writeKeys = computed(() => writeSkills.value.filter((s) => s.available).map((s) => s.key));
+//
+// Taken from the server's own list rather than from the checkboxes above, because some
+// write skills are implemented but withheld from the form. Deriving it from what is
+// rendered would hide the approval control from an agent that holds only one of those —
+// it would still change data, just with no warning and no way to require approval.
+const writeKeys = computed(() => (
+    catalogue.value.writeSkillKeys && catalogue.value.writeSkillKeys.length
+        ? catalogue.value.writeSkillKeys
+        : writeSkills.value.filter((s) => s.available).map((s) => s.key)
+));
 const formHasWriteSkill = computed(() => form.value.skills.some((k) => writeKeys.value.includes(k)));
 
 /**
@@ -1156,9 +1166,15 @@ select.agt-input { cursor: pointer; }
     transform: rotate(45deg) scale(0);
     transition: transform 0.12s ease;
 }
-.agt-toggle input:checked + .agt-toggle__box { background: #2F3990; border-color: #2F3990; }
-.agt-toggle input:checked + .agt-toggle__box::after { transform: rotate(45deg) scale(1); }
-.agt-toggle input:focus-visible + .agt-toggle__box { outline: 2px solid #2F3990; outline-offset: 2px; }
+/* The checked state belongs to the box, not to one of its two containers. Scoped to
+   .agt-toggle it never matched a skill's checkbox, so ticking a skill only tinted the
+   row — the square stayed empty and the tick never appeared. */
+.agt-toggle input:checked + .agt-toggle__box,
+.agt-skill input:checked + .agt-toggle__box { background: #2F3990; border-color: #2F3990; }
+.agt-toggle input:checked + .agt-toggle__box::after,
+.agt-skill input:checked + .agt-toggle__box::after { transform: rotate(45deg) scale(1); }
+.agt-toggle input:focus-visible + .agt-toggle__box,
+.agt-skill input:focus-visible + .agt-toggle__box { outline: 2px solid #2F3990; outline-offset: 2px; }
 .agt-toggle__text { font-size: 13px; color: #2A2C39; line-height: 1.45; }
 .agt-toggle__hint { display: block; font-size: 11.5px; color: #8A909C; margin-top: 2px; }
 
@@ -1184,7 +1200,9 @@ select.agt-input { cursor: pointer; }
 .agt-skill__desc { font-size: 11.5px; color: #8A909C; line-height: 1.45; }
 .agt-skill--write .agt-skill__name { color: #8A5A0B; }
 .agt-skill--write.is-on { background: #FEFAF1; border-color: #F0DFB8; }
-.agt-skill--write.is-on .agt-toggle__box { background: #8A5A0B; border-color: #8A5A0B; }
+/* Must come AFTER the generic checked rule above — same specificity, so source order is
+   what keeps a ticked write skill amber instead of navy. The tick itself is inherited. */
+.agt-skill--write input:checked + .agt-toggle__box { background: #8A5A0B; border-color: #8A5A0B; }
 
 /* Visible, but plainly not on offer yet — no hover, no pointer, muted. */
 .agt-skill.is-soon { cursor: default; opacity: 0.6; }
