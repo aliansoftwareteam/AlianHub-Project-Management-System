@@ -229,6 +229,7 @@
     import OnLeaveCard from "@/components/organisms/OnLeaveCard/OnLeaveCard.vue";
     import NextUpCard from "@/components/organisms/NextUpCard/NextUpCard.vue";
     import MyAchievementsCard from "@/components/organisms/MyAchievementsCard/MyAchievementsCard.vue";
+    import TaskStatusSummaryCard from "@/components/organisms/TaskStatusSummaryCard/TaskStatusSummaryCard.vue";
     import MyLeaveCard from "@/components/organisms/MyLeaveCard/MyLeaveCard.vue";
     import DueSoonCard from "@/components/organisms/DueSoonCard/DueSoonCard.vue";
     import MyTimeCard from "@/components/organisms/MyTimeCard/MyTimeCard.vue";
@@ -438,6 +439,8 @@
                 return NextUpCard;
             case 'MyAchievementsCard':
                 return MyAchievementsCard;
+            case 'TaskStatusSummaryCard':
+                return TaskStatusSummaryCard;
             case 'MyLeaveCard':
                 return MyLeaveCard;
             case 'DueSoonCard':
@@ -843,7 +846,7 @@
         'WorkedTasksTableCard', 'TeamCategoryBreakdownCard', 'TeamLoggedVsEtaCard',
         'TasksByStatusCard', 'TasksByProjectCard', 'TotalTasksCard',
         'NextUpCard', 'MyAchievementsCard', 'MyLeaveCard', 'DueSoonCard', 'MyTimeCard',
-        'MilestoneReportCard', 'TASKLIST',
+        'MilestoneReportCard', 'TaskStatusSummaryCard', 'TASKLIST',
     ].includes(cid);
 
     // ── Dashboard-level date range ──────────────────────────────────
@@ -887,7 +890,7 @@
     const PROJECT_PERIOD_CARDS = [
         'RunningProjectsCard', 'UsersByCategoryCard', 'ProjectPulseCard',
         'WorkedTasksTableCard', 'TeamCategoryBreakdownCard', 'TeamLoggedVsEtaCard', 'OnLeaveCard',
-        'MyAchievementsCard', 'MyTimeCard', 'MilestoneReportCard',
+        'MyAchievementsCard', 'MyTimeCard', 'MilestoneReportCard', 'TaskStatusSummaryCard',
     ];
     const PROJECT_PERIOD_OPTIONS = [
         { id: 0, label: 'Auto' },
@@ -897,7 +900,7 @@
     const PROJECT_PERIOD_DEFAULT = {
         RunningProjectsCard: 1, UsersByCategoryCard: 3, ProjectPulseCard: 1,
         WorkedTasksTableCard: 3, TeamCategoryBreakdownCard: 3, TeamLoggedVsEtaCard: 3, OnLeaveCard: 1,
-        MyAchievementsCard: 5, MyTimeCard: 3, MilestoneReportCard: 5, TASKLIST: 0,
+        MyAchievementsCard: 5, MyTimeCard: 3, MilestoneReportCard: 5, TaskStatusSummaryCard: 3, TASKLIST: 0,
     };
     // TASKLIST shows the period dropdown only when its date-range toggle is on.
     const periodOptionsFor = (item) => {
