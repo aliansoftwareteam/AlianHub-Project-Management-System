@@ -964,14 +964,36 @@ exports.getMilestoneSummary = async (req, res) => {
             const projects = await MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.PROJECTS,
                 data: [
-                    { _id: { $in: projectIds } },
-                    { ProjectName: 1, ProjectCurrency: 1 },
+                    // deletedStatusKey 1 is a DELETED project. Excluded here, which drops
+                    // its milestones from the card entirely (see liveProject below).
+                    //
+                    // They were being listed as ordinary rows, with a name and a working
+                    // -looking link — but the project list endpoint excludes deleted
+                    // projects, so clicking one landed on whatever project happened to be
+                    // first and rewrote the URL to match. They were also counted as
+                    // receivable, which a deleted project's milestone is not.
+                    { _id: { $in: projectIds }, deletedStatusKey: { $ne: 1 } },
+                    { ProjectName: 1, ProjectCurrency: 1, statusType: 1 },
                 ],
             }, "find").catch(() => []);
             (projects || []).forEach((p) => {
-                projectsMap[String(p._id)] = { name: p.ProjectName || "", currency: p.ProjectCurrency || "" };
+                projectsMap[String(p._id)] = {
+                    name: p.ProjectName || "",
+                    currency: p.ProjectCurrency || "",
+                    // A closed project is FINISHED, not PAID: of 493 milestones on closed
+                    // projects here, 261 are still unpaid. They stay in every figure — a
+                    // receivable that is hidden is a receivable nobody chases — but the row
+                    // says so, because "why is a finished project in my inbox" is the first
+                    // question it otherwise raises.
+                    closed: String(p.statusType || "") === "close",
+                };
             });
         }
+
+        // A milestone counts only while its parent project is still live. A project that
+        // was deleted (or an id that resolves to nothing at all) takes its milestones with
+        // it — out of the totals, out of the status bars, out of the timeline.
+        const liveProject = (m) => Object.prototype.hasOwnProperty.call(projectsMap, String(m.projectId));
 
         // ProjectCurrency is stored as a currency OBJECT ({ symbol, code, name,
         // … }); we need its ISO code to convert the amount to USD. A legacy
@@ -1015,7 +1037,10 @@ exports.getMilestoneSummary = async (req, res) => {
         let allTimeUsd = 0;          // consolidated USD across every milestone (footer)
         const due = { receivableUsd: 0, receivedUsd: 0, outstandingUsd: 0, receivableCount: 0, receivedCount: 0 };
 
+        let liveCount = 0;
         milestones.forEach((m) => {
+            if (!liveProject(m)) return;
+            liveCount += 1;
             const usd = usdOf(m);
             allTimeUsd += usd;        // all-time total spans every milestone
             if (!inRange(m)) return;  // status bars, receivable & recent are period-scoped
@@ -1049,7 +1074,7 @@ exports.getMilestoneSummary = async (req, res) => {
         // past → today → upcoming rather than always truncating the future away.
         const nowMs = Date.now();
         const dueOf = (m) => Number(m.dueDate) || 0;
-        const inScope = milestones.filter((m) => inRange(m) && matchStatus(m));
+        const inScope = milestones.filter((m) => liveProject(m) && inRange(m) && matchStatus(m));
         const future = inScope.filter((m) => dueOf(m) > nowMs).sort((a, b) => dueOf(a) - dueOf(b));   // nearest upcoming first
         const pastNow = inScope.filter((m) => dueOf(m) <= nowMs).sort((a, b) => dueOf(b) - dueOf(a)); // nearest recent-past first
         let futurePick = future.slice(0, Math.ceil(RECENT_LIMIT / 2));
@@ -1064,6 +1089,7 @@ exports.getMilestoneSummary = async (req, res) => {
                 return {
                     projectId: String(m.projectId || ""),
                     projectName: proj.name || "",
+                    projectClosed: !!proj.closed,
                     milestoneName: m.milestoneName || "",
                     amountUsd: usdOf(m),
                     status: m.statusId || "",
@@ -1075,12 +1101,12 @@ exports.getMilestoneSummary = async (req, res) => {
         const data = {
             currency: "USD",
             due,
-            allTime: { totalUsd: allTimeUsd, count: milestones.length },
+            allTime: { totalUsd: allTimeUsd, count: liveCount },
             byStatus: Object.keys(statusAgg)
                 .map((status) => ({ status, count: statusAgg[status].count }))
                 .sort((a, b) => b.count - a.count),
             recent,
-            totalCount: milestones.filter((m) => inRange(m) && matchStatus(m)).length,
+            totalCount: inScope.length,
             period,
             ratesLive,
         };
