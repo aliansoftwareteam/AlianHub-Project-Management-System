@@ -62,6 +62,16 @@
                 <img src="@/assets/images/svg/mention_icon.svg" class="cursor-pointer" id="mention_driver" @click="getMentions(!mentions.length), showNotification = 1, notificationVisible = true">
                 <span :class="{'notification-tick': totalMentions > 0}" class="blinking"></span>
             </div>
+            <!--
+              Inbox. A route, not a dropdown: the two icons either side of it are for
+              glancing, this is where you sit and work through them. Its dot counts
+              unread PRIMARY groups only — the bell already covers everything, so
+              repeating that number here would just be a second copy of the same badge.
+            -->
+            <router-link class="position-re" :to="{name: 'inbox', params: {cid: companyId}}" v-if="rules && Object.keys(rules).length">
+                <img src="@/assets/images/svg/inbox_icon.svg" class="cursor-pointer" id="inbox_driver" :title="$t('Inbox.title')">
+                <span :class="{'notification-tick': inboxPrimaryCount > 0}" class="blinking"></span>
+            </router-link>
             <div class="position-re" v-if="rules && Object.keys(rules).length">
                 <img src="@/assets/images/svg/notepad_icon.svg" class="cursor-pointer" id="notepad_driver" :title="$t('Notepad.title')" @click="notepadVisible = true">
             </div>
@@ -443,6 +453,16 @@ onMounted(() => {
             console.error("ERROR in get projects chat:", error);
         })
     }
+
+    loadInboxCount();
+})
+
+// Leaving the Inbox is the one moment the count is reliably stale — the user has just
+// read or cleared things. Refreshing only then avoids polling on every navigation.
+// Watched off `router.currentRoute` rather than a useRoute() import, to keep the diff
+// to this shared header as small as possible.
+watch(() => router.currentRoute.value.name, (to, from) => {
+    if (from === 'inbox' && to !== 'inbox') loadInboxCount();
 })
 
 const tourImages = {
@@ -473,6 +493,22 @@ const talkToTextVisible = ref(false);
 const myCounts = computed(() => getters["users/myCounts"]?.data || {})
 const totalNotification = computed(() => myCounts.value?.notification_counts);
 const totalMentions = computed(() => myCounts.value?.mention_counts)
+
+// Unread groups on the Inbox's Primary tab.
+//
+// Its own request rather than a slice of myCounts, because "important" is decided by
+// the Inbox's own rules and grouping — a number the existing counts payload has no way
+// to produce. Kept out of the render path entirely: it starts at 0, the dot simply
+// appears if the call comes back with something, and a failure leaves it at 0 rather
+// than blocking a header that every page depends on.
+const inboxPrimaryCount = ref(0);
+const loadInboxCount = () => {
+    apiRequest("get", `${env.INBOX}/counts`).then((response) => {
+        if (response?.data?.status) inboxPrimaryCount.value = Number(response.data.data?.primary) || 0;
+    }).catch(() => {
+        inboxPrimaryCount.value = 0;
+    });
+};
 const companyUser = ref(getters['settings/companyUserDetail']);
 
 const dispatchEventForFilet = () => {
