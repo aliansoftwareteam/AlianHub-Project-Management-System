@@ -97,7 +97,9 @@ export function useHelper() {
             ]
         },
         {
-            // Reports — Milestone (permission-gated) + the always-on Custom & Variance reports.
+            // Reports — Milestone (permission-gated). Custom & Variance are hidden for now;
+            // their entries and routes are left in place so turning them back on is a
+            // one-word change (NavLinks renders only submenu items with show === true).
             name: "Reports",
             show: true,
             submenu: [
@@ -109,12 +111,12 @@ export function useHelper() {
                 {
                     name: "Custom_Report",
                     to: {path: `/${companyId.value}/custom-reports`},
-                    show: true
+                    show: false
                 },
                 {
                     name: "Variance_Report",
                     to: {path: `/${companyId.value}/reports/variance`},
-                    show: true
+                    show: false
                 }
             ]
         }
