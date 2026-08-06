@@ -2428,5 +2428,43 @@
         "image": "Calculation",
         "cardType": "project_progress",
         "backgroundColor": "#0f766e"
+    },
+    {
+        "_id": "6a3700000000000000000701",
+        "name": "task_status_summary_card_title",
+        "description": "task_status_summary_card_description",
+        "permission": [],
+        "fields": [
+            { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "Tasks Summary by Status", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false },
+            { "label": "location", "groupBy": "data", "type": "dropdown", "name": "projectId", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
+            { "label": "status", "groupBy": "data", "type": "dropdown", "name": "statusArray", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
+            {
+                "label": "timerange",
+                "groupBy": "data",
+                "type": "dropdown",
+                "name": "timerange",
+                "value": 3,
+                "placeHolder": "select",
+                "options": [
+                    { "id": 0, "name": "auto_range" },
+                    { "id": 1, "name": "today" },
+                    { "id": 2, "name": "yesterday" },
+                    { "id": 3, "name": "this_week" },
+                    { "id": 4, "name": "last_week" },
+                    { "id": 5, "name": "this_month" },
+                    { "id": 6, "name": "last_month" },
+                    { "id": 7, "name": "this_year" },
+                    { "id": 8, "name": "last_30_days" }
+                ],
+                "rules": "",
+                "info": "",
+                "hidden": false,
+                "disabled": false
+            }
+        ],
+        "key": "TaskStatusSummaryCard",
+        "image": "PieChartWorkload",
+        "cardType": "task",
+        "backgroundColor": "#2f3990"
     }
 ]
