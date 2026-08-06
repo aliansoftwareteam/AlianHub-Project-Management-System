@@ -726,6 +726,8 @@ export default {
         save_tamplete: "Save as Template",
         previous: "Previous",
         new_task: "New Task",
+        sprint_estimate_label: "Estimated",
+        sprint_total_estimate: "Total estimated hours for every task in this sprint, subtasks included",
         add_subtask: "Add Subtask",
         linked_tasks: "Linked Tasks",
         add_link: "Link Task",
