@@ -70,7 +70,7 @@
             -->
             <router-link class="position-re" :to="{name: 'inbox', params: {cid: companyId}}" v-if="rules && Object.keys(rules).length">
                 <img src="@/assets/images/svg/inbox_icon.svg" class="cursor-pointer" id="inbox_driver" :title="$t('Inbox.title')">
-                <span :class="{'notification-tick': inboxPrimaryCount > 0}" class="blinking"></span>
+                <span :class="{'notification-tick': inboxUnreadCount > 0}" class="blinking"></span>
             </router-link>
             <div class="position-re" v-if="rules && Object.keys(rules).length">
                 <img src="@/assets/images/svg/notepad_icon.svg" class="cursor-pointer" id="notepad_driver" :title="$t('Notepad.title')" @click="notepadVisible = true">
@@ -357,7 +357,7 @@
 
 <script setup>
 // PACKAGE
-import { computed, defineComponent, defineEmits, inject, onMounted, ref, watch, watchEffect } from "vue";
+import { computed, defineComponent, defineEmits, inject, onMounted, onUnmounted, ref, watch, watchEffect } from "vue";
 import { useRouter } from "vue-router";
 import {version} from "../../../../../package.json";
 import {useHelper} from "./helper"
@@ -457,14 +457,6 @@ onMounted(() => {
     loadInboxCount();
 })
 
-// Leaving the Inbox is the one moment the count is reliably stale — the user has just
-// read or cleared things. Refreshing only then avoids polling on every navigation.
-// Watched off `router.currentRoute` rather than a useRoute() import, to keep the diff
-// to this shared header as small as possible.
-watch(() => router.currentRoute.value.name, (to, from) => {
-    if (from === 'inbox' && to !== 'inbox') loadInboxCount();
-})
-
 const tourImages = {
     ai_tour,
     automate_screen_tour,
@@ -501,14 +493,67 @@ const totalMentions = computed(() => myCounts.value?.mention_counts)
 // to produce. Kept out of the render path entirely: it starts at 0, the dot simply
 // appears if the call comes back with something, and a failure leaves it at 0 rather
 // than blocking a header that every page depends on.
-const inboxPrimaryCount = ref(0);
+/**
+ * The inbox dot: shown only when something is genuinely unread.
+ *
+ * It deliberately does NOT read myCounts. That is a stored counters document maintained
+ * by increments, and increments drift — on this instance it reads 8 notifications and 2
+ * mentions where the collections actually hold 154 and 5. A dot driven by that lights up
+ * with nothing behind it, or stays dark when there is something.
+ *
+ * /inbox/counts counts the rows themselves, so it cannot drift.
+ *
+ * myCounts is still used, but as a TRIGGER rather than a source: it changes over a socket
+ * the moment a notification arrives, so watching it re-checks the truth at exactly the
+ * right time. Live, and correct.
+ */
+const inboxUnreadCount = ref(0);
+// Debounced, because reading ten notifications in the bell moves myCounts ten times and
+// only the final state matters. Bursts collapse into one check.
+let inboxCountTimer = null;
 const loadInboxCount = () => {
-    apiRequest("get", `${env.INBOX}/counts`).then((response) => {
-        if (response?.data?.status) inboxPrimaryCount.value = Number(response.data.data?.primary) || 0;
-    }).catch(() => {
-        inboxPrimaryCount.value = 0;
-    });
+    clearTimeout(inboxCountTimer);
+    inboxCountTimer = setTimeout(() => {
+        apiRequest("get", `${env.INBOX}/counts`).then((response) => {
+            if (response?.data?.status) inboxUnreadCount.value = Number(response.data.data?.all) || 0;
+        }).catch(() => {
+            // Deliberately NOT zeroed. A failed request is not evidence of an empty inbox,
+            // and the checks after this one are all event-driven — myCounts changing, or
+            // leaving the inbox. Zeroing here turned a single failure into a permanently
+            // dark dot: restarting the API while the page is open fails the mount check,
+            // and with the counters collection quiet nothing ever asks again.
+        });
+    }, 400);
 };
+
+// These two watches sit HERE, not up beside onMounted, because `watch` evaluates its
+// getter immediately during setup — referencing totalNotification above its own `const`
+// threw "Cannot access 'totalNotification' before initialization" and took the whole
+// header down. onMounted is fine either way: its callback runs after setup completes.
+//
+// myCounts moves over a socket whenever a notification or mention arrives, and again when
+// one is read. That is the cue to re-check the real unread count, so the dot tracks
+// reality without polling for it.
+watch(() => [totalNotification.value, totalMentions.value], () => {
+    loadInboxCount();
+})
+
+// Leaving the inbox is the other moment it goes stale: things were just read there.
+watch(() => router.currentRoute.value.name, (to, from) => {
+    if (from === 'inbox' && to !== 'inbox') loadInboxCount();
+})
+
+// Coming back to the tab is the recovery path. Every other check above is driven by
+// something happening inside this tab, so a check that failed while the tab was in the
+// background — or while the API was restarting — would never be retried. Cheaper than
+// polling, and it lands exactly when the user is about to look at the dot.
+const recheckInboxCount = () => { if (!document.hidden) loadInboxCount(); };
+onMounted(() => { document.addEventListener('visibilitychange', recheckInboxCount); });
+onUnmounted(() => {
+    document.removeEventListener('visibilitychange', recheckInboxCount);
+    clearTimeout(inboxCountTimer);
+})
+
 const companyUser = ref(getters['settings/companyUserDetail']);
 
 const dispatchEventForFilet = () => {
