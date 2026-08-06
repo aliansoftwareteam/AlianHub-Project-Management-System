@@ -16,6 +16,19 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.23.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.22.0...v14.23.0) (2026-08-06)
+
+
+### 🚀 Features
+
+* **dashboard:** add a Tasks Summary by Status card ([bdaa211](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bdaa2112c27b8299b844233cd11b20e72ace0d8d))
+* **sprint:** show total estimated hours in the sprint header ([f840b85](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f840b85c61d45393071490b537c1fa4421bf1d85))
+
+
+### 🐛 Bug Fixes
+
+* **dashboard:** send milestone card links to their own project ([da7f56f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/da7f56f1f298bb994d59ebd0e5bf492ba88f2d52))
+
 ## [14.22.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.21.0...v14.22.0) (2026-08-04)
 
 
