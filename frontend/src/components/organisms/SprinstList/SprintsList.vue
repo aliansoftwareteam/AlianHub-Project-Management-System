@@ -31,11 +31,26 @@
                         </button>
                     </template>
                     <div class="d-flex align-items-center ml-10px cursor-pointer suggest-tasks-cta" :class="[{'pointer-event-none' : isSpinner}]" v-if="checkApps('AI',project) &&
-                        checkPermission('task.task_list',project?.isGlobalPermission) === true && 
+                        checkPermission('task.task_list',project?.isGlobalPermission) === true &&
                         checkPermission('task.task_create',project?.isGlobalPermission) === true">
                         <img :src="aiIcon" class="mr-3px" />
                         <span @click.stop="suggestTask()" class="ai-color font-size-14 font-weight-500 ai-border-bottom" :class="[{'pointer-event-none' : isSpinner}]">{{$t("AI.suggest_tasks")}}</span>
                     </div>
+                    <!-- Total estimated hours for the whole sprint, subtasks included.
+                         Counted on the server, not from the rows on screen: the list pages
+                         at 35 and subtasks are not loaded at all while they are collapsed,
+                         so a client-side sum would quietly under-report. -->
+                    <span
+                        v-if="showEstimateBadge"
+                        class="sprint-estimate-badge ml-10px"
+                        :title="$t('Projects.sprint_total_estimate')"
+                        @click.stop
+                    >
+                        <!-- Named, not just a number: "43h 00m" on its own reads as
+                             logged time just as easily as estimated time. -->
+                        <span class="sprint-estimate-badge__label">{{ $t('Projects.sprint_estimate_label') }}</span>
+                        <span class="sprint-estimate-badge__value">{{ sprintEstimateLabel }}</span>
+                    </span>
                 </div>
             </div>
             <div v-if="!showArchiveVar" class="d-flex align-items-center sharewith__status-toggle" :style="[{paddingTop : clientWidth <=512 ? '15px' : '' }]">
@@ -242,7 +257,7 @@
 
 <script setup>
 // PACKAGES
-import { computed, defineComponent, defineEmits, defineProps, inject, onMounted, ref, watch} from 'vue';
+import { computed, defineComponent, defineEmits, defineProps, inject, onMounted, onUnmounted, ref, watch} from 'vue';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { useToast } from 'vue-toast-notification';
 
@@ -321,6 +336,68 @@ const props = defineProps({
     commonDateFormatForDate: String,
     calendarDate: Number
 })
+
+// ─── Sprint total estimate badge ────────────────────────────────────────────────
+//
+// The sum of every task's estimate in this sprint, SUBTASKS INCLUDED.
+//
+// Counted on the server rather than from the rows on screen. The list pages at 35 and
+// subtasks are not fetched at all while the Subtask toggle is Collapsed, so summing what
+// the client happens to hold would under-report — silently, and by more the bigger the
+// sprint. (The story-points total beside each status group does sum client-side, and has
+// that weakness.)
+//
+// It reuses the same generic aggregation endpoint the task list itself posts to, so this
+// adds no new route. `objId` is expanded to real ObjectIds server-side.
+const sprintEstimateMinutes = ref(0);
+const currentCompanyForEstimate = computed(() => getters["settings/selectedCompany"]);
+// Gated on the plan feature, the same one that gates the estimate editor on a task: a
+// company without time estimates would otherwise stare at a permanent 00h 00m.
+const showEstimateBadge = computed(() => !!currentCompanyForEstimate.value?.planFeature?.timeEstimateProjectApp
+    && checkPermission('task.task_list', project.value?.isGlobalPermission) === true);
+
+// Same shape the task detail shows ("01h 00m"), so the two read as the same number.
+const sprintEstimateLabel = computed(() => {
+    const total = Number(sprintEstimateMinutes.value) || 0;
+    const h = Math.floor(total / 60);
+    const m = total % 60;
+    return `${h.toString().padStart(2, "0")}h ${m.toString().padStart(2, "0")}m`;
+});
+
+const loadSprintEstimate = () => {
+    const projectId = project.value?._id;
+    if (!showEstimateBadge.value || !projectId || !props.sprint?.id) return;
+    const findQuery = [
+        {
+            $match: {
+                objId: { sprintId: props.sprint.id, ProjectID: projectId },
+                deletedStatusKey: 0,
+                // No isParentTask clause on purpose — subtasks carry their own estimate
+                // and the badge is meant to include them.
+            },
+        },
+        { $group: { _id: null, total: { $sum: "$totalEstimatedTime" } } },
+    ];
+    apiRequest("post", `${env.TASK}/find`, { findQuery })
+        .then((res) => {
+            sprintEstimateMinutes.value = Number(res?.data?.[0]?.total) || 0;
+        })
+        .catch(() => {
+            // A failed count must not blank a number that was right a moment ago.
+        });
+};
+
+// Re-count when this sprint's tasks change — an estimate edited, a task added, moved or
+// deleted. Debounced because a bulk change fires this once per task.
+let estimateTimer = null;
+const refreshSprintEstimate = () => {
+    clearTimeout(estimateTimer);
+    estimateTimer = setTimeout(loadSprintEstimate, 600);
+};
+watch(() => getters["projectData/tasks"]?.[project.value?._id]?.[props.sprint?.id]?.tasks,
+    refreshSprintEstimate, { deep: true });
+onMounted(loadSprintEstimate);
+onUnmounted(() => clearTimeout(estimateTimer));
 
 watch(route, () => {
     if (createTask.value) {
@@ -830,6 +907,25 @@ function startTaskTour(key) {
 </script>
 
 <style>
+/* Sprint total estimate. Quiet by design: it sits beside "+ New Task" and the AI CTA, and
+   it is a figure to glance at, not an action — so no accent colour and no pointer. */
+.sprint-estimate-badge {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 5px;
+    flex: 0 0 auto;
+    padding: 2px 9px;
+    border-radius: 11px;
+    background: #f0f2f7;
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: nowrap;
+    cursor: default;
+}
+/* Label recedes, number carries — so it scans as "Estimated: 43h" rather than as two
+   competing pieces of text. */
+.sprint-estimate-badge__label { color: #8a909c; font-weight: 500; }
+.sprint-estimate-badge__value { color: #5b6472; font-weight: 600; font-variant-numeric: tabular-nums; }
 .v-enter-active,
 .v-leave-active {
   transition: all 0.2s ease;
