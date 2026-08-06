@@ -92,11 +92,11 @@
                           avatar only replaces it when there IS one and it loads — a 404
                           used to just hide the img and leave the cell blank.
                         -->
-                        <span class="ibx__avatar" :class="'is-' + it.sourceType">
+                        <span class="ibx__avatar" :class="'is-' + it.sourceType" :title="actorName(it)">
                             <img
-                                v-if="it.actorImage && !brokenAvatars.includes(it.sourceId)"
-                                :src="it.actorImage"
-                                alt=""
+                                v-if="actorImage(it) && !brokenAvatars.includes(it.sourceId)"
+                                :src="actorImage(it)"
+                                :alt="actorName(it)"
                                 @error="onAvatarError(it)"
                             />
                             <span v-else v-html="it.sourceType === 'mention' ? ICONS.at : ICONS.bell"></span>
@@ -144,7 +144,7 @@ import { useToast } from 'vue-toast-notification';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useStore } from 'vuex';
-import { useCustomComposable } from '@/composable';
+import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { useProjects } from '@/composable/projects';
 // The header's own router for notification and mention rows. Reused rather than
 // reimplemented — see open().
@@ -160,6 +160,10 @@ const { t } = useI18n();
 const $toast = useToast();
 // The app's own mention-token flattener, shared with the header sidebar and chat list.
 const { changeText } = useCustomComposable();
+// The same resolver the bell and @ dropdowns use for the face on a row. The picture is
+// looked up live from the company-user list, never taken from the notification document —
+// see actorId in Modules/Inbox/controller.js.
+const { getUser } = useGetterFunctions();
 // And its own date+time formatter — the one the mention dropdown already uses. It honours
 // the user's 12/24-hour preference, which a hardcoded toLocaleTimeString did not.
 const { getDateAndTime } = useProjects();
@@ -268,6 +272,17 @@ const brokenAvatars = ref([]);
 const onAvatarError = (it) => {
     if (!brokenAvatars.value.includes(it.sourceId)) brokenAvatars.value = [...brokenAvatars.value, it.sourceId];
 };
+
+// Who the row is FROM. getUser answers with a "Ghost User" placeholder for an id it does
+// not know, and that placeholder carries a default avatar — so an unknown actor would get
+// a stock face instead of the row's type icon. Only a real match is used.
+const actorOf = (it) => {
+    if (!it.actorId) return null;
+    const u = getUser(it.actorId);
+    return u && !u.ghostUser ? u : null;
+};
+const actorImage = (it) => actorOf(it)?.Employee_profileImageURL || '';
+const actorName = (it) => actorOf(it)?.Employee_Name || '';
 
 const loadCounts = async () => {
     try {

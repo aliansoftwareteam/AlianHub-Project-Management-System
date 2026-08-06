@@ -92,8 +92,15 @@ const readNotifications = async (companyId, userId, { limit, read, sort }) => {
         type: String(r.type || ''),
         Key: r.Key,
         companyId: String(r.companyId || ''),
-        actorName: r.Employee_Name || r.User_Employee_Name || '',
-        actorImage: r.Employee_profileImage || r.User_Employee_profileImage || '',
+        // WHO did this, as an id — resolved to a name and picture on the client through
+        // getUser(), exactly as the bell dropdown does it.
+        //
+        // NOT the Employee_* / User_Employee_* fields stored on the row. Those are
+        // denormalised copies written at send time and they do not hold the actor: rows
+        // written by one person were rendering with the reader's own photo. The live
+        // company-user record is the only place the right face comes from, and it also
+        // stays right when someone changes their picture.
+        actorId: String(r.userId || ''),
         unread: Array.isArray(r.notSeen) && r.notSeen.map(String).includes(userId),
         createdAt: r.createdAt,
     }));
@@ -142,8 +149,9 @@ const readMentions = async (companyId, userId, { limit, read, sort }) => {
         type: String(r.type || ''),
         comment_id: String(r.comment_id || ''),
         mainChat: !!r.mainChat,
-        actorName: '',
-        actorImage: '',
+        // The commenter. A mention row carries no denormalised name at all, which is why
+        // the @ dropdown resolves this id too rather than reading the row.
+        actorId: String(r.userId || ''),
         unread: Array.isArray(r.notSeen) && r.notSeen.map(String).includes(userId),
         createdAt: r.createdAt,
     }));
