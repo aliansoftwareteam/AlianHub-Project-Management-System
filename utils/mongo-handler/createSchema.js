@@ -159,6 +159,14 @@ const automationRulesSchema = new Schema(schema.automationRules, {strict: true, 
 automationRulesSchema.index({ deletedStatusKey: 1 });
 const integrationConnectionsSchema = new Schema(schema.integrationConnections, {strict: true, timestamps: true});
 integrationConnectionsSchema.index({ type: 1, deletedStatusKey: 1 });
+const agentsSchema = new Schema(schema.agents, {strict: true, timestamps: true});
+// Every lookup is "which agents apply here", so the scope pair leads the index.
+agentsSchema.index({ 'scope.level': 1, 'scope.refId': 1, deletedStatusKey: 1 });
+const agentRunsSchema = new Schema(schema.agentRuns, {strict: true, timestamps: true});
+agentRunsSchema.index({ agentId: 1, startedAt: -1 });
+// Budget checks count a company's runs in a time window, so date leads here.
+agentRunsSchema.index({ startedAt: -1, status: 1 });
+
 const cloudStorageConnectionsSchema = new Schema(schema.cloudStorageConnections, {strict: true, timestamps: true});
 // Every lookup is "this user's connection to this provider" — unique so a
 // double-tap on Connect can't leave two rows with divergent refresh tokens.
@@ -260,6 +268,8 @@ module.exports = {
     automationRulesSchema,
     integrationConnectionsSchema,
     cloudStorageConnectionsSchema,
+    agentsSchema,
+    agentRunsSchema,
     historySchema,
     userIdSchema, 
     usersSchema,

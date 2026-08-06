@@ -1,29 +1,45 @@
 <template>
     <div>
         <div class="d-flex align-items-center" @click.stop.prevent="!showAddUser ? addUser ? openSidebar() : '' : ''" :id="tourId">
-            <UserProfile
-                v-for="user in detailedUsers.filter((x, index) => index < numOfUsers)"
-                :key="user._id"
-                :showDot="showDot"
-                class="cursor-pointer ml--5px"
-                :data="user"
-                :width="imageWidth"
-                :thumbnail="'30x30'"
-            />
+            <!-- People and agents share one queue, so the +N overflow covers both. An
+                 agent shows its emoji rather than an initials avatar, so it is never
+                 mistaken for a person at a glance. -->
+            <template v-for="entry in stackEntries.filter((x, index) => index < numOfUsers)" :key="(entry.type === 'agent' ? 'agt_' : 'usr_') + entry._id">
+                <span
+                    v-if="entry.type === 'agent'"
+                    class="assignee__agent ml--5px"
+                    :title="entry.name"
+                    :style="{width: imageWidth, height: imageWidth}"
+                >{{ entry.emoji }}</span>
+                <UserProfile
+                    v-else
+                    :showDot="showDot"
+                    class="cursor-pointer ml--5px"
+                    :data="entry"
+                    :width="imageWidth"
+                    :thumbnail="'30x30'"
+                />
+            </template>
 
-            <DropDown :id="'Assignee_'+makeUniqueId(6)" v-if="detailedUsers.length > numOfUsers">
+            <DropDown :id="'Assignee_'+makeUniqueId(6)" v-if="stackEntries.length > numOfUsers">
                 <template #button>
                     <div class="d-flex align-items-center justify-content-center profile-image black text-nowrap font-weight-400 ml--5px border-2px-blue font-size-12 bg-colorlightgray position-re" :style="{width: imageWidth, height: imageWidth}">
-                        +{{detailedUsers.length - numOfUsers}}
+                        +{{stackEntries.length - numOfUsers}}
                     </div>
                 </template>
                 <template #options>
                     <DropDownOption
-                        v-for="(user, index) in detailedUsers.filter((x, index) => index >= numOfUsers).map((x) => ({label: x.title ? x.title : x.name, image: x.image, type: x.type, teamColor: x.teamColor || {}, assigneeUsersArray: x.assigneeUsersArray || []}))"
+                        v-for="(user, index) in stackEntries.filter((x, index) => index >= numOfUsers).map((x) => ({label: x.title ? x.title : x.name, image: x.image, type: x.type, emoji: x.emoji, teamColor: x.teamColor || {}, assigneeUsersArray: x.assigneeUsersArray || []}))"
                         :key="'user'+index"
-                    >   
+                    >
                         <div class="d-flex align-items-center" :title="user.label">
+                            <span
+                                v-if="user.type === 'agent'"
+                                class="assignee__agent ml--5px"
+                                :style="{width: imageWidth, height: imageWidth}"
+                            >{{ user.emoji }}</span>
                             <UserProfile
+                                v-else
                                 :showDot="false"
                                 class="cursor-pointer ml--5px"
                                 :data="user"
@@ -36,14 +52,14 @@
                 </template>
             </DropDown>
 
-            <img v-if="addUser && (showAddUser || !detailedUsers.length)" :src="addUserIcon" alt="add user" :title="$t('Members.adduser')" class="cursor-pointer add__user" @click.stop="addUser ? openSidebar() : ''" :style="{marginLeft: (detailedUsers.length ? '5px' : '0px'), width: imageWidth, height: imageWidth}" />
-            <span v-if="!addUser && !detailedUsers.length" class="font-size-13">N/A</span>
+            <img v-if="addUser && (showAddUser || !detailedUsers.length)" :src="addUserIcon" alt="add user" :title="$t('Members.adduser')" class="cursor-pointer add__user" @click.stop="addUser ? openSidebar() : ''" :style="{marginLeft: (stackEntries.length ? '5px' : '0px'), width: imageWidth, height: imageWidth}" />
+            <span v-if="!addUser && !detailedUsers.length && !attachedAgents.length" class="font-size-13">N/A</span>
         </div>
 
         <Sidebar
             :top="clientWidth<=767 ? '0px' : '46px' "
             :title="$t('Projects.list_of_user')"
-            :value="detailedUsers.map((x) => ({value: x.id, label: x.title ,id: x.id, image: x.image, isOnline: x.isOnline,designation:x.designation}))"
+            :value="[...detailedUsers.map((x) => ({value: x.id, label: x.title ,id: x.id, image: x.image, isOnline: x.isOnline,designation:x.designation})), ...attachedAgentOptions]"
             v-model:visible="visible"
             :options="detailedOptions"
             :multi-select="props.multiSelect"
@@ -54,7 +70,7 @@
             :zIndex="zIndexAssigne"
             @selected="selectFun"
             @itemClicked="selectFun"
-            @removed="$emit('removed', $event)"
+            @removed="removeFun"
         />
     </div>
 </template>
@@ -91,7 +107,10 @@ defineComponent({
     }
 })
 
-const emit = defineEmits(["selected", "removed"])
+// Agents get their OWN events. A parent that has not opted in cannot receive them,
+// and a parent that has cannot mistake an agent for a user — which matters because
+// `selected` feeds straight into AssigneeUserId at most call sites.
+const emit = defineEmits(["selected", "removed", "agentSelected", "agentRemoved"])
 
 // PROPS
 const props = defineProps({
@@ -142,6 +161,26 @@ const props = defineProps({
     tourId: {
         type: String,
         default: ''
+    },
+    // ── automation agents ──────────────────────────────────────────────
+    // Off by default, and that default is the safety guarantee: this component
+    // has 27 call sites (tasks, subtasks, checklists, projects, sprints, teams,
+    // channels). Only the ones that opt in can show or emit an agent, so the
+    // other 26 are unaffected by construction rather than by inspection.
+    enableAgents: {
+        type: Boolean,
+        default: false
+    },
+    // Agents that apply here, from GET /api/v1/agents/available. The parent
+    // fetches them, because only it knows which entity is being looked at.
+    agents: {
+        type: Array,
+        default: () => []
+    },
+    // Ids of the agents currently attached — the task's assignedAgentIds.
+    selectedAgents: {
+        type: Array,
+        default: () => []
     }
 })
 
@@ -195,8 +234,61 @@ const unselectedUser = computed(() => {
     return props.options.filter(user => !props.users.includes(user));
 })
 
+// Agent ids live in a different namespace from user ids, so they are routed before
+// the user path is even considered — an agent must never reach `selected`.
+const agentIdSet = computed(() => new Set((props.selectedAgents || []).map((x) => String(x))));
+
+const attachedAgents = computed(() => {
+    if (!props.enableAgents) return [];
+    return (props.agents || []).filter((a) => a && agentIdSet.value.has(String(a._id)));
+});
+
+// Shape the attached agents the way Select expects, so they render as ticked.
+const attachedAgentOptions = computed(() => attachedAgents.value.map((a) => ({
+    value: String(a._id),
+    id: String(a._id),
+    label: `${a.emoji || '🤖'} ${a.name}`,
+    image: '',
+    type: 'agent'
+})));
+
+// Agents shaped like the entries the avatar stack already renders, so they queue WITH
+// people rather than hanging off the end of the row. `type: 'agent'` is what tells a row
+// to draw the emoji chip instead of a UserProfile.
+const agentStackEntries = computed(() => attachedAgents.value.map((a) => ({
+    _id: String(a._id),
+    id: String(a._id),
+    name: a.name,
+    title: a.name,
+    emoji: a.emoji || '🤖',
+    image: '',
+    type: 'agent',
+})));
+
+// One queue: people first, then agents. The +N overflow now counts both, so ten agents
+// collapse into the dropdown exactly as ten people would instead of stretching the row.
+// `detailedUsers` is deliberately left alone — the sidebar, the N/A case and the add-user
+// button all key off it, and widening it there would change behaviour well beyond this row.
+const stackEntries = computed(() => [...detailedUsers.value, ...agentStackEntries.value]);
+
 function selectFun(event) {
+    if (props.enableAgents && event?.type === 'agent') {
+        agentIdSet.value.has(String(event.id)) ? emit('agentRemoved', event) : emit('agentSelected', event)
+        return
+    }
     selectedUser.value.includes(event.id) ? emit('removed', event) : emit('selected', event)
+}
+
+// The sidebar's explicit × emits `removed` directly rather than going through selectFun,
+// so it needs the same agent routing. Forwarding it straight to `removed` sent an agent
+// id down the user path: the parent tried to unassign a user that does not exist, said
+// "Assignee removed successfully", and the agent stayed put.
+function removeFun(event) {
+    if (props.enableAgents && event?.type === 'agent') {
+        emit('agentRemoved', event)
+        return
+    }
+    emit('removed', event)
 }
 // Temporary team assign hide
 // const teams = computed(() => {
@@ -227,6 +319,25 @@ const detailedOptions = computed(() => {
         // Temporary team assign hide
         // res[isDisplayTeam.value ? 1: 0].options.push(x);
     })
+
+    // Agents as their own group, the way ClickUp does it — never merged into the
+    // people list, so nothing that reads "assignees" starts seeing non-people.
+    if (props.enableAgents && (props.agents || []).length) {
+        res.push({
+            label: t('Agents.assignee_group'),
+            options: (props.agents || []).map((a) => ({
+                id: String(a._id),
+                value: String(a._id),
+                // The emoji carries the distinction in the row itself, so it reads
+                // as an agent even when the group heading has scrolled away.
+                label: `${a.emoji || '🤖'} ${a.name}`,
+                image: '',
+                designation: '',
+                type: 'agent'
+            }))
+        })
+    }
+
     // Temporary team assign hide
     // if (isDisplayTeam.value) {
     //     res[0].options = teams.value.filter((tf) => unselectedUser.value.indexOf('tId_'+tf._id) !== -1 || selectedUser.value.indexOf('tId_'+tf._id) !== -1).map((tRow) => ({
@@ -285,5 +396,19 @@ function openSidebar () {
 }
 .add__user{
     min-width: 25px;
+}
+/* An attached agent, shown as its emoji. Dashed border so it reads as a different
+   kind of thing from a person's avatar without needing a colour to carry it. */
+.assignee__agent{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 25px;
+    border-radius: 50%;
+    background: #EEF0FE;
+    border: 1px dashed #A9B2EE;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
 }
 </style>

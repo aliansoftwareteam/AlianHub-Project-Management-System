@@ -7,6 +7,23 @@
     min-width: 30px;
 }
 
+/* An agent's stand-in for an avatar. Same dashed-circle treatment as the assignee
+   stack (.assignee__agent), sized to the 30px this row reserves, so an agent reads
+   as an agent wherever it turns up. */
+.activity__agent {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    flex: none;
+    border-radius: 50%;
+    background: #EEF0FE;
+    border: 1px dashed #A9B2EE;
+    font-size: 14px;
+    line-height: 1;
+}
+
 @media (max-width:991px){
     .wrapperNameImage span {
         font-size: 13px!important; 

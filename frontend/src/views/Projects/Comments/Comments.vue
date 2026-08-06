@@ -79,6 +79,21 @@
                         @pin="pinMessage(data)"
                         @markUnread="updateCount(true, messages.length - index), resetUnread = false"
                     />
+
+                    <!-- An @-mentioned agent is running server-side. Shown until its
+                         reply arrives, or until the timeout, so a few seconds of
+                         silence does not read as a failure. -->
+                    <div
+                        v-for="agent in thinkingAgents"
+                        :key="'thinking_' + agent.id"
+                        class="d-flex align-items-center mt-1 agent__thinking"
+                    >
+                        <span class="agent__thinking-avatar mr-10px">{{ agent.emoji }}</span>
+                        <span class="agent__thinking-text">
+                            {{ agent.name }} {{ $t('Agents.is_working') }}
+                            <span class="agent__dots"><i></i><i></i><i></i></span>
+                        </span>
+                    </div>
                 </div>
             </template>
         </div>
@@ -113,6 +128,7 @@
                                 @cancel-reply="message.reply = {}"
                                 :showAll="mainChat && !projectData?.default"
                                 :userIds="users.map((x) => x.id)"
+                                :agents="mentionableAgents"
                                 @enter="mediaFiles.length ? sendMedia() : sendMessageFun(message)"
                                 :sendMessageAllowed="messageAllowed"
                                 @pasteFile="checkMedia"
@@ -439,6 +455,93 @@ const messageLimit = ref(25);
 const snapshotListener = ref(null);
 const initalUser = ref(null);
 const users = ref([]);
+
+// ── @-mentionable agents ───────────────────────────────────────────────────
+// Only on a task, and only agents whose scope actually covers it — the server
+// walks task → sprint → folder → project → company to decide. Project comments
+// and main chat pass nothing, so their mention list is unchanged.
+const mentionableAgents = ref([]);
+
+const loadMentionableAgents = async () => {
+    if (!props.taskId || props.mainChat) { mentionableAgents.value = []; return; }
+    const taskId = String(props.taskId);
+    try {
+        const res = await apiRequest('get', `${env.AGENTS}/available?entityType=task&entityId=${taskId}`);
+        // Drop a late reply for a task we have already left.
+        if (String(props.taskId) !== taskId) return;
+        mentionableAgents.value = (res?.data?.status && res.data.data?.agents) || [];
+    } catch (error) {
+        // Mentioning an agent is an extra; never let it break the comment box.
+        mentionableAgents.value = [];
+        console.error('Could not load mentionable agents', error);
+    }
+};
+
+watch(() => props.taskId, () => loadMentionableAgents(), { immediate: true });
+
+// ── "agent is working" indicator ───────────────────────────────────────────
+// The agent runs server-side AFTER the comment is saved, so there is a gap of a
+// few seconds where the thread looks like nothing happened. This fills it.
+//
+// Client-side and optimistic on purpose: it needs no new socket event, so it
+// cannot affect the comment stream or anyone else's session. The trade-off is
+// that it is visible only to the person who mentioned the agent.
+const thinkingAgents = ref([]);
+const thinkingTimers = new Map();
+
+// Must outlast the server's own model timeout (AGENT_LLM_TIMEOUT_MS, 180s by
+// default) or the indicator would give up while the agent is still thinking and
+// the reply would arrive to an empty thread. The upper bound still matters: a run
+// can legitimately end without a comment — refused by a guard, or the model had
+// nothing to add on an automatic trigger — so this must not spin forever.
+const THINKING_TIMEOUT_MS = 200000;
+
+const clearThinking = (agentId) => {
+    const id = String(agentId);
+    const timer = thinkingTimers.get(id);
+    if (timer) { clearTimeout(timer); thinkingTimers.delete(id); }
+    thinkingAgents.value = thinkingAgents.value.filter((a) => a.id !== id);
+};
+
+const hasTrigger = (agent, type) => ((agent && agent.triggers) || []).some((t) => t && t.type === type);
+
+/**
+ * Show the indicator for whichever agents this comment will actually wake.
+ *
+ * Mirrors the server's rule in Modules/Agents/commentHook.js exactly: an agent runs
+ * when it is NAMED and its mention trigger is on. Nothing else — being attached to
+ * the task does not make it answer a comment that did not ask it to. Showing it for
+ * an agent that will not run is as misleading as showing nothing for one that will.
+ */
+const markAgentsThinking = (mentionedIds) => {
+    const woken = new Map();
+
+    (mentionedIds || []).forEach((raw) => {
+        const id = String(raw);
+        const agent = mentionableAgents.value.find((a) => String(a._id) === id);
+        // Only agents — a mentioned person is not going to reply on a timer.
+        if (agent && hasTrigger(agent, 'mention')) woken.set(id, agent);
+    });
+
+    woken.forEach((agent, id) => {
+        // Waking one that is already working restarts its timeout rather than
+        // stacking a second row for the same agent.
+        clearThinking(id);
+        thinkingAgents.value = [...thinkingAgents.value, { id, name: agent.name, emoji: agent.emoji || '🤖' }];
+        thinkingTimers.set(id, setTimeout(() => clearThinking(id), THINKING_TIMEOUT_MS));
+    });
+};
+
+// Stop as soon as the agent actually speaks.
+const clearThinkingFor = (comment) => {
+    if (comment && comment.agentId) clearThinking(comment.agentId);
+};
+
+onBeforeUnmount(() => {
+    // Timers outlive the component otherwise, and fire against a dead ref.
+    thinkingTimers.forEach((t) => clearTimeout(t));
+    thinkingTimers.clear();
+});
 const unreadMessages = ref(0);
 let debounceTimeout;
 const countGetter = computed(() => {
@@ -651,6 +754,12 @@ function tabSyncDataGet () {
             const url = `${env.API_COMMENTS}/get-paginated-messages?projectId=${projectData.value._id}&taskId=${props.taskId}&sprintId=${props.sprintId}&isDefault=${projectData.value?.default}&mainChat=${props.mainChat}&skipValue=${0}&batchLimit=${messageLimit.value}&tabLeaveTime=${tabLeaveTime}`;
             apiRequest("get", url).then((response) => {
                 response.data.data.forEach((docData)=> {
+                    // This resync path (tab regained focus) pushes straight into
+                    // `messages` instead of going through upsertIncomingComment, so
+                    // it needs the same clear — otherwise mentioning an agent,
+                    // switching tabs and returning leaves the indicator spinning
+                    // until its timeout even though the reply is on screen.
+                    clearThinkingFor(docData);
                     let index = messages.value.findIndex((x) => x._id === docData._id);
                     if(index > -1) {
                         messages.value[index] = {...docData, sent: docData.userId === userId.value};
@@ -1299,6 +1408,10 @@ function shouldShowDateDivider(obj) {
 function upsertIncomingComment(docData, {replaceSending = false, incrementTotal = false} = {}) {
     if(!docData) return false;
 
+    // Every incoming comment funnels through here, so it is the one place that
+    // needs to stop the "working" indicator when the agent finally replies.
+    clearThinkingFor(docData);
+
     const obj = decorateIncomingMessage(docData);
     const existingIndex = findMessageIndexById(obj);
     if(existingIndex > -1) {
@@ -1696,10 +1809,24 @@ function checkMentions(message){
         tmpMentions.forEach((data) => {
             let id = data.split("(")[1].replace(")", "");
             let msgName = data.split("(")[0].replace("[", "").replace("]", "");
-            const user = id === "everyone" ? {id, name: "All"} : users.value.filter((x) => x.id === id)[0];
-            if(`@${user.name}` === msgName) {
-                mentions.push(user.id)
-                msg = msg.replace(data, `@[${user.name}](${user.id})`);
+
+            // Resolve against people, then agents. An agent is mentioned with the
+            // same @[Name](id) token as a person, so both have to be looked up here.
+            let target = id === "everyone" ? {id, name: "All"} : users.value.find((x) => x.id === id);
+            if(!target) {
+                const agent = mentionableAgents.value.find((a) => String(a._id) === id);
+                if(agent) target = {id, name: agent.name};
+            }
+
+            // An id that resolves to nothing must be skipped, not dereferenced.
+            // This used to read .name off undefined, and because it runs inside the
+            // send promise chain the throw silently aborted the whole post — the
+            // comment simply never appeared.
+            if(!target) return;
+
+            if(`@${target.name}` === msgName) {
+                mentions.push(target.id)
+                msg = msg.replace(data, `@[${target.name}](${target.id})`);
             }
         })
     }
@@ -2065,11 +2192,15 @@ async function sendMessageFun(messageData,isReset = true) {
                         if(mentions.includes("everyone")) {
                             messageObj.mentionIds = users.value
                                 ?.filter((user) => !user.ghostUser && user.id !== messageData.userId)
-                                .map((x) => x.id); 
+                                .map((x) => x.id);
                         } else {
                             messageObj.mentionIds = mentions;
                         }
                         messageObj.message = msg;
+                        // Inside the mentions branch: an agent only runs when it is
+                        // named, so a comment without mentions wakes nothing and
+                        // must not show an indicator.
+                        markAgentsThinking(mentions);
                     }
                 }
 
@@ -2402,5 +2533,52 @@ const closePreviewer = () => {
 
 .commments__component-wrapper{
     height: 100%;
+}
+
+/* "Agent is working" row. Dashed ring matches the assignee chip, the mention
+   row and the agent comment avatar, so one visual language means "agent". */
+.agent__thinking {
+    padding-left: 2px;
+}
+.agent__thinking-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    flex: none;
+    border-radius: 50%;
+    background: #EEF0FE;
+    border: 1px dashed #A9B2EE;
+    font-size: 14px;
+    line-height: 1;
+}
+.agent__thinking-text {
+    font-size: 12.5px;
+    color: #8A909C;
+    font-style: italic;
+}
+.agent__dots {
+    display: inline-flex;
+    gap: 3px;
+    margin-left: 3px;
+    vertical-align: middle;
+}
+.agent__dots i {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #A9B2EE;
+    animation: agentDot 1.1s infinite ease-in-out;
+}
+.agent__dots i:nth-child(2) { animation-delay: 0.18s; }
+.agent__dots i:nth-child(3) { animation-delay: 0.36s; }
+@keyframes agentDot {
+    0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
+    40%           { opacity: 1;    transform: translateY(-2px); }
+}
+/* Still legible without the animation — the row itself carries the message. */
+@media (prefers-reduced-motion: reduce) {
+    .agent__dots i { animation: none; opacity: 0.6; }
 }
 </style>

@@ -11,7 +11,12 @@
                         @mouseover="selectedUserIndex = index"
                         @click="addMention(data)"
                     >
+                        <!-- An agent has no user record, so getUser-based avatars
+                             cannot resolve it — its emoji stands in, and the tag
+                             makes clear this is not a person. -->
+                        <span v-if="data.isAgent" class="mention__agent-avatar mr-10px">{{ data.emoji }}</span>
                         <UserProfile
+                            v-else
                             :showDot="false"
                             class="user__profile cursor-pointer mr-10px"
                             :data="{
@@ -23,6 +28,7 @@
                             :thumbnail="'30x30'"
                         />
                         <span>{{data.name}}</span>
+                        <span v-if="data.isAgent" class="mention__agent-tag ml-5px">{{ $t('Agents.agent_tag') }}</span>
                     </li>
                 </template>
                 <template v-else>
@@ -110,6 +116,13 @@ const props = defineProps({
         type: Array,
         default: () => []
     },
+    // Automation agents that can be @-mentioned here. Empty by default, so the
+    // project-comment and main-chat uses of this input are unchanged; only the
+    // task comment view passes any. Each is { _id, name, emoji }.
+    agents: {
+        type: Array,
+        default: () => []
+    },
     showAll: {
         type: Boolean,
         default: false
@@ -137,8 +150,20 @@ const selectionIndex = ref(0);
 const mentionSearch = ref("");
 const users = ref([]);
 
-onMounted(() => {
-    users.value = props.userIds?.map((x) => {
+/**
+ * Build the @-mention list: people, then agents.
+ *
+ * Agents are appended, never merged into the people, and carry `isAgent` so the
+ * row renders as an agent. `key` is the agent's own id, which is what addMention
+ * writes into the [Name](id) token — an agent id is a 24-hex ObjectId exactly like
+ * a user id, so the token format needs no change and the server tells them apart
+ * by looking the id up.
+ *
+ * One function for both the mount and the watch: these were two copies of the same
+ * mapping, and a third would have been one more place for them to drift.
+ */
+function buildUsers() {
+    const people = (props.userIds || []).map((x) => {
         const user = getUser(x);
         return {
             name: user.Employee_Name,
@@ -146,7 +171,31 @@ onMounted(() => {
             key: user.id,
             ghost: user.ghostUser
         }
-    })
+    });
+
+    const agents = (props.agents || []).map((a) => ({
+        name: a.name,
+        image: '',
+        key: String(a._id),
+        ghost: false,
+        isAgent: true,
+        emoji: a.emoji || '🤖'
+    }));
+
+    users.value = [...people, ...agents];
+
+    if (props.showAll) {
+        users.value.unshift({
+            name: "All",
+            image: defaultProfile.value,
+            key: "everyone",
+            ghost: false
+        })
+    }
+}
+
+onMounted(() => {
+    buildUsers();
 
     // nextTick(() => {
     //     autoResize()
@@ -161,25 +210,9 @@ watch(()=> props.loadingChat, (val) => {
     }
 });
 
-watch(()=> props.userIds, (val) => {
-    users.value = val.map((x) => {
-        const user = getUser(x);
-        return {
-            name: user.Employee_Name,
-            image: user.Employee_profileImageURL,
-            key: user.id,
-            ghost: user.ghostUser
-        }
-    })
-    if(props.showAll) {
-        users.value.unshift({
-            name: "All",
-            image: defaultProfile.value,
-            key: "everyone",
-            ghost: false
-        })
-    }
-})
+// Rebuild when either source changes: agents arrive from an async fetch, so they
+// almost always land after the first render.
+watch(() => [props.userIds, props.agents], () => buildUsers(), { deep: true })
 
 const filteredUsers = computed(() => {
     return users.value.filter((x) => !x.ghost && x.name.replaceAll(" ", "").toLowerCase().includes(mentionSearch.value.toLowerCase()))
@@ -352,4 +385,30 @@ function handlePaste(e) {
 
 <style>
 @import './style.css';
+
+/* Agent rows in the @-mention list. Dashed ring, matching the assignee chip and
+   the agent comment avatar, so the same visual means the same thing everywhere. */
+.mention__agent-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    flex: none;
+    border-radius: 50%;
+    background: #EEF0FE;
+    border: 1px dashed #A9B2EE;
+    font-size: 14px;
+    line-height: 1;
+}
+.mention__agent-tag {
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: #EEF0FE;
+    color: #6473E8;
+    font-size: 9.5px;
+    font-weight: 650;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
 </style>
