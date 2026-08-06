@@ -31,4 +31,8 @@ exports.init = (app) => {
     app.post('/api/v1/dashboard/my-leave', ctrl.getMyLeave);
     app.post('/api/v1/dashboard/my-due-soon', ctrl.getMyDueSoon);
     app.post('/api/v1/dashboard/my-time', ctrl.getMyTime);
+    // TaskStatusSummaryCard — task counts per status for the window, plus the task rows
+    // behind one status. Owner/Admin see the company; everyone else sees their own work
+    // (resolved server-side from company_users, not from the body).
+    app.post('/api/v1/dashboard/tasks-by-status', ctrl.getTasksByStatus);
 }

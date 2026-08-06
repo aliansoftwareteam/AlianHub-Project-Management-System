@@ -7,6 +7,7 @@ const logger = require("../../Config/loggerConfig");
 const dashboardTemplate = require("../../utils/dashboardTemplate.json");
 const cardComponent = require("../../utils/cardComponent.json");
 const { getUsdRates, toUsd } = require("../../utils/currencyRates");
+const { escapeRegex } = require("../../utils/escapeRegex");
 const { fetchRules } = require("../settings/securityPermissions/controller");
 const {
     getDayOrRangeBounds,
@@ -964,14 +965,36 @@ exports.getMilestoneSummary = async (req, res) => {
             const projects = await MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.PROJECTS,
                 data: [
-                    { _id: { $in: projectIds } },
-                    { ProjectName: 1, ProjectCurrency: 1 },
+                    // deletedStatusKey 1 is a DELETED project. Excluded here, which drops
+                    // its milestones from the card entirely (see liveProject below).
+                    //
+                    // They were being listed as ordinary rows, with a name and a working
+                    // -looking link — but the project list endpoint excludes deleted
+                    // projects, so clicking one landed on whatever project happened to be
+                    // first and rewrote the URL to match. They were also counted as
+                    // receivable, which a deleted project's milestone is not.
+                    { _id: { $in: projectIds }, deletedStatusKey: { $ne: 1 } },
+                    { ProjectName: 1, ProjectCurrency: 1, statusType: 1 },
                 ],
             }, "find").catch(() => []);
             (projects || []).forEach((p) => {
-                projectsMap[String(p._id)] = { name: p.ProjectName || "", currency: p.ProjectCurrency || "" };
+                projectsMap[String(p._id)] = {
+                    name: p.ProjectName || "",
+                    currency: p.ProjectCurrency || "",
+                    // A closed project is FINISHED, not PAID: of 493 milestones on closed
+                    // projects here, 261 are still unpaid. They stay in every figure — a
+                    // receivable that is hidden is a receivable nobody chases — but the row
+                    // says so, because "why is a finished project in my inbox" is the first
+                    // question it otherwise raises.
+                    closed: String(p.statusType || "") === "close",
+                };
             });
         }
+
+        // A milestone counts only while its parent project is still live. A project that
+        // was deleted (or an id that resolves to nothing at all) takes its milestones with
+        // it — out of the totals, out of the status bars, out of the timeline.
+        const liveProject = (m) => Object.prototype.hasOwnProperty.call(projectsMap, String(m.projectId));
 
         // ProjectCurrency is stored as a currency OBJECT ({ symbol, code, name,
         // … }); we need its ISO code to convert the amount to USD. A legacy
@@ -1015,7 +1038,10 @@ exports.getMilestoneSummary = async (req, res) => {
         let allTimeUsd = 0;          // consolidated USD across every milestone (footer)
         const due = { receivableUsd: 0, receivedUsd: 0, outstandingUsd: 0, receivableCount: 0, receivedCount: 0 };
 
+        let liveCount = 0;
         milestones.forEach((m) => {
+            if (!liveProject(m)) return;
+            liveCount += 1;
             const usd = usdOf(m);
             allTimeUsd += usd;        // all-time total spans every milestone
             if (!inRange(m)) return;  // status bars, receivable & recent are period-scoped
@@ -1049,7 +1075,7 @@ exports.getMilestoneSummary = async (req, res) => {
         // past → today → upcoming rather than always truncating the future away.
         const nowMs = Date.now();
         const dueOf = (m) => Number(m.dueDate) || 0;
-        const inScope = milestones.filter((m) => inRange(m) && matchStatus(m));
+        const inScope = milestones.filter((m) => liveProject(m) && inRange(m) && matchStatus(m));
         const future = inScope.filter((m) => dueOf(m) > nowMs).sort((a, b) => dueOf(a) - dueOf(b));   // nearest upcoming first
         const pastNow = inScope.filter((m) => dueOf(m) <= nowMs).sort((a, b) => dueOf(b) - dueOf(a)); // nearest recent-past first
         let futurePick = future.slice(0, Math.ceil(RECENT_LIMIT / 2));
@@ -1064,6 +1090,7 @@ exports.getMilestoneSummary = async (req, res) => {
                 return {
                     projectId: String(m.projectId || ""),
                     projectName: proj.name || "",
+                    projectClosed: !!proj.closed,
                     milestoneName: m.milestoneName || "",
                     amountUsd: usdOf(m),
                     status: m.statusId || "",
@@ -1075,12 +1102,12 @@ exports.getMilestoneSummary = async (req, res) => {
         const data = {
             currency: "USD",
             due,
-            allTime: { totalUsd: allTimeUsd, count: milestones.length },
+            allTime: { totalUsd: allTimeUsd, count: liveCount },
             byStatus: Object.keys(statusAgg)
                 .map((status) => ({ status, count: statusAgg[status].count }))
                 .sort((a, b) => b.count - a.count),
             recent,
-            totalCount: milestones.filter((m) => inRange(m) && matchStatus(m)).length,
+            totalCount: inScope.length,
             period,
             ratesLive,
         };
@@ -2357,6 +2384,203 @@ exports.getMyTime = async (req, res) => {
         return res.status(500).json({
             status: false,
             message: "An error occurred while building my-time.",
+            error: error && error.message ? error.message : String(error),
+        });
+    }
+};
+
+/**
+ * TaskStatusSummaryCard — how many tasks sit in each status for the selected window,
+ * with a per-status drill-down.
+ *
+ * SCOPE. Owner/Admin (roleType 1/2) see the whole company; everyone else sees only the
+ * tasks assigned to them. The role is resolved from company_users via req.uid, never
+ * from the body — a role the caller can name is a role the caller can grant themselves.
+ *
+ * WINDOW. A task belongs to the window when its DUE DATE falls inside it. Nothing else:
+ * not when it was created, not when it was last touched, and not when it merely runs
+ * through the period. "Today" means due today.
+ *
+ * An overlap rule was tried first and reads wrong from the outside — filtering to Today
+ * and getting back a task due on the 31st looks like the filter is broken, whatever the
+ * reasoning. A task with no due date therefore never appears, in any period.
+ *
+ * Body: { dateFrom, dateTo,
+ *         statusKeys?: number[]  - restrict the boxes to the ones the card shows
+ *         statusKey?:  number    - drill down: also return that status's task rows
+ *         projectId?, projectMode?, taskMatch?, limit? }
+ *
+ * Returns: { statuses: [{ statusKey, count }], total, rows: [...], scope, period }
+ *   `scope` is "company" or "self", so the card can say whose numbers these are.
+ */
+exports.getTasksByStatus = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        if (!companyId) {
+            return res.status(400).json({ status: false, message: "companyId header required" });
+        }
+        const uid = String(req.uid || "");
+        const empty = { statuses: [], total: 0, rows: [], scope: "self", period: null };
+        if (!uid) return res.status(200).json({ status: true, data: empty });
+
+        const body = req.body || {};
+        const { dateFrom, dateTo } = getDayOrRangeBounds(body);
+
+        const callerRoleType = await resolveCallerRoleType(companyId, uid);
+        const isManagement = callerRoleType === 1 || callerRoleType === 2;
+
+        // Which statuses the card is showing. Empty means every status, so a freshly
+        // added card is useful before anyone opens its settings.
+        const statusKeys = (Array.isArray(body.statusKeys) ? body.statusKeys : [])
+            .map(Number).filter((n) => Number.isFinite(n));
+
+        const projClause = projectScopeClause(body.projectMode || "all", body.projectId);
+
+        const baseFilter = applyTaskMatch({
+            deletedStatusKey: 0,
+            mainChat: { $ne: true }, // chat threads are stored as tasks; they are not work
+            // Due date inside the window - see WINDOW above.
+            DueDate: { $gte: dateFrom, $lte: dateTo },
+            ...(statusKeys.length ? { statusKey: { $in: statusKeys } } : {}),
+            ...(projClause ? { ProjectID: projClause } : {}),
+            // A member sees their own work only: assigned to them, not merely led or
+            // created by them - the same line getMyAchievements draws.
+            ...(isManagement ? {} : { AssigneeUserId: uid }),
+        }, bodyTaskMatch(body));
+
+        // Counts come from a $group rather than by fetching every task: the boxes need a
+        // number, and a company-wide window can hold thousands of rows.
+        const grouped = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS,
+            data: [[
+                { $match: baseFilter },
+                { $group: { _id: "$statusKey", n: { $sum: 1 } } },
+                { $sort: { n: -1 } },
+            ]],
+        }, "aggregate").catch((e) => {
+            logger.error(`getTasksByStatus count failed: ${e && e.message ? e.message : e}`);
+            return [];
+        });
+
+        const statuses = (grouped || [])
+            .filter((g) => g && g._id !== null && g._id !== undefined)
+            .map((g) => ({ statusKey: Number(g._id), count: Number(g.n) || 0 }));
+        const total = statuses.reduce((a, s) => a + s.count, 0);
+
+        // Drill-down: only when a box was clicked. Everything above is one cheap
+        // aggregation; the rows below are the expensive part, so they are never built
+        // speculatively.
+        let rows = [];
+        const drillKey = Number(body.statusKey);
+        if (Number.isFinite(drillKey)) {
+            const limit = Number(body.limit) > 0 ? Math.min(Number(body.limit), 200) : 50;
+            const drillFilter = { ...baseFilter, statusKey: drillKey };
+
+            // Search runs HERE, in the query, not over the page that was already fetched:
+            // the list is capped, so filtering the fetched rows would search 50 of 51 and
+            // quietly miss the rest. The boxes above keep their true totals — a search
+            // narrows the list you opened, it does not restate the counts.
+            const search = String(body.search || "").trim();
+            if (search) {
+                const rx = new RegExp(escapeRegex(search), "i");
+                // Assignee names live on the user, not the task, so a name search has to
+                // resolve to ids first.
+                const matchedUsers = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
+                    type: SCHEMA_TYPE.USERS,
+                    data: [
+                        { $or: [{ Employee_Name: rx }, { Employee_FName: rx }, { Employee_LName: rx }] },
+                        { _id: 1 },
+                    ],
+                }, "find").catch(() => []);
+                const matchedIds = (matchedUsers || []).map((u) => String(u._id));
+
+                // Task NAME and employee name only. TaskKey is deliberately not searched:
+                // the key embeds the project's prefix, so "bharat" matched
+                // BHARATVEDIKA-168 - a task whose name and assignee contain no such word.
+                // One project's prefix would quietly pull in every task it owns.
+                const searchOr = [{ TaskName: rx }];
+                if (matchedIds.length) searchOr.push({ AssigneeUserId: { $in: matchedIds } });
+
+                // Under $and, not as a bare $or key: applyTaskMatch may already have put an
+                // $or on the filter from the caller's own match, and a second $or key would
+                // silently replace it rather than combine with it.
+                const existingOr = drillFilter.$or;
+                delete drillFilter.$or;
+                drillFilter.$and = (drillFilter.$and || []).concat(
+                    existingOr ? [{ $or: existingOr }] : [],
+                    [{ $or: searchOr }],
+                );
+            }
+
+            const tasks = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.TASKS,
+                data: [
+                    drillFilter,
+                    { TaskName: 1, TaskKey: 1, AssigneeUserId: 1, totalEstimatedTime: 1, DueDate: 1, ProjectID: 1, sprintArray: 1 },
+                    { sort: { DueDate: 1 }, limit },
+                ],
+            }, "find").catch((e) => {
+                logger.error(`getTasksByStatus drill failed: ${e && e.message ? e.message : e}`);
+                return [];
+            });
+
+            // Logged is every worklog on the task, by anyone - the same basis the estimate
+            // is set against (totalEstimatedTime is the task's, not per-assignee), so the
+            // two columns compare like for like.
+            const taskIds = (tasks || []).map((t) => String(t._id));
+            const loggedByTask = {};
+            if (taskIds.length) {
+                const tlogs = await MongoDbCrudOpration(companyId, {
+                    type: SCHEMA_TYPE.TIMESHEET,
+                    data: [{ TicketID: { $in: taskIds } }, { TicketID: 1, LogTimeDuration: 1 }],
+                }, "find").catch(() => []);
+                (tlogs || []).forEach((ts) => {
+                    if (!ts.TicketID) return;
+                    const k = String(ts.TicketID);
+                    loggedByTask[k] = (loggedByTask[k] || 0) + (Number(ts.LogTimeDuration) || 0);
+                });
+            }
+
+            const assigneeIds = [];
+            (tasks || []).forEach((t) => {
+                (Array.isArray(t.AssigneeUserId) ? t.AssigneeUserId : [t.AssigneeUserId])
+                    .filter(Boolean).forEach((id) => assigneeIds.push(String(id)));
+            });
+            const nameMap = await getUserNameMap(assigneeIds).catch(() => ({}));
+
+            rows = (tasks || []).map((t) => {
+                const ids = (Array.isArray(t.AssigneeUserId) ? t.AssigneeUserId : [t.AssigneeUserId])
+                    .filter(Boolean).map(String);
+                return {
+                    taskId: String(t._id),
+                    taskKey: t.TaskKey || "",
+                    taskName: t.TaskName || "",
+                    projectId: String(t.ProjectID || ""),
+                    sprintId: (t.sprintArray && t.sprintArray.id) || "",
+                    // Every assignee, not just the first: a shared task shown against one
+                    // name reads as that person's alone.
+                    assignees: ids.map((id) => ({ id, name: nameMap[id] || "-" })),
+                    estimateMinutes: Number(t.totalEstimatedTime) || 0,
+                    loggedMinutes: loggedByTask[String(t._id)] || 0,
+                };
+            });
+        }
+
+        return res.status(200).json({
+            status: true,
+            data: {
+                statuses,
+                total,
+                rows,
+                scope: isManagement ? "company" : "self",
+                period: { from: dateFrom, to: dateTo },
+            },
+        });
+    } catch (error) {
+        logger.error(`getTasksByStatus error: ${error && error.message ? error.message : error}`);
+        return res.status(500).json({
+            status: false,
+            message: "An error occurred while building the task status summary.",
             error: error && error.message ? error.message : String(error),
         });
     }
