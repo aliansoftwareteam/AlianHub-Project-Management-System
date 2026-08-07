@@ -46,6 +46,10 @@ const verifyJWTTokenWithCRoute = [
     "/api/v1/updateTaskIndexOnload",
     "/api/tasks",
     "/api/v2/tasks",
+    // Wiki pages (Modules/Pages). These were reachable without a token: the prefix was in
+    // neither JWT list, and app.use only guards the prefixes it is given. The handlers now
+    // take the author from req.uid, which this is what sets.
+    "/api/v2/pages",
     "/api/v1/importTasks",
     "/api/v1/wasabi/retriveObject",
     "/api/v1/wasabi/deleteFile",
@@ -226,6 +230,14 @@ const verifyJWTTokenWithCRoute = [
     // the prefix listed here no JWT runs, req.uid is empty, and every request is
     // (correctly) refused as unauthenticated.
     '/api/v1/inbox',
+    // Public-share management (Modules/PublicShares). Creating a share MINTS a
+    // login-free link to company data, so it has to be an authenticated act —
+    // these were in neither list, and app.use only guards the prefixes it is
+    // given. req.uid is also what records who published the link. The public
+    // pages themselves (/share/:token) live outside /api and stay open, which
+    // is the entire point of them.
+    '/api/v2/public-shares',
+    '/api/v2/intake',
 ];
 const verifyJWTToken = [
     "/api/v2/company/delete",

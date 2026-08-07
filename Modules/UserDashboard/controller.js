@@ -7,7 +7,6 @@ const logger = require("../../Config/loggerConfig");
 const dashboardTemplate = require("../../utils/dashboardTemplate.json");
 const cardComponent = require("../../utils/cardComponent.json");
 const { getUsdRates, toUsd } = require("../../utils/currencyRates");
-const { escapeRegex } = require("../../utils/escapeRegex");
 const { fetchRules } = require("../settings/securityPermissions/controller");
 const {
     getDayOrRangeBounds,
@@ -2391,7 +2390,11 @@ exports.getMyTime = async (req, res) => {
 
 /**
  * TaskStatusSummaryCard — how many tasks sit in each status for the selected window,
- * with a per-status drill-down.
+ * broken down per person, with a per-person-per-status drill-down.
+ *
+ * THREE LAYERS. The counters at the top are the totals for the window. The matrix below
+ * splits those totals by assignee. Picking one cell of the matrix lists the tasks behind
+ * that one number.
  *
  * SCOPE. Owner/Admin (roleType 1/2) see the whole company; everyone else sees only the
  * tasks assigned to them. The role is resolved from company_users via req.uid, never
@@ -2406,11 +2409,14 @@ exports.getMyTime = async (req, res) => {
  * reasoning. A task with no due date therefore never appears, in any period.
  *
  * Body: { dateFrom, dateTo,
- *         statusKeys?: number[]  - restrict the boxes to the ones the card shows
+ *         statusKeys?: number[]  - restrict the counters to the ones the card shows
  *         statusKey?:  number    - drill down: also return that status's task rows
+ *         userId?:     string    - ...for this assignee
+ *         unassigned?: boolean   - ...or for the tasks nobody is on
  *         projectId?, projectMode?, taskMatch?, limit? }
  *
- * Returns: { statuses: [{ statusKey, count }], total, rows: [...], scope, period }
+ * Returns: { statuses: [{ statusKey, count }], total, users: [...], usersCapped,
+ *            rows: [...], scope, period }
  *   `scope` is "company" or "self", so the card can say whose numbers these are.
  */
 exports.getTasksByStatus = async (req, res) => {
@@ -2467,8 +2473,56 @@ exports.getTasksByStatus = async (req, res) => {
             .map((g) => ({ statusKey: Number(g._id), count: Number(g.n) || 0 }));
         const total = statuses.reduce((a, s) => a + s.count, 0);
 
-        // Drill-down: only when a box was clicked. Everything above is one cheap
-        // aggregation; the rows below are the expensive part, so they are never built
+        // The per-person matrix: one row per assignee, one number per status.
+        //
+        // AssigneeUserId is an array, so this unwinds it — a task shared by three people
+        // counts once against each of them. That is what "per person" has to mean here
+        // (each of them does have it on their plate), and it is why a column can add up to
+        // more than its counter above.
+        //
+        // preserveNullAndEmptyArrays keeps tasks nobody is on. They are real tasks in the
+        // window and dropping them would leave the matrix quietly short of the counters,
+        // with nothing on screen to say where the difference went.
+        const perUser = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS,
+            data: [[
+                { $match: baseFilter },
+                { $unwind: { path: "$AssigneeUserId", preserveNullAndEmptyArrays: true } },
+                { $group: { _id: { u: "$AssigneeUserId", s: "$statusKey" }, n: { $sum: 1 } } },
+            ]],
+        }, "aggregate").catch((e) => {
+            logger.error(`getTasksByStatus matrix failed: ${e && e.message ? e.message : e}`);
+            return [];
+        });
+
+        const byUser = new Map();   // userId ("" = unassigned) -> { counts, total }
+        (perUser || []).forEach((g) => {
+            const sKey = Number(g && g._id && g._id.s);
+            if (!Number.isFinite(sKey)) return;
+            const key = (g._id && g._id.u) ? String(g._id.u) : "";
+            if (!byUser.has(key)) byUser.set(key, { counts: {}, total: 0 });
+            const rec = byUser.get(key);
+            const n = Number(g.n) || 0;
+            rec.counts[sKey] = (rec.counts[sKey] || 0) + n;
+            rec.total += n;
+        });
+
+        const matrixNames = await getUserNameMap([...byUser.keys()].filter(Boolean)).catch(() => ({}));
+        // Busiest first, so the rows that need attention are the ones you land on.
+        const allUsers = [...byUser.entries()]
+            .map(([id, rec]) => ({
+                userId: id,
+                // "" is the unassigned row; the card supplies its own label for that.
+                name: id ? (matrixNames[id] || "-") : "",
+                counts: rec.counts,
+                total: rec.total,
+            }))
+            .sort((a, b) => b.total - a.total);
+        const USER_LIMIT = 500;
+        const users = allUsers.slice(0, USER_LIMIT);
+
+        // Drill-down: only when a matrix cell was picked. Everything above is two cheap
+        // aggregations; the rows below are the expensive part, so they are never built
         // speculatively.
         let rows = [];
         const drillKey = Number(body.statusKey);
@@ -2476,40 +2530,23 @@ exports.getTasksByStatus = async (req, res) => {
             const limit = Number(body.limit) > 0 ? Math.min(Number(body.limit), 200) : 50;
             const drillFilter = { ...baseFilter, statusKey: drillKey };
 
-            // Search runs HERE, in the query, not over the page that was already fetched:
-            // the list is capped, so filtering the fetched rows would search 50 of 51 and
-            // quietly miss the rest. The boxes above keep their true totals — a search
-            // narrows the list you opened, it does not restate the counts.
-            const search = String(body.search || "").trim();
-            if (search) {
-                const rx = new RegExp(escapeRegex(search), "i");
-                // Assignee names live on the user, not the task, so a name search has to
-                // resolve to ids first.
-                const matchedUsers = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
-                    type: SCHEMA_TYPE.USERS,
-                    data: [
-                        { $or: [{ Employee_Name: rx }, { Employee_FName: rx }, { Employee_LName: rx }] },
-                        { _id: 1 },
+            // Whose row was opened.
+            //
+            // A member may only ever open their own. Writing a caller-supplied id straight
+            // onto the filter would REPLACE the AssigneeUserId clause that scopes them to
+            // their own work — which is exactly how someone would read a colleague's tasks.
+            const wantUnassigned = body.unassigned === true && isManagement;
+            const wantUser = isManagement ? String(body.userId || "") : uid;
+            if (wantUnassigned) {
+                drillFilter.$and = (drillFilter.$and || []).concat([{
+                    $or: [
+                        { AssigneeUserId: { $exists: false } },
+                        { AssigneeUserId: null },
+                        { AssigneeUserId: { $size: 0 } },
                     ],
-                }, "find").catch(() => []);
-                const matchedIds = (matchedUsers || []).map((u) => String(u._id));
-
-                // Task NAME and employee name only. TaskKey is deliberately not searched:
-                // the key embeds the project's prefix, so "bharat" matched
-                // BHARATVEDIKA-168 - a task whose name and assignee contain no such word.
-                // One project's prefix would quietly pull in every task it owns.
-                const searchOr = [{ TaskName: rx }];
-                if (matchedIds.length) searchOr.push({ AssigneeUserId: { $in: matchedIds } });
-
-                // Under $and, not as a bare $or key: applyTaskMatch may already have put an
-                // $or on the filter from the caller's own match, and a second $or key would
-                // silently replace it rather than combine with it.
-                const existingOr = drillFilter.$or;
-                delete drillFilter.$or;
-                drillFilter.$and = (drillFilter.$and || []).concat(
-                    existingOr ? [{ $or: existingOr }] : [],
-                    [{ $or: searchOr }],
-                );
+                }]);
+            } else if (wantUser) {
+                drillFilter.AssigneeUserId = wantUser;
             }
 
             const tasks = await MongoDbCrudOpration(companyId, {
@@ -2571,6 +2608,8 @@ exports.getTasksByStatus = async (req, res) => {
             data: {
                 statuses,
                 total,
+                users,
+                usersCapped: allUsers.length > USER_LIMIT,
                 rows,
                 scope: isManagement ? "company" : "self",
                 period: { from: dateFrom, to: dateTo },

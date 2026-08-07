@@ -730,6 +730,12 @@ const schema = {
         createdBy: { type: String, required: false },
         updatedBy: { type: String, required: false },
         order: { type: Number, required: false },
+        // Tasks this doc is attached to. Held on the DOC, not on the task: one place to
+        // read and write, and a doc knows what it belongs to without a second lookup.
+        // A project link needs no field of its own — ProjectID above already is one.
+        linkedTasks: { type: [mongoose.Schema.Types.ObjectId], required: false, default: [] },
+        // 'project' (anyone who can see the project) or 'private' (only its author).
+        visibility: { type: String, required: false, default: 'project' },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
     pageVersions: {
