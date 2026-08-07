@@ -185,10 +185,12 @@ exports.list = async (req, res) => {
         if (!companyId || !userId) return fail(res, 'companyId and an authenticated user are required.');
 
         const tab = R.normalizeTab(req.query.tab);
+        // Narrows Archive to one kind. Ignored on the tabs that already are one kind.
+        const source = R.normalizeSource(req.query.source);
         const limit = R.normalizeLimit(req.query.limit);
         const skip = R.normalizeSkip(req.query.skip);
         const sort = R.normalizeSort(req.query.sort);
-        const plan = R.planFor(tab);
+        const plan = R.planFor(tab, source);
         const now = new Date();
 
         // Each source is read from the TOP through the end of the requested page, not from
@@ -233,6 +235,7 @@ exports.list = async (req, res) => {
             status: true,
             data: {
                 tab,
+                source,
                 sort,
                 items: page,
                 // Two ways there is more: the merge itself has rows past this page, or a

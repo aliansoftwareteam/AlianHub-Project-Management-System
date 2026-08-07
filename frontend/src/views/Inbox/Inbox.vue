@@ -19,8 +19,21 @@
         <div class="ibx__bar">
             <span class="ibx__hint">{{ $t('Inbox.tab_hint_' + tab) }}</span>
             <div class="ibx__bar-right">
+                <!-- Archive is the one tab holding both kinds at once, so it is the one
+                     that needs narrowing. It also has no "Mark all as read" — those rows
+                     are already read — so this takes that space rather than adding any. -->
+                <div v-if="tab === 'archive'" class="ibx__seg">
+                    <button
+                        v-for="s in SOURCES"
+                        :key="s"
+                        class="ibx__seg-btn"
+                        :class="{ 'is-on': source === s }"
+                        :disabled="busy"
+                        @click="switchSource(s)"
+                    >{{ $t('Inbox.source_' + s) }}</button>
+                </div>
                 <button
-                    v-if="tab !== 'archive'"
+                    v-else
                     class="ibx__chip"
                     :disabled="busy || !hasUnread"
                     @click="markAllRead"
@@ -190,6 +203,8 @@ const { openRoute } = useHelper();
 
 // One tab per thing the user already has, plus All to see them together.
 const TABS = ['all', 'notifications', 'mentions', 'archive'];
+// Archive-only: which kind of row to show. Mirrors SOURCES in Modules/Inbox/helpers.
+const SOURCES = ['all', 'notifications', 'mentions'];
 
 // Only settings that change THIS view. A switch that does nothing visible is worse than
 // no switch, so display modes and importance editors are deliberately absent.
@@ -245,6 +260,7 @@ const resolveTab = (candidate) => {
     return (wanted === 'all' && !prefs.value.showAllTab) ? 'notifications' : wanted;
 };
 const tab = ref(resolveTab(route.query.tab));
+const source = ref(SOURCES.includes(route.query.source) ? route.query.source : 'all');
 const items = ref([]);
 const counts = ref({ all: 0, notifications: 0, mentions: 0, archive: 0 });
 const loading = ref(true);
@@ -318,7 +334,8 @@ const load = async (append = false) => {
     try {
         const skip = append ? nextSkip.value : 0;
         const sort = prefs.value.newestFirst ? 'newest' : 'oldest';
-        const res = await apiRequest('get', `${env.INBOX}?tab=${tab.value}&skip=${skip}&sort=${sort}`);
+        // source is only meaningful on Archive; the server ignores it elsewhere.
+        const res = await apiRequest('get', `${env.INBOX}?tab=${tab.value}&source=${source.value}&skip=${skip}&sort=${sort}`);
         if (!res?.data?.status) {
             // Surface the server's own message: a generic failure is undebuggable.
             loadError.value = res?.data?.statusText || t('Inbox.load_failed');
@@ -385,7 +402,17 @@ watch(liveCounts, (next) => {
 const switchTab = (next) => {
     if (tab.value === next) return;
     tab.value = next;
-    router.replace({ query: { ...route.query, tab: next } }).catch(() => {});
+    // The filter belongs to Archive. Carrying it to a tab that is already one kind would
+    // leave it set but invisible, and it would still be applied on the way back.
+    if (next !== 'archive') source.value = 'all';
+    router.replace({ query: { ...route.query, tab: next, source: source.value } }).catch(() => {});
+    load(false);
+};
+
+const switchSource = (next) => {
+    if (source.value === next) return;
+    source.value = next;
+    router.replace({ query: { ...route.query, source: next } }).catch(() => {});
     load(false);
 };
 
@@ -574,6 +601,26 @@ onUnmounted(() => {
 }
 .ibx__chip:hover:not(:disabled) { background: #F6F7FC; }
 .ibx__chip:disabled { opacity: 0.5; cursor: default; }
+
+/* Archive's source filter. One pill holding three options rather than three loose chips:
+   these are exclusive, and a segmented control says that where separate chips would read
+   as three independent toggles. */
+.ibx__seg {
+    display: inline-flex;
+    padding: 2px;
+    border: 1px solid #DDE0EA; border-radius: 16px;
+    background: #F6F7FC;
+}
+.ibx__seg-btn {
+    border: 0; border-radius: 14px;
+    padding: 4px 12px;
+    background: transparent; color: #6B7280;
+    font-size: 12.5px; cursor: pointer; white-space: nowrap;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+.ibx__seg-btn:hover:not(:disabled):not(.is-on) { color: #2A2C39; }
+.ibx__seg-btn.is-on { background: #fff; color: var(--ibx-primary); font-weight: 600; box-shadow: 0 1px 2px rgba(42, 44, 57, 0.10); }
+.ibx__seg-btn:disabled { opacity: 0.5; cursor: default; }
 .ibx__link { border: 0; background: transparent; padding: 0; color: var(--ibx-primary); font-size: 12.5px; font-weight: 600; cursor: pointer; }
 
 /* ── list ─────────────────────────────────────────────── */

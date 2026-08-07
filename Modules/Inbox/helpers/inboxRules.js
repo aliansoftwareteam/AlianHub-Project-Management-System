@@ -161,6 +161,12 @@ const dateGroupOf = (iso, now = new Date()) => {
 
 const normalizeTab = (tab) => (TABS.includes(String(tab)) ? String(tab) : 'all');
 
+// Archive holds both kinds at once, so it is the one tab that needs narrowing. A separate
+// parameter rather than more tab keys: the tabs decide READ state, this decides SOURCE,
+// and folding the two into one list would mean a key per combination.
+const SOURCES = Object.freeze(['all', 'notifications', 'mentions']);
+const normalizeSource = (source) => (SOURCES.includes(String(source)) ? String(source) : 'all');
+
 const normalizeLimit = (raw) => {
     const n = Number.parseInt(raw, 10);
     if (!Number.isFinite(n) || n <= 0) return PAGE_SIZE;
@@ -172,12 +178,25 @@ const normalizeSkip = (raw) => {
     return (!Number.isFinite(n) || n < 0) ? 0 : n;
 };
 
-/** Which sources a tab reads, and whether it wants read or unread rows. */
-const planFor = (tab) => {
+/**
+ * Which sources a tab reads, and whether it wants read or unread rows.
+ *
+ * `source` narrows a tab that carries both kinds — only Archive does. It is ignored
+ * elsewhere: Notifications and Mentions are already one source each, and narrowing them
+ * further could only ever return nothing.
+ */
+const planFor = (tab, source = 'all') => {
     if (tab === 'notifications') return { notifications: true, mentions: false, read: false };
     if (tab === 'mentions') return { notifications: false, mentions: true, read: false };
     // The bell's archive is its already-read notifications.
-    if (tab === 'archive') return { notifications: true, mentions: true, read: true };
+    if (tab === 'archive') {
+        const want = normalizeSource(source);
+        return {
+            notifications: want !== 'mentions',
+            mentions: want !== 'notifications',
+            read: true,
+        };
+    }
     return { notifications: true, mentions: true, read: false };
 };
 
@@ -194,6 +213,8 @@ module.exports = {
     dedupeKeyOf,
     dateGroupOf,
     normalizeTab,
+    SOURCES,
+    normalizeSource,
     normalizeLimit,
     normalizeSkip,
     planFor,
