@@ -2,92 +2,125 @@
     <div class="tss">
         <CardSkeleton v-if="loading && !loaded" :counters="3" :rows="4" />
         <template v-else>
-            <!-- One box per status the card is configured to show. The box IS the
-                 selector: clicking it opens that status's tasks below. -->
+            <!-- One counter per status the card is configured to show. Read-only: the
+                 breakdown lives in the matrix below, so these stay totals and nothing
+                 else. -->
             <div v-if="!boxes.length" class="tss-msg">{{ $t('dashboardCard.tss_no_status') }}</div>
             <div v-else class="tss-boxes">
-                <button
+                <div
                     v-for="b in boxes"
                     :key="b.statusKey"
-                    type="button"
                     class="tss-box"
-                    :class="{ 'is-active': activeStatus === b.statusKey }"
+                    :class="{ 'is-zero': !b.count }"
                     :style="{ '--tss-accent': b.color }"
-                    :title="$t('dashboardCard.tss_open_status', { status: b.name })"
-                    @click="toggleStatus(b.statusKey)"
                 >
                     <span class="tss-num">{{ b.count }}</span>
-                    <span class="tss-name" :title="b.name">{{ b.name }}</span>
-                </button>
+                    <span class="tss-name" :title="b.name"><i class="tss-dot"></i>{{ b.name }}</span>
+                </div>
             </div>
 
+            <!-- The count of what is on screen and the way to narrow it, on one line —
+                 they are the same question asked twice. Whose numbers these are moved to
+                 the card header, next to the period it covers. -->
             <div class="tss-meta">
-                <span>{{ $t('dashboardCard.tss_total', { n: total }) }}</span>
-                <span class="tss-scope">{{ scopeLabel }}</span>
+                <span class="tss-total">{{ $t('dashboardCard.tss_total', { n: total }) }}</span>
+                <input
+                    v-model="userSearch"
+                    type="search"
+                    class="tss-search"
+                    :placeholder="$t('dashboardCard.tss_search_user_placeholder')"
+                    @mousedown.stop
+                    @keydown.stop
+                />
             </div>
 
-            <!-- The drill-down. Only present once a box is picked, so the card stays a
-                 set of counters until someone asks for the detail behind one. -->
-            <template v-if="activeStatus !== null">
-                <div class="tss-drill-head">
-                    <span class="tss-drill-title">
-                        <span class="tss-dot" :style="{ backgroundColor: activeMeta.color }"></span>
-                        {{ activeMeta.name }}
-                    </span>
-                    <!-- Searches the whole status on the server, not the rows already on
-                         screen — the list is capped, so a client-side filter would search
-                         50 of 51 and look like the task simply is not there. -->
-                    <input
-                        v-model="search"
-                        type="search"
-                        class="tss-search"
-                        :placeholder="$t('dashboardCard.tss_search_placeholder')"
-                        @mousedown.stop
-                        @keydown.stop
-                    />
-                    <button type="button" class="tss-clear" @click="clearStatus">✕</button>
-                </div>
+            <!-- The matrix: who has what, per status. A count opens its tasks in place,
+                 as a row under the person it belongs to — the table stays put, so you can
+                 read one person's list without losing your place in everyone else's. -->
+            <div v-if="!visibleUsers.length" class="tss-msg">
+                {{ userSearch ? $t('dashboardCard.tss_no_user_match', { q: userSearch }) : $t('dashboardCard.tss_no_users') }}
+            </div>
+            <div v-else class="tss-table-wrap">
+                <table class="tss-table tss-matrix">
+                    <thead>
+                        <tr>
+                            <th class="tss-th tss-th--user">{{ $t('dashboardCard.tss_col_user') }}</th>
+                            <th v-for="b in boxes" :key="'h' + b.statusKey" class="tss-th tss-th--num" :title="b.name">
+                                {{ b.name }}
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template v-for="u in visibleUsers" :key="u.userId || 'unassigned'">
+                            <tr class="tss-tr" :class="{ 'is-open': isOpenUser(u) }">
+                                <td class="tss-td tss-td--user" :title="userLabel(u)">{{ userLabel(u) }}</td>
+                                <td
+                                    v-for="b in boxes"
+                                    :key="(u.userId || 'unassigned') + '-' + b.statusKey"
+                                    class="tss-td tss-td--num"
+                                    :class="{ 'tss-cell--link': cellCount(u, b) > 0, 'is-open': isOpenCell(u, b) }"
+                                    :title="cellCount(u, b) > 0 ? $t('dashboardCard.tss_open_cell', { user: userLabel(u), status: b.name }) : ''"
+                                    @click="toggleDrill(u, b)"
+                                    @mousedown.stop
+                                >{{ cellCount(u, b) || '—' }}</td>
+                            </tr>
 
-                <div v-if="drillLoading" class="tss-msg">{{ $t('dashboardCard.tss_loading_tasks') }}</div>
-                <div v-else-if="!rows.length" class="tss-msg">
-                    {{ search ? $t('dashboardCard.tss_no_match', { q: search }) : $t('dashboardCard.tss_no_tasks') }}
-                </div>
-                <div v-else class="tss-table-wrap">
-                    <table class="tss-table">
-                        <thead>
-                            <tr>
-                                <th class="tss-th tss-th--task">{{ $t('dashboardCard.tss_col_task') }}</th>
-                                <th class="tss-th tss-th--who">{{ $t('dashboardCard.tss_col_employee') }}</th>
-                                <th class="tss-th tss-th--num">{{ $t('dashboardCard.tss_col_estimate') }}</th>
-                                <th class="tss-th tss-th--num">{{ $t('dashboardCard.tss_col_logged') }}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="r in rows" :key="r.taskId" class="tss-tr">
-                                <td class="tss-td tss-td--task">
-                                    <span
-                                        class="tss-task"
-                                        :class="{ 'tss-task--link': r.projectId }"
-                                        :title="(r.taskKey ? r.taskKey + ' ' : '') + r.taskName"
-                                        @click="openTaskDetail(r)"
-                                        @mousedown.stop
-                                    >
-                                        <b v-if="r.taskKey" class="tss-key">{{ r.taskKey }}</b> {{ r.taskName }}
-                                    </span>
+                            <!-- The expansion. Spans the whole table so the task list is not
+                                 squeezed into one status column's width. -->
+                            <tr v-if="isOpenUser(u)" class="tss-expand-tr">
+                                <td class="tss-expand" :colspan="boxes.length + 1" :style="{ '--tss-accent': drill.color }">
+                                    <button type="button" class="tss-expand-close" :title="$t('dashboardCard.tss_close_list')" @click="closeDrill">✕</button>
+
+                                    <!-- A cell cannot bound its own height, so the scroll
+                                         belongs to a block inside it. -->
+                                    <div class="tss-expand-inner">
+                                    <div v-if="drillLoading" class="tss-msg">{{ $t('dashboardCard.tss_loading_tasks') }}</div>
+                                    <div v-else-if="!rows.length" class="tss-msg">{{ $t('dashboardCard.tss_no_tasks') }}</div>
+                                    <template v-else>
+                                        <table class="tss-table tss-inner">
+                                            <thead>
+                                                <tr>
+                                                    <th class="tss-th tss-th--task">{{ $t('dashboardCard.tss_col_task') }}</th>
+                                                    <th class="tss-th tss-th--who">{{ $t('dashboardCard.tss_col_employee') }}</th>
+                                                    <th class="tss-th tss-th--num">{{ $t('dashboardCard.tss_col_estimate') }}</th>
+                                                    <th class="tss-th tss-th--num">{{ $t('dashboardCard.tss_col_logged') }}</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr v-for="r in rows" :key="r.taskId" class="tss-tr">
+                                                    <td class="tss-td tss-td--task">
+                                                        <span
+                                                            class="tss-task"
+                                                            :class="{ 'tss-task--link': r.projectId }"
+                                                            :title="(r.taskKey ? r.taskKey + ' ' : '') + r.taskName"
+                                                            @click="openTaskDetail(r)"
+                                                            @mousedown.stop
+                                                        >
+                                                            <b v-if="r.taskKey" class="tss-key">{{ r.taskKey }}</b> {{ r.taskName }}
+                                                        </span>
+                                                    </td>
+                                                    <td class="tss-td tss-td--who" :title="whoTitle(r)">{{ who(r) }}</td>
+                                                    <td class="tss-td tss-td--num">{{ r.estimateMinutes ? formatMinutes(r.estimateMinutes) : '—' }}</td>
+                                                    <td class="tss-td tss-td--num" :class="{ 'tss-over': isOver(r) }">
+                                                        {{ r.loggedMinutes ? formatMinutes(r.loggedMinutes) : '—' }}
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                        <div v-if="rows.length >= ROW_LIMIT" class="tss-capped">
+                                            {{ $t('dashboardCard.tss_capped', { n: ROW_LIMIT }) }}
+                                        </div>
+                                    </template>
+                                    </div>
                                 </td>
-                                <td class="tss-td tss-td--who" :title="whoTitle(r)">{{ who(r) }}</td>
-                                <td class="tss-td tss-td--num">{{ r.estimateMinutes ? formatMinutes(r.estimateMinutes) : '—' }}</td>
-                                <td class="tss-td tss-td--num" :class="{ 'tss-over': isOver(r) }">
-                                    {{ r.loggedMinutes ? formatMinutes(r.loggedMinutes) : '—' }}
-                                </td>
                             </tr>
-                        </tbody>
-                    </table>
-                    <div v-if="rows.length >= ROW_LIMIT" class="tss-capped">
-                        {{ $t('dashboardCard.tss_capped', { n: ROW_LIMIT }) }}
-                    </div>
+                        </template>
+                    </tbody>
+                </table>
+                <div v-if="usersCapped" class="tss-capped">
+                    {{ $t('dashboardCard.tss_users_capped', { n: visibleUsers.length }) }}
                 </div>
-            </template>
+            </div>
         </template>
 
         <!-- Task detail sidebar — same pattern the other cards use. -->
@@ -109,7 +142,7 @@ export default { name: 'TaskStatusSummaryCard' };
 </script>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted, inject, provide } from 'vue';
+import { ref, computed, watch, onMounted, inject, provide } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
@@ -150,12 +183,15 @@ const timerange = computed(() => {
 const counts = ref({});          // statusKey -> count, from the server
 const total = ref(0);
 const scope = ref('self');
+const users = ref([]);           // [{ userId, name, counts, total }] — "" userId = unassigned
+const usersCapped = ref(false);
 const rows = ref([]);
 const loading = ref(false);
 const loaded = ref(false);
 const drillLoading = ref(false);
-const activeStatus = ref(null);
-const search = ref('');
+// Which cell of the matrix is open: { userId, unassigned, statusKey, userName, statusName, color }
+const drill = ref(null);
+const userSearch = ref('');
 
 // The company's status list: { key, name, textColor }. Same shape the pie/bar cards read.
 const statusSettings = computed(() => {
@@ -184,12 +220,30 @@ const boxes = computed(() => selectedKeys.value.map((key) => {
     };
 }));
 
-const activeMeta = computed(() => boxes.value.find((b) => b.statusKey === activeStatus.value)
-    || { name: '', color: '#6473e8' });
-
 const scopeLabel = computed(() => (scope.value === 'company'
     ? t('dashboardCard.tss_scope_company')
     : t('dashboardCard.tss_scope_self')));
+
+// Whose numbers these are belongs in the card header, beside the period they cover — both
+// qualify the same figures. Held back until the first response, or the card would claim
+// "My tasks" for a moment before the server says otherwise.
+const headerBadge = inject('dashboardCardBadge', null);
+watch([loaded, scopeLabel], () => {
+    if (headerBadge) headerBadge.value = loaded.value ? scopeLabel.value : '';
+}, { immediate: true });
+
+// Tasks nobody is assigned to still belong to the window, so they get a row rather than
+// going missing between the counters and the matrix.
+const userLabel = (u) => (u.userId ? (u.name || '-') : t('dashboardCard.tss_unassigned'));
+const cellCount = (u, b) => Number(u.counts && u.counts[b.statusKey]) || 0;
+
+// Searching the rows already in hand, not the server: the matrix is one row per person,
+// which is a list a browser filters instantly and a round-trip only makes slower.
+const visibleUsers = computed(() => {
+    const term = userSearch.value.trim().toLowerCase();
+    if (!term) return users.value;
+    return users.value.filter((u) => userLabel(u).toLowerCase().includes(term));
+});
 
 const who = (r) => (r.assignees && r.assignees.length
     ? r.assignees.map((a) => a.name).join(', ')
@@ -199,41 +253,49 @@ const whoTitle = (r) => (r.assignees && r.assignees.length > 1
     : who(r));
 const isOver = (r) => !!r.estimateMinutes && r.loggedMinutes > r.estimateMinutes;
 
-const requestBody = (statusKey) => {
+const requestBody = () => {
     const { dateFrom, dateTo } = resolveCardRange(timerange.value, globalRange && globalRange.value);
+    const d = drill.value;
     return {
         dateFrom,
         dateTo,
         statusKeys: props.cardData?.statusArray || [],
         projectId: props.cardData?.projectId || [],
         projectMode: props.cardData?.projectMode || 'all',
-        // Search only means anything alongside a drill-down; it narrows the open list,
-        // never the counters.
-        ...(statusKey === null || statusKey === undefined
-            ? {}
-            : { statusKey, limit: ROW_LIMIT, search: search.value.trim() }),
+        // The task rows are only asked for while a cell is open. The counters and the
+        // matrix come back either way, so the card behind the list stays current.
+        ...(d
+            ? {
+                statusKey: d.statusKey,
+                limit: ROW_LIMIT,
+                ...(d.unassigned ? { unassigned: true } : { userId: d.userId }),
+            }
+            : {}),
     };
 };
 
 const load = async () => {
     loading.value = true;
-    // Whichever status was open stays open across a reload, so changing the period does
-    // not silently collapse the detail the user was reading.
-    if (activeStatus.value !== null) drillLoading.value = true;
+    // Whichever cell was open stays open across a reload, so changing the period does not
+    // silently collapse the detail the user was reading.
+    if (drill.value) drillLoading.value = true;
     try {
-        const res = await apiRequest('post', `${env.TASKS_BY_STATUS}`, requestBody(activeStatus.value));
+        const res = await apiRequest('post', `${env.TASKS_BY_STATUS}`, requestBody());
         const d = (res && res.data && res.data.status) ? (res.data.data || {}) : {};
         const map = {};
         (d.statuses || []).forEach((s) => { map[Number(s.statusKey)] = Number(s.count) || 0; });
         counts.value = map;
         total.value = Number(d.total) || 0;
         scope.value = d.scope || 'self';
+        users.value = d.users || [];
+        usersCapped.value = d.usersCapped === true;
         rows.value = d.rows || [];
         loaded.value = true;
     } catch (e) {
         console.error('TaskStatusSummaryCard fetch error:', e);
         counts.value = {};
         total.value = 0;
+        users.value = [];
         rows.value = [];
     } finally {
         loading.value = false;
@@ -241,24 +303,33 @@ const load = async () => {
     }
 };
 
-const toggleStatus = (key) => {
-    activeStatus.value = activeStatus.value === key ? null : key;
-    // A search belongs to the list it was typed into; carrying it into the next status
-    // would show an empty list and no obvious reason why.
-    search.value = '';
-    if (activeStatus.value === null) { rows.value = []; return; }
+// Which row is expanded, and which of its cells opened it. Keyed on the row rather than
+// the name, so two people who share a name still expand independently.
+const rowKey = (u) => (u.userId || 'unassigned');
+const isOpenUser = (u) => !!drill.value && drill.value.rowKey === rowKey(u);
+const isOpenCell = (u, b) => isOpenUser(u) && drill.value.statusKey === b.statusKey;
+
+const toggleDrill = (u, b) => {
+    // An empty cell has nothing to open, and a list that comes back empty reads as a
+    // failure rather than as a zero.
+    if (cellCount(u, b) <= 0) return;
+    // The same cell again closes it — the expansion is the cell's own state, so the cell
+    // is what turns it off.
+    if (isOpenCell(u, b)) { closeDrill(); return; }
+    drill.value = {
+        rowKey: rowKey(u),
+        userId: u.userId,
+        unassigned: !u.userId,
+        statusKey: b.statusKey,
+        userName: userLabel(u),
+        statusName: b.name,
+        color: b.color,
+    };
+    rows.value = [];
     load();
 };
-const clearStatus = () => { activeStatus.value = null; rows.value = []; search.value = ''; };
 
-// Typing is a burst; one request per keystroke is not. Only the settled value is asked for.
-let searchTimer = null;
-watch(search, () => {
-    if (activeStatus.value === null) return;
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(load, 350);
-});
-onUnmounted(() => clearTimeout(searchTimer));
+const closeDrill = () => { drill.value = null; rows.value = []; };
 
 // ─── Task-detail sidebar (same pattern as the other cards) ───
 const isTaskDetail = ref(false);
@@ -289,71 +360,114 @@ onMounted(load);
 </script>
 
 <style scoped>
-/* The card itself does NOT scroll: the counters, the total line and the drill-down header
-   stay put, and only the task list moves. That is what lets the table header stick — a
-   sticky header needs a scroll container with a bounded height, and the card body has no
-   bound. Same shape MilestoneReportCard and the Inbox page use. */
-.tss { height: 100%; width: 100%; padding: 8px 10px; overflow: hidden; display: flex; flex-direction: column; gap: 8px; }
-.tss-msg { color: #9aa0b4; font-size: 12px; padding: 8px 0; }
+/* One palette for the whole card, so nothing is picked twice by eye. `faint` is what the
+   empty cells use: a table this wide is mostly dashes, and they should sit well behind the
+   numbers that are actually there. */
+.tss {
+    --ink: #1f2430;
+    --body: #3a3f52;
+    --muted: #8b90a3;
+    --faint: #c9cdd8;
+    --hairline: #eef0f5;
+    --surface: #f7f8fb;
+    --accent: #0e7490;
+    --accent-tint: #eaf4f7;
+}
+
+/* The card itself does NOT scroll: the counters and the total line stay put, and only the
+   table moves. That is what lets the table header stick — a sticky header needs a scroll
+   container with a bounded height, and the card body has no bound. Same shape
+   MilestoneReportCard and the Inbox page use. */
+.tss { height: 100%; width: 100%; padding: 10px 12px; overflow: hidden; display: flex; flex-direction: column; gap: 10px; }
+.tss-msg { color: var(--muted); font-size: 12px; padding: 10px 2px; }
 
 /* Counter row. Wraps rather than scrolls: a status that fell off the right edge is a
    status nobody counts. */
 .tss-boxes { display: flex; flex-wrap: wrap; gap: 8px; flex: 0 0 auto; }
+/* Read-only counters. No hover, no cursor, no selected state — nothing here reacts to a
+   click, so nothing here should look like it would. */
 .tss-box {
     flex: 1 1 96px;
-    min-width: 88px;
-    border: 1px solid transparent;
-    border-radius: 8px;
-    background: #f5f7fb;
-    padding: 8px 6px;
+    min-width: 92px;
+    border-radius: 10px;
+    background: var(--surface);
+    padding: 10px 8px 9px;
     text-align: center;
-    cursor: pointer;
-    transition: background .12s ease, border-color .12s ease, box-shadow .12s ease;
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 4px;
 }
-.tss-box:hover { background: #eef2fb; }
-/* The accent only appears on the selected box, so the row stays calm until you pick one. */
-.tss-box.is-active {
-    background: #fff;
-    border-color: var(--tss-accent);
-    box-shadow: inset 0 -3px 0 0 var(--tss-accent);
+/* The number is ink, not the status colour. Status colours come from settings and are not
+   chosen for contrast on white — a pale "On Hold" yellow rendered a real count nearly
+   invisible. The colour moves to the dot, where it identifies without having to be read. */
+/* Numbers stay on one line across the row and labels sit on the floor of the tile, so a
+   two-line status name lengthens the tiles without knocking the counts out of line. */
+.tss-num { font-size: 21px; font-weight: 700; color: var(--ink); line-height: 1.15; font-variant-numeric: tabular-nums; }
+.tss-box .tss-name { margin-top: auto; }
+/* Status names are whatever the company typed, so the label has to survive any length.
+   It wraps instead of truncating — the previous version put text-overflow on a centred
+   flex container, where ellipsis does not apply at all, so "Ready For Production" was
+   clipped at BOTH ends into ":ADY FOR PRODUC". Two lines is the ceiling; past that the
+   clamp trims and the title attribute carries the rest. */
+.tss-name {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-align: center;
+    font-size: 9.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+    line-height: 1.35;
+    color: var(--muted);
+    /* A single unbroken word — a name with no spaces — breaks rather than escaping the tile. */
+    overflow-wrap: anywhere;
 }
-.tss-num { font-size: 22px; font-weight: 700; color: #2f3546; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.tss-box.is-active .tss-num { color: var(--tss-accent); }
-.tss-name { font-size: 10px; color: #6b7280; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tss-dot {
+    display: inline-block; vertical-align: middle;
+    width: 6px; height: 6px; margin: -1px 5px 0 0;
+    border-radius: 50%; background: var(--tss-accent);
+}
+/* Nothing in it: the tile stays for the sake of a stable row, but recedes so the eye lands
+   on the statuses that do have work in them. */
+.tss-box.is-zero { background: #fafbfd; }
+.tss-box.is-zero .tss-num { color: var(--faint); }
+.tss-box.is-zero .tss-dot { background: var(--faint); }
 
-.tss-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 11px; color: #9aa0b4; }
-.tss-scope { font-weight: 600; color: #6b7280; white-space: nowrap; }
-
-.tss-drill-head { display: flex; align-items: center; gap: 8px; border-top: 1px solid #eef0f6; padding-top: 8px; flex: 0 0 auto; }
-/* The status name keeps its width; the search box takes the slack between it and ✕. */
-.tss-drill-title { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #3a3f52; flex: 0 0 auto; }
-.tss-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+/* Total on the left, search on the right, one line. */
+.tss-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex: 0 0 auto; }
+.tss-total { font-size: 11px; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tss-search {
-    flex: 1 1 auto;
+    flex: 0 1 240px;
     min-width: 0;
-    max-width: 260px;
-    margin-left: auto;
-    height: 26px;
-    padding: 0 9px;
-    border: 1px solid #e3e6ef;
-    border-radius: 6px;
-    background: #fff;
-    font-size: 11.5px;
-    color: #3a3f52;
+    height: 30px;
+    padding: 0 10px 0 30px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background-color: var(--surface);
+    /* Inlined, because the card must not depend on an asset request to look finished. */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b90a3' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.4-3.4' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 10px center;
+    background-size: 13px 13px;
+    font-size: 12px;
+    color: var(--body);
     outline: none;
+    transition: background-color .12s ease, border-color .12s ease;
 }
-.tss-search::placeholder { color: #b0b6c6; }
-.tss-search:focus { border-color: #6473e8; }
-.tss-clear { border: none; background: none; padding: 0 2px; font-size: 12px; color: #9aa0b4; cursor: pointer; flex: 0 0 auto; }
-.tss-clear:hover { color: #3a3f52; }
+.tss-search::placeholder { color: var(--muted); }
+.tss-search:focus { background-color: #fff; border-color: var(--accent); }
 
-/* The list is the only thing that scrolls, and it takes whatever height the card has left.
+/* The table is the only thing that scrolls, and it takes whatever height the card has left.
    `min-height: 0` is what allows it to shrink inside the flex column — without it the
    region grows to fit its rows and the card clips instead of scrolling. */
 .tss-table-wrap { flex: 1 1 auto; min-height: 0; overflow: auto; }
+/* A thin scrollbar rather than the platform's: the default one is wide enough to sit over
+   the last column and read as clipped numbers. */
+.tss-table-wrap::-webkit-scrollbar, .tss-expand-inner::-webkit-scrollbar { width: 7px; height: 7px; }
+.tss-table-wrap::-webkit-scrollbar-track, .tss-expand-inner::-webkit-scrollbar-track { background: transparent; }
+.tss-table-wrap::-webkit-scrollbar-thumb, .tss-expand-inner::-webkit-scrollbar-thumb { background: #dcdfe8; border-radius: 4px; }
+.tss-table-wrap::-webkit-scrollbar-thumb:hover, .tss-expand-inner::-webkit-scrollbar-thumb:hover { background: #c3c8d6; }
+.tss-table-wrap, .tss-expand-inner { scrollbar-width: thin; scrollbar-color: #dcdfe8 transparent; }
+
 .tss-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .tss-th {
     position: sticky;
@@ -361,30 +475,98 @@ onMounted(load);
     z-index: 1;
     /* Opaque, or the rows show through as they pass under it. */
     background: #fff;
-    font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .02em;
-    color: #9aa0b4; text-align: left; padding: 4px 8px 5px 0;
+    font-size: 9.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--muted); text-align: left; padding: 2px 8px 7px 0;
+    /* Bottom-aligned so a status name that wraps to two lines still shares a baseline with
+       the single-line ones instead of leaving the row ragged. */
+    vertical-align: bottom;
     /* An inset shadow rather than border-bottom: with border-collapse the border belongs
        to the table grid and scrolls away from a sticky cell, leaving the header floating
        over the rows with no edge. */
-    box-shadow: inset 0 -1px 0 #eef0f6;
+    box-shadow: inset 0 -1px 0 var(--hairline);
 }
 .tss-th--who { width: 26%; }
 .tss-th--num { width: 74px; text-align: right; }
+.tss-th--user { width: auto; }
+
+/* The matrix. Status columns are fixed and narrow so the names column takes the slack;
+   with enough statuses the whole table scrolls sideways inside its own region rather
+   than squeezing every column to nothing. */
+.tss-matrix { table-layout: auto; min-width: 100%; }
+.tss-td--user {
+    font-weight: 500; color: var(--ink);
+    max-width: 0; width: 99%;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Bounded at both ends: wide enough for a count to breathe, capped so one long status
+   name cannot claim half the table. The header wraps inside that cap, and an unbroken
+   word breaks rather than forcing the column wider than the cap. */
+.tss-matrix .tss-th--num, .tss-matrix .tss-td--num { min-width: 85px; max-width: 130px; }
+.tss-matrix .tss-th--num { overflow-wrap: anywhere; }
+/* Tracing one person across nine columns is the main thing asked of this table. */
+.tss-matrix tbody .tss-tr:hover .tss-td { background: #fbfcfe; }
+/* Only a cell with something behind it is clickable — an empty one has no list to open.
+   It reads as a plain number until the pointer is on it: nine teal numbers per row would
+   turn the table into a wall of links.
+
+   Scoped under .tss-matrix so it outranks the faint colour .tss-td--num sets further
+   down — at equal specificity the later rule would win and grey out every real number. */
+.tss-matrix .tss-cell--link { cursor: pointer; color: var(--ink); font-weight: 600; }
+.tss-matrix tbody .tss-tr .tss-cell--link:hover { background: var(--accent-tint); color: var(--accent); }
+/* The open cell stays marked while its list is below it: with the matrix still on screen,
+   nothing else says which of nine numbers you actually opened. */
+.tss-matrix .tss-td--num.is-open {
+    background: var(--accent-tint);
+    color: var(--accent);
+    box-shadow: inset 0 -2px 0 0 var(--accent);
+}
+.tss-matrix .tss-tr.is-open .tss-td { background: #f8fbfc; }
+.tss-matrix .tss-tr.is-open .tss-td--user { font-weight: 600; color: var(--ink); }
+
+/* The expansion, spanning every column. The left edge carries the status colour, which is
+   what ties the list to the cell that opened it. */
+.tss-expand-tr > .tss-expand {
+    position: relative;
+    padding: 6px 30px 10px 12px;
+    background: #f8fafc;
+    border-bottom: 1px solid var(--hairline);
+    box-shadow: inset 3px 0 0 0 var(--tss-accent);
+}
+/* The list scrolls on its own once it is long, so a person with forty tasks does not push
+   everyone below them off the card. */
+.tss-expand-inner { max-height: 240px; overflow-y: auto; overflow-x: hidden; }
+.tss-expand-close {
+    position: absolute; top: 7px; right: 8px;
+    width: 20px; height: 20px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: none; border-radius: 50%; background: transparent;
+    font-size: 11px; color: var(--muted); cursor: pointer; line-height: 1;
+    transition: background .12s ease, color .12s ease;
+}
+.tss-expand-close:hover { background: #eceef4; color: var(--body); }
+/* The inner header is not sticky: this region is short and already sits under the matrix's
+   own sticky header, and two headers stacking on scroll reads as a glitch. */
+.tss-inner { table-layout: fixed; }
+.tss-inner .tss-th { position: static; background: transparent; box-shadow: inset 0 -1px 0 #e6eaf0; }
+.tss-inner .tss-td, .tss-inner .tss-th { padding-left: 8px; }
+.tss-inner .tss-tr { border-bottom-color: #edf0f4; }
+.tss-inner tbody .tss-tr:hover .tss-td { background: #f2f6f9; }
 /* The list region carries the scrollbar, so without this the last column sits under it and
    the numbers read as clipped. The width above already reserves the column; this is the gap. */
 .tss-th:last-child, .tss-td:last-child { padding-right: 14px; }
-.tss-tr { border-bottom: 1px solid #f4f5f9; }
+.tss-tr { border-bottom: 1px solid var(--hairline); }
 .tss-tr:last-child { border-bottom: none; }
-.tss-td { padding: 6px 8px 6px 0; font-size: 11.5px; color: #3a3f52; vertical-align: middle; }
+.tss-td { padding: 7px 8px 7px 0; font-size: 11.5px; color: var(--body); vertical-align: middle; transition: background .1s ease; }
 .tss-td--task, .tss-td--who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tss-td--who { color: #6b7280; }
-.tss-td--num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tss-td--who { color: var(--muted); }
+.tss-td--num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--faint); }
 /* Logged past the estimate is the one thing worth colouring in this table. */
 .tss-over { color: #b45309; font-weight: 600; }
+.tss-inner .tss-td--num { color: var(--body); }
 .tss-task { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 .tss-task--link { cursor: pointer; }
-.tss-task--link:hover { color: #0e7490; text-decoration: underline; }
-.tss-key { color: #0e7490; font-size: 10.5px; }
+.tss-task--link:hover { color: var(--accent); text-decoration: underline; }
+.tss-key { color: var(--accent); font-size: 10.5px; }
 /* Inside the scroll region, so it sits after the last row rather than pinned to the card. */
-.tss-capped { font-size: 10px; color: #9aa0b4; padding: 6px 0 2px; }
+.tss-capped { font-size: 10px; color: var(--muted); padding: 7px 0 2px; }
 </style>
