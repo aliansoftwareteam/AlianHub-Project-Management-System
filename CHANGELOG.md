@@ -16,6 +16,26 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.24.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.23.0...v14.24.0) (2026-08-07)
+
+
+### 🚀 Features
+
+* break Tasks Summary by Status down per person ([386cd6c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/386cd6ccdb232c8b45a1e0b61cb6f625550a1f92))
+* docs module — linked docs on tasks and read-only public links ([b0a2132](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b0a2132b3bf760ecb1edf91795d7b6e361491a57))
+* **inbox:** filter Archive by notifications or mentions ([a50cd0e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a50cd0e1a8f9777029979f37075f91c3aa655225))
+* **inbox:** unified inbox for notifications and mentions ([0327fbf](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0327fbfaca5ebd4d21153adc25f2b1a72d33a98f))
+
+
+### 🐛 Bug Fixes
+
+* **inbox:** show who acted, clear rows live, and land on a real tab ([2b9457f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2b9457f98d28673e429874ea39bb6d277fb1ab28))
+
+
+### ♻️ Refactors
+
+* **header:** drop the bell and @ dropdowns for the Inbox ([31ee0d7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/31ee0d7a34a7ce1c8244b0d787932dce8fa57e7b))
+
 ## [14.23.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.22.0...v14.23.0) (2026-08-06)
 
 
