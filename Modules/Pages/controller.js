@@ -5,20 +5,42 @@ const logger = require("../../Config/loggerConfig");
 const { validatePageInput, contentTooLarge, htmlToRawText, isObjectIdString } = require('./helpers/pageRules');
 
 // Wiki pages: per-company documentation, optionally scoped to a project.
-// Single-writer v1 — every save snapshots the previous body into
-// pageVersions, and any version can be restored. (Real-time co-editing is
-// the documented follow-up; the storage model already supports it.)
+//
+// There is no version history. It was removed rather than fixed: it recorded a snapshot
+// per save with no way to see what changed, which made it something to scroll past rather
+// than something to use. The `pageVersions` collection and schema are left registered so
+// the rows already written stay readable — nothing writes to it now.
 
-/* POST /api/v2/pages  body: { title, projectId?, userData } */
+/**
+ * Who is acting, from the JWT — never from the request body.
+ *
+ * These handlers used to take `userData` off the body, so the author recorded on a page
+ * was whatever the caller typed. `req.uid` is set by the JWT middleware and cannot be
+ * chosen by the caller.
+ */
+const callerId = (req) => String((req && req.uid) || '');
+
+/* POST /api/v2/pages  body: { title, projectId?, parentPageId?, visibility?, linkedTasks? } */
 exports.createPage = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
-        const { title, projectId, userData } = req.body || {};
+        const { title, projectId, parentPageId, visibility, linkedTasks } = req.body || {};
         const check = validatePageInput({ companyId, title, projectId });
         if (!check.valid) {
             return res.send({ status: false, statusText: check.reason });
         }
-        const userId = userData && (userData.id || userData._id) ? String(userData.id || userData._id) : '';
+        // A sub-page. The field and the list projection have carried it since the module
+        // was written; only create never accepted it, so every page was a root page.
+        if (parentPageId !== undefined && parentPageId !== null && parentPageId !== '' && !isObjectIdString(parentPageId)) {
+            return res.send({ status: false, statusText: 'parentPageId must be a valid id when provided.' });
+        }
+        // Creating a doc from a task links it in the same write. A create-then-update pair
+        // would leave an unlinked doc behind whenever the second call failed — one the task
+        // it was written for cannot see.
+        if (linkedTasks !== undefined && (!Array.isArray(linkedTasks) || !linkedTasks.every((x) => isObjectIdString(x)))) {
+            return res.send({ status: false, statusText: 'linkedTasks must be a list of valid task ids.' });
+        }
+        const userId = callerId(req);
         const doc = {
             title: String(title).trim(),
             content: { html: '' },
@@ -27,9 +49,14 @@ exports.createPage = async (req, res) => {
             updatedBy: userId,
             deletedStatusKey: 0,
             order: Date.now(),
+            linkedTasks: [...new Set((linkedTasks || []).map(String))].map((x) => new mongoose.Types.ObjectId(x)),
+            visibility: String(visibility) === 'private' ? 'private' : 'project',
         };
         if (projectId) {
             doc.ProjectID = new mongoose.Types.ObjectId(projectId);
+        }
+        if (parentPageId) {
+            doc.parentPageId = new mongoose.Types.ObjectId(parentPageId);
         }
         const created = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PAGES, data: doc }, 'save');
         return res.send({ status: true, statusText: 'Page created.', data: created });
@@ -39,8 +66,9 @@ exports.createPage = async (req, res) => {
     }
 };
 
-/* GET /api/v2/pages?projectId= — list (no bodies). projectId optional:
- * without it, company-wide pages (no ProjectID) are returned. */
+/* GET /api/v2/pages?projectId=&taskId= — list (no bodies).
+ * projectId: that project's docs. taskId: docs linked to that task. Neither: the
+ * company-wide docs, i.e. those with no ProjectID. */
 exports.listPages = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
@@ -48,16 +76,34 @@ exports.listPages = async (req, res) => {
             return res.send({ status: false, statusText: 'companyId is required.' });
         }
         const projectId = String(req.query?.projectId || '');
+        const taskId = String(req.query?.taskId || '');
         const filter = { deletedStatusKey: 0 };
-        if (projectId) {
+
+        if (taskId) {
+            if (!isObjectIdString(taskId)) {
+                return res.send({ status: false, statusText: 'taskId must be a valid id.' });
+            }
+            filter.linkedTasks = new mongoose.Types.ObjectId(taskId);
+        } else if (projectId) {
             if (!isObjectIdString(projectId)) {
                 return res.send({ status: false, statusText: 'projectId must be a valid id.' });
             }
             filter.ProjectID = new mongoose.Types.ObjectId(projectId);
+        } else {
+            // Company-wide docs only. Omitting the clause entirely returned EVERY doc in
+            // the company — including every project's, private ones among them — to any
+            // caller who left the parameter off, which is not what the line above promises.
+            filter.ProjectID = { $in: [null, undefined] };
         }
+
+        // A private doc belongs to its author alone, so it never appears in anyone else's
+        // list — including a task's linked docs, where it would otherwise leak by title.
+        const uid = callerId(req);
+        filter.$or = [{ visibility: { $ne: 'private' } }, { createdBy: uid }];
+
         const pages = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PAGES,
-            data: [filter, 'title parentPageId ProjectID updatedBy updatedAt order', { sort: { order: 1 } }],
+            data: [filter, 'title parentPageId ProjectID visibility createdBy linkedTasks updatedBy updatedAt order', { sort: { order: 1 } }],
         }, 'find');
         return res.send({ status: true, statusText: 'Pages fetched.', data: pages || [] });
     } catch (error) {
@@ -81,6 +127,11 @@ exports.getPage = async (req, res) => {
         if (!page) {
             return res.send({ status: false, statusText: 'Page not found.' });
         }
+        // Same answer for "not yours" as for "does not exist": otherwise the difference
+        // tells a caller that a private doc with this id is there.
+        if (String(page.visibility || '') === 'private' && String(page.createdBy || '') !== callerId(req)) {
+            return res.send({ status: false, statusText: 'Page not found.' });
+        }
         return res.send({ status: true, statusText: 'Page fetched.', data: page });
     } catch (error) {
         logger.error(`ERROR in get page: ${error.message}`);
@@ -88,13 +139,12 @@ exports.getPage = async (req, res) => {
     }
 };
 
-/* PUT /api/v2/pages/:id  body: { title?, contentHtml?, userData } —
- * snapshots the previous body as a version before applying. */
+/* PUT /api/v2/pages/:id  body: { title?, contentHtml?, visibility?, linkedTasks? } */
 exports.updatePage = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
         const { id } = req.params;
-        const { title, contentHtml, userData } = req.body || {};
+        const { title, contentHtml, visibility, linkedTasks } = req.body || {};
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid page id are required.' });
         }
@@ -117,33 +167,32 @@ exports.updatePage = async (req, res) => {
             return res.send({ status: false, statusText: 'Page not found.' });
         }
 
-        // Snapshot the outgoing body (only when the body actually changes).
-        if (contentHtml !== undefined) {
-            await MongoDbCrudOpration(companyId, {
-                type: SCHEMA_TYPE.PAGE_VERSIONS,
-                data: {
-                    pageId: pageObjId,
-                    title: existing.title,
-                    content: existing.content || { html: '' },
-                    rawText: existing.rawText || '',
-                    savedBy: existing.updatedBy || '',
-                },
-            }, 'save').catch((error) => {
-                logger.error(`ERROR in page version snapshot: ${error.message}`);
-            });
+        const userId = callerId(req);
+        if (String(existing.visibility || '') === 'private' && String(existing.createdBy || '') !== userId) {
+            return res.send({ status: false, statusText: 'Page not found.' });
         }
 
-        const userId = userData && (userData.id || userData._id) ? String(userData.id || userData._id) : '';
         const update = { updatedBy: userId };
         if (title !== undefined) update.title = String(title).trim();
         if (contentHtml !== undefined) {
             update.content = { html: String(contentHtml) };
             update.rawText = htmlToRawText(contentHtml);
         }
+        if (visibility !== undefined) {
+            update.visibility = String(visibility) === 'private' ? 'private' : 'project';
+        }
+        if (linkedTasks !== undefined) {
+            if (!Array.isArray(linkedTasks) || !linkedTasks.every((x) => isObjectIdString(x))) {
+                return res.send({ status: false, statusText: 'linkedTasks must be a list of valid task ids.' });
+            }
+            // Deduped, so linking the same task twice cannot double a row in any list.
+            update.linkedTasks = [...new Set(linkedTasks.map(String))].map((x) => new mongoose.Types.ObjectId(x));
+        }
         const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PAGES,
             data: [{ _id: pageObjId }, { $set: update }, { returnDocument: 'after' }],
         }, 'findOneAndUpdate');
+
         return res.send({ status: true, statusText: 'Page saved.', data: updated });
     } catch (error) {
         logger.error(`ERROR in update page: ${error.message}`);
@@ -151,7 +200,7 @@ exports.updatePage = async (req, res) => {
     }
 };
 
-/* DELETE /api/v2/pages/:id — soft delete. */
+/* DELETE /api/v2/pages/:id — soft delete, together with everything nested under it. */
 exports.deletePage = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
@@ -159,57 +208,44 @@ exports.deletePage = async (req, res) => {
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid page id are required.' });
         }
+
+        // The whole subtree, not just this page. Deleting a parent on its own would leave
+        // its children pointing at a page that no longer exists — they would either vanish
+        // from the tree or reappear at the root, and there would be no way to reach or
+        // remove them. Walked breadth-first over the live pages; the set is small.
+        const all = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.PAGES,
+            data: [{ deletedStatusKey: 0 }, '_id parentPageId'],
+        }, 'find').catch(() => []);
+
+        const childrenOf = new Map();
+        (all || []).forEach((p) => {
+            const parent = p.parentPageId ? String(p.parentPageId) : '';
+            if (!parent) return;
+            if (!childrenOf.has(parent)) childrenOf.set(parent, []);
+            childrenOf.get(parent).push(String(p._id));
+        });
+
+        const doomed = [];
+        const queue = [String(id)];
+        // `seen` guards against a cycle in the data — a page that is somehow its own
+        // ancestor would otherwise loop here forever.
+        const seen = new Set();
+        while (queue.length) {
+            const next = queue.shift();
+            if (seen.has(next)) continue;
+            seen.add(next);
+            doomed.push(new mongoose.Types.ObjectId(next));
+            (childrenOf.get(next) || []).forEach((child) => queue.push(child));
+        }
+
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PAGES,
-            data: [{ _id: new mongoose.Types.ObjectId(id) }, { $set: { deletedStatusKey: 1 } }],
-        }, 'updateOne');
-        return res.send({ status: true, statusText: 'Page deleted.' });
+            data: [{ _id: { $in: doomed } }, { $set: { deletedStatusKey: 1 } }],
+        }, 'updateMany');
+        return res.send({ status: true, statusText: 'Page deleted.', data: { deleted: doomed.length } });
     } catch (error) {
         logger.error(`ERROR in delete page: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
-    }
-};
-
-/* GET /api/v2/pages/:id/versions — newest 20 snapshots (no bodies). */
-exports.listVersions = async (req, res) => {
-    try {
-        const companyId = req.headers['companyid'] || '';
-        const { id } = req.params;
-        if (!companyId || !isObjectIdString(id)) {
-            return res.send({ status: false, statusText: 'companyId and a valid page id are required.' });
-        }
-        const versions = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.PAGE_VERSIONS,
-            data: [{ pageId: new mongoose.Types.ObjectId(id) }, 'title savedBy createdAt', { sort: { createdAt: -1 }, limit: 20 }],
-        }, 'find');
-        return res.send({ status: true, statusText: 'Versions fetched.', data: versions || [] });
-    } catch (error) {
-        logger.error(`ERROR in list page versions: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
-    }
-};
-
-/* POST /api/v2/pages/:id/restore  body: { versionId, userData } */
-exports.restoreVersion = async (req, res) => {
-    try {
-        const companyId = req.headers['companyid'] || '';
-        const { id } = req.params;
-        const { versionId, userData } = req.body || {};
-        if (!companyId || !isObjectIdString(id) || !isObjectIdString(versionId)) {
-            return res.send({ status: false, statusText: 'companyId, page id and version id are required.' });
-        }
-        const version = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.PAGE_VERSIONS,
-            data: [{ _id: new mongoose.Types.ObjectId(versionId), pageId: new mongoose.Types.ObjectId(id) }],
-        }, 'findOne');
-        if (!version) {
-            return res.send({ status: false, statusText: 'Version not found.' });
-        }
-        // Route the restore through updatePage semantics: snapshot current, apply old.
-        req.body = { contentHtml: (version.content && version.content.html) || '', title: version.title, userData };
-        return exports.updatePage(req, res);
-    } catch (error) {
-        logger.error(`ERROR in restore page version: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
 };

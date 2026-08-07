@@ -45,6 +45,12 @@
                 :task="task"
                 class="mt-1"
             />
+            <LinkedDocs
+                :task="task"
+                :refreshKey="docsRefreshKey"
+                class="mt-1"
+                @open="$emit('openDoc', $event)"
+            />
             <EpicPicker
                 :task="task"
                 class="mt-1"
@@ -131,6 +137,7 @@ import Attachments from '@/components/atom/Attachments/Attachments.vue'
 import CheckListComponent from '@/components/molecules/CheckList/CheckList.vue'
 import SubTasks from '@/components/organisms/SubTasks/SubTasks.vue'
 import LinkedTasks from '@/components/organisms/LinkedTasks/LinkedTasks.vue'
+import LinkedDocs from '@/components/molecules/Pages/LinkedDocs.vue'
 import EpicPicker from '@/components/molecules/Epics/EpicPicker.vue'
 import CreateTagPopup from "@/components/molecules/TagList/CreateTagPopup.vue";
 import TagChip from '@/components/atom/TagChip/TagChip.vue'
@@ -175,11 +182,16 @@ const props = defineProps({
     isMainSpinner:{
         type:Boolean,
         default:false
+    },
+    // Bumped when the docs panel closes, so Linked Docs re-reads titles that changed there.
+    docsRefreshKey: {
+        type: Number,
+        default: 0
     }
 });
 
 // emit
-const emit = defineEmits(["openSeeAll"]);
+const emit = defineEmits(["openSeeAll", 'openDoc']);
 
 //computed
 const fileExtentions = computed(() => {
