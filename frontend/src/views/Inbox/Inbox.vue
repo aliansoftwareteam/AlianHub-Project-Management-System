@@ -87,17 +87,23 @@
                         </span>
 
                         <!--
-                          The type icon is the point: a bell for a notification, @ for a
-                          mention, exactly as the two header dropdowns are labelled. The
-                          avatar only replaces it when there IS one and it loads — a 404
-                          used to just hide the img and leave the cell blank.
+                          Whose action this was. UserProfile rather than a bare <img>, for
+                          the same reason the bell dropdown uses it: a profile picture is
+                          often a Wasabi key, not an http URL, and a raw src on one of those
+                          404s. That is what left a row showing its type icon instead of a
+                          face. UserProfile routes those through WasabiImage and falls back
+                          to the default avatar, so a row always has a person on it.
+
+                          The type icon is kept only for a row with no actor at all.
                         -->
                         <span class="ibx__avatar" :class="'is-' + it.sourceType" :title="actorName(it)">
-                            <img
-                                v-if="actorImage(it) && !brokenAvatars.includes(it.sourceId)"
-                                :src="actorImage(it)"
-                                :alt="actorName(it)"
-                                @error="onAvatarError(it)"
+                            <UserProfile
+                                v-if="it.actorId"
+                                :showDot="false"
+                                :isBorder="false"
+                                :data="{ image: actorImage(it), title: actorName(it) }"
+                                width="22px"
+                                thumbnail="40x40"
                             />
                             <span v-else v-html="it.sourceType === 'mention' ? ICONS.at : ICONS.bell"></span>
                         </span>
@@ -106,8 +112,15 @@
                           v-html because these messages ARE html — the writers store <b>
                           tags. changeText flattens mention tokens the same way the header
                           sidebar and chat list do, so @Name reads the same everywhere.
+
+                          The name leads the line, as it does in the bell dropdown: the
+                          messages themselves say "Status of X changed" without ever naming
+                          who changed it, so without this the row does not say whose it is.
                         -->
-                        <span class="ibx__text" v-html="render(it)"></span>
+                        <span class="ibx__text">
+                            <b v-if="actorName(it)" class="ibx__actor">{{ actorName(it) }}</b>
+                            <span class="ibx__msg" v-html="render(it)"></span>
+                        </span>
 
                         <!-- Fixed-width slot: the hover button is wider than the time, and
                              letting it size to content made every row shift on hover. -->
@@ -146,6 +159,9 @@ import * as env from '@/config/env';
 import { useStore } from 'vuex';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { useProjects } from '@/composable/projects';
+// The same avatar component the bell dropdown uses, so a picture that lives on Wasabi
+// resolves here too.
+import UserProfile from '@/components/atom/UserProfile/UserProfile.vue';
 // The header's own router for notification and mention rows. Reused rather than
 // reimplemented — see open().
 import { useHelper } from '@/components/organisms/Header/helper';
@@ -215,7 +231,20 @@ const loadPrefs = () => {
 
 const prefs = ref(loadPrefs());
 const customizeOpen = ref(false);
-const tab = ref(TABS.includes(route.query.tab) ? route.query.tab : 'all');
+/**
+ * Which tab to stand on, honouring the fact that All can be switched off in the gear.
+ *
+ * The default used to be 'all' unconditionally. With the All tab hidden, opening /inbox
+ * with no ?tab= landed on a tab that is not in the strip: nothing appeared selected, so it
+ * read as Notifications while actually listing notifications AND mentions together — the
+ * mention rows looked like they had leaked into the wrong tab. A stale ?tab=all in the URL
+ * did the same.
+ */
+const resolveTab = (candidate) => {
+    const wanted = TABS.includes(candidate) ? candidate : 'all';
+    return (wanted === 'all' && !prefs.value.showAllTab) ? 'notifications' : wanted;
+};
+const tab = ref(resolveTab(route.query.tab));
 const items = ref([]);
 const counts = ref({ all: 0, notifications: 0, mentions: 0, archive: 0 });
 const loading = ref(true);
@@ -265,22 +294,12 @@ const stamp = (iso) => {
 };
 const render = (it) => changeText(String(it.message || ''));
 
-// A profile image can 404 — a deleted user, or an expired presigned URL. Remember which
-// ones failed so the row falls back to its TYPE icon. Hiding the img element instead left
-// the cell empty, so a notification row showed nothing at all where the bell should be.
-const brokenAvatars = ref([]);
-const onAvatarError = (it) => {
-    if (!brokenAvatars.value.includes(it.sourceId)) brokenAvatars.value = [...brokenAvatars.value, it.sourceId];
-};
-
-// Who the row is FROM. getUser answers with a "Ghost User" placeholder for an id it does
-// not know, and that placeholder carries a default avatar — so an unknown actor would get
-// a stock face instead of the row's type icon. Only a real match is used.
-const actorOf = (it) => {
-    if (!it.actorId) return null;
-    const u = getUser(it.actorId);
-    return u && !u.ghostUser ? u : null;
-};
+// Who the row is FROM, resolved from the live company-user record exactly as the bell
+// dropdown resolves it. A user getUser does not know still answers — with the ghost avatar
+// and, for a removed member, their email as the name. That is the honest thing to show:
+// "a person who is no longer here did this" reads better than an anonymous row, and it is
+// what the bell already shows for the same notification.
+const actorOf = (it) => (it.actorId ? getUser(it.actorId) : null);
 const actorImage = (it) => actorOf(it)?.Employee_profileImageURL || '';
 const actorName = (it) => actorOf(it)?.Employee_Name || '';
 
@@ -322,6 +341,47 @@ const load = async (append = false) => {
 const reload = async () => { await Promise.all([load(false), loadCounts()]); };
 const loadMore = () => load(true);
 
+/**
+ * Arrive live, rather than on the next visit.
+ *
+ * myCounts is a stored counters document that moves over a socket the moment a
+ * notification or mention is written, so watching it is the cue that something new
+ * exists. The header's dot is driven from exactly this signal — which is why the dot
+ * appeared instantly while the list behind it sat still.
+ *
+ * The counters themselves are NOT read: they drift (they are maintained by increments).
+ * They are only a trigger to re-read the rows, which cannot drift.
+ *
+ * Debounced, because a single action can move the document more than once, and only the
+ * settled state is worth a request. A page the user has paged through is reloaded from the
+ * top: appending would put a new row underneath older ones, and dropping their loaded
+ * pages mid-read is worse than the row appearing where it belongs.
+ */
+const liveCounts = computed(() => {
+    const c = getters['users/myCounts']?.data || {};
+    return [c.notification_counts, c.mention_counts];
+});
+let liveTimer = null;
+const scheduleLiveRefresh = () => {
+    clearTimeout(liveTimer);
+    liveTimer = setTimeout(() => {
+        // Not while a request of our own is in flight, or the two race and the loser's
+        // response overwrites the list.
+        if (busy.value) { scheduleLiveRefresh(); return; }
+        reload();
+    }, 400);
+};
+// Only when a counter goes UP. Reading a row moves this document too, and refetching after
+// every mark-as-read would undo the row we just removed by hand — with a visible flash on
+// the way. A new arrival is the only thing that increases it.
+let lastCounts = null;
+watch(liveCounts, (next) => {
+    const prev = lastCounts;
+    lastCounts = next;
+    if (!prev) return;
+    if (next.some((n, i) => Number(n || 0) > Number(prev[i] || 0))) scheduleLiveRefresh();
+}, { immediate: true });
+
 const switchTab = (next) => {
     if (tab.value === next) return;
     tab.value = next;
@@ -362,19 +422,30 @@ const toggleRead = async (it) => {
     if (!read) payload.read = 'false';
     if (!(await post('/read', payload))) return;
 
-    // The row stays where it is; only its emphasis changes. On Archive a row that becomes
-    // unread no longer belongs there, so drop it.
-    if (tab.value === 'archive' && !read) {
-        items.value = items.value.filter((x) => x.sourceId !== it.sourceId);
-    } else {
+    // Archive lists the rows that ARE read; every other tab lists the ones that are not
+    // (planFor, Modules/Inbox/helpers). So a row whose state just flipped no longer belongs
+    // to the tab it is on — in BOTH directions. Only the Archive half of that was handled,
+    // which left a row marked read sitting in a list of unread things until the next load.
+    const stillBelongs = tab.value === 'archive' ? read : !read;
+    if (stillBelongs) {
         items.value = items.value.map((x) => (x.sourceId === it.sourceId ? { ...x, unread: !read } : x));
+    } else {
+        items.value = items.value.filter((x) => x.sourceId !== it.sourceId);
+        // The row left the server's result set too, so the next page starts one earlier.
+        // Without this, loading more after marking rows read steps over unseen rows.
+        nextSkip.value = Math.max(0, nextSkip.value - 1);
     }
     loadCounts();
 };
 
 const markAllRead = async () => {
     if (!(await post('/read-all', { tab: tab.value }, t('Inbox.all_read_toast')))) return;
-    items.value = items.value.map((x) => ({ ...x, unread: false }));
+    // read-all is scoped to the tab server-side and the server refuses it on Archive, so
+    // on any other tab there is nothing unread left for the list to hold — not just on the
+    // page that was loaded.
+    items.value = [];
+    hasMore.value = false;
+    nextSkip.value = 0;
     loadCounts();
 };
 
@@ -399,7 +470,11 @@ const open = (it) => {
 };
 
 watch(() => route.query.tab, (next) => {
-    if (next && TABS.includes(next) && next !== tab.value) { tab.value = next; load(false); }
+    if (!next) return;
+    // Through resolveTab, so a link or a back button carrying ?tab=all cannot put someone
+    // back on a tab they have switched off.
+    const wanted = resolveTab(next);
+    if (wanted !== tab.value) { tab.value = wanted; load(false); }
 });
 
 // The gear and the panel both stop propagation, so this only fires on a genuine click
@@ -408,10 +483,18 @@ const onDocClick = () => { customizeOpen.value = false; };
 
 onMounted(async () => {
     document.addEventListener('click', onDocClick);
+    // Keep the URL honest when resolveTab overrode what it asked for, so a refresh or a
+    // copied link lands where the page actually is.
+    if (route.query.tab !== tab.value) {
+        router.replace({ query: { ...route.query, tab: tab.value } }).catch(() => {});
+    }
     await loadCounts();
     await load(false);
 });
-onUnmounted(() => document.removeEventListener('click', onDocClick));
+onUnmounted(() => {
+    document.removeEventListener('click', onDocClick);
+    clearTimeout(liveTimer);
+});
 </script>
 
 <style scoped>
@@ -505,7 +588,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
 
 .ibx__row {
     display: grid;
-    grid-template-columns: minmax(110px, 1fr) 20px minmax(0, 2.4fr) 194px;
+    grid-template-columns: minmax(110px, 1fr) 24px minmax(0, 2.4fr) 194px;
     align-items: center;
     gap: 12px;
     /* Height is pinned so hovering swaps what is drawn, never the layout — otherwise
@@ -555,16 +638,23 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
     font-size: 13px; font-weight: 500; color: #4A4E5C;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.ibx__avatar { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; color: #B4B9C6; }
-.ibx__avatar img { width: 18px; height: 18px; border-radius: 50%; object-fit: cover; }
+.ibx__avatar { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; color: #B4B9C6; }
+/* UserProfile sizes its own wrapper and image; these only round it off and stop it being
+   squeezed by the grid column. */
+.ibx__avatar :deep(.profile-image) { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; }
 .ibx__avatar :deep(svg) { width: 15px; height: 15px; }
 /* A mention is about YOU, so it gets the accent; a notification stays neutral. Same
-   distinction the two header icons make. */
+   distinction the two header icons make. Applies to the fallback icon only — an avatar
+   has no stroke to tint. */
 .ibx__avatar.is-mention { color: var(--ibx-primary); }
 .ibx__text {
     font-size: 13px; color: #6B7280; line-height: 1.45;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* The name leads, and stays whole: it is the part that says whose row this is, so the
+   message is what gets clipped when the row runs out of width. */
+.ibx__actor { color: var(--ibx-ink); font-weight: 600; margin-right: 5px; white-space: nowrap; }
+.ibx__msg { color: inherit; }
 .ibx__text :deep(.mentioned) { color: var(--ibx-primary); font-weight: 600; }
 .ibx__text :deep(b), .ibx__text :deep(strong) { color: var(--ibx-ink); font-weight: 600; }
 /* Status and priority chips arrive as spans carrying their own background and colour —
