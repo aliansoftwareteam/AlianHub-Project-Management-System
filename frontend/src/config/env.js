@@ -255,3 +255,4 @@ module.exports.API_OAUTH_GOOGLE = '/api/v1/google';
 module.exports.API_OAUTH_GITLAB = '/api/v1/gitlab';
 module.exports.GET_CHANGELOG = '/api/v2/changelog';
 module.exports.TASKS_BY_STATUS = '/api/v1/dashboard/tasks-by-status';
+module.exports.INBOX = '/api/v1/inbox';

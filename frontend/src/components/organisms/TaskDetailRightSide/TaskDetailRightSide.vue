@@ -317,6 +317,7 @@ const dateFormat = inject('$dateFormat');
 const project = inject('selectedProject');
 
 const $toast = useToast();
+
 const props = defineProps({
     task: {
         type: Object,

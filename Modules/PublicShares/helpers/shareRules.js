@@ -3,7 +3,7 @@
 
 const crypto = require('crypto');
 
-const ENTITY_TYPES = Object.freeze(['sprint', 'report']);
+const ENTITY_TYPES = Object.freeze(['sprint', 'report', 'page']);
 const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
 // Accept legacy 16-byte (32-hex) tokens and new 32-byte (64-hex) tokens.
 const TOKEN_PATTERN = /^[0-9a-f]{32,64}$/;
@@ -56,6 +56,153 @@ const escapeHtml = (text) => String(text === null || text === undefined ? '' : t
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
+/* ── Doc bodies on the public page ─────────────────────────────────────────
+ *
+ * A shared doc is the one thing here that is rendered as HTML rather than as
+ * escaped text — escaping it would show the markup instead of the document.
+ * That HTML was written by a member through the editor, so it is trusted about
+ * as far as any other member-supplied string: treat it as hostile and rebuild
+ * it from an allow-list.
+ *
+ * Everything not named below is dropped. Tags go but their text stays, so a
+ * stripped wrapper never swallows a paragraph.
+ */
+const ALLOWED_TAGS = new Set([
+    'p', 'br', 'hr', 'div', 'span',
+    'strong', 'b', 'em', 'i', 'u', 's', 'del', 'ins', 'sub', 'sup', 'mark', 'small',
+    'blockquote', 'pre', 'code',
+    'ol', 'ul', 'li',
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+    'a', 'img',
+    'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'caption',
+]);
+const VOID_TAGS = new Set(['br', 'hr', 'img']);
+// Removed WITH their contents. Anything else only loses its tags.
+const STRIPPED_TAGS = 'script|style|svg|math|iframe|object|embed|template|noscript|form|input|button|select|textarea|link|meta|base';
+// Inline styles carry the editor's colours and alignment. Layout and anything
+// that can fetch or execute is not on the list.
+const ALLOWED_STYLE_PROPS = new Set([
+    'color', 'background-color', 'text-align', 'text-decoration', 'font-weight',
+    'font-style', 'padding-left', 'padding-right', 'direction',
+]);
+const SAFE_HREF = /^(?:https?:\/\/|mailto:|#|\/)/i;
+const SAFE_IMG_SRC = /^(?:https?:\/\/|data:image\/(?:png|jpe?g|gif|webp);base64,)/i;
+
+/**
+ * Resolve a URL attribute the way a browser would before deciding it is safe.
+ *
+ * `javascript&#58;alert(1)` and `java\tscript:alert(1)` both reach the parser as
+ * `javascript:`, so the scheme has to be checked against the decoded, stripped
+ * form rather than against the raw attribute text.
+ */
+const decodeForSchemeCheck = (value) => String(value || '')
+    .replace(/&#x([0-9a-f]+);?/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&#(\d+);?/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
+    .replace(/&colon;/gi, ':')
+    .replace(/&Tab;|&NewLine;/gi, '')
+    // Control characters, whitespace and DEL are ignored inside a scheme.
+    .replace(new RegExp('[\\u0000-\\u0020\\u007f]', 'g'), '')
+    .trim();
+
+const attrValue = (value) => String(value === null || value === undefined ? '' : value)
+    .replace(/&(?!#?\w+;)/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+const cleanStyle = (value) => String(value || '')
+    .split(';')
+    .map((decl) => {
+        const at = decl.indexOf(':');
+        if (at === -1) return '';
+        const prop = decl.slice(0, at).trim().toLowerCase();
+        const val = decl.slice(at + 1).trim();
+        if (!ALLOWED_STYLE_PROPS.has(prop)) return '';
+        // url() can fetch, expression() could once execute, and a stray brace
+        // would let a declaration escape into a new rule.
+        if (/url\s*\(|expression\s*\(|javascript:|[{}<>]/i.test(val)) return '';
+        return `${prop}: ${val}`;
+    })
+    .filter(Boolean)
+    .join('; ');
+
+// The editor's own classes carry alignment and indent; nothing else is kept, so
+// a doc cannot borrow a class from the surrounding page.
+const cleanClass = (value) => String(value || '')
+    .split(/\s+/)
+    .filter((token) => /^(?:ql|ah)[\w-]*$/.test(token))
+    .join(' ');
+
+const cleanAttrs = (tag, raw) => {
+    const kept = [];
+    let hasHref = false;
+    const ATTR = /([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/g;
+    let match;
+    while ((match = ATTR.exec(raw))) {
+        const name = match[1].toLowerCase();
+        const value = match[2] !== undefined ? match[2] : (match[3] !== undefined ? match[3] : (match[4] || ''));
+        if (name === 'class') {
+            const cls = cleanClass(value);
+            if (cls) kept.push(`class="${attrValue(cls)}"`);
+        } else if (name === 'style') {
+            const style = cleanStyle(value);
+            if (style) kept.push(`style="${attrValue(style)}"`);
+        } else if (name === 'href' && tag === 'a') {
+            if (SAFE_HREF.test(decodeForSchemeCheck(value))) {
+                kept.push(`href="${attrValue(value)}"`);
+                hasHref = true;
+            }
+        } else if (name === 'src' && tag === 'img') {
+            if (SAFE_IMG_SRC.test(decodeForSchemeCheck(value))) kept.push(`src="${attrValue(value)}"`);
+        } else if ((name === 'alt' || name === 'title') && (tag === 'img' || tag === 'a')) {
+            kept.push(`${name}="${attrValue(value)}"`);
+        } else if ((name === 'width' || name === 'height') && tag === 'img' && /^\d{1,4}$/.test(value)) {
+            kept.push(`${name}="${value}"`);
+        }
+        // Everything else — including every on* handler — is dropped by omission.
+    }
+    // A link out of a public page opens away from it and carries nothing back.
+    if (tag === 'a' && hasHref) kept.push('target="_blank"', 'rel="noopener noreferrer nofollow"');
+    return kept.length ? ` ${kept.join(' ')}` : '';
+};
+
+const sanitizeDocHtml = (html) => {
+    let working = String(html || '').replace(/<!--[\s\S]*?-->/g, '');
+
+    // Nested openers (`<scr<script>ipt>`) reappear once the inner pair is cut, so
+    // keep cutting until a pass changes nothing.
+    const blockRe = new RegExp(`<(${STRIPPED_TAGS})\\b[\\s\\S]*?<\\/\\1\\s*>`, 'gi');
+    for (let pass = 0; pass < 5; pass += 1) {
+        const next = working.replace(blockRe, '');
+        if (next === working) break;
+        working = next;
+    }
+    // ...and unclosed ones leave a lone opener behind.
+    working = working.replace(new RegExp(`<\\/?(?:${STRIPPED_TAGS})\\b[^>]*>?`, 'gi'), '');
+
+    // Rebuild tag by tag. Text between tags is passed through so entities survive,
+    // with any leftover '<' neutralised — the loop has already consumed every
+    // well-formed tag, so one here cannot be the start of a real element.
+    const text = (chunk) => chunk.replace(/</g, '&lt;');
+    const TAG = /<(\/?)([a-zA-Z][a-zA-Z0-9-]*)((?:"[^"]*"|'[^']*'|[^>])*)>/g;
+    let out = '';
+    let last = 0;
+    let match;
+    while ((match = TAG.exec(working))) {
+        out += text(working.slice(last, match.index));
+        last = TAG.lastIndex;
+        const closing = match[1] === '/';
+        const tag = match[2].toLowerCase();
+        if (!ALLOWED_TAGS.has(tag)) continue;          // drop the tag, keep the text
+        if (closing) {
+            if (!VOID_TAGS.has(tag)) out += `</${tag}>`;
+            continue;
+        }
+        out += `<${tag}${cleanAttrs(tag, match[3])}>`;
+    }
+    return out + text(working.slice(last));
+};
+
 module.exports = {
     ENTITY_TYPES,
     MAX_TITLE_LENGTH,
@@ -65,4 +212,5 @@ module.exports = {
     validateCreateShare,
     validateIntakeSubmission,
     escapeHtml,
+    sanitizeDocHtml,
 };

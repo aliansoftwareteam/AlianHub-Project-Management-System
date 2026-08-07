@@ -104,6 +104,8 @@ epicsSchema.index({ ProjectID: 1, deletedStatusKey: 1 });
 const pagesSchema = new Schema(schema.pages, {strict: true, timestamps: true});
 pagesSchema.index({ parentPageId: 1, deletedStatusKey: 1 });
 pagesSchema.index({ ProjectID: 1, deletedStatusKey: 1 });
+// "Which docs are attached to this task?" is asked on every task detail open.
+pagesSchema.index({ linkedTasks: 1, deletedStatusKey: 1 });
 const pageVersionsSchema = new Schema(schema.pageVersions, {strict: true, timestamps: true});
 pageVersionsSchema.index({ pageId: 1, createdAt: -1 });
 const publicSharesSchema = new Schema(schema.publicShares, {strict: true, timestamps: true});

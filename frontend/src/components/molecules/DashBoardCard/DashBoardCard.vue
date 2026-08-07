@@ -3,6 +3,10 @@
     <div class="cardHeader">
       <span class="font-size-18 font-weight-bold text-ellipsis dashboard-card-title" :title="title">{{ title }}</span>
       <span class="cursor-pointer dashboard-container-setting-controller">
+        <!-- A short label the card itself supplies (see the headerBadge provide) — the
+             scope of what it is showing, say. Sits BEFORE the period selector, because it
+             qualifies the data rather than controlling it. -->
+        <span v-if="headerBadge" class="dashboard-card-badge mr-10px" :title="headerBadge">{{ headerBadge }}</span>
         <!-- Inline time-period selector — only when the parent passes
              periodOptions. Sits BEFORE the refresh/settings icons. -->
         <select
@@ -94,6 +98,11 @@ onUnmounted(() => {
   }
 })
 provide("$containerWidth", containerWidth);
+
+// A card can put one short label into the chrome without the dashboard having to know
+// which cards have one. Empty by default, so every other card is untouched.
+const headerBadge = ref('');
+provide('dashboardCardBadge', headerBadge);
 defineEmits(['delete-card','edit-card','refresh-card','period-change']); // Define delete-card event
 </script>
 
@@ -135,6 +144,21 @@ h2 {
   display: inline-flex;
   align-items: center;
   flex-shrink: 1;
+}
+/* Quiet enough to read as a caption on the data, not as another control next to the
+   period selector it sits beside. */
+.dashboard-card-badge {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 10px;
+  font-weight: 600;
+  color: #3a3f52;
+  background: #f7f8fb;
+  border-radius: 20px;
+  padding: 3px 9px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 /* Icons keep their size; only the period <select> absorbs the shrink. */
 .dashboard-container-setting-controller img,
