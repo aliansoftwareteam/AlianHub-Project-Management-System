@@ -22,9 +22,7 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 ### 🚀 Features
 
 * break Tasks Summary by Status down per person ([386cd6c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/386cd6ccdb232c8b45a1e0b61cb6f625550a1f92))
-* break Tasks Summary by Status down per person ([9fafab6](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9fafab623a2d2d8b16eed8d57b087f207af27ce8))
 * docs module — linked docs on tasks and read-only public links ([b0a2132](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b0a2132b3bf760ecb1edf91795d7b6e361491a57))
-* docs module — linked docs on tasks and read-only public links ([49a09ad](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/49a09ad217267d7a51655da33ebe8f81a15b7626))
 * **inbox:** filter Archive by notifications or mentions ([a50cd0e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a50cd0e1a8f9777029979f37075f91c3aa655225))
 * **inbox:** unified inbox for notifications and mentions ([0327fbf](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0327fbfaca5ebd4d21153adc25f2b1a72d33a98f))
 
