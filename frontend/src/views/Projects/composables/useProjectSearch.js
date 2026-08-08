@@ -20,6 +20,27 @@ export function useProjectSearch(projectData, showArchived) {
 
     const showTasks = computed(() => checkPermission('task.show_tasks', projectData.value.isGlobalPermission, { gettersVal: getters }));
 
+    /**
+     * Whether this search may see everyone's tasks — decided EXACTLY as the task list
+     * decides it (views/Projects/helper.js -> store/ProjectData/actions.js).
+     *
+     * The list only applies the own-tasks-only restriction when the project carries its OWN
+     * permissions; on a project using the global rules it passes `true` and shows
+     * everything. Search applied the restriction unconditionally, so a role whose global
+     * `task.show_tasks` is 1 saw every task in the list and only their own the moment they
+     * typed in the search box. Owner/Admin never hit it — checkPermission short-circuits
+     * roleType 1|2 to `true` — which is why it only ever showed up for other roles.
+     */
+    const showAllTasks = computed(() => (
+        projectData.value.isGlobalPermission === false ? showTasks.value : true
+    ));
+
+    // The same accepted values the store uses: undefined, true and 2 all mean "everyone's".
+    // Anything else — including null, a role the rule does not name — narrows to your own.
+    const seesEveryonesTasks = computed(() => (
+        showAllTasks.value === undefined || showAllTasks.value === true || showAllTasks.value === 2
+    ));
+
     function resetFilters() {
         groupBy.value = 0;
         filterUsers.value = [];
@@ -38,6 +59,15 @@ export function useProjectSearch(projectData, showArchived) {
         if (!taskSearch.value.trim().length && !filterUsers.value.length && !showArchived.value && !Object.keys(filterQuery.value).length) {
             commit('projectData/mutateSearchTask', { data: [], op: 'added' });
             searchTask.value = false;
+            return;
+        }
+
+        // A role the project's own rules do not name gets no tasks at all — getSprintTasks
+        // returns without fetching (helper.js). Search must not be the way around a list
+        // that refuses to load, so it returns nothing here rather than the caller's own.
+        if (showTasks.value === null && projectData.value.isGlobalPermission === false) {
+            commit('projectData/mutateSearchTask', { data: [], op: 'added' });
+            searchTask.value = true;
             return;
         }
 
@@ -82,7 +112,7 @@ export function useProjectSearch(projectData, showArchived) {
             query[0].$match.$and.push({ AssigneeUserId: { $in: filterUsers.value } });
         }
 
-        if (showTasks.value === 1) {
+        if (!seesEveryonesTasks.value) {
             query[0].$match.$and.push({ AssigneeUserId: { $in: [userId.value] } });
         }
 

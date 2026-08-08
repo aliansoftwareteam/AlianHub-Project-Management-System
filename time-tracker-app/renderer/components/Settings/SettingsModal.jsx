@@ -7,6 +7,10 @@ import store from '../../store/store';
 import { setCompanyRulesToStore } from '../../controller/company/company';
 import WasabiImage from '../WasabiImage/WasabiImage';
 
+// Inlined at build time from the root package.json (see renderer/next.config.js), which is
+// the same version electron-builder puts on the installer.
+const appVersion = process.env.NEXT_PUBLIC_APP_VERSION || '';
+
 const SettingsModal = ({onLogout}) => {
   const router = useRouter();
   const { user } = useSelector((state)=> state.user)
@@ -82,6 +86,13 @@ async function changeCompany(e) {
             </svg>
             Logout
           </button>
+        </div>
+
+        {/* Which build this is. There was no version anywhere in the app, so a user
+            reporting a problem could not say what they were running — and with no
+            auto-updater, "are you on the latest?" is the first question worth asking. */}
+        <div className="mt-2 pt-2 border-t border-gray-100 px-3 text-[11px] text-gray-400 select-text">
+          Version {appVersion}
         </div>
       </div>
     </div>

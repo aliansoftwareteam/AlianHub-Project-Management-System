@@ -153,6 +153,34 @@
                                     </div>
                                 </div>
                             </div>
+
+                            <!-- Whether the desktop tracker is capped by a task's estimate.
+                                 A company-wide switch, so it sits with the other company-wide
+                                 time settings rather than on a project or a person. -->
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <div class="company__setting-toggle">
+                                        <div class="company__setting-toggle-copy">
+                                            <label for="trackerEstimateLimit">{{ $t('Settings.tracker_estimate_limit') }}</label>
+                                            <p>{{ $t('Settings.tracker_estimate_limit_hint') }}</p>
+                                        </div>
+                                        <!-- Toggle sizes itself inline from `width` (track = width,
+                                             height = width/2), overriding its stylesheet. 20 gave a
+                                             20x10 pill with an 8px knob, which reads as a dot rather
+                                             than a switch. 40 is a normal switch at this scale. -->
+                                        <Toggle
+                                            id="trackerEstimateLimit"
+                                            :width="40"
+                                            class="company__setting-switch"
+                                            :class="{ 'is-disabled': !props.editPermission }"
+                                            :modelValue="formData.trackerEstimateLimit"
+                                            :disabled="!props.editPermission"
+                                            @update:modelValue="(v) => formData.trackerEstimateLimit = v"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
                             <button v-if="props.editPermission" :disabled="isSpinner" ref="refButton"
                                 @click.prevent="SaveChangeToDb()" class="blue_btn" id="blue-btn-savecompany">{{ $t('Settings.save_changes') }}</button>
                         </form>
@@ -177,6 +205,7 @@
 import PhoneCountry from "@/components/molecules/CountryPhoneNumberDropdown/PhoneCountry.vue"
 import Sidebar from '@/components/molecules/Sidebar/Sidebar.vue';
 import InputText from "@/components/atom/InputText/InputText.vue";
+import Toggle from "@/components/atom/Toggle/Toggle.vue";
 import { computed, defineComponent, inject, onMounted, ref, watchEffect,defineProps, nextTick, watch } from "vue";
 import { useStore } from "vuex";
 import DropDown from "@/components/molecules/DropDown/DropDown.vue";
@@ -292,6 +321,9 @@ onMounted(() => {
     formData.value.Cst_DialCode = selectedCompany.value?.Cst_DialCode;
     formData.value.city.value = selectedCompany.value?.Cst_City;
     formData.value.day.value = selectedCompany.value?.Cst_LogTimeDays;
+    // Absent means a company that predates the setting, which has the cap today — so it
+    // reads as ON. Only an explicit false turns it off.
+    formData.value.trackerEstimateLimit = selectedCompany.value?.trackerEstimateLimit !== false;
     formData.value.format_date = companyDate.value.dateFormat;
     oldFileValue.value = selectedCompany.value?.Cst_profileImage;
     formData.value.Cst_countryCode.value = selectedCompany.value?.Cst_countryCode || 'IN';
@@ -314,7 +346,10 @@ const SaveChangeToDb = async () => {
             if (formData.value.companyprofileImage == selectedCompany.value?.Cst_profileImage && formData.value.companyName.value == selectedCompany.value?.Cst_CompanyName
                 && formData.value.phoneNumber.value == selectedCompany.value?.Cst_Phone && countryCodeObj.value.name == selectedCompany.value?.Cst_DialCode.name
                 && formData.value.country.value == selectedCompany.value?.Cst_Country && formData.value.state.value == selectedCompany.value?.Cst_State
-                && formData.value.city.value == selectedCompany.value?.Cst_City && formData.value.format_date == companyDate.value.dateFormat) {
+                && formData.value.city.value == selectedCompany.value?.Cst_City && formData.value.format_date == companyDate.value.dateFormat
+                // Compared the same way it is read — absent counts as ON — or flipping only
+                // this switch would be judged "nothing to update" and silently not save.
+                && formData.value.trackerEstimateLimit === (selectedCompany.value?.trackerEstimateLimit !== false)) {
                 return $toast.error(t('Toast.Nothing_to_update'), { position: 'top-right' });
             }
             isSpinner.value = true;
@@ -365,6 +400,7 @@ const SaveChangeToDb = async () => {
                 Cst_State: formData.value.state.value,
                 Cst_City: formData.value.city.value,
                 Cst_LogTimeDays: formData.value.day.value,
+                trackerEstimateLimit: formData.value.trackerEstimateLimit !== false,
                 Cst_countryCode: formData.value.Cst_countryCode.value,
                 Cst_stateCode: formData.value.Cst_stateCode.value,
                 updatedAt: new Date()
