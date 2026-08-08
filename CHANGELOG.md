@@ -16,6 +16,22 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.25.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.24.0...v14.25.0) (2026-08-08)
+
+
+### 🚀 Features
+
+* **tracker:** company setting for the estimate-hours cap, plus 5.1.5 ([143b1c8](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/143b1c8f4c06b79a32f378dbf63a2975c64bf48b))
+* **tracker:** make the estimate-hours cap a company setting ([6cb6ba6](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6cb6ba62a9f4ffef49e67c60dc60a12ed9e53337))
+* **tracker:** show the app version, and release 5.1.5 ([eec8f85](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/eec8f856f63da3f95c0c9f0e1def6efd23862680))
+
+
+### 🐛 Bug Fixes
+
+* **projects:** search the whole project, not just your own tasks ([b0eefc3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b0eefc3f9407d19899a2d3e58cf958983c434469))
+* **projects:** search the whole project, not just your own tasks ([17fdc27](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/17fdc272b404c406ec2f7517c74daa698b45bbe3))
+* **tracker:** logout no longer blocks forever on a stuck offline queue ([6680600](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6680600f1173da60dda20557fe4b822084e9a4c0))
+
 ## [14.24.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.23.0...v14.24.0) (2026-08-07)
 
 
