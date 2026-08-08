@@ -2,7 +2,7 @@ import { setUser } from "../../store/user";
 import store from '../../store/store';
 import { apiRequestWithoutCompnay } from "../../utils/services";
 import { logout, setShowOfflineQueueScreen,setShowOflineLogout } from '../../store/authSlice'
-import { getQueue } from '../../utils/apiQueue';
+import { replayQueue } from '../../utils/queueReplay';
 
 export const getUserData = async () => {
     return new Promise((resolve, reject) => {
@@ -27,8 +27,13 @@ export const getUserData = async () => {
 
 export const logoutFunction = async () => {
     try {
-        const queue = await getQueue();
-        if (queue && queue.length > 0) {
+        // Try to SEND what is queued before deciding anything. This used to only look at
+        // the queue and refuse, while the only code that drained it ran on a timer that
+        // starts exclusively when the app thinks it is offline — so once back online a
+        // single stuck entry blocked logout forever, behind a message about the internet.
+        const { remaining } = await replayQueue();
+
+        if (remaining > 0) {
             store.dispatch(setShowOflineLogout(true));
             store.dispatch(setShowOfflineQueueScreen(true));
             // Optionally, show a toast or message here

@@ -4,7 +4,7 @@ import { DateTime } from 'luxon';
 import { apiRequest } from '../utils/services';
 import { setComment, setTrackerStartTime } from '../store/timelog';
 import { DEFAULT_TASK_IMAGE } from '../utils/imageDefaults';
-import { estimateStatusFromTask } from '../utils/estimateLimit';
+import { estimateStatusFromTask, isEstimateLimitEnabled } from '../utils/estimateLimit';
 
 // Start a tracker session from a deep link (myapp://…?taskId=&comment=).
 // Fetches just what start needs (task + project/folder/sprint names), guards to
@@ -62,8 +62,10 @@ export function useDeepLinkStart(setLoading = () => {}) {
       const taskTypeImage = getTaskTypeImage(projectName, task.TaskType);
 
       // AHE-3831 — a task needs an estimate with time left to be tracked
-      // (no estimate, or estimate already met, both block the start).
-      const est = estimateStatusFromTask(task);
+      // (no estimate, or estimate already met, both block the start), unless the company
+      // has the cap switched off. This site reads the task from the deep link rather than
+      // fetching it, so it passes the company switch in itself.
+      const est = estimateStatusFromTask(task, isEstimateLimitEnabled(currentCompany));
       if (est.blockStart) {
         setLoading(false);
         try { window.ipc.send('estimate:limit', { reason: est.blockReason, taskName }); } catch (e) { /* best-effort */ }
