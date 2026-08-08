@@ -1113,6 +1113,20 @@ const schema = {
             type: String,
             required: true
         },
+        // Whether the desktop tracker is capped by a task's estimated hours (AHE-3831).
+        // ON: a task needs an estimate to start, and the tracker auto-stops when the
+        // estimate is met. OFF: neither gate applies and the tracker runs freely.
+        //
+        // Defaults to true so every company that predates this setting keeps the behaviour
+        // it has today — an absent field must not silently switch the cap off.
+        //
+        // MUST stay declared: this schema is strict, so an undeclared path is dropped on
+        // save and only shows up as a setting that will not stick after a reload.
+        trackerEstimateLimit: {
+            type: Boolean,
+            required: false,
+            default: true
+        },
         Cst_Phone: {
             type: String,
             required: true

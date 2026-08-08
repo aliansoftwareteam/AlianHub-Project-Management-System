@@ -993,3 +993,44 @@ max-width: 100%;
 }
 
 }
+
+/* Company-wide switch rows (e.g. the tracker estimate limit). The label carries the
+   setting and the paragraph carries what it does — the toggle alone cannot say whether
+   "on" caps the tracker or frees it. */
+.company__setting-toggle {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 16px 0 4px;
+    border-top: 1px solid #eef0f5;
+}
+/* The switch sits on the label's line, not centred against the whole block — with a
+   two-line description, centring leaves it floating between the two. */
+.company__setting-switch {
+    flex: 0 0 auto;
+    margin-top: 2px;
+}
+/* Toggle has no disabled state of its own; it only ignores the click. Without this the
+   control looks live to someone who cannot change it. */
+.company__setting-switch.is-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.company__setting-toggle-copy {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.company__setting-toggle-copy label {
+    display: block;
+    margin: 0 0 3px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #2a2c39;
+}
+.company__setting-toggle-copy p {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #8b90a3;
+}

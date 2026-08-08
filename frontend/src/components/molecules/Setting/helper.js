@@ -77,6 +77,9 @@ export function setFocus() {
             error: ""
         },
         format_date: '',
+        // Tracker capped by a task's estimate. True is the behaviour every company has
+        // today, so an unloaded form must not render as though it were off.
+        trackerEstimateLimit: true,
         companyprofileImage: "",
         Cst_countryCode: {
             value: ""
