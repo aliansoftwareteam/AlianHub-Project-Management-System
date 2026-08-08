@@ -9,8 +9,7 @@ import { getAssignCompanyData } from '../../controller/company/company';
 import { TrackerController } from '../../controller/tracker/tracker';
 import { removeAllTimeLog, setTrackerStopTime } from '../../store/timelog';
 import { useDeepLinkStart } from '../../hooks/useDeepLinkStart';
-import { getQueue, removeFirstFromQueue, objectToFormData } from '../../utils/apiQueue';
-import { apiRequest, apiRequestFormData, apiRequestWithoutCompnay, apiRequestWithoutSecure } from '../../utils/services';
+import { replayQueue } from '../../utils/queueReplay';
 import store from '../../store/store';
 const publicRoutes = ['/login']; // Add any public routes here
 
@@ -27,6 +26,10 @@ const Layout = ({ children }) => {
   const startFromDeepLink = useDeepLinkStart();
   // Deep link that arrived while a tracker is already running — prompt the user.
   const [deepLinkPrompt, setDeepLinkPrompt] = useState(null); // { taskId, comment }
+  // Entries still waiting to reach the server, so the offline screen can say what is
+  // actually wrong instead of always blaming the connection.
+  const [pendingCount, setPendingCount] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   useEffect(() => {
     timeLogRef.current = timeLog;
@@ -135,33 +138,20 @@ const Layout = ({ children }) => {
     }
   }, [timeLog.trackerStart, timeLog.taskId]);
 
-  const replayQueue = async () => {
-    const queue = await getQueue();
-    for (const req of queue) {
-      try {
-        if (req.method === 'apiRequest') {
-          if (req.endPoint === '/api/v4/timeTracker/capture' || req.endPoint === '/api/v2/timeTracker/end' || req.endPoint === '/api/v3/timeTracker/start') {
-            req.data.considerActionTime = true;
-            await apiRequest(req.type, req.endPoint, req.data, req.dataType);
-          } else {
-          }
-        } else if (req.method === 'apiRequestFormData') {
-          let replayData = req.data;
-          if (req.dataType === 'form') {
-            replayData = objectToFormData(req.data);
-          }
-          await apiRequestFormData(req.type, req.endPoint, replayData, req.dataType);
-        } else if (req.method === 'apiRequestWithoutCompnay') {
-          await apiRequestWithoutCompnay(req.type, req.endPoint, req.data);
-        } else if (req.method === 'apiRequestWithoutSecure') {
-          await apiRequestWithoutSecure(req.type, req.endPoint, req.data, req.dataType);
-        }
-        await removeFirstFromQueue();
-      } catch (e) {
-        // If still offline, break and try again later
-        if (!navigator.onLine) break;
-      }
+  // The drain itself lives in utils/queueReplay so logout can run it too — see
+  // logoutFunction. This wrapper is just what the reconnect timer and the retry button do
+  // with the result.
+  const drainQueue = async () => {
+    const { remaining } = await replayQueue();
+
+    // Anything left means the queue is genuinely not clear yet, so the screen must stay:
+    // dismissing it here would hand back an app that still cannot log out.
+    if (remaining > 0) {
+      setPendingCount(remaining);
+      return remaining;
     }
+
+    setPendingCount(0);
     store.dispatch(setInternetLost(false));
     if (store.getState().auth.showOfflineQueueScreen) {
       store.dispatch(setShowOfflineQueueScreen(false));
@@ -175,6 +165,7 @@ const Layout = ({ children }) => {
         })
       }
     }
+    return 0;
   };
 
   useEffect(() => {
@@ -185,7 +176,7 @@ const Layout = ({ children }) => {
           if (online) {
             clearInterval(intervalRef.current);
             intervalRef.current = null;
-            replayQueue();
+            drainQueue();
           }
         }, 30000); // 1 minute
       }
@@ -242,16 +233,35 @@ const Layout = ({ children }) => {
     <div>
       {showOfflineQueueScreen && (
         <div className="fixed inset-0 flex items-center justify-center bg-white z-50">
-          <div className="text-center">
+          <div className="text-center px-6">
             <img src="/images/png/Frame.png" alt="warning" className="mx-auto mb-4" />
-            <div className="font-semibold text-md mb-2">Internet connection is lost. Check your connection.</div>
-            {showOflineLogout && <div className="text-sm text-gray-500">You have unsynced data. Please reconnect to the internet before logging out.</div>}
-            <div className='' onClick={()=> window.location.reload()}>
+            {/* Two different problems, and they need different things from the user. The
+                screen used to blame the connection either way, which is why being online
+                and still blocked read as a broken app. */}
+            <div className="font-semibold text-md mb-2">
+              {isInternetLost
+                ? 'Internet connection is lost. Check your connection.'
+                : 'Some tracked time has not reached the server yet.'}
+            </div>
+            {showOflineLogout && (
+              <div className="text-sm text-gray-500">
+                {pendingCount > 0
+                  ? `${pendingCount} ${pendingCount === 1 ? 'entry is' : 'entries are'} still waiting to sync. Retry before logging out so none of your time is lost.`
+                  : 'You have unsynced data. Please reconnect to the internet before logging out.'}
+              </div>
+            )}
+            <div>
+              {/* Retries the send. It used to reload the window, which cleared the screen
+                  without ever touching the queue — so the next logout hit the same wall. */}
               <button
-                className="px-[25px] py-[10px] bg-[#1CB303] text-white rounded text-sm hover:bg-[#169302] transition-colors mt-2.5"
-                onClick={()=> window.location.reload()}
+                className="px-[25px] py-[10px] bg-[#1CB303] text-white rounded text-sm hover:bg-[#169302] transition-colors mt-2.5 disabled:opacity-60"
+                disabled={isRetrying}
+                onClick={async () => {
+                  setIsRetrying(true);
+                  try { await drainQueue(); } finally { setIsRetrying(false); }
+                }}
               >
-                Check Connection
+                {isRetrying ? 'Retrying…' : 'Retry sync'}
               </button>
             </div>
           </div>
