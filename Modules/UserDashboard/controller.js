@@ -2488,24 +2488,109 @@ exports.getTasksByStatus = async (req, res) => {
             data: [[
                 { $match: baseFilter },
                 { $unwind: { path: "$AssigneeUserId", preserveNullAndEmptyArrays: true } },
-                { $group: { _id: { u: "$AssigneeUserId", s: "$statusKey" }, n: { $sum: 1 } } },
+                {
+                    $group: {
+                        _id: { u: "$AssigneeUserId", s: "$statusKey" },
+                        n: { $sum: 1 },
+                        // Estimate is the TASK's, not a share of it — the same number the
+                        // task detail shows. A task on three people therefore contributes
+                        // its full estimate to each of them, exactly as it contributes 1 to
+                        // each of their counts.
+                        est: { $sum: { $ifNull: ["$totalEstimatedTime", 0] } },
+                    },
+                },
             ]],
         }, "aggregate").catch((e) => {
             logger.error(`getTasksByStatus matrix failed: ${e && e.message ? e.message : e}`);
             return [];
         });
 
-        const byUser = new Map();   // userId ("" = unassigned) -> { counts, total }
+        const byUser = new Map();   // userId ("" = unassigned) -> { counts, total, estimateMinutes }
         (perUser || []).forEach((g) => {
             const sKey = Number(g && g._id && g._id.s);
             if (!Number.isFinite(sKey)) return;
             const key = (g._id && g._id.u) ? String(g._id.u) : "";
-            if (!byUser.has(key)) byUser.set(key, { counts: {}, total: 0 });
+            if (!byUser.has(key)) byUser.set(key, { counts: {}, total: 0, estimateMinutes: 0 });
             const rec = byUser.get(key);
             const n = Number(g.n) || 0;
             rec.counts[sKey] = (rec.counts[sKey] || 0) + n;
             rec.total += n;
+            rec.estimateMinutes += Number(g.est) || 0;
         });
+
+        // Logged time per person.
+        //
+        // Deliberately narrower than "everything they logged this period": only their own
+        // time, on the tasks counted in their own row. The row is about their tasks, so a
+        // Logged figure that also counted their time on a colleague's task would not be
+        // comparable to the Estimate beside it.
+        //
+        // That pairing needs to know which tasks are whose, which the grouped aggregation
+        // above has already collapsed away — hence the second read. It projects two fields
+        // and is bounded by the same window the counts already scan.
+        const ownership = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS,
+            data: [baseFilter, { _id: 1, AssigneeUserId: 1, totalEstimatedTime: 1 }],
+        }, "find").catch((e) => {
+            logger.error(`getTasksByStatus ownership read failed: ${e && e.message ? e.message : e}`);
+            return [];
+        });
+
+        // taskId -> Set(userId), so a log line can be credited only to a real assignee.
+        // taskId -> estimate, for the per-task overrun below.
+        const assigneesByTask = new Map();
+        const estimateByTask = new Map();
+        const taskIds = [];
+        (ownership || []).forEach((t) => {
+            const id = String(t._id);
+            taskIds.push(id);
+            const ids = (Array.isArray(t.AssigneeUserId) ? t.AssigneeUserId : [t.AssigneeUserId])
+                .filter(Boolean).map(String);
+            assigneesByTask.set(id, new Set(ids));
+            estimateByTask.set(id, Number(t.totalEstimatedTime) || 0);
+        });
+
+        if (taskIds.length) {
+            const logs = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.TIMESHEET,
+                data: [[
+                    { $match: { TicketID: { $in: taskIds } } },
+                    { $group: { _id: { u: "$Loggeduser", t: "$TicketID" }, m: { $sum: "$LogTimeDuration" } } },
+                ]],
+            }, "aggregate").catch((e) => {
+                logger.error(`getTasksByStatus logged read failed: ${e && e.message ? e.message : e}`);
+                return [];
+            });
+            (logs || []).forEach((l) => {
+                const uid2 = String((l._id && l._id.u) || "");
+                const tid = String((l._id && l._id.t) || "");
+                if (!uid2 || !byUser.has(uid2)) return;
+                // Only credit the time if the logger is actually on that task — otherwise
+                // it belongs to somebody else's row, or to none of them.
+                const owners = assigneesByTask.get(tid);
+                if (!owners || !owners.has(uid2)) return;
+                const rec = byUser.get(uid2);
+                const spent = Number(l.m) || 0;
+                rec.loggedMinutes = (rec.loggedMinutes || 0) + spent;
+
+                // Over estimate: time spent BEYOND the estimate, summed per task. NOT "overdue"
+                // in this codebase's sense — MyAchievements uses that for finished after the
+                // DUE DATE, which is a different question with a different answer.
+                //
+                // Per task, not on the totals. Netting one task's overrun against another
+                // task's unused estimate reports zero for someone who has already blown
+                // through an estimate — the very thing this column exists to show. Three
+                // hours estimated and five spent is two hours over, whatever else is
+                // still untouched.
+                //
+                // A task with NO estimate is skipped rather than counted as entirely
+                // overdue: nothing was promised, so nothing was exceeded.
+                const est = estimateByTask.get(tid) || 0;
+                if (est > 0 && spent > est) {
+                    rec.overEstimateMinutes = (rec.overEstimateMinutes || 0) + (spent - est);
+                }
+            });
+        }
 
         const matrixNames = await getUserNameMap([...byUser.keys()].filter(Boolean)).catch(() => ({}));
         // Busiest first, so the rows that need attention are the ones you land on.
@@ -2516,6 +2601,9 @@ exports.getTasksByStatus = async (req, res) => {
                 name: id ? (matrixNames[id] || "-") : "",
                 counts: rec.counts,
                 total: rec.total,
+                estimateMinutes: rec.estimateMinutes || 0,
+                loggedMinutes: rec.loggedMinutes || 0,
+                overEstimateMinutes: rec.overEstimateMinutes || 0,
             }))
             .sort((a, b) => b.total - a.total);
         const USER_LIMIT = 500;
@@ -2525,9 +2613,12 @@ exports.getTasksByStatus = async (req, res) => {
         // aggregations; the rows below are the expensive part, so they are never built
         // speculatively.
         let rows = [];
+        let rowsHasMore = false;
+        let rowsNextSkip = 0;
         const drillKey = Number(body.statusKey);
         if (Number.isFinite(drillKey)) {
             const limit = Number(body.limit) > 0 ? Math.min(Number(body.limit), 200) : 50;
+            const skip = Number(body.skip) > 0 ? Number(body.skip) : 0;
             const drillFilter = { ...baseFilter, statusKey: drillKey };
 
             // Whose row was opened.
@@ -2553,18 +2644,30 @@ exports.getTasksByStatus = async (req, res) => {
                 type: SCHEMA_TYPE.TASKS,
                 data: [
                     drillFilter,
-                    { TaskName: 1, TaskKey: 1, AssigneeUserId: 1, totalEstimatedTime: 1, DueDate: 1, ProjectID: 1, sprintArray: 1 },
-                    { sort: { DueDate: 1 }, limit },
+                    // folderObjId decides which route opens the task: a sprint inside a
+                    // folder is a different route from a sprint directly on the project.
+                    { TaskName: 1, TaskKey: 1, AssigneeUserId: 1, totalEstimatedTime: 1, DueDate: 1, ProjectID: 1, sprintArray: 1, folderObjId: 1 },
+                    // One row past the page is read but never returned — that is what makes
+                    // hasMore exact. Asking for exactly the page cannot tell "there are
+                    // more" from "that was the last one", and an infinite scroll that
+                    // cannot tell the difference either spins forever or stops early.
+                    { sort: { DueDate: 1 }, skip, limit: limit + 1 },
                 ],
             }, "find").catch((e) => {
                 logger.error(`getTasksByStatus drill failed: ${e && e.message ? e.message : e}`);
                 return [];
             });
 
+            // Trim the probe row off before anything else looks at the page, so the extra
+            // task is never fetched worklogs for, named, or returned.
+            const pageTasks = (tasks || []).slice(0, limit);
+            rowsHasMore = (tasks || []).length > limit;
+            rowsNextSkip = skip + pageTasks.length;
+
             // Logged is every worklog on the task, by anyone - the same basis the estimate
             // is set against (totalEstimatedTime is the task's, not per-assignee), so the
             // two columns compare like for like.
-            const taskIds = (tasks || []).map((t) => String(t._id));
+            const taskIds = pageTasks.map((t) => String(t._id));
             const loggedByTask = {};
             if (taskIds.length) {
                 const tlogs = await MongoDbCrudOpration(companyId, {
@@ -2579,13 +2682,13 @@ exports.getTasksByStatus = async (req, res) => {
             }
 
             const assigneeIds = [];
-            (tasks || []).forEach((t) => {
+            pageTasks.forEach((t) => {
                 (Array.isArray(t.AssigneeUserId) ? t.AssigneeUserId : [t.AssigneeUserId])
                     .filter(Boolean).forEach((id) => assigneeIds.push(String(id)));
             });
             const nameMap = await getUserNameMap(assigneeIds).catch(() => ({}));
 
-            rows = (tasks || []).map((t) => {
+            rows = pageTasks.map((t) => {
                 const ids = (Array.isArray(t.AssigneeUserId) ? t.AssigneeUserId : [t.AssigneeUserId])
                     .filter(Boolean).map(String);
                 return {
@@ -2594,6 +2697,7 @@ exports.getTasksByStatus = async (req, res) => {
                     taskName: t.TaskName || "",
                     projectId: String(t.ProjectID || ""),
                     sprintId: (t.sprintArray && t.sprintArray.id) || "",
+                    folderId: String(t.folderObjId || ""),
                     // Every assignee, not just the first: a shared task shown against one
                     // name reads as that person's alone.
                     assignees: ids.map((id) => ({ id, name: nameMap[id] || "-" })),
@@ -2611,6 +2715,8 @@ exports.getTasksByStatus = async (req, res) => {
                 users,
                 usersCapped: allUsers.length > USER_LIMIT,
                 rows,
+                rowsHasMore,
+                rowsNextSkip,
                 scope: isManagement ? "company" : "self",
                 period: { from: dateFrom, to: dateTo },
             },
