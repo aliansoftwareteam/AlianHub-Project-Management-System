@@ -45,6 +45,13 @@
                     <thead>
                         <tr>
                             <th class="tss-th tss-th--user">{{ $t('dashboardCard.tss_col_user') }}</th>
+                            <!-- Hours sit next to the name, before the status columns: they
+                                 describe the person's whole row, not any one status. -->
+                            <th class="tss-th tss-th--hours">{{ $t('dashboardCard.tss_col_estimate') }}</th>
+                            <th class="tss-th tss-th--hours">{{ $t('dashboardCard.tss_col_logged') }}</th>
+                            <th class="tss-th tss-th--hours" :title="$t('dashboardCard.tss_overdue_hours_hint')">
+                                {{ $t('dashboardCard.tss_col_overdue_hours') }}
+                            </th>
                             <th v-for="b in boxes" :key="'h' + b.statusKey" class="tss-th tss-th--num" :title="b.name">
                                 {{ b.name }}
                             </th>
@@ -54,6 +61,16 @@
                         <template v-for="u in visibleUsers" :key="u.userId || 'unassigned'">
                             <tr class="tss-tr" :class="{ 'is-open': isOpenUser(u) }">
                                 <td class="tss-td tss-td--user" :title="userLabel(u)">{{ userLabel(u) }}</td>
+                                <td class="tss-td tss-td--hours">{{ u.estimateMinutes ? formatMinutes(u.estimateMinutes) : '—' }}</td>
+                                <td class="tss-td tss-td--hours">{{ u.loggedMinutes ? formatMinutes(u.loggedMinutes) : '—' }}</td>
+                                <!-- Logged plus the overrun. Red only when there IS an
+                                     overrun — without one this equals the Logged column
+                                     and nothing went wrong. -->
+                                <td
+                                    class="tss-td tss-td--hours"
+                                    :class="{ 'tss-over': u.overEstimateMinutes > 0 }"
+                                    :title="u.overEstimateMinutes > 0 ? $t('dashboardCard.tss_overdue_hours_row', { hours: formatMinutes(u.overEstimateMinutes) }) : ''"
+                                >{{ loggedPlusOver(u) ? formatMinutes(loggedPlusOver(u)) : '—' }}</td>
                                 <td
                                     v-for="b in boxes"
                                     :key="(u.userId || 'unassigned') + '-' + b.statusKey"
@@ -68,12 +85,13 @@
                             <!-- The expansion. Spans the whole table so the task list is not
                                  squeezed into one status column's width. -->
                             <tr v-if="isOpenUser(u)" class="tss-expand-tr">
-                                <td class="tss-expand" :colspan="boxes.length + 1" :style="{ '--tss-accent': drill.color }">
+                                <!-- +4: username, Estimate, Logged and Overdue Hrs, on top of one per status. -->
+                                <td class="tss-expand" :colspan="boxes.length + 4" :style="{ '--tss-accent': drill.color }">
                                     <button type="button" class="tss-expand-close" :title="$t('dashboardCard.tss_close_list')" @click="closeDrill">✕</button>
 
                                     <!-- A cell cannot bound its own height, so the scroll
                                          belongs to a block inside it. -->
-                                    <div class="tss-expand-inner">
+                                    <div class="tss-expand-inner" @scroll.passive="onRowsScroll">
                                     <div v-if="drillLoading" class="tss-msg">{{ $t('dashboardCard.tss_loading_tasks') }}</div>
                                     <div v-else-if="!rows.length" class="tss-msg">{{ $t('dashboardCard.tss_no_tasks') }}</div>
                                     <template v-else>
@@ -107,9 +125,10 @@
                                                 </tr>
                                             </tbody>
                                         </table>
-                                        <div v-if="rows.length >= ROW_LIMIT" class="tss-capped">
-                                            {{ $t('dashboardCard.tss_capped', { n: ROW_LIMIT }) }}
-                                        </div>
+                                        <!-- Nothing is capped any more; scrolling brings the
+                                             rest. This only says a page is on its way, so
+                                             the list does not look finished while it is. -->
+                                        <div v-if="rowsBusy" class="tss-capped">{{ $t('dashboardCard.tss_loading_tasks') }}</div>
                                     </template>
                                     </div>
                                 </td>
@@ -123,17 +142,6 @@
             </div>
         </template>
 
-        <!-- Task detail sidebar — same pattern the other cards use. -->
-        <TaskDetail
-            v-if="isTaskDetail"
-            :companyId="companyId"
-            :projectId="detailProjectId"
-            :sprintId="detailSprintId"
-            :taskId="detailTaskId"
-            :isTaskDetailSideBar="isTaskDetail"
-            @toggleTaskDetail="toggleTaskDetail"
-            :zIndex="7"
-        />
     </div>
 </template>
 
@@ -142,13 +150,13 @@ export default { name: 'TaskStatusSummaryCard' };
 </script>
 
 <script setup>
-import { ref, computed, watch, onMounted, inject, provide } from 'vue';
+import { ref, computed, watch, onMounted, inject } from 'vue';
+import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { resolveCardRange, formatMinutes } from '@/composable/useResourceWorkload';
 import CardSkeleton from '@/components/atom/CardSkeleton/CardSkeleton.vue';
-import TaskDetail from '@/views/TaskDetail/TaskDetail.vue';
 
 // Task counts per status for the selected window, with a per-status drill-down.
 //
@@ -171,9 +179,13 @@ const props = defineProps({
 
 const { t } = useI18n();
 const companyId = inject('$companyId', ref(''));
+const router = useRouter();
 const globalRange = inject('dashboardGlobalRange', null);
 
-const ROW_LIMIT = 50;
+// One page of the drill-down list. Smaller than the old flat 50: the list scrolls in a
+// 240px box, so a page only has to outlast a couple of flicks, and a smaller first page
+// puts the tasks on screen sooner.
+const ROW_LIMIT = 25;
 
 const timerange = computed(() => {
     const v = Number(props.cardData?.timerange);
@@ -189,6 +201,9 @@ const rows = ref([]);
 const loading = ref(false);
 const loaded = ref(false);
 const drillLoading = ref(false);
+const rowsHasMore = ref(false);
+const rowsNextSkip = ref(0);
+const rowsBusy = ref(false);
 // Which cell of the matrix is open: { userId, unassigned, statusKey, userName, statusName, color }
 const drill = ref(null);
 const userSearch = ref('');
@@ -253,7 +268,20 @@ const whoTitle = (r) => (r.assignees && r.assignees.length > 1
     : who(r));
 const isOver = (r) => !!r.estimateMinutes && r.loggedMinutes > r.estimateMinutes;
 
-const requestBody = () => {
+/**
+ * Logged time plus the overrun, as specified.
+ *
+ * Read this as an emphasis figure rather than an amount of work: the overrun is already
+ * part of the logged total (a task estimated at 3h with 5h against it contributes 5h
+ * logged AND 2h over, the 2 being part of the 5), so this sum counts those hours twice and
+ * is larger than anyone actually worked. It is deliberate — it weights a row by how far it
+ * ran past its estimates. The Logged column beside it carries the true figure.
+ *
+ * Dash when nothing has been logged: there is nothing to weight.
+ */
+const loggedPlusOver = (u) => (u.loggedMinutes ? u.loggedMinutes + (u.overEstimateMinutes || 0) : 0);
+
+const requestBody = (skip = 0) => {
     const { dateFrom, dateTo } = resolveCardRange(timerange.value, globalRange && globalRange.value);
     const d = drill.value;
     return {
@@ -268,6 +296,7 @@ const requestBody = () => {
             ? {
                 statusKey: d.statusKey,
                 limit: ROW_LIMIT,
+                skip,
                 ...(d.unassigned ? { unassigned: true } : { userId: d.userId }),
             }
             : {}),
@@ -280,7 +309,7 @@ const load = async () => {
     // silently collapse the detail the user was reading.
     if (drill.value) drillLoading.value = true;
     try {
-        const res = await apiRequest('post', `${env.TASKS_BY_STATUS}`, requestBody());
+        const res = await apiRequest('post', `${env.TASKS_BY_STATUS}`, requestBody(0));
         const d = (res && res.data && res.data.status) ? (res.data.data || {}) : {};
         const map = {};
         (d.statuses || []).forEach((s) => { map[Number(s.statusKey)] = Number(s.count) || 0; });
@@ -290,6 +319,8 @@ const load = async () => {
         users.value = d.users || [];
         usersCapped.value = d.usersCapped === true;
         rows.value = d.rows || [];
+        rowsHasMore.value = d.rowsHasMore === true;
+        rowsNextSkip.value = Number(d.rowsNextSkip) || rows.value.length;
         loaded.value = true;
     } catch (e) {
         console.error('TaskStatusSummaryCard fetch error:', e);
@@ -297,10 +328,46 @@ const load = async () => {
         total.value = 0;
         users.value = [];
         rows.value = [];
+        rowsHasMore.value = false;
     } finally {
         loading.value = false;
         drillLoading.value = false;
     }
+};
+
+/**
+ * The next page of the open list, appended.
+ *
+ * Only the rows are taken from the response: the counters and the matrix are unchanged by
+ * scrolling, and letting them overwrite would re-render the whole table under the pointer
+ * mid-scroll.
+ */
+const loadMoreRows = async () => {
+    if (rowsBusy.value || !rowsHasMore.value || !drill.value) return;
+    rowsBusy.value = true;
+    try {
+        const res = await apiRequest('post', `${env.TASKS_BY_STATUS}`, requestBody(rowsNextSkip.value));
+        const d = (res && res.data && res.data.status) ? (res.data.data || {}) : {};
+        rows.value = [...rows.value, ...(d.rows || [])];
+        // The server's own answer, not an inference from page length: a full page is not
+        // evidence of more, and a short one is not proof there is nothing left.
+        rowsHasMore.value = d.rowsHasMore === true;
+        rowsNextSkip.value = Number(d.rowsNextSkip) || rows.value.length;
+    } catch (e) {
+        console.error('TaskStatusSummaryCard page fetch error:', e);
+        // Leave hasMore alone — a failed page is not the end of the list, and the next
+        // scroll should be able to try again.
+    } finally {
+        rowsBusy.value = false;
+    }
+};
+
+// Within 60px of the bottom is close enough to start fetching: the next page lands before
+// the user reaches the end, so the list reads as continuous rather than as a stall.
+const onRowsScroll = (e) => {
+    const el = e && e.target;
+    if (!el || !rowsHasMore.value || rowsBusy.value) return;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight <= 60) loadMoreRows();
 };
 
 // Which row is expanded, and which of its cells opened it. Keyed on the row rather than
@@ -325,32 +392,47 @@ const toggleDrill = (u, b) => {
         statusName: b.name,
         color: b.color,
     };
+    // A different cell is a different list: carrying the previous one's offset would start
+    // the new one part-way through, silently skipping its first rows.
     rows.value = [];
+    rowsHasMore.value = false;
+    rowsNextSkip.value = 0;
     load();
 };
 
-const closeDrill = () => { drill.value = null; rows.value = []; };
+const closeDrill = () => {
+    drill.value = null;
+    rows.value = [];
+    rowsHasMore.value = false;
+    rowsNextSkip.value = 0;
+};
 
-// ─── Task-detail sidebar (same pattern as the other cards) ───
-const isTaskDetail = ref(false);
-const detailProjectId = ref('');
-const detailSprintId = ref('');
-const detailTaskId = ref('');
+/**
+ * Open the task where it lives.
+ *
+ * Navigates into the project first and lets the task detail open there, rather than
+ * mounting the sidebar over the dashboard. The task then sits in its own project, with the
+ * sprint, the board and the breadcrumb around it — and the URL is somewhere you can go
+ * back to or share, which a sidebar floating over a dashboard was not.
+ *
+ * folderObjId picks the route: a sprint inside a folder is a different route from a sprint
+ * directly on the project, and the folder variant needs the folder id in its params.
+ * sprintId is required by both, so a row without one is not navigable.
+ */
 function openTaskDetail(r) {
-    if (!r || !r.taskId || !r.projectId) return;
-    detailProjectId.value = r.projectId;
-    detailSprintId.value = r.sprintId || '';
-    detailTaskId.value = r.taskId;
-    isTaskDetail.value = true;
+    if (!r || !r.taskId || !r.projectId || !r.sprintId) return;
+    router.push({
+        name: r.folderId ? 'ProjectFolderSprintTask' : 'ProjectSprintTask',
+        params: {
+            cid: companyId.value,
+            id: r.projectId,
+            ...(r.folderId ? { folderId: r.folderId } : {}),
+            sprintId: r.sprintId,
+            taskId: r.taskId,
+        },
+        query: { detailTab: 'task-detail-tab' },
+    }).catch(() => {});
 }
-function toggleTaskDetail(_task, close = false) {
-    isTaskDetail.value = false;
-    if (close === true) return;
-    detailProjectId.value = '';
-    detailSprintId.value = '';
-    detailTaskId.value = '';
-}
-provide('toggleTaskDetail', toggleTaskDetail);
 
 watch(() => props.refreshTrigger, load);
 watch(() => props.cardData, load, { deep: true });
@@ -502,6 +584,18 @@ onMounted(load);
    name cannot claim half the table. The header wraps inside that cap, and an unbroken
    word breaks rather than forcing the column wider than the cap. */
 .tss-matrix .tss-th--num, .tss-matrix .tss-td--num { min-width: 85px; max-width: 130px; }
+/* Hours read as figures, not as counts: right-aligned and tabular like the status columns,
+   but muted, so the eye still lands on the numbers that are clickable. */
+.tss-th--hours, .tss-td--hours {
+    width: 78px;
+    min-width: 78px;
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+.tss-matrix .tss-td--hours { color: var(--muted); }
+/* Over the estimate keeps the amber it has in the task list — same meaning, same colour. */
+.tss-matrix .tss-td--hours.tss-over { color: #b45309; font-weight: 600; }
 .tss-matrix .tss-th--num { overflow-wrap: anywhere; }
 /* Tracing one person across nine columns is the main thing asked of this table. */
 .tss-matrix tbody .tss-tr:hover .tss-td { background: #fbfcfe; }
