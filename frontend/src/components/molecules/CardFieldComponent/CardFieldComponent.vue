@@ -207,6 +207,43 @@ const teams = computed(() => {
 
 const taskStatusArray = computed(() => JSON.parse(JSON.stringify(getters["settings/AllTaskStatus"]?.settings || [])));
 
+/**
+ * Which statuses start ticked on a NEW card.
+ *
+ * Every card but one starts with all of them. TaskStatusSummaryCard starts with the five
+ * below, because its matrix gets a column per selected status and every status makes a
+ * table too wide to read. Statuses stay dynamic — the dropdown still offers the full list,
+ * so anything left unticked is one click away rather than unavailable.
+ *
+ * Matched on NAME, case-insensitively, because statuses are per-company and user-named:
+ * their numeric keys differ between companies, so a key whitelist would tick the right
+ * boxes for one tenant and the wrong ones for the next.
+ *
+ * Nothing stops a company creating two statuses with the same name — this instance has two
+ * called "In Review", in different colours. Only the first of each name is pre-ticked;
+ * ticking both would double every count in that column.
+ *
+ * A company using none of these names falls back to all of them, rather than opening the
+ * settings with nothing selected and a card that shows nothing.
+ */
+const SUMMARY_CARD_DEFAULT_STATUSES = ['to do', 'in progress', 'in review', 'backlog', 'complete'];
+
+const defaultStatusKeys = computed(() => {
+    const all = taskStatusArray.value || [];
+    const allKeys = all.map((e) => e.key);
+    if (props.componentId !== 'TaskStatusSummaryCard') return allKeys;
+    const seen = new Set();
+    const picked = all
+        .filter((s) => {
+            const name = String(s?.name || '').trim().toLowerCase();
+            if (!SUMMARY_CARD_DEFAULT_STATUSES.includes(name) || seen.has(name)) return false;
+            seen.add(name);
+            return true;
+        })
+        .map((e) => e.key);
+    return picked.length ? picked : allKeys;
+});
+
 const selectedUser = ref([]);
 const selectedStatus = ref([]);
 const selectedProjects = ref([]);
@@ -500,9 +537,11 @@ const initializeSelectedValues = () => {
     }
 
     if (formObj.value?.statusArray) {
-        selectedStatus.value = props.isEditCard 
-            ? (formObj.value?.statusArray?.value?.length ? formObj.value?.statusArray?.value : (taskStatusArray.value?.map(e => e.key) || []))
-            : (taskStatusArray.value?.map(e => e.key) || []);
+        // An edited card keeps what it was saved with; anything else opens on the
+        // per-card default (see defaultStatusKeys).
+        selectedStatus.value = props.isEditCard
+            ? (formObj.value?.statusArray?.value?.length ? formObj.value?.statusArray?.value : defaultStatusKeys.value)
+            : defaultStatusKeys.value;
     }
     if (formObj.value?.measure) {
         selectedMeasure.value = formObj.value?.measure?.value;
