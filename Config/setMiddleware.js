@@ -238,6 +238,12 @@ const verifyJWTTokenWithCRoute = [
     // is the entire point of them.
     '/api/v2/public-shares',
     '/api/v2/intake',
+    // Outgoing webhooks (Modules/Webhooks). A webhook belongs to the member who created
+    // it, and every route is scoped to req.uid — which only this middleware sets. These
+    // were in neither list, so the owner was taken from the request body instead: with
+    // the list now filtered by owner, that would have been a way to read someone else's
+    // integrations rather than merely to mislabel one.
+    '/api/v2/webhooks',
 ];
 const verifyJWTToken = [
     "/api/v2/company/delete",

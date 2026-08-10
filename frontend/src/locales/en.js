@@ -2192,6 +2192,8 @@ export default {
         edit: "Edit",
         delete: "Delete",
         no_logs: "No deliveries recorded yet.",
+        load_more: "Load more",
+        loading: "Loading…",
         event: "Event",
         status: "Status",
         duration: "Duration",
