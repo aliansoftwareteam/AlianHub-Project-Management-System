@@ -2396,17 +2396,30 @@ exports.getMyTime = async (req, res) => {
  * splits those totals by assignee. Picking one cell of the matrix lists the tasks behind
  * that one number.
  *
+ * HOURS (Planned, Logged, Overdue) sit beside the name. They follow the timesheet, not the
+ * counts: credited to whoever planned or logged them, and counted across EVERY status —
+ * including the ones the card is not displaying. A row's counts answer "what is assigned
+ * to them in these statuses"; its hours answer "what did they plan and what did they
+ * work", full stop. The two are not a partition of one number and never were, so a row can
+ * carry hours with no visible tasks.
+ *
+ * OVERDUE is the period's projected cost against its plan — see the derivation below. It
+ * is a NET figure over the row: a task finished under its plan gives that time back, so
+ * one task's overrun can be offset by another's underrun.
+ *
  * SCOPE. Owner/Admin (roleType 1/2) see the whole company; everyone else sees only the
  * tasks assigned to them. The role is resolved from company_users via req.uid, never
  * from the body — a role the caller can name is a role the caller can grant themselves.
  *
- * WINDOW. A task belongs to the window when its DUE DATE falls inside it. Nothing else:
- * not when it was created, not when it was last touched, and not when it merely runs
- * through the period. "Today" means due today.
+ * WINDOW. A task belongs to the window when somebody PLANNED it or LOGGED time on it
+ * inside it — the same rule the Workload Timesheet runs on, so the two agree about what
+ * "This Week" contains. Planned comes from estimated_time.Date (the per-day plan), logged
+ * from timesheets.LogStartTime. A task's own due date is not consulted at all.
  *
- * An overlap rule was tried first and reads wrong from the outside — filtering to Today
- * and getting back a task due on the 31st looks like the filter is broken, whatever the
- * reasoning. A task with no due date therefore never appears, in any period.
+ * This replaced a due-date window. Due date answers "when is this owed", which is a
+ * different question from "what was worked on", and it left the card unable to agree with
+ * the timesheet the company already reads. A task nobody planned or logged in the period
+ * therefore never appears, however it is scheduled.
  *
  * Body: { dateFrom, dateTo,
  *         statusKeys?: number[]  - restrict the counters to the ones the card shows
@@ -2426,11 +2439,16 @@ exports.getTasksByStatus = async (req, res) => {
             return res.status(400).json({ status: false, message: "companyId header required" });
         }
         const uid = String(req.uid || "");
-        const empty = { statuses: [], total: 0, rows: [], scope: "self", period: null };
-        if (!uid) return res.status(200).json({ status: true, data: empty });
+        const emptyPayload = (scope) => ({
+            statuses: [], total: 0, users: [], usersCapped: false,
+            rows: [], rowsHasMore: false, rowsNextSkip: 0,
+            scope, period: null,
+        });
+        if (!uid) return res.status(200).json({ status: true, data: emptyPayload("self") });
 
         const body = req.body || {};
-        const { dateFrom, dateTo } = getDayOrRangeBounds(body);
+        // estimated_time.Date is a real Date; timesheets.LogStartTime is Unix seconds.
+        const { dateFrom, dateTo, fromSec, toSec } = getDayOrRangeBounds(body);
 
         const callerRoleType = await resolveCallerRoleType(companyId, uid);
         const isManagement = callerRoleType === 1 || callerRoleType === 2;
@@ -2442,17 +2460,71 @@ exports.getTasksByStatus = async (req, res) => {
 
         const projClause = projectScopeClause(body.projectMode || "all", body.projectId);
 
-        const baseFilter = applyTaskMatch({
+        // ─── The window: every task planned or logged inside it — see WINDOW above ────
+        //
+        // Neither collection carries a task's status, and the tasks collection carries no
+        // "was worked on" date, so the period has to be resolved to a set of task ids
+        // first and applied to the task query second. Both reads group down to distinct
+        // ids in Mongo rather than shipping every plan row and log line back here.
+        const [plannedIds, loggedIds] = await Promise.all([
+            MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.ESTIMATES_TIME,
+                data: [[
+                    { $match: { Date: { $gte: dateFrom, $lte: dateTo } } },
+                    { $group: { _id: "$TaskId" } },
+                ]],
+            }, "aggregate").catch((e) => {
+                logger.error(`getTasksByStatus planned window failed: ${e && e.message ? e.message : e}`);
+                return [];
+            }),
+            MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.TIMESHEET,
+                data: [[
+                    { $match: { LogStartTime: { $gte: fromSec, $lte: toSec } } },
+                    { $group: { _id: "$TicketID" } },
+                ]],
+            }, "aggregate").catch((e) => {
+                logger.error(`getTasksByStatus logged window failed: ${e && e.message ? e.message : e}`);
+                return [];
+            }),
+        ]);
+
+        // Both collections hold the task id as a STRING. It has to be cast by hand: the
+        // counts and the matrix below run through $match inside an aggregation, and an
+        // aggregation applies no schema casting — a string would silently match nothing.
+        const windowTaskIds = [];
+        const seenTaskId = new Set();
+        [plannedIds, loggedIds].forEach((groups) => (groups || []).forEach((g) => {
+            const id = g && g._id ? String(g._id) : "";
+            if (!id || seenTaskId.has(id) || !mongoose.Types.ObjectId.isValid(id)) return;
+            seenTaskId.add(id);
+            windowTaskIds.push(new mongoose.Types.ObjectId(id));
+        }));
+
+        const scope = isManagement ? "company" : "self";
+        if (!windowTaskIds.length) {
+            return res.status(200).json({
+                status: true,
+                data: { ...emptyPayload(scope), period: { from: dateFrom, to: dateTo } },
+            });
+        }
+
+        // The card's scope, built fresh each time: applyTaskMatch MUTATES what it is
+        // handed, so the two callers below cannot share one object.
+        const taskScope = (withStatusFilter) => applyTaskMatch({
             deletedStatusKey: 0,
             mainChat: { $ne: true }, // chat threads are stored as tasks; they are not work
-            // Due date inside the window - see WINDOW above.
-            DueDate: { $gte: dateFrom, $lte: dateTo },
-            ...(statusKeys.length ? { statusKey: { $in: statusKeys } } : {}),
+            _id: { $in: windowTaskIds },
+            ...(withStatusFilter && statusKeys.length ? { statusKey: { $in: statusKeys } } : {}),
             ...(projClause ? { ProjectID: projClause } : {}),
             // A member sees their own work only: assigned to them, not merely led or
             // created by them - the same line getMyAchievements draws.
             ...(isManagement ? {} : { AssigneeUserId: uid }),
         }, bodyTaskMatch(body));
+
+        const baseFilter = taskScope(true);
+        // The hours columns deliberately drop the status selection — see HOURS above.
+        const hoursFilter = taskScope(false);
 
         // Counts come from a $group rather than by fetching every task: the boxes need a
         // number, and a company-wide window can hold thousands of rows.
@@ -2483,20 +2555,20 @@ exports.getTasksByStatus = async (req, res) => {
         // preserveNullAndEmptyArrays keeps tasks nobody is on. They are real tasks in the
         // window and dropping them would leave the matrix quietly short of the counters,
         // with nothing on screen to say where the difference went.
+        //
+        // Runs over `hoursFilter`, so it sees EVERY status — including the ones the card
+        // is not displaying. Those land in the OTHER bucket below rather than being
+        // dropped: since the hours count them, a row would otherwise carry time with no
+        // task anywhere on screen to explain it.
         const perUser = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
             data: [[
-                { $match: baseFilter },
+                { $match: hoursFilter },
                 { $unwind: { path: "$AssigneeUserId", preserveNullAndEmptyArrays: true } },
                 {
                     $group: {
                         _id: { u: "$AssigneeUserId", s: "$statusKey" },
                         n: { $sum: 1 },
-                        // Estimate is the TASK's, not a share of it — the same number the
-                        // task detail shows. A task on three people therefore contributes
-                        // its full estimate to each of them, exactly as it contributes 1 to
-                        // each of their counts.
-                        est: { $sum: { $ifNull: ["$totalEstimatedTime", 0] } },
                     },
                 },
             ]],
@@ -2505,90 +2577,154 @@ exports.getTasksByStatus = async (req, res) => {
             return [];
         });
 
-        const byUser = new Map();   // userId ("" = unassigned) -> { counts, total, estimateMinutes }
+        // Everything the card is not showing a column for, gathered under one key the card
+        // renders as "Other". An empty selection means every status is shown, so nothing
+        // is left over and the bucket stays empty.
+        const OTHER_BUCKET = "other";
+        const shownStatuses = new Set(statusKeys);
+        const isShown = (sKey) => !statusKeys.length || shownStatuses.has(sKey);
+
+        const byUser = new Map();   // userId ("" = unassigned) -> { counts, total }
         (perUser || []).forEach((g) => {
             const sKey = Number(g && g._id && g._id.s);
             if (!Number.isFinite(sKey)) return;
             const key = (g._id && g._id.u) ? String(g._id.u) : "";
-            if (!byUser.has(key)) byUser.set(key, { counts: {}, total: 0, estimateMinutes: 0 });
+            if (!byUser.has(key)) byUser.set(key, { counts: {}, total: 0 });
             const rec = byUser.get(key);
             const n = Number(g.n) || 0;
-            rec.counts[sKey] = (rec.counts[sKey] || 0) + n;
+            const bucket = isShown(sKey) ? sKey : OTHER_BUCKET;
+            rec.counts[bucket] = (rec.counts[bucket] || 0) + n;
             rec.total += n;
-            rec.estimateMinutes += Number(g.est) || 0;
         });
 
-        // Logged time per person.
+        // ─── Planned and Logged hours — the Workload Timesheet's own figures ─────
         //
-        // Deliberately narrower than "everything they logged this period": only their own
-        // time, on the tasks counted in their own row. The row is about their tasks, so a
-        // Logged figure that also counted their time on a colleague's task would not be
-        // comparable to the Estimate beside it.
+        // Planned is the person's per-day plan (estimated_time.EstimatedTime); Logged is
+        // what they actually tracked (timesheets.LogTimeDuration). Same rows, summed the
+        // same way as the timesheet's two columns, so the card and the timesheet agree.
         //
-        // That pairing needs to know which tasks are whose, which the grouped aggregation
-        // above has already collapsed away — hence the second read. It projects two fields
-        // and is bounded by the same window the counts already scan.
-        const ownership = await MongoDbCrudOpration(companyId, {
+        // Credited to whoever PLANNED or LOGGED it, NOT to the task's assignee — the
+        // timesheet's rule. The hours are yours because you put them on your own plan or
+        // your own tracker. Someone who worked here but is on nobody's assignee list still
+        // gets a row; dropping them would leave the card quietly short of the timesheet,
+        // which is the one thing this change exists to prevent.
+        //
+        // Counted over `hoursFilter`, which is the card's scope MINUS the status
+        // selection. Which statuses the card displays is a choice about which boxes and
+        // columns to show, not a statement about which work exists — so a task sitting in
+        // a status nobody ticked still had hours against it, and the timesheet counts
+        // them. Scoping the hours by statusKey made them vanish, and the card silently
+        // disagreed with the timesheet until somebody moved the task.
+        //
+        // Everything that really is scope still applies: project, member, deleted, chat
+        // threads, and the advanced "Add filter" — that one is somebody deliberately
+        // asking for a slice, which is a different intent from the card's default boxes.
+        // statusType rides along for the overdue projection below: 'close' is this
+        // codebase's definition of a finished task, everywhere from epic recount to
+        // velocity. Statuses are per-company and renameable, so the type is the only
+        // safe signal — matching on the name "Complete" would break the first time a
+        // company called it something else.
+        const surviving = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
-            data: [baseFilter, { _id: 1, AssigneeUserId: 1, totalEstimatedTime: 1 }],
+            data: [hoursFilter, { _id: 1, statusType: 1 }],
         }, "find").catch((e) => {
-            logger.error(`getTasksByStatus ownership read failed: ${e && e.message ? e.message : e}`);
+            logger.error(`getTasksByStatus surviving-task read failed: ${e && e.message ? e.message : e}`);
             return [];
         });
 
-        // taskId -> Set(userId), so a log line can be credited only to a real assignee.
-        // taskId -> estimate, for the per-task overrun below.
-        const assigneesByTask = new Map();
-        const estimateByTask = new Map();
-        const taskIds = [];
-        (ownership || []).forEach((t) => {
+        // Both hour collections hold the task id as a STRING — the opposite of the
+        // ObjectId the task query needed. Casting the wrong way round matches nothing,
+        // silently.
+        const survivingIds = [];
+        const isFinished = new Set();
+        (surviving || []).forEach((t) => {
             const id = String(t._id);
-            taskIds.push(id);
-            const ids = (Array.isArray(t.AssigneeUserId) ? t.AssigneeUserId : [t.AssigneeUserId])
-                .filter(Boolean).map(String);
-            assigneesByTask.set(id, new Set(ids));
-            estimateByTask.set(id, Number(t.totalEstimatedTime) || 0);
+            survivingIds.push(id);
+            if (String(t.statusType || "") === "close") isFinished.add(id);
         });
 
-        if (taskIds.length) {
-            const logs = await MongoDbCrudOpration(companyId, {
-                type: SCHEMA_TYPE.TIMESHEET,
-                data: [[
-                    { $match: { TicketID: { $in: taskIds } } },
-                    { $group: { _id: { u: "$Loggeduser", t: "$TicketID" }, m: { $sum: "$LogTimeDuration" } } },
-                ]],
-            }, "aggregate").catch((e) => {
-                logger.error(`getTasksByStatus logged read failed: ${e && e.message ? e.message : e}`);
-                return [];
-            });
-            (logs || []).forEach((l) => {
-                const uid2 = String((l._id && l._id.u) || "");
-                const tid = String((l._id && l._id.t) || "");
-                if (!uid2 || !byUser.has(uid2)) return;
-                // Only credit the time if the logger is actually on that task — otherwise
-                // it belongs to somebody else's row, or to none of them.
-                const owners = assigneesByTask.get(tid);
-                if (!owners || !owners.has(uid2)) return;
-                const rec = byUser.get(uid2);
-                const spent = Number(l.m) || 0;
-                rec.loggedMinutes = (rec.loggedMinutes || 0) + spent;
+        if (survivingIds.length) {
+            // Grouped per person AND per task, not per person alone: the overdue
+            // projection asks a different question of a finished task than of an open
+            // one, so the two cannot be pre-summed.
+            const [plans, logs] = await Promise.all([
+                MongoDbCrudOpration(companyId, {
+                    type: SCHEMA_TYPE.ESTIMATES_TIME,
+                    data: [[
+                        {
+                            $match: {
+                                TaskId: { $in: survivingIds },
+                                Date: { $gte: dateFrom, $lte: dateTo },
+                                // A member sees their own hours only. Without this, a
+                                // colleague who planned or logged on a task the member is
+                                // assigned to would appear as a row — a name and a workload
+                                // the member is not entitled to, handed over by these
+                                // columns.
+                                ...(isManagement ? {} : { UserId: uid }),
+                            },
+                        },
+                        { $group: { _id: { u: "$UserId", t: "$TaskId" }, m: { $sum: "$EstimatedTime" } } },
+                    ]],
+                }, "aggregate").catch((e) => {
+                    logger.error(`getTasksByStatus planned read failed: ${e && e.message ? e.message : e}`);
+                    return [];
+                }),
+                MongoDbCrudOpration(companyId, {
+                    type: SCHEMA_TYPE.TIMESHEET,
+                    data: [[
+                        {
+                            $match: {
+                                TicketID: { $in: survivingIds },
+                                LogStartTime: { $gte: fromSec, $lte: toSec },
+                                ...(isManagement ? {} : { Loggeduser: uid }),
+                            },
+                        },
+                        { $group: { _id: { u: "$Loggeduser", t: "$TicketID" }, m: { $sum: "$LogTimeDuration" } } },
+                    ]],
+                }, "aggregate").catch((e) => {
+                    logger.error(`getTasksByStatus logged read failed: ${e && e.message ? e.message : e}`);
+                    return [];
+                }),
+            ]);
 
-                // Over estimate: time spent BEYOND the estimate, summed per task. NOT "overdue"
-                // in this codebase's sense — MyAchievements uses that for finished after the
-                // DUE DATE, which is a different question with a different answer.
-                //
-                // Per task, not on the totals. Netting one task's overrun against another
-                // task's unused estimate reports zero for someone who has already blown
-                // through an estimate — the very thing this column exists to show. Three
-                // hours estimated and five spent is two hours over, whatever else is
-                // still untouched.
-                //
-                // A task with NO estimate is skipped rather than counted as entirely
-                // overdue: nothing was promised, so nothing was exceeded.
-                const est = estimateByTask.get(tid) || 0;
-                if (est > 0 && spent > est) {
-                    rec.overEstimateMinutes = (rec.overEstimateMinutes || 0) + (spent - est);
-                }
+            // One entry per person+task, so each task can be judged on its own footing
+            // before the row is totalled.
+            const pairs = new Map();   // `${userId}|${taskId}` -> { planned, logged }
+            const collect = (groups, field) => (groups || []).forEach((g) => {
+                const person = String((g && g._id && g._id.u) || "");
+                const task = String((g && g._id && g._id.t) || "");
+                if (!person || !task) return;
+                const key = `${person}|${task}`;
+                if (!pairs.has(key)) pairs.set(key, { person, task, planned: 0, logged: 0 });
+                pairs.get(key)[field] += Number(g.m) || 0;
+            });
+            collect(plans, "planned");
+            collect(logs, "logged");
+
+            // ─── Overdue: what the period is on course to cost, against what was
+            // planned for it ────────────────────────────────────────────────────────
+            //
+            //   projected = Σ logged            over FINISHED tasks
+            //             + Σ max(planned, logged) over OPEN tasks
+            //   planned   = Σ planned           over every task in the window
+            //   overdue   = projected − planned, when positive
+            //
+            // A finished task is settled: what it cost is what it logged, and a task
+            // brought in under its plan gives that time back to the total. An open task
+            // will cost at least what was planned for it and at least what has already
+            // gone into it — flooring at the larger of the two is what lets a task that
+            // is already 8h into a 3h plan show up now, rather than on the day somebody
+            // closes it.
+            //
+            // A person appears here because they did the work, so a row is created for
+            // them if the assignee matrix above did not already have one.
+            pairs.forEach(({ person, task, planned, logged }) => {
+                if (!byUser.has(person)) byUser.set(person, { counts: {}, total: 0 });
+                const rec = byUser.get(person);
+                rec.plannedMinutes = (rec.plannedMinutes || 0) + planned;
+                rec.loggedMinutes = (rec.loggedMinutes || 0) + logged;
+                rec.projectedMinutes = (rec.projectedMinutes || 0)
+                    + (isFinished.has(task) ? logged : Math.max(planned, logged));
             });
         }
 
@@ -2601,9 +2737,11 @@ exports.getTasksByStatus = async (req, res) => {
                 name: id ? (matrixNames[id] || "-") : "",
                 counts: rec.counts,
                 total: rec.total,
-                estimateMinutes: rec.estimateMinutes || 0,
+                plannedMinutes: rec.plannedMinutes || 0,
                 loggedMinutes: rec.loggedMinutes || 0,
-                overEstimateMinutes: rec.overEstimateMinutes || 0,
+                // Only the overrun is reported. A period running under its plan is not
+                // "negative overdue", it is simply not overdue.
+                overdueMinutes: Math.max(0, (rec.projectedMinutes || 0) - (rec.plannedMinutes || 0)),
             }))
             .sort((a, b) => b.total - a.total);
         const USER_LIMIT = 500;
@@ -2616,10 +2754,16 @@ exports.getTasksByStatus = async (req, res) => {
         let rowsHasMore = false;
         let rowsNextSkip = 0;
         const drillKey = Number(body.statusKey);
-        if (Number.isFinite(drillKey)) {
+        // The Other column opens the same list for everything the card has no column for.
+        // Meaningless when the card shows every status, so it is only honoured when the
+        // selection is actually a subset.
+        const wantOther = body.otherStatuses === true && statusKeys.length > 0;
+        if (wantOther || Number.isFinite(drillKey)) {
             const limit = Number(body.limit) > 0 ? Math.min(Number(body.limit), 200) : 50;
             const skip = Number(body.skip) > 0 ? Number(body.skip) : 0;
-            const drillFilter = { ...baseFilter, statusKey: drillKey };
+            const drillFilter = wantOther
+                ? { ...hoursFilter, statusKey: { $nin: statusKeys } }
+                : { ...baseFilter, statusKey: drillKey };
 
             // Whose row was opened.
             //
@@ -2646,7 +2790,9 @@ exports.getTasksByStatus = async (req, res) => {
                     drillFilter,
                     // folderObjId decides which route opens the task: a sprint inside a
                     // folder is a different route from a sprint directly on the project.
-                    { TaskName: 1, TaskKey: 1, AssigneeUserId: 1, totalEstimatedTime: 1, DueDate: 1, ProjectID: 1, sprintArray: 1, folderObjId: 1 },
+                    // statusKey rides along so the Other list can say which status each
+                    // task is actually in — the whole point of opening that column.
+                    { TaskName: 1, TaskKey: 1, statusKey: 1, DueDate: 1, ProjectID: 1, sprintArray: 1, folderObjId: 1 },
                     // One row past the page is read but never returned — that is what makes
                     // hasMore exact. Asking for exactly the page cannot tell "there are
                     // more" from "that was the last one", and an infinite scroll that
@@ -2664,47 +2810,64 @@ exports.getTasksByStatus = async (req, res) => {
             rowsHasMore = (tasks || []).length > limit;
             rowsNextSkip = skip + pageTasks.length;
 
-            // Logged is every worklog on the task, by anyone - the same basis the estimate
-            // is set against (totalEstimatedTime is the task's, not per-assignee), so the
-            // two columns compare like for like.
-            const taskIds = pageTasks.map((t) => String(t._id));
+            // Hours per task, on the same basis as the row that was opened: this person,
+            // these days. Anything wider and the list would not add up to the row above
+            // it. `wantUser` is already the caller's own id for a member, so this cannot
+            // read somebody else's hours.
+            //
+            // The unassigned row has no person and so has no hours — blank, not
+            // everyone's.
+            const drillTaskIds = pageTasks.map((t) => String(t._id));
+            const plannedByTask = {};
             const loggedByTask = {};
-            if (taskIds.length) {
-                const tlogs = await MongoDbCrudOpration(companyId, {
-                    type: SCHEMA_TYPE.TIMESHEET,
-                    data: [{ TicketID: { $in: taskIds } }, { TicketID: 1, LogTimeDuration: 1 }],
-                }, "find").catch(() => []);
-                (tlogs || []).forEach((ts) => {
+            if (drillTaskIds.length && wantUser) {
+                const [dPlans, dLogs] = await Promise.all([
+                    MongoDbCrudOpration(companyId, {
+                        type: SCHEMA_TYPE.ESTIMATES_TIME,
+                        data: [
+                            { TaskId: { $in: drillTaskIds }, UserId: wantUser, Date: { $gte: dateFrom, $lte: dateTo } },
+                            { TaskId: 1, EstimatedTime: 1 },
+                        ],
+                    }, "find").catch((e) => {
+                        logger.error(`getTasksByStatus drill planned read failed: ${e && e.message ? e.message : e}`);
+                        return [];
+                    }),
+                    MongoDbCrudOpration(companyId, {
+                        type: SCHEMA_TYPE.TIMESHEET,
+                        data: [
+                            { TicketID: { $in: drillTaskIds }, Loggeduser: wantUser, LogStartTime: { $gte: fromSec, $lte: toSec } },
+                            { TicketID: 1, LogTimeDuration: 1 },
+                        ],
+                    }, "find").catch((e) => {
+                        logger.error(`getTasksByStatus drill logged read failed: ${e && e.message ? e.message : e}`);
+                        return [];
+                    }),
+                ]);
+                (dPlans || []).forEach((p) => {
+                    if (!p.TaskId) return;
+                    const k = String(p.TaskId);
+                    plannedByTask[k] = (plannedByTask[k] || 0) + (Number(p.EstimatedTime) || 0);
+                });
+                (dLogs || []).forEach((ts) => {
                     if (!ts.TicketID) return;
                     const k = String(ts.TicketID);
                     loggedByTask[k] = (loggedByTask[k] || 0) + (Number(ts.LogTimeDuration) || 0);
                 });
             }
 
-            const assigneeIds = [];
-            pageTasks.forEach((t) => {
-                (Array.isArray(t.AssigneeUserId) ? t.AssigneeUserId : [t.AssigneeUserId])
-                    .filter(Boolean).forEach((id) => assigneeIds.push(String(id)));
-            });
-            const nameMap = await getUserNameMap(assigneeIds).catch(() => ({}));
-
-            rows = pageTasks.map((t) => {
-                const ids = (Array.isArray(t.AssigneeUserId) ? t.AssigneeUserId : [t.AssigneeUserId])
-                    .filter(Boolean).map(String);
-                return {
-                    taskId: String(t._id),
-                    taskKey: t.TaskKey || "",
-                    taskName: t.TaskName || "",
-                    projectId: String(t.ProjectID || ""),
-                    sprintId: (t.sprintArray && t.sprintArray.id) || "",
-                    folderId: String(t.folderObjId || ""),
-                    // Every assignee, not just the first: a shared task shown against one
-                    // name reads as that person's alone.
-                    assignees: ids.map((id) => ({ id, name: nameMap[id] || "-" })),
-                    estimateMinutes: Number(t.totalEstimatedTime) || 0,
-                    loggedMinutes: loggedByTask[String(t._id)] || 0,
-                };
-            });
+            // No assignee names are resolved here: the list already sits under the person
+            // whose row was opened, so naming them again on every line said nothing.
+            rows = pageTasks.map((t) => ({
+                taskId: String(t._id),
+                taskKey: t.TaskKey || "",
+                taskName: t.TaskName || "",
+                statusKey: Number(t.statusKey),
+                projectId: String(t.ProjectID || ""),
+                sprintId: (t.sprintArray && t.sprintArray.id) || "",
+                folderId: String(t.folderObjId || ""),
+                plannedMinutes: plannedByTask[String(t._id)] || 0,
+                loggedMinutes: loggedByTask[String(t._id)] || 0,
+            }));
         }
 
         return res.status(200).json({
@@ -2717,7 +2880,7 @@ exports.getTasksByStatus = async (req, res) => {
                 rows,
                 rowsHasMore,
                 rowsNextSkip,
-                scope: isManagement ? "company" : "self",
+                scope,
                 period: { from: dateFrom, to: dateTo },
             },
         });

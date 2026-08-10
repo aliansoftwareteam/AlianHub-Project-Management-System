@@ -723,6 +723,18 @@ export const getCardsComponentsSize = (key) => {
                 "minH": 8,
                 "maxH": 22
             };
+        case 'TaskStatusSummaryCard':
+            // Tasks Summary by Status — a person per row with Planned, Logged and a
+            // column per status, so it needs half the grid (6 of 12 ≈ 945px on a 1920
+            // screen) before the status columns start squeezing each other. Expressed in
+            // columns rather than pixels because the grid lays out in columns: a hard
+            // 945px floor would overrun its own cell on a smaller screen.
+            return {
+                "minW": 6,
+                "maxW": 12,
+                "minH": 8,
+                "maxH": 22
+            };
         case 'ActiveProjectsCard':
         case 'ProjectsByTypeCard':
         case 'RunningProjectsCard':
