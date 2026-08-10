@@ -54,6 +54,9 @@
                                  describe the person's whole row, not any one status. -->
                             <th class="tss-th tss-th--hours">{{ $t('dashboardCard.tss_col_planned') }}</th>
                             <th class="tss-th tss-th--hours">{{ $t('dashboardCard.tss_col_logged') }}</th>
+                            <th class="tss-th tss-th--hours" :title="$t('dashboardCard.tss_overdue_hint')">
+                                {{ $t('dashboardCard.tss_col_overdue') }}
+                            </th>
                             <th v-for="b in boxes" :key="'h' + b.statusKey" class="tss-th tss-th--num" :title="b.name">
                                 {{ b.name }}
                             </th>
@@ -68,6 +71,11 @@
                                 <td class="tss-td tss-td--user" :title="userLabel(u)">{{ userLabel(u) }}</td>
                                 <td class="tss-td tss-td--hours">{{ u.plannedMinutes ? formatMinutes(u.plannedMinutes) : '—' }}</td>
                                 <td class="tss-td tss-td--hours">{{ u.loggedMinutes ? formatMinutes(u.loggedMinutes) : '—' }}</td>
+                                <!-- Only an overrun is worth colouring; a period inside its
+                                     plan has nothing to report and stays a dash. -->
+                                <td class="tss-td tss-td--hours" :class="{ 'tss-over': u.overdueMinutes > 0 }">
+                                    {{ u.overdueMinutes ? formatMinutes(u.overdueMinutes) : '—' }}
+                                </td>
                                 <td
                                     v-for="b in boxes"
                                     :key="(u.userId || 'unassigned') + '-' + b.statusKey"
@@ -95,16 +103,16 @@
                                  computes its own widths and can only ever land near them. -->
                             <template v-if="isOpenUser(u)">
                                 <tr class="tss-drill-head">
-                                    <td class="tss-drill-cell" :colspan="matrixColumns + 3">
+                                    <td class="tss-drill-cell" :colspan="matrixTotalColumns">
                                         <span class="tss-drill-title">{{ drillTitle }}</span>
                                         <button type="button" class="tss-drill-close" :title="$t('dashboardCard.tss_close_list')" @click="closeDrill">✕</button>
                                     </td>
                                 </tr>
                                 <tr v-if="drillLoading" class="tss-drill-msg">
-                                    <td class="tss-drill-cell" :colspan="matrixColumns + 3">{{ $t('dashboardCard.tss_loading_tasks') }}</td>
+                                    <td class="tss-drill-cell" :colspan="matrixTotalColumns">{{ $t('dashboardCard.tss_loading_tasks') }}</td>
                                 </tr>
                                 <tr v-else-if="!rows.length" class="tss-drill-msg">
-                                    <td class="tss-drill-cell" :colspan="matrixColumns + 3">{{ $t('dashboardCard.tss_no_tasks') }}</td>
+                                    <td class="tss-drill-cell" :colspan="matrixTotalColumns">{{ $t('dashboardCard.tss_no_tasks') }}</td>
                                 </tr>
                                 <template v-else>
                                     <tr v-for="r in rows" :key="r.taskId" class="tss-tr tss-drill-row">
@@ -121,6 +129,11 @@
                                         </td>
                                         <td class="tss-td tss-td--hours">{{ r.plannedMinutes ? formatMinutes(r.plannedMinutes) : '—' }}</td>
                                         <td class="tss-td tss-td--hours">{{ r.loggedMinutes ? formatMinutes(r.loggedMinutes) : '—' }}</td>
+                                        <!-- Overdue is a NET figure over the whole row — one
+                                             task's underrun cancels another's overrun — so it
+                                             has no honest per-task value to print here. The
+                                             cell keeps the columns lined up. -->
+                                        <td class="tss-td tss-td--hours"></td>
                                         <!-- The Other list is the only one that mixes statuses,
                                              so only it names the status each task is in. It goes
                                              in the run past the hours, which is empty on a task
@@ -134,7 +147,7 @@
                                          says a page is on its way, so the list does not look
                                          finished while it is. -->
                                     <tr v-if="rowsBusy" class="tss-drill-msg">
-                                        <td class="tss-drill-cell" :colspan="matrixColumns + 3">{{ $t('dashboardCard.tss_loading_tasks') }}</td>
+                                        <td class="tss-drill-cell" :colspan="matrixTotalColumns">{{ $t('dashboardCard.tss_loading_tasks') }}</td>
                                     </tr>
                                 </template>
                             </template>
@@ -257,8 +270,12 @@ const otherBox = computed(() => ({
     name: t('dashboardCard.tss_col_other'),
     color: '#8a94a6',
 }));
-// Every column the matrix renders, so one place decides the expansion's colspan.
+// The status columns (plus Other), and the whole row width including the four fixed
+// leading columns — username, Planned, Logged, Overdue. One place decides both, so adding
+// a column cannot leave a colspan behind somewhere.
 const matrixColumns = computed(() => (showOther.value ? boxes.value.length + 1 : boxes.value.length));
+const LEAD_COLUMNS = 4;
+const matrixTotalColumns = computed(() => matrixColumns.value + LEAD_COLUMNS);
 
 // Statuses can be named even when the card is not showing them, which is what makes the
 // Other list readable.
@@ -612,6 +629,10 @@ onMounted(load);
     font-variant-numeric: tabular-nums;
 }
 .tss-matrix .tss-td--hours { color: var(--muted); }
+/* An overrun is the one figure here worth colouring. Scoped under .tss-matrix so it
+   outranks the muted colour the rule above sets at equal weight — a bare .tss-over loses
+   that fight and the number stays grey. */
+.tss-matrix .tss-td--hours.tss-over { color: #b45309; font-weight: 600; }
 .tss-matrix .tss-th--num { overflow-wrap: anywhere; }
 /* Other is a real column but not a status: set off by a rule so the eye reads the status
    columns as one group and this as the remainder, not as one more status. */

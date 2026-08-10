@@ -53,8 +53,9 @@ const U_PLANNER = '507f1f77bcf86cd799439022';
 let calls = [];
 let plannedTaskIds = [];       // window read: estimated_time -> distinct TaskId
 let loggedTaskIds = [];        // window read: timesheets -> distinct TicketID
-let plannedByUser = [];        // planned read: [{ _id: userId, m: minutes }]
-let loggedByUser = [];         // logged read:  [{ _id: userId, m: minutes }]
+let plannedByUser = [];        // planned read: [{ _id: {u,t}, m: minutes }]
+let loggedByUser = [];         // logged read:  [{ _id: {u,t}, m: minutes }]
+let finishedTaskIds = [];      // tasks whose statusType is 'close'
 let survivingTaskIds = [];     // tasks that pass baseFilter
 let matrixGroups = [];         // [{ _id: { u, s }, n }]
 let callerRoleType = 1;        // 1 = Owner, 3 = member
@@ -72,14 +73,14 @@ mongoC.MongoDbCrudOpration = async (db, obj, op) => {
         if (op !== 'aggregate') return [];                       // drill's per-task find
         const key = groupKey(obj);
         if (key === '"$TaskId"') return plannedTaskIds.map((id) => ({ _id: id }));
-        if (key === '"$UserId"') return plannedByUser;
+        if (key === '{"u":"$UserId","t":"$TaskId"}') return plannedByUser;
         return [];
     }
     if (obj.type === SCHEMA_TYPE.TIMESHEET) {
         if (op !== 'aggregate') return [];                       // drill's per-task find
         const key = groupKey(obj);
         if (key === '"$TicketID"') return loggedTaskIds.map((id) => ({ _id: id }));
-        if (key === '"$Loggeduser"') return loggedByUser;
+        if (key === '{"u":"$Loggeduser","t":"$TicketID"}') return loggedByUser;
         return [];
     }
     if (obj.type === SCHEMA_TYPE.COMPANY_USERS) return { roleType: callerRoleType };
@@ -91,7 +92,12 @@ mongoC.MongoDbCrudOpration = async (db, obj, op) => {
             return matrixGroups;                                  // per-user matrix
         }
         // find: the surviving-id read projects only _id; the drill passes options too.
-        if (obj.data.length === 2) return survivingTaskIds.map((id) => ({ _id: OID(id) }));
+        if (obj.data.length === 2) {
+            return survivingTaskIds.map((id) => ({
+                _id: OID(id),
+                statusType: finishedTaskIds.includes(id) ? 'close' : 'default_active',
+            }));
+        }
         return [];
     }
     return [];
@@ -127,12 +133,12 @@ const baseMatch = () => {
 // The hour reads are the aggregations that group by person rather than by task.
 const plannedMatch = () => {
     const c = calls.find((x) => x.type === SCHEMA_TYPE.ESTIMATES_TIME && x.op === 'aggregate'
-        && groupKey({ data: x.data }) === '"$UserId"');
+        && groupKey({ data: x.data }) === '{"u":"$UserId","t":"$TaskId"}');
     return c ? c.data[0][0].$match : null;
 };
 const loggedMatch = () => {
     const c = calls.find((x) => x.type === SCHEMA_TYPE.TIMESHEET && x.op === 'aggregate'
-        && groupKey({ data: x.data }) === '"$Loggeduser"');
+        && groupKey({ data: x.data }) === '{"u":"$Loggeduser","t":"$TicketID"}');
     return c ? c.data[0][0].$match : null;
 };
 const userRow = (payload, id) => (payload.data.users || []).find((u) => u.userId === id);
@@ -210,8 +216,9 @@ const userRow = (payload, id) => (payload.data.users || []).find((u) => u.userId
     loggedTaskIds = [];
     survivingTaskIds = [T1];
     matrixGroups = [{ _id: { u: U_ASSIGNEE, s: 1 }, n: 2 }];
-    plannedByUser = [{ _id: U_PLANNER, m: 1080 }];   // 18h, as in the timesheet
-    loggedByUser = [{ _id: U_PLANNER, m: 337 }];     // 05:37, as in the timesheet
+    finishedTaskIds = [];
+    plannedByUser = [{ _id: { u: U_PLANNER, t: T1 }, m: 1080 }];   // 18h, as in the timesheet
+    loggedByUser = [{ _id: { u: U_PLANNER, t: T1 }, m: 337 }];     // 05:37, as in the timesheet
     callerRoleType = 1;
     res = await run(BODY);
 
@@ -306,6 +313,69 @@ const userRow = (payload, id) => (payload.data.users || []).find((u) => u.userId
         counts2 && Array.isArray(counts2.$and) && counts2.$and.length === 1
             && surviving2 && Array.isArray(surviving2.data[0].$and) && surviving2.data[0].$and.length === 1,
         'counts=' + JSON.stringify(counts2 && counts2.$and) + ' planned=' + JSON.stringify(surviving2 && surviving2.data[0].$and));
+
+    // ── Overdue projection ──────────────────────────────────────────────────────
+    //   projected = Σ logged (finished) + Σ max(planned, logged) (open)
+    //   overdue   = projected − Σ planned, when positive
+    const overdueOf = (r, u) => { const row = userRow(r.payload, u); return row && row.overdueMinutes; };
+    const setUp = (opts) => {
+        plannedTaskIds = opts.tasks; loggedTaskIds = []; survivingTaskIds = opts.tasks;
+        finishedTaskIds = opts.finished || [];
+        matrixGroups = []; callerRoleType = 1;
+        plannedByUser = opts.planned.map(([t, m]) => ({ _id: { u: U_PLANNER, t }, m }));
+        loggedByUser = opts.logged.map(([t, m]) => ({ _id: { u: U_PLANNER, t }, m }));
+        return run({ ...BODY });
+    };
+
+    section('a finished task that overran counts what it actually cost');
+    res = await setUp({ tasks: [T1], finished: [T1], planned: [[T1, 180]], logged: [[T1, 300]] });
+    assert('3h planned, 5h logged, closed -> 2h over', overdueOf(res, U_PLANNER) === 120,
+        'got ' + overdueOf(res, U_PLANNER));
+
+    section('a finished task brought in early gives the time back');
+    res = await setUp({ tasks: [T1], finished: [T1], planned: [[T1, 180]], logged: [[T1, 120]] });
+    assert('3h planned, 2h logged, closed -> not overdue', overdueOf(res, U_PLANNER) === 0,
+        'got ' + overdueOf(res, U_PLANNER));
+
+    section('an open task still inside its plan reports nothing');
+    res = await setUp({ tasks: [T1], finished: [], planned: [[T1, 360]], logged: [[T1, 120]] });
+    assert('6h planned, 2h logged, open -> not overdue', overdueOf(res, U_PLANNER) === 0,
+        'got ' + overdueOf(res, U_PLANNER));
+
+    section('an open task already past its plan shows now, not when it closes');
+    res = await setUp({ tasks: [T1], finished: [], planned: [[T1, 180]], logged: [[T1, 480]] });
+    assert('3h planned, 8h logged, open -> 5h over', overdueOf(res, U_PLANNER) === 300,
+        'got ' + overdueOf(res, U_PLANNER));
+
+    section('the row nets across tasks, as specified');
+    // A: closed, 3h planned / 5h logged -> +2h.  B: closed, 3h planned / 2h logged -> -1h.
+    res = await setUp({
+        tasks: [T1, T2], finished: [T1, T2],
+        planned: [[T1, 180], [T2, 180]], logged: [[T1, 300], [T2, 120]],
+    });
+    assert('+2h and -1h net to 1h over', overdueOf(res, U_PLANNER) === 60,
+        'got ' + overdueOf(res, U_PLANNER));
+
+    section('an underrun cannot drive the row negative');
+    res = await setUp({ tasks: [T1], finished: [T1], planned: [[T1, 600]], logged: [[T1, 60]] });
+    assert('10h planned, 1h logged -> reported as 0, not -9h', overdueOf(res, U_PLANNER) === 0,
+        'got ' + overdueOf(res, U_PLANNER));
+
+    section('planned and logged totals are unchanged by the per-task grouping');
+    res = await setUp({
+        tasks: [T1, T2], finished: [],
+        planned: [[T1, 90], [T2, 30]], logged: [[T1, 45], [T2, 15]],
+    });
+    const totRow = userRow(res.payload, U_PLANNER);
+    assert('planned still sums across tasks', totRow && totRow.plannedMinutes === 120,
+        JSON.stringify(totRow));
+    assert('logged still sums across tasks', totRow && totRow.loggedMinutes === 60,
+        JSON.stringify(totRow));
+
+    section('completion is read from statusType, never from the status name');
+    const survRead = taskQueries().find((c) => c.op === 'find' && c.data.length === 2);
+    assert('the surviving-task read projects statusType',
+        survRead && survRead.data[1].statusType === 1, JSON.stringify(survRead && survRead.data[1]));
 
     // ── The "Other" bucket ──────────────────────────────────────────────────────
     // Hours count every status, so the tasks behind them must be reachable even when

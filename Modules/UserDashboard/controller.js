@@ -2396,12 +2396,16 @@ exports.getMyTime = async (req, res) => {
  * splits those totals by assignee. Picking one cell of the matrix lists the tasks behind
  * that one number.
  *
- * HOURS (Planned, Logged) sit beside the name. They follow the timesheet, not the counts:
- * credited to whoever planned or logged them, and counted across EVERY status — including
- * the ones the card is not displaying. A row's counts answer "what is assigned to them in
- * these statuses"; its hours answer "what did they plan and what did they work", full
- * stop. The two are not a partition of one number and never were, so a row can carry
- * hours with no visible tasks.
+ * HOURS (Planned, Logged, Overdue) sit beside the name. They follow the timesheet, not the
+ * counts: credited to whoever planned or logged them, and counted across EVERY status —
+ * including the ones the card is not displaying. A row's counts answer "what is assigned
+ * to them in these statuses"; its hours answer "what did they plan and what did they
+ * work", full stop. The two are not a partition of one number and never were, so a row can
+ * carry hours with no visible tasks.
+ *
+ * OVERDUE is the period's projected cost against its plan — see the derivation below. It
+ * is a NET figure over the row: a task finished under its plan gives that time back, so
+ * one task's overrun can be offset by another's underrun.
  *
  * SCOPE. Owner/Admin (roleType 1/2) see the whole company; everyone else sees only the
  * tasks assigned to them. The role is resolved from company_users via req.uid, never
@@ -2615,9 +2619,14 @@ exports.getTasksByStatus = async (req, res) => {
         // Everything that really is scope still applies: project, member, deleted, chat
         // threads, and the advanced "Add filter" — that one is somebody deliberately
         // asking for a slice, which is a different intent from the card's default boxes.
+        // statusType rides along for the overdue projection below: 'close' is this
+        // codebase's definition of a finished task, everywhere from epic recount to
+        // velocity. Statuses are per-company and renameable, so the type is the only
+        // safe signal — matching on the name "Complete" would break the first time a
+        // company called it something else.
         const surviving = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
-            data: [hoursFilter, { _id: 1 }],
+            data: [hoursFilter, { _id: 1, statusType: 1 }],
         }, "find").catch((e) => {
             logger.error(`getTasksByStatus surviving-task read failed: ${e && e.message ? e.message : e}`);
             return [];
@@ -2626,8 +2635,18 @@ exports.getTasksByStatus = async (req, res) => {
         // Both hour collections hold the task id as a STRING — the opposite of the
         // ObjectId the task query needed. Casting the wrong way round matches nothing,
         // silently.
-        const survivingIds = (surviving || []).map((t) => String(t._id));
+        const survivingIds = [];
+        const isFinished = new Set();
+        (surviving || []).forEach((t) => {
+            const id = String(t._id);
+            survivingIds.push(id);
+            if (String(t.statusType || "") === "close") isFinished.add(id);
+        });
+
         if (survivingIds.length) {
+            // Grouped per person AND per task, not per person alone: the overdue
+            // projection asks a different question of a finished task than of an open
+            // one, so the two cannot be pre-summed.
             const [plans, logs] = await Promise.all([
                 MongoDbCrudOpration(companyId, {
                     type: SCHEMA_TYPE.ESTIMATES_TIME,
@@ -2644,7 +2663,7 @@ exports.getTasksByStatus = async (req, res) => {
                                 ...(isManagement ? {} : { UserId: uid }),
                             },
                         },
-                        { $group: { _id: "$UserId", m: { $sum: "$EstimatedTime" } } },
+                        { $group: { _id: { u: "$UserId", t: "$TaskId" }, m: { $sum: "$EstimatedTime" } } },
                     ]],
                 }, "aggregate").catch((e) => {
                     logger.error(`getTasksByStatus planned read failed: ${e && e.message ? e.message : e}`);
@@ -2660,7 +2679,7 @@ exports.getTasksByStatus = async (req, res) => {
                                 ...(isManagement ? {} : { Loggeduser: uid }),
                             },
                         },
-                        { $group: { _id: "$Loggeduser", m: { $sum: "$LogTimeDuration" } } },
+                        { $group: { _id: { u: "$Loggeduser", t: "$TicketID" }, m: { $sum: "$LogTimeDuration" } } },
                     ]],
                 }, "aggregate").catch((e) => {
                     logger.error(`getTasksByStatus logged read failed: ${e && e.message ? e.message : e}`);
@@ -2668,17 +2687,45 @@ exports.getTasksByStatus = async (req, res) => {
                 }),
             ]);
 
+            // One entry per person+task, so each task can be judged on its own footing
+            // before the row is totalled.
+            const pairs = new Map();   // `${userId}|${taskId}` -> { planned, logged }
+            const collect = (groups, field) => (groups || []).forEach((g) => {
+                const person = String((g && g._id && g._id.u) || "");
+                const task = String((g && g._id && g._id.t) || "");
+                if (!person || !task) return;
+                const key = `${person}|${task}`;
+                if (!pairs.has(key)) pairs.set(key, { person, task, planned: 0, logged: 0 });
+                pairs.get(key)[field] += Number(g.m) || 0;
+            });
+            collect(plans, "planned");
+            collect(logs, "logged");
+
+            // ─── Overdue: what the period is on course to cost, against what was
+            // planned for it ────────────────────────────────────────────────────────
+            //
+            //   projected = Σ logged            over FINISHED tasks
+            //             + Σ max(planned, logged) over OPEN tasks
+            //   planned   = Σ planned           over every task in the window
+            //   overdue   = projected − planned, when positive
+            //
+            // A finished task is settled: what it cost is what it logged, and a task
+            // brought in under its plan gives that time back to the total. An open task
+            // will cost at least what was planned for it and at least what has already
+            // gone into it — flooring at the larger of the two is what lets a task that
+            // is already 8h into a 3h plan show up now, rather than on the day somebody
+            // closes it.
+            //
             // A person appears here because they did the work, so a row is created for
             // them if the assignee matrix above did not already have one.
-            const creditHours = (groups, field) => (groups || []).forEach((g) => {
-                const person = String((g && g._id) || "");
-                if (!person) return;
+            pairs.forEach(({ person, task, planned, logged }) => {
                 if (!byUser.has(person)) byUser.set(person, { counts: {}, total: 0 });
                 const rec = byUser.get(person);
-                rec[field] = (rec[field] || 0) + (Number(g.m) || 0);
+                rec.plannedMinutes = (rec.plannedMinutes || 0) + planned;
+                rec.loggedMinutes = (rec.loggedMinutes || 0) + logged;
+                rec.projectedMinutes = (rec.projectedMinutes || 0)
+                    + (isFinished.has(task) ? logged : Math.max(planned, logged));
             });
-            creditHours(plans, "plannedMinutes");
-            creditHours(logs, "loggedMinutes");
         }
 
         const matrixNames = await getUserNameMap([...byUser.keys()].filter(Boolean)).catch(() => ({}));
@@ -2692,6 +2739,9 @@ exports.getTasksByStatus = async (req, res) => {
                 total: rec.total,
                 plannedMinutes: rec.plannedMinutes || 0,
                 loggedMinutes: rec.loggedMinutes || 0,
+                // Only the overrun is reported. A period running under its plan is not
+                // "negative overdue", it is simply not overdue.
+                overdueMinutes: Math.max(0, (rec.projectedMinutes || 0) - (rec.plannedMinutes || 0)),
             }))
             .sort((a, b) => b.total - a.total);
         const USER_LIMIT = 500;

@@ -3411,6 +3411,8 @@ export default {
         tss_col_user: "Username",
         tss_col_planned: "Planned Hours",
         tss_col_logged: "Logged Hours",
+        tss_col_overdue: "Overdue Hours",
+        tss_overdue_hint: "How far the period is on course to run past its plan. Finished tasks count what they actually logged; unfinished ones count their plan, or the time already spent if that is more. The result is netted across the row, so a task brought in early offsets one that overran.",
         tss_col_other: "Other",
         tss_other_hint: "Tasks with hours in this period that sit in a status this card is not showing. The hours columns count them, so this is where they are.",
         tss_open_other: "Show {user}'s tasks outside the selected statuses",
