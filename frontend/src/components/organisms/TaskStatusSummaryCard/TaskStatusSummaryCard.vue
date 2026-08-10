@@ -40,20 +40,25 @@
             <div v-if="!visibleUsers.length" class="tss-msg">
                 {{ userSearch ? $t('dashboardCard.tss_no_user_match', { q: userSearch }) : $t('dashboardCard.tss_no_users') }}
             </div>
-            <div v-else class="tss-table-wrap">
-                <table class="tss-table tss-matrix">
+            <!-- The open list is part of this table now, so the region that scrolls it is
+                 the one that pages it. -->
+            <div v-else class="tss-table-wrap" @scroll.passive="onRowsScroll">
+                <!-- The open list's accent lives here rather than on one cell: its rows are
+                     siblings, so a variable set on any one of them would not reach the rest.
+                     Only one list is ever open, so one value covers it. -->
+                <table class="tss-table tss-matrix" :style="drill ? { '--tss-accent': drill.color } : null">
                     <thead>
                         <tr>
                             <th class="tss-th tss-th--user">{{ $t('dashboardCard.tss_col_user') }}</th>
                             <!-- Hours sit next to the name, before the status columns: they
                                  describe the person's whole row, not any one status. -->
-                            <th class="tss-th tss-th--hours">{{ $t('dashboardCard.tss_col_estimate') }}</th>
+                            <th class="tss-th tss-th--hours">{{ $t('dashboardCard.tss_col_planned') }}</th>
                             <th class="tss-th tss-th--hours">{{ $t('dashboardCard.tss_col_logged') }}</th>
-                            <th class="tss-th tss-th--hours" :title="$t('dashboardCard.tss_overdue_hours_hint')">
-                                {{ $t('dashboardCard.tss_col_overdue_hours') }}
-                            </th>
                             <th v-for="b in boxes" :key="'h' + b.statusKey" class="tss-th tss-th--num" :title="b.name">
                                 {{ b.name }}
+                            </th>
+                            <th v-if="showOther" class="tss-th tss-th--num tss-th--other" :title="$t('dashboardCard.tss_other_hint')">
+                                {{ otherBox.name }}
                             </th>
                         </tr>
                     </thead>
@@ -61,16 +66,8 @@
                         <template v-for="u in visibleUsers" :key="u.userId || 'unassigned'">
                             <tr class="tss-tr" :class="{ 'is-open': isOpenUser(u) }">
                                 <td class="tss-td tss-td--user" :title="userLabel(u)">{{ userLabel(u) }}</td>
-                                <td class="tss-td tss-td--hours">{{ u.estimateMinutes ? formatMinutes(u.estimateMinutes) : '—' }}</td>
+                                <td class="tss-td tss-td--hours">{{ u.plannedMinutes ? formatMinutes(u.plannedMinutes) : '—' }}</td>
                                 <td class="tss-td tss-td--hours">{{ u.loggedMinutes ? formatMinutes(u.loggedMinutes) : '—' }}</td>
-                                <!-- Logged plus the overrun. Red only when there IS an
-                                     overrun — without one this equals the Logged column
-                                     and nothing went wrong. -->
-                                <td
-                                    class="tss-td tss-td--hours"
-                                    :class="{ 'tss-over': u.overEstimateMinutes > 0 }"
-                                    :title="u.overEstimateMinutes > 0 ? $t('dashboardCard.tss_overdue_hours_row', { hours: formatMinutes(u.overEstimateMinutes) }) : ''"
-                                >{{ loggedPlusOver(u) ? formatMinutes(loggedPlusOver(u)) : '—' }}</td>
                                 <td
                                     v-for="b in boxes"
                                     :key="(u.userId || 'unassigned') + '-' + b.statusKey"
@@ -80,59 +77,67 @@
                                     @click="toggleDrill(u, b)"
                                     @mousedown.stop
                                 >{{ cellCount(u, b) || '—' }}</td>
+                                <!-- Work in a status this card has no column for. Reads as a
+                                     count like the rest, and opens the same list. -->
+                                <td
+                                    v-if="showOther"
+                                    class="tss-td tss-td--num tss-td--other"
+                                    :class="{ 'tss-cell--link': cellCount(u, otherBox) > 0, 'is-open': isOpenCell(u, otherBox) }"
+                                    :title="cellCount(u, otherBox) > 0 ? $t('dashboardCard.tss_open_other', { user: userLabel(u) }) : $t('dashboardCard.tss_other_hint')"
+                                    @click="toggleDrill(u, otherBox)"
+                                    @mousedown.stop
+                                >{{ cellCount(u, otherBox) || '—' }}</td>
                             </tr>
 
-                            <!-- The expansion. Spans the whole table so the task list is not
-                                 squeezed into one status column's width. -->
-                            <tr v-if="isOpenUser(u)" class="tss-expand-tr">
-                                <!-- +4: username, Estimate, Logged and Overdue Hrs, on top of one per status. -->
-                                <td class="tss-expand" :colspan="boxes.length + 4" :style="{ '--tss-accent': drill.color }">
-                                    <button type="button" class="tss-expand-close" :title="$t('dashboardCard.tss_close_list')" @click="closeDrill">✕</button>
-
-                                    <!-- A cell cannot bound its own height, so the scroll
-                                         belongs to a block inside it. -->
-                                    <div class="tss-expand-inner" @scroll.passive="onRowsScroll">
-                                    <div v-if="drillLoading" class="tss-msg">{{ $t('dashboardCard.tss_loading_tasks') }}</div>
-                                    <div v-else-if="!rows.length" class="tss-msg">{{ $t('dashboardCard.tss_no_tasks') }}</div>
-                                    <template v-else>
-                                        <table class="tss-table tss-inner">
-                                            <thead>
-                                                <tr>
-                                                    <th class="tss-th tss-th--task">{{ $t('dashboardCard.tss_col_task') }}</th>
-                                                    <th class="tss-th tss-th--who">{{ $t('dashboardCard.tss_col_employee') }}</th>
-                                                    <th class="tss-th tss-th--num">{{ $t('dashboardCard.tss_col_estimate') }}</th>
-                                                    <th class="tss-th tss-th--num">{{ $t('dashboardCard.tss_col_logged') }}</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <tr v-for="r in rows" :key="r.taskId" class="tss-tr">
-                                                    <td class="tss-td tss-td--task">
-                                                        <span
-                                                            class="tss-task"
-                                                            :class="{ 'tss-task--link': r.projectId }"
-                                                            :title="(r.taskKey ? r.taskKey + ' ' : '') + r.taskName"
-                                                            @click="openTaskDetail(r)"
-                                                            @mousedown.stop
-                                                        >
-                                                            <b v-if="r.taskKey" class="tss-key">{{ r.taskKey }}</b> {{ r.taskName }}
-                                                        </span>
-                                                    </td>
-                                                    <td class="tss-td tss-td--who" :title="whoTitle(r)">{{ who(r) }}</td>
-                                                    <td class="tss-td tss-td--num">{{ r.estimateMinutes ? formatMinutes(r.estimateMinutes) : '—' }}</td>
-                                                    <td class="tss-td tss-td--num" :class="{ 'tss-over': isOver(r) }">
-                                                        {{ r.loggedMinutes ? formatMinutes(r.loggedMinutes) : '—' }}
-                                                    </td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                        <!-- Nothing is capped any more; scrolling brings the
-                                             rest. This only says a page is on its way, so
-                                             the list does not look finished while it is. -->
-                                        <div v-if="rowsBusy" class="tss-capped">{{ $t('dashboardCard.tss_loading_tasks') }}</div>
-                                    </template>
-                                    </div>
-                                </td>
-                            </tr>
+                            <!-- The expansion: REAL rows of this table, not a table of its
+                                 own. That is what puts a task's hours directly under the
+                                 Planned / Logged headings they belong to — a nested table
+                                 computes its own widths and can only ever land near them. -->
+                            <template v-if="isOpenUser(u)">
+                                <tr class="tss-drill-head">
+                                    <td class="tss-drill-cell" :colspan="matrixColumns + 3">
+                                        <span class="tss-drill-title">{{ drillTitle }}</span>
+                                        <button type="button" class="tss-drill-close" :title="$t('dashboardCard.tss_close_list')" @click="closeDrill">✕</button>
+                                    </td>
+                                </tr>
+                                <tr v-if="drillLoading" class="tss-drill-msg">
+                                    <td class="tss-drill-cell" :colspan="matrixColumns + 3">{{ $t('dashboardCard.tss_loading_tasks') }}</td>
+                                </tr>
+                                <tr v-else-if="!rows.length" class="tss-drill-msg">
+                                    <td class="tss-drill-cell" :colspan="matrixColumns + 3">{{ $t('dashboardCard.tss_no_tasks') }}</td>
+                                </tr>
+                                <template v-else>
+                                    <tr v-for="r in rows" :key="r.taskId" class="tss-tr tss-drill-row">
+                                        <td class="tss-td tss-td--task">
+                                            <span
+                                                class="tss-task"
+                                                :class="{ 'tss-task--link': r.projectId }"
+                                                :title="(r.taskKey ? r.taskKey + ' ' : '') + r.taskName"
+                                                @click="openTaskDetail(r)"
+                                                @mousedown.stop
+                                            >
+                                                <b v-if="r.taskKey" class="tss-key">{{ r.taskKey }}</b> {{ r.taskName }}
+                                            </span>
+                                        </td>
+                                        <td class="tss-td tss-td--hours">{{ r.plannedMinutes ? formatMinutes(r.plannedMinutes) : '—' }}</td>
+                                        <td class="tss-td tss-td--hours">{{ r.loggedMinutes ? formatMinutes(r.loggedMinutes) : '—' }}</td>
+                                        <!-- The Other list is the only one that mixes statuses,
+                                             so only it names the status each task is in. It goes
+                                             in the run past the hours, which is empty on a task
+                                             row — up front it crowded the name down to an
+                                             ellipsis, which is the one thing the row must show. -->
+                                        <td v-if="matrixColumns" class="tss-td tss-td--tail" :colspan="matrixColumns">
+                                            <span v-if="isOtherDrill" class="tss-chip" :title="statusLabel(r.statusKey)">{{ statusLabel(r.statusKey) }}</span>
+                                        </td>
+                                    </tr>
+                                    <!-- Nothing is capped; scrolling brings the rest. This only
+                                         says a page is on its way, so the list does not look
+                                         finished while it is. -->
+                                    <tr v-if="rowsBusy" class="tss-drill-msg">
+                                        <td class="tss-drill-cell" :colspan="matrixColumns + 3">{{ $t('dashboardCard.tss_loading_tasks') }}</td>
+                                    </tr>
+                                </template>
+                            </template>
                         </template>
                     </tbody>
                 </table>
@@ -235,6 +240,39 @@ const boxes = computed(() => selectedKeys.value.map((key) => {
     };
 }));
 
+/**
+ * The "Other" column: work sitting in a status this card has no column for.
+ *
+ * The hours beside a name count every status, so without this a row could carry time
+ * with no task anywhere on screen to explain it. Opening the column lists those tasks
+ * with the status each one is really in.
+ *
+ * Only shown when the card displays a subset — with every status ticked there is no
+ * "other", and an always-empty column is just noise.
+ */
+const OTHER_KEY = 'other';
+const showOther = computed(() => statusSettings.value.length > selectedKeys.value.length);
+const otherBox = computed(() => ({
+    statusKey: OTHER_KEY,
+    name: t('dashboardCard.tss_col_other'),
+    color: '#8a94a6',
+}));
+// Every column the matrix renders, so one place decides the expansion's colspan.
+const matrixColumns = computed(() => (showOther.value ? boxes.value.length + 1 : boxes.value.length));
+
+// Statuses can be named even when the card is not showing them, which is what makes the
+// Other list readable.
+const statusLabel = (key) => {
+    const meta = statusSettings.value.find((s) => Number(s.key) === Number(key));
+    return (meta && meta.name) || t('dashboardCard.tss_unknown_status');
+};
+const isOtherDrill = computed(() => !!drill.value && drill.value.statusKey === OTHER_KEY);
+// The open list has no header row of its own — its columns are the matrix's — so this line
+// is what says whose list it is and which cell opened it.
+const drillTitle = computed(() => (drill.value
+    ? `${drill.value.userName} · ${drill.value.statusName}`
+    : ''));
+
 const scopeLabel = computed(() => (scope.value === 'company'
     ? t('dashboardCard.tss_scope_company')
     : t('dashboardCard.tss_scope_self')));
@@ -260,27 +298,6 @@ const visibleUsers = computed(() => {
     return users.value.filter((u) => userLabel(u).toLowerCase().includes(term));
 });
 
-const who = (r) => (r.assignees && r.assignees.length
-    ? r.assignees.map((a) => a.name).join(', ')
-    : '—');
-const whoTitle = (r) => (r.assignees && r.assignees.length > 1
-    ? t('dashboardCard.tss_assignees', { n: r.assignees.length }) + ': ' + who(r)
-    : who(r));
-const isOver = (r) => !!r.estimateMinutes && r.loggedMinutes > r.estimateMinutes;
-
-/**
- * Logged time plus the overrun, as specified.
- *
- * Read this as an emphasis figure rather than an amount of work: the overrun is already
- * part of the logged total (a task estimated at 3h with 5h against it contributes 5h
- * logged AND 2h over, the 2 being part of the 5), so this sum counts those hours twice and
- * is larger than anyone actually worked. It is deliberate — it weights a row by how far it
- * ran past its estimates. The Logged column beside it carries the true figure.
- *
- * Dash when nothing has been logged: there is nothing to weight.
- */
-const loggedPlusOver = (u) => (u.loggedMinutes ? u.loggedMinutes + (u.overEstimateMinutes || 0) : 0);
-
 const requestBody = (skip = 0) => {
     const { dateFrom, dateTo } = resolveCardRange(timerange.value, globalRange && globalRange.value);
     const d = drill.value;
@@ -294,7 +311,9 @@ const requestBody = (skip = 0) => {
         // matrix come back either way, so the card behind the list stays current.
         ...(d
             ? {
-                statusKey: d.statusKey,
+                // Other is not a status, so it travels as its own flag rather than as a
+                // statusKey the server would have to parse out of a number.
+                ...(d.statusKey === OTHER_KEY ? { otherStatuses: true } : { statusKey: d.statusKey }),
                 limit: ROW_LIMIT,
                 skip,
                 ...(d.unassigned ? { unassigned: true } : { userId: d.userId }),
@@ -544,11 +563,11 @@ onMounted(load);
 .tss-table-wrap { flex: 1 1 auto; min-height: 0; overflow: auto; }
 /* A thin scrollbar rather than the platform's: the default one is wide enough to sit over
    the last column and read as clipped numbers. */
-.tss-table-wrap::-webkit-scrollbar, .tss-expand-inner::-webkit-scrollbar { width: 7px; height: 7px; }
-.tss-table-wrap::-webkit-scrollbar-track, .tss-expand-inner::-webkit-scrollbar-track { background: transparent; }
-.tss-table-wrap::-webkit-scrollbar-thumb, .tss-expand-inner::-webkit-scrollbar-thumb { background: #dcdfe8; border-radius: 4px; }
-.tss-table-wrap::-webkit-scrollbar-thumb:hover, .tss-expand-inner::-webkit-scrollbar-thumb:hover { background: #c3c8d6; }
-.tss-table-wrap, .tss-expand-inner { scrollbar-width: thin; scrollbar-color: #dcdfe8 transparent; }
+.tss-table-wrap::-webkit-scrollbar { width: 7px; height: 7px; }
+.tss-table-wrap::-webkit-scrollbar-track { background: transparent; }
+.tss-table-wrap::-webkit-scrollbar-thumb { background: #dcdfe8; border-radius: 4px; }
+.tss-table-wrap::-webkit-scrollbar-thumb:hover { background: #c3c8d6; }
+.tss-table-wrap { scrollbar-width: thin; scrollbar-color: #dcdfe8 transparent; }
 
 .tss-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .tss-th {
@@ -567,7 +586,6 @@ onMounted(load);
        over the rows with no edge. */
     box-shadow: inset 0 -1px 0 var(--hairline);
 }
-.tss-th--who { width: 26%; }
 .tss-th--num { width: 74px; text-align: right; }
 .tss-th--user { width: auto; }
 
@@ -584,19 +602,32 @@ onMounted(load);
    name cannot claim half the table. The header wraps inside that cap, and an unbroken
    word breaks rather than forcing the column wider than the cap. */
 .tss-matrix .tss-th--num, .tss-matrix .tss-td--num { min-width: 85px; max-width: 130px; }
-/* Hours read as figures, not as counts: right-aligned and tabular like the status columns,
+/* Hours read as a figure, not a count: right-aligned and tabular like the status columns,
    but muted, so the eye still lands on the numbers that are clickable. */
 .tss-th--hours, .tss-td--hours {
-    width: 78px;
-    min-width: 78px;
+    width: 88px;
+    min-width: 88px;
     text-align: right;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
 }
 .tss-matrix .tss-td--hours { color: var(--muted); }
-/* Over the estimate keeps the amber it has in the task list — same meaning, same colour. */
-.tss-matrix .tss-td--hours.tss-over { color: #b45309; font-weight: 600; }
 .tss-matrix .tss-th--num { overflow-wrap: anywhere; }
+/* Other is a real column but not a status: set off by a rule so the eye reads the status
+   columns as one group and this as the remainder, not as one more status. */
+.tss-matrix .tss-th--other, .tss-matrix .tss-td--other { border-left: 1px solid var(--hairline); }
+/* The status a task is really in, in the Other list. A chip rather than plain text: it is
+   a label on the row, not another field to read across. */
+.tss-chip {
+    display: inline-block; max-width: 100%;
+    padding: 1px 7px; border-radius: 9px;
+    background: #eef0f6; color: var(--muted);
+    font-size: 10.5px; line-height: 16px; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; vertical-align: middle;
+}
+/* The status chip starts where the first status column does, so it reads as belonging to
+   that side of the table rather than floating after the numbers. */
+.tss-drill-row > .tss-td--tail { padding-left: 8px; }
 /* Tracing one person across nine columns is the main thing asked of this table. */
 .tss-matrix tbody .tss-tr:hover .tss-td { background: #fbfcfe; }
 /* Only a cell with something behind it is clickable — an empty one has no list to open.
@@ -617,46 +648,45 @@ onMounted(load);
 .tss-matrix .tss-tr.is-open .tss-td { background: #f8fbfc; }
 .tss-matrix .tss-tr.is-open .tss-td--user { font-weight: 600; color: var(--ink); }
 
-/* The expansion, spanning every column. The left edge carries the status colour, which is
-   what ties the list to the cell that opened it. */
-.tss-expand-tr > .tss-expand {
-    position: relative;
-    padding: 6px 30px 10px 12px;
-    background: #f8fafc;
-    border-bottom: 1px solid var(--hairline);
-    box-shadow: inset 3px 0 0 0 var(--tss-accent);
-}
-/* The list scrolls on its own once it is long, so a person with forty tasks does not push
-   everyone below them off the card. */
-.tss-expand-inner { max-height: 240px; overflow-y: auto; overflow-x: hidden; }
-.tss-expand-close {
-    position: absolute; top: 7px; right: 8px;
+/* The open list. Its rows belong to the matrix, so they inherit its columns and the hours
+   land under their own headings; all that is left to do is set the region apart. The left
+   edge carries the status colour, which is what ties the list to the cell that opened it. */
+.tss-drill-head > .tss-drill-cell,
+.tss-drill-msg > .tss-drill-cell,
+.tss-drill-row > .tss-td { background: #f8fafc; box-shadow: inset 3px 0 0 0 var(--tss-accent, transparent); }
+/* Only the first cell of a row can carry the accent bar; the rest just take the tint. */
+.tss-drill-row > .tss-td ~ .tss-td { box-shadow: none; }
+.tss-drill-head > .tss-drill-cell { position: relative; padding: 7px 30px 5px 12px; }
+.tss-drill-msg > .tss-drill-cell { padding: 8px 12px; font-size: 11px; color: var(--muted); }
+.tss-drill-title { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+/* The task name is indented to read as nested. Padding on the flexible column only eats
+   into itself, so the fixed-width hours columns beside it do not move. */
+/* The task name is indented to read as nested. Padding on the flexible column only eats
+   into itself, so the fixed-width hours columns beside it do not move. */
+.tss-drill-row > .tss-td--task { padding-left: 12px; }
+/* The row border belongs to the <tr> under border-collapse, so it is set there. */
+.tss-drill-row { border-bottom-color: #edf0f4; }
+.tss-matrix tbody .tss-drill-row:hover > .tss-td { background: #f2f6f9; }
+.tss-drill-close {
+    position: absolute; top: 4px; right: 8px;
     width: 20px; height: 20px;
     display: inline-flex; align-items: center; justify-content: center;
     border: none; border-radius: 50%; background: transparent;
     font-size: 11px; color: var(--muted); cursor: pointer; line-height: 1;
     transition: background .12s ease, color .12s ease;
 }
-.tss-expand-close:hover { background: #eceef4; color: var(--body); }
-/* The inner header is not sticky: this region is short and already sits under the matrix's
-   own sticky header, and two headers stacking on scroll reads as a glitch. */
-.tss-inner { table-layout: fixed; }
-.tss-inner .tss-th { position: static; background: transparent; box-shadow: inset 0 -1px 0 #e6eaf0; }
-.tss-inner .tss-td, .tss-inner .tss-th { padding-left: 8px; }
-.tss-inner .tss-tr { border-bottom-color: #edf0f4; }
-.tss-inner tbody .tss-tr:hover .tss-td { background: #f2f6f9; }
-/* The list region carries the scrollbar, so without this the last column sits under it and
-   the numbers read as clipped. The width above already reserves the column; this is the gap. */
+.tss-drill-close:hover { background: #eceef4; color: var(--body); }
+/* The region carries the scrollbar, so without this the last column sits under it and the
+   numbers read as clipped. The width above already reserves the column; this is the gap. */
 .tss-th:last-child, .tss-td:last-child { padding-right: 14px; }
 .tss-tr { border-bottom: 1px solid var(--hairline); }
 .tss-tr:last-child { border-bottom: none; }
 .tss-td { padding: 7px 8px 7px 0; font-size: 11.5px; color: var(--body); vertical-align: middle; transition: background .1s ease; }
-.tss-td--task, .tss-td--who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tss-td--who { color: var(--muted); }
+/* max-width: 0 like the username cell above it: without it a long task name widens the
+   first column under auto layout and drags the hours columns out of alignment with their
+   own headings — the exact thing the shared table was for. */
+.tss-td--task { max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tss-td--num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--faint); }
-/* Logged past the estimate is the one thing worth colouring in this table. */
-.tss-over { color: #b45309; font-weight: 600; }
-.tss-inner .tss-td--num { color: var(--body); }
 .tss-task { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 .tss-task--link { cursor: pointer; }
 .tss-task--link:hover { color: var(--accent); text-decoration: underline; }
