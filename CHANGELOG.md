@@ -16,6 +16,16 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.26.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.25.0...v14.26.0) (2026-08-10)
+
+
+### 🚀 Features
+
+* **dashboard:** per-person hours, status defaults and paged drill-down ([aea493c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/aea493cd3e79bc35f013b42bf7605d8706425d7d))
+* **dashboard:** per-person hours, status defaults and paged drill-down ([163e7dc](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/163e7dca25f26207e663a510c38e006baf768ce0))
+* **webhooks:** scope integrations to their owner, and page the logs ([68a3ce5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/68a3ce5942af21b164aa4019c2fb2b2c5c04e784))
+* **webhooks:** scope integrations to their owner, and page the logs ([3469571](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3469571124f7e4c9e679e39fc02c7fc57ee734e1))
+
 ## [14.25.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.24.0...v14.25.0) (2026-08-08)
 
 
