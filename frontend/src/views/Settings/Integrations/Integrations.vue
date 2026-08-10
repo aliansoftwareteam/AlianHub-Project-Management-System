@@ -123,6 +123,13 @@
                                                 </tr>
                                             </tbody>
                                         </table>
+                                        <button
+                                            v-if="logsHasMore"
+                                            type="button"
+                                            class="intg-logs-more"
+                                            :disabled="logsBusy"
+                                            @click="loadMoreLogs"
+                                        >{{ logsBusy ? $t('Integrations.loading') : $t('Integrations.load_more') }}</button>
                                     </div>
                                 </div>
                             </div>
@@ -239,7 +246,7 @@ export default { name: 'IntegrationsSettings' };
 <script setup>
 import * as env from '@/config/env';
 import { useToast } from 'vue-toast-notification';
-import { ref, computed, inject, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
 import { apiRequest } from '../../../services';
 import { useI18n } from 'vue-i18n';
@@ -253,7 +260,6 @@ import {
 
 const { t } = useI18n();
 const $toast = useToast();
-const userId = inject('$userId');
 
 const isSpinner = ref(false);
 const webhooks = ref([]);
@@ -262,6 +268,9 @@ const newSecret = ref('');
 const editingId = ref('');
 const logsFor = ref('');
 const logs = ref([]);
+const logsHasMore = ref(false);
+const logsNextSkip = ref(0);
+const logsBusy = ref(false);
 
 const formatOptions = [
     { value: 'slack', label: 'Slack' },
@@ -343,7 +352,9 @@ const submitForm = async () => {
         if (editingId.value) {
             res = await apiRequest('put', `${env.WEBHOOKS}/${editingId.value}`, body);
         } else {
-            res = await apiRequest('post', env.WEBHOOKS, { ...body, userData: { id: userId.value } });
+            // No userData: the server takes the owner from the session token now, since a
+            // caller-supplied id would decide whose integrations it can later read.
+            res = await apiRequest('post', env.WEBHOOKS, body);
         }
         if (!ok(res)) {
             $toast.error((res && res.data && res.data.statusText) || t('Toast.something_went_wrong'), { position: 'top-right' });
@@ -401,18 +412,45 @@ const removeWebhook = async (hook) => {
     }
 };
 
-const viewLogs = async (hook) => {
-    if (logsFor.value === hook._id) { logsFor.value = ''; return; }
+// Delivery logs are paged: a webhook firing on every task event builds thousands of rows,
+// and the panel shows a handful. LOGS_PAGE must match nothing on the server — it caps the
+// request there — this is only what we ask for.
+const LOGS_PAGE = 10;
+
+const loadLogs = async (hookId, append = false) => {
     try {
-        isSpinner.value = true;
-        const res = await apiRequest('get', `${env.WEBHOOKS}/${hook._id}/logs`);
-        logs.value = ok(res) ? (res.data.data || []) : [];
-        logsFor.value = hook._id;
+        if (append) logsBusy.value = true; else isSpinner.value = true;
+        const skip = append ? logsNextSkip.value : 0;
+        const res = await apiRequest('get', `${env.WEBHOOKS}/${hookId}/logs?skip=${skip}&limit=${LOGS_PAGE}`);
+        if (!ok(res)) return;
+        const page = res.data.data || [];
+        logs.value = append ? [...logs.value, ...page] : page;
+        // Trust the server's own count rather than inferring from page length: a full page
+        // is not evidence of more, and a short one is not proof there is nothing left.
+        logsHasMore.value = res.data.hasMore === true;
+        logsNextSkip.value = typeof res.data.nextSkip === 'number' ? res.data.nextSkip : logs.value.length;
     } catch (e) {
         $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
     } finally {
         isSpinner.value = false;
+        logsBusy.value = false;
     }
+};
+
+const viewLogs = async (hook) => {
+    if (logsFor.value === hook._id) { logsFor.value = ''; return; }
+    // Opening a different webhook starts a fresh list — carrying the previous one's rows
+    // or its paging offset would show one hook's deliveries under another's name.
+    logs.value = [];
+    logsHasMore.value = false;
+    logsNextSkip.value = 0;
+    await loadLogs(hook._id, false);
+    logsFor.value = hook._id;
+};
+
+const loadMoreLogs = () => {
+    if (logsBusy.value || !logsHasMore.value || !logsFor.value) return;
+    loadLogs(logsFor.value, true);
 };
 
 const copySecret = async () => {
@@ -607,6 +645,21 @@ onMounted(() => {
 .intg-logs-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .intg-logs-table th { text-align: left; color: #8A909C; font-weight: 600; padding: 4px 8px; }
 .intg-logs-table td { padding: 4px 8px; color: #1F212A; border-top: 1px solid #F2F4F8; }
+.intg-logs-more {
+    display: block;
+    width: 100%;
+    margin-top: 8px;
+    padding: 7px 0;
+    border: 1px solid #E3E6EF;
+    border-radius: 6px;
+    background: #FAFBFD;
+    color: #2F3990;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.intg-logs-more:hover:not(:disabled) { background: #F2F4FB; }
+.intg-logs-more:disabled { opacity: 0.6; cursor: default; }
 .intg-ok { color: #1B7F3B; }
 .intg-fail { color: #E5484D; }
 
