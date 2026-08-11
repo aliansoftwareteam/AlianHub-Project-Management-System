@@ -40,6 +40,10 @@ const verifyJWTTokenWithCRoute = [
     // "/api/v1/removeSprintOperations",
     "/api/v1/sprint",
     "/api/v1/sprint/:id",
+    // Sprint analytics (Modules/Sprints: burndown, hours). A prefix, so every route
+    // added under it is guarded by default — these were unauthenticated and took the
+    // company purely from a header, which is a company id anyone can type.
+    "/api/v2/sprints",
     "/api/v1/folder",
     "/api/v1/folder/:id",
     "/api/v1/taskIndex",

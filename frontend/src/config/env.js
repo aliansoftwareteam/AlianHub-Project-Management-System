@@ -57,6 +57,7 @@ module.exports.MONGO_OPRATION = '/api/v1/mongoOpration';
 module.exports.TASKTYPE = '/api/v1/projectSetting/taskType';
 module.exports.TASKSTATUS = '/api/v1/projectSetting/taskStatus';
 module.exports.SPRINT = '/api/v1/sprint';
+module.exports.SPRINT_HOURS = '/api/v2/sprints/hours';
 module.exports.FOLDER = '/api/v1/folder';
 module.exports.REMOVE_USER_NOTIFICATION = '/api/v1/removeUserNotification';
 module.exports.GENERATETOKEN = '/api/v1/generateToken';
