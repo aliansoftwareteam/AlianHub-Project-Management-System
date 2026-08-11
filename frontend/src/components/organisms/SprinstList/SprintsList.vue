@@ -36,20 +36,28 @@
                         <img :src="aiIcon" class="mr-3px" />
                         <span @click.stop="suggestTask()" class="ai-color font-size-14 font-weight-500 ai-border-bottom" :class="[{'pointer-event-none' : isSpinner}]">{{$t("AI.suggest_tasks")}}</span>
                     </div>
-                    <!-- Total estimated hours for the whole sprint, subtasks included.
-                         Counted on the server, not from the rows on screen: the list pages
-                         at 35 and subtasks are not loaded at all while they are collapsed,
-                         so a client-side sum would quietly under-report. -->
-                    <span
-                        v-if="showEstimateBadge"
-                        class="sprint-estimate-badge ml-10px"
-                        :title="$t('Projects.sprint_total_estimate')"
-                        @click.stop
-                    >
-                        <!-- Named, not just a number: "43h 00m" on its own reads as
-                             logged time just as easily as estimated time. -->
-                        <span class="sprint-estimate-badge__label">{{ $t('Projects.sprint_estimate_label') }}</span>
-                        <span class="sprint-estimate-badge__value">{{ sprintEstimateLabel }}</span>
+                    <!-- Planned / Logged / Overdue for the whole sprint, on the same
+                         definitions the Tasks Summary by Status card uses. Counted on the
+                         server: the list pages at 35 and subtasks are not loaded at all
+                         while collapsed, so a client-side sum would quietly under-report.
+                         No period here — this is the sprint entire. -->
+                    <span v-if="showSprintHours" class="sprint-hours ml-10px" @click.stop>
+                        <span class="sprint-hours__item" :title="$t('Projects.sprint_planned_hint')">
+                            <span class="sprint-hours__label">{{ $t('Projects.sprint_planned') }}</span>
+                            <span class="sprint-hours__value">{{ hoursLabel(sprintHours.plannedMinutes) }}</span>
+                        </span>
+                        <span class="sprint-hours__item" :title="$t('Projects.sprint_logged_hint')">
+                            <span class="sprint-hours__label">{{ $t('Projects.sprint_logged') }}</span>
+                            <span class="sprint-hours__value">{{ hoursLabel(sprintHours.loggedMinutes) }}</span>
+                        </span>
+                        <!-- Only an overrun is worth colouring; a sprint inside its plan
+                             has nothing to report. -->
+                        <span class="sprint-hours__item" :title="$t('Projects.sprint_overdue_hint')">
+                            <span class="sprint-hours__label">{{ $t('Projects.sprint_overdue') }}</span>
+                            <span class="sprint-hours__value" :class="{ 'sprint-hours__value--over': sprintHours.overdueMinutes > 0 }">
+                                {{ hoursLabel(sprintHours.overdueMinutes) }}
+                            </span>
+                        </span>
                     </span>
                 </div>
             </div>
@@ -337,67 +345,54 @@ const props = defineProps({
     calendarDate: Number
 })
 
-// ─── Sprint total estimate badge ────────────────────────────────────────────────
+// ─── Sprint hours: Planned, Logged, Overdue ─────────────────────────────────────
 //
-// The sum of every task's estimate in this sprint, SUBTASKS INCLUDED.
+// The same three figures the Tasks Summary by Status card shows, on the same
+// definitions, for the whole sprint rather than a period. The projection that turns
+// them into "overdue" lives on the server (Modules/Sprints/hours.js) so the two places
+// cannot drift — the card and this header must always agree about what overdue means.
 //
-// Counted on the server rather than from the rows on screen. The list pages at 35 and
-// subtasks are not fetched at all while the Subtask toggle is Collapsed, so summing what
-// the client happens to hold would under-report — silently, and by more the bigger the
-// sprint. (The story-points total beside each status group does sum client-side, and has
-// that weakness.)
-//
-// It reuses the same generic aggregation endpoint the task list itself posts to, so this
-// adds no new route. `objId` is expanded to real ObjectIds server-side.
-const sprintEstimateMinutes = ref(0);
-const currentCompanyForEstimate = computed(() => getters["settings/selectedCompany"]);
-// Gated on the plan feature, the same one that gates the estimate editor on a task: a
-// company without time estimates would otherwise stare at a permanent 00h 00m.
-const showEstimateBadge = computed(() => !!currentCompanyForEstimate.value?.planFeature?.timeEstimateProjectApp
+// Counted on the server for a second reason: the list pages at 35 and subtasks are not
+// fetched at all while the Subtask toggle is Collapsed, so summing what the client
+// happens to hold would under-report — silently, and by more the bigger the sprint.
+const sprintHours = ref({ plannedMinutes: 0, loggedMinutes: 0, overdueMinutes: 0 });
+const currentCompanyForHours = computed(() => getters["settings/selectedCompany"]);
+// Gated on the same plan feature that gates the estimate editor on a task: a company
+// without time estimates would otherwise stare at three permanent 00h 00m.
+const showSprintHours = computed(() => !!currentCompanyForHours.value?.planFeature?.timeEstimateProjectApp
     && checkPermission('task.task_list', project.value?.isGlobalPermission) === true);
 
-// Same shape the task detail shows ("01h 00m"), so the two read as the same number.
-const sprintEstimateLabel = computed(() => {
-    const total = Number(sprintEstimateMinutes.value) || 0;
+// Same shape the task detail shows ("01h 00m"), so the numbers read as one family.
+const hoursLabel = (minutes) => {
+    const total = Number(minutes) || 0;
     const h = Math.floor(total / 60);
     const m = total % 60;
     return `${h.toString().padStart(2, "0")}h ${m.toString().padStart(2, "0")}m`;
-});
+};
 
-const loadSprintEstimate = () => {
-    const projectId = project.value?._id;
-    if (!showEstimateBadge.value || !projectId || !props.sprint?.id) return;
-    const findQuery = [
-        {
-            $match: {
-                objId: { sprintId: props.sprint.id, ProjectID: projectId },
-                deletedStatusKey: 0,
-                // No isParentTask clause on purpose — subtasks carry their own estimate
-                // and the badge is meant to include them.
-            },
-        },
-        { $group: { _id: null, total: { $sum: "$totalEstimatedTime" } } },
-    ];
-    apiRequest("post", `${env.TASK}/find`, { findQuery })
+const loadSprintHours = () => {
+    if (!showSprintHours.value || !props.sprint?.id) return;
+    apiRequest("post", `${env.SPRINT_HOURS}`, { sprintId: props.sprint.id })
         .then((res) => {
-            sprintEstimateMinutes.value = Number(res?.data?.[0]?.total) || 0;
+            const d = res?.data?.data;
+            if (d) sprintHours.value = d;
         })
         .catch(() => {
-            // A failed count must not blank a number that was right a moment ago.
+            // A failed count must not blank numbers that were right a moment ago.
         });
 };
 
-// Re-count when this sprint's tasks change — an estimate edited, a task added, moved or
-// deleted. Debounced because a bulk change fires this once per task.
-let estimateTimer = null;
-const refreshSprintEstimate = () => {
-    clearTimeout(estimateTimer);
-    estimateTimer = setTimeout(loadSprintEstimate, 600);
+// Re-count when this sprint's tasks change — an estimate edited, time logged, a task
+// added, moved or deleted. Debounced because a bulk change fires this once per task.
+let hoursTimer = null;
+const refreshSprintHours = () => {
+    clearTimeout(hoursTimer);
+    hoursTimer = setTimeout(loadSprintHours, 600);
 };
 watch(() => getters["projectData/tasks"]?.[project.value?._id]?.[props.sprint?.id]?.tasks,
-    refreshSprintEstimate, { deep: true });
-onMounted(loadSprintEstimate);
-onUnmounted(() => clearTimeout(estimateTimer));
+    refreshSprintHours, { deep: true });
+onMounted(loadSprintHours);
+onUnmounted(() => clearTimeout(hoursTimer));
 
 watch(route, () => {
     if (createTask.value) {
@@ -907,14 +902,15 @@ function startTaskTour(key) {
 </script>
 
 <style>
-/* Sprint total estimate. Quiet by design: it sits beside "+ New Task" and the AI CTA, and
-   it is a figure to glance at, not an action — so no accent colour and no pointer. */
-.sprint-estimate-badge {
+/* Sprint hours. Quiet by design: they sit beside "+ New Task" and the AI CTA, and they
+   are figures to glance at, not actions — so no accent colour and no pointer. One pill
+   holding three readings rather than three pills, so the row stays calm. */
+.sprint-hours {
     display: inline-flex;
     align-items: baseline;
-    gap: 5px;
+    gap: 12px;
     flex: 0 0 auto;
-    padding: 2px 9px;
+    padding: 2px 10px;
     border-radius: 11px;
     background: #f0f2f7;
     font-size: 12px;
@@ -922,10 +918,13 @@ function startTaskTour(key) {
     white-space: nowrap;
     cursor: default;
 }
-/* Label recedes, number carries — so it scans as "Estimated: 43h" rather than as two
+.sprint-hours__item { display: inline-flex; align-items: baseline; gap: 5px; }
+/* Label recedes, number carries — so each pair scans as "Planned 43h" rather than as two
    competing pieces of text. */
-.sprint-estimate-badge__label { color: #8a909c; font-weight: 500; }
-.sprint-estimate-badge__value { color: #5b6472; font-weight: 600; font-variant-numeric: tabular-nums; }
+.sprint-hours__label { color: #8a909c; font-weight: 500; }
+.sprint-hours__value { color: #5b6472; font-weight: 600; font-variant-numeric: tabular-nums; }
+/* An overrun is the one figure here worth colouring — same amber the task list uses. */
+.sprint-hours__value--over { color: #b45309; }
 .v-enter-active,
 .v-leave-active {
   transition: all 0.2s ease;

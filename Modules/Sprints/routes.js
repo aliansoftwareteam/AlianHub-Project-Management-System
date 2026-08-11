@@ -1,5 +1,6 @@
 const ctrl = require('./controller');
 const burndown = require('./burndown');
+const hours = require('./hours');
 const { requirePermission } = require('../../Config/permissionGuard');
 
 // Whitelist of functions allowed to be called via PATCH /sprint/:id
@@ -11,6 +12,9 @@ const ALLOWED_FOLDER_TYPES = ['editFolderName', 'updateFolder'];
 exports.init = (app) => {
     // Read-only burndown series for a sprint (count + estimate based).
     app.post('/api/v2/sprints/burndown', burndown.getSprintBurndown);
+
+    // Read-only Planned / Logged / Overdue totals for a whole sprint.
+    app.post('/api/v2/sprints/hours', hours.getSprintHours);
 
     app.post('/api/v1/sprint', requirePermission('project.project_sprint_create'), ctrl.addSprint);
     app.patch('/api/v1/sprint/:id', (req, res) => {
