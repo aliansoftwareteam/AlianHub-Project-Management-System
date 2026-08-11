@@ -51,6 +51,16 @@
     min-height: var(--mc-header-h);
     box-sizing: border-box;
 }
+/* The back-to-list control on narrow screens. Sits before the conversation icon, so it
+   reads as "out of here" rather than as one more action on the conversation. */
+.mc-head-back {
+    flex: none;
+    width: 20px; height: 20px;
+    cursor: pointer;
+    opacity: .7;
+    transition: opacity .12s ease;
+}
+.mc-head-back:hover { opacity: 1; }
 .mc-head-id { min-width: 0; display: flex; flex-direction: column; }
 .mc-head-name {
     font-size: 14.5px; font-weight: 700; color: var(--mc-ink);

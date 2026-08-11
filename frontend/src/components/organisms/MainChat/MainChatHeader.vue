@@ -1,5 +1,10 @@
 <template>
     <header class="mc-head">
+        <!-- Anything that has to sit left of the conversation, e.g. the button that
+             brings the list back on a narrow screen. Empty on wide layouts, where the
+             list is always visible and there is nothing to go back to. -->
+        <slot name="lead"></slot>
+
         <MainChatConversationIcon
             :title="title"
             :avatar-src="avatarSrc"

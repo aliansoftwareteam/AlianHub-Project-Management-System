@@ -44,6 +44,10 @@ const verifyJWTTokenWithCRoute = [
     // added under it is guarded by default — these were unauthenticated and took the
     // company purely from a header, which is a company id anyone can type.
     "/api/v2/sprints",
+    // Call signalling support (Modules/Calls). The ICE endpoint mints a short-lived TURN
+    // credential, so it must be behind a login — an unauthenticated relay credential is a
+    // relay for the whole internet.
+    "/api/v2/calls",
     "/api/v1/folder",
     "/api/v1/folder/:id",
     "/api/v1/taskIndex",
