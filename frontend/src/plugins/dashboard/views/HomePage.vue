@@ -534,12 +534,17 @@
             } else {
                 let makeUid = makeUniqueId();
                 let minMax = getCardsComponentsSize(fieldArray.value.key) ?? {"minW": 3,"maxW": 12,"minH": 5,"maxH": 18};
-                let newPosition = findNextCardPositionOnLayout(3,5,gridCol.value);
+                // Start at the card's own minimum when that is larger than the default
+                // 3x5 — a card created below its minimum is one the user has to resize
+                // before it is readable, and the slot is searched at the wrong size too.
+                let newW = Math.max(3, Number(minMax.minW) || 3);
+                let newH = Math.max(5, Number(minMax.minH) || 5);
+                let newPosition = findNextCardPositionOnLayout(newW, newH, gridCol.value);
                 let posi = {
                     "x": newPosition.x ? newPosition.x : (layout.value.length * 2) % (gridCol.value || 12),
                     "y": newPosition.y ? newPosition.y : layout.value.length + (gridCol.value || 12),
-                    "w": 3,
-                    "h": 5,
+                    "w": newW,
+                    "h": newH,
                     ...minMax
                 }
                 let object = {
