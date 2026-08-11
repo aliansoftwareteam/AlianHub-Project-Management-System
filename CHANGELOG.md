@@ -16,6 +16,20 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.28.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.27.0...v14.28.0) (2026-08-11)
+
+
+### 🚀 Features
+
+* **sprints:** show planned, logged and overdue hours in the sprint header ([3700dcc](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3700dccdb9eb3cb8205ada0778c92c98e4c5dbf3))
+* **sprints:** show Planned, Logged and Overdue hours in the sprint header ([cb1f51f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/cb1f51f56f7b70bf2c30aaae040c6c343ccef3e3))
+
+
+### 🐛 Bug Fixes
+
+* **tasks:** keep the default assignee after the create row resets ([200ea4a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/200ea4abbc68e846dce789e3c3091056e43ef1e3))
+* **tasks:** keep the default assignee after the create row resets ([f9d36fa](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f9d36fa5d97d418095a5f3f920542bab51b6d91b))
+
 ## [14.27.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.26.0...v14.27.0) (2026-08-11)
 
 
