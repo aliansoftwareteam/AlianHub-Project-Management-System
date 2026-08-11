@@ -143,7 +143,23 @@
                             :avatarSrc="selectedProject?.default ? (getUser(selectedChat?.receiverId)?.Employee_profileImageURL || '') : ''"
                             :sendMessageAllowed="sendMessageAllowed"
                             @created="onChatCreated"
-                        />
+                        >
+                            <!-- The way back to the conversation list on a narrow screen.
+                                 The legacy header carried this button, but the new UI
+                                 hides that header — which left an open conversation with
+                                 no way out, since the only other trigger lives on the
+                                 "no chat selected" screen. -->
+                            <template #header-lead>
+                                <img
+                                    v-if="clientWidth <= responseWidth"
+                                    :src="sidebarArrowIcon"
+                                    alt=""
+                                    class="mc-head-back"
+                                    :title="$t('Chat.chats')"
+                                    @click="visible = !visible"
+                                />
+                            </template>
+                        </MainChatPanel>
                         <Comments
                             v-else-if="selectedChat?.id && !loadingChats"
                             :taskId="selectedProject?.default ? selectedChat?.id : 'default'"

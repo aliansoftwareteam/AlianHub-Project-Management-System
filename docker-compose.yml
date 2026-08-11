@@ -69,6 +69,43 @@ services:
     networks:
       - alianhub
 
+  # ── TURN relay for audio/video calling (optional) ──────────────────
+  #
+  # Calls are peer-to-peer, so most connect browser-to-browser with no help.
+  # A minority cannot — symmetric NAT and strict corporate firewalls, roughly
+  # 15-20% of real connections — and those need a relay or they simply fail.
+  #
+  # Disabled by default because it only works with real configuration: a
+  # public IP the relay can advertise, and open ports. Enable with:
+  #
+  #   docker compose --profile calling up -d
+  #
+  # then set in .env:
+  #   TURN_URLS="turn:<your-public-host>:3478"
+  #   TURN_STATIC_AUTH_SECRET="<the same secret as below>"
+  #
+  # NOTE: host networking is used because a relay has to hand out addresses
+  # that are reachable from the outside; behind Docker's NAT it would
+  # advertise an address only the container can reach.
+  coturn:
+    image: coturn/coturn:4.6-alpine
+    container_name: alianhub-coturn
+    restart: unless-stopped
+    profiles: ["calling"]
+    network_mode: host
+    command: >
+      -n
+      --realm=${TURN_REALM:-alianhub}
+      --use-auth-secret
+      --static-auth-secret=${TURN_STATIC_AUTH_SECRET:?set TURN_STATIC_AUTH_SECRET in .env}
+      --external-ip=${TURN_PUBLIC_IP:?set TURN_PUBLIC_IP in .env}
+      --listening-port=3478
+      --min-port=49160
+      --max-port=49200
+      --no-cli
+      --no-tlsv1
+      --no-tlsv1_1
+
 volumes:
   alianhub_mongo_data:
     name: alianhub_mongo_data
