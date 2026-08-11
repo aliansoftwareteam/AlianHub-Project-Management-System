@@ -16,6 +16,15 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.27.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.26.0...v14.27.0) (2026-08-11)
+
+
+### 🚀 Features
+
+* **dashboard:** add the Overdue Hours column to the Tasks Summary card ([7c5d5a9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7c5d5a9102432f330747cefc34693a0e1ce3a135))
+* **dashboard:** match the Tasks Summary card to the Workload Timesheet ([e895178](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e8951781d689c10e0c5836a5fca8ddfe0d8e9721))
+* **dashboard:** match the Tasks Summary card to the Workload Timesheet ([56febde](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/56febde9b091c8396482eba6afbab7139d01e340))
+
 ## [14.26.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.25.0...v14.26.0) (2026-08-10)
 
 
