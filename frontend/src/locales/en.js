@@ -1143,6 +1143,8 @@ export default {
         camera_off: "Turn camera off",
         camera_on: "Turn camera on",
         peer_muted: "Their microphone is off",
+        sound_off: "Silence the ringer",
+        sound_on: "Turn the ringer back on",
         share_screen: "Share your screen",
         stop_share: "Stop sharing",
         maximize: "Maximise",

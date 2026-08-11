@@ -13,6 +13,17 @@
                 </div>
             </div>
             <div class="call-ring__actions">
+                <!-- Silence the ringer, remembered for next time. Offered here because
+                     this is the moment somebody wants it, not buried in a settings page
+                     they would have to go and find while the phone is ringing. -->
+                <button
+                    type="button"
+                    class="call-ring__quiet"
+                    :title="sound.muted.value ? $t('call.sound_on') : $t('call.sound_off')"
+                    @click="sound.toggleMuted()"
+                >
+                    <CallIcon :name="sound.muted.value ? 'bellOff' : 'bell'" :size="15" />
+                </button>
                 <button type="button" class="call-btn call-btn--decline" :title="$t('call.decline')" @click="rejectCall">
                     <CallIcon name="hangup" />
                 </button>
@@ -111,6 +122,7 @@
 import { ref, computed, watch, inject, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { useStore } from 'vuex';
 import { useCall } from '@/composable/useCall';
+import { useCallSound } from '@/composable/useCallSound';
 import { useGetterFunctions } from '@/composable';
 import CallAvatar from './CallAvatar.vue';
 import CallIcon from './CallIcon.vue';
@@ -127,6 +139,8 @@ const {
     isIncoming, isBusy, isActive, isOutgoing,
     bindSocket, acceptCall, rejectCall, hangUp, toggleMic, toggleCam, toggleShare, STATE,
 } = useCall();
+
+const sound = useCallSound();
 
 // Purely presentational, so it stays here rather than in the call engine.
 const maximized = ref(false);
@@ -231,6 +245,22 @@ watch(errorMessage, (msg) => {
     errorTimer = setTimeout(() => { errorMessage.value = ''; }, ERROR_VISIBLE_MS);
 });
 
+/**
+ * The tones follow the call's own state machine rather than individual events, so every
+ * way out — answered, declined, cancelled, timed out, taken on another device, the socket
+ * dropping — lands here and silences the ring. A ring that outlives its call is worse than
+ * no ring at all, and hanging it off the happy path is how that happens.
+ */
+watch(state, (now, was) => {
+    if (now === STATE.INCOMING) { sound.startIncoming(); return; }
+    if (now === STATE.OUTGOING) { sound.startRingback(); return; }
+    sound.stop();
+    if (now === STATE.ACTIVE && was !== STATE.ACTIVE) sound.connected();
+    // Only a call that actually connected is worth a goodbye; a declined one already
+    // said what it had to say.
+    if (now === STATE.IDLE && was === STATE.ACTIVE) sound.ended();
+});
+
 watch(isActive, (active) => {
     clearInterval(ticker);
     if (!active) { elapsed.value = 0; return; }
@@ -246,6 +276,9 @@ onBeforeUnmount(() => {
     window.removeEventListener('beforeunload', warnOnUnload);
     clearInterval(ticker);
     clearTimeout(errorTimer);
+    // A ring is on a timer, not tied to this component's life — without this it keeps
+    // going after the overlay is gone.
+    sound.stop();
 });
 </script>
 
@@ -274,7 +307,16 @@ onBeforeUnmount(() => {
 .call-ring__text { display: flex; flex-direction: column; }
 .call-ring__name { font-size: 13.5px; font-weight: 600; color: #1e2436; }
 .call-ring__sub { font-size: 11.5px; color: #7b8496; }
-.call-ring__actions { display: flex; gap: 9px; }
+.call-ring__actions { display: flex; align-items: center; gap: 9px; }
+/* Deliberately plain next to accept and decline: silencing the ringer is a preference,
+   not one of the two answers being asked for. */
+.call-ring__quiet {
+    width: 28px; height: 28px; flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: none; border-radius: 50%; background: transparent;
+    color: #9aa3b4; cursor: pointer; transition: background .12s ease, color .12s ease;
+}
+.call-ring__quiet:hover { background: #eef0f5; color: #5b6472; }
 
 /* In-call window. */
 .call-win {
