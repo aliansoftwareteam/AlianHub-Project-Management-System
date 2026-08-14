@@ -1,7 +1,7 @@
 ---
 id: 003
 title: Show library task-type icons in the time tracker
-status: active
+status: done
 priority: medium
 depends_on: []
 created: 2026-08-14
