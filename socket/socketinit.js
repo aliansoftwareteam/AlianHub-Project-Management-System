@@ -5,6 +5,7 @@ const {commentSocketHandler} = require('./controller/commentSocket');
 const {companiesSocketHandler} = require('./controller/companiesSocket');
 const {userNotificationCountHandler} = require('./controller/userNotificationCount');
 const {generalReminderSocketHandler} = require('./controller/generalReminderSocket');
+const {callSocketHandler} = require('./controller/callSocket');
 const { instrument } = require('@socket.io/admin-ui');
 const jwt = require('jsonwebtoken');
 const logger = require('../Config/loggerConfig');
@@ -128,6 +129,7 @@ exports.initSocket = (server) => {
         generalReminderSocketHandler({socket, namespace});
         commentSocketHandler({socket, namespace});
         companiesSocketHandler({socket, namespace});
+        callSocketHandler({socket, namespace});
     });
     
 };

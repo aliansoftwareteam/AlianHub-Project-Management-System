@@ -15,9 +15,31 @@
             @pinned="toggleRightPane('pinned')"
             @info="toggleRightPane('info')"
         >
-            <!-- forwarded so the parent can drop in call buttons later without
-                 this panel knowing about calling -->
-            <template #call-actions><slot name="call-actions"></slot></template>
+            <!-- Forwarded so the page that owns the layout can put its own control here.
+                 The panel does not know whether a conversation list exists beside it. -->
+            <template #lead><slot name="header-lead"></slot></template>
+            <template #call-actions>
+                <!-- Calling is one-to-one only: a channel has many members and no peer to
+                     ring. It also needs a real conversation task to authorise against, so
+                     a chat that has not sent its first message yet cannot start one. -->
+                <template v-if="canCall">
+                    <button
+                        type="button"
+                        class="mc-icon-btn"
+                        :disabled="callBusy"
+                        :title="$t('call.start_audio')"
+                        @click="startCall(effectiveTaskId, 'audio')"
+                    ><CallIcon name="phone" :size="16" /></button>
+                    <button
+                        type="button"
+                        class="mc-icon-btn"
+                        :disabled="callBusy"
+                        :title="$t('call.start_video')"
+                        @click="startCall(effectiveTaskId, 'video')"
+                    ><CallIcon name="video" :size="16" /></button>
+                </template>
+                <slot name="call-actions"></slot>
+            </template>
             <template #actions><slot name="header-actions"></slot></template>
         </MainChatHeader>
 
@@ -143,6 +165,8 @@ import MainChatMessageList from './MainChatMessageList.vue';
 import MainChatComposer from './MainChatComposer.vue';
 import MainChatInfo from './MainChatInfo.vue';
 import MainChatSearch from './MainChatSearch.vue';
+import CallIcon from '@/components/organisms/CallOverlay/CallIcon.vue';
+import { useCall } from '@/composable/useCall';
 import { useMainChatConversation } from './useMainChatConversation';
 
 const props = defineProps({
@@ -214,6 +238,18 @@ const effectiveTaskId = computed(() => {
 });
 
 const conversationKey = computed(() => `${(projectData && projectData.value && projectData.value._id) || ''}:${props.sprintId}:${effectiveTaskId.value || props.taskId}`);
+
+// ─── Calling ────────────────────────────────────────────────────────────────────
+// One-to-one only, and only once the conversation task exists — the server authorises
+// a call by loading that task and checking the caller is one of its two participants,
+// so there is nothing to authorise against before the first message is sent.
+const { startCall, isBusy: callBusy, isSupported: callSupported, isSecure: callSecure } = useCall();
+const canCall = computed(() => !props.isChannel
+    && isDefaultProject.value
+    && !!effectiveTaskId.value
+    && effectiveTaskId.value !== 'default'
+    && callSupported()
+    && callSecure());
 
 const emptyTitle = computed(() => (props.isChannel
     ? t('MainChat.empty_channel')

@@ -1130,6 +1130,27 @@ export default {
     },
     // Main Chat module (components/organisms/MainChat). Kept in its own namespace
     // so the chat UI owns its strings instead of borrowing from Comments.
+    call: {
+        start_audio: "Start an audio call",
+        start_video: "Start a video call",
+        incoming_audio: "Incoming audio call",
+        incoming_video: "Incoming video call",
+        accept: "Accept",
+        decline: "Decline",
+        hang_up: "Hang up",
+        mute: "Mute",
+        unmute: "Unmute",
+        camera_off: "Turn camera off",
+        camera_on: "Turn camera on",
+        peer_muted: "Their microphone is off",
+        sound_off: "Silence the ringer",
+        sound_on: "Turn the ringer back on",
+        share_screen: "Share your screen",
+        stop_share: "Stop sharing",
+        maximize: "Maximise",
+        restore: "Restore",
+        no_turn_warning: "No TURN relay is configured. Calls may fail to connect on restrictive networks.",
+    },
     MainChat: {
         search: "Search in conversation",
         user_info: "View profile",
