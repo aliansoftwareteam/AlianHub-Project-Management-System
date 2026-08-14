@@ -12,6 +12,7 @@ const { PlanSchema, ClarifyResponseSchema, TasksPlanSchema, TasksResponseSchema,
 const { buildSystemPrompt, buildUserMessage, buildRepairPrompt, buildTasksSystemPrompt, buildTasksUserMessage } = require('./promptBuilder');
 const { briefUpload, extractFromFile, safeUnlink, MAX_BRIEF_BYTES } = require('./briefExtractor');
 const { usageFromResult, addUsage, summarize } = require('./usage');
+const planRules = require('./planRules');
 const sseEmitter = require('./sseEmitter');
 const orchestrator = require('./orchestrator');
 const clarifier = require('./clarifier');
@@ -238,6 +239,26 @@ async function generatePlanForJob({ jobId, uid, companyId, description, addition
             const sanitized = sanitizeMemberIds(plan, allowed);
             plan = sanitized.plan;
         } catch (_e) { /* leave as-is */ }
+
+        // Name the sprints for the weeks they run, here rather than at creation,
+        // so the review screen shows the names the project will actually get.
+        // Previously the review displayed the model's working titles and the
+        // real weekly names only appeared after "Create everything", which read
+        // as the plan having changed behind the user's back.
+        //
+        // The prefix is the plan's project code. A code collision at creation
+        // can still shift it (EPLP -> EPLP2), so the orchestrator recomputes
+        // with the final code — this is the preview, and the two agree except
+        // in that rare case.
+        if (plan && Array.isArray(plan.sprints) && plan.sprints.length) {
+            const previewNames = planRules.weeklySprintNames({
+                prefix: (plan.project && plan.project.ProjectCode) || '',
+                count: plan.sprints.length,
+            });
+            plan.sprints.forEach((sprint, i) => {
+                if (previewNames[i]) sprint.sprintName = previewNames[i];
+            });
+        }
 
         // The user's explicit public/private choice always wins over whatever
         // the LLM picked.

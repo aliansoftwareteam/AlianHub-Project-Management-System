@@ -309,6 +309,14 @@
                                         </summary>
                                         <pre class="aipg-task-desc-body">{{ renderTaskDescription(task) }}</pre>
                                     </details>
+                                    <!-- Sub-tasks and hours were generated but never shown, so a split
+                                         task looked identical to a flat one until after creation. -->
+                                    <span v-if="task.estimatedHours" class="aipg-task-est">{{ formatHours(task.estimatedHours) }}</span>
+                                    <div v-if="task.subtasks && task.subtasks.length" class="aipg-subs">
+                                        <div v-for="(st, sti) in task.subtasks" :key="'st-'+si+'-'+ti+'-'+sti" class="aipg-sub">
+                                            ↳ {{ st.TaskName }}<span v-if="st.estimatedHours" class="aipg-sub-est">{{ formatHours(st.estimatedHours) }}</span>
+                                        </div>
+                                    </div>
                                 </li>
                             </ul>
                         </details>
@@ -571,6 +579,16 @@ export default defineComponent({
             if (u.costUsd === null) parts.push('no price on file for this model');
             return parts.join(' — ');
         });
+
+        // "2h" and "1h 30m" read better than "1.5" against a task name.
+        const formatHours = (h) => {
+            const total = Math.round((Number(h) || 0) * 60);
+            if (total <= 0) return '';
+            const hours = Math.floor(total / 60);
+            const mins = total % 60;
+            if (!hours) return `${mins}m`;
+            return mins ? `${hours}h ${mins}m` : `${hours}h`;
+        };
 
         const formatTokens = (n) => Number(n || 0).toLocaleString();
         // Sub-cent runs are normal, so two decimals would read as "$0.00".
@@ -1007,7 +1025,7 @@ export default defineComponent({
             jobId, progress, createdProjectId,
             placeholderText,
             canGenerate, hasGeneratedPlan, hasGeneratedQuestions, totals, isBusy,
-            runUsage, usageTooltip, formatTokens, formatCost,
+            runUsage, usageTooltip, formatTokens, formatCost, formatHours,
             renderTaskDescription, isStepDone, stepClass, stepDoneDot, rowClass, stepIcon, stepStatusLabel,
             onFileChosen, clearBrief,
             onGeneratePlan, onNextWithExistingPlan,
@@ -1454,6 +1472,28 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
     font-variant-numeric: tabular-nums;
     cursor: help;
     border-bottom: 1px dotted #cbd5e1;
+}
+
+.aipg-subs { margin: 2px 0 4px 12px; }
+.aipg-sub {
+    font-size: 12px; color: #6b7488; padding: 2px 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* The estimate is the number a reader scans for, so it gets the same quiet
+   pill the project code uses rather than trailing off as plain grey text.
+   Parent and sub-task are styled identically — a sub-task's two hours are
+   worth exactly as much as a parent's. */
+.aipg-sub-est, .aipg-task-est {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
 .aipg-code-pill {

@@ -18,6 +18,8 @@
 const fs = require('fs');
 const path = require('path');
 
+const { MAX_TASK_HOURS } = require('./planRules');
+
 const PROMPTS_DIR = path.join(__dirname, 'prompts');
 
 // Strip BOM + normalize line endings so files authored on different OSes
@@ -180,6 +182,26 @@ function buildUserMessage({ description, additionalRequirements, briefText, memb
             `The company's project skills (pick the ones this project genuinely needs for "skills", using these exact slugs — never invent a slug, and leave the array empty if none apply):\n${JSON.stringify(availableSkills.slice(0, 120), null, 2)}`,
         );
     }
+
+    // The same directive AI-Assist uses for its sub-tasks toggle, which is the
+    // one place this reliably works. Stating the rule in the system prompt was
+    // not enough: the model produced one split task out of forty. It sits in
+    // the USER message, last, where the model weights it most heavily.
+    //
+    // Unconditional here, unlike AI-Assist — splitting oversized work is a
+    // company rule for every project, not a per-run option.
+    sections.push(
+        `SUB-TASKS (company rule — you MUST use them): no task may carry more than ${MAX_TASK_HOURS} hours. `
+        + `Give every task an "estimatedHours". When the honest estimate for a task exceeds ${MAX_TASK_HOURS} hours, `
+        + 'you MUST break it down with a "subtasks" array on that task instead of shrinking the estimate — each entry '
+        + `is { "TaskName": "...", "estimatedHours": <= ${MAX_TASK_HOURS}, "descriptionBlocks": [ ... ] }. `
+        + 'Give each sub-task a SHORT description: at least one paragraph saying what it involves; it does NOT need '
+        + 'the full "What to do" / "Acceptance criteria" skeleton that top-level tasks use. The sub-task estimates '
+        + 'add up to the honest total, and the parent task then carries NO "estimatedHours" of its own. '
+        + 'A plan in which every task is flat is WRONG unless every single task genuinely fits in '
+        + `${MAX_TASK_HOURS} hours — real projects almost always contain multi-part work that does not. `
+        + 'Only genuinely single-step tasks stay flat. Never nest sub-tasks under sub-tasks.',
+    );
 
     sections.push(
         'Reminder: emit ONE JSON object only. needsClarification MUST be false. Include the full "plan" object.',

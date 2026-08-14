@@ -47,6 +47,7 @@ const { HandleHistory } = require('../Tasks/helpers/helper');
 const { HandleBothNotification } = require('../Tasks/helpers/handleNotification');
 const { checkProjectPlan, removeProjectCount } = require('../createProject/controller');
 const { estimateAndPersist: estimateTaskTimeWithAI } = require('../EstimatedTime/aiTaskEstimator');
+const planRules = require('./planRules');
 const sseEmitter = require('./sseEmitter');
 
 // Concurrency cap for fire-and-forget AI estimates after bulk task insert —
@@ -67,6 +68,10 @@ function fireTaskEstimatesInBackground(companyId, docs, userData) {
                     companyId,
                     taskId: String(d._id),
                     task: d,
+                    // Company rule: no task carries more than two hours. Passed
+                    // rather than baked into the estimator so the manual
+                    // "estimate this task" button keeps its own behaviour.
+                    maxMinutes: planRules.MAX_TASK_MINUTES,
                     // Pass the run's actor so the estimate's activity-log entry
                     // is attributed consistently (defaults to "AlianHub AI").
                     userData,
@@ -716,6 +721,12 @@ function buildTaskDoc({ task, projectDoc, sprintDoc, statusByName, taskTypeByKey
         TaskType: taskType ? (taskType.value || taskType.name || 'task') : 'task',
         TaskTypeKey: taskType ? taskType.key : 0,
         ParentTaskId: parentTaskId ? String(parentTaskId) : '',
+        // Taken straight from the plan and capped, so a task that was split
+        // shows its slice immediately rather than waiting on the background
+        // estimator — which never runs for sub-tasks at all.
+        ...(Number(task.estimatedHours) > 0
+            ? { totalEstimatedTime: Math.min(Math.round(Number(task.estimatedHours) * 60), planRules.MAX_TASK_MINUTES) }
+            : {}),
         ProjectID: projectDoc._id,
         CompanyId: projectDoc.CompanyId,
         status: {
@@ -866,7 +877,14 @@ async function createTasksForSprint({ companyId, projectDoc, sprintDoc, tasks, s
     // is not blocked by the per-task LLM calls. Only top-level tasks are
     // estimated — sub-tasks are small, and estimating each would multiply the
     // per-task LLM calls.
-    fireTaskEstimatesInBackground(companyId, parentDocs, userData);
+    // A parent that was split carries no estimate by design — the hours live on
+    // its sub-tasks. Estimating it here would put the whole job back on the
+    // parent, breaking the two-hour rule and double-counting in any roll-up.
+    // Tasks that already carry a plan estimate are skipped for the same reason.
+    const needsEstimate = parentDocs.filter(
+        (d) => !(d.subTasks > 0) && !(Number(d.totalEstimatedTime) > 0),
+    );
+    fireTaskEstimatesInBackground(companyId, needsEstimate, userData);
 
     return docs;
 }
@@ -1028,16 +1046,26 @@ async function executePlan({ plan, companyId, uid, userData, jobId }) {
         // 7. Sprints (sequential).
         emit({ event: 'progress', step: 'sprint', status: 'started', total: plan.sprints.length });
         const sprintRecords = [];
-        for (const sprint of plan.sprints) {
-            emit({ event: 'progress', step: 'sprint', status: 'progress', name: sprint.sprintName });
+        // Sprint names are weekly date ranges, computed here rather than asked
+        // of the model: an LLM does not reliably know today's date and is worse
+        // at date arithmetic, and a wrong date would be baked into the name for
+        // good. The model still decides how the work is sliced — only the label
+        // is ours. Format matches the ranges the team already writes by hand.
+        const weeklyNames = planRules.weeklySprintNames({
+            prefix: projectDoc.ProjectCode,
+            count: plan.sprints.length,
+        });
+        for (const [sprintIndex, sprint] of plan.sprints.entries()) {
+            const sprintName = weeklyNames[sprintIndex] || sprint.sprintName;
+            emit({ event: 'progress', step: 'sprint', status: 'progress', name: sprintName });
             const sprintDoc = await createSprint({
                 companyId,
                 projectId: projectDoc._id,
                 projectName: projectDoc.ProjectName,
-                sprintName: sprint.sprintName,
+                sprintName,
                 userData,
             });
-            tracker.sprints.push({ id: sprintDoc._id.toString(), name: sprint.sprintName });
+            tracker.sprints.push({ id: sprintDoc._id.toString(), name: sprintName });
             sprintRecords.push({ sprint, sprintDoc });
         }
         emit({ event: 'progress', step: 'sprint', status: 'done', completed: tracker.sprints.length });
@@ -1418,16 +1446,26 @@ async function executeTasksIntoProject({ tasksPlan, projectId, companyId, uid, u
         const sprints = Array.isArray(tasksPlan.sprints) ? tasksPlan.sprints : [];
         emit({ event: 'progress', step: 'sprint', status: 'started', total: sprints.length });
         const sprintRecords = [];
-        for (const sprint of sprints) {
-            emit({ event: 'progress', step: 'sprint', status: 'progress', name: sprint.sprintName });
+        // Same weekly labelling as a new project, so sprints added later match
+        // the ones already there. Numbered from the current week: this flow has
+        // no view of which weeks the project has already used, so a sprint for
+        // a week that already exists is possible and is the user's call to
+        // rename, not something to guess at here.
+        const weeklyNames = planRules.weeklySprintNames({
+            prefix: projectDoc.ProjectCode,
+            count: sprints.length,
+        });
+        for (const [sprintIndex, sprint] of sprints.entries()) {
+            const sprintName = weeklyNames[sprintIndex] || sprint.sprintName;
+            emit({ event: 'progress', step: 'sprint', status: 'progress', name: sprintName });
             const sprintDoc = await createSprint({
                 companyId,
                 projectId: projectDoc._id,
                 projectName: projectDoc.ProjectName,
-                sprintName: sprint.sprintName,
+                sprintName,
                 userData,
             });
-            tracker.sprints.push({ id: sprintDoc._id.toString(), name: sprint.sprintName });
+            tracker.sprints.push({ id: sprintDoc._id.toString(), name: sprintName });
             sprintRecords.push({ sprint, sprintDoc });
         }
         emit({ event: 'progress', step: 'sprint', status: 'done', completed: tracker.sprints.length });
