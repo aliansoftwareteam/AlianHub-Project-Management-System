@@ -1,6 +1,8 @@
 <!-- =========================================================================================
     Created By : Dipsha Kalariya
     Commnet : This component is used to display task status detail for blank project form as step-6 in create project module.
+    Now a thin wrapper over the reusable <TemplateSelectForm>: it owns the task-status data,
+    store/API operations and the right-column list; the shell owns the template picker UI.
 ========================================================================================== -->
 <template>
 <div class="statusHeader statusHeader_two">
@@ -11,57 +13,24 @@
     :class="{'border-radius-5-px  task-heading-desktop': clientWidth > 767 , 'border-radius-8-px  task-heading-mobile': clientWidth <= 767}"
     >{{$t('Templates.what_task')}}?</h3>
     <div class="taskStatusSection style-scroll">
-        <div class="statusTaskWrapper d-flex justify-content-between">
-            <div class="taskStatusLeft">
-                <div class="d-flex justify-content-between align-items-baseline w-90">
-                    <label class="templetes" :class="{'template-label-desktop': clientWidth > 767 , 'template-label-mobile': clientWidth <= 767}">{{$t('Templates.templates')}} ({{templateList.length}})</label>
-                    <img class="cursor-pointer" src="@/assets/images/svg/pluss.svg" @click="activeTemplate()"/>
-                </div>
-                <ul class="templated_name_ul position-re">
-                    <li v-for="(tempVal,index) in templateList" v-bind:key="index" class="cursor-pointer" :class="[{'temp_save_value':tempVal.isShowSave}]">
-                        <span v-if="!tempVal.isEditable" :class="[{'temp_save_dot':tempVal.isShowSave}]"  :style="`${theModel.taskStatusField.value._id === tempVal._id ? 'color: #3845B3 !important; font-weight: 500' : ''}`" @click="setTemplateData(tempVal)" class="templated_name text-ellipsis" :title="tempVal.TemplateName"> {{tempVal.TemplateName}} </span>
-                        <input type="text" class="statusInputText form-control edit-input statuseditInput" :maxlength="50" v-if="tempVal.isEditable" v-model.trim="taskTypeName" @keyup.enter="editTaskTemplate(tempVal,index)" @input="errTempMsg=''"/>
-                        <span class="position-ab" :style="[{paddingTop : clientWidth > 767 ? '8px' : '0px', right : clientWidth > 767 ? '20px' : '20px'}]">
-                            <img :src="saveIcon" class="cursor-pointer" v-if="tempVal.isEditable" @click="editTaskTemplate(tempVal,index)">
-                            <img :src="deletered" class="cursor-pointer ml-10px" v-if="tempVal.isEditable" @click="tempVal.isEditable = false,errTempMsg=''">
-                        </span>
-                        <span class="task-leftside" v-if="!tempVal.isEditable && tempVal.isShowSave !== true && tempVal.TemplateName !== 'Custom'">
-                            <img v-if="clientWidth > 767 || (clientWidth <= 767 && tempVal.showEditIcon)"  :src="templateEditIcon" alt="editicon" class="taskleftEditIcon" @click="taskTypeName = tempVal.TemplateName,isTemplate=false,editTemplateOpen(index),addTaskType=false"/>
-                            <img v-if="!tempVal.default && (clientWidth > 767 || (clientWidth <= 767 && tempVal.showEditIcon))" :src="templateDeleteIcon" alt="deleteicon" class="taskleftdeleteIcon" @click="isDeleteTemp = true,deleteTemplateObj = tempVal"/>
-                        </span>
-                        <button type="button" :class="[{'pointer-event-none':isSpinner}]" class="save_template" v-if="tempVal.isShowSave" @click="saveTemplateData(tempVal)">{{$t('Templates.save_template')}}</button>
-                    </li>
-                </ul>
-                <ConfirmationSidebar
-                    v-model="isDeleteTemp"
-                    :acceptButtonClass="`btn-danger`"
-                    :acceptButton="$t('Projects.delete')"
-                    :title="$t('Templates.delete_template')"
-                    :message="$t('Templates.delete_template_confirmation')"
-                    :isShowInput="false"
-                    @confirm="handleConfirm"
-                >
-                    <template #body>
-                        <div></div>
-                    </template>
-                </ConfirmationSidebar>
-                <button class="add_template" type="button" @click="activeTemplate()">+ {{$t('Templates.new_template')}}</button>
-                <div class="d-flex position-re">
-                    <input v-if="isTemplate" :placeholder="$t('PlaceHolder.Enter_Template')" class="add_new_temp form-control" :maxlength="50" type="text" @keypress.enter.prevent="addNewTaskTypeTemplate()" v-model.trim="templateName" @input="errTempMsg = ''"/>
-                    <span class="position-ab edit-rightinput save__closeimg-wrapper">
-                        <img :src="saveIcon" class="cursor-pointer"  v-if="isTemplate" @click="addNewTaskTypeTemplate(),templateName = ''">
-                        <img :src="deletered" class="cursor-pointer ml-10px" v-if="isTemplate" @click="isTemplate = false, templateName = '',errTempMsg = ''">
-                    </span>
-                </div>
-                <div class="err_temp_status">
-                    <span v-if="errTempMsg" class="err_temp red font-size-12">{{errTempMsg}}</span>
-                    <div class="red font-size-11">{{theModel.taskStatusField.error}}</div>
-                </div>
-            </div>
-            <div class="taskStatusRight status_right status_new_right">
+        <TemplateSelectForm
+            ref="templateFormRef"
+            :templates="templateList"
+            :modelValue="theModel.taskStatusField.value"
+            :fieldError="theModel.taskStatusField.error"
+            :isSaving="isSpinner"
+            rightClass="status_right status_new_right"
+            @update:modelValue="setTemplateData"
+            @create="onCreateTemplate"
+            @rename="onRenameTemplate"
+            @delete="onDeleteTemplate"
+            @save="saveTemplateData"
+            @left-focus="onLeftFocus"
+        >
+            <template #list>
                 <h3 :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}"
                 >{{$t('Projects.active_status')}}</h3>
-                <div class="statuInputwrapper activeStatus" v-if="theModel.taskStatusField.value.defaultActive && Object.keys(theModel.taskStatusField.value.defaultActive).length > 0">                   
+                <div class="statuInputwrapper activeStatus" v-if="theModel.taskStatusField.value.defaultActive && Object.keys(theModel.taskStatusField.value.defaultActive).length > 0">
                     <ul class="status_ul">
                         <li class="d-flex align-items-center justify-content-between">
                             <span class="taskInnerData w-100" :class="{'taskInnerData-desktop': clientWidth > 767 , 'taskInnerData-mobile': clientWidth <= 767}">
@@ -78,7 +47,7 @@
                         </li>
                     </ul>
                 </div>
-                <DragDropField :group="{ name: 'task_status_group' }" 
+                <DragDropField :group="{ name: 'task_status_group' }"
                     :isDeletable="true" :isChangeColor="true"
                     v-model="theModel.taskStatusField.value.ActiveStatusList"
                     categoryTytpe="active"
@@ -86,35 +55,32 @@
                     @enter:updateFieldValue="addTaskStatus"
                     @click:updateFieldValue="addTaskStatus"
                     @input:deleteFieldValue="manageDeleteData"
-                    @resetTaskTypeErr="errorMsgTask=''" @renameUpdate="(val) =>{renameUpdate(val)}"
-                    :isTemplate="isTemplate"
+                    @resetTaskTypeErr="errorMsgTask=''"
                     :addTaskType="addTaskType"
                     @changeColor="inputColor()"
                     :useDataArray="useTaskStatusArr"
                     :projectData="projectData"
                 />
-                <button class="cursor-pointer btn btn-primary addstatus-btn ml-0 mb-20px" type="button" @click="taskStatusName = '', addTaskType = true,isTemplate=false,templateList.map((x)=>{return x.isEditable = false}),isTaskSidebarOpen = true">+ {{$t('Projects.add_status')}}</button>
+                <button class="cursor-pointer btn btn-primary addstatus-btn ml-0 mb-20px" type="button" @click="openTaskStatusSidebar()">+ {{$t('Projects.add_status')}}</button>
                 <div class="red">
                     <span v-if="errorMsgTask" class="font-size-11">{{errorMsgTask}}</span>
                 </div>
                 <h3 :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}"
                 >{{$t('Projects.done_status')}}</h3>
-                <DragDropField 
-                    :group="{ name: 'task_status_group' }" 
-                    v-if="theModel.taskStatusField && Object.keys(theModel.taskStatusField.value).length > 0" 
-                    :isDeletable="true" 
-                    :isChangeColor="true" 
-                    v-model="theModel.taskStatusField.value.DoneStatusList" 
-                    categoryTytpe="done" 
-                    @change:DraggableOption="manageSelectedOption" 
-                    @enter:updateFieldValue="addTaskStatus" 
-                    @click:updateFieldValue="addTaskStatus" 
-                    @input:deleteFieldValue="manageDeleteData" 
-                    @resetTaskTypeErr="errorMsgTask=''" 
-                    @renameUpdate="(val) =>{renameUpdate(val)}" 
-                    :isTemplate="isTemplate" 
-                    :addTaskType="addTaskType" 
-                    @changeColor="inputColor()" 
+                <DragDropField
+                    :group="{ name: 'task_status_group' }"
+                    v-if="theModel.taskStatusField && Object.keys(theModel.taskStatusField.value).length > 0"
+                    :isDeletable="true"
+                    :isChangeColor="true"
+                    v-model="theModel.taskStatusField.value.DoneStatusList"
+                    categoryTytpe="done"
+                    @change:DraggableOption="manageSelectedOption"
+                    @enter:updateFieldValue="addTaskStatus"
+                    @click:updateFieldValue="addTaskStatus"
+                    @input:deleteFieldValue="manageDeleteData"
+                    @resetTaskTypeErr="errorMsgTask=''"
+                    :addTaskType="addTaskType"
+                    @changeColor="inputColor()"
                     :useDataArray="useTaskStatusArr"
                     :projectData="projectData"
                 />
@@ -137,8 +103,8 @@
                         </ul>
                     </div>
                 </div>
-            </div>
-        </div>
+            </template>
+        </TemplateSelectForm>
     </div>
     <TaskStatusSidebar v-if="isTaskSidebarOpen" :isTaskSidebarOpen="isTaskSidebarOpen" @closesidebar="isTaskSidebarOpen = false" :title="$t('Projects.list_of_task_status')" :options="statusOPtion" @selected="updateTaskStatus" @removed="removeTaskStatus" :isAddStatus="true" :type="'task_status'" :useDataArray="useTaskStatusArr"/>
 
@@ -150,8 +116,8 @@ import { ref, onMounted, inject, watch, defineComponent } from "vue";
 const {getters, commit} = useStore();
 import DragDropField from '@/components/atom/DragDropField/DragDropField.vue';
 import {useToast} from 'vue-toast-notification';
-import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue"
 import TaskStatusSidebar from '@/components/molecules/TaskStatusSidebar/TaskStatusSidebar.vue';
+import TemplateSelectForm from '@/components/molecules/TemplateSelectForm/TemplateSelectForm.vue';
 import cloneDeep from 'lodash/cloneDeep'; // Import a cloning library
 import { useI18n } from "vue-i18n";
 import * as env from '@/config/env';
@@ -160,18 +126,13 @@ const { t } = useI18n();
     defineComponent({
         name: "Task-Status-form",
     })
-    const saveIcon = require("@/assets/images/svg/right_tick_green.svg");
     const deletered = require("@/assets/images/svg/deletered.svg");
-    const templateEditIcon = require('@/assets/images/svg/edit_icon.svg');
-    const templateDeleteIcon = require('@/assets/images/svg/closeLeftHover.svg');
     const templateList = ref([]);
     const clientWidth = inject("$clientWidth");
     const $toast = useToast();
     const saveData = require("@/assets/images/save.png");
-    const taskTypeName = ref('');
-    const isDeleteTemp = ref(false);
-    const deleteTemplateObj = ref({});
     const isSpinner = ref(false);
+    const templateFormRef = ref(null);
     const props = defineProps({
         modelValue: {
             type: Object,
@@ -186,14 +147,14 @@ const { t } = useI18n();
             default: () => (''),
         }
     });
-    const theModel = ref(props.modelValue); 
+    const theModel = ref(props.modelValue);
     const fromWhich = ref(props.from);
     const isTaskSidebarOpen = ref(false);
     const statusOPtion = ref([]);
     const newStatusData = ref([]);
 
     const emit = defineEmits([
-        'update:modelValue','renameTaskStatus','setTemplateDataTaskStatus','saveTemplate','spinnerOn'
+        'update:modelValue','renameTaskStatus','setTemplateDataTaskStatus','saveTemplate','spinnerOn','updateStatus'
     ]);
     const errorMsgTask = ref('');
     const useTaskStatusArr = ref([]);
@@ -206,7 +167,7 @@ const { t } = useI18n();
                     return x._id === props.projectData.TemplateTaskStatusId;
                 })
                 if(index !== -1){
-                    theModel.value.taskStatusField.value = Object.keys(theModel.value.taskStatusField.value).length > 0 ? theModel.value.taskStatusField.value : templateList.value[index]    
+                    theModel.value.taskStatusField.value = Object.keys(theModel.value.taskStatusField.value).length > 0 ? theModel.value.taskStatusField.value : templateList.value[index]
                 }else{
                     const customObj = {
                         TemplateName : 'Custom',
@@ -251,7 +212,7 @@ const { t } = useI18n();
                     console.error("Error onMounted hook: ", err)
                 });
             })
-    
+
         }
     })
     watch(() => getters['settings/taskStatus'], (val) => {
@@ -262,7 +223,7 @@ const { t } = useI18n();
                     return x._id === props.projectData.TemplateTaskStatusId;
                 })
                 if(index !== -1){
-                    theModel.value.taskStatusField.value = Object.keys(theModel.value.taskStatusField.value).length > 0 ? theModel.value.taskStatusField.value : templateList.value[index]    
+                    theModel.value.taskStatusField.value = Object.keys(theModel.value.taskStatusField.value).length > 0 ? theModel.value.taskStatusField.value : templateList.value[index]
                 }else{
                     const customObj = {
                         TemplateName : 'Custom',
@@ -283,27 +244,26 @@ const { t } = useI18n();
     watch(()=> props.modelValue ,(val)=>{
         theModel.value = val;
     })
-    const isTemplate = ref(false);
-    const errTempMsg = ref("");
     const addTaskType = ref(false);
     const taskStatusName = ref("");
-    const templateName = ref('');
-    function activeTemplate(){
-        isTemplate.value = true;
-        templateList.value?.map((x)=>{return x.isEditable = false});
-        if(theModel.value.taskStatusField.value.defaultComplete){
-            theModel.value.taskStatusField.value.defaultComplete.isEditable = false;
-        }
+    function openTaskStatusSidebar(){
+        taskStatusName.value = '';
+        addTaskType.value = true;
+        isTaskSidebarOpen.value = true;
+        templateFormRef.value?.closeInputs();
+    }
+    function onLeftFocus(){
+        addTaskType.value = false;
         if(theModel.value.taskStatusField.value.defaultActive){
             theModel.value.taskStatusField.value.defaultActive.isEditable = false;
         }
-        addTaskType.value = false;
+        if(theModel.value.taskStatusField.value.defaultComplete){
+            theModel.value.taskStatusField.value.defaultComplete.isEditable = false;
+        }
+        (theModel.value.taskStatusField.value.ActiveStatusList || []).forEach((x) => { x.isEditable = false; });
+        (theModel.value.taskStatusField.value.DoneStatusList || []).forEach((x) => { x.isEditable = false; });
     }
     function setTemplateData(itemData) {
-        templateList.value.forEach(template => {
-            template.showEditIcon = false;
-        });
-        itemData.showEditIcon = true;
         theModel.value.taskStatusField.value = {};
         theModel.value.taskStatusField.value = itemData;
         statusOPtion.value = [...theModel.value.taskStatusField.value.ActiveStatusList, ...theModel.value.taskStatusField.value.DoneStatusList, theModel.value.taskStatusField.value.defaultActive, theModel.value.taskStatusField.value.defaultComplete];
@@ -371,7 +331,7 @@ const { t } = useI18n();
             commit("settings/mutateTaskStatus", {data: templateList.value[indexKey], op: "modified"});
         }
     }
-    function manageDeleteData(item){        
+    function manageDeleteData(item){
         saveTaskStatus('deleteType',item);
     }
     function addTaskStatus(item){
@@ -410,74 +370,53 @@ const { t } = useI18n();
         }
         emit('update:modelValue', theModel.value);
     }
-    async function addNewTaskTypeTemplate(){
-        if(templateName.value === "" || templateName.value === null){
-            errTempMsg.value = t('errorPage.Template_name_is_required');
-            return;
+    async function onCreateTemplate(name){
+        const insertObj = {
+            TemplateName : name,
+            ActiveStatusList : [],
+            DoneStatusList: [],
+            defaultActive : {
+                'name': 'To Do',
+                'value': 'to_do',
+                'textColor':'#ff9600',
+                'bgColor': '#ff960035',
+                'isEditable': false,
+                'key':1,
+                'editColor':false,
+                'type': 'default_active'
+            },
+            defaultComplete : {
+                'name': 'Complete',
+                'value': 'complete',
+                'textColor':'#6BC950',
+                'bgColor': '#6BC95035',
+                'isEditable': false,
+                'key':2,
+                'editColor':false,
+                'type': 'close'
+            },
+            taskcloseStatus : 2,
+            taskActiveStatus : [1],
+            taskDoneStatus : [],
+            createdAt: new Date()
         }
-        if(templateName.value.toLowerCase() === 'custom'){
-            $toast.error(t("Toast.Can_not_create_template_name_Custom"),{position: 'top-right'});
-            return;
+        const object = {
+            updateObject:insertObj
         }
-        let mainId = templateList.value.findIndex(item=>{
-            return item.TemplateName.replaceAll(" ", "_").toLowerCase() === templateName.value.replaceAll(" ", "_").toLowerCase();
-        })
-        if(mainId === -1){
-            const insertObj = {
-                TemplateName : templateName.value,
-                ActiveStatusList : [],
-                DoneStatusList: [],
-                defaultActive : {
-                    'name': 'To Do',
-                    'value': 'to_do',
-                    'textColor':'#ff9600',
-                    'bgColor': '#ff960035',
-                    'isEditable': false,
-                    'key':1,
-                    'editColor':false,
-                    'type': 'default_active'
-                },
-                defaultComplete : {
-                    'name': 'Complete',
-                    'value': 'complete',
-                    'textColor':'#6BC950',
-                    'bgColor': '#6BC95035',
-                    'isEditable': false,
-                    'key':2,
-                    'editColor':false,
-                    'type': 'close'
-                },
-                taskcloseStatus : 2,
-                taskActiveStatus : [1],
-                taskDoneStatus : [],
-                createdAt: new Date()
-            }
-            const object = {
-                updateObject:insertObj
-            }
-            await apiRequest("post",env.TASK_STATUS_TEMPLATE,object).then((res) => {
-                if(res.status === 200 && res?.data?._id){
-                    commit("settings/mutateTaskStatus", {data: {...insertObj, _id: res?.data?._id || ''}, op: "added"});
-                    commit("settings/setProjectTaskStatusArray", {data: JSON.parse(JSON.stringify(({...insertObj, _id: res?.data?._id || '',newAdded:true}))), op: "added"});
-                    theModel.value.taskStatusField.value = {...insertObj, _id: res?.data?._id || ''};
-                    $toast.success(t("Toast.Template_has_been_created_Successfully"),{position: 'top-right'});
-                }else{
-                    $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
-                }
-                templateName.value = "";
-            })
-            .catch((error) => {
-                console.error(error);
+        await apiRequest("post",env.TASK_STATUS_TEMPLATE,object).then((res) => {
+            if(res.status === 200 && res?.data?._id){
+                commit("settings/mutateTaskStatus", {data: {...insertObj, _id: res?.data?._id || ''}, op: "added"});
+                commit("settings/setProjectTaskStatusArray", {data: JSON.parse(JSON.stringify(({...insertObj, _id: res?.data?._id || '',newAdded:true}))), op: "added"});
+                theModel.value.taskStatusField.value = {...insertObj, _id: res?.data?._id || ''};
+                $toast.success(t("Toast.Template_has_been_created_Successfully"),{position: 'top-right'});
+            }else{
                 $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
-            })
-        }
-        if(mainId !== -1){
-            errTempMsg.value = t('errorPage.This_template_name_is_already_exists');
-            setTimeout(()=>{
-                errTempMsg.value = "";
-                templateName.value = "";
-            },5000)
-        }
+            }
+        })
+        .catch((error) => {
+            console.error(error);
+            $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
+        })
         emit('update:modelValue', theModel.value);
     }
     async function saveTemplateData(val){
@@ -536,82 +475,39 @@ const { t } = useI18n();
             isSpinner.value = false;
         })
     }
-    async function editTaskTemplate(temp,index) {
-        if(taskTypeName.value !== ''){
-            if(taskTypeName.value.toLowerCase() === 'custom'){
-                $toast.error(t("Toast.Can_not_create_template_name_Custom"),{position: 'top-right'});
-                return;
+    async function onRenameTemplate(temp,name) {
+        const object = {
+            type: "updateOne",
+            key: "$set",
+            updateObject:{ TemplateName : name },
+            id:temp._id
+        };
+        await apiRequest("put",env.TASK_STATUS_TEMPLATE,object).then((res) => {
+            if(res.status === 200){
+                let index = templateList.value.findIndex((x) => x._id === temp._id);
+                if(index !== -1) {
+                    let modifiedObj = {...templateList.value[index],TemplateName: name,isEditable:false};
+                    commit("settings/mutateTaskStatus", {data: {...modifiedObj, _id: temp._id}, op: "modified"});
+                }
+                $toast.success(t("Toast.Template_name_updated_successfully"),{position: 'top-right'});
+            }else {
+                $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
             }
-            const duplicateNameIndex = templateList.value.findIndex(
-                (object, i) => object.TemplateName === taskTypeName.value && i !== index
-            );
-            let mainId = templateList.value.findIndex(item=>{
-                return item.TemplateName=== taskTypeName.value;
-            })
-            let obj = {
-                TemplateName : taskTypeName.value
-            }
-            if(mainId === -1 || duplicateNameIndex === -1){
-                const object = {
-                    type: "updateOne",
-                    key: "$set",
-                    updateObject:{...obj},
-                    id:temp._id
-                };
-                await apiRequest("put",env.TASK_STATUS_TEMPLATE,object).then((res) => {
-                    if(res.status === 200){
-                        let index = templateList.value.findIndex((x) => x._id === temp._id);
-                        if(index !== -1) {
-                            let modifiedObj = {...templateList.value[index],TemplateName: taskTypeName.value,isEditable:false};
-                            commit("settings/mutateTaskStatus", {data: {...modifiedObj, _id: temp._id}, op: "modified"});
-                        }
-                        $toast.success(t("Toast.Template_name_updated_successfully"),{position: 'top-right'});
-                    }else {
-                        $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
-                    }
-                }).catch((err) => {
-                    console.error(err)
-                    $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
-                })
-            }
-            if(mainId !== -1 && duplicateNameIndex !== -1){
-                errTempMsg.value = t('errorPage.This_template_name_is_already_exists');
-            }
-        }else{
-            errTempMsg.value = t('errorPage.Template_name_is_required');
-        }
-    }
-    function renameUpdate(val) {
-        isTemplate.value = val;
-        addTaskType.value = val;
-        theModel.value.taskStatusField.value.defaultActive.isEditable = false;
-        theModel.value.taskStatusField.value.defaultComplete.isEditable = false;
-        templateList.value.map((x)=>{return x.isEditable = false});
-    }
-    function editTemplateOpen(index) {
-        theModel.value.taskStatusField.value.defaultActive.isEditable = false;
-        theModel.value.taskStatusField.value.defaultComplete.isEditable = false;
-        const mergedArray = [...theModel.value.taskStatusField.value.ActiveStatusList, ...theModel.value.taskStatusField.value.DoneStatusList];
-        mergedArray.filter((x) =>{return x.isEditable = false});
-        templateList.value.forEach((x,ind) => {
-            if(ind === index){
-                x.isEditable = true;
-            }else{
-                x.isEditable = false;
-            }
+        }).catch((err) => {
+            console.error(err)
+            $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
         })
     }
-    async function handleConfirm(){
-        await apiRequest("delete",`${env.TASK_STATUS_TEMPLATE}/${deleteTemplateObj.value._id}`).then(async(response) => {
+    async function onDeleteTemplate(temp){
+        await apiRequest("delete",`${env.TASK_STATUS_TEMPLATE}/${temp._id}`).then((response) => {
             if(response.status === 200){
                 theModel.value.taskStatusField.value = templateList.value[0] || {};
-                commit("settings/mutateTaskStatus", {data: {_id: deleteTemplateObj.value._id}, op: "removed"});
-                commit("settings/setProjectTaskStatusArray", {data: {_id: deleteTemplateObj.value._id}, op: "removed"});
+                commit("settings/mutateTaskStatus", {data: {_id: temp._id}, op: "removed"});
+                commit("settings/setProjectTaskStatusArray", {data: {_id: temp._id}, op: "removed"});
                 $toast.success(t("Toast.Template_has_been_created_Successfully"),{position: 'top-right'});
             }else {
                 $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
             }
-            isDeleteTemp.value = false;
         }).catch((err) =>{
             console.error(err,"Error in Delete Template");
             $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });

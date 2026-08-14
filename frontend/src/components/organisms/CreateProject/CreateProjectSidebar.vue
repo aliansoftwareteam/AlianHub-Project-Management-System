@@ -16,7 +16,7 @@
                     <button class="btn outline-primary d-flex align-items-center justify-content-center create-project-cancelbtn" :class="{'cursor-pointer' : (!isSpinner || !isSpinnerForTemplate) , 'cursor-default pointer-event-none' : (isSpinner || isSpinnerForTemplate)}" :disabled="(isSpinner || isSpinnerForTemplate)" @click="handleCloseSidebar">{{$t('Projects.cancel')}}</button>
                 </template>
             <template #body>
-                <div class="bg-light-gray mobile-common-background h-100" :class="{'p-015' : !isDisplayTemplate , 'addUseTemplate' : isDisplayTemplate, 'wizard-tt-fill' : activeIndex === 3 && !isDisplayTemplate}" >
+                <div class="bg-light-gray mobile-common-background h-100" :class="{'p-015' : !isDisplayTemplate , 'addUseTemplate' : isDisplayTemplate, 'wizard-tt-fill' : activeIndex === 3 && !isDisplayTemplate, 'wizard-step-fill' : (activeIndex === 3 || activeIndex === 4 || activeIndex === 5) && !isDisplayTemplate}" >
                     <div class="header-sidebar default-background-header d-flex bg-white border-radius-8-px">
                         <div id="create-project-loading" class="createProjectWizardSlider createProjectBlankUseTemplateWrapper w-100" :class="{'p-020' : !isDisplayTemplate}">
                             <template v-if="checkProjectPlan() === true">
@@ -1011,24 +1011,44 @@ const  { checkAllFields } = useValidation();
     .wizard-tt-fill .taskyou_need_right .addStatusBtn { flex: none; padding-top: 12px; }
 }
 
-/* Mobile: same intent as desktop but the columns are stacked. Fill the screen so the
-   Prev/Next footer pins to the bottom (no wasted space), make the stacked wrapper a
-   flex column with the task-type list filling the remaining height + scrolling, and
-   pin the add button so it is never clipped by the footer. */
+/* Mobile: the three shell steps (task-type / project-status / task-status) each show ONE
+   column at a time via TemplateSelectForm's stepper, so fill the screen, pin the Prev/Next
+   footer to the bottom (no wasted space below it), and let whichever column is visible take
+   the remaining height and scroll. Gated on .wizard-step-fill (activeIndex 3/4/5). */
 @media(max-width: 767px){
-    .wizard-tt-fill { display: flex; flex-direction: column; }
-    .wizard-tt-fill > .header-sidebar { flex: 1 1 auto; min-height: 0; }
-    .wizard-tt-fill > .header-sidebar > .createProjectWizardSlider { display: flex; flex-direction: column; min-height: 0; }
-    .wizard-tt-fill #project-step-container { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; max-height: none !important; overflow: hidden !important; }
-    .wizard-tt-fill .conditional-btn-wrapper { flex: none; }
-    .wizard-tt-fill .statusHeader { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-    .wizard-tt-fill .statusHeader > div:first-child { flex: none; }
-    .wizard-tt-fill .taskStatusSection { flex: 1 1 auto; min-height: 0; max-height: none !important; overflow-y: auto; }
-    .wizard-tt-fill #project-step-container .statusTaskWrapper { display: flex !important; flex-direction: column; height: 100%; min-height: 0; }
-    .wizard-tt-fill .taskStatusLeft { flex: none; margin-bottom: 16px; }
-    .wizard-tt-fill .taskyou_need_right { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-    .wizard-tt-fill .taskyou_need_right .ddf__root { min-height: 0; display: flex; flex-direction: column; }
-    .wizard-tt-fill .taskyou_need_right .status_ul { flex: 1 1 auto; min-height: 0; max-height: none !important; overflow-y: auto; }
-    .wizard-tt-fill .taskyou_need_right .addStatusBtn { flex: none; }
+    .wizard-step-fill { display: flex; flex-direction: column; }
+    .wizard-step-fill > .header-sidebar { flex: 1 1 auto; min-height: 0; }
+    .wizard-step-fill > .header-sidebar > .createProjectWizardSlider { display: flex; flex-direction: column; min-height: 0; }
+    .wizard-step-fill #project-step-container { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; max-height: none !important; overflow: hidden !important; }
+    .wizard-step-fill .conditional-btn-wrapper { flex: none; }
+
+    /* form root: statusHeader (task-type/task-status) or the taskStatusSection.statusTaskWrapper
+       root (project-status) — fills and stacks its title above the columns. */
+    .wizard-step-fill .statusHeader,
+    .wizard-step-fill #project-step-container > .taskStatusSection { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+    .wizard-step-fill .statusHeader > .bg-light-gray,
+    .wizard-step-fill .statusHeader > div:first-child,
+    .wizard-step-fill #project-step-container > .taskStatusSection > .bg-light-gray { flex: none; }
+    /* the section below the fixed step header is THE scroll area — it has a bounded height (the
+       same flex:1 chain that pins the footer), so a long list scrolls here while the step header
+       + Prev/Next stay put. TemplateSelectForm's sub-header is position:sticky within this scroll.
+       overflow-y:auto must beat the form's own .style-scroll{overflow:auto/340px}. */
+    .wizard-step-fill .taskStatusSection { flex: 1 1 auto; min-height: 0; max-height: none !important; overflow-y: auto !important; display: flex; flex-direction: column; }
+
+    /* the always-present empty .usetemplatesWrapper is also a .statusTaskWrapper — don't stretch it. */
+    .wizard-step-fill .usetemplatesWrapper { flex: none; }
+    .wizard-step-fill #project-step-container .statusTaskWrapper { flex: 1 1 auto; min-height: 0; }
+    .wizard-step-fill .taskStatusLeft,
+    .wizard-step-fill .taskStatusRight { display: flex; flex-direction: column; min-height: 0; }
+    /* uncap the desktop list heights (140px left / 220px right) so nothing clips; lists grow to
+       fill a short column but never shrink below content, so a long list overflows into the
+       section scroll above. */
+    .wizard-step-fill .taskStatusLeft .templated_name_ul,
+    .wizard-step-fill .taskStatusRight .status_ul { max-height: none !important; overflow: visible !important; }
+    .wizard-step-fill .taskStatusLeft .templated_name_ul { flex: 1 0 auto; min-height: 0; }
+    .wizard-step-fill .taskyou_need_right .ddf__root { flex: 1 0 auto; min-height: 0; display: flex; flex-direction: column; }
+    .wizard-step-fill .taskStatusLeft .add_template,
+    .wizard-step-fill .taskStatusLeft .err_temp_status,
+    .wizard-step-fill .taskyou_need_right .addStatusBtn { flex: none; }
 }
 </style>
