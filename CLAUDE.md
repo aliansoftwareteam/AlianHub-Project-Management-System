@@ -14,18 +14,26 @@ These are **hard rules**. They override default behavior and must be followed ex
 - **Never** narrate **what** the code does. No restating the line, no step-by-step play-by-play, no section-banner comments, no decorative dividers, no "TODO for later" notes left in shipped code.
 - Prefer a clear name over a comment. If a rename makes the comment redundant, rename and delete the comment.
 - When editing existing code, **remove** comments that merely repeat the code. If a comment is not required, delete it.
+- This rule **overrides** the usual "match the surrounding comment density" instinct. When you touch a verbose file, trim redundant comments opportunistically rather than mirroring them.
 
-### Rule 2 — Understand → PRD → implement (applies to *every* task)
+### Rule 2 — Understand before building; scale the process to the task
 
-For **every** task or defined piece of work, before writing implementation code:
+Match the ceremony to the work. Two tiers:
 
-1. **Evaluate** the request. Restate the goal in your own words.
-2. **Interview** the user with focused questions whenever anything is unclear or ambiguous. Bundle questions into one turn; ask only what you genuinely cannot resolve yourself.
-3. **Answer from the codebase/context first.** Anything directly answerable from the code, docs, or git history — look it up; do not ask the user what you can find.
-4. **Write a PRD** once the task is understood — goal, scope, out-of-scope, acceptance criteria — and confirm it before building.
-5. **Implement with progress tracking.** Use the `task-manager` skill (`Tasks/` → `task.md` + `progress.md`) to record the definition and update progress as work proceeds.
+**Trivial** — a typo, a one-line or obvious localized fix, a rename, a copy/style tweak. Just do it. No PRD, no task folder; a one-line progress note is optional.
+*Examples:* "tooltip should show on hover", "fix this label", "bump the padding 2px".
 
-The `task-manager` skill in [.claude/skills/task-manager/](.claude/skills/task-manager/SKILL.md) is the mechanism for steps 4–5. Task tracking lives in [Tasks/](Tasks/README.md).
+**Non-trivial** — a new feature, a multi-file or cross-module change, anything ambiguous or architectural, or anything where the user is unsure. Before writing implementation code:
+
+1. **Evaluate** — restate the goal in your own words.
+2. **Answer from the codebase/context first** — anything in the code, docs, or git history, look it up; never ask what you can find yourself.
+3. **Interview** — ask focused questions only for what's genuinely unresolved, bundled into one turn. If nothing is unclear, ask nothing.
+4. **Write the PRD as `task.md`** — goal, scope, out-of-scope, acceptance criteria. The `task.md` *is* the PRD; do not write a second document. Confirm before building.
+5. **Implement with progress tracking** — update `progress.md` as work proceeds.
+
+Either tier can be overridden per task: the user can say "just do it" (skip the process) or "let's spec this first" (force it).
+
+The `task-manager` skill in [.claude/skills/task-manager/](.claude/skills/task-manager/SKILL.md) is the mechanism for steps 4–5; task tracking lives in [Tasks/](Tasks/README.md).
 
 ---
 
