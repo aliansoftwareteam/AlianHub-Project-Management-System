@@ -11,6 +11,8 @@ const { getProvider, isAnyProviderConfigured } = require('./llmProvider');
 const { PlanSchema, ClarifyResponseSchema, TasksPlanSchema, TasksResponseSchema, TasksOnlyPlanSchema, TasksOnlyResponseSchema, SprintsOnlyPlanSchema, SprintsOnlyResponseSchema, sanitizeMemberIds, sanitizeTaskPlanMemberIds, tryParseJson } = require('./schemaValidator');
 const { buildSystemPrompt, buildUserMessage, buildRepairPrompt, buildTasksSystemPrompt, buildTasksUserMessage } = require('./promptBuilder');
 const { briefUpload, extractFromFile, safeUnlink, MAX_BRIEF_BYTES } = require('./briefExtractor');
+const { usageFromResult, addUsage, summarize } = require('./usage');
+const planRules = require('./planRules');
 const sseEmitter = require('./sseEmitter');
 const orchestrator = require('./orchestrator');
 const clarifier = require('./clarifier');
@@ -117,15 +119,16 @@ async function loadActiveMembers(companyId) {
     }
 }
 
-async function callLlmForPlan({ description, additionalRequirements, briefText, members, clarifications, availableSkills }) {
+async function callLlmForPlan({ description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills }) {
     const provider = getProvider();
     const systemPrompt = buildSystemPrompt();
-    const userMessage = buildUserMessage({ description, additionalRequirements, briefText, members, clarifications, availableSkills });
-    // 32000 default: large plans (30+ tasks) with 5-block descriptions
-    // routinely run 15-25K output tokens. Claude Sonnet 4.5 supports 64K
-    // output and gpt-5 supports 128K, so 32K is well within bounds for
-    // either provider while still bounding cost.
-    const maxTokens = Number(process.env.LLM_MAX_TOKENS_PLAN) || 32000;
+    const userMessage = buildUserMessage({ description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills });
+    // A generous ask, not a target: each provider clamps this to its own output
+    // ceiling, so requesting more than a given model supports is harmless. The
+    // old 32000 predated tasks carrying estimates and sub-tasks — every
+    // sub-task adds a name, an estimate and a description to the JSON, so the
+    // same size of plan now costs far more output and was truncating mid-plan.
+    const maxTokens = Number(process.env.LLM_MAX_TOKENS_PLAN) || 262144;
 
     const firstAttempt = await provider.chat({
         systemPrompt,
@@ -160,7 +163,10 @@ async function callLlmForPlan({ description, additionalRequirements, briefText, 
     };
 
     let validated = tryValidate(firstAttempt.content);
-    let usedTokens = firstAttempt.totalTokens || 0;
+    // The input/output split is kept rather than collapsed to a total: output
+    // tokens cost several times what input tokens do, so a total alone cannot
+    // be priced. The repair pass below adds into the same tally.
+    let usage = usageFromResult(firstAttempt);
     let repairAttempt = null;
 
     if (!validated.ok) {
@@ -176,7 +182,9 @@ async function callLlmForPlan({ description, additionalRequirements, briefText, 
             maxTokens,
             temperature: 0.2,
         });
-        usedTokens += repairAttempt.totalTokens || 0;
+        // Counted before the guards below: a repair pass that then fails still
+        // consumed tokens, and the user is still billed for them.
+        usage = addUsage(usage, usageFromResult(repairAttempt));
         // Same truncation guard on the repair pass.
         if (repairAttempt.truncated) {
             const err = new Error(
@@ -195,10 +203,19 @@ async function callLlmForPlan({ description, additionalRequirements, briefText, 
         }
     }
 
-    return { result: validated.value, tokens: usedTokens, model: (provider && provider.name) || 'unknown' };
+    // `model` is the model id (claude-sonnet-4-6), which is what pricing keys
+    // off — not the provider name. Both are reported: the id prices the run,
+    // the provider name says which integration served it.
+    const modelId = (repairAttempt && repairAttempt.model) || firstAttempt.model || '';
+    return {
+        result: validated.value,
+        usage: summarize(usage, modelId),
+        provider: (provider && provider.name) || 'unknown',
+        model: modelId || (provider && provider.name) || 'unknown',
+    };
 }
 
-async function generatePlanForJob({ jobId, uid, companyId, description, additionalRequirements, briefText, isPrivateSpace, clarifications }) {
+async function generatePlanForJob({ jobId, uid, companyId, description, additionalRequirements, briefText, isPrivateSpace, clarifications, selectedSkills }) {
     const emit = (payload) => sseEmitter.emit(jobId, payload);
 
     try {
@@ -210,8 +227,8 @@ async function generatePlanForJob({ jobId, uid, companyId, description, addition
         // Generate the full plan in the background; the HTTP request already
         // returned a job id, so slow LLM responses no longer trip the proxy.
         emit({ event: 'progress', phase: 'plan', step: 'ai', status: 'started' });
-        const { result, tokens, model } = await callLlmForPlan({
-            description, additionalRequirements, briefText, members, clarifications, availableSkills,
+        const { result, usage, model, provider } = await callLlmForPlan({
+            description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills,
         });
 
         let { plan } = result;
@@ -223,6 +240,26 @@ async function generatePlanForJob({ jobId, uid, companyId, description, addition
             const sanitized = sanitizeMemberIds(plan, allowed);
             plan = sanitized.plan;
         } catch (_e) { /* leave as-is */ }
+
+        // Name the sprints for the weeks they run, here rather than at creation,
+        // so the review screen shows the names the project will actually get.
+        // Previously the review displayed the model's working titles and the
+        // real weekly names only appeared after "Create everything", which read
+        // as the plan having changed behind the user's back.
+        //
+        // The prefix is the plan's project code. A code collision at creation
+        // can still shift it (EPLP -> EPLP2), so the orchestrator recomputes
+        // with the final code — this is the preview, and the two agree except
+        // in that rare case.
+        if (plan && Array.isArray(plan.sprints) && plan.sprints.length) {
+            const previewNames = planRules.weeklySprintNames({
+                prefix: (plan.project && plan.project.ProjectCode) || '',
+                count: plan.sprints.length,
+            });
+            plan.sprints.forEach((sprint, i) => {
+                if (previewNames[i]) sprint.sprintName = previewNames[i];
+            });
+        }
 
         // The user's explicit public/private choice always wins over whatever
         // the LLM picked.
@@ -256,8 +293,12 @@ async function generatePlanForJob({ jobId, uid, companyId, description, addition
             needsClarification: false,
             planId,
             plan,
-            tokensUsed: tokens,
+            // tokensUsed stays for anything already reading it; `usage` carries
+            // the split plus the priced cost.
+            tokensUsed: usage.totalTokens,
+            usage,
             model,
+            provider,
         });
     } catch (error) {
         logger.error(`AIPG plan job error: ${error && error.message ? error.message : error}`);
@@ -367,6 +408,15 @@ exports.plan = async (req, res) => {
         // what the client posted.
         const clarifications = sanitizeClarifications(req.body && req.body.clarifications);
 
+        // The technology the team picked in the Describe step. Resolved through
+        // the same company catalog the execute step uses, so a client cannot
+        // put arbitrary text into the prompt — unknown slugs are dropped rather
+        // than forwarded.
+        const selectedSkills = await resolveProjectSkills(
+            companyId,
+            req.body && Array.isArray(req.body.skills) ? req.body.skills : [],
+        );
+
         const jobId = token();
 
         // Reply immediately so reverse proxies do not 504 while the LLM is
@@ -385,6 +435,7 @@ exports.plan = async (req, res) => {
                 briefText,
                 isPrivateSpace: !!(req.body && req.body.isPrivateSpace),
                 clarifications,
+                selectedSkills,
             }).catch((error) => {
                 logger.error(`AIPG plan job outer error: ${error && error.message ? error.message : error}`);
                 sseEmitter.emit(jobId, {
@@ -427,7 +478,7 @@ exports.clarify = async (req, res) => {
             if (stash && stash.companyId === companyId) briefText = stash.text;
         }
 
-        const { understanding, questions, tokens, model } = await clarifier.generateClarifyingQuestions({
+        const { understanding, questions, usage, model, provider } = await clarifier.generateClarifyingQuestions({
             description,
             additionalRequirements,
             briefText,
@@ -437,8 +488,10 @@ exports.clarify = async (req, res) => {
             status: true,
             understanding,
             questions,
-            tokensUsed: tokens,
+            tokensUsed: usage.totalTokens,
+            usage,
             model,
+            provider,
         });
     } catch (error) {
         logger.error(`AIPG clarify error: ${error && error.message ? error.message : error}`);
@@ -611,7 +664,10 @@ async function callLlmForTasksPlan({ project, additionalRequirements, briefText,
     const systemPrompt = buildTasksSystemPrompt();
     const userMessage = buildTasksUserMessage({ project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features });
     const ResponseSchema = tasksResponseSchemaForMode(mode);
-    const maxTokens = Number(process.env.LLM_MAX_TOKENS_PLAN) || 32000;
+    // Same generous ask as the plan stage — see the note there. This path needs
+    // it more, not less: AI-Assist's sub-tasks option is the setting that
+    // pushed output past the old limit in the first place.
+    const maxTokens = Number(process.env.LLM_MAX_TOKENS_PLAN) || 262144;
 
     const firstAttempt = await provider.chat({
         systemPrompt,
@@ -641,10 +697,11 @@ async function callLlmForTasksPlan({ project, additionalRequirements, briefText,
     };
 
     let validated = tryValidate(firstAttempt.content);
-    let usedTokens = firstAttempt.totalTokens || 0;
+    let usage = usageFromResult(firstAttempt);
+    let repairAttempt = null;
 
     if (!validated.ok) {
-        const repairAttempt = await provider.chat({
+        repairAttempt = await provider.chat({
             systemPrompt,
             messages: [
                 { role: 'user', content: userMessage },
@@ -655,7 +712,7 @@ async function callLlmForTasksPlan({ project, additionalRequirements, briefText,
             maxTokens,
             temperature: 0.2,
         });
-        usedTokens += repairAttempt.totalTokens || 0;
+        usage = addUsage(usage, usageFromResult(repairAttempt));
         if (repairAttempt.truncated) {
             const err = new Error(
                 'The AI ran out of output token budget on the repair attempt. Raise '
@@ -673,7 +730,13 @@ async function callLlmForTasksPlan({ project, additionalRequirements, briefText,
         }
     }
 
-    return { result: validated.value, tokens: usedTokens, model: (provider && provider.name) || 'unknown' };
+    const modelId = (repairAttempt && repairAttempt.model) || firstAttempt.model || '';
+    return {
+        result: validated.value,
+        usage: summarize(usage, modelId),
+        provider: (provider && provider.name) || 'unknown',
+        model: modelId || (provider && provider.name) || 'unknown',
+    };
 }
 
 async function generateTasksPlanForJob({ jobId, uid, companyId, projectId, additionalRequirements, briefText, clarifications, mode, targetSprintName, features }) {
@@ -694,7 +757,7 @@ async function generateTasksPlanForJob({ jobId, uid, companyId, projectId, addit
         emit({ event: 'progress', phase: 'plan', step: 'context', status: 'done' });
 
         emit({ event: 'progress', phase: 'plan', step: 'ai', status: 'started' });
-        const { result, tokens, model } = await callLlmForTasksPlan({
+        const { result, usage, model, provider } = await callLlmForTasksPlan({
             project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features,
         });
 
@@ -734,7 +797,9 @@ async function generateTasksPlanForJob({ jobId, uid, companyId, projectId, addit
             planId,
             projectId: String(projectId),
             plan,
-            tokensUsed: tokens,
+            tokensUsed: usage.totalTokens,
+            usage,
+            provider,
             model,
         });
     } catch (error) {

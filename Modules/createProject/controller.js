@@ -335,7 +335,10 @@ exports.createProject = async (req) => {
                                                     value: valueItem.value,
                                                     key:valueItem.key,
                                                     taskImage:valueItem.taskImage,
-                                                    name:item.name
+                                                    name:item.name,
+                                                    iconType: valueItem.iconType || 'upload',
+                                                    iconValue: valueItem.iconValue || '',
+                                                    iconColor: valueItem.iconColor || null
                                                 }
                                             );
                                         }else{
@@ -347,7 +350,10 @@ exports.createProject = async (req) => {
                                                         value: item.value,
                                                         name:item.name,
                                                         taskImage:item.taskImage,
-                                                        key:incrementTaskType
+                                                        key:incrementTaskType,
+                                                        iconType: item.iconType || 'upload',
+                                                        iconValue: item.iconValue || '',
+                                                        iconColor: item.iconColor || null
                                                     }
                                                 );
                                                 updateTaskTypeStatus.totalStatus = incrementTaskType;

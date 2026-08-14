@@ -34,6 +34,7 @@ const timeLog = createSlice({
       state.folderName = action.payload.folderName;
       state.sprintName = action.payload.sprintName;
       state.taskTypeImage = action.payload.taskTypeImage
+      state.taskTypeData = action.payload.taskTypeData || null
       state.remainingMinutes = action.payload.remainingMinutes ?? null
     },
     setTrackerStartTime: (state, action) => {

@@ -12,7 +12,7 @@ import ManualTimeEntry from '../components/ManualTimeEntry/ManualTimeEntry'
 import Loader from '../components/Loader/Loader'
 import { DateTime } from 'luxon';
 import TrackerTask from '../components/TrackerTask';
-import WasabiImage from '../components/WasabiImage/WasabiImage'
+import TaskTypeIcon from '../components/TaskTypeIcon/TaskTypeIcon'
 import { fetchAndProcessProjects } from '../utils/projectUtils'
 import { formatMinutes } from '../hooks/useTodayLogged'
 import { DEFAULT_TASK_IMAGE } from '../utils/imageDefaults'
@@ -342,8 +342,8 @@ export default function HomePage() {
             sprintName = selectedData?.selectedProject?.sprintsObj[id]?.name || '';
           }
           let taskKey = tasks.find((x)=> (x.fullData?.taskData?._id === selectedData?.selectedTask?.value) || (x.fullData?._id === selectedData?.selectedTask?.value));
-          let taskTypeImage = getTaskTypeImage(selectedData?.selectedProject?.ProjectName,taskKey?.fullData?.taskData?.TaskType)
-          
+          const taskTypeData = getTaskTypeData(selectedData?.selectedProject?.ProjectName, taskKey?.fullData?.taskData?.TaskType)
+
           dispatch(setTrackerStartTime(response.data.statusText));
           dispatch(setComment({
             comment: selectedData?.comment,
@@ -354,7 +354,8 @@ export default function HomePage() {
             projectName: selectedData?.selectedProject?.ProjectName,
             folderName: folderName,
             sprintName: sprintName,
-            taskTypeImage: taskTypeImage,
+            taskTypeImage: taskTypeData?.taskImage || DEFAULT_TASK_IMAGE,
+            taskTypeData: taskTypeData,
             remainingMinutes: est.hasEstimate ? est.remainingMinutes : null
           }));
           setIsSpinner(false);
@@ -408,17 +409,10 @@ export default function HomePage() {
     });
   }
 
-  const getTaskTypeImage = (projectName, key) => {
-    let project = projectOption.find((x) => x.label === projectName);
-    let imgUrl = DEFAULT_TASK_IMAGE;
-    if (project?.taskTypeCounts?.length > 0) {
-      const match = project.taskTypeCounts.find((item) => item.value === key);
-      if (match?.taskImage) {
-        imgUrl = match?.taskImage;
-      }
-    }
-
-    return imgUrl;
+  const getTaskTypeData = (projectName, key) => {
+    const project = projectOption.find((x) => x.label === projectName);
+    const match = project?.taskTypeCounts?.find((item) => item.value === key);
+    return match || { taskImage: DEFAULT_TASK_IMAGE };
   };
 
   return (
@@ -507,7 +501,7 @@ export default function HomePage() {
                       {/* Collapsed line: task name + open-in-web + expand */}
                       <div className="flex items-center gap-2">
                         <span className="text-yellow-500 shrink-0">
-                          <WasabiImage url={getTaskTypeImage(task.projectName, task.fullData.taskData?.TaskType)} isUser={false} className="!w-[15px] !h-[15px]" />
+                          <TaskTypeIcon taskType={getTaskTypeData(task.projectName, task.fullData.taskData?.TaskType)} className="!w-[15px] !h-[15px]" />
                         </span>
                         <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-800" title={task.taskName}>{task.taskName}</span>
                         <button

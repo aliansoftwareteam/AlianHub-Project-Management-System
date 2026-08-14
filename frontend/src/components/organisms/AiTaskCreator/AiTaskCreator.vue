@@ -112,6 +112,10 @@
                     <div class="aitc__preview-head">
                         <span class="aitc__preview-hint">Review — uncheck anything you don't want.</span>
                         <span class="aitc__selected-pill">{{ selectedCount }} selected</span>
+                        <span v-if="runUsage" class="aitc__usage" :title="usageTooltip">
+                            {{ formatTokens(runUsage.totalTokens) }} tokens<template
+                                v-if="runUsage.costUsd !== null"> · {{ formatCost(runUsage.costUsd) }}</template>
+                        </span>
                     </div>
                     <div v-if="plan.links && plan.links.length" class="aitc__links-note">🔗 {{ plan.links.length }} task link{{ plan.links.length === 1 ? '' : 's' }} will be created</div>
                     <div v-if="plan.epics && plan.epics.length" class="aitc__links-note">📁 {{ plan.epics.length }} epic{{ plan.epics.length === 1 ? '' : 's' }} will be created</div>
@@ -200,6 +204,33 @@ const mode = ref('full');           // full | tasks | sprints
 const targetSprintId = ref('');
 const requirements = ref('');
 const plan = ref({ sprints: [] });
+
+// What this generation cost. Same shape and rules as the project creator's
+// display: the cost is shown only when the model used has a price on file, so
+// an unpriced provider reports tokens alone rather than a made-up figure.
+const planUsage = ref(null);
+const runUsage = computed(() => {
+    const u = planUsage.value;
+    if (!u || !(Number(u.totalTokens) > 0)) return null;
+    return {
+        totalTokens: Number(u.totalTokens) || 0,
+        inputTokens: Number(u.inputTokens) || 0,
+        outputTokens: Number(u.outputTokens) || 0,
+        costUsd: (u.priced && typeof u.costUsd === 'number') ? u.costUsd : null,
+        model: u.model || '',
+    };
+});
+const formatTokens = (n) => Number(n || 0).toLocaleString();
+// Sub-cent runs are normal, so two decimals would read as "$0.00".
+const formatCost = (n) => (n >= 0.01 ? `$${n.toFixed(2)}` : `$${n.toFixed(4)}`);
+const usageTooltip = computed(() => {
+    const u = runUsage.value;
+    if (!u) return '';
+    const parts = [`${formatTokens(u.inputTokens)} in · ${formatTokens(u.outputTokens)} out`];
+    if (u.model) parts.push(u.model);
+    if (u.costUsd === null) parts.push('no price on file for this model');
+    return parts.join(' — ');
+});
 const progressMsg = ref('');
 const error = ref('');
 // Optional capabilities (AI-Assist "Advanced" section). Off by default.
@@ -260,6 +291,7 @@ function reset() {
     targetSprintId.value = props.activeSprintId || (props.sprints[0] && props.sprints[0].id) || '';
     requirements.value = '';
     plan.value = { sprints: [] };
+    planUsage.value = null;
     progressMsg.value = '';
     error.value = '';
     features.value = { subtasks: false, links: false, epics: false, customFields: false };
@@ -314,6 +346,7 @@ async function generate() {
         }
         selectAll(p);
         plan.value = p;
+        planUsage.value = (res && res.usage) || null;
         step.value = 'preview';
     } catch (e) {
         error.value = (e && e.message) || 'Generation failed. Please try again.';
@@ -553,6 +586,17 @@ function successMessage(totals) {
 /* Preview */
 .aitc__preview-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .aitc__preview-hint { font-size: 13px; color: #6b7488; }
+/* Sits beside the selected count — informational, not something to act on.
+   Tabular figures so the number does not jitter as boxes are ticked. */
+.aitc__usage {
+    margin-left: auto;
+    font-size: 11.5px;
+    color: #8a909c;
+    font-variant-numeric: tabular-nums;
+    cursor: help;
+    border-bottom: 1px dotted #cbd5e1;
+}
+
 .aitc__selected-pill { font-size: 12px; font-weight: 600; color: #6a5cff; background: #f3f1ff; border-radius: 999px; padding: 3px 11px; }
 .aitc__links-note { font-size: 12px; color: #6b7488; margin: -4px 0 8px; }
 .aitc__plan { overflow-y: auto; max-height: 48vh; border: 1px solid #ecedf3; border-radius: 12px; padding: 6px; }

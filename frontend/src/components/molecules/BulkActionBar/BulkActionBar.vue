@@ -255,7 +255,7 @@
         :title="`Archive ${selection.count.value} ${selection.count.value === 1 ? 'task' : 'tasks'}`"
         :message="`Archived tasks can be restored later from the archive view.`"
         :confirmationString="`archive ${selection.count.value} ${selection.count.value === 1 ? 'task' : 'tasks'}`"
-        acceptButtonClass="archive-delete-btn-bg-red"
+        acceptButtonClass="archive-confirm-btn"
         acceptButton="Archive"
         :showSpinner="isWorking"
         @confirm="performArchive"

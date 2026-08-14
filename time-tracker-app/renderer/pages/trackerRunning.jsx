@@ -8,7 +8,7 @@ import { fetchEstimateStatus } from '../utils/estimateLimit';
 import store from '../store/store';
 import moment from 'moment';
 import { DateTime } from 'luxon';
-import WasabiImage from '../components/WasabiImage/WasabiImage';
+import TaskTypeIcon from '../components/TaskTypeIcon/TaskTypeIcon';
 
 // const ipcRenderer = electron.ipcRenderer || false;
 
@@ -46,6 +46,7 @@ function TimeTrackerView() {
       folderName: prev.folderName,
       sprintName: prev.sprintName,
       taskTypeImage: prev.taskTypeImage,
+      taskTypeData: prev.taskTypeData,
     };
 
     try {
@@ -90,6 +91,7 @@ function TimeTrackerView() {
           folderName: ctx.folderName,
           sprintName: ctx.sprintName,
           taskTypeImage: ctx.taskTypeImage,
+          taskTypeData: ctx.taskTypeData,
           remainingMinutes: est.hasEstimate ? est.remainingMinutes : null,
         }));
         setIsEditing(false);
@@ -344,7 +346,7 @@ function TimeTrackerView() {
           {timeLog?.sprintName && ` / ${timeLog?.sprintName}`}
         </div>
         <p className="text-sm font-medium text-gray-800 mt-1 flex items-center gap-1.5">
-          <WasabiImage url={timeLog?.taskTypeImage || ''} isUser={false} className="!w-[16px] !h-[16px] shrink-0" />
+          <TaskTypeIcon taskType={timeLog?.taskTypeData || { taskImage: timeLog?.taskTypeImage }} className="!w-[16px] !h-[16px] shrink-0" />
           <span className="truncate" title={timeLog?.taskName}>{timeLog?.taskName}</span>
         </p>
 

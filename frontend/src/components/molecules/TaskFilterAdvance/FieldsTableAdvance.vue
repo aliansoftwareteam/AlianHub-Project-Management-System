@@ -135,7 +135,7 @@
                                     <div class="d-flex align-items-center" :class="[{'selectOption-dropdown select_wrapper_option':(item.values.length > 0)}]" v-if="item.name.value === 'TaskTypeKey'">
                                         <span v-for="(option, i) in item.displayData" :key="i">
                                             <span v-if="i < numberOfItem" class="d-flex align-items-center">
-                                                <img v-if="option.taskImage" :src="option.taskImage" alt="" height="13" width="13"/>
+                                                <TaskTypeIcon v-if="option.taskImage" :taskType="option" :style="{ height: '13px', width: '13px' }" />
                                                 <span class="font-size-12 mr-5-px">{{ option.name }}</span>
                                             </span>
                                         </span>
@@ -312,7 +312,7 @@
                                                 <div v-for="(option, i) in taskTypeArray" :key="i" class="dropdown-item checkbox-dropdown">
                                                     <label :for="'tasktype'+i" class="cursor-pointer d-flex align-items-center lebel-items font-size-14 GunPowder">
                                                         <CheckboxComponent :class="`advance_setting_warpper_check`" :id="'tasktype'+i" :value="option.key" v-model="item.values" @change="handleChecked(item)"/>
-                                                        <img class="task-type-image" v-if="option.taskImage" :src="option.taskImage" alt="" height="14" width="14" />
+                                                        <TaskTypeIcon class="task-type-image" v-if="option.taskImage" :taskType="option" :style="{ height: '14px', width: '14px' }" />
                                                         <span class="font-family-dropdown-span">{{ option.name }}</span>
                                                     </label>
                                                 </div>
@@ -615,6 +615,7 @@ import CalenderCompo from '@/components/atom/CalenderCompo/CalenderCompo.vue';
 import CustomDropDown from '@/components/molecules/DropDown/CustomDropDown.vue';
 import CheckboxComponent from '@/components/atom/Checkbox/CheckboxComponent.vue';
 import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
+import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
 import "@/components/molecules/TaskFilterAdvance/styleFilter.css"
 // Emites
 const emit = defineEmits(["delete","apply","empty"])

@@ -1,4 +1,3 @@
-const { default: axios } = require("axios");
 const { dbCollections } = require("../../Config/collections");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const { default: mongoose } = require("mongoose");
@@ -16,6 +15,75 @@ const { updateMemberFunction } = require('../settings/Members/controller.js');
 const aiPrompts = require('../../utils/aiPrompts.json');
 const { generateDescription } = require('./aiDescriptionWriter');
 
+// AI-Assist used to post straight to OpenAI, so LLM_PROVIDER had no effect here
+// even though every other AI feature in the app honours it. It now goes through
+// the same provider factory as the project generator, which makes that one
+// setting drive all of them. Required lazily and defensively for the same
+// reason the description writer does it: a missing or broken provider module
+// should degrade to "AI is not integrated" rather than take this controller
+// down at load time.
+let providerFactory = null;
+try {
+    providerFactory = require('../AIProjectGenerator/llmProvider');
+} catch (_e) {
+    providerFactory = null;
+}
+
+/**
+ * Is there any usable LLM?
+ *
+ * Replaces the old `config.AI_API_KEY && config.AI_MODEL` gate, which really
+ * asked "is OpenAI set up" — so a company that had selected Anthropic or
+ * DeepSeek and held no OpenAI key at all was told AI was not integrated. Falls
+ * back to the original check if the factory cannot be loaded, so behaviour is
+ * unchanged for an existing OpenAI setup either way.
+ */
+function isAiConfigured() {
+    if (providerFactory && typeof providerFactory.isAnyProviderConfigured === 'function') {
+        return providerFactory.isAnyProviderConfigured();
+    }
+    return Boolean(config.AI_API_KEY && config.AI_MODEL);
+}
+
+/**
+ * One AI-Assist call, through whichever provider LLM_PROVIDER selects.
+ *
+ * `temperature: 1` is deliberate and is not the factory's default of 0.4. The
+ * old direct call sent no temperature at all, so OpenAI applied its own default
+ * of 1 — and AI-Assist writes prose, where dropping to 0.4 would visibly change
+ * the character of every answer. Pinning it keeps existing output as it is.
+ * (Providers that reject an explicit temperature, such as OpenAI's reasoning
+ * models, already drop it inside their own implementation.)
+ */
+function askProvider(messages, { jsonMode = false } = {}) {
+    if (!providerFactory || typeof providerFactory.getProvider !== 'function') {
+        return Promise.reject(new Error('No LLM provider is available.'));
+    }
+    let provider;
+    try {
+        // Throws a specific message when the selected provider has no key or
+        // model — worth surfacing as-is rather than flattening to "AI failed".
+        provider = providerFactory.getProvider();
+    } catch (error) {
+        return Promise.reject(error);
+    }
+    return provider.chat({ messages, jsonMode, temperature: 1 });
+}
+
+/**
+ * Cut an answer into the small pieces the typing effect consumes.
+ *
+ * The pieces are concatenated back together on the other side, so this splits
+ * on a fixed width rather than on words: a word-wise split has to make choices
+ * about the whitespace it swallows, and getting that wrong corrupts the text.
+ * Six characters is about a word, which paces the typing like the per-token
+ * pieces OpenAI used to hand back.
+ */
+function splitForTyping(text) {
+    if (!text) return [];
+    return text.match(/[\s\S]{1,6}/g) || [];
+}
+
 // GENERATE INITIAL REQUEST AND FOR FUNCTION USE (SUB TASK,CHECKLIST)
 exports.generatePrompt = (req,res) => {
     try {
@@ -30,7 +98,7 @@ exports.generatePrompt = (req,res) => {
         if(req.body.isRegenerate){
             deleteChat(req.body.uniqueUserId);
         }
-        if(config.AI_API_KEY && config.AI_MODEL){
+        if(isAiConfigured()){
                 const promptData = aiPrompts.find((e) => e._id === req.body.prompt.id);
                 if (promptData) {
                     let promptRes = promptData;
@@ -44,38 +112,31 @@ exports.generatePrompt = (req,res) => {
                         }
                     })
                     addChat(req.body.uniqueUserId,{role: "user",content: promptsText });
-                    let curlUrl = "https://api.openai.com/v1/chat/completions";
-                    let axiosData = {
-                        "model": config.AI_MODEL,
-                        "messages": [{"role": "user", "content": `${JSON.stringify(promptsText)}`}]
-                    }
-                    const header = {
-                        headers: {
-                          Authorization: `Bearer ${config.AI_API_KEY}`,
-                          'Content-Type': 'application/json'
-                        }
-                    };
+                    // Kept verbatim, including the JSON.stringify: it wraps the prompt in
+                    // quotes and escapes it, which is part of what these prompts have been
+                    // tuned against. Sending the bare text would be a different prompt.
+                    const messages = [{"role": "user", "content": `${JSON.stringify(promptsText)}`}];
                     if(stream === true){
-                        exports.generateWithStream(axiosData,header,req.body.userId,req.body.companyId,req.body.uniqueUserId,req.body.eventId).then((response) => {
+                        exports.generateWithStream(messages,req.body.userId,req.body.companyId,req.body.uniqueUserId,req.body.eventId).then((response) => {
                             res.send({status: true, statusText: response});
                         }).catch((error) => {
-                            res.send({status: false, statusText: error});
+                            res.send({status: false, statusText: (error && error.message) || String(error)});
                             console.error(error,"ERROR IN GENERATE WITH STRAM:");
                         })
                     }else{
                         try {
-                            axios.post(curlUrl,axiosData,header).then(async(response) => {
-                                let result = response.data.choices[0].message.content;
-                                let totalTokenUsed = response.data.usage.total_tokens;
-                                const userUpdate = await exports.limitCountUpdate(req.body.userId,req.body.companyId,totalTokenUsed);
-                                res.send({status: true, statusText: result,userUpdate:userUpdate});
+                            // No jsonMode here, matching the old direct call: only the
+                            // streamed prompts ever asked for JSON-only output.
+                            askProvider(messages).then(async(result) => {
+                                const userUpdate = await exports.limitCountUpdate(req.body.userId,req.body.companyId,(result && result.totalTokens) || 0);
+                                res.send({status: true, statusText: (result && result.content) || '',userUpdate:userUpdate});
                             }).catch((error) => {
-                                res.send({status: false, statusText: error});
+                                res.send({status: false, statusText: (error && error.message) || String(error)});
                                 console.error(error,"ERROR:");
                             })
                         } catch (error) {
                             console.error(error,"ERROR:");
-                            res.send({status: false, statusText: error});
+                            res.send({status: false, statusText: (error && error.message) || String(error)});
                         }
                     }
                 } else {
@@ -94,27 +155,19 @@ exports.generatePrompt = (req,res) => {
 // FOR MULTI CHAT PURPOSE
 exports.generatePromptChat = (req,res) => {
     try {
-        if(config.AI_API_KEY && config.AI_MODEL){
+        if(isAiConfigured()){
             if(!req.body.isRegenerate){
                 pushChat(req.body.uniqueUserId,{role: "user",content: req.body.message});
             }else{
                 removeChat(req.body.uniqueUserId)
             }
-            const header = {
-                headers: {
-                  Authorization: `Bearer ${config.AI_API_KEY}`,
-                  'Content-Type': 'application/json'
-                }
-            };
             if(getChat(req.body.uniqueUserId) && getChat(req.body.uniqueUserId).length>0){
-                let axiosData = {
-                    'model': config.AI_MODEL,
-                    "messages": getChat(req.body.uniqueUserId)
-                }
-                exports.generateWithStream(axiosData,header,req.body.userId,req.body.companyId,req.body.uniqueUserId,req.body.eventId).then((response) => {
+                // The stored chat is already a role/content list, which is exactly what
+                // every provider takes.
+                exports.generateWithStream(getChat(req.body.uniqueUserId),req.body.userId,req.body.companyId,req.body.uniqueUserId,req.body.eventId).then((response) => {
                     res.send({status: true, statusText: response});
                 }).catch((error) => {
-                    res.send({status: false, statusText: error});
+                    res.send({status: false, statusText: (error && error.message) || String(error)});
                     console.error(error,"ERROR IN GENERATE WITH STRAM:");
                 })
             }else{
@@ -417,50 +470,48 @@ exports.writeDescription = async (req, res) => {
     }
 };
 
-exports.generateWithStream = (axiosData,header,userId,companyId,uniqueUserId,eventId) => {
+/**
+ * Run a prompt and feed the answer out piece by piece for the typing effect.
+ *
+ * It is worth being clear about what "stream" means here, because it is not
+ * what the name suggests and never was. The old code asked OpenAI for a stream
+ * but did not read the response as one — axios buffered the whole body, and
+ * only then was it split apart and replayed through delayProvider at a fixed
+ * 50ms per piece. So the answer already arrived complete before the first
+ * character appeared on screen, and going through the provider factory changes
+ * none of that timing.
+ *
+ * The pieces are cosmetic. `resolve(fullText)` is what reaches the caller and
+ * becomes the HTTP response, and that is the authoritative result.
+ */
+exports.generateWithStream = (messages,userId,companyId,uniqueUserId,eventId) => {
     return new Promise((resolve,reject) => {
         try {
-            let curlUrl = "https://api.openai.com/v1/chat/completions";
-            axiosData.stream = true;
-            axiosData.stream_options = {"include_usage": true};
-            axiosData.response_format = { "type": "json_object" };
-            axios.post(curlUrl,axiosData,header)
-            .then((response) => response.data)
-            .then(async(response) => {
-                const resP = response.toString();
-                let chunks = [];
-                let fullText = '';
-                if (resP.includes('\n')) {
-                    chunks = resP.split('\n');
-                } else {
-                    chunks = [resP];
+            // jsonMode because the streamed prompts have always been sent with
+            // OpenAI's `response_format: json_object`, making JSON-only output
+            // part of the contract with the frontend. The factory holds that
+            // guarantee on every provider — natively where one exists, by
+            // instruction where it does not.
+            askProvider(messages, { jsonMode: true })
+            .then(async(result) => {
+                const fullText = (result && result.content) || '';
+
+                // Prime the queue with an empty piece. delayProvider drops
+                // whatever it is handed first — it schedules a send and then
+                // shifts from a queue that is still empty — so without this the
+                // opening characters of every answer go missing from the typing
+                // effect. Harmless before, when a piece was one token; visible
+                // now that a piece is a few characters wider.
+                delayProvider('', eventId);
+                for (const piece of splitForTyping(fullText)) {
+                    delayProvider(piece, eventId);
                 }
-                let chunkObjects = chunks
-                .map((chunk) => chunk.replace(/^data: /, '').trim())
-                .filter((chunk) => chunk !== undefined && chunk !== '' && chunk !== '[DONE]')
-                .map((chunk) => JSON.parse(chunk));
-                // BUG-017 / #71 fix: this loop has an `await` inside (the
-                // `limitCountUpdate` call) so the previous `.forEach(async ...)`
-                // was fire-and-forget — `resolve(fullText)` ran before the
-                // quota update settled, so quota failures were invisible.
-                // `for ... of` + `await` guarantees the update is fully
-                // applied before we continue.
-                for (const chunk of chunkObjects) {
-                    if (chunk.choices && chunk.choices.length > 0 && chunk.choices[0].delta.content) {
-                        delayProvider(chunk.choices[0].delta.content, eventId);
-                    } else if (chunk.usage) {
-                        const userUpdate = await exports.limitCountUpdate(userId, companyId, chunk.usage.total_tokens);
-                        emitListener(eventId, { step: "COUNT", value: userUpdate });
-                    }
-                }
-                // BUG-017 / #71 fix: this loop has no `await` inside — just
-                // string concatenation — so the `async` keyword on the
-                // callback was misleading. Plain `forEach` is correct here.
-                chunkObjects.forEach((chunk) => {
-                    if (chunk.choices && chunk.choices.length > 0 && chunk.choices[0].delta.content){
-                        fullText += chunk.choices[0].delta.content;
-                    }
-                });
+
+                // BUG-017 / #71: the quota update is awaited before resolving,
+                // so a failure to record usage surfaces instead of being lost.
+                const userUpdate = await exports.limitCountUpdate(userId, companyId, (result && result.totalTokens) || 0);
+                emitListener(eventId, { step: "COUNT", value: userUpdate });
+
                 resolve(fullText);
                 await pushChat(uniqueUserId,{role: "system",content: JSON.stringify(fullText)});
             }).catch((error) => {

@@ -1,20 +1,21 @@
 <template>
-    <div>
-        <draggable v-model="itemData" tag="ul" class="status_ul" @update:modelValue="$emit('update:modelValue',$event)" @change="updateItem(itemData,$event)" :item-key="makeUniqueId(5)" :group="group.name ? group.name : ''" :move="checkMove">
+    <div class="ddf__root">
+        <draggable v-model="itemData" tag="ul" class="status_ul" @update:modelValue="$emit('update:modelValue',$event)" @change="updateItem(itemData,$event)" :item-key="makeUniqueId(5)" :group="group.name ? group.name : ''" :move="checkMove" :handle="props.from === 'task_type' ? '.drag-handle' : null">
             <template #item="{ element, index }">
                 <li class=" d-flex align-items-center justify-content-between position-re">
                     <span class="taskInnerData"  v-if="!element.isEditable">
                         <div class="d-flex align-items-center  position-re">
-                            <span class="drag-image-wrapper position-ab">
+                            <span v-if="props.from === 'task_type'" class="drag-handle" title="Drag to reorder">
+                                <img :src="dragDots" class="drag-handle__img" alt="drag" />
+                            </span>
+                            <span v-else class="drag-image-wrapper position-ab">
                                 <img :src="dragIcon" class="dragImage position-re" />
                             </span>
                         <template v-if="!element.isEditable && !isChangeColor" >
-                            <img v-if="element?.taskImage?.includes('http')" :src="element.taskImage ? element.taskImage : defaultTaskType" alt="task_type"  @click="$emit('click:uploadImage'),$emit('click:ImageItem',element)" class="ignore-drag project__setting-ignoredrag border-radius-2-px mr-5px cursor-pointer">
-                            <WasabiImage
-                                v-else
+                            <TaskTypeIcon
+                                :taskType="element"
                                 @click="$emit('click:uploadImage'),$emit('click:ImageItem',element)"
                                 class="ignore-drag project__setting-ignoredrag border-radius-2-px mr-5px cursor-pointer"
-                                :data="{url: element.taskImage}"
                             />
                         </template>
                         <input v-if="!element.isAddNewStatus && element.textColor" :id="`ActiveTaskStatus${index}`" type="color" v-model.trim="element.textColor" @input="element.bgColor = element.textColor+'35',emit('changeColor')" class="ignore-drag border-radius-2-px mr-8px border-0 d-inline-block p-0 cursor-pointer bg-transparent change__colorignore-drag" disabled>
@@ -62,7 +63,7 @@ import { ref,defineProps, defineEmits, watch, defineComponent,inject } from 'vue
 import draggable from 'vuedraggable';
 import DropDown from '@/components/molecules/DropDown/DropDown.vue';
 import { useCustomComposable } from "@/composable";
-import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
+import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
 const {makeUniqueId} = useCustomComposable();
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
     const emit = defineEmits(["onSelect","resetTaskTypeErr","renameUpdate","disbaleButton","DraggableOption","update:modelValue","click:ImageItem","click:uploadImage", "enter:updateFieldValue", "click:updateFieldValue", "input:deleteFieldValue","changeColor"]);
@@ -112,11 +113,11 @@ import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption
     const visible = ref(false);
     const clientWidth = inject("$clientWidth");
     const dragIcon = require("@/assets/images/svg/Swip.svg");
+    const dragDots = require("@/assets/images/svg/drag_dots.svg");
     const saveData = require("@/assets/images/svg/right_tick_green.svg");
     const deletered = require("@/assets/images/svg/deletered.svg");
     const dotcolor = require("@/assets/images/svg/three_dot.svg");
     const deleteIcon = require("@/assets/images/svg/redDelete_Icon.svg");
-    const defaultTaskType = inject("$defaultTaskStatusImg");
 
 
     watch(() => props.modelValue, (newVal, oldVal) => {
@@ -169,13 +170,12 @@ import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption
 .taskStatusSection {
     margin-top: 2px;
 }
-.taskStatusRight ul li span {
+.taskStatusRight ul li .taskInnerData {
     display: flex;
     align-items: center;
     justify-content: space-between;
     font-size: 13px !important;
     line-height: 19px !important;
-    /* width: 100%; */
 }
 
 button.dot-btn {
@@ -204,6 +204,23 @@ input.form-control.edit-input {
     width: 16px !important;
     height: 16px !important;
 }
+/* Six-dot grip is the only drag handle for task-type cards. touch-action:none lets a
+   touch on the grip start the drag; the rest of the card keeps default touch-action so
+   mobile users can scroll the list by dragging the card body. */
+.drag-handle {
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+    vertical-align: middle;
+    cursor: grab;
+    touch-action: none;
+    margin-right: 8px;
+}
+.drag-handle:active { cursor: grabbing; }
+.drag-handle__img { width: 9px; height: 16px; display: block; }
+/* grip sits at the card start — drop the left indent that made room for the old
+   absolute drag icon. */
+.taskyou_need_right ul.status_ul li { padding-left: 8px; }
 @media(max-width: 767px){
     input.form-control.edit-input {margin: 0px 8px 0px 0px;}
 }

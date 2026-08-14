@@ -52,6 +52,7 @@ promotion. 6 months of runway."
             "TaskTypeKey": 3,
             "status": "Idea",
             "priority": "High",
+            "estimatedHours": 1.5,
             "AssigneeUserId": [],
             "descriptionBlocks": [
               { "type": "paragraph", "data": { "text": "The name will appear on every platform listing and in social posts, so we need it locked before any cover art or trailers are produced." } },
@@ -73,6 +74,7 @@ promotion. 6 months of runway."
           {
             "TaskName": "Design cover art and intro music",
             "TaskTypeKey": 3,
+            "_comment": "Roughly six hours of work, so it is split. The parent carries NO estimatedHours — the hours live on the sub-tasks.",
             "status": "Idea",
             "priority": "Medium",
             "AssigneeUserId": [],
@@ -92,6 +94,29 @@ promotion. 6 months of runway."
                 "All files are licensed for podcast distribution."
               ] } },
               { "type": "paragraph", "data": { "text": "Depends on: Decide podcast name and tagline" } }
+            ],
+            "subtasks": [
+              {
+                "TaskName": "Design three cover art concepts",
+                "estimatedHours": 2,
+                "descriptionBlocks": [
+                  { "type": "paragraph", "data": { "text": "Three distinct directions at 3000x3000px, each readable when shrunk to a 55px podcast tile." } }
+                ]
+              },
+              {
+                "TaskName": "Refine the chosen cover art to final artwork",
+                "estimatedHours": 2,
+                "descriptionBlocks": [
+                  { "type": "paragraph", "data": { "text": "Take the concept the hosts picked to final, and export at every size Apple and Spotify require." } }
+                ]
+              },
+              {
+                "TaskName": "Produce the intro and outro music stings",
+                "estimatedHours": 2,
+                "descriptionBlocks": [
+                  { "type": "paragraph", "data": { "text": "Licence or commission a short theme, then cut a 10-second intro and a 5-second outro from it." } }
+                ]
+              }
             ]
           },
           {

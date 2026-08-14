@@ -28,8 +28,7 @@
             <div :class="[{'d-flex align-items-center' : isDisable === true}]">
                 <div v-if="isDisable === true && item.textColor" class="mr-10px border-radius-3-33-px" :style="[{'background-color': item?.textColor,height:'12px',width:'12px'}]"></div>
                 <template v-if="item.taskImage && isDisable === true">
-                    <WasabiImage v-if="item.taskImage.includes('setting')" :data="{url: item.taskImage}" class="sidebar__task-image" />
-                    <img v-else :src="item.taskImage" class="sidebar__task-image"/>
+                    <TaskTypeIcon :taskType="item" class="sidebar__task-image" />
                 </template>
                 <span class="d-block emp_label" :class="[{'font-weight-400' : isDisable === true , 'font-weight-500 font-size-13' : isDisable === false, 'pl-5px': imageDisplayForPriority,'pl-10px' : taskType}]" :style="[{'font-size-13' : clientWidth > 767 &&  isDisable === true , 'font-size-16' : clientWidth <= 767 &&  isDisable === true }]">{{item.label}}</span>
                 <span v-if="item.designation" class="font-size-12 d-block designationAssignee emp_label">{{item.designation ? item.designation : ''}}</span>
@@ -70,6 +69,7 @@ import UserProfile from '@/components/atom/UserProfile/UserProfile.vue';
 import DropDown from '@/components/molecules/DropDown/DropDown.vue';
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
 import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
+import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
 import { companyPrioritiesIcons } from '@/composable/commonFunction';
 defineProps({
     item: {

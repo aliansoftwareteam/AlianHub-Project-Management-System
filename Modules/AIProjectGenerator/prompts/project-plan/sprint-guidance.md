@@ -1,8 +1,9 @@
 # Sprints
 
 A sprint is a shippable slice — a chunk of work the team could plausibly
-finish and demo, hand off, or close out as a unit. Sprints are about scope,
-not time.
+finish and demo, hand off, or close out as a unit. Each sprint is one
+working week, so size a sprint to what the team can genuinely finish in
+five days.
 
 There is no required number of sprints. Some projects break into 3 natural
 phases, others into 7. Pick whatever genuinely fits the project — not a
@@ -25,11 +26,18 @@ Examples:
 
 ## Naming
 
-Each sprint's name describes WHAT is being shipped, not WHEN. Forbidden:
-"Week 1", "Sprint 3", "Iteration 2", "Phase 1" — these names tell the team
-nothing. Required: a short noun phrase tied to the deliverable.
+Do not name the sprints. This team plans in weeks, so each sprint is
+labelled with the working week it runs — "AHE - 10 - 14 Aug 2026" — and
+those labels are generated afterwards from the calendar, not by you.
 
-A sprint name is good when, on its own, it tells you what's in it.
+Still give each sprint a `sprintName` describing what it ships, as a short
+noun phrase. It is used while the plan is being reviewed and then replaced
+by the date range, so make it readable but do not agonise over it, and do
+not attempt a date yourself — you do not know today's date.
+
+The ORDER you emit sprints in is what matters, because sprint 1 becomes the
+first week, sprint 2 the week after, and so on. Sequence them so that each
+week's work is genuinely startable when its turn comes.
 
 ## What goes in a sprint
 

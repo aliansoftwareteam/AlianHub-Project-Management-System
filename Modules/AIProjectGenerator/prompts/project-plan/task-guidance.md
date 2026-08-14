@@ -287,3 +287,31 @@ If you have assigned High to more than one-third of your tasks, you
 are over-classifying — go back and downgrade tasks that do not
 literally block other tasks to Medium. A plan where every task is
 High is a plan with no priorities at all.
+
+## Size: nothing over two hours
+
+Company rule, and it is absolute: **no task carries more than two hours of
+estimated work.** Two hours exactly is allowed; two hours and one minute is
+not.
+
+Give every task an `estimatedHours` — the honest effort for the work as
+described, not a number chosen to fit the cap.
+
+When the honest estimate is larger than two hours, do not shrink it and do
+not write a vaguer task. Split the work into sub-tasks:
+
+- Each sub-task is a real, separately completable piece of the job — not
+  "part 1 of 5". Someone should be able to pick one up and know what done
+  looks like without reading the others.
+- Each sub-task carries its own `estimatedHours`, at most two.
+- The sub-task estimates add up to the honest total for the whole job.
+- The parent task gets **no** `estimatedHours` at all. The hours live on the
+  sub-tasks; putting them on the parent as well would count the same work
+  twice wherever hours are summed.
+
+A ten-hour job becomes a parent with five sub-tasks of two hours each. A
+three-hour job becomes a parent with two sub-tasks — say two hours and one
+hour — not one task quietly rounded down.
+
+Work that genuinely fits in two hours or less stays a single task with its
+own `estimatedHours` and no sub-tasks. Do not split for the sake of it.

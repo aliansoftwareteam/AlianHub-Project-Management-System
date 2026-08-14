@@ -71,12 +71,7 @@
                                     <div class="mw-100 w-100 d-flex align-items-center">
                                     <span v-if="data.convertType === undefined || data.convertType === ''" class="font-size-16 color94 task_type-title">{{$t('general.Select_Task_Type')}}</span>
                                     <div class="d-flex align-items-center" v-if="data.convertType !== undefined">
-                                        <img v-if="data.convertType?.taskImage?.includes('http')" :src="data.convertType ? data.convertType?.taskImage : ''" class="position-re border-radius-2-px convert__type mr-8px">
-                                        <WasabiImage
-                                            v-else
-                                            class="position-re vertical-middle task__image"
-                                            :data="{url: data.convertType?.taskImage}"
-                                        />
+                                        <TaskTypeIcon :taskType="data.convertType" class="position-re border-radius-2-px convert__type mr-8px" />
                                         <span :class="{'font-size-13' : clientWidth > 767, 'font-size-16' : clientWidth <= 767}">{{data.convertType ? data.convertType.name : ''}}</span>
                                     </div>
                                     <span class="red position-ab font-size-11 error__msg-text mt-50px" v-if="(data.convertType === undefined || data.convertType === '')">{{errorMsgType}}</span>
@@ -131,7 +126,7 @@
 import ConfirmationSidebar from '@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue';
 import TaskStatus from "@/components/atom/TaskStatus/TaskStatus.vue"
 import TaskType from "@/components/atom/TaskType/TaskType.vue"
-import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
+import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
 
 import { ref } from 'vue';
 
