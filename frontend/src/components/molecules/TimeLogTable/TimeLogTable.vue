@@ -5,12 +5,7 @@
                 <tr>
                 <th colspan="3" rowspan="1">
                     <div class="d-flex align-items-center timelog-task-title">
-                        <img v-if="getTaskType(props.task.TaskTypeKey).taskImage?.includes('http')" :src="getTaskType(props.task.TaskTypeKey).taskImage ? getTaskType(props.task.TaskTypeKey).taskImage : defaultTaskImg" :title="props.task.TaskType"  class="border-radius-2-px mt-2px timelog___taskimg"/>
-                        <WasabiIamgeCompp 
-                            v-else
-                            :data="{url: (getTaskType(props.task.TaskTypeKey).taskImage ? getTaskType(props.task.TaskTypeKey).taskImage : defaultTaskImg),title : props.task.TaskType}"
-                            class="border-radius-2-px mt-2px timelog___taskimg"
-                        />
+                        <TaskTypeIcon :taskType="getTaskType(props.task.TaskTypeKey)" :title="props.task.TaskType" class="border-radius-2-px mt-2px timelog___taskimg"/>
                         <span v-if="!props.task.TaskName && isSpinner" class="timelogtable-thtitle-wrapped font-weight-500 pl-9px">
                             <Skelaton class="border-radius-5-px skelaton__option m-5px" :style="{ height: clientWidth <= 767 ? '24' : '24px', width: '150px' }" />
                         </span>
@@ -64,10 +59,9 @@
     import { dbCollections } from '@/utils/Collections';
     import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
     import { useI18n } from 'vue-i18n';
-    import WasabiIamgeCompp from '@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue';
+    import TaskTypeIcon from '@/components/atom/TaskTypeIcon/TaskTypeIcon.vue';
     const {getUser} = useGetterFunctions();
     const { getters } = useStore();
-    const defaultTaskImg = inject('$defaultTaskStatusImg')
     const userId =  inject('$userId');
     const companyId = inject('$companyId');
     const $toast = useToast();

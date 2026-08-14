@@ -85,12 +85,7 @@
                     <ul class="d-flex task_type_statusul" @click="!item.isRestrict ? openEditSidebar(item,'taskType') : ''">
                         <li class="projectDataColorli" v-for="(taskType,taskTypeKey) in item.taskTypeCounts" :key="taskTypeKey">
                             <div class="task_type d-flex align-items-center border-radius-6-px bg-lightgray" :class="[{'cursor-pointer' : activeTab === 0}]">
-                                <img v-if="taskType?.taskImage?.includes('http')" :src="taskType.taskImage" alt="task_type" :style="[{'height':'13.85px','width':'13.85px'}]">
-                                <WasabiImage
-                                    v-else
-                                    :style="[{'height':'13.85px','width':'13.85px'}]"
-                                    :data="{url: taskType.taskImage}"
-                                />
+                                <TaskTypeIcon :taskType="taskType" :style="[{'height':'13.85px','width':'13.85px'}]" />
                                 <span class="font-size-13 font-roboto-sans font-weight-400 GunPowder ml-8px" :class="[{'cursor-pointer' : activeTab === 0}]">{{taskType.name}}</span>
                             </div>
                         </li>
@@ -184,6 +179,7 @@ const companyId = inject('$companyId');
 const userId = inject("$userId");
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
+import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
 import { projectComponentsIcons, projectAppsIcons } from '@/composable/commonFunction';
 import { apiRequest } from "@/services";
 import * as env from '@/config/env';

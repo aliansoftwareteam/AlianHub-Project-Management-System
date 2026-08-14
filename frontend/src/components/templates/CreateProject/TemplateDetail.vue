@@ -74,12 +74,7 @@
                     <ul class="d-flex align-items-center" v-if="templateView.TemplateTaskType && templateView.TemplateTaskType.length > 0">
                         <li class="setImagevalue" v-for="(status,index) in templateView.TemplateTaskType" :key="index">
                             <span :title="status.name">
-                                <img v-if="status.taskImage && status.taskImage.includes('http')" :src="status.taskImage" class="taskdetail-icon-image taskdetail__img d-inline-block border-radius-2-px"/>
-                                <WasabiImage
-                                    v-else
-                                    class="taskdetail-icon-image taskdetail__img d-inline-block border-radius-2-px"
-                                    :data="{url: status.taskImage}"
-                                />
+                                <TaskTypeIcon :taskType="status" class="taskdetail-icon-image taskdetail__img d-inline-block border-radius-2-px"/>
                             </span>
                         </li>
                     </ul>
@@ -133,7 +128,7 @@ import { useStore } from "vuex";
 import {useToast} from 'vue-toast-notification';
 import { apiRequest } from '../../../services'
 import WasabiIamgeCompp from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue"
-import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
+import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
 import { projectComponentsIcons,getImageUrl } from '@/composable/commonFunction';
 import { storageQueryBuilder } from '@/utils/storageQueryBuild';
 import { useI18n } from "vue-i18n";

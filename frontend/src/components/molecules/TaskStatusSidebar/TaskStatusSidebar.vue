@@ -9,6 +9,7 @@
                     <img :src="closeBlueImage" @click="isSidebarOpen = false,$emit('closesidebar',taskSelectedStatus)" />
             </template>
             <template #body>
+                <div class="tts__body">
                 <div class="p-15px search-bar__input bg-white">
                     <InputText  
                         v-model="search"
@@ -22,9 +23,10 @@
                 <div v-if="isOpenAddStatus && isAddStatus === true"  class="open__add-status position-re d-flex align-items-center justify-content-between bg-white" :class="[{'openinput_sidebar' : type !== 'task_type'}]">
                     <input type="color" v-if="props.type !== 'task_type'" v-model="statusColor" class="status__color-input position-ab">
                     <input v-if="props.type === 'task_type'" type="file" class="d-none"  ref="task_type_image" accept="image/*" @change="checkFile">
-                    <button v-if="props.type === 'task_type'" class="cursor-pointer upload-image-btn btn-primary mr-10-px" type="button" @click="$refs.task_type_image.click()">
-                        <img v-if="addNewtaskImage" :src="addNewtaskImage" class="projecttasktypeform__image__after"/>
-                        <img v-else src="@/assets/images/svg/upload.svg" class="projecttasktypeform__image__before" alt="upload">
+                    <button v-if="props.type === 'task_type'" class="cursor-pointer upload-image-btn btn-primary mr-10px" type="button" @click="showIconPicker = !showIconPicker">
+                        <TaskTypeIcon v-if="iconSource === 'library' && selectedIconValue" :taskType="{ iconType: 'library', iconValue: selectedIconValue, iconColor: selectedIconColor }" class="projecttasktypeform__image__after"/>
+                        <img v-else-if="addNewtaskImage" :src="addNewtaskImage" class="projecttasktypeform__image__after"/>
+                        <img v-else src="@/assets/images/svg/upload.svg" class="projecttasktypeform__image__before" alt="icon">
                     </button>
                     <InputText  
                         v-model="formData.status.value"
@@ -43,11 +45,18 @@
                     />
                     <span class="cursor-pointer d-flex justify-content-end ml-13px confrm__cancel-wrapper">
                         <img :src="greenCheck" class="greenCheck_sidebar vertical-middle mr-13px" @click="addTaskStatus()">
-                        <img :src="deleteRed" alt="cancel" @click="isOpenAddStatus = false,formData.status.error='',addNewtaskImage = ''" class="deleteRed_sidebar vertical-middle">
+                        <img :src="deleteRed" alt="cancel" @click="isOpenAddStatus = false,formData.status.error='',resetIconState()" class="deleteRed_sidebar vertical-middle">
                     </span>
                     <div class="position-ab red font-size-11 error-text">{{formData.status.error}}</div>
                 </div>
-                <div class="overflow-y-auto sidebar-options overflow-x-hidden bg-white" :style="`height: ${!isOpenAddStatus && isAddStatus === true ? 'calc(100% - 0px);' : (clientWidth > 767 ? 'calc(100% - 70px);' : 'calc(100% - 90px);')}`">
+                <div v-if="props.type === 'task_type' && isOpenAddStatus && showIconPicker" class="tasktype__iconpop bg-white">
+                    <div class="tasktype__iconpop-toggle">
+                        <button type="button" :class="{ active: iconSource === 'library' }" @click="iconSource = 'library'">{{ $t('dashboardCard.icon_library') }}</button>
+                        <button type="button" :class="{ active: iconSource === 'upload' }" @click="iconSource = 'upload'; $refs.task_type_image.click()">{{ $t('dashboardCard.icon_upload') }}</button>
+                    </div>
+                    <IconPicker v-if="iconSource === 'library'" v-model="selectedIconValue" v-model:color="selectedIconColor" />
+                </div>
+                <div class="overflow-y-auto sidebar-options overflow-x-hidden bg-white">
                     <template v-if="filteredStatusOptions && filteredStatusOptions.length">
                         <SidebarItems
                             v-for="(item, itemIndex) in filteredStatusOptions"
@@ -64,6 +73,7 @@
                     </template>
                     <div v-else  class="text-center red m-15px">{{$t('UserTimesheet.no_records_found')}}</div>
                 </div>
+                </div>
             </template>
         </Sidebar>
     </div>
@@ -74,6 +84,9 @@ import { defineProps, ref, defineEmits, computed, inject, watch} from "vue";
 import Sidebar from '@/components/molecules/Sidebar/Sidebar.vue';
 import SidebarItems from "@/components/molecules/SidebarItems/SidebarItems.vue";
 import InputText from "@/components/atom/InputText/InputText.vue";
+import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
+import IconPicker from "@/components/molecules/IconPicker/IconPicker.vue";
+import { DEFAULT_ICON_COLOR } from "@/utils/iconLibrary";
 import { useStore } from "vuex";
 import { useValidation } from "@/composable/Validation";
 import { useToast } from "vue-toast-notification";
@@ -127,7 +140,20 @@ const isSidebarOpen = ref(props.isTaskSidebarOpen);
 const isOpenAddStatus = ref(false);
 const addNewtaskImage = ref("");
 const taskImageFile = ref("")
-const task_type_image = ref(null);    
+const task_type_image = ref(null);
+// Icon source for a new task type: 'library' (Iconify picker) or 'upload'.
+const iconSource = ref('library');
+const selectedIconValue = ref('');
+const selectedIconColor = ref(DEFAULT_ICON_COLOR);
+const showIconPicker = ref(false);
+function resetIconState() {
+    addNewtaskImage.value = "";
+    taskImageFile.value = "";
+    selectedIconValue.value = "";
+    selectedIconColor.value = DEFAULT_ICON_COLOR;
+    iconSource.value = 'library';
+    showIconPicker.value = false;
+}
 const TaskStatusArray = computed(() => JSON.parse(JSON.stringify(getters["settings/AllTaskStatus"])));
 const projectStatusArray = computed(() => JSON.parse(JSON.stringify(getters["settings/AllProjectStatus"])));
 const taskTypeArray = computed(() => JSON.parse(JSON.stringify(getters["settings/AllTaskType"])));
@@ -303,7 +329,16 @@ function addTaskStatus () {
                     'assignAsSubtask': false,
                     'assignAsTask': false,
                 }
-                if(taskImageFile.value!== ''){
+                if(iconSource.value === 'library' && selectedIconValue.value){
+                    // Library icon: store the Iconify name + color. taskImage keeps
+                    // a fallback path so the (still-required) backend field is set
+                    // and rendering degrades gracefully if iconValue is ever cleared.
+                    obj.iconType = 'library';
+                    obj.iconValue = selectedIconValue.value;
+                    obj.iconColor = selectedIconColor.value;
+                    obj.taskImage = defaultTaskType;
+                }else if(taskImageFile.value!== ''){
+                    obj.iconType = 'upload';
                     let name = generateFileName(taskImageFile.value.name,env.STORAGE_TYPE);
                     let filePath = `setting/task_type/${name}`;
 
@@ -319,6 +354,7 @@ function addTaskStatus () {
                         }
                     })
                 }else{
+                    obj.iconType = 'upload';
                     obj.taskImage = defaultTaskType;
                 }
                 await apiRequest("put",env.TASK_TYPE_SETTING_TEMPLATE,obj).then((res) => {
@@ -326,7 +362,7 @@ function addTaskStatus () {
                         const updatedArray = res.data;
                         commit("settings/setTaskTypeArray", {data: updatedArray, op: "modified"});
                         statusOptions.value = organizeDataArray(updatedArray.settings);
-                        addNewtaskImage.value = "";
+                        resetIconState();
                         $toast.success(t(`Toast.Task_Type_added_sucessfully`), {position: "top-right"});
                     }else{
                         $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
@@ -409,3 +445,15 @@ const organizeDataArray = (data) => {
 </script>
 
 <style scoped src="./style.css"></style>
+<style scoped>
+.tasktype__iconpop { padding: 10px 15px; border-bottom: 1px solid #eef0f6; }
+.tasktype__iconpop-toggle { display: flex; gap: 6px; margin-bottom: 8px; }
+.tasktype__iconpop-toggle button { flex: 1; border: 1px solid #e2e5ee; background: #fff; color: #6b7280; border-radius: 6px; padding: 4px 8px; font-size: 12px; cursor: pointer; }
+.tasktype__iconpop-toggle button.active { background: #2F3990; border-color: #2F3990; color: #fff; }
+
+/* Flex-column body: search / add-form / icon-picker take their natural height; the
+   options list fills the rest and scrolls. Replaces a hardcoded calc(100% - Npx) that
+   ignored the icon picker and could overflow the panel. */
+.tts__body { display: flex; flex-direction: column; height: 100%; }
+.tts__body .sidebar-options { flex: 1 1 auto; min-height: 0; }
+</style>

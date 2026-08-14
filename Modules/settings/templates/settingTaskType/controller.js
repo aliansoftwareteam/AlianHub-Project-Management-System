@@ -13,7 +13,7 @@ const { MongoDbCrudOpration } = require("../../../../utils/mongo-handler/mongoQu
 exports.updateTaskTypeSettingTemplate = async (req, res) => {
     try {
         const companyId = req.headers["companyid"];
-        const { taskImage, assignAsSubtask, assignAsTask, isDeleted, isEditable, isAddNewStatus, value, taskCount, name } = req.body;
+        const { taskImage, assignAsSubtask, assignAsTask, isDeleted, isEditable, isAddNewStatus, value, taskCount, name, iconType, iconValue, iconColor } = req.body;
 
         if (!companyId) {
             return res.status(400).json({
@@ -28,7 +28,7 @@ exports.updateTaskTypeSettingTemplate = async (req, res) => {
             return res.status(400).json({ message: `${missingField} is required.` });
         }
 
-        const allowedKeys = ["key", "taskImage", "assignAsSubtask", "assignAsTask", "isDeleted", "isEditable", "isAddNewStatus", "value", "taskCount", "name","refreshToken"];
+        const allowedKeys = ["key", "taskImage", "assignAsSubtask", "assignAsTask", "isDeleted", "isEditable", "isAddNewStatus", "value", "taskCount", "name","refreshToken", "iconType", "iconValue", "iconColor"];
         const invalidKeys = Object.keys(req.body).filter(key => !allowedKeys.includes(key));
         if (invalidKeys.length > 0) {
             return res.status(400).json({
@@ -47,7 +47,12 @@ exports.updateTaskTypeSettingTemplate = async (req, res) => {
             isDeleted,
             assignAsSubtask,
             assignAsTask,
-            taskImage
+            taskImage,
+            // Icon library fields (task-type icon PRD). Default to the legacy
+            // 'upload' kind so anything not sending them renders unchanged.
+            iconType: iconType || 'upload',
+            iconValue: iconValue || '',
+            iconColor: iconColor || null
         };
 
         const query = {

@@ -4,6 +4,7 @@ import getConfig from "next/config";
 import { useSelector, useDispatch } from 'react-redux'
 import { fetchAndProcessProjects } from '../../utils/projectUtils'
 import WasabiImage from '../WasabiImage/WasabiImage';
+import TaskTypeIcon from '../TaskTypeIcon/TaskTypeIcon';
 import TimeElapsed from '../TimeElapsed/TimeElapsed';
 import { removeAllTimeLog, setTrackerStopTime } from '../../store/timelog';
 const { APIURL } = publicRuntimeConfig
@@ -228,7 +229,7 @@ function Header() {
                                     </ul>
                                     <div className="flex items-center leading-none text-white overflow-hidden text-ellipsis whitespace-nowrap">
                                         {/* <img src={project?.selectedTaskType} className="h-4 w-4" alt="task type" /> */}
-                                        {timeLog?.taskTypeImage && <WasabiImage url={timeLog?.taskTypeImage} isUser={false} className="!w-[15px] !h-[15px]" />}
+                                        {(timeLog?.taskTypeData || timeLog?.taskTypeImage) && <TaskTypeIcon taskType={timeLog?.taskTypeData || { taskImage: timeLog?.taskTypeImage }} className="!w-[15px] !h-[15px]" />}
                                         <span className="ml-2 font-medium text-sm overflow-hidden text-ellipsis whitespace-nowrap">
                                             {timeLog?.taskName}
                                         </span>

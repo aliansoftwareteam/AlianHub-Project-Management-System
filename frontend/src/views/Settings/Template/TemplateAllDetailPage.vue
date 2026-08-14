@@ -23,18 +23,7 @@
             <h5>{{$t('Projects.task_type')}}</h5>
             <ul class="d-flex align-items-center" v-if="theModel.taskTypeForm.taskTypeField.value && Object.keys(theModel.taskTypeForm.taskTypeField.value).length">
                 <li class="setImagevalue cursor-pointer" v-for="(taskType,index) in theModel.taskTypeForm.taskTypeField.value.taskTypes" :key="index">
-                    <img
-                        v-if="taskType.taskImage.includes('http')"
-                        class="task-type-image-block"
-                        :src="taskType.taskImage"
-                        :alt="taskType.name"
-                        :title="taskType.name"
-                    />
-                    <WasabiImage
-                        v-else
-                        class="task-type-image-block"
-                        :data="{url: taskType.taskImage}"
-                    />
+                    <TaskTypeIcon :taskType="taskType" :title="taskType.name" class="task-type-image-block" />
                 </li>
             </ul>
         </div>
@@ -76,7 +65,7 @@
 </template>
 <script setup>
 import { ref , inject} from "vue";
-import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
+import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
 import { projectComponentsIcons } from '@/composable/commonFunction';
     const props = defineProps({
         modelValue : {
