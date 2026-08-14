@@ -13,12 +13,20 @@
  *
  *   node scripts/migrate-task-type-icons.js --company <companyId>            # dry-run
  *   node scripts/migrate-task-type-icons.js --company <companyId> --apply    # execute
+ *   node scripts/migrate-task-type-icons.js --company <companyId> --verify   # checks only
+ *
+ * After --apply, verification runs automatically (prints PASS/FAIL) and caches are cleared
+ * best-effort via POST <APIURL>api/v1/removeCache — node-cache is in-process, so a separate
+ * script can't clear the live backend directly; on failure it prints a manual command.
+ * Chat projects (main_chats) carry taskTypeCounts too but are intentionally OUT of scope here.
  *
  * Ordering: B (keys) then A (icons) so icon fields land on the final entries.
  * Decisions baked in (see spec): orphans left untouched + reported; status-like
  * rows left in place, usage reported; single company; no same-value merges expected.
  */
 require('dotenv').config();
+const http = require('http');
+const https = require('https');
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { settingsCollectionDocs } = require('../Config/collections');
@@ -240,12 +248,18 @@ async function run() {
         }
 
         if (APPLY) {
-            const finalEntries = entries.map(withIcon); // deduped + re-keyed + icons
-            report.iconSetTotal += finalEntries.length;
-            await crud(SCHEMA_TYPE.PROJECTS, [{ _id: p._id }, { $set: { taskTypeCounts: finalEntries } }], 'updateOne');
-            for (const r of rewrites) {
-                await crud(SCHEMA_TYPE.TASKS,
-                    [{ ProjectID: pid, TaskType: r.value, TaskTypeKey: { $ne: r.key } }, { $set: { TaskTypeKey: r.key } }], 'updateMany');
+            try {
+                const finalEntries = entries.map(withIcon); // deduped + re-keyed + icons
+                report.iconSetTotal += finalEntries.length;
+                await crud(SCHEMA_TYPE.PROJECTS, [{ _id: p._id }, { $set: { taskTypeCounts: finalEntries } }], 'updateOne');
+                for (const r of rewrites) {
+                    await crud(SCHEMA_TYPE.TASKS,
+                        [{ ProjectID: pid, TaskType: r.value, TaskTypeKey: { $ne: r.key } }, { $set: { TaskTypeKey: r.key } }], 'updateMany');
+                }
+            } catch (e) {
+                // No transactions via the helper — name the exact project that half-applied so
+                // ops can restore just it from the backup, then re-run (idempotent).
+                throw new Error(`[project "${p.ProjectName}" ${pid}] write failed: ${e && e.message ? e.message : e}`);
             }
         }
     }
@@ -299,7 +313,87 @@ async function run() {
             p.rewrites.forEach((r) => console.log(`      rewrite ${r.value} → key ${r.key}: ${r.tasks} task(s)`));
         }
     }
-    console.log(`\n${APPLY ? '✓ APPLIED.' : 'DRY-RUN complete — nothing written.'} ${APPLY ? 'Now clear caches: tasktype:' + companyId + ', taskTypeTemplate:' + companyId + ', UserProjectData:*' : 'Re-run with --apply after backup.'}\n`);
+    console.log(`\n${APPLY ? '✓ APPLIED — running verification + cache-bust…' : 'DRY-RUN complete — nothing written. Re-run with --apply after backup.'}\n`);
+}
+
+// ── Verification (spec §"Verification queries") — read-only; run after --apply or via --verify.
+const hasIcon = (e) => !!(e && e.iconType === 'library' && e.iconValue && e.iconColor);
+async function verify() {
+    console.log(`\n=== Verification — company ${companyId} ===`);
+    const projects = await crud(SCHEMA_TYPE.PROJECTS,
+        [{ 'taskTypeCounts.0': { $exists: true } }, { ProjectName: 1, taskTypeCounts: 1 }], 'find');
+
+    let badKeyProjects = 0, rewriteMisses = 0, projIconMissing = 0;
+    for (const p of projects || []) {
+        const cnts = Array.isArray(p.taskTypeCounts) ? p.taskTypeCounts : [];
+        const keys = cnts.map((e) => e.key);
+        if (keys.some(isBadKey) || keys.some((k, i) => keys.indexOf(k) !== i)) badKeyProjects++;
+        projIconMissing += cnts.filter((e) => !hasIcon(e)).length;
+        for (const e of cnts) {
+            if (!e.value) continue;
+            rewriteMisses += await crud(SCHEMA_TYPE.TASKS,
+                [{ ProjectID: String(p._id), TaskType: e.value, TaskTypeKey: { $ne: e.key } }], 'countDocuments');
+        }
+    }
+
+    const settingsDoc = await crud(SCHEMA_TYPE.SETTINGS, [{ name: settingsCollectionDocs.TASK_TYPE }], 'findOne');
+    const catMissing = (settingsDoc && Array.isArray(settingsDoc.settings) ? settingsDoc.settings : []).filter((e) => !hasIcon(e)).length;
+    const templates = await crud(SCHEMA_TYPE.TASK_TYPE_TEMPLATES, [{}], 'find');
+    const tplMissing = (templates || []).reduce((s, t) => s + (Array.isArray(t.taskTypes) ? t.taskTypes.filter((e) => !hasIcon(e)).length : 0), 0);
+    const iconMissing = projIconMissing + catMissing + tplMissing;
+
+    const line = (ok, label, detail) => console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label} — ${detail}`);
+    line(badKeyProjects === 0, '(a) no NaN/duplicate project keys', `${badKeyProjects} project(s) affected`);
+    line(rewriteMisses === 0, '(b) no unresolved task re-keys', `${rewriteMisses} task(s) still mismatched`);
+    line(iconMissing === 0, '(c) icon fields present', `${iconMissing} missing (project ${projIconMissing}, catalog ${catMissing}, template ${tplMissing})`);
+    const pass = badKeyProjects === 0 && rewriteMisses === 0 && iconMissing === 0;
+    console.log(`\n${pass ? '✓ Verification PASSED.' : '✗ Verification FAILED — review above (orphans by-key are expected; see dry-run report).'}\n`);
+    return pass;
+}
+
+// ── Best-effort cache-bust. node-cache is per-process, so the live backend must clear its own
+// cache: POST the removeCache endpoint (unauthenticated). Falls back to a printed command.
+const CACHE_KEYS = () => [
+    { cacheKey: `tasktype:${companyId}`, isPrefix: true },
+    { cacheKey: `taskTypeTemplate:${companyId}` },
+    { cacheKey: `UserProjectData:${companyId}:`, isPrefix: true },
+];
+function printManualCache() {
+    console.log('  Restart the backend, OR POST each of these to /api/v1/removeCache:');
+    for (const k of CACHE_KEYS()) console.log(`    ${JSON.stringify(k)}`);
+}
+function postJSON(url, body) {
+    return new Promise((resolve, reject) => {
+        const u = new URL(url);
+        const lib = u.protocol === 'https:' ? https : http;
+        const data = JSON.stringify(body);
+        const req = lib.request({
+            hostname: u.hostname, port: u.port, path: u.pathname, method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) },
+        }, (res) => { let b = ''; res.on('data', (c) => (b += c)); res.on('end', () => resolve({ status: res.statusCode, body: b })); });
+        req.on('error', reject);
+        req.setTimeout(5000, () => req.destroy(new Error('timeout')));
+        req.write(data); req.end();
+    });
+}
+async function bustCache() {
+    console.log('\n=== Cache-bust ===');
+    if (!process.env.APIURL) {
+        console.log('  APIURL not set — clear manually:');
+        printManualCache();
+        return;
+    }
+    const url = `${process.env.APIURL.replace(/\/*$/, '/')}api/v1/removeCache`;
+    try {
+        for (const k of CACHE_KEYS()) {
+            const r = await postJSON(url, k);
+            if (r.status !== 200) throw new Error(`HTTP ${r.status} for ${k.cacheKey}`);
+        }
+        console.log(`  ✓ Cleared via ${url} (tasktype/taskTypeTemplate/UserProjectData for ${companyId}).`);
+    } catch (e) {
+        console.log(`  ⚠ Auto cache-bust failed (${e && e.message ? e.message : e}). Clear manually:`);
+        printManualCache();
+    }
 }
 
 // Pure helpers exported for testing; DB-touching run() only executes as a CLI.
@@ -308,13 +402,17 @@ module.exports = { rekey, mapFor, withIcon, isBadKey, VALUE_MAP, STATUS_LIKE };
 if (require.main === module) {
     const argv = process.argv.slice(2);
     APPLY = argv.includes('--apply');
+    const VERIFY_ONLY = argv.includes('--verify');
     const i = argv.indexOf('--company');
     companyId = i !== -1 ? argv[i + 1] : null;
     if (!companyId) {
         console.error('ERROR: --company <companyId> is required.');
         process.exit(1);
     }
-    run().then(() => process.exit(0)).catch((e) => {
+    const main = VERIFY_ONLY
+        ? verify
+        : async () => { await run(); if (APPLY) { await verify(); await bustCache(); } };
+    main().then(() => process.exit(0)).catch((e) => {
         console.error('\nMIGRATION FAILED:', e && e.message ? e.message : e);
         process.exit(1);
     });
