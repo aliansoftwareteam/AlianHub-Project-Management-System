@@ -24,7 +24,6 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 * **ai-assist:** show tokens and cost on the generated plan ([586f55a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/586f55a02ba336f57e2f5ba9b8a9961d8826e842))
 * **ai:** apply the company planning rules to generated work ([a61e799](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a61e799ac1f2a0bc519b3100515656411bb70366))
 * **ai:** drive every AI feature from LLM_PROVIDER, and apply the company planning rules ([cb89f9a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/cb89f9a6b66c35709b41f04dd16b432e0ff8e60a))
-* **ai:** drive every AI feature from LLM_PROVIDER, and apply the company planning rules ([4d37d8e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4d37d8e72e73377333d9aac9b8aeb027a02428d6))
 * **task-type-icon:** add coloured boundary box and hover tooltip ([7d00a49](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7d00a4921427eb77b856047fef0e817f7d7f0517))
 * **task-type-icons:** offline icon library for task types + migration script ([815c80b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/815c80b95f0db6c52362bd7c8edfd7638bdb9b12))
 * **task-type-settings:** fix icon overlap, fill height, drag handle ([44f976e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/44f976ef8a3a813d9dc667e9a691ac2a45e925db))
