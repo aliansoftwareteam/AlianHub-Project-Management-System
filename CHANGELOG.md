@@ -21,7 +21,6 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ### 🐛 Bug Fixes
 
-* **sprint:** archive a sprint nested in a folder ([efa6211](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/efa621154fd60a155e5bedb99a8d69cdd7d974c3))
 * **sprint:** archive and restore a sprint nested in a folder ([e694c12](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e694c12abd0f778ed497b97defd8a8c64280097f))
 
 ## [14.28.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.27.0...v14.28.0) (2026-08-11)
