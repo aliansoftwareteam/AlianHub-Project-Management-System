@@ -107,10 +107,24 @@ const STATUS_PALETTE = [
 const DEFAULT_STATUS_TEXT = STATUS_PALETTE[1];
 const DEFAULT_STATUS_BG = `${DEFAULT_STATUS_TEXT}35`;
 
-// System-wide excluded views — Gantt / Timeline are never enabled by default
-// on any project (manual or AI), so we drop them when reading the company
-// `project_tab_components` catalog.
-const ALWAYS_EXCLUDED_VIEW_KEYS = new Set(['gantt', 'timeline']);
+// The views an AI-created project starts with. Deliberately an allowlist and
+// not a list of exclusions: the company catalog grows over time, and under a
+// blocklist every view added to it — Dashboard, Map, Canvas, Docs — silently
+// turned up on new AI projects until someone remembered to exclude it. Adding
+// a view to the catalog should not change what this creates.
+//
+// Matched on keyName, which is stable; `name` is the display label and a
+// company can rename it.
+const AI_PROJECT_VIEW_KEYS = new Set([
+    'projectlistview',   // List
+    'projectkanban',     // Board
+    'projectdetail',     // Project Details
+    'comments',          // Comments
+    'activitylog',       // Activity
+]);
+
+// Fallback for a catalog row with no keyName, matched on the display name.
+const AI_PROJECT_VIEW_NAMES = new Set(['list', 'board', 'project details', 'comments', 'activity']);
 
 // View key that should be the project's default landing tab if present.
 // Falls back to whatever is first if List isn't in the catalog.
@@ -360,10 +374,10 @@ function pickRequiredComponents(tabComponents) {
     let defaultPicked = false;
     const shaped = tabComponents
         .filter((v) => {
-            const lowerName = String(v.name || '').toLowerCase();
-            const lowerKey = String(v.keyName || '').toLowerCase();
-            if (ALWAYS_EXCLUDED_VIEW_KEYS.has(lowerName) || ALWAYS_EXCLUDED_VIEW_KEYS.has(lowerKey)) return false;
-            return true;
+            const lowerName = String(v.name || '').trim().toLowerCase();
+            const lowerKey = String(v.keyName || '').trim().toLowerCase();
+            if (lowerKey) return AI_PROJECT_VIEW_KEYS.has(lowerKey);
+            return AI_PROJECT_VIEW_NAMES.has(lowerName);
         })
         .map((v) => {
             const lowerName = String(v.name || '').toLowerCase();
@@ -371,7 +385,16 @@ function pickRequiredComponents(tabComponents) {
             const isDefault = !defaultPicked && (PREFERRED_DEFAULT_VIEW_KEY.has(lowerName) || PREFERRED_DEFAULT_VIEW_KEY.has(lowerKey));
             if (isDefault) defaultPicked = true;
             return {
-                _id: v._id ? new mongoose.Types.ObjectId(v._id) : new mongoose.Types.ObjectId(),
+                // A STRING, not an ObjectId — deleting a view is a
+                // `$pull: { ProjectRequiredComponent: { _id: <id> } }` where the
+                // id arrives from the browser as a string, and this field is
+                // declared as an untyped Array so Mongoose casts nothing. An
+                // ObjectId here never equals that string: the pull matched
+                // nothing, the request still succeeded, and the view reappeared
+                // on the next load. The manual create path stores a string
+                // (CreateProjectSidebar.vue) and its backend compares against a
+                // stringified catalog id, so a string is the canonical form.
+                _id: String(v._id || new mongoose.Types.ObjectId()),
                 activeIcon: v.activeIcon,
                 icon: v.icon,
                 createdAt: v.createdAt ? new Date(v.createdAt) : new Date(),
