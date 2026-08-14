@@ -42,6 +42,7 @@ export function useAiTaskGenerator() {
                         projectId: payload.projectId,
                         plan: payload.plan,
                         tokensUsed: payload.tokensUsed,
+                        usage: payload.usage,
                         model: payload.model,
                     });
                 } else if (payload.event === 'error') {
