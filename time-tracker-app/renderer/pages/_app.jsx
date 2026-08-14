@@ -28,6 +28,7 @@ function MyApp({ Component, pageProps }) {
         taskName: 'Preview task — tracking screen layout',
         projectName: 'Project Management', folderName: 'AHE', sprintName: 'Sprint 1',
         taskTypeImage: '',
+        taskTypeData: null,
       }));
       store.dispatch(setTrackerStartTime('preview'));
       router.push('/trackerRunning');
