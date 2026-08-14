@@ -553,4 +553,12 @@ const { t } = useI18n();
 </script>
 <style scoped>
 @import './style.css';
+
+/* Bound the task-type list so a long list scrolls and "+ Add task type" stays visible
+   below it (mirrors the left Templates list). :deep() reaches the ul that DragDropField
+   renders; .taskyou_need_right scopes this to the task-type column only. */
+.taskyou_need_right :deep(.status_ul) {
+    max-height: 220px;
+    overflow-y: auto;
+}
 </style>

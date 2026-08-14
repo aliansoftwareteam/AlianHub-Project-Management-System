@@ -76,7 +76,10 @@ watch(isLibrary, (lib) => {
    the bare icon did; no background/padding of its own → layout-neutral, the caller's
    margin on the inner icon still reads as external spacing. */
 .tticon {
-    display: inline-flex;
+    /* !important: this span is TaskTypeIcon's root, so it inherits the host's scoped
+       styles; an ancestor `span { display:flex }` would otherwise flip it block-level
+       and push the label onto its own line. */
+    display: inline-flex !important;
     vertical-align: middle;
 }
 /* Boundary box painted on the icon element itself. content-box so the 2px padding

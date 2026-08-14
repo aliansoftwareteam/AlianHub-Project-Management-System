@@ -9,6 +9,7 @@
                     <img :src="closeBlueImage" @click="isSidebarOpen = false,$emit('closesidebar',taskSelectedStatus)" />
             </template>
             <template #body>
+                <div class="tts__body">
                 <div class="p-15px search-bar__input bg-white">
                     <InputText  
                         v-model="search"
@@ -22,7 +23,7 @@
                 <div v-if="isOpenAddStatus && isAddStatus === true"  class="open__add-status position-re d-flex align-items-center justify-content-between bg-white" :class="[{'openinput_sidebar' : type !== 'task_type'}]">
                     <input type="color" v-if="props.type !== 'task_type'" v-model="statusColor" class="status__color-input position-ab">
                     <input v-if="props.type === 'task_type'" type="file" class="d-none"  ref="task_type_image" accept="image/*" @change="checkFile">
-                    <button v-if="props.type === 'task_type'" class="cursor-pointer upload-image-btn btn-primary mr-10-px" type="button" @click="showIconPicker = !showIconPicker">
+                    <button v-if="props.type === 'task_type'" class="cursor-pointer upload-image-btn btn-primary mr-10px" type="button" @click="showIconPicker = !showIconPicker">
                         <TaskTypeIcon v-if="iconSource === 'library' && selectedIconValue" :taskType="{ iconType: 'library', iconValue: selectedIconValue, iconColor: selectedIconColor }" class="projecttasktypeform__image__after"/>
                         <img v-else-if="addNewtaskImage" :src="addNewtaskImage" class="projecttasktypeform__image__after"/>
                         <img v-else src="@/assets/images/svg/upload.svg" class="projecttasktypeform__image__before" alt="icon">
@@ -55,7 +56,7 @@
                     </div>
                     <IconPicker v-if="iconSource === 'library'" v-model="selectedIconValue" v-model:color="selectedIconColor" />
                 </div>
-                <div class="overflow-y-auto sidebar-options overflow-x-hidden bg-white" :style="`height: ${!isOpenAddStatus && isAddStatus === true ? 'calc(100% - 0px);' : (clientWidth > 767 ? 'calc(100% - 70px);' : 'calc(100% - 90px);')}`">
+                <div class="overflow-y-auto sidebar-options overflow-x-hidden bg-white">
                     <template v-if="filteredStatusOptions && filteredStatusOptions.length">
                         <SidebarItems
                             v-for="(item, itemIndex) in filteredStatusOptions"
@@ -71,6 +72,7 @@
                         />
                     </template>
                     <div v-else  class="text-center red m-15px">{{$t('UserTimesheet.no_records_found')}}</div>
+                </div>
                 </div>
             </template>
         </Sidebar>
@@ -448,4 +450,10 @@ const organizeDataArray = (data) => {
 .tasktype__iconpop-toggle { display: flex; gap: 6px; margin-bottom: 8px; }
 .tasktype__iconpop-toggle button { flex: 1; border: 1px solid #e2e5ee; background: #fff; color: #6b7280; border-radius: 6px; padding: 4px 8px; font-size: 12px; cursor: pointer; }
 .tasktype__iconpop-toggle button.active { background: #2F3990; border-color: #2F3990; color: #fff; }
+
+/* Flex-column body: search / add-form / icon-picker take their natural height; the
+   options list fills the rest and scrolls. Replaces a hardcoded calc(100% - Npx) that
+   ignored the icon picker and could overflow the panel. */
+.tts__body { display: flex; flex-direction: column; height: 100%; }
+.tts__body .sidebar-options { flex: 1 1 auto; min-height: 0; }
 </style>

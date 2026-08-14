@@ -10,8 +10,8 @@
                 <button class="bg-blue cancelButtonProject white cursor-pointer" @click="submitData()" :disabled="isSpinnerTaskType || isSpinnerTaskStatus">{{ $t('Projects.submit') }}</button>
             </template>
             <template #body>
-                <div :class="{'bg-white' : clientWidth <=767}" class="h-100">
-                    <div v-if="sidebarTitle === 'projectStatus'" class="bg-white m-015 project__setting--blankproject border-radius-8-px createProjectWizardSlider" :class="{'mobile-project-taskstatus-section task-detail-mobile' : clientWidth<=767}"  :style="[{margin : clientWidth > 767 ? '15px' : '0'}]">
+                <div :class="{'bg-white' : clientWidth <=767}" class="h-100 pss__setting-body">
+                    <div v-if="sidebarTitle === 'projectStatus'" class="bg-white m-015 project__setting--blankproject border-radius-8-px createProjectWizardSlider pss__setting-panel" :class="{'mobile-project-taskstatus-section task-detail-mobile' : clientWidth<=767}"  :style="[{margin : clientWidth > 767 ? '15px' : '0'}]">
                         <ProjectStatusForm
                             v-model="formData.projectStatusForm"
                             :from="'setting'"
@@ -21,7 +21,7 @@
                             @updateStatus="updateStatus"
                         />
                     </div>
-                    <div v-if="sidebarTitle === 'taskType'" class="bg-white m-015 project__setting--blankproject border-radius-8-px createProjectWizardSlider" :class="{'mobile-project-taskstatus-section task-detail-mobile' : clientWidth<=767}" :style="[{margin : clientWidth > 767 ? '15px' : '0'}]">
+                    <div v-if="sidebarTitle === 'taskType'" class="bg-white m-015 project__setting--blankproject border-radius-8-px createProjectWizardSlider pss__setting-panel" :class="{'mobile-project-taskstatus-section task-detail-mobile' : clientWidth<=767}" :style="[{margin : clientWidth > 767 ? '15px' : '0'}]">
                         <ProjectTaskTypeForm
                             v-model="formData.taskTypeForm"
                             :from="'setting'"
@@ -32,7 +32,7 @@
                             @updateStatus="updateStatus"
                         />
                     </div>
-                    <div v-if="sidebarTitle === 'taskStatus'" class="bg-white m-015 project__setting--blankproject border-radius-8-px createProjectWizardSlider" :class="{'mobile-project-taskstatus-section task-detail-mobile' : clientWidth<=767}" :style="[{margin : clientWidth > 767 ? '15px' : '0'}]">
+                    <div v-if="sidebarTitle === 'taskStatus'" class="bg-white m-015 project__setting--blankproject border-radius-8-px createProjectWizardSlider pss__setting-panel" :class="{'mobile-project-taskstatus-section task-detail-mobile' : clientWidth<=767}" :style="[{margin : clientWidth > 767 ? '15px' : '0'}]">
                         <TaskStatusForm 
                             v-model="formData.taskStatusForm" 
                             :from="'setting'" 
@@ -689,6 +689,39 @@ function confirmData () {
     margin-left: auto;
 }
 input.statusInputText.form-control.edit-input:focus-visible{outline-color: none !important;}
+
+/* Settings sidebar: fill the body so the form panel spans the full height instead of
+   leaving an empty gap below its content. Scoped to .pss__setting-* (added only here) so
+   the shared .createProjectWizardSlider in the create-project wizard stays untouched. */
+.pss__setting-body { display: flex; flex-direction: column; }
+.pss__setting-body > .pss__setting-panel { flex: 1 1 auto; min-height: 0; }
+
+/* Settings sidebar (desktop): the form and both scrollable lists grow to fill the
+   panel height dynamically. Chain: panel → form root (.statusHeader) → section →
+   columns row → each column → its list. min-height:0 at every level lets the inner
+   lists scroll instead of overflowing. Scoped to .pss__setting-panel so the shared
+   create-project wizard / template pages are untouched; desktop-only so the mobile
+   rules below (max-height:500px etc.) still own small screens. */
+@media(min-width: 768px){
+    .pss__setting-panel { display: flex; flex-direction: column; box-sizing: border-box; }
+    .pss__setting-panel > .statusHeader { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+    .pss__setting-panel > .statusHeader > .bg-light-gray { flex: none; margin-bottom: 16px; }
+    /* overflow:hidden is load-bearing: it forces the min-height:0 chain to bound, so the
+       lists scroll instead of growing and pushing the add/new-template buttons out.
+       max-height:none overrides the base `.taskStatusSection.style-scroll{max-height:307px}`
+       cap so the section grows to the full panel height instead of stopping short. */
+    .pss__setting-panel .taskStatusSection { flex: 1 1 auto; min-height: 0; max-height: none !important; overflow: hidden; }
+    .pss__setting-panel .statusTaskWrapper { height: 100%; min-height: 0; }
+
+    .pss__setting-panel .taskStatusLeft { display: flex; flex-direction: column; min-height: 0; }
+    .pss__setting-panel .taskStatusLeft .templated_name_ul { max-height: none !important; min-height: 60px; }
+    .pss__setting-panel .taskStatusLeft .add_template { flex: none; }
+
+    .pss__setting-panel .taskyou_need_right { display: flex; flex-direction: column; min-height: 0; }
+    .pss__setting-panel .taskyou_need_right .ddf__root { min-height: 0; display: flex; flex-direction: column; }
+    .pss__setting-panel .taskyou_need_right .status_ul { flex: 1 1 auto; max-height: none !important; min-height: 0; overflow-y: auto; }
+    .pss__setting-panel .taskyou_need_right .addStatusBtn { flex: none; padding-top: 12px; }
+}
 
 @media(max-width: 767px){
     .project__setting--blankproject {padding: 20px !important;border-radius: 0 !important;}
