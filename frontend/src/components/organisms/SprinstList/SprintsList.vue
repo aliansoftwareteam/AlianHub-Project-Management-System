@@ -18,7 +18,7 @@
                     <img v-if="sprint.isFolder === true" :src="folder">
                     <span class="text-ellipse font-weight-bold text-capitalize ml-10px cursor-pointer font-size-14 color52">{{ sprint.name }}</span>
                 </div>
-                <div :class="clientWidth <= 480 ? 'pt-1' : ''" class="d-flex align-items-center">
+                <div :class="clientWidth <= 480 ? 'pt-1' : ''" class="d-flex align-items-center sprint-head-actions">
                     <template v-if="$route?.query?.tab !== 'Calendar'">
                         <button
                             v-if="sprint.isExpanded && !searchedTask && checkPermission('task.task_create',project.isGlobalPermission) === true && checkPermission('task.task_list',project.isGlobalPermission) == true && showArchiveVar === false"
@@ -905,11 +905,23 @@ function startTaskTour(key) {
 /* Sprint hours. Quiet by design: they sit beside "+ New Task" and the AI CTA, and they
    are figures to glance at, not actions — so no accent colour and no pointer. One pill
    holding three readings rather than three pills, so the row stays calm. */
+/* The header runs out of room long before the viewport does — the sprint name,
+   New Task, Suggest tasks and this chip share one capped column. It used to be
+   rigid (flex: 0 0 auto + nowrap), so instead of giving way it overflowed and
+   sat on top of the Share With controls. It now shrinks, and drops onto its own
+   line when there is genuinely no room, which is the honest failure mode. */
+.sprint-head-actions {
+    flex-wrap: wrap;
+    row-gap: 6px;
+    min-width: 0;
+}
+
 .sprint-hours {
     display: inline-flex;
     align-items: baseline;
     gap: 12px;
-    flex: 0 0 auto;
+    flex: 0 1 auto;
+    max-width: 100%;
     padding: 2px 10px;
     border-radius: 11px;
     background: #f0f2f7;
@@ -925,6 +937,14 @@ function startTaskTour(key) {
 .sprint-hours__value { color: #5b6472; font-weight: 600; font-variant-numeric: tabular-nums; }
 /* An overrun is the one figure here worth colouring — same amber the task list uses. */
 .sprint-hours__value--over { color: #b45309; }
+
+/* Narrow screens keep the numbers and drop the words. Each item already has a
+   title attribute, so nothing becomes unexplainable — and three labelled pairs
+   is the single widest thing in this header. */
+@media (max-width: 767px) {
+    .sprint-hours { gap: 10px; padding: 2px 8px; }
+    .sprint-hours__label { display: none; }
+}
 .v-enter-active,
 .v-leave-active {
   transition: all 0.2s ease;
