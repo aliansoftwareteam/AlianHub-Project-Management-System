@@ -3,6 +3,7 @@
 ## Checklist
 - [x] P6 — Six-dot drag handle on task-type cards; drag only via handle (mobile body scroll)
 - [x] P7 — Same full-height fill/scroll/pinned-buttons in the create-project wizard's task-type step
+- [x] P8 — Mobile responsive fill for both (settings + wizard) task-type steps
 - [x] P1 — Harden `.tticon` to inline-flex + narrow `DragDropField` `.taskStatusRight ul li span` selector
 - [ ] P1 — Verify boundary box unaffected in task list / kanban / dropdowns (visual check)
 - [x] P2 — Bound the right task-type list height so "+ Add task type" stays visible
@@ -41,6 +42,19 @@ grow removed but shrink + overflow kept, few items sit naturally (button right a
 list), many items shrink-to-fit and scroll. Verified in wizard repro: left list 116px (4
 items, +New Template 0px gap after), right list 304px + scrolls (16 items), all buttons +
 Prev/Next footer visible. Heading "extra space" fixed by moving bg-light-gray onto the h3.
+
+P8 (mobile): on mobile the columns stack + fixed caps (panel 600px, section 500/307px)
+left a big empty area below the Prev/Next footer and clipped the add button. Added mobile
+`@media(max-width:767px)` fill chains in both ProjectSettingSidebar (`.pss__setting-panel`)
+and CreateProjectSidebar (`.wizard-tt-fill`): step fills the screen, `.statusTaskWrapper`
+becomes a flex COLUMN (templates natural on top, task-type list fills + scrolls, add button
+pinned), footer/header buttons stay visible. Verified at 375px in a repro: task-type list
+362px + scrolls, add button above footer (not clipped), New Template + Add both visible.
+P8 robustness: real app still showed no-scroll + hidden add button (flex chain not engaging /
+stale). Changed the mobile section from `overflow:hidden` to `overflow-y:auto` in both files.
+Verified the WORST case in a faithful repro (base rules + overrides at 375px, wrapper forced
+to block): section scrolls (709>577), add button reachable, footer visible. So it works whether
+or not the inner flex chain engages — the section scroll is the safety net.
 
 ## Blockers
 None.

@@ -732,5 +732,21 @@ input.statusInputText.form-control.edit-input:focus-visible{outline-color: none 
     .project__setting--blankproject img.ignore-drag.project__setting-ignoredrag {height: 16px !important;width: 16px !important;}
     .project__setting--blankproject .taskStatusSection.style-scroll {max-height: 500px !important;}
     .project__setting--blankproject .taskStatusRight ul.status_ul li.d-flex.align-items-center.justify-content-between {padding-top: 4px !important;padding-bottom: 4px !important;}
+
+    /* Mobile: fill the full screen height instead of the fixed 600px/500px caps that
+       leave a gap on tall phones (Submit/Cancel stay in the fixed sidebar header).
+       Columns stack as a flex column: templates on top (natural), the task-type list
+       fills the rest and scrolls, and the add button is pinned so it stays visible. */
+    .pss__setting-panel { display: flex; flex-direction: column; max-height: none !important; overflow: hidden !important; }
+    .pss__setting-panel .statusHeader { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+    .pss__setting-panel .statusHeader > div:first-child { flex: none; }
+    .pss__setting-panel .taskStatusSection.style-scroll { flex: 1 1 auto; min-height: 0; max-height: none !important; overflow-y: auto; }
+    .pss__setting-panel .statusTaskWrapper { display: flex !important; flex-direction: column; height: 100%; min-height: 0; }
+    .pss__setting-panel .taskStatusLeft { flex: none; margin-bottom: 16px; }
+    .pss__setting-panel .taskyou_need_right { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+    .pss__setting-panel .taskyou_need_right .ddf__root { min-height: 0; display: flex; flex-direction: column; }
+    .pss__setting-panel .taskyou_need_right .status_ul { flex: 1 1 auto; min-height: 0; max-height: none !important; overflow-y: auto; }
+    .pss__setting-panel .taskyou_need_right .addStatusBtn { flex: none; }
+    .pss__setting-panel .templated_name_ul { max-height: 120px; }
 }
 </style>
