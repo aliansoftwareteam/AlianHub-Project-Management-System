@@ -174,6 +174,10 @@ const ProjectSchema = z.object({
     DueDate: DateLike.optional(),
     isPrivateSpace: z.boolean().default(false),
     ProjectType: z.string().min(1).max(60).optional().default('Fix'),
+    // Accepted so the model's picks survive into the plan and can be pre-ticked
+    // on review. The execute request is authoritative and filters against the
+    // company list, so a slug invented here is never persisted.
+    skills: z.array(z.string().min(1).max(60)).max(15).optional().default([]),
 
     // No min/max — the AI decides per project. Safety caps only.
     projectStatusData: z.array(StatusEntrySchema).min(1).max(20),

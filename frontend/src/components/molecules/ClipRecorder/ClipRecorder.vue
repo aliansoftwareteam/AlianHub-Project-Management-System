@@ -2,15 +2,14 @@
     <!-- GLOBAL recorder: mounted once at the app shell (Header) and shown via the
          shared composable's `open` flag, so it survives in-app navigation. -->
     <template v-if="recorder.state.open">
-        <!-- FULL MODAL — hidden while minimized so the user can work over the page -->
-        <div v-if="!minimized" class="clip__overlay" @click.self="requestClose">
+        <!-- FULL MODAL — shown to choose a mode and, after stopping, to preview and
+             save. While recording, only the floating widget below is on screen. -->
+        <div v-if="phase !== 'recording'" class="clip__overlay" @click.self="requestClose">
             <div class="clip__card">
                 <!-- HEAD -->
                 <div class="d-flex align-items-center justify-content-between clip__head">
                     <span class="font-size-16 font-weight-700">{{ $t('ClipRecorder.record_clip') }}</span>
                     <div class="d-flex align-items-center clip__head-actions">
-                        <span v-if="phase === 'recording'" class="cursor-pointer clip__icon-btn"
-                            :title="$t('ClipRecorder.minimize')" @click="minimize">&#8211;</span>
                         <span class="cursor-pointer font-size-16 clip__close" :title="$t('ClipRecorder.close')" @click="requestClose">&#10005;</span>
                     </div>
                 </div>
@@ -21,7 +20,8 @@
                 </div>
 
                 <template v-else>
-                    <!-- MODE SELECT (only while idle) -->
+                    <!-- MODE SELECT + START (idle) — one row under a divider, so the
+                         whole choose-and-go step reads as a single line. -->
                     <div v-if="phase === 'idle'" class="clip__modes">
                         <label class="clip__mode" :class="{ 'clip__mode--active': mode === 'voice' }">
                             <input type="radio" value="voice" v-model="mode" />
@@ -35,6 +35,7 @@
                             <input type="radio" value="screenMic" v-model="mode" :disabled="!isDisplaySupported" />
                             <span>{{ $t('ClipRecorder.screen_mic') }}</span>
                         </label>
+                        <button type="button" class="clip__start" @click="startRecording">{{ $t('ClipRecorder.start') }}</button>
                     </div>
 
                     <div v-if="!isDisplaySupported && phase === 'idle'" class="font-size-12 gray81 clip__hint">
@@ -44,16 +45,6 @@
                     <!-- ERROR (permission / runtime) -->
                     <div v-if="errorMessage" class="font-size-13 clip__msg clip__msg--err">
                         {{ errorMessage }}
-                    </div>
-
-                    <!-- RECORDING / TIMER -->
-                    <div v-if="phase === 'recording'" class="clip__recording">
-                        <span class="clip__dot"></span>
-                        <span class="font-size-14 font-weight-600">{{ $t('ClipRecorder.recording') }}</span>
-                        <span class="clip__timer font-size-14">{{ formattedElapsed }}</span>
-                    </div>
-                    <div v-if="phase === 'recording'" class="font-size-12 gray81 clip__hint">
-                        {{ $t('ClipRecorder.minimize_hint') }}
                     </div>
 
                     <!-- PREVIEW -->
@@ -75,30 +66,22 @@
                         />
                     </div>
 
-                    <!-- CONTROLS -->
-                    <div class="d-flex justify-content-end clip__actions">
-                        <button v-if="phase === 'idle'" type="button" class="btn-primary font-size-13" @click="startRecording">{{ $t('ClipRecorder.start') }}</button>
-
-                        <template v-if="phase === 'recording'">
-                            <button type="button" class="clip__btn-ghost font-size-13 mr-10px" @click="minimize">{{ $t('ClipRecorder.minimize') }}</button>
-                            <button type="button" class="btn-primary font-size-13 clip__stop" @click="stopRecording">{{ $t('ClipRecorder.stop') }}</button>
-                        </template>
-
-                        <template v-if="phase === 'preview'">
-                            <button type="button" class="clip__btn-ghost font-size-13 mr-10px" :disabled="isSaving" @click="reRecord">{{ $t('ClipRecorder.re_record') }}</button>
-                            <button type="button" class="btn-primary font-size-13" :disabled="isSaving" @click="saveClip">{{ isSaving ? $t('ClipRecorder.saving') : $t('ClipRecorder.save') }}</button>
-                        </template>
+                    <!-- CONTROLS — idle keeps its Start inline with the mode row above,
+                         so this is the preview step's actions only. -->
+                    <div v-if="phase === 'preview'" class="d-flex justify-content-end clip__actions">
+                        <button type="button" class="clip__btn-ghost font-size-13 mr-10px" :disabled="isSaving" @click="reRecord">{{ $t('ClipRecorder.re_record') }}</button>
+                        <button type="button" class="btn-primary font-size-13" :disabled="isSaving" @click="saveClip">{{ isSaving ? $t('ClipRecorder.saving') : $t('ClipRecorder.save') }}</button>
                     </div>
                 </template>
             </div>
         </div>
 
-        <!-- MINIMIZED WIDGET — floats over the app while recording continues in the background -->
+        <!-- RECORDING WIDGET — the only thing on screen while recording, so the user
+             can keep working. Stop returns to the modal for preview + save. -->
         <div v-else class="clip__mini">
             <span class="clip__dot"></span>
             <span class="clip__mini-timer font-size-13 font-weight-600">{{ formattedElapsed }}</span>
             <button type="button" class="clip__mini-stop" @click="stopRecording">{{ $t('ClipRecorder.stop') }}</button>
-            <span class="cursor-pointer clip__icon-btn" :title="$t('ClipRecorder.maximize')" @click="maximize">&#9974;</span>
         </div>
     </template>
 </template>
@@ -141,7 +124,6 @@ const isDisplaySupported = ref(
 // STATE
 const mode = ref("voice"); // 'voice' | 'screen' | 'screenMic'
 const phase = ref("idle"); // 'idle' | 'recording' | 'preview'
-const minimized = ref(false);
 const errorMessage = ref("");
 const previewUrl = ref("");
 const recordedBlob = ref(null);
@@ -262,7 +244,6 @@ async function startRecording() {
             title.value = "Clip " + new Date().toLocaleString();
         }
         phase.value = "preview";
-        minimized.value = false; // restore the modal so the user can preview + save
         stopTracks();
     };
 
@@ -281,16 +262,6 @@ function stopRecording() {
     } else {
         stopTracks();
     }
-}
-
-function minimize() {
-    if (phase.value === "recording") {
-        minimized.value = true;
-    }
-}
-
-function maximize() {
-    minimized.value = false;
 }
 
 function reRecord() {
@@ -450,7 +421,6 @@ function close() {
 watch(() => recorder.state.open, (open) => {
     if (open) {
         phase.value = "idle";
-        minimized.value = false;
         errorMessage.value = "";
         elapsed.value = 0;
         title.value = "";
@@ -519,25 +489,22 @@ onBeforeUnmount(() => {
 .clip__head-actions {
     gap: 14px;
 }
-.clip__icon-btn {
-    font-size: 18px;
-    line-height: 1;
-    color: #5b5b6b;
-}
-.clip__icon-btn:hover {
-    color: #2f3990;
-}
 .clip__close {
     color: #9a9a9a;
 }
 .clip__close:hover {
     color: #e84a4a;
 }
+/* Idle step: the three modes and Start sit on one line, separated from the
+   header by a divider, so choosing and starting is a single row. */
 .clip__modes {
     display: flex;
-    gap: 8px;
-    margin-bottom: 12px;
+    align-items: center;
+    gap: 6px;
     flex-wrap: wrap;
+    padding-top: 12px;
+    margin-bottom: 0;
+    border-top: 1px solid #ededf3;
 }
 .clip__mode {
     display: flex;
@@ -545,18 +512,35 @@ onBeforeUnmount(() => {
     gap: 6px;
     border: 1px solid #e0e0e0;
     border-radius: 8px;
-    padding: 8px 12px;
+    padding: 6px 10px;
     cursor: pointer;
-    font-size: 13px;
+    font-size: 12.5px;
 }
 .clip__mode--active {
     border-color: #2f3990;
     background: #f1f2fb;
 }
+/* Pushed to the far right of the same row. */
+.clip__start {
+    margin-left: auto;
+    padding: 7px 16px;
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #fff;
+    background: #2f3990;
+    border: 0;
+    border-radius: 8px;
+    cursor: pointer;
+}
+.clip__start:hover {
+    background: #262e75;
+}
 .clip__mode input:disabled {
     cursor: not-allowed;
 }
 .clip__hint {
+    margin-top: 10px;
     margin-bottom: 12px;
 }
 .clip__msg {
@@ -568,12 +552,6 @@ onBeforeUnmount(() => {
     background: #fdecec;
     color: #c0392b;
 }
-.clip__recording {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
-}
 .clip__dot {
     width: 10px;
     height: 10px;
@@ -581,10 +559,6 @@ onBeforeUnmount(() => {
     background: #e84a4a;
     animation: clip-pulse 1s infinite;
     flex: 0 0 auto;
-}
-.clip__timer {
-    margin-left: auto;
-    font-variant-numeric: tabular-nums;
 }
 .clip__preview {
     margin-bottom: 12px;
@@ -617,9 +591,6 @@ onBeforeUnmount(() => {
 }
 .clip__actions {
     margin-top: 4px;
-}
-.clip__stop {
-    background: #e84a4a !important;
 }
 /* btn-primary has no disabled style of its own — show the saving state clearly. */
 .clip__actions .btn-primary:disabled {
@@ -668,12 +639,6 @@ onBeforeUnmount(() => {
     padding: 4px 12px;
     font-size: 12px;
     cursor: pointer;
-}
-.clip__mini .clip__icon-btn {
-    color: #fff;
-}
-.clip__mini .clip__icon-btn:hover {
-    color: #cfd2ff;
 }
 @keyframes clip-pulse {
     0% { opacity: 1; }

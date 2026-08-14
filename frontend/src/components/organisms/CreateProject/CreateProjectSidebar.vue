@@ -152,6 +152,7 @@ import { computed, defineComponent,defineProps, ref, inject, watch, onMounted, n
 import { defineEmits } from 'vue';
 import { dbCollections } from "@/utils/Collections";
 import ProjectForm from '@/components/templates/CreateProject/ProjectForm.vue';
+import { checkSourceFields } from '@/utils/projectSource';
 import ProjectProfileForm from '@/components/templates/CreateProject/ProjectProfileForm.vue';
 import ProjectWorkspace from '@/components/templates/CreateProject/ProjectWorkspace.vue';
 import ProjectTaskTypeForm from '@/components/templates/CreateProject/ProjectTaskTypeForm.vue'
@@ -237,6 +238,24 @@ const  { checkAllFields } = useValidation();
             rules:
             "required",
             name: "dueDate",
+            error: "",
+        },
+        proposalId: {
+            value: "",
+            rules: "",
+            name: "proposal id",
+            error: "",
+        },
+        skills: {
+            value: [],
+            rules: "",
+            name: "skills",
+            error: "",
+        },
+        source: {
+            value: "",
+            rules: "",
+            name: "source",
             error: "",
         },
         projectProfileField:{
@@ -417,8 +436,12 @@ const  { checkAllFields } = useValidation();
     }
     const nextStep = ()=>{
         if(activeIndex.value === 0){
+            // Runs before checkAllFields, not inside its success branch: the user
+            // should see every missing field at once, not the source error only
+            // after fixing the name and key.
+            const sourceValid = checkSourceFields(formData.value, t);
             checkAllFields({projectName : formData.value.projectName,projectCode:formData.value.projectCode}).then((valid)=>{
-                if(valid){ 
+                if(valid && sourceValid){
                     if(formData.value.projectCode.isUniqueProjectCode !== ""){
                         return
                     }
@@ -689,6 +712,9 @@ const  { checkAllFields } = useValidation();
                 'LeadUserId': Array.from(new Set([companyUser.value.userId,...formData.value.leadUser.value.map((x)=>x.id)])),
                 'DueDate': formData.value.dueDate.value !== '' ? new Date(formData.value.dueDate.value) : "",
                 ...(formData.value.dueDate.value !== '' && { 'dueDateDeadLine': [{'date': new Date(formData.value.dueDate.value) }] }),
+                'proposalId': formData.value.proposalId.value,
+                'skills': formData.value.skills.value,
+                'source': formData.value.source.value,
                 // STEP 3
                 'isPrivateSpace': formData.value.workSpaceField.privateSpaceValue.value,
                 // STEP 4

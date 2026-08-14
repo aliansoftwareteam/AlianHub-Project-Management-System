@@ -1,0 +1,348 @@
+/* My Clips popover. Deliberately mirrors Notepad/panel.css so the two header
+   panels read as siblings. Scoped to the component. */
+
+.cl__overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: transparent;
+}
+
+.cl__pop {
+    position: absolute;
+    top: 52px;
+    right: 16px;
+    width: 400px;
+    max-width: calc(100vw - 24px);
+    max-height: min(560px, calc(100vh - 80px));
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border: 1px solid #E6E7EF;
+    border-radius: 12px;
+    box-shadow: 0 16px 44px rgba(23, 24, 36, 0.2);
+    overflow: hidden;
+}
+
+/* ── Header ────────────────────────────────────────────────────────── */
+.cl__head {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 10px 10px 14px;
+    background: #2F3990;
+    flex: none;
+}
+.cl__htitle {
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.cl__hmenuwrap { position: relative; flex: none; }
+.cl__hbtn {
+    flex: none;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    color: rgba(255, 255, 255, 0.82);
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.cl__hbtn:hover,
+.cl__hbtn.is-on {
+    background: rgba(255, 255, 255, 0.16);
+    color: #fff;
+}
+
+/* ── Search ────────────────────────────────────────────────────────── */
+.cl__searchbar {
+    flex: none;
+    padding: 10px 12px;
+    border-bottom: 1px solid #EDEDF3;
+}
+.cl__searchinput {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 6px 9px;
+    font-family: inherit;
+    font-size: 12.5px;
+    color: #191A2B;
+    border: 1px solid #E6E7EF;
+    border-radius: 6px;
+    outline: none;
+}
+.cl__searchinput:focus { border-color: #AEB5DC; }
+
+.cl__state {
+    padding: 34px 16px;
+    font-size: 12.5px;
+    color: #84869B;
+    text-align: center;
+}
+
+/* ── List ──────────────────────────────────────────────────────────── */
+.cl__list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
+.cl__row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    flex-wrap: wrap;
+    padding: 10px 12px;
+    border-bottom: 1px solid #F0F0F6;
+}
+.cl__row:last-child { border-bottom: 0; }
+.cl__row:hover { background: #FAFAFD; }
+
+/* Media-type chip */
+.cl__type {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+}
+.cl__type.is-video { background: #EAEEFF; color: #2F3990; }
+.cl__type.is-audio { background: #E3F3EC; color: #166B4E; }
+
+.cl__main { flex: 1; min-width: 0; cursor: pointer; }
+.cl__title {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #191A2B;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.cl__meta {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin-top: 2px;
+    font-size: 11.5px;
+    color: #84869B;
+}
+.cl__converted {
+    padding: 1px 7px;
+    background: #E3F3EC;
+    color: #166B4E;
+    border-radius: 999px;
+}
+.cl__renameinput {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 4px 7px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: #191A2B;
+    border: 1px solid #AEB5DC;
+    border-radius: 6px;
+    outline: none;
+}
+
+/* Hover actions */
+.cl__actions {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    opacity: 0;
+    transition: opacity 0.12s ease;
+}
+.cl__row:hover .cl__actions { opacity: 1; }
+.cl__menuwrap { position: relative; }
+.cl__a {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    color: #6B6B70;
+    background: #fff;
+    border: 1px solid #E6E7EF;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.cl__a:hover {
+    color: #2F3990;
+    border-color: #AEB5DC;
+    background: #F5F7FF;
+}
+
+/* Inline player */
+.cl__player {
+    width: 100%;
+    margin-top: 8px;
+}
+.cl__media {
+    display: block;
+    width: 100%;
+    max-height: 200px;
+    background: #15161F;
+    border-radius: 8px;
+    outline: none;
+}
+.cl__media--audio {
+    max-height: 40px;
+    background: transparent;
+}
+.cl__resolving {
+    padding: 10px;
+    font-size: 12px;
+    color: #84869B;
+    text-align: center;
+    background: #FAFAFD;
+    border-radius: 8px;
+}
+
+/* ── Record new ────────────────────────────────────────────────────── */
+.cl__new {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 12px 14px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    color: #2F3990;
+    background: #fff;
+    border: 0;
+    border-top: 1px solid #EDEDF3;
+    cursor: pointer;
+    text-align: left;
+}
+.cl__new:hover { background: #F5F7FF; }
+.cl__rec {
+    flex: none;
+    width: 9px;
+    height: 9px;
+    background: #DC4C4C;
+    border-radius: 50%;
+}
+
+/* ── Row overflow menu (fixed, so the scrolling list can't clip it) ── */
+.cl__menu {
+    position: fixed;
+    z-index: 1010;
+    min-width: 156px;
+    padding: 4px;
+    background: #fff;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(23, 24, 36, 0.16);
+}
+.cl__mitem {
+    box-sizing: border-box;
+    display: block;
+    width: 100%;
+    padding: 7px 9px;
+    font-family: inherit;
+    font-size: 12.5px;
+    color: #191A2B;
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+    text-align: left;
+}
+.cl__mitem:hover { background: #F4F4FA; }
+.cl__mitem--danger { color: #9B2C2C; }
+.cl__mitem--danger:hover { background: #FBEBEB; }
+
+/* ── Delete confirmation ───────────────────────────────────────────── */
+.cl__confirmwrap {
+    position: fixed;
+    inset: 0;
+    z-index: 1020;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(23, 24, 36, 0.45);
+}
+.cl__confirm {
+    width: 100%;
+    max-width: 384px;
+    padding: 20px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 18px 50px rgba(23, 24, 36, 0.28);
+}
+.cl__cicon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    margin-bottom: 12px;
+    color: #9B2C2C;
+    background: #FBEBEB;
+    border-radius: 9px;
+}
+.cl__ctitle {
+    margin: 0 0 4px;
+    font-size: 14.5px;
+    font-weight: 600;
+    color: #191A2B;
+}
+.cl__cdesc {
+    margin: 0 0 18px;
+    font-size: 12.5px;
+    color: #6B6B70;
+}
+.cl__cactions { display: flex; gap: 10px; }
+.cl__cbtn {
+    flex: 1;
+    padding: 8px 14px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: #191A2B;
+    background: #fff;
+    border: 1px solid #D3D5E4;
+    border-radius: 8px;
+    cursor: pointer;
+}
+.cl__cbtn:hover { background: #F4F4FA; }
+.cl__cbtn--danger {
+    color: #fff;
+    background: #DC4C4C;
+    border-color: #DC4C4C;
+}
+.cl__cbtn--danger:hover { background: #C43D3D; }
+
+/* Scrollbar */
+.cl__list::-webkit-scrollbar { width: 7px; }
+.cl__list::-webkit-scrollbar-thumb { background: #D3D5E4; border-radius: 7px; }
+.cl__list::-webkit-scrollbar-track { background: transparent; }
+
+@media (max-width: 640px) {
+    .cl__pop {
+        right: 8px;
+        left: 8px;
+        width: auto;
+    }
+}

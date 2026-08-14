@@ -10,6 +10,8 @@ const { getCachedGlobalTemplateData } = require("../../utils/enterpriseHelper");
 const { removeCache } = require('../../utils/commonFunctions');
 const { updateCompanyFun } = require("../Company/controller/updateCompany");
 const projectTemplate = require("../../utils/projectTemplates.json");
+const { resolveProjectSkills } = require("../settings/ProjectSkills/helper");
+const { normaliseSource, cleanProposalId, numericProposalId, validateProposalId } = require("../Project/helpers/projectSourceRules");
 
 exports.checkProjectPlan = (req) => {
     return new Promise(async(resolve,reject) => {
@@ -115,6 +117,19 @@ exports.createProject = async (req) => {
             }
             if(!req.body.ProjectCode){
                 reject({status: false, statusText: 'project key is requried'});
+                return;
+            }
+            const source = normaliseSource(req.body.source);
+            if(!source){
+                reject({status: false, statusText: 'project source is requried'});
+                return;
+            }
+            req.body.source = source;
+            req.body.proposalId = cleanProposalId(req.body.proposalId);
+            req.body.proposalIdNumeric = numericProposalId(req.body.proposalId);
+            const proposalCheck = validateProposalId(source, req.body.proposalId);
+            if(!proposalCheck.valid){
+                reject({status: false, statusText: 'proposal id is requried for upwork projects'});
                 return;
             }
             if(!req.body.projectIcon && Object.keys(req.body.projectIcon)?.length){
@@ -413,6 +428,7 @@ exports.createProject = async (req) => {
                             }
                         }
                     }
+                    createProjectObject.skills = await resolveProjectSkills(req.body.CompanyId, createProjectObject.skills);
                     createProjectObject.DueDate = createProjectObject.DueDate ? new Date(createProjectObject.DueDate) : '';
                     createProjectObject.viewColumn = [
                         {

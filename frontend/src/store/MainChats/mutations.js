@@ -59,7 +59,9 @@ export const mutateChatSprints = (state,payload) => {
                 state.mainChatSprints[pId].push(data);
             }
         }else{
-            state.mainChatSprints = {[pId]:[data]}
+            // AHE-3834 — merge into the map; do NOT reassign it (that wiped every
+            // other project's cached channels, so only 1 project was ever cached).
+            state.mainChatSprints[pId] = [data];
         }
     }else if(op === "modified"){
         const sprintIndex = state.mainChatSprints[pId] && state.mainChatSprints[pId].length > 0 && state.mainChatSprints[pId]?.findIndex((x) => x._id === data._id);
@@ -87,7 +89,8 @@ export const mutateChatFolders = (state,payload) => {
                 state.mainChatFolders[pId].push(data);
             }
         }else{
-            state.mainChatFolders = {[pId]:[data]}
+            // AHE-3834 — merge into the map; do NOT reassign it (same cache-wipe bug).
+            state.mainChatFolders[pId] = [data];
         }
     }else if(op === "modified"){
         const sprintIndex = state.mainChatFolders[pId] && state.mainChatFolders[pId].length > 0 && state.mainChatFolders[pId]?.findIndex((x) => x._id === data._id);

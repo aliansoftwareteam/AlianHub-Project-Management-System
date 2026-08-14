@@ -125,7 +125,8 @@ exports.importSettingsFunction = (req, cb) => {
             "importTaskDefaultStatus",
             "importProjectStatus",
             "importStatusType",
-            "importCompanyDesignations"
+            "importCompanyDesignations",
+            "importProjectSkills"
         ]
 
         if (!isFromBackend) {

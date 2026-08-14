@@ -72,19 +72,10 @@
       }
     },
     {
-      "element": "#notification_driver",
+      "element": "#inbox_driver",
       "popover": {
         "title": "Notification",
         "description": "real_time_notifications_text",
-        "side": "bottom",
-        "align": "end"
-      }
-    },
-    {
-      "element": "#mention_driver",
-      "popover": {
-        "title": "mention",
-        "description": "address_specific_individuals_text",
         "side": "bottom",
         "align": "end"
       }

@@ -14,6 +14,11 @@ const CATALOG = [
     { key: 'microsoft_teams', name: 'Microsoft Teams', category: 'Chat', icon: '👔', description: 'Post task updates to a Teams channel.', fields: [{ key: 'webhook_url', label: 'Incoming webhook URL', secret: true }] },
     { key: 'zapier', name: 'Zapier', category: 'Automation', icon: '⚡', description: 'Connect to 6000+ apps via a catch hook.', fields: [{ key: 'hook_url', label: 'Zapier catch hook URL', secret: true }] },
     { key: 'custom_iframe', name: 'Custom embed', category: 'Apps', icon: '🪟', description: 'Embed an external tool as an app panel.', multiple: true, fields: [{ key: 'name', label: 'App name' }, { key: 'url', label: 'Embed URL (https)' }] },
+    // NOTE (AHE-3838): the cloud storage providers (Google Drive / Dropbox)
+    // are deliberately NOT in this catalog. They are configured on
+    // Settings → Integrations and owned by Modules/CloudStorage, which validates
+    // them against its own provider list. Adding them here would surface a second,
+    // competing place to configure the same thing.
 ];
 
 const byKey = (key) => CATALOG.find((c) => c.key === String(key)) || null;

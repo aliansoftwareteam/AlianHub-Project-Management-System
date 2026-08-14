@@ -137,11 +137,22 @@ exports.updateCount = (companyId,userIds, manageQuery, cb) => {
                             userId: row
                         },
                         manageQuery,
-                        {returnDocument: 'after'}
+                        // upsert: a user has no counter document until something
+                        // first counts for them, and this collection is empty for a
+                        // company that has never had one written. Without it every
+                        // count write matched nothing, changed nothing, and STILL
+                        // reported "Count update succesfully" — so unread badges
+                        // (incoming messages, mark-as-unread, mentions) silently
+                        // did nothing at all for that user.
+                        {returnDocument: 'after', upsert: true, setDefaultsOnInsert: true}
                     ]
                 }
                 mongoCm.MongoDbCrudOpration(companyId, obj, "findOneAndUpdate").then((data)=>{
-                    socketEmitter.emit('update', { type: "update", data: data , module: 'userIdNotification' });
+                    // A null document would blank the client's whole count store, so
+                    // only broadcast a real one.
+                    if (data) {
+                        socketEmitter.emit('update', { type: "update", data: data , module: 'userIdNotification' });
+                    }
                     count++;
                     countFunction(userIds[count]);
                 }).catch((err) => {
@@ -172,7 +183,16 @@ exports.updateUnReadCommentsCount = (req, res) => {
         res.send(cData);
     })
     .catch((error) => {
-        res.send(error.message);
+        // Every rejection below is a { status:false, statusText } object with no
+        // `message`, so this answered `200` with an EMPTY BODY — a rejected write
+        // was indistinguishable from a successful one, and the caller carried on as
+        // though the count had been stored. Report the actual reason, with a status
+        // code the caller can act on.
+        const rejected = error && error.status === false;
+        res.status(rejected ? 400 : 500).json({
+            status: false,
+            statusText: (error && (error.statusText || error.message)) || 'Failed to update unread count',
+        });
     });
 };
 exports.updateUnReadCommentsCountFun = (req) => {
@@ -181,7 +201,17 @@ exports.updateUnReadCommentsCountFun = (req) => {
             if (!(req.body && req.body.companyId)) {
                 reject({
                     status: false,
-                    statusText: "companyId is required"  
+                    statusText: "companyId is required"
+                });
+                return;
+            }
+
+            // SEC (AHE-3834) — the tenant is the authenticated company (header), not a
+            // client-chosen body value. Blocks mutating another company's unread counts.
+            if (req.headers && req.headers['companyid'] && String(req.body.companyId) !== String(req.headers['companyid'])) {
+                reject({
+                    status: false,
+                    statusText: "companyId mismatch"
                 });
                 return;
             }
@@ -334,9 +364,23 @@ exports.updateUnReadCommentsCountFun = (req) => {
                         }
                     }
 
-                    manageQuery["$inc"] = {
-                        [sprintFieldName]: newCount,
-                        ...(req.body.parentTaskId ? {[parentTaskField]: newCount} : {})
+                    // The sprint rollup is deliberately NOT incremented here.
+                    //
+                    // The other two paths stopped maintaining it: the increment for a
+                    // new message is commented out further down, and so is the
+                    // decrement on read (see updateSprintCount). That left THIS the
+                    // only live writer of a field nothing reduces and nothing
+                    // renders, so it grew by messageCount on every "mark as unread"
+                    // and never came back down — e.g. two marks of 4 left
+                    // `sprint_<projectId>_<sprintId>_comments: 8` behind with no
+                    // task count to match it.
+                    //
+                    // Only added when there is something to increment: an empty $inc
+                    // is a MongoDB error.
+                    if (req.body.parentTaskId) {
+                        manageQuery["$inc"] = {
+                            [parentTaskField]: newCount
+                        }
                     }
 
                     exports.updateCount(req.body.companyId,req.body.userIds, manageQuery, (tData) => {

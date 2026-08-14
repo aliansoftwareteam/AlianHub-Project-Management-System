@@ -1,7 +1,8 @@
 <template>
-<div 
-    v-if="!isEditing" 
-    class="time-display" 
+<div
+    v-if="!isEditing"
+    class="time-display"
+    :class="{ 'time-display--readonly': !editable }"
     @click="startEditing"
 >
     {{ displayTime }}
@@ -50,6 +51,14 @@ const props = defineProps({
   task: {
     type: Object,
     required: true
+  },
+  // false => display-only: clicking never opens the inputs. Needed so the
+  // "Read" level of task.task_estimated_hours shows the value without
+  // allowing edits. Defaults to true so the editable behaviour is unchanged
+  // wherever the prop is not passed.
+  editable: {
+    type: Boolean,
+    default: true
   }
 })
 
@@ -91,6 +100,9 @@ const validateMinutes = () => {
 
 // Start editing mode
 const startEditing = async () => {
+  if (!props.editable) {
+    return // read-only permission: never enter edit mode
+  }
   const totalMinutes = props.task.totalEstimatedTime || 0
   editHours.value = Math.floor(totalMinutes / 60)
   editMinutes.value = totalMinutes % 60
@@ -157,6 +169,11 @@ onUnmounted(() => {
 /* .time-display:hover {
   background: #e9ecef;
 } */
+
+/* Read-only: drop the affordance so the value does not look clickable. */
+.time-display--readonly {
+  cursor: default;
+}
 
 .time-inputs {
   display: flex;

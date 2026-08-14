@@ -4,6 +4,9 @@
 		<DemoBanner/>
 		<template v-if="$route.meta.requiresAuth">
 			<template v-if="logged && (rules && Object.keys(rules).length && companyUserDetail && Object.keys(companyUserDetail).length) && socket">
+                <!-- Mounted at the root so an incoming call rings wherever the user is,
+                     not only when the conversation that called them is on screen. -->
+                <CallOverlay />
                 <HeaderComponent v-if="!$route.meta.hideHeader" @change="changeCompany($event)" @filter="handleFilter"/>
                 <div :style="`height: calc(100dvh - ${$route.meta.hideHeader ? '0' : '46'}px);`" class="billing__history-wrapper style-scroll overflow-auto">
                     <AdvanceSearchModal
@@ -74,6 +77,7 @@ import { computed, defineComponent, onMounted, provide, ref, watch, inject} from
 // COMPONENTS
 import TourCom from "@/components/organisms/Tour/TourComponet.vue"
 import HeaderComponent from '@/components/organisms/Header/Header.vue'
+import CallOverlay from '@/components/organisms/CallOverlay/CallOverlay.vue'
 import AdvanceSearchModal from '@/components/atom/Modal/Modal.vue'
 import Modal from "@/components/atom/Modal/Modal.vue"
 import MainSearchComponent from '@/components/molecules/AdvanceSearch/MainComponent.vue'
@@ -343,6 +347,12 @@ async function getFirebaseData() {
                             dispatch('settings/setDesignations', companyId.value)
                             .catch((error) => {
                                 console.error("ERROR in set designations: ", error)
+                            })
+                        }
+                        if(getters['settings/projectSkills'] && !getters['settings/projectSkills'].length) {
+                            dispatch('settings/setProjectSkills', companyId.value)
+                            .catch((error) => {
+                                console.error("ERROR in set project skills: ", error)
                             })
                         }
                         if(getters['settings/companyUserStatus'] && !getters['settings/companyUserStatus'].length) {

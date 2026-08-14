@@ -2,7 +2,7 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
-const { isShareToken, validateIntakeSubmission, escapeHtml } = require('./helpers/shareRules');
+const { isShareToken, validateIntakeSubmission, escapeHtml, sanitizeDocHtml } = require('./helpers/shareRules');
 const reportRules = require('../CustomReports/helpers/reportRules'); // REP-09 — share saved reports
 const bcrypt = require('bcrypt');
 
@@ -28,12 +28,44 @@ const PAGE_STYLE = `
     input,textarea{width:100%;box-sizing:border-box;border:1px solid #ddd;border-radius:6px;padding:8px;font-size:14px;font-family:inherit}
     button{margin-top:14px;background:#7b68ee;border:none;color:#fff;border-radius:6px;padding:9px 18px;font-size:14px;cursor:pointer}
     .footer{margin-top:26px;text-align:center;color:#aaa;font-size:12px}
+    .doc{background:#fff;border:1px solid #e6e6e6;border-radius:10px;padding:20px 24px;font-size:15px;line-height:1.7}
+    .doc>*:first-child{margin-top:0}
+    .doc>*:last-child{margin-bottom:0}
+    .doc h1,.doc h2,.doc h3,.doc h4{line-height:1.35;margin:22px 0 8px}
+    .doc h1{font-size:24px}.doc h2{font-size:20px}.doc h3{font-size:17px}.doc h4{font-size:15px}
+    .doc p{margin:0 0 12px}
+    .doc ol,.doc ul{margin:0 0 12px;padding-left:26px}
+    .doc li{margin:3px 0}
+    .doc blockquote{margin:0 0 12px;padding:2px 0 2px 14px;border-left:4px solid #e0e0e0;color:#555}
+    .doc pre{background:#f6f7f9;border-radius:6px;padding:12px 14px;overflow-x:auto;font-size:13px;white-space:pre-wrap;word-break:break-word}
+    .doc img{max-width:100%;height:auto}
+    .doc a{color:#5b4ccc}
+    .doc table{border-collapse:collapse}
+    .doc td,.doc th{border:1px solid #e6e6e6;padding:6px 10px}
+    /* The editor stores alignment and indent as classes, so the public page has to
+       understand them too or every centred heading silently goes left. */
+    .ql-align-center{text-align:center}.ql-align-right{text-align:right}.ql-align-justify{text-align:justify}
+    .ql-indent-1{padding-left:3em}.ql-indent-2{padding-left:6em}.ql-indent-3{padding-left:9em}
+    .ql-indent-4{padding-left:12em}.ql-indent-5{padding-left:15em}
 `;
+
+/* A shared page is read-only and static: no script of ours, and none of theirs.
+ * This is the backstop behind sanitizeDocHtml — anything that slipped past the
+ * allow-list still has no way to execute. */
+const CSP = "default-src 'none'; img-src https: data:; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'";
 
 const htmlPage = (title, body) => `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex"><title>${escapeHtml(title)}</title><style>${PAGE_STYLE}</style></head>
 <body><div class="wrap">${body}<div class="footer">Shared via AlianHub</div></div></body></html>`;
+
+/* Every public response goes out with the same locked-down headers. */
+const sendPage = (res, status, title, body) => res
+    .status(status)
+    .set('Content-Security-Policy', CSP)
+    .set('X-Content-Type-Options', 'nosniff')
+    .set('Referrer-Policy', 'no-referrer')
+    .send(htmlPage(title, body));
 
 // Password gate (server-rendered) shown when a share is password-protected.
 const passwordForm = (token, wrong) => `<h1>Password required</h1>
@@ -94,12 +126,40 @@ async function renderReport(companyId, share) {
     return { title: report.name, body };
 }
 
+/**
+ * A shared doc — the document itself, read-only, for anyone with the link.
+ *
+ * The body is member-authored HTML, so it goes through the allow-list before it
+ * reaches the page (see sanitizeDocHtml) and the page is served under a CSP that
+ * permits no script at all.
+ */
+async function renderPage(companyId, share) {
+    const page = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.PAGES,
+        data: [{ _id: share.entityId }],
+    }, 'findOne');
+    if (!page || page.deletedStatusKey === 1) {
+        return { title: 'Doc', body: '<h1>This doc is no longer available.</h1>' };
+    }
+    // Marked private after the link was made. Private means private — the link
+    // stops working rather than outliving the decision.
+    if (String(page.visibility || '') === 'private') {
+        return { title: 'Doc', body: '<h1>This doc is no longer shared.</h1>' };
+    }
+    const title = page.title || 'Untitled doc';
+    const html = sanitizeDocHtml(page.content && page.content.html);
+    let body = `<h1>${escapeHtml(title)}</h1>`;
+    body += '<div class="muted">read-only public doc</div>';
+    body += `<div class="doc">${html || '<p style="color:#999">This doc is empty.</p>'}</div>`;
+    return { title, body };
+}
+
 /* GET /share/:token — read-only board grouped by status. */
 exports.renderShare = async (req, res) => {
     try {
         const resolved = await resolveShare(req.params.token);
         if (!resolved) {
-            return res.status(404).send(htmlPage('Not found', '<h1>This link is not available.</h1>'));
+            return sendPage(res, 404, 'Not found', '<h1>This link is not available.</h1>');
         }
         const { companyId, share } = resolved;
 
@@ -108,14 +168,20 @@ exports.renderShare = async (req, res) => {
             const supplied = (req.body && req.body.password) ? String(req.body.password) : '';
             const ok = supplied && await bcrypt.compare(supplied, share.passwordHash);
             if (!ok) {
-                return res.send(htmlPage('Protected', passwordForm(req.params.token, req.method === 'POST')));
+                return sendPage(res, 200, 'Protected', passwordForm(req.params.token, req.method === 'POST'));
             }
         }
 
         // REP-09 — report shares render a read-only table instead of a task board.
         if (share.entityType === 'report') {
             const rendered = await renderReport(companyId, share);
-            return res.send(htmlPage(rendered.title, rendered.body));
+            return sendPage(res, 200, rendered.title, rendered.body);
+        }
+
+        // A shared doc renders the document itself.
+        if (share.entityType === 'page') {
+            const rendered = await renderPage(companyId, share);
+            return sendPage(res, 200, rendered.title, rendered.body);
         }
 
         const [sprint, tasks] = await Promise.all([
@@ -164,10 +230,10 @@ exports.renderShare = async (req, res) => {
             </form>`;
         }
 
-        return res.send(htmlPage(sprint ? sprint.name : 'Shared board', body));
+        return sendPage(res, 200, sprint ? sprint.name : 'Shared board', body);
     } catch (error) {
         logger.error(`ERROR in render public share: ${error.message}`);
-        return res.status(500).send(htmlPage('Error', '<h1>Something went wrong.</h1>'));
+        return sendPage(res, 500, 'Error', '<h1>Something went wrong.</h1>');
     }
 };
 
@@ -176,12 +242,12 @@ exports.submitIntake = async (req, res) => {
     try {
         const resolved = await resolveShare(req.params.token);
         if (!resolved || !resolved.share.allowIntake) {
-            return res.status(404).send(htmlPage('Not found', '<h1>This link is not available.</h1>'));
+            return sendPage(res, 404, 'Not found', '<h1>This link is not available.</h1>');
         }
         const { title, description, name, email } = req.body || {};
         const check = validateIntakeSubmission({ title, description, name, email });
         if (!check.valid) {
-            return res.status(400).send(htmlPage('Invalid', `<h1>${escapeHtml(check.reason)}</h1><div class="muted"><a href="/share/${escapeHtml(req.params.token)}">Go back</a></div>`));
+            return sendPage(res, 400, 'Invalid', `<h1>${escapeHtml(check.reason)}</h1><div class="muted"><a href="/share/${escapeHtml(req.params.token)}">Go back</a></div>`);
         }
         await MongoDbCrudOpration(resolved.companyId, {
             type: SCHEMA_TYPE.INTAKE_ITEMS,
@@ -194,9 +260,9 @@ exports.submitIntake = async (req, res) => {
                 status: 'pending',
             },
         }, 'save');
-        return res.send(htmlPage('Thanks', `<h1>Thanks — your request was submitted.</h1><div class="muted"><a href="/share/${escapeHtml(req.params.token)}">Back to the board</a></div>`));
+        return sendPage(res, 200, 'Thanks', `<h1>Thanks — your request was submitted.</h1><div class="muted"><a href="/share/${escapeHtml(req.params.token)}">Back to the board</a></div>`);
     } catch (error) {
         logger.error(`ERROR in submit intake: ${error.message}`);
-        return res.status(500).send(htmlPage('Error', '<h1>Something went wrong.</h1>'));
+        return sendPage(res, 500, 'Error', '<h1>Something went wrong.</h1>');
     }
 };

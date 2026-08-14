@@ -45,6 +45,12 @@
                 :task="task"
                 class="mt-1"
             />
+            <LinkedDocs
+                :task="task"
+                :refreshKey="docsRefreshKey"
+                class="mt-1"
+                @open="$emit('openDoc', $event)"
+            />
             <EpicPicker
                 :task="task"
                 class="mt-1"
@@ -97,6 +103,7 @@
                 :attachments="task.attachments"
                 :extensions="fileExtentions"
                 @update:add="(files) => newAttachments(files)"
+                @update:cloud-add="(payload) => newCloudAttachments(payload)"
                 @update:delete="(file) => deleteAttachments(file)"
                 @seAll="(val)=>{openSeeAll(val)}"
                 @record-clip="onRecordClip"
@@ -130,6 +137,7 @@ import Attachments from '@/components/atom/Attachments/Attachments.vue'
 import CheckListComponent from '@/components/molecules/CheckList/CheckList.vue'
 import SubTasks from '@/components/organisms/SubTasks/SubTasks.vue'
 import LinkedTasks from '@/components/organisms/LinkedTasks/LinkedTasks.vue'
+import LinkedDocs from '@/components/molecules/Pages/LinkedDocs.vue'
 import EpicPicker from '@/components/molecules/Epics/EpicPicker.vue'
 import CreateTagPopup from "@/components/molecules/TagList/CreateTagPopup.vue";
 import TagChip from '@/components/atom/TagChip/TagChip.vue'
@@ -144,6 +152,8 @@ import taskClass from '@/utils/TaskOperations';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import AppTeaserBlock from '@/components/molecules/AppTeaserBlock/AppTeaserBlock.vue';
 import {storageQueryBuilder,generateFileName} from '@/utils/storageQueryBuild.js';
+import { buildCloudAttachment, isCloudAttachment, cloudTypeOf, CLOUD_PROVIDERS } from '@/utils/cloudAttachment';
+import { importCloudFile } from '@/composable/cloudPicker';
 import { useClipRecorder } from '@/composables/useClipRecorder';
 import { useI18n } from 'vue-i18n';
 
@@ -172,11 +182,16 @@ const props = defineProps({
     isMainSpinner:{
         type:Boolean,
         default:false
+    },
+    // Bumped when the docs panel closes, so Linked Docs re-reads titles that changed there.
+    docsRefreshKey: {
+        type: Number,
+        default: 0
     }
 });
 
 // emit
-const emit = defineEmits(["openSeeAll"]);
+const emit = defineEmits(["openSeeAll", 'openDoc']);
 
 //computed
 const fileExtentions = computed(() => {
@@ -367,6 +382,98 @@ const newAttachments = (files) => {
     countFun(fileList[count.value]);
 };
 
+/**
+ * AHE-3838 — attach files LINKED from a cloud drive. No upload step: the bytes
+ * stay with the provider, so this only writes the attachment record.
+ *
+ * Reuses taskClass.updateAttachments (the same call the upload path makes) so the
+ * socket broadcast, history entry and cache clear all behave identically.
+ *
+ * Deliberately no checkBucketStorage() call — a link stores nothing of ours, so
+ * it must not consume the company's storage quota.
+ */
+const newCloudAttachments = async ({ provider, files, mode = 'link' } = {}) => {
+    if (!provider || !files || !files.length) return;
+
+    // Importing copies bytes into our storage, so unlike linking it DOES consume
+    // the company's quota and has to be checked first.
+    if (mode === 'import' && checkBucketStorage(files.map((f) => f?.size || 0), { gettersVal: getters }) !== true) {
+        return;
+    }
+
+    const findIndex = allProjectsArrayFilter.value.findIndex((ele) => ele.id === props?.task?.ProjectID);
+    const userInfo = {
+        id: user.id,
+        name: user.Employee_Name,
+        companyOwnerId: companyOwner.value._id,
+    };
+    const projectInfo = {
+        id: findIndex === -1 ? projectData.value._id : allProjectsArrayFilter.value[findIndex]._id,
+        ProjectName: findIndex === -1 ? projectData.value.ProjectName : allProjectsArrayFilter.value[findIndex].ProjectName,
+    };
+
+    isSpinner.value = true;
+    let attached = 0;
+    // Sequential on purpose: updateAttachments does a read-modify-write of the
+    // task's attachments array, so concurrent calls would drop records.
+    for (const file of files) {
+        try {
+            let record;
+            if (mode === 'import') {
+                // Server pulls the bytes and stores them exactly where an upload
+                // would have. The result is an ORDINARY attachment — no `source`,
+                // nothing cloud-specific about it from here on.
+                const storedName = generateFileName(file.name, env.STORAGE_TYPE);
+                const imported = await importCloudFile({
+                    provider,
+                    fileId: file.id,
+                    filename: file.name,
+                    path: `Project/${props.task.ProjectID}/Sprint/${props.task._id}/Attachment/${storedName}`,
+                    // Dropbox only: the temporary direct link the Chooser returned,
+                    // since it gives us no token to authenticate a download with.
+                    downloadUrl: file.downloadUrl || '',
+                });
+                const extension = storedName.substring(storedName.lastIndexOf(".") + 1);
+                record = {
+                    filename: file.name,
+                    extension,
+                    size: imported.size || file.size || 0,
+                    id: makeUniqueId(17),
+                    createdAt: new Date(),
+                    userId: userId.value,
+                    type: cloudTypeOf(file.mimeType),
+                    url: imported.url,
+                };
+            } else {
+                record = buildCloudAttachment({ provider, file, userId: userId.value, id: makeUniqueId(17) });
+            }
+            await taskClass.updateAttachments({
+                companyId: companyId.value,
+                sprintId: props.task.sprintId,
+                taskId: props.task._id,
+                taskData: props.task,
+                operation: "add",
+                data: record,
+                userData: userInfo,
+                projectData: projectInfo,
+            });
+            attached += 1;
+        } catch (error) {
+            console.error("Error attaching cloud file: ", error);
+        }
+    }
+    isSpinner.value = false;
+
+    if (attached > 0) {
+        const label = CLOUD_PROVIDERS[provider]?.label || provider;
+        $toast.success(t('Attachments.cloud_attached', { provider: label }), { position: 'top-right' });
+    } else {
+        $toast.error(mode === 'import'
+            ? t('Attachments.import_failed', { provider: CLOUD_PROVIDERS[provider]?.label || provider })
+            : t('Attachments.cloud_attach_failed'), { position: 'top-right' });
+    }
+};
+
 // Record-from-task: open the GLOBAL recorder with this task as the target. When
 // the user saves, the clip is uploaded once + recorded globally (My Clips), and
 // the returned clip record is attached to THIS task via attachClipToTask.
@@ -433,35 +540,51 @@ const deleteAttachments = (attachment) => {
     }).then((result)=>{
         if (result.isConfirmed) {
             isSpinner.value = true;
+
+            // Dropping the attachment record. Unchanged from before — only the
+            // storage-delete step above it is now conditional.
+            const removeRecord = () => {
+                let findIndex = allProjectsArrayFilter.value.findIndex((ele)=>{return ele._id === props?.task?.ProjectID});
+                taskClass.updateAttachments({
+                    companyId: companyId.value,
+                    sprintId: props.task.sprintId,
+                    taskId: props.task._id,
+                    taskData: props.task,
+                    operation: "remove",
+                    id: attachment.id,
+                    data: attachment,
+                    userData: {
+                        id: user.id,
+                        name: user.Employee_Name,
+                        companyOwnerId: companyOwner.value._id,
+                    },
+                    projectData: {
+                        id: findIndex == -1 ? projectData.value._id : allProjectsArrayFilter.value[findIndex]._id,
+                        ProjectName: findIndex == -1 ? projectData.value.ProjectName : allProjectsArrayFilter.value[findIndex].ProjectName
+                    }
+                }).then(() => {
+                    isSpinner.value = false;
+                    $toast.success(t('Toast.Attachment_removed_successfully'),{position: 'top-right'});
+                }).catch((error) => {
+                    console.error("Error in removing Attachment: ", error);
+                    $toast.error(t('Toast.Attachment_not_removed'),{position: 'top-right'});
+                })
+            };
+
+            // AHE-3838 — a cloud-linked attachment owns no object in our storage,
+            // so there is nothing to delete there and its `url` is empty. Asking
+            // the storage layer to remove it would just fail and leave the record
+            // stranded. Removing the link never touches the user's Drive.
+            if (isCloudAttachment(attachment)) {
+                removeRecord();
+                return;
+            }
+
             let axiousObject = storageQueryBuilder('delete',companyId.value,((env.STORAGE_TYPE && env.STORAGE_TYPE === 'server') ? (attachment.url + "&thubmkey=attachmentIcon") : attachment.url));
 
             apiRequest(axiousObject.method, axiousObject.route, axiousObject.data).then((response)=>{
                 if(response.data.status === true){
-                    let findIndex = allProjectsArrayFilter.value.findIndex((ele)=>{return ele._id === props?.task?.ProjectID});
-                    taskClass.updateAttachments({
-                        companyId: companyId.value,
-                        sprintId: props.task.sprintId,
-                        taskId: props.task._id,
-                        taskData: props.task,
-                        operation: "remove",
-                        id: attachment.id,
-                        data: attachment,
-                        userData: {
-                            id: user.id,
-                            name: user.Employee_Name,
-                            companyOwnerId: companyOwner.value._id,
-                        },
-                        projectData: {
-                            id: findIndex == -1 ? projectData.value._id : allProjectsArrayFilter.value[findIndex]._id,
-                            ProjectName: findIndex == -1 ? projectData.value.ProjectName : allProjectsArrayFilter.value[findIndex].ProjectName
-                        }
-                    }).then(() => {
-                        isSpinner.value = false;
-                        $toast.success(t('Toast.Attachment_removed_successfully'),{position: 'top-right'});
-                    }).catch((error) => {
-                        console.error("Error in removing Attachment: ", error);
-                        $toast.error(t('Toast.Attachment_not_removed'),{position: 'top-right'});
-                    })
+                    removeRecord();
                 }else{
                     isSpinner.value = false;
                     $toast.success(t('Toast.something_went_wrong'),{position: 'top-right'});

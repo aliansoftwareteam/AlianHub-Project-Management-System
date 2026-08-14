@@ -89,14 +89,31 @@
                             <td class="mrc-td mrc-td--name">
                                 <span class="mrc-dot" :style="dotStyle(m.status)"></span>
                                 <span class="mrc-item-main">
+                                    <!-- A closed project cannot be opened, so its name is
+                                         not dressed as a link: no pointer, no hover
+                                         underline, no button role. The click handler stays
+                                         so a click that happens anyway is answered. -->
                                     <span
                                         class="mrc-item-name"
-                                        :class="{ 'mrc-item-name--link': m.projectId }"
-                                        :role="m.projectId ? 'button' : null"
-                                        :title="m.projectId ? $t('dashboardCard.milestone_open_project') : m.milestoneName"
+                                        :class="{ 'mrc-item-name--link': m.projectId && !m.projectClosed }"
+                                        :role="m.projectId && !m.projectClosed ? 'button' : null"
+                                        :title="m.projectClosed
+                                            ? $t('dashboardCard.milestone_project_closed_hint')
+                                            : (m.projectId ? $t('dashboardCard.milestone_open_project') : m.milestoneName)"
                                         @click="openProject(m)"
                                     >{{ m.milestoneName || '—' }}</span>
-                                    <span class="mrc-item-project" :title="m.projectName">{{ m.projectName }}</span>
+                                    <!-- The project line, plus a marker when that project
+                                         is already closed. The milestone still counts —
+                                         finished is not the same as paid — but the row
+                                         should not make a wrapped-up project look live. -->
+                                    <span class="mrc-item-sub">
+                                        <span class="mrc-item-project" :title="m.projectName">{{ m.projectName }}</span>
+                                        <span
+                                            v-if="m.projectClosed"
+                                            class="mrc-closed"
+                                            :title="$t('dashboardCard.milestone_project_closed_hint')"
+                                        >{{ $t('dashboardCard.milestone_project_closed') }}</span>
+                                    </span>
                                 </span>
                             </td>
                             <td class="mrc-td mrc-td--date">
@@ -135,6 +152,7 @@ export default { name: 'MilestoneReportCard' };
 <script setup>
 import { ref, computed, watch, inject, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useToast } from 'vue-toast-notification';
 import { useRoute, useRouter } from 'vue-router';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
@@ -157,6 +175,7 @@ const props = defineProps({
 });
 
 const { t: translate } = useI18n();
+const $toast = useToast();
 const route = useRoute();
 const router = useRouter();
 
@@ -301,6 +320,14 @@ const openReport = () => {
 const openProject = (m) => {
     const cid = route.params.cid;
     if (!cid || !m || !m.projectId) return;
+    // A closed project is filtered out of the sidebar's project list, so routing to it
+    // used to land on whichever project happened to be first and rewrite the URL to
+    // match. The row is already styled as unclickable; this answers the click that comes
+    // anyway rather than doing nothing, or doing the wrong thing.
+    if (m.projectClosed) {
+        $toast.info(translate('dashboardCard.milestone_project_closed_toast'), { position: 'top-right' });
+        return;
+    }
     router.push({ name: 'Project', params: { cid, id: m.projectId }, query: { tab: 'ProjectDetail' } });
 };
 
@@ -361,7 +388,19 @@ onMounted(load);
 .mrc-item-name { font-size: 12px; color: #3a3f52; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mrc-item-name--link { cursor: pointer; }
 .mrc-item-name--link:hover { color: #0d9488; text-decoration: underline; }
+/* The project name takes the slack and ellipsises; the Closed marker never shrinks, so a
+   long project name cannot squeeze it out of the row. */
+.mrc-item-sub { display: flex; align-items: center; gap: 5px; min-width: 0; }
 .mrc-item-project { font-size: 11px; color: #9aa0b4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mrc-closed {
+    flex: 0 0 auto;
+    font-size: 9px; font-weight: 600; line-height: 1.6;
+    padding: 0 5px; border-radius: 8px;
+    color: #5b6472; background: #eef0f6;
+    text-transform: uppercase; letter-spacing: .03em;
+    /* Deliberately the same neutral as the "Past" temporal pill: it is context, not a
+       warning. Overdue money stays the only red thing in the row. */
+}
 .mrc-due { display: block; font-size: 12px; color: #3a3f52; white-space: nowrap; }
 
 /* Temporal pill: past → present → future within the selected range. */

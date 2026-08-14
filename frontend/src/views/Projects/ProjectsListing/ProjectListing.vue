@@ -74,6 +74,10 @@ import Sidebar from "@/components/molecules/Sidebar/Sidebar.vue"
 import { useProjectsHelper } from '../helper';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import { useToast } from 'vue-toast-notification';
+// Same pairing the sibling helpers use (views/Projects/helper.js, Header/helper.js):
+// the i18n global, not useI18n(), so it works outside a setup-scoped component too.
+import { i18n } from '@/locales/main';
 
 
 // UTILS
@@ -81,6 +85,8 @@ const {getters, commit, dispatch} = useStore();
 const {projects, filterdProjects, projectListFilters} = useProjectsHelper();
 const searchProject = computed(()=> getters['projectData/searchedProjects'])
 const {checkPermission} = useCustomComposable()
+const $toast = useToast();
+const t = i18n.global.t;
 const router = useRouter();
 let route = useRoute();
 const userId = inject("$userId");
@@ -151,6 +157,7 @@ watch(projects, () => {
                 if(projectIndex !== -1) {
                     mutateCurrentProjectDetails(projects.value[projectIndex]);
                 } else {
+                    reportUnreachableRouteProject();
                     mutateCurrentProjectDetails(projects.value[0], true);
                 }
             } else {
@@ -201,6 +208,20 @@ watch(() => route.params,(newVal, oldVal) => {
 })
 
 // MUTATE CURRENT PROJECT DETAILS
+/**
+ * The URL named a project that is not in this user's list.
+ *
+ * That happens when the project was deleted (deletedStatusKey 1 — the list endpoint
+ * excludes those) or is one this user cannot see. The caller still falls back to the
+ * first project and rewrites the address bar to match, which on its own is silent: the
+ * user asked for project X, got project Y, and the URL agrees with Y. Deep links from
+ * the dashboard's milestone card, a notification or a bookmark all landed this way and
+ * looked like they had opened what was clicked. Say so instead.
+ */
+function reportUnreachableRouteProject() {
+    $toast.info(t('Toast.The_project_not_found'), { position: 'top-right' });
+}
+
 function mutateCurrentProjectDetails(data, updateRoute = false,isClicked = false) {
     if(!projects?.value?.length) return;
     if (expandedId.value === data._id && isClicked) {
@@ -282,9 +303,30 @@ onMounted(async() => {
     folderData.value = getters["projectData/folders"][route.params.id];
     if(projects.value && Object.keys(projects.value).length) {
         if(props.projectData && !Object.keys(props.projectData).length) {
-            mutateCurrentProjectDetails(projects.value[0], true);
-            if(projects.value[0]?.isGlobalPermission === false) {
-                getSprintFolderData(projects.value[0]?._id);
+            // Open the project the URL asks for — same rule the `projects` watcher
+            // above already applies.
+            //
+            // Which of the two runs depends on whether the list is warm, and
+            // `projectsList` is a module-level ref (views/Projects/helper.js) so it
+            // survives every route change. A cold load leaves it empty here and the
+            // watcher decides; ANY client-side navigation — a milestone card link, a
+            // notification — arrives with it already full, so this branch decides
+            // instead. It used to take projects[0] unconditionally and, with
+            // updateRoute=true, rewrite the address bar to match, so every deep link
+            // silently opened the first project and looked like it had been asked for.
+            //
+            // updateRoute stays true ONLY for the fallback: when the URL already names
+            // the project there is nothing to correct, and re-pushing would drop the
+            // caller's `tab` query (mutateCurrentProjectDetails swaps any tab that is
+            // not one of the project's own views — which is what `tab=ProjectDetail` is).
+            const routeIndex = route.params?.id
+                ? projects.value.findIndex((item) => item._id === route.params.id)
+                : -1;
+            const target = routeIndex !== -1 ? projects.value[routeIndex] : projects.value[0];
+            if(route.params?.id && routeIndex === -1) reportUnreachableRouteProject();
+            mutateCurrentProjectDetails(target, routeIndex === -1);
+            if(target?.isGlobalPermission === false) {
+                getSprintFolderData(target?._id);
             }
         } else {
             const projIndex = projects.value.findIndex((item) => item._id === props.projectData._id);

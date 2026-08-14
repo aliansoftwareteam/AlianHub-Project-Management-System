@@ -79,7 +79,7 @@
 <script setup>
 // PACKAGES
 import { useCustomComposable, useGetterFunctions } from "@/composable";
-import {defineProps, defineEmits, computed, onMounted, watch, ref, nextTick, inject} from "vue";
+import {defineProps, defineEmits, computed, onMounted, onBeforeUnmount, watch, ref, nextTick, inject} from "vue";
 
 // COMPONENTS
 import UserProfile from "@/components/atom/UserProfile/UserProfile.vue"
@@ -214,6 +214,25 @@ function keyDown(e) {
     }
 }
 
+/**
+ * Dismiss the mention list when the click lands outside it and outside the
+ * input. Previously it only closed on selection or Escape, so clicking anywhere
+ * else left the list floating over the page.
+ */
+function handleOutsideClick(event) {
+    if(!showUsersList.value) return;
+
+    const list = document.querySelector(".show__userlist");
+    const box = document.getElementById("message-box");
+    if((list && list.contains(event.target)) || (box && box.contains(event.target))) {
+        return;
+    }
+    resetMentions();
+}
+
+onMounted(() => document.addEventListener("click", handleOutsideClick));
+onBeforeUnmount(() => document.removeEventListener("click", handleOutsideClick));
+
 //RESET MENTIONS
 function resetMentions(reset = true) {
     if(!reset) {
@@ -250,13 +269,22 @@ function autoResize() {
     setTimeout(()=>{
         const defaultTextHeight = 56;
         const textarea = document.getElementById("message-box");
+        // The timeout can fire after this input is unmounted.
+        if(!textarea) return;
         textarea.style.height = defaultTextHeight+"px";
         const newHeight = Math.min(textarea.scrollHeight, 250);
         textarea.style.height = newHeight + "px";
 
         nextTick(() => {
             const comment_footer = newHeight + props.isHeight;
+            // `#message_container` belongs to the comment layout that hosts this
+            // input; other hosts (e.g. the Main Chat module, whose transcript
+            // sizes itself with flexbox) simply do not have it. Previously the
+            // unguarded access threw "Cannot read properties of null (reading
+            // 'style')" on every keystroke there. Where the element exists the
+            // behaviour is unchanged.
             const message_container = document.getElementById("message_container");
+            if(!message_container) return;
             const height = Math.min(comment_footer, 275);
             message_container.style.height = `calc(100% - ${height}px)`;
         });
@@ -310,10 +338,14 @@ function checkShowMentions(selectionStart, keyCode) {
 }
 
 function handlePaste(e) {
-    const item = e.clipboardData.items[0];
+    // AHE-3834 — guard: an empty/absent clipboard payload threw on `item.kind`.
+    // Also collect ALL pasted files instead of only the first item.
+    const items = Array.from(e?.clipboardData?.items || []);
+    if(!items.length) return;
 
-    if(item.kind === "file") {
-        emit('pasteFile', [item.getAsFile()]);
+    const files = items.filter((item) => item.kind === "file").map((item) => item.getAsFile()).filter(Boolean);
+    if(files.length) {
+        emit('pasteFile', files);
     }
 }
 </script>

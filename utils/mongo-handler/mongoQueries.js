@@ -69,6 +69,8 @@ const {
     publicShareIndexSchema,
     recurringTasksSchema,
     remindersSchema,
+    generalRemindersSchema,
+    generalReminderQueueSchema,
     notesSchema,
     clipsSchema,
     timesheetApprovalSchema,
@@ -83,7 +85,8 @@ const {
     emailInboxesSchema,
     calendarFeedsSchema,
     automationRulesSchema,
-    integrationConnectionsSchema
+    integrationConnectionsSchema,
+    cloudStorageConnectionsSchema
 } = require('./createSchema');
 
 
@@ -225,6 +228,10 @@ exports.checkType = (type) => {
             return recurringTasksSchema
         case SCHEMA_TYPE.REMINDERS:
             return remindersSchema
+        case SCHEMA_TYPE.GENERAL_REMINDERS:
+            return generalRemindersSchema
+        case SCHEMA_TYPE.GENERAL_REMINDER_QUEUE:
+            return generalReminderQueueSchema
         case SCHEMA_TYPE.NOTES:
             return notesSchema
         case SCHEMA_TYPE.CLIPS:
@@ -255,6 +262,8 @@ exports.checkType = (type) => {
             return automationRulesSchema
         case SCHEMA_TYPE.INTEGRATION_CONNECTIONS:
             return integrationConnectionsSchema
+        case SCHEMA_TYPE.CLOUD_STORAGE_CONNECTIONS:
+            return cloudStorageConnectionsSchema
         default:
             return ""
     }
@@ -399,6 +408,10 @@ exports.tableType = (type) => {
                 return `${dbCollections.RECURRING_TASKS}`
         case SCHEMA_TYPE.REMINDERS:
                 return `${dbCollections.REMINDERS}`
+        case SCHEMA_TYPE.GENERAL_REMINDERS:
+                return `${dbCollections.GENERAL_REMINDERS}`
+        case SCHEMA_TYPE.GENERAL_REMINDER_QUEUE:
+                return `${dbCollections.GENERAL_REMINDER_QUEUE}`
         case SCHEMA_TYPE.NOTES:
                 return `${dbCollections.NOTES}`
         case SCHEMA_TYPE.CLIPS:
@@ -429,6 +442,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.AUTOMATION_RULES}`
         case SCHEMA_TYPE.INTEGRATION_CONNECTIONS:
                 return `${dbCollections.INTEGRATION_CONNECTIONS}`
+        case SCHEMA_TYPE.CLOUD_STORAGE_CONNECTIONS:
+                return `${dbCollections.CLOUD_STORAGE_CONNECTIONS}`
         default:
             return ""
     }

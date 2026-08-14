@@ -41,6 +41,35 @@ export async function getQueue() {
   });
 }
 
+// Entries WITH their keys. The replay needs to delete the row it just handled; deleting
+// "the first one" instead (see removeFirstFromQueue) drops the wrong row as soon as any
+// entry is skipped or fails.
+export async function getQueueEntries() {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    const keysReq = store.getAllKeys();
+    const valsReq = store.getAll();
+    tx.oncomplete = () => {
+      const keys = keysReq.result || [];
+      const vals = valsReq.result || [];
+      resolve(keys.map((key, i) => ({ key, value: vals[i] })));
+    };
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function removeFromQueueByKey(key) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).delete(key);
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
 export async function clearQueue() {
   const db = await openDB();
   return new Promise((resolve, reject) => {
@@ -78,7 +107,11 @@ export function formDataToObject(formData) {
   return obj;
 }
 
-function objectToFormData(obj) {
+// Exported: Layout.jsx has always imported this by name, but it was never exported — so it
+// arrived as undefined and every form-data replay threw "not a function". Combined with a
+// catch that neither removed nor stopped on the failure, that is how an entry became
+// permanently stuck and blocked logout.
+export function objectToFormData(obj) {
   const formData = new FormData();
   for (const key in obj) {
     formData.append(key, obj[key]);
