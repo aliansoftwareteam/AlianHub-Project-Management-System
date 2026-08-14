@@ -408,8 +408,15 @@ function updateItem(value = null) {
     if(props.folder) {
         axiosData.sprints = sprints.value?.filter((x) => !x.deletedStatusKey || x.deletedStatusKey === 6)?.map((x) => x.id)
     }
+    // Keyed on `props.folder` — is this row ITSELF a folder — the same signal
+    // `type` and `itemId` above already use. It previously keyed on
+    // `props.data.folderId`, which asks a different question: is this row INSIDE
+    // a folder. The two agree for a folder and for a loose sprint, and disagree
+    // for a sprint nested in a folder, which was sent as `updateSprint` to the
+    // folder route. That combination is not on the folder route's whitelist, so
+    // archiving a nested sprint failed with "Invalid type".
     let reqUrl = env.SPRINT+'/'+itemId.value;
-    if (props.data.folderId) {
+    if (props.folder) {
         reqUrl = env.FOLDER+'/'+itemId.value;
     }
     apiRequest("patch", reqUrl, axiosData)
