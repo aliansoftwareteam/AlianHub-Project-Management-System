@@ -211,6 +211,7 @@ input.form-control.edit-input {
     display: inline-flex;
     align-items: center;
     flex: none;
+    vertical-align: middle;
     cursor: grab;
     touch-action: none;
     margin-right: 8px;

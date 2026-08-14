@@ -705,7 +705,7 @@ input.statusInputText.form-control.edit-input:focus-visible{outline-color: none 
 @media(min-width: 768px){
     .pss__setting-panel { display: flex; flex-direction: column; box-sizing: border-box; }
     .pss__setting-panel > .statusHeader { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-    .pss__setting-panel > .statusHeader > .bg-light-gray { flex: none; margin-bottom: 16px; }
+    .pss__setting-panel > .statusHeader > .bg-light-gray { flex: none; }
     /* overflow:hidden is load-bearing: it forces the min-height:0 chain to bound, so the
        lists scroll instead of growing and pushing the add/new-template buttons out.
        max-height:none overrides the base `.taskStatusSection.style-scroll{max-height:307px}`

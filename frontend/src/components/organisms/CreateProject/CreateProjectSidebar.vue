@@ -16,7 +16,7 @@
                     <button class="btn outline-primary d-flex align-items-center justify-content-center create-project-cancelbtn" :class="{'cursor-pointer' : (!isSpinner || !isSpinnerForTemplate) , 'cursor-default pointer-event-none' : (isSpinner || isSpinnerForTemplate)}" :disabled="(isSpinner || isSpinnerForTemplate)" @click="handleCloseSidebar">{{$t('Projects.cancel')}}</button>
                 </template>
             <template #body>
-                <div class="bg-light-gray mobile-common-background h-100" :class="{'p-015' : !isDisplayTemplate , 'addUseTemplate' : isDisplayTemplate}" >
+                <div class="bg-light-gray mobile-common-background h-100" :class="{'p-015' : !isDisplayTemplate , 'addUseTemplate' : isDisplayTemplate, 'wizard-tt-fill' : activeIndex === 3 && !isDisplayTemplate}" >
                     <div class="header-sidebar default-background-header d-flex bg-white border-radius-8-px">
                         <div id="create-project-loading" class="createProjectWizardSlider createProjectBlankUseTemplateWrapper w-100" :class="{'p-020' : !isDisplayTemplate}">
                             <template v-if="checkProjectPlan() === true">
@@ -982,4 +982,32 @@ const  { checkAllFields } = useValidation();
 <style>
 @import "./style.css";
 
+/* Create-project wizard, task-type step only (desktop): fill the step to the full body
+   height so both lists grow + scroll and the add/new-template buttons stay pinned —
+   mirrors the settings sidebar. Gated on .wizard-tt-fill, which is only present when
+   activeIndex===3, so the other wizard steps, the Next/Prev footer, and the template
+   flow are untouched. Chain: body → header row → slider column → step → form → lists. */
+@media(min-width: 768px){
+    .wizard-tt-fill { display: flex; flex-direction: column; box-sizing: border-box; }
+    .wizard-tt-fill > .header-sidebar { flex: 1 1 auto; min-height: 0; }
+    .wizard-tt-fill > .header-sidebar > .createProjectWizardSlider { display: flex; flex-direction: column; min-height: 0; }
+    .wizard-tt-fill #project-step-container { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+    .wizard-tt-fill .conditional-btn-wrapper { flex: none; }
+
+    .wizard-tt-fill .statusHeader { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+    .wizard-tt-fill .statusHeader > .bg-light-gray { flex: none; margin-bottom: 16px; }
+    .wizard-tt-fill .taskStatusSection { flex: 1 1 auto; min-height: 0; max-height: none !important; overflow: hidden; }
+    /* scope to the step's own columns row — .usetemplatesWrapper is also a
+       .statusTaskWrapper and must not be stretched. */
+    .wizard-tt-fill #project-step-container .statusTaskWrapper { height: 100%; min-height: 0; }
+
+    .wizard-tt-fill .taskStatusLeft { display: flex; flex-direction: column; min-height: 0; }
+    .wizard-tt-fill .taskStatusLeft .templated_name_ul { max-height: none !important; min-height: 60px; }
+    .wizard-tt-fill .taskStatusLeft .add_template { flex: none; }
+
+    .wizard-tt-fill .taskyou_need_right { display: flex; flex-direction: column; min-height: 0; }
+    .wizard-tt-fill .taskyou_need_right .ddf__root { min-height: 0; display: flex; flex-direction: column; }
+    .wizard-tt-fill .taskyou_need_right .status_ul { flex: 1 1 auto; max-height: none !important; min-height: 0; overflow-y: auto; }
+    .wizard-tt-fill .taskyou_need_right .addStatusBtn { flex: none; padding-top: 12px; }
+}
 </style>

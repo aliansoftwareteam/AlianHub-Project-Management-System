@@ -4,11 +4,11 @@
 ========================================================================================== -->
 <template>
 <div class="statusHeader statusHeader_one">
-    <div class="bg-light-gray"  :class="{'border-radius-5-px': clientWidth > 767 , 'border-radius-8-px': clientWidth <= 767 } ">
-        <h3 v-if="fromWhich == ''" class="heading_text mt-0" 
+    <div :class="{'border-radius-5-px': clientWidth > 767 , 'border-radius-8-px': clientWidth <= 767 } ">
+        <h3 v-if="fromWhich == ''" class="heading_text mt-0 bg-light-gray" 
         :class="{'border-radius-5-px  task-heading-desktop': clientWidth > 767 , 'border-radius-8-px task-heading-mobile': clientWidth <= 767}"
         >{{$t('Projects.add_task_need')}}</h3>
-        <h3 v-else class="heading_text mt-0" 
+        <h3 v-else class="heading_text mt-0 bg-light-gray" 
         :class="{'border-radius-5-px  task-heading-desktop': clientWidth > 767 , 'border-radius-8-px task-heading-mobile': clientWidth <= 767}"
         >{{$t('Projects.what_task_want')}}</h3>
     </div>

@@ -2,6 +2,7 @@
 
 ## Checklist
 - [x] P6 — Six-dot drag handle on task-type cards; drag only via handle (mobile body scroll)
+- [x] P7 — Same full-height fill/scroll/pinned-buttons in the create-project wizard's task-type step
 - [x] P1 — Harden `.tticon` to inline-flex + narrow `DragDropField` `.taskStatusRight ul li span` selector
 - [ ] P1 — Verify boundary box unaffected in task list / kanban / dropdowns (visual check)
 - [x] P2 — Bound the right task-type list height so "+ Add task type" stays visible
@@ -22,6 +23,24 @@ P6: added `drag_dots.svg` (2x3 grip) as `.drag-handle` at the start of each task
 for `from==='task_type'` so only the grip starts a drag — card body drag is a no-op, so mobile
 users scroll the list by dragging the body (`touch-action:none` only on the grip). Scoped to
 task_type; status/project-status lists keep whole-card drag. Needs real touch-device verification.
+
+P7: applied the settings fill-chain to the create-project wizard's task-type step
+(CreateProjectSidebar.vue). Gated on a `.wizard-tt-fill` marker class added only when
+activeIndex===3 && !isDisplayTemplate, so the other 8 wizard steps + Next/Prev footer +
+template flow are untouched. Chain: body → header-sidebar row → slider column → step → form
+→ lists; footer `flex:none` stays pinned. Overlap fix + six-dot handle already carried over
+via the shared components. Verified in a faithful wizard repro served from the app dev server:
+right list 398 (fills, was 164), scrolls, left 411, add button + Prev/Next footer visible.
+Key bug found & fixed during verify: `.statusTaskWrapper` selector also matched the wizard's
+`.usetemplatesWrapper` (234px) — scoped it to `#project-step-container .statusTaskWrapper`.
+
+P7 refinement (user-driven): switched the lists from flex-GROW to flex-SHRINK — removed
+`flex:1` from `.templated_name_ul` and `.ddf__root` (both settings + wizard). Growing forced
+few items to fill and floated the add/new-template buttons to the bottom with a gap. With
+grow removed but shrink + overflow kept, few items sit naturally (button right after the
+list), many items shrink-to-fit and scroll. Verified in wizard repro: left list 116px (4
+items, +New Template 0px gap after), right list 304px + scrolls (16 items), all buttons +
+Prev/Next footer visible. Heading "extra space" fixed by moving bg-light-gray onto the h3.
 
 ## Blockers
 None.
