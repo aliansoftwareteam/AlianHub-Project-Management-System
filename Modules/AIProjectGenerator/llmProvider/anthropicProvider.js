@@ -54,7 +54,12 @@ const anthropicProvider = {
         // 32000 default — large plans (30+ tasks) with rich descriptions
         // can run 15-25K output tokens. Claude Sonnet 4.5 supports up to
         // 64K output natively, so 32K is well within range.
-        const maxTokens = opts.maxTokens || 32000;
+        // Clamp to Claude's output ceiling. Unlike DeepSeek this provider had no
+        // clamp at all, so once the shared default was raised past 128K for
+        // DeepSeek's sake, every Anthropic request would have been rejected
+        // outright. Each provider bounds its own limit; the caller asks freely.
+        const ANTHROPIC_MAX_OUTPUT_TOKENS = 128000;
+        const maxTokens = Math.min(opts.maxTokens || 32000, ANTHROPIC_MAX_OUTPUT_TOKENS);
 
         const params = {
             model: process.env.ANTHROPIC_MODEL,

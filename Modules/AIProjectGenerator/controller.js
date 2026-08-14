@@ -123,11 +123,12 @@ async function callLlmForPlan({ description, additionalRequirements, briefText, 
     const provider = getProvider();
     const systemPrompt = buildSystemPrompt();
     const userMessage = buildUserMessage({ description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills });
-    // 32000 default: large plans (30+ tasks) with 5-block descriptions
-    // routinely run 15-25K output tokens. Claude Sonnet 4.5 supports 64K
-    // output and gpt-5 supports 128K, so 32K is well within bounds for
-    // either provider while still bounding cost.
-    const maxTokens = Number(process.env.LLM_MAX_TOKENS_PLAN) || 32000;
+    // A generous ask, not a target: each provider clamps this to its own output
+    // ceiling, so requesting more than a given model supports is harmless. The
+    // old 32000 predated tasks carrying estimates and sub-tasks — every
+    // sub-task adds a name, an estimate and a description to the JSON, so the
+    // same size of plan now costs far more output and was truncating mid-plan.
+    const maxTokens = Number(process.env.LLM_MAX_TOKENS_PLAN) || 262144;
 
     const firstAttempt = await provider.chat({
         systemPrompt,
@@ -663,7 +664,10 @@ async function callLlmForTasksPlan({ project, additionalRequirements, briefText,
     const systemPrompt = buildTasksSystemPrompt();
     const userMessage = buildTasksUserMessage({ project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features });
     const ResponseSchema = tasksResponseSchemaForMode(mode);
-    const maxTokens = Number(process.env.LLM_MAX_TOKENS_PLAN) || 32000;
+    // Same generous ask as the plan stage — see the note there. This path needs
+    // it more, not less: AI-Assist's sub-tasks option is the setting that
+    // pushed output past the old limit in the first place.
+    const maxTokens = Number(process.env.LLM_MAX_TOKENS_PLAN) || 262144;
 
     const firstAttempt = await provider.chat({
         systemPrompt,
