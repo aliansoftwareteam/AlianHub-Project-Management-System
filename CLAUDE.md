@@ -2,6 +2,33 @@
 
 Quick reference for development. For detailed guides, see **See Also** section at the bottom.
 
+---
+
+## Working Agreement (Hard Rules for Claude) ⛔
+
+These are **hard rules**. They override default behavior and must be followed exactly.
+
+### Rule 1 — Comments: minimal, or none
+
+- Write a comment **only** when the code cannot carry the intent by itself — a non-obvious **why** (a workaround, an external constraint, a gotcha, a subtle invariant).
+- **Never** narrate **what** the code does. No restating the line, no step-by-step play-by-play, no section-banner comments, no decorative dividers, no "TODO for later" notes left in shipped code.
+- Prefer a clear name over a comment. If a rename makes the comment redundant, rename and delete the comment.
+- When editing existing code, **remove** comments that merely repeat the code. If a comment is not required, delete it.
+
+### Rule 2 — Understand → PRD → implement (applies to *every* task)
+
+For **every** task or defined piece of work, before writing implementation code:
+
+1. **Evaluate** the request. Restate the goal in your own words.
+2. **Interview** the user with focused questions whenever anything is unclear or ambiguous. Bundle questions into one turn; ask only what you genuinely cannot resolve yourself.
+3. **Answer from the codebase/context first.** Anything directly answerable from the code, docs, or git history — look it up; do not ask the user what you can find.
+4. **Write a PRD** once the task is understood — goal, scope, out-of-scope, acceptance criteria — and confirm it before building.
+5. **Implement with progress tracking.** Use the `task-manager` skill (`Tasks/` → `task.md` + `progress.md`) to record the definition and update progress as work proceeds.
+
+The `task-manager` skill in [.claude/skills/task-manager/](.claude/skills/task-manager/SKILL.md) is the mechanism for steps 4–5. Task tracking lives in [Tasks/](Tasks/README.md).
+
+---
+
 ## What is AlianHub?
 
 **AlianHub** is a self-hosted, open-source project management system designed for teams needing customization, transparency, and data control without vendor lock-in.
