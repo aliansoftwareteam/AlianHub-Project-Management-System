@@ -47,13 +47,18 @@ export function useAiProjectGenerator() {
         return res.data || { status: false, questions: [] };
     }
 
-    async function generatePlan({ description, additionalRequirements, briefId, isPrivateSpace, clarifications }) {
+    async function generatePlan({ description, additionalRequirements, briefId, isPrivateSpace, clarifications, skills }) {
         const res = await apiRequest('post', env.AI_PROJECT_PLAN, {
             description,
             additionalRequirements: additionalRequirements || '',
             briefId: briefId || null,
             isPrivateSpace: !!isPrivateSpace,
             clarifications: Array.isArray(clarifications) && clarifications.length ? clarifications : null,
+            // The chosen technology has to reach the planner, not just the save.
+            // Sent on execute only, it labelled the finished project without ever
+            // shaping the work — a WordPress build came back planned as a custom
+            // server with REST endpoints.
+            skills: Array.isArray(skills) ? skills : [],
         });
         if (res.data && res.data.plan) {
             return res.data;
@@ -79,6 +84,7 @@ export function useAiProjectGenerator() {
                         planId: payload.planId,
                         plan: payload.plan,
                         tokensUsed: payload.tokensUsed,
+                        usage: payload.usage,
                         model: payload.model,
                     });
                 } else if (payload.event === 'error') {

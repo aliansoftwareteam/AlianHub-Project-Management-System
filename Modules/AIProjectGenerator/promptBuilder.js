@@ -125,7 +125,7 @@ function buildSystemPrompt() {
  * @param {string} [args.briefText]          - Extracted text from an uploaded brief
  * @param {Array}  [args.members]            - { id, name, role } member list
  */
-function buildUserMessage({ description, additionalRequirements, briefText, members, clarifications, availableSkills }) {
+function buildUserMessage({ description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills }) {
     const sections = [];
 
     const desc = String(description || '').trim();
@@ -155,6 +155,23 @@ function buildUserMessage({ description, additionalRequirements, briefText, memb
         }));
         sections.push(
             `Available members (use these ids exactly in AssigneeUserId / LeadUserId, otherwise leave those arrays empty):\n${JSON.stringify(slim, null, 2)}`,
+        );
+    }
+
+    // The team's own choice of technology, and the strongest signal in this
+    // message. It goes ABOVE the catalog below because the two look alike and
+    // do opposite jobs: this one decides what the work IS, the catalog only
+    // supplies vocabulary for labelling it afterwards. Without this block the
+    // model has no platform to plan against and invents a generic custom
+    // build — a WordPress site came back with a hand-written server and REST
+    // endpoints, which is work WordPress exists to make unnecessary.
+    if (Array.isArray(selectedSkills) && selectedSkills.length) {
+        sections.push(
+            `The team has already chosen what this project is built with: ${selectedSkills.slice(0, 20).join(', ')}.\n`
+            + 'Plan the work FOR that choice. Sprints and tasks must be the ones that technology actually '
+            + 'requires, named in its own vocabulary and built from its own pieces — and must leave out work '
+            + 'it makes unnecessary. A project on a CMS, for instance, already has a backend, an admin UI and '
+            + 'form handling, so planning a custom server or REST endpoints for it would be wrong.',
         );
     }
 
