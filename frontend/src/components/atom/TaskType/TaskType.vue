@@ -65,11 +65,22 @@ defineEmits(['update:modelValue', 'select'])
     height:13px; 
     width:13px;
 }
-.task__image{
-    height:13px; 
-    width:15px; 
+/* Task-list row task-type icon: a little smaller than the shared TaskTypeIcon default
+   (17px library box + 2px padding). :deep() reaches the icon/box that TaskTypeIcon renders
+   under its own scope; keyed to .task__image so only the list/board row icon shrinks — the
+   dropdown options (.task__type-image) and other call sites keep their size. */
+:deep(.task__image) {
+    width: 14px;
+    height: 14px;
     object-fit: contain;
     top: -2px;
+}
+:deep(.task__image.tticon--lib) {
+    width: 14px !important;
+    height: 14px !important;
+}
+:deep(.task__image.tticon__box) {
+    padding: 1px;
 }
 .task__type-image{
     height:13px; 
