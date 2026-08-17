@@ -4,8 +4,9 @@ import moment from 'moment';
 import store from '../store/store';
 import { apiRequest } from '../utils/services';
 import TrackerTask from '../components/TrackerTask';
-import WasabiImage from '../components/WasabiImage/WasabiImage';
+import TaskTypeIcon from '../components/TaskTypeIcon/TaskTypeIcon';
 import { fetchAndProcessProjects } from '../utils/projectUtils';
+import { DEFAULT_TASK_IMAGE } from '../utils/imageDefaults';
 
 const LogEntryView = () => {
   const dispatch = useDispatch();
@@ -181,15 +182,9 @@ const LogEntryView = () => {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   };
 
-  const getTaskTypeImage = (project, key) => {
-    let imgUrl = "https://firebasestorage.googleapis.com/v0/b/erpproject-1addc.appspot.com/o/defaut_task_status_img.png?alt=media&token=570a9fca-e23a-41ee-a47b-d82fb766b1fd";
-    if (project?.taskTypeCounts?.length > 0) {
-      const match = project.taskTypeCounts.find((item) => item.key === key);
-      if (match?.taskImage) {
-        imgUrl = match?.taskImage;
-      }
-    }
-    return imgUrl;
+  const getTaskTypeData = (project, key) => {
+    const match = project?.taskTypeCounts?.find((item) => item.key === key);
+    return match || { taskImage: DEFAULT_TASK_IMAGE };
   };
 
 
@@ -266,7 +261,7 @@ const LogEntryView = () => {
                         </li>
                       </ul>
                       <div className="flex items-center mt-1">
-                        <WasabiImage url={getTaskTypeImage(project, taskType)} isUser={false} className="!w-[15px] !h-[15px]" />
+                        <TaskTypeIcon taskType={getTaskTypeData(project, taskType)} className="!w-[15px] !h-[15px]" />
                         <h4 className="ml-2 font-medium text-sm truncate">{taskName}</h4>
                       </div>
                     </div>

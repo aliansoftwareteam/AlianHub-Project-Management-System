@@ -4,13 +4,7 @@
             <template #button>
                 <div :ref="uid" class="status-main-div d-flex align-items-center">
                     <slot name="head">
-                        <img v-if="modelValue?.taskImage?.includes('http')" :src="modelValue?.taskImage" alt="task_type" :title="modelValue?.name" :class="imgClasses" class="task__type-image vertical-middle cursor-pointer">
-                        <WasabiImage 
-                            v-else
-                            class="vertical-middle tasktype__wasabiimg cursor-pointer"
-                            :data="{url: modelValue?.taskImage}"
-                            :class="imgClasses"
-                        />
+                        <TaskTypeIcon :taskType="modelValue" :title="modelValue?.name" :class="['task__type-image vertical-middle cursor-pointer', imgClasses]" />
                     </slot>
                 </div>
             </template>
@@ -32,12 +26,7 @@
             <template #options>
                 <DropDownOption v-for="(status, statusIndex) in filteredOptions" :key="statusIndex" @click="$emit('select', status,convertStatus), $emit('update:modelValue', item), $refs[uid].click()">
                     <div class="d-flex align-items-center">
-                        <img v-if="status?.taskImage?.includes('http')" :src="status?.taskImage" alt="task_type" :title="status?.name"  class="task__type-image ml-10px vertical-middle">
-                        <WasabiImage 
-                            v-else
-                            class="ml-10px vertical-middle tasktype__wasabiimg"
-                            :data="{url: status?.taskImage}"
-                        />
+                        <TaskTypeIcon :taskType="status" :title="status?.name" class="task__type-image ml-10px vertical-middle" />
                         <span class="ml-5px"  :style="{color: status.textColor}">{{status.name}}</span>
                     </div>
                 </DropDownOption>
@@ -45,13 +34,7 @@
         </DropDown>
     </div>
     <template v-else>
-        <img v-if="modelValue?.taskImage?.includes('http')" :src="modelValue?.taskImage" alt="task_type" :title="modelValue?.name"  :class="imgClasses"  class="task__type-image vertical-middle">
-        <WasabiImage 
-            v-else
-            class="vertical-middle tasktype__wasabiimg"
-            :data="{url: modelValue?.taskImage}"
-            :class="imgClasses"
-        />
+        <TaskTypeIcon :taskType="modelValue" :title="modelValue?.name" :class="['task__type-image vertical-middle', imgClasses]" />
     </template>
 </template>
 
@@ -64,7 +47,7 @@ import DropDown from '@/components/molecules/DropDown/DropDown.vue'
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue'
 import InputText from '@/components/atom/InputText/InputText.vue'
 import { useCustomComposable } from '@/composable';
-import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
+import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
 
 // UTILS
 const clientWidth = inject('$clientWidth');

@@ -18,7 +18,10 @@ const timeLog = createSlice({
     taskName: "",
     projectName: "",
     folderName: "",
-    sprintName: ""
+    sprintName: "",
+    // AHE-3831 — minutes of tracking left before this task hits its estimate,
+    // captured at session start. `null` = no cap (task has no estimate).
+    remainingMinutes: null
   },
   reducers: {
     setComment: (state, action) => {
@@ -31,6 +34,8 @@ const timeLog = createSlice({
       state.folderName = action.payload.folderName;
       state.sprintName = action.payload.sprintName;
       state.taskTypeImage = action.payload.taskTypeImage
+      state.taskTypeData = action.payload.taskTypeData || null
+      state.remainingMinutes = action.payload.remainingMinutes ?? null
     },
     setTrackerStartTime: (state, action) => {
       
@@ -92,6 +97,7 @@ const timeLog = createSlice({
       state.projectName = "";
       state.folderName = "";
       state.sprintName = "";
+      state.remainingMinutes = null;
     }
 
   },

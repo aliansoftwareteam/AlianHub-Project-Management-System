@@ -13,13 +13,12 @@
             </span>
         </template>
         <template #head-right>
-            <img
+            <button
                 v-if="step !== 'executing'"
-                :src="closeIcon"
-                alt="Close"
-                class="aipg-close-icon"
-                :class="{ 'aipg-close-icon-disabled': isBusy }"
-                @click="isBusy ? null : onClose()"/>
+                class="btn outline-primary d-flex align-items-center justify-content-center aipg-cancel-btn"
+                :class="{ 'cursor-pointer': !isBusy, 'cursor-default pointer-event-none': isBusy }"
+                :disabled="isBusy"
+                @click="onClose()">{{ $t('Projects.cancel') }}</button>
         </template>
         <template #body>
             <div class="aipg-wrapper">
@@ -92,6 +91,35 @@
                                 </span>
                             </button>
                         </div>
+                    </div>
+
+                    <div class="aipg-card">
+                        <label class="aipg-field-label">{{ $t('ProjectDetails.skills') }} <span class="aipg-muted">{{ $t('AI.ai_optional') }}</span></label>
+                        <p class="aipg-helper">{{ $t('AI.ai_skills_hint') }}</p>
+                        <div class="aipg-skills-select">
+                            <SkillsSelect v-model="skills" :bordered="true" :showAll="true"/>
+                        </div>
+                    </div>
+
+                    <div class="aipg-card">
+                        <label class="aipg-field-label">{{ $t('ProjectDetails.source') }} <span class="aipg-required">*</span></label>
+                        <div class="aipg-skills-select">
+                            <ProjectSourceSelect v-model="source"/>
+                        </div>
+
+                        <label class="aipg-field-label aipg-field-label-stacked">
+                            {{ $t('ProjectDetails.proposal_id') }}
+                            <span class="aipg-required" v-if="source === 'upwork'">*</span>
+                            <span class="aipg-muted" v-else>{{ $t('AI.ai_optional') }}</span>
+                        </label>
+                        <p class="aipg-helper">{{ source === 'upwork' ? $t('Projects.proposal_id_format_hint') : $t('AI.ai_proposal_id_hint') }}</p>
+                        <input
+                            v-model.trim="proposalId"
+                            class="aipg-input"
+                            type="text"
+                            maxlength="100"
+                            :placeholder="$t('PlaceHolder.Enter_Proposal_Id')"
+                            :disabled="loading"/>
                     </div>
 
                     <div class="aipg-card">
@@ -232,9 +260,23 @@
                             <code class="aipg-code-pill">{{ plan.project.ProjectCode }}</code>
                             <span class="aipg-ml-auto aipg-helper">
                                 {{ totals.sprints }} sprints · {{ totals.tasks }} tasks
+                                <!-- Cost is omitted, not zeroed, when the model
+                                     has no price on file — a wrong number is
+                                     worse than no number. -->
+                                <template v-if="runUsage">
+                                    ·
+                                    <span class="aipg-usage" :title="usageTooltip">
+                                        {{ formatTokens(runUsage.totalTokens) }} tokens<template
+                                            v-if="runUsage.costUsd !== null"> · {{ formatCost(runUsage.costUsd) }}</template>
+                                    </span>
+                                </template>
                             </span>
                         </div>
                         <p class="aipg-plan-description">{{ plan.project.description }}</p>
+                        <div class="aipg-plan-skills">
+                            <label class="aipg-field-label-sm">{{ $t('ProjectDetails.skills') }}</label>
+                            <SkillsSelect v-model="skills" :bordered="true" :showAll="true"/>
+                        </div>
                     </div>
 
                     <div class="aipg-folder-list">
@@ -267,6 +309,14 @@
                                         </summary>
                                         <pre class="aipg-task-desc-body">{{ renderTaskDescription(task) }}</pre>
                                     </details>
+                                    <!-- Sub-tasks and hours were generated but never shown, so a split
+                                         task looked identical to a flat one until after creation. -->
+                                    <span v-if="task.estimatedHours" class="aipg-task-est">{{ formatHours(task.estimatedHours) }}</span>
+                                    <div v-if="task.subtasks && task.subtasks.length" class="aipg-subs">
+                                        <div v-for="(st, sti) in task.subtasks" :key="'st-'+si+'-'+ti+'-'+sti" class="aipg-sub">
+                                            ↳ {{ st.TaskName }}<span v-if="st.estimatedHours" class="aipg-sub-est">{{ formatHours(st.estimatedHours) }}</span>
+                                        </div>
+                                    </div>
                                 </li>
                             </ul>
                         </details>
@@ -345,10 +395,15 @@ import { ref, reactive, computed, onBeforeUnmount, inject, defineComponent } fro
 import Sidebar from '@/components/molecules/Sidebar/Sidebar.vue';
 import ClarifyStep from './clarify/ClarifyStep.vue';
 import { useAiProjectGenerator } from '@/composable/aiProjectGenerator';
+import { useStore } from 'vuex';
+import SkillsSelect from '@/components/molecules/SkillsSelect/SkillsSelect.vue';
+import ProjectSourceSelect from '@/components/molecules/ProjectSourceSelect/ProjectSourceSelect.vue';
+import { PROJECT_SOURCES, checkProposalId } from '@/utils/projectSource';
+import { useI18n } from 'vue-i18n';
 
 export default defineComponent({
     name: 'AiProjectCreator',
-    components: { Sidebar, ClarifyStep },
+    components: { Sidebar, ClarifyStep, SkillsSelect, ProjectSourceSelect },
     props: {
         visible: { type: Boolean, default: false },
     },
@@ -356,7 +411,8 @@ export default defineComponent({
     setup(props, { emit }) {
         const clientWidth = inject('$clientWidth') || ref(window.innerWidth);
         const api = useAiProjectGenerator();
-        const closeIcon = require('@/assets/images/svg/CloseSidebar.svg');
+        const store = useStore();
+        const { t } = useI18n();
 
         const step = ref('input'); // input | clarify | preview | executing | done | error
         const loading = ref(false);
@@ -393,6 +449,11 @@ export default defineComponent({
         // We force this onto the plan server-side so the user's choice always
         // wins over whatever the LLM picked.
         const isPrivateSpace = ref(false);
+        // Sent straight to /execute — kept out of the plan so the LLM can't invent one.
+        const proposalId = ref('');
+        const source = ref('');
+        // Step-1 picks, merged with the model's suggestions once the plan lands.
+        const skills = ref([]);
         const briefFile = ref(null);
         const briefId = ref(null);
         const briefStats = reactive({ tokenEstimate: 0, charCount: 0, truncated: false });
@@ -481,6 +542,57 @@ export default defineComponent({
             for (const sp of plan.value.sprints) t += (sp.tasks || []).length;
             return { sprints: plan.value.sprints.length, tasks: t };
         });
+
+        // What this run cost. One wizard run can be two LLM calls — the clarify
+        // round and the plan itself — so both are collected and added up;
+        // reporting only the plan would undercount every run that asked
+        // questions first.
+        const clarifyUsage = ref(null);
+        const planUsage = ref(null);
+
+        const runUsage = computed(() => {
+            const parts = [clarifyUsage.value, planUsage.value].filter(Boolean);
+            if (!parts.length) return null;
+            const totalTokens = parts.reduce((sum, u) => sum + (Number(u.totalTokens) || 0), 0);
+            if (!totalTokens) return null;
+            // A cost is shown only when EVERY call in the run was priced.
+            // Adding a priced call to an unpriced one would render a number
+            // that looks like the run total but silently omits part of it.
+            const priced = parts.every((u) => u.priced && typeof u.costUsd === 'number');
+            return {
+                totalTokens,
+                inputTokens: parts.reduce((sum, u) => sum + (Number(u.inputTokens) || 0), 0),
+                outputTokens: parts.reduce((sum, u) => sum + (Number(u.outputTokens) || 0), 0),
+                costUsd: priced ? parts.reduce((sum, u) => sum + u.costUsd, 0) : null,
+                model: (planUsage.value && planUsage.value.model) || '',
+            };
+        });
+
+        // The breakdown lives in a tooltip: the split explains why the cost is
+        // what it is (output is priced several times higher than input), but it
+        // is detail, not the headline.
+        const usageTooltip = computed(() => {
+            const u = runUsage.value;
+            if (!u) return '';
+            const parts = [`${formatTokens(u.inputTokens)} in · ${formatTokens(u.outputTokens)} out`];
+            if (u.model) parts.push(u.model);
+            if (u.costUsd === null) parts.push('no price on file for this model');
+            return parts.join(' — ');
+        });
+
+        // "2h" and "1h 30m" read better than "1.5" against a task name.
+        const formatHours = (h) => {
+            const total = Math.round((Number(h) || 0) * 60);
+            if (total <= 0) return '';
+            const hours = Math.floor(total / 60);
+            const mins = total % 60;
+            if (!hours) return `${mins}m`;
+            return mins ? `${hours}h ${mins}m` : `${hours}h`;
+        };
+
+        const formatTokens = (n) => Number(n || 0).toLocaleString();
+        // Sub-cent runs are normal, so two decimals would read as "$0.00".
+        const formatCost = (n) => (n >= 0.01 ? `$${n.toFixed(2)}` : `$${n.toFixed(4)}`);
 
         // Render Editor.js blocks as readable plain text for the preview
         // `<pre>`. Matches the orchestrator's blocksToText helper so the
@@ -605,6 +717,7 @@ export default defineComponent({
                     description: description.value.trim(),
                     briefId: briefId.value,
                 });
+                if (res && res.usage) clarifyUsage.value = res.usage;
                 if (res && res.status && Array.isArray(res.questions) && res.questions.length) {
                     // Questions came back — NOW move into the Clarify step.
                     clarifyQuestions.value = res.questions;
@@ -642,6 +755,10 @@ export default defineComponent({
                     briefId: briefId.value,
                     isPrivateSpace: isPrivateSpace.value,
                     clarifications: clarificationsPayload,
+                    // Picked in step 1 and, until now, only used when saving the
+                    // finished project. The plan has to be built for the chosen
+                    // technology, not merely tagged with it afterwards.
+                    skills: skills.value,
                 });
                 if (!result || !result.status) {
                     error.value = (result && result.statusText) || 'Plan generation failed. Please try again.';
@@ -655,6 +772,8 @@ export default defineComponent({
                 }
                 plan.value = result.plan;
                 planId.value = result.planId;
+                planUsage.value = result.usage || null;
+                mergeSuggestedSkills(result.plan);
                 step.value = 'preview';
             } catch (e) {
                 error.value = friendlyErr(e);
@@ -662,6 +781,23 @@ export default defineComponent({
             } finally {
                 loading.value = false;
             }
+        }
+
+        // User's picks first, then the model's — known slugs only, mirroring the
+        // server rule so the review step never shows a tick that won't save.
+        function mergeSuggestedSkills(generatedPlan) {
+            const suggested = generatedPlan && generatedPlan.project && Array.isArray(generatedPlan.project.skills)
+                ? generatedPlan.project.skills
+                : [];
+            if (!suggested.length) return;
+            const known = new Set((store.getters['settings/projectSkills'] || [])
+                .filter((s) => s.active !== false)
+                .map((s) => s.slug));
+            const merged = [...skills.value];
+            for (const slug of suggested) {
+                if (known.has(slug) && !merged.includes(slug) && merged.length < 15) merged.push(slug);
+            }
+            skills.value = merged;
         }
 
         // ── Clarify step handlers ────────────────────────────────────────
@@ -692,6 +828,7 @@ export default defineComponent({
                     description: description.value.trim(),
                     briefId: briefId.value,
                 });
+                if (res && res.usage) clarifyUsage.value = res.usage;
                 if (res && res.status && Array.isArray(res.questions) && res.questions.length) {
                     clarifyQuestions.value = res.questions;
                     clarifyUnderstanding.value = res.understanding || '';
@@ -727,6 +864,18 @@ export default defineComponent({
 
         async function onApprovePlan() {
             if (!plan.value) return;
+            // Enforced here rather than before plan generation: the AI doesn't
+            // need either value, so blocking step 1 would be friction for nothing.
+            if (!PROJECT_SOURCES.includes(source.value)) {
+                error.value = t('Projects.source_required');
+                step.value = 'input';
+                return;
+            }
+            if (checkProposalId(source.value, proposalId.value) === 'required') {
+                error.value = t('Projects.proposal_id_required_upwork');
+                step.value = 'input';
+                return;
+            }
             loading.value = true;
             error.value = '';
             try {
@@ -735,6 +884,9 @@ export default defineComponent({
                     edits: buildEdits(),
                     userName: '',
                     isPrivateSpace: isPrivateSpace.value,
+                    proposalId: proposalId.value,
+                    source: source.value,
+                    skills: skills.value,
                 });
                 if (!result || !result.status || !result.jobId) {
                     error.value = (result && result.statusText) || 'Execute failed';
@@ -841,6 +993,11 @@ export default defineComponent({
             rolledBack.value = false;
             briefUploading.value = false;
             isPrivateSpace.value = false;
+            proposalId.value = '';
+            source.value = '';
+            skills.value = [];
+            clarifyUsage.value = null;
+            planUsage.value = null;
             // Reset clarify state too so re-opening the modal is a clean slate.
             clarifyLoading.value = false;
             clarifyQuestions.value = [];
@@ -862,13 +1019,13 @@ export default defineComponent({
         });
 
         return {
-            closeIcon,
             clientWidth, step, loading, briefUploading, error, rolledBack,
-            description, isPrivateSpace, briefFile, briefId, briefStats,
+            description, isPrivateSpace, proposalId, source, skills, briefFile, briefId, briefStats,
             plan, planId, editableProjectName,
             jobId, progress, createdProjectId,
             placeholderText,
             canGenerate, hasGeneratedPlan, hasGeneratedQuestions, totals, isBusy,
+            runUsage, usageTooltip, formatTokens, formatCost, formatHours,
             renderTaskDescription, isStepDone, stepClass, stepDoneDot, rowClass, stepIcon, stepStatusLabel,
             onFileChosen, clearBrief,
             onGeneratePlan, onNextWithExistingPlan,
@@ -928,14 +1085,14 @@ export default defineComponent({
 }
 .aipg-spark { font-size: 18px; }
 
-.aipg-close-icon {
-    width: 24px;
-    height: 24px;
-    cursor: pointer;
-    transition: opacity 0.15s ease;
+/* Mirrors .create-project-cancelbtn, which is scoped to CreateProject. */
+.aipg-cancel-btn {
+    max-width: 77px;
+    min-width: 77px;
 }
-.aipg-close-icon:hover { opacity: 0.7; }
-.aipg-close-icon-disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+@media(max-width: 414px) {
+    .aipg-cancel-btn { width: 55px; min-width: 55px; font-size: 14px !important; padding: 3px !important; }
+}
 
 /* ─────────────────────────────────────────────────────────────────────
    Stepper
@@ -1067,6 +1224,7 @@ export default defineComponent({
 
 .aipg-input {
     width: 100%;
+    margin-top: 10px;   /* same helper-to-control gap as .aipg-file-drop */
     padding: 8px 12px;
     border: 1px solid #e5e7eb;
     border-radius: 8px;
@@ -1307,6 +1465,37 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
     flex: 1 1 auto;
     min-width: 0;
 }
+/* Sits in the same muted line as the sprint/task counts — informational, not a
+   number the user has to act on. Tabular figures so it does not jitter while
+   the plan is still being edited. */
+.aipg-usage {
+    font-variant-numeric: tabular-nums;
+    cursor: help;
+    border-bottom: 1px dotted #cbd5e1;
+}
+
+.aipg-subs { margin: 2px 0 4px 12px; }
+.aipg-sub {
+    font-size: 12px; color: #6b7488; padding: 2px 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* The estimate is the number a reader scans for, so it gets the same quiet
+   pill the project code uses rather than trailing off as plain grey text.
+   Parent and sub-task are styled identically — a sub-task's two hours are
+   worth exactly as much as a parent's. */
+.aipg-sub-est, .aipg-task-est {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
 .aipg-code-pill {
     background: #f1f5f9;
     color: #475569;
@@ -1321,6 +1510,13 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
     margin: 10px 0 12px;
     color: #475569;
     font-size: 13px;
+}
+.aipg-required { color: #dc2626; }
+/* Second field in a shared card: separated by space, not another border. */
+.aipg-field-label-stacked { margin-top: 18px; }
+.aipg-plan-skills,
+.aipg-skills-select {
+    margin-top: 10px;   /* same helper-to-control gap as .aipg-file-drop */
 }
 .aipg-chip-row {
     display: flex;

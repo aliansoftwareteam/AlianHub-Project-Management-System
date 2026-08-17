@@ -182,6 +182,14 @@ const searchMongoTasks = (date = null, reset = true) => {
         let startDate = date == null ? new Date(dateValue.value.setHours(0, 0, 0)).getTime() : new Date(date.setHours(0, 0, 0)).getTime();
         let endDate = date == null ? new Date(dateValue.value.setHours(23, 59, 59)).getTime() : new Date(date.setHours(23, 59, 59)).getTime();
         const projectIDs = cardObject.value.projectId.length ? cardObject.value.projectId : JSON.parse(JSON.stringify(allProjects.value)).map((e) => e?._id);
+        // Project scope, always bounded to accessible projects: exclude → whitelist
+        // (accessible minus excluded) so a raw $nin can't leak other projects.
+        const projectMode = cardObject.value.projectMode || 'all';
+        const excludeIds = cardObject.value.projectId || [];
+        const accessibleIds = JSON.parse(JSON.stringify(allProjects.value)).map((e) => e?._id);
+        const projectIdObjId = (projectMode === 'exclude' && excludeIds.length)
+            ? { $in: accessibleIds.filter((id) => !excludeIds.includes(id)) }
+            : (projectIDs && projectIDs.length ? { $in: projectIDs } : {});
         // const statusKeys = cardObject.value.statusArray || [];
         let queryAndConditions = [
             {
@@ -192,7 +200,7 @@ const searchMongoTasks = (date = null, reset = true) => {
             { deletedStatusKey: 0 },
             {
                 ProjectID: {
-                    objId: projectIDs && projectIDs.length ? { $in: projectIDs } : {},
+                    objId: projectIdObjId,
                 },
             },
             ...(filterQuery.value ? Object.entries(filterQuery.value).map(([key, value]) => ({ [key]: value })) : [])

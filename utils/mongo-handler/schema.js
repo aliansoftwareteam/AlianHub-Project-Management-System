@@ -188,12 +188,35 @@ const schema = {
             type: String,
             required: false
         },
+        // Marks this task as a one-to-one main-chat conversation (a task in the
+        // hidden `default` chat project) rather than a normal task.
+        //
+        // This schema is built with `strict: true` (P1-SEC-11, see
+        // createSchema.js), so an UNDECLARED field is silently dropped on save.
+        // `mainChat` was set by the chat creator but never declared here, so it
+        // never persisted — and the one-to-one list filters on exactly this flag
+        // (`{ mainChat: true, AssigneeUserId }` in Modules/MainChats/controller.js
+        // setChats). The conversation therefore worked in-session but vanished
+        // from the list on reload. Channels were unaffected because they are
+        // sprints, not tasks. Declaring it makes the flag stick.
+        mainChat: {
+            type: Boolean,
+            required: false
+        },
         totalEstimatedTime:{
             type: Number,
             required: false
         },
         remainingHours:{
             type: Number,
+            required: false
+        },
+        // AHE — set true when a task's estimate is RE-updated (changed after it was
+        // first set). Surfaced in the Project Timesheet so a TL sees which tasks had
+        // their estimate changed. Permanent for now; a manual clear will be added later.
+        estimateChangedFlag: {
+            type: Boolean,
+            default: false,
             required: false
         },
         points: {
@@ -418,6 +441,47 @@ const schema = {
         createdBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0 },
     },
+    // Due-index for general reminders, stored in the GLOBAL database.
+    //
+    // Reminders themselves live in per-company databases, so finding what is due
+    // would otherwise mean opening a connection to EVERY company every minute —
+    // which pins one live connection per tenant and never lets them idle out.
+    // This index holds one tiny pointer row per pending reminder, so the
+    // scheduler reads the global DB once and only connects to the companies that
+    // actually have work. Rows are removed when a reminder fires, completes or
+    // is deleted. It is a derived cache: it can be rebuilt from the per-company
+    // collections and never holds reminder content.
+    general_reminder_queue: {
+        companyId: { type: String, required: true },
+        reminderId: { type: String, required: true },
+        notifyAt: { type: Date, required: true },
+    },
+    // Standalone, general-purpose reminders — the header "Reminder" dialog.
+    // Deliberately a separate collection from `reminders` above (which is the
+    // task-scoped "Remind me" flow) because these are not tied to a task and
+    // carry their own title, description, notify lead-time, attachments and
+    // recipient. Managed by Modules/GeneralReminders.
+    general_reminders: {
+        title: { type: String, required: true },
+        description: { type: String, required: false },
+        // Who the reminder is for ("For me" = the creator).
+        userId: { type: String, required: true },
+        createdBy: { type: String, required: false },
+        companyId: { type: String, required: false },
+        remindAt: { type: Date, required: true },
+        // Lead time in minutes before remindAt. 0 = on due date, -1 = don't notify.
+        notifyBefore: { type: Number, default: 0 },
+        // Denormalised firing moment (remindAt - notifyBefore) so the cron can use
+        // a single indexed range query.
+        notifyAt: { type: Date, required: false },
+        // [{ name, url, extension, size }]
+        attachments: { type: Array, default: [] },
+        fired: { type: Boolean, default: false },
+        firedAt: { type: Date, required: false },
+        isDone: { type: Boolean, default: false },
+        completedAt: { type: Date, required: false },
+        deletedStatusKey: { type: Number, default: 0 },
+    },
     // Personal notepad (COLLAB-06) — quick per-user notes, convertible to tasks.
     // Managed by Modules/Notes. convertedTaskId is stamped (frontend) once a note
     // has been turned into a task via the existing task-create flow.
@@ -445,6 +509,9 @@ const schema = {
         size: { type: Number, required: false },
         durationSec: { type: Number, required: false },
         source: { type: String, required: false },
+        // Stamped by the client after a clip has been turned into a task through
+        // the existing task-create flow, mirroring notes.convertedTaskId.
+        convertedTaskId: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0 },
     },
     // Timesheet approval submissions — one per user per period (week/month) — managed by Modules/TimesheetApproval
@@ -622,6 +689,37 @@ const schema = {
         connectedAt: { type: Date, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // AHE-3838 — one row per (user, cloud storage provider). Distinct from
+    // integrationConnections above, which holds the COMPANY's app registration:
+    // every person has their own Drive, so the OAuth grant has to be per-user.
+    // Tokens are AES-256-GCM ciphertext (Modules/CloudStorage/helpers/cloudCrypto),
+    // never plaintext, and are never returned to the browser.
+    cloudStorageConnections: {
+        provider: { type: String, required: true },      // google_drive | dropbox
+        userId: { type: String, required: true },
+        // The user's OWN app registration for this provider (client id/secret,
+        // api key, app id / app key). Per-user, not per-company: one member must
+        // never see or overwrite another's credentials, and two people may point
+        // at the same drive account independently.
+        //
+        // MUST stay declared — this sub-schema is strict: true, so an undeclared
+        // path is silently dropped on save and only shows up as data that
+        // vanishes after a reload.
+        config: { type: Object, default: {}, required: false },
+        accountEmail: { type: String, required: false },
+        accountName: { type: String, required: false },
+        accessToken: { type: String, required: false },  // encrypted
+        refreshToken: { type: String, required: false },  // encrypted
+        expiresAt: { type: Date, required: false },
+        scope: { type: String, required: false },
+        // 'connected' | 'reauth_required' — set to reauth_required when the
+        // provider rejects our refresh token, so the UI can prompt instead of
+        // failing every pick with an opaque error.
+        status: { type: String, default: 'connected', required: false },
+        lastUsedAt: { type: Date, required: false },
+        connectedAt: { type: Date, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Wiki pages (Editor.js blocks; versioned) — managed by Modules/Pages
     pages: {
         title: { type: String, required: true },
@@ -632,6 +730,12 @@ const schema = {
         createdBy: { type: String, required: false },
         updatedBy: { type: String, required: false },
         order: { type: Number, required: false },
+        // Tasks this doc is attached to. Held on the DOC, not on the task: one place to
+        // read and write, and a doc knows what it belongs to without a second lookup.
+        // A project link needs no field of its own — ProjectID above already is one.
+        linkedTasks: { type: [mongoose.Schema.Types.ObjectId], required: false, default: [] },
+        // 'project' (anyone who can see the project) or 'private' (only its author).
+        visibility: { type: String, required: false, default: 'project' },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
     pageVersions: {
@@ -1008,6 +1112,20 @@ const schema = {
         Cst_LogTimeDays: {
             type: String,
             required: true
+        },
+        // Whether the desktop tracker is capped by a task's estimated hours (AHE-3831).
+        // ON: a task needs an estimate to start, and the tracker auto-stops when the
+        // estimate is met. OFF: neither gate applies and the tracker runs freely.
+        //
+        // Defaults to true so every company that predates this setting keeps the behaviour
+        // it has today — an absent field must not silently switch the cap off.
+        //
+        // MUST stay declared: this schema is strict, so an undeclared path is dropped on
+        // save and only shows up as a setting that will not stick after a reload.
+        trackerEstimateLimit: {
+            type: Boolean,
+            required: false,
+            default: true
         },
         Cst_Phone: {
             type: String,
@@ -1756,6 +1874,34 @@ const schema = {
         tagsArray:{
             type: Array,
             required: false
+        },
+        // Id of the won proposal this project came from (bidding tool
+        // `proposals.proposalId`). Free text — not validated against that DB.
+        proposalId: {
+            type: String,
+            required: false,
+            default: ''
+        },
+        // Digits-only form of `proposalId` when one can be derived. The bidding
+        // DB stores 19-digit ids, so this is what the warehouse joins on.
+        proposalIdNumeric: {
+            type: String,
+            required: false,
+            default: ''
+        },
+        // Where the work came from: 'upwork' | 'fiverr' | 'other'. Required on
+        // create; absent on projects that predate the field, which read 'other'.
+        source: {
+            type: String,
+            required: false,
+            default: 'other'
+        },
+        // Slugs from the company's `project_skills` settings list, so renames
+        // are display-only and the value joins to a bid's skills downstream.
+        skills: {
+            type: Array,
+            required: false,
+            default: []
         }
     },
     mainChats: {

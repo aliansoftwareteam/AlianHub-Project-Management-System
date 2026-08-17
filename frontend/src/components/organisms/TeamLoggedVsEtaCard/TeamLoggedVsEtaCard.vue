@@ -45,9 +45,21 @@
                             <template v-if="expanded[team.teamId + '|' + u.userId]">
                                 <div v-for="t in u.tasks" :key="t.taskId" class="tle-row tle-task-row">
                                     <span class="tle-c-name tle-indent-task">
-                                        <span v-if="t.taskKey" class="tle-task-key">{{ t.taskKey }}</span>
-                                        <span class="tle-task-name" :title="t.taskName">{{ t.taskName || '—' }}</span>
-                                        <span v-if="t.projectName" class="tle-task-proj">· {{ t.projectName }}</span>
+                                        <span
+                                            class="tle-task-link"
+                                            :class="{ 'tle-task-clickable': t.taskId && t.projectId }"
+                                            :title="(t.taskKey ? t.taskKey + ' ' : '') + (t.taskName || '')"
+                                            :role="t.taskId && t.projectId ? 'button' : null"
+                                            :tabindex="t.taskId && t.projectId ? 0 : null"
+                                            @click.stop="openTaskDetail(t)"
+                                            @keydown.enter.stop.prevent="openTaskDetail(t)"
+                                            @keydown.space.stop.prevent="openTaskDetail(t)"
+                                            @mousedown.stop
+                                        >
+                                            <span v-if="t.taskKey" class="tle-task-key">{{ t.taskKey }}</span>
+                                            <span class="tle-task-name">{{ t.taskName || '—' }}</span>
+                                            <span v-if="t.projectName" class="tle-task-proj">· {{ t.projectName }}</span>
+                                        </span>
                                     </span>
                                     <span class="tle-c-num tle-logged">{{ formatMinutes(t.loggedMinutes) }}</span>
                                     <span class="tle-c-num">{{ formatMinutes(t.etaMinutes) }}</span>
@@ -59,6 +71,18 @@
                 </template>
             </div>
         </template>
+
+        <!-- Task detail sidebar — opened by clicking a task row (same pattern as LiveWorkCard). -->
+        <TaskDetail
+            v-if="isTaskDetail"
+            :companyId="companyId"
+            :projectId="detailProjectId"
+            :sprintId="detailSprintId"
+            :taskId="detailTaskId"
+            :isTaskDetailSideBar="isTaskDetail"
+            @toggleTaskDetail="toggleTaskDetail"
+            :zIndex="7"
+        />
     </div>
 </template>
 
@@ -67,13 +91,14 @@ export default { name: 'TeamLoggedVsEtaCard' };
 </script>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted, inject } from 'vue';
+import { ref, reactive, computed, watch, onMounted, inject, provide } from 'vue';
 import { useStore } from 'vuex';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { teamIdToUserId, buildFilterQuery } from '@/composable/commonFunction';
 import { resolveCardRange, formatMinutes } from '@/composable/useResourceWorkload';
 import CardSkeleton from '@/components/atom/CardSkeleton/CardSkeleton.vue';
+import TaskDetail from '@/views/TaskDetail/TaskDetail.vue';
 
 // Resource Utilization card #6 — per-team logged vs estimate (ETA),
 // drill-down: Team → User → Task, in an aligned table layout.
@@ -89,6 +114,7 @@ const props = defineProps({
 });
 
 const userId = inject('$userId');
+const companyId = inject('$companyId', ref(''));
 const { getters } = useStore();
 const teamsArr = getters['settings/teams'] || [];
 
@@ -96,6 +122,27 @@ const teams = ref([]);
 const loading = ref(false);
 const expanded = reactive({});
 const toggle = (key) => { expanded[key] = !expanded[key]; };
+
+// ─── Task-detail sidebar (same pattern as LiveWorkCard) ───
+const isTaskDetail = ref(false);
+const detailProjectId = ref('');
+const detailSprintId = ref('');
+const detailTaskId = ref('');
+function openTaskDetail(t) {
+    if (!t || !t.taskId || !t.projectId) return;
+    detailProjectId.value = t.projectId;
+    detailSprintId.value = t.sprintId || '';
+    detailTaskId.value = t.taskId;
+    isTaskDetail.value = true;
+}
+function toggleTaskDetail(_task, close = false) {
+    isTaskDetail.value = false;
+    if (close === true) return;
+    detailProjectId.value = '';
+    detailSprintId.value = '';
+    detailTaskId.value = '';
+}
+provide('toggleTaskDetail', toggleTaskDetail);
 
 // Period lives in the card-header dropdown; 0 = Auto → dashboard range.
 const globalRange = inject('dashboardGlobalRange', null);
@@ -116,6 +163,7 @@ const load = async () => {
         const payload = {
             employeeIds: Array.isArray(employeeIds) ? employeeIds : [],
             projectIds: props.cardData?.projectId || [],
+            projectMode: props.cardData?.projectMode || 'all',
             statusKeys: props.cardData?.statusArray || [],
             dateFrom,
             dateTo,
@@ -196,6 +244,11 @@ onMounted(load);
 .tle-user-name { font-weight: 600; color: #3a3f52; }
 .tle-logged { color: #0f766e; }
 
+/* Task name spans the row; only clickable when it can open a task. */
+.tle-task-link { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 auto; }
+.tle-task-link.tle-task-clickable { cursor: pointer; }
+.tle-task-link.tle-task-clickable:hover .tle-task-name { text-decoration: underline; }
+.tle-task-link.tle-task-clickable:focus-visible { outline: 2px solid #0d9488; outline-offset: 2px; border-radius: 3px; }
 .tle-task-key { color: #0d9488; font-weight: 600; flex: none; }
 .tle-task-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tle-task-proj { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #9aa0b4; }

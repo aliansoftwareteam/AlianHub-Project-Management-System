@@ -8,6 +8,10 @@ const socketEmitter = require('../../event/socketEventEmitter');
 
 const handleUserNotificationChange = (changeData) => {
     if (changeData.module !== 'userIdNotification') return;
+    // A findOneAndUpdate that matched nothing resolves to null. Reading .userId off
+    // it threw here, and broadcasting it would have replaced the client's entire
+    // count store with null — wiping every badge.
+    if (!changeData.data || !changeData.data.userId) return;
 
     const userIdIdentifier = `userIdNotification_${changeData.data.userId}`;
     // SOCKET-PERFORMANCE-PLAN #1 (Phase 2): O(1) prefix lookup.

@@ -179,6 +179,7 @@ function initializeControllers() {
     require('./Modules/Scim/init').init(app);
     require('./Modules/Pto/init').init(app);
     require('./Modules/Portfolio/init').init(app);
+    require('./Modules/ProjectDashboard/init').init(app);
     require('./Modules/CustomReports/init').init(app);
     require('./Modules/VarianceReport/init').init(app);
     require('./Modules/CapacityPlanning/init').init(app);
@@ -187,14 +188,18 @@ function initializeControllers() {
     require('./Modules/Calendar/init').init(app);
     require('./Modules/Automations/init').init(app);
     require('./Modules/Integrations/init').init(app);
+    require('./Modules/CloudStorage/init').init(app);
+    require('./Modules/Inbox/init').init(app);
     require('./Modules/notification1/init').init(app);
     require('./Modules/ImportSettings/init').init(app);
     require('./Modules/Tasks/init.js').init(app);
     require('./Modules/Sprints/init.js').init(app);
+    require('./Modules/Calls/init.js').init(app);
     require('./Modules/AgileReports/init').init(app);
     require('./Modules/Export/init').init(app);
     require('./Modules/RecurringTasks/init').init(app);
     require('./Modules/Reminders/init').init(app);
+    require('./Modules/GeneralReminders/init').init(app);
     require('./Modules/Notes/init').init(app);
     require('./Modules/Clips/init').init(app);
     require('./Modules/LogTime/init.js').init(app);
@@ -260,6 +265,7 @@ function initializeControllers() {
     require('./Modules/settings/Category/init').init(app);
     require('./Modules/settings/Roles/init').init(app);
     require('./Modules/settings/Designation/init').init(app);
+    require('./Modules/settings/ProjectSkills/init').init(app);
     require('./Modules/settings/CompanyUserStatus/init').init(app);
     require('./Modules/settings/fileExtensions/init').init(app);
     require('./Modules/settings/commonDateFormate/init').init(app);

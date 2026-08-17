@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Notification</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body { overflow: hidden; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      background: transparent;
+      padding: 12px 16px 16px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(12px) scale(0.9); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes toastOut {
+      from { opacity: 1; transform: translateY(0) scale(1); }
+      to   { opacity: 0; transform: translateY(12px) scale(0.9); }
+    }
+
+    .toast {
+      position: relative;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.8) 100%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      border-radius: 14px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+      overflow: hidden;
+      transform-origin: bottom right;
+      animation: toastIn 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .toast.closing { animation: toastOut 0.2s ease-in forwards; }
+    .toast::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(120% 80% at 0% 0%, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0) 55%);
+      pointer-events: none;
+    }
+
+    /* Text-only card is snug; when a media image is present the head tightens
+       up so the preview sits right below it (matches the screenshot layout). */
+    .toast-head { display: flex; align-items: center; gap: 10px; padding: 14px 12px; position: relative; z-index: 1; }
+    body.has-image .toast-head { padding: 12px 12px 10px; }
+
+    .logo { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+
+    .head-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+    .title { font-size: 14px; font-weight: 700; color: #171b26; line-height: 1.2; letter-spacing: 0.2px; }
+    .subtitle { font-size: 12px; color: #444b5c; margin-top: 2px; }
+
+    .close {
+      width: 22px; height: 22px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 6px;
+      cursor: pointer;
+      color: #4b5162;
+      flex-shrink: 0;
+      transition: background 0.15s, color 0.15s;
+    }
+    .close:hover { background: rgba(0, 0, 0, 0.08); color: #171b26; }
+
+    .media-wrap { padding: 0 12px 14px; position: relative; z-index: 1; }
+    .media {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      height: auto;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      display: block;
+      background: rgba(255, 255, 255, 0.25);
+    }
+
+    .countdown-track {
+      position: absolute;
+      bottom: 0; left: 0;
+      width: 100%;
+      height: 5px;
+      background: rgba(47, 57, 144, 0.15);
+      z-index: 1;
+    }
+    .countdown {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #2F3990, #5561d6);
+      border-radius: 0 3px 3px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="toast">
+    <div class="toast-head">
+      <img src="./logo.png" class="logo" alt="Logo" id="logo">
+      <div class="head-text">
+        <span class="title" id="title">Notification</span>
+        <span class="subtitle" id="subtitle"></span>
+      </div>
+      <div class="close" id="close_icon" title="Dismiss">
+        <svg width="14" height="14" viewBox="0 0 490 490" fill="currentColor">
+          <polygon points="456.851,0 245,212.564 33.149,0 0.708,32.337 212.669,245.004 0.708,457.678 33.149,490 245,277.443 456.851,490 489.292,457.678 277.331,245.004 489.292,32.337 "/>
+        </svg>
+      </div>
+    </div>
+    <div class="media-wrap" id="media-wrap" style="display:none;">
+      <img id="media" class="media" src="" alt="">
+    </div>
+    <div class="countdown-track">
+      <div class="countdown" id="progress-bar-fill"></div>
+    </div>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+    const toast = document.querySelector('.toast');
+    const OUT_MS = 200;
+    let closing = false;
+    let started = false;
+
+    ipcRenderer.on('logo-path', (event, path) => {
+      document.getElementById('logo').src = path;
+    });
+
+    // Measure the actual laid-out card and ask main to fit the window to it, so
+    // content of ANY length is shown in full and never clipped. Height = the
+    // card + the body's vertical padding (which reserves room for the shadow).
+    function reportSize() {
+      const card = document.querySelector('.toast');
+      if (!card) return;
+      const cs = getComputedStyle(document.body);
+      const padV = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+      const h = Math.ceil(card.getBoundingClientRect().height + padV);
+      ipcRenderer.send('notification:size', { height: h });
+    }
+    // Re-measure once a media preview finishes loading (its box may resize).
+    const mediaEl = document.getElementById('media');
+    if (mediaEl) mediaEl.addEventListener('load', reportSize);
+
+    // Single entry point: the shared layout renders whatever the caller sends.
+    // { title, subtitle, image?, timeout? } — pass an image to show the media
+    // preview, omit it for a compact text-only card.
+    ipcRenderer.on('notification:render', (event, data) => {
+      data = data || {};
+      if (data.title != null) document.getElementById('title').textContent = data.title;
+      if (data.subtitle != null) document.getElementById('subtitle').textContent = data.subtitle;
+
+      const wrap = document.getElementById('media-wrap');
+      if (data.image) {
+        document.getElementById('media').src = data.image;
+        wrap.style.display = '';
+        document.body.classList.add('has-image');
+      } else {
+        wrap.style.display = 'none';
+        document.body.classList.remove('has-image');
+      }
+
+      startCountdown(typeof data.timeout === 'number' ? data.timeout : 10000);
+      // Wait for layout to settle after the text/image change, then fit the window.
+      requestAnimationFrame(() => requestAnimationFrame(reportSize));
+    });
+
+    function closeWithAnim() {
+      if (closing) return;
+      closing = true;
+      toast.classList.add('closing');
+      setTimeout(() => ipcRenderer.send('notification:close'), OUT_MS);
+    }
+    document.getElementById('close_icon').addEventListener('click', closeWithAnim);
+
+    // Auto-dismiss + depleting countdown bar, synced to the caller's timeout.
+    function startCountdown(timeout) {
+      if (started) return;
+      started = true;
+      setTimeout(closeWithAnim, Math.max(timeout - OUT_MS, 0));
+      const fill = document.getElementById('progress-bar-fill');
+      const start = Date.now();
+      (function tick() {
+        const remaining = Math.max(1 - (Date.now() - start) / timeout, 0);
+        fill.style.width = (remaining * 100) + '%';
+        if (remaining > 0) requestAnimationFrame(tick);
+      })();
+    }
+  </script>
+</body>
+</html>

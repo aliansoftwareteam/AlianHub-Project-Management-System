@@ -5,9 +5,15 @@ import Loader from '../Loader/Loader';
 import { setCurrentCompany } from '../../store/companySlice';
 import store from '../../store/store';
 import { setCompanyRulesToStore } from '../../controller/company/company';
+import WasabiImage from '../WasabiImage/WasabiImage';
+
+// Inlined at build time from the root package.json (see renderer/next.config.js), which is
+// the same version electron-builder puts on the installer.
+const appVersion = process.env.NEXT_PUBLIC_APP_VERSION || '';
 
 const SettingsModal = ({onLogout}) => {
   const router = useRouter();
+  const { user } = useSelector((state)=> state.user)
   const companies = useSelector((state)=> state.company.assignCompany)
   const currentCompany = useSelector((state)=> state.company.currentCompany)
   const [selectedCompany,setSelectedCompany] = useState(currentCompany?.id)
@@ -38,6 +44,11 @@ async function changeCompany(e) {
     <div className="w-full">
         {isLoading && <Loader/>}
       <div className="p-2">
+        {/* Logged-in user */}
+        <div className="flex items-center gap-2 pb-3 mb-2 border-b border-[#E5E7EB]">
+          <WasabiImage url={user?.Employee_profileImageURL} isUser={true} thumbnail="35x35" className="w-[36px] h-[36px] rounded-full shrink-0" />
+          <span className="text-[24px] font-medium text-[#374151] truncate">{user?.Employee_Name}</span>
+        </div>
         {/* Dropdown */}
         <div className='text-red-400 mt-2.5'>{isInterNetLost ? 'Internet Connection Lost' : ''}</div>
         <div className="relative">
@@ -75,6 +86,13 @@ async function changeCompany(e) {
             </svg>
             Logout
           </button>
+        </div>
+
+        {/* Which build this is. There was no version anywhere in the app, so a user
+            reporting a problem could not say what they were running — and with no
+            auto-updater, "are you on the latest?" is the first question worth asking. */}
+        <div className="mt-2 pt-2 border-t border-gray-100 px-3 text-[11px] text-gray-400 select-text">
+          Version {appVersion}
         </div>
       </div>
     </div>

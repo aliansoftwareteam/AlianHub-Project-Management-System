@@ -1,7 +1,7 @@
 const loggerConfig = require("../Config/loggerConfig");
 const { SCHEMA_TYPE } = require("../Config/schemaType");
 const { updateCompanyFun } = require("../Modules/Company/controller/updateCompany");
-const { uploadMainFileForbase64Thumbnail, uploadFileWasabiPromise, getBucketSize,cleanUpTrackshotStorage, createCompanyDataWasabi, getUserProfilePresignedUrl, getPresignedUrl, copyWasabiImage } = require("../Modules/storage/wasabi/controller");
+const { uploadMainFileForbase64Thumbnail, uploadFileWasabiPromise, getBucketSize,cleanUpTrackshotStorage, createCompanyDataWasabi, getUserProfilePresignedUrl, getUserProfilePresignedUrlCallBackFunction, getPresignedUrl, copyWasabiImage } = require("../Modules/storage/wasabi/controller");
 const fs = require("fs");
 
 exports.currentDirectory = 'wasabi';
@@ -197,8 +197,11 @@ exports.handleMulterStorage = () => {
     return { dest: "wasabiUploads/" }
 }
 
-exports.handleProfileGetForUser = (req,res) => {
-    getUserProfilePresignedUrl(req,res);
+exports.handleProfileGetForUser = async (req,res) => {
+    // POST /api/v1/getUserProfile sends the path in the body; the params-based
+    // getUserProfilePresignedUrl is for the GET /wasabi/retriveUserProfile route.
+    const result = await getUserProfilePresignedUrlCallBackFunction({ path: req.body?.path });
+    res.send(result);
 }
 exports.handleTaskTypeImageGet = (req,res) => {
     getPresignedUrl(req,res);

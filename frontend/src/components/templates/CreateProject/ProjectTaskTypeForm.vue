@@ -4,11 +4,11 @@
 ========================================================================================== -->
 <template>
 <div class="statusHeader statusHeader_one">
-    <div class="bg-light-gray"  :class="{'border-radius-5-px': clientWidth > 767 , 'border-radius-8-px': clientWidth <= 767 } ">
-        <h3 v-if="fromWhich == ''" class="heading_text mt-0" 
+    <div :class="{'border-radius-5-px': clientWidth > 767 , 'border-radius-8-px': clientWidth <= 767 } ">
+        <h3 v-if="fromWhich == ''" class="heading_text mt-0 bg-light-gray" 
         :class="{'border-radius-5-px  task-heading-desktop': clientWidth > 767 , 'border-radius-8-px task-heading-mobile': clientWidth <= 767}"
         >{{$t('Projects.add_task_need')}}</h3>
-        <h3 v-else class="heading_text mt-0" 
+        <h3 v-else class="heading_text mt-0 bg-light-gray" 
         :class="{'border-radius-5-px  task-heading-desktop': clientWidth > 767 , 'border-radius-8-px task-heading-mobile': clientWidth <= 767}"
         >{{$t('Projects.what_task_want')}}</h3>
     </div>
@@ -553,4 +553,12 @@ const { t } = useI18n();
 </script>
 <style scoped>
 @import './style.css';
+
+/* Bound the task-type list so a long list scrolls and "+ Add task type" stays visible
+   below it (mirrors the left Templates list). :deep() reaches the ul that DragDropField
+   renders; .taskyou_need_right scopes this to the task-type column only. */
+.taskyou_need_right :deep(.status_ul) {
+    max-height: 220px;
+    overflow-y: auto;
+}
 </style>

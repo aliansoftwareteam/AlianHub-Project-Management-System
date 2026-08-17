@@ -10,6 +10,8 @@ const { getCachedGlobalTemplateData } = require("../../utils/enterpriseHelper");
 const { removeCache } = require('../../utils/commonFunctions');
 const { updateCompanyFun } = require("../Company/controller/updateCompany");
 const projectTemplate = require("../../utils/projectTemplates.json");
+const { resolveProjectSkills } = require("../settings/ProjectSkills/helper");
+const { normaliseSource, cleanProposalId, numericProposalId, validateProposalId } = require("../Project/helpers/projectSourceRules");
 
 exports.checkProjectPlan = (req) => {
     return new Promise(async(resolve,reject) => {
@@ -115,6 +117,19 @@ exports.createProject = async (req) => {
             }
             if(!req.body.ProjectCode){
                 reject({status: false, statusText: 'project key is requried'});
+                return;
+            }
+            const source = normaliseSource(req.body.source);
+            if(!source){
+                reject({status: false, statusText: 'project source is requried'});
+                return;
+            }
+            req.body.source = source;
+            req.body.proposalId = cleanProposalId(req.body.proposalId);
+            req.body.proposalIdNumeric = numericProposalId(req.body.proposalId);
+            const proposalCheck = validateProposalId(source, req.body.proposalId);
+            if(!proposalCheck.valid){
+                reject({status: false, statusText: 'proposal id is requried for upwork projects'});
                 return;
             }
             if(!req.body.projectIcon && Object.keys(req.body.projectIcon)?.length){
@@ -320,7 +335,10 @@ exports.createProject = async (req) => {
                                                     value: valueItem.value,
                                                     key:valueItem.key,
                                                     taskImage:valueItem.taskImage,
-                                                    name:item.name
+                                                    name:item.name,
+                                                    iconType: valueItem.iconType || 'upload',
+                                                    iconValue: valueItem.iconValue || '',
+                                                    iconColor: valueItem.iconColor || null
                                                 }
                                             );
                                         }else{
@@ -332,7 +350,10 @@ exports.createProject = async (req) => {
                                                         value: item.value,
                                                         name:item.name,
                                                         taskImage:item.taskImage,
-                                                        key:incrementTaskType
+                                                        key:incrementTaskType,
+                                                        iconType: item.iconType || 'upload',
+                                                        iconValue: item.iconValue || '',
+                                                        iconColor: item.iconColor || null
                                                     }
                                                 );
                                                 updateTaskTypeStatus.totalStatus = incrementTaskType;
@@ -407,6 +428,7 @@ exports.createProject = async (req) => {
                             }
                         }
                     }
+                    createProjectObject.skills = await resolveProjectSkills(req.body.CompanyId, createProjectObject.skills);
                     createProjectObject.DueDate = createProjectObject.DueDate ? new Date(createProjectObject.DueDate) : '';
                     createProjectObject.viewColumn = [
                         {

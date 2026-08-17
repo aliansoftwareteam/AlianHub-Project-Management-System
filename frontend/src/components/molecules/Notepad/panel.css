@@ -1,0 +1,416 @@
+/* Notepad popover. Scoped to the component — no global selectors. */
+
+.np__overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: transparent;
+}
+
+.np__pop {
+    position: absolute;
+    top: 52px;
+    right: 16px;
+    width: 400px;
+    max-width: calc(100vw - 24px);
+    max-height: min(560px, calc(100vh - 80px));
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border: 1px solid #E6E7EF;
+    border-radius: 12px;
+    box-shadow: 0 16px 44px rgba(23, 24, 36, 0.2);
+    overflow: hidden;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────
+   Solid app primary. The popover hangs directly off the dark blue top nav,
+   so sharing its colour visually ties the two together. */
+.np__head {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 10px 10px 14px;
+    background: #2F3990;
+    flex: none;
+}
+.np__htitle {
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+/* The note title, edited directly in the header. Transparent so it reads as the
+   header text itself, with a faint field appearing on hover/focus to signal it
+   is editable. */
+.np__htitleinput {
+    flex: 1;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 3px 6px;
+    margin-left: -6px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    outline: none;
+}
+.np__htitleinput::placeholder { color: rgba(255, 255, 255, 0.6); font-weight: 500; }
+.np__htitleinput:hover { background: rgba(255, 255, 255, 0.1); }
+.np__htitleinput:focus {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.np__hbtn {
+    flex: none;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    color: rgba(255, 255, 255, 0.82);
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.np__hbtn:hover,
+.np__hbtn.is-on {
+    background: rgba(255, 255, 255, 0.16);
+    color: #fff;
+}
+
+/* Header overflow menu */
+.np__hmenuwrap { position: relative; flex: none; }
+.np__hmenu {
+    position: absolute;
+    top: 30px;
+    right: 0;
+    z-index: 5;
+    min-width: 196px;
+    padding: 4px;
+    background: #fff;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(23, 24, 36, 0.16);
+}
+.np__hmitem {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    padding: 8px 9px;
+    font-size: 12.5px;
+    color: #191A2B;
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+    text-align: left;
+}
+.np__hmitem:hover { background: #F4F4FA; }
+.np__hmitem--static { cursor: default; }
+.np__hmitem--static:hover { background: transparent; }
+.np__hmlabel { flex: 1; }
+
+/* Toggle switch */
+.np__switch {
+    flex: none;
+    box-sizing: border-box;
+    position: relative;
+    width: 32px;
+    height: 18px;
+    padding: 0;
+    background: #D3D5E4;
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.14s ease;
+}
+.np__switch.is-on { background: #2F3990; }
+.np__knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.14s ease;
+}
+.np__switch.is-on .np__knob { transform: translateX(14px); }
+
+/* ── Search ────────────────────────────────────────────────────────── */
+.np__searchbar {
+    flex: none;
+    padding: 10px 12px;
+    border-bottom: 1px solid #EDEDF3;
+}
+.np__searchinput {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 6px 9px;
+    font-family: inherit;
+    font-size: 12.5px;
+    color: #191A2B;
+    border: 1px solid #E6E7EF;
+    border-radius: 6px;
+    outline: none;
+}
+.np__searchinput:focus { border-color: #AEB5DC; }
+
+/* ── States ────────────────────────────────────────────────────────── */
+.np__state {
+    padding: 34px 16px;
+    font-size: 12.5px;
+    color: #84869B;
+    text-align: center;
+}
+
+/* ── List ──────────────────────────────────────────────────────────── */
+.np__list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
+.np__row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid #F0F0F6;
+    cursor: pointer;
+}
+.np__row:last-child { border-bottom: 0; }
+.np__row:hover { background: #FAFAFD; }
+.np__rowmain { flex: 1; min-width: 0; }
+.np__rtitle {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #191A2B;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.np__rpreview {
+    margin-top: 2px;
+    font-size: 12px;
+    color: #84869B;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Row hover actions */
+.np__rowactions {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    opacity: 0;
+    transition: opacity 0.12s ease;
+}
+.np__row:hover .np__rowactions { opacity: 1; }
+.np__ra {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    color: #6B6B70;
+    background: #fff;
+    border: 1px solid #E6E7EF;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.np__ra:hover {
+    color: #2F3990;
+    border-color: #AEB5DC;
+    background: #F5F7FF;
+}
+.np__ra--danger:hover {
+    color: #9B2C2C;
+    border-color: #F0C4C4;
+    background: #FBEBEB;
+}
+
+/* ── New note ──────────────────────────────────────────────────────── */
+.np__new {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+    padding: 12px 14px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    color: #2F3990;
+    background: #fff;
+    border: 0;
+    border-top: 1px solid #EDEDF3;
+    cursor: pointer;
+    text-align: left;
+}
+.np__new:hover { background: #F5F7FF; }
+.np__new:disabled { opacity: 0.55; cursor: default; }
+.np__plus { font-size: 15px; line-height: 1; }
+
+/* ── Detail / editor ───────────────────────────────────────────────── */
+.np__editor {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 12px 14px;
+    overflow-y: auto;
+}
+.np__etext {
+    box-sizing: border-box;
+    flex: 1;
+    width: 100%;
+    min-height: 220px;
+    padding: 0;
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #4B4D60;
+    background: transparent;
+    border: 0;
+    outline: none;
+    resize: none;
+}
+.np__etext::placeholder { color: #A5A6BA; }
+
+.np__efoot {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 9px 12px;
+    border-top: 1px solid #EDEDF3;
+}
+.np__saved {
+    flex: 1;
+    font-size: 11.5px;
+    color: #9092AC;
+}
+.np__eaction {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    color: #6B6B70;
+    background: transparent;
+    border: 1px solid #E6E7EF;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.np__eaction:hover {
+    color: #2F3990;
+    border-color: #AEB5DC;
+    background: #F5F7FF;
+}
+.np__eaction--danger:hover {
+    color: #9B2C2C;
+    border-color: #F0C4C4;
+    background: #FBEBEB;
+}
+
+/* ── Delete confirmation ───────────────────────────────────────────── */
+.np__confirmwrap {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(23, 24, 36, 0.45);
+}
+.np__confirm {
+    width: 100%;
+    max-width: 384px;
+    padding: 20px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 18px 50px rgba(23, 24, 36, 0.28);
+}
+.np__cicon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    margin-bottom: 12px;
+    color: #9B2C2C;
+    background: #FBEBEB;
+    border-radius: 9px;
+}
+.np__ctitle {
+    margin: 0 0 4px;
+    font-size: 14.5px;
+    font-weight: 600;
+    color: #191A2B;
+}
+.np__cdesc {
+    margin: 0 0 18px;
+    font-size: 12.5px;
+    color: #6B6B70;
+}
+.np__cactions {
+    display: flex;
+    gap: 10px;
+}
+.np__cbtn {
+    flex: 1;
+    padding: 8px 14px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: #191A2B;
+    background: #fff;
+    border: 1px solid #D3D5E4;
+    border-radius: 8px;
+    cursor: pointer;
+}
+.np__cbtn:hover { background: #F4F4FA; }
+.np__cbtn--danger {
+    color: #fff;
+    background: #DC4C4C;
+    border-color: #DC4C4C;
+}
+.np__cbtn--danger:hover { background: #C43D3D; }
+
+/* Scrollbars */
+.np__list::-webkit-scrollbar,
+.np__editor::-webkit-scrollbar { width: 7px; }
+.np__list::-webkit-scrollbar-thumb,
+.np__editor::-webkit-scrollbar-thumb { background: #D3D5E4; border-radius: 7px; }
+.np__list::-webkit-scrollbar-track,
+.np__editor::-webkit-scrollbar-track { background: transparent; }
+
+@media (max-width: 640px) {
+    .np__pop {
+        right: 8px;
+        left: 8px;
+        width: auto;
+    }
+}

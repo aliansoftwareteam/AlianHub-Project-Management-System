@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Tracker Stopped</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { overflow: hidden; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      background: transparent;
+      /* room for the shadow to fade without clipping (matches notification-template.html) */
+      padding: 12px 16px 16px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    @keyframes popIn {
+      from { opacity: 0; transform: translateY(12px) scale(0.96); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes popOut {
+      from { opacity: 1; transform: translateY(0) scale(1); }
+      to   { opacity: 0; transform: translateY(12px) scale(0.96); }
+    }
+
+    /* ---- distinct "stopped" identity: amber, NOT the routine white toast ---- */
+    .alert {
+      position: relative;
+      background: #ffffff;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 12px 34px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.30);
+      transform-origin: bottom right;
+      animation: popIn 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .alert.closing { animation: popOut 0.2s ease-in forwards; }
+
+    .alert-head {
+      display: flex; align-items: center; gap: 11px;
+      padding: 12px 12px 12px 14px;
+      background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+      position: relative;
+    }
+    .alert-head::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: rgba(0,0,0,.08); }
+
+    .a-icon {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: rgba(255,255,255,.22); border: 1px solid rgba(255,255,255,.35);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .a-icon svg { width: 16px; height: 16px; fill: #fff; }
+
+    .a-head-text { flex: 1; min-width: 0; }
+    .a-title { color: #fff; font-size: 14.5px; font-weight: 800; letter-spacing: .2px; line-height: 1.15; }
+    .a-kicker { color: rgba(255,255,255,.85); font-size: 11px; font-weight: 600; margin-top: 1px; }
+
+    .a-close {
+      width: 24px; height: 24px; border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; color: #fff; opacity: .9; flex-shrink: 0;
+      transition: background .15s, opacity .15s;
+    }
+    .a-close:hover { background: rgba(255,255,255,.22); opacity: 1; }
+    .a-close svg { width: 12px; height: 12px; fill: currentColor; }
+
+    .alert-body { padding: 13px 14px 14px; }
+    .a-reason { font-size: 13.5px; line-height: 1.45; color: #2b3040; }
+    .a-reason b { color: #171B26; font-weight: 700; }
+
+    .a-meta { display: flex; align-items: center; gap: 7px; margin-top: 9px; color: #5b6270; font-size: 12px; font-weight: 600; }
+    .a-dot { width: 7px; height: 7px; border-radius: 50%; background: #F59E0B; box-shadow: 0 0 0 3px #FEF3C7; flex-shrink: 0; }
+
+    .a-actions { display: flex; gap: 9px; margin-top: 14px; }
+    .btn {
+      height: 34px; border-radius: 9px; font-size: 13px; font-weight: 700; cursor: pointer;
+      border: 1px solid transparent; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+      transition: transform .06s, background .15s, box-shadow .15s;
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn-resume {
+      flex: 1; color: #fff;
+      background: linear-gradient(135deg, #F59E0B, #D97706);
+      box-shadow: 0 3px 10px rgba(217,119,6,.35);
+    }
+    .btn-resume:hover { box-shadow: 0 5px 14px rgba(217,119,6,.45); }
+    .btn-resume svg { width: 13px; height: 13px; fill: #fff; }
+    .btn-dismiss { padding: 0 16px; color: #4b5162; background: #f4f5f7; border-color: #e6e8ec; }
+    .btn-dismiss:hover { background: #e9ebef; }
+  </style>
+</head>
+<body>
+  <div class="alert" id="alert">
+    <div class="alert-head">
+      <div class="a-icon">
+        <!-- stop glyph -->
+        <svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>
+      </div>
+      <div class="a-head-text">
+        <div class="a-title">Time tracking stopped</div>
+        <div class="a-kicker">AlianHub Time Tracker</div>
+      </div>
+      <div class="a-close" id="close_icon" title="Dismiss">
+        <svg viewBox="0 0 490 490"><polygon points="456.851,0 245,212.564 33.149,0 0.708,32.337 212.669,245.004 0.708,457.678 33.149,490 245,277.443 456.851,490 489.292,457.678 277.331,245.004 489.292,32.337 "/></svg>
+      </div>
+    </div>
+    <div class="alert-body">
+      <div class="a-reason" id="reason">Tracking has stopped.</div>
+      <div class="a-meta"><span class="a-dot"></span><span id="ago">Stopped just now</span></div>
+      <div class="a-actions">
+        <button class="btn btn-resume" id="resume_btn">
+          <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          Resume tracking
+        </button>
+        <button class="btn btn-dismiss" id="dismiss_btn">Dismiss</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+    const alertEl = document.getElementById('alert');
+    const OUT_MS = 200;
+    let closing = false;
+    let stoppedAt = null;
+
+    // Fit the window to the card's real laid-out height (task names/reasons vary
+    // in length), keeping the bottom edge anchored above the taskbar.
+    function reportSize() {
+      const cs = getComputedStyle(document.body);
+      const padV = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+      const h = Math.ceil(alertEl.getBoundingClientRect().height + padV);
+      ipcRenderer.send('alert:size', { height: h });
+    }
+
+    function escapeHtml(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // Build the human reason line from the stop reason + (optional) task name.
+    function reasonText(reason, taskName) {
+      const t = taskName ? ' on <b>“' + escapeHtml(taskName) + '”</b>' : '';
+      switch (reason) {
+        case 'estimate':
+          return 'Reached the estimated hours' + (taskName ? ' on <b>“' + escapeHtml(taskName) + '”</b>' : '') + ' — tracking has stopped.';
+        case 'locked':
+          return 'Your screen was locked, so tracking' + t + ' was stopped.';
+        case 'suspended':
+          return 'Your computer went to sleep, so tracking' + t + ' was stopped.';
+        default:
+          return 'Time tracking' + t + ' has stopped.';
+      }
+    }
+
+    // Live "Stopped X ago" so a returning user instantly knows how long it's been off.
+    function fmtAgo() {
+      if (!stoppedAt) return 'Stopped just now';
+      const s = Math.max(0, Math.floor((Date.now() - stoppedAt) / 1000));
+      if (s < 5) return 'Stopped just now';
+      if (s < 60) return 'Stopped ' + s + ' second' + (s > 1 ? 's' : '') + ' ago';
+      const m = Math.floor(s / 60);
+      if (m < 60) return 'Stopped ' + m + ' minute' + (m > 1 ? 's' : '') + ' ago';
+      const h = Math.floor(m / 60);
+      return 'Stopped ' + h + ' hour' + (h > 1 ? 's' : '') + ' ago';
+    }
+    function tickAgo() {
+      const el = document.getElementById('ago');
+      if (el) el.textContent = fmtAgo();
+    }
+    setInterval(tickAgo, 1000);
+
+    // Single entry point — main sends { reason, taskName, stoppedAt }.
+    ipcRenderer.on('alert:render', (event, data) => {
+      data = data || {};
+      stoppedAt = typeof data.stoppedAt === 'number' ? data.stoppedAt : Date.now();
+      document.getElementById('reason').innerHTML = reasonText(data.reason, data.taskName);
+      tickAgo();
+      // Wait for layout to settle, then fit the window. (No auto-dismiss — this
+      // card is PERSISTENT: it stays until the user acts.)
+      requestAnimationFrame(() => requestAnimationFrame(reportSize));
+    });
+
+    function closeWithAnim(channel) {
+      if (closing) return;
+      closing = true;
+      alertEl.classList.add('closing');
+      setTimeout(() => ipcRenderer.send(channel), OUT_MS);
+    }
+
+    document.getElementById('close_icon').addEventListener('click', () => closeWithAnim('alert:dismiss'));
+    document.getElementById('dismiss_btn').addEventListener('click', () => closeWithAnim('alert:dismiss'));
+    document.getElementById('resume_btn').addEventListener('click', () => closeWithAnim('alert:resume'));
+  </script>
+</body>
+</html>

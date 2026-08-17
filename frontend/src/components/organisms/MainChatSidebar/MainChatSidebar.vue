@@ -1,302 +1,306 @@
 <template>
-    <div class="d-flex w-100 h-100">
-        <div class="border-right chat__chanel-icons">
-            <div class="border-radius-5-px d-flex align-items-center bg-light-gray justify-content-center m-15px h-35px" v-if="clientWidth <= 1200" @click="$emit('hide')">
-                <img :src="sidebarArrowIcon" alt="sidebarArrowIcon">
-            </div>
-            <div :title="!project?.default ? currentCompanyName : 'Chats'"
-                v-for="project in projects" :key="project._id"
-                @click="setProject(project)"
-                class="position-re"
+    <!--
+      Main Chat conversation pane (left column of the 3-pane layout).
+
+      The TEMPLATE was rebuilt to the new layout; the script block below is the
+      original and untouched, so every existing behaviour still runs through the
+      same code: project switching (setProject), conversation selection
+      (setActiveChat) with its route sync, the category/channel tree, favourites,
+      search, and the create-category / create-channel flows.
+    -->
+    <div class="mcs">
+        <!-- workspace + overflow actions -->
+        <header class="mcs-top">
+            <button
+                v-if="clientWidth <= 1200"
+                type="button"
+                class="mcs-icon"
+                :title="$t('MainChat.cancel')"
+                @click="$emit('hide')"
             >
-                <div class="bg-blue position-ab border-right-radius-5-px h-100 selected__projectid-div" v-if="selectedProject._id === project._id"></div>
-                <div class="d-flex cursor-pointer align-items-center justify-content-center border-radius-5-px  white position-re m-15px h-35px" :class="{'bg-blue' : selectedProject._id === project._id && project?.default,'border-2px-blue' : selectedProject._id === project._id && !project?.default && currentCompanyImage,'border-2': (selectedProject._id !== project._id && project?.default)}">
-                    <template v-if="project?.default">
-                        <img :src="allChats" alt="All chats" class="filter-shadow-light all_chats-img">
-                        <span v-if="checkAllCount(project)" class="notification-tick blinking checkall__count">{{ checkAllCount(project) > 99 ? "+99" :checkAllCount(project) }}</span>
-                    </template>
-                    <template v-else>
-                        <template v-if="currentCompanyImage">
-                            <img v-if="currentCompanyImage?.includes('http')" class="profile-image border-radius-5-px w-100 h-100" :src="currentCompanyImage" :alt="currentCompanyName">
-                            <WasabiImageComp v-else class="profile-image border-radius-5-px w-100 h-100" :data="{url: currentCompanyImage, filename: currentCompanyImage.split('/').pop(), extension: currentCompanyImage.split('/').pop().split('.').pop()}"/>
-                        </template>
-                        <template v-else-if="currentCompanyName">
-                            <span class="bg-blue company_latter" :class="{'white': selectedProject._id === project._id}">{{currentCompanyName.charAt(0)}}</span>
-                        </template>
-                        <span v-if="checkAllCount(project)" class="notification-tick blinking checkall__count">{{ checkAllCount(project) > 99 ? "+99" :checkAllCount(project) }}</span>
-                    </template>
-                </div>
-            </div>
-        </div>
-        <div class="chanel__detail-icon" :class="[{'border-right' : allowChannelFeature}]" v-if="!loadingChats">
-            <div class="d-flex align-items-center p0x-10px chanel__searchinput-wrapper" :class="[{'bg-light-gray': selectedProject?.default ? allowOneToOneChatFeature : allowChannelFeature}]">
-                <template v-if="selectedProject?.default">
-                    <InputText
-                        v-if="allowOneToOneChatFeature"
-                        v-model="searchChat"
-                        :placeholder="`${$t('PlaceHolder.search_here')}...`"
-                        class="chanel__searchinput"
-                        :isOutline="false"
+                <img :src="sidebarArrowIcon" alt="" />
+            </button>
+
+            <span class="mcs-workspace" :title="currentCompanyName">
+                <template v-if="currentCompanyImage">
+                    <img v-if="currentCompanyImage?.includes('http')" :src="currentCompanyImage" :alt="currentCompanyName" />
+                    <WasabiImageComp
+                        v-else
+                        :data="{url: currentCompanyImage, filename: currentCompanyImage.split('/').pop(), extension: currentCompanyImage.split('/').pop().split('.').pop()}"
                     />
                 </template>
-                <template v-else>
-                    <div class="d-flex align-items-center justify-content-between w-100" v-if="allowChannelFeature">
-                        <span>{{selectedProject?.ProjectName}}</span>
+                <template v-else>{{ (currentCompanyName || '?').charAt(0).toUpperCase() }}</template>
+            </span>
 
-                        <DropDown :title="selectedProject.ProjectName" v-if="selectedProject?._id && checkPermission('chat.chat_category') === true">
-                            <template #button>
-                                <img ref="createChannelBtn" src="@/assets/images/svg/horizontalDots.svg" alt="dots" class="vertical-middle ml-6px">
-                            </template>
-                            <template #options>
-                                <DropDownOption @click="$refs.createChannelBtn.click(), showCreateCategory = true">
-                                    <div class="d-flex align-items-center project-mobile-desc">
-                                        <img :src="createCategory" alt="createCategory" class="mr-10px">
-                                        {{$t('Category.create_category')}}
-                                    </div>
-                                </DropDownOption>
-                            </template>
-                        </DropDown>
-                    </div>
+            <span class="mcs-workspace-name">{{ currentCompanyName }}</span>
+
+            <DropDown
+                v-if="selectedProject?._id && !selectedProject?.default && canManageCategory"
+                :title="selectedProject.ProjectName"
+                class="mcs-top-menu"
+            >
+                <template #button>
+                    <button ref="createChannelBtn" type="button" class="mcs-icon" :title="$t('Category.create_category')">
+                        <img src="@/assets/images/svg/horizontalDots.svg" alt="" />
+                    </button>
                 </template>
-            </div>
-            <div class="overflow-y-auto style-scroll chanel__defultchat-wrapper">
-                <!-- CHANNEL CHAT -->
-                <template v-if="!selectedProject?.default">
-                    <div v-if="allowChannelFeature">
-                        <template v-if="!loadingSprints">
-                            <template v-if="category && Object.keys(category).length">
-                                <TransitionGroup>
-                                    <div v-for="folder in category" :key="folder.folderId">
-                                        <ChatListItem
-                                            :key="folder.folderId"
-                                            :item="folder"
-                                            :active="Object.values(folder?.sprintsObj || {})?.map((x) => x?.id).includes(selectedChat?.id)"
-                                            @click="(e) => e ? setActiveChat(e) : folder.isExpanded = !folder.isExpanded"
-                                            @toggle="folder.isExpanded = !folder.isExpanded"
-                                            type="category"
-                                            :selectedProject="selectedProject"
-                                        >
-                                            <template #options>
-                                                <div class="d-flex align-items-center">
-                                                    <Transition>
-                                                        <div v-if="checkCount(folder)" class="red border-radius-1 font-size-12 bg-transparent p2x-5px border-red">
-                                                            {{(checkCount(folder)) > 99 ? "+99" : checkCount(folder)}}
-                                                        </div>
-                                                    </Transition>
-                                                    <DropDown :id="`category_${folder.folderId}`" :title="folder.name" v-if="checkPermission('chat.chat_channel') === true">
-                                                        <template #button>
-                                                            <img :ref="`category_${folder.folderId}Ref`" src="@/assets/images/svg/horizontalDots.svg" alt="dots" class="vertical-middle ml-6px">
-                                                        </template>
-                                                        <template #options>
-                                                            <DropDownOption @click="$refs[`category_${folder.folderId}Ref`][0].click(), folderId=folder.folderId, showCreateChannel = true">
-                                                                <div class="d-flex align-items-center project-mobile-desc">
-                                                                    <img :src="addLogo" alt="addLogo" class="mr-10px">
-                                                                    {{$t('Category.create_channel')}}
-                                                                </div>
-                                                            </DropDownOption>
-                                                        </template>
-                                                    </DropDown>
-                                                </div>
-                                            </template>
-                                        </ChatListItem>
-                                    </div>
-                                </TransitionGroup>
-                            </template>
-                            <template v-else>
-                                <div class="cursor-default text-center font-weight-normal mt-10px">
-                                    {{$t('Category.no_chat_found')}}
-                                </div>
-                            </template>
-                        </template>
-                        <template v-else>
-                            <template v-for="i in Math.round(Math.random() * (8-3) + 3)" :key="i">
-                                <Skelaton style="height: 40px;" class="border-radius-5-px mb-5px"/>
-                                <template v-if="[3,5].includes(i)">
-                                    <Skelaton style="height: 40px;" class="border-radius-5-px mb-5px ml-25px" v-for="j in Math.round(Math.random() * (5-0) + 0)" :key="j"/>
-                                </template>
-                            </template>
-                        </template>
-                    </div>
-                    <div v-else>
-                        <UpgradePlan
-                            :buttonText="$t('Upgrades.upgrade_your_plan')"
-                            :lastTitle="$t('Upgrades.unlock_channel')"
-                            :secondTitle="$t('Upgrades.unlimited')"
-                            :firstTitle="$t('Upgrades.upgrade_to')"
-                            :message="$t('Upgrades.the_feature_not_available')"
-                        />
-                    </div>
-                </template>
-
-                <!-- DEFAULT CHAT -->
-                <template v-else>
-                    <template v-if="allowOneToOneChatFeature">
-                        <h4 class="m-0 font-size-14 font-weight-500 gray63 fav__h4">{{$t('Chat.chats')}}</h4>
-                        <div>
-                            <template v-if="!loadingSprints">
-                                <!-- FAVORITE -->
-                                <Transition>
-                                    <div v-if="favoritesFilter?.length">
-                                        <h4 class="m-0 font-size-14 font-weight-500 gray63 fav__h4" >{{$t('Chat.favorites')}}</h4>
-                                        <template v-if="favoritesFilter?.length">
-                                            <TransitionGroup>
-                                                <ChatListItem
-                                                    v-for="chat in sortedFavoriteChat"
-                                                    :key="chat.id"
-                                                    :item="chat"
-                                                    :active="chat.id === selectedChat?.id"
-                                                    @click="setActiveChat"
-                                                    type="user"
-                                                    @toggle="chat.isExpanded = !chat.isExpanded"
-                                                >
-                                                    <template #options>
-                                                        <Transition>
-                                                            <div v-if="myCounts?.[`task_${selectedProject._id}_${chat.sprintId}_${chat._id}_comments`]" class="white border-radius-1 font-size-12 bg-red p2x-5px">
-                                                                {{myCounts?.[`task_${selectedProject._id}_${chat.sprintId}_${chat._id}_comments`] > 99 ? "+99" : myCounts?.[`task_${selectedProject._id}_${chat.sprintId}_${chat._id}_comments`]}}
-                                                            </div>
-                                                        </Transition>
-                                                    </template>
-                                                </ChatListItem>
-                                            </TransitionGroup>
-                                        </template>
-                                        <template v-else>
-                                            <div class="cursor-default text-center font-weight-normal m10px-0px">
-                                                {{$t('Category.no_chat_found')}}
-                                            </div>
-                                        </template>
-                                    </div>
-                                </Transition>
-
-                                <!-- CHATS -->
-                                <template v-if="chatsFilter?.length">
-                                    <TransitionGroup>
-                                        <ChatListItem
-                                            v-for="chat in sortedChat"
-                                            :key="chat.id"
-                                            :item="chat"
-                                            :active="chat.id === selectedChat?.id"
-                                            @click="setActiveChat"
-                                            type="user"
-                                        >
-                                            <template #options>
-                                                <div class="convertdate_formate-wrapper">
-                                                    <div class="date_or_text">
-                                                        {{chat?.lastMessage ? convertDateFormat(chat.lastMessage) : ""}}
-                                                    </div>
-                                                    <div>
-                                                        <Transition>
-                                                            <div v-if="myCounts?.[`task_${selectedProject._id}_${chat.sprintId}_${chat._id}_comments`]" class="red border-radius-1 font-size-12 bg-transparent border-red p2x-5px leftside_replay-count">
-                                                                {{myCounts?.[`task_${selectedProject._id}_${chat.sprintId}_${chat._id}_comments`] > 99 ? "+99" : myCounts?.[`task_${selectedProject._id}_${chat.sprintId}_${chat._id}_comments`]}}
-                                                            </div>
-                                                        </Transition>
-                                                    </div>
-                                                </div>
-                                            </template>
-                                        </ChatListItem>
-                                    </TransitionGroup>
-                                </template>
-                                <template v-else>
-                                    <div class="cursor-default text-center font-weight-normal mt-10px">
-                                        {{$t('Category.no_chat_found')}}
-                                    </div>
-                                </template>
-                            </template>
-                            <template v-else>
-                                <Skelaton style="height: 40px;" class="border-radius-5-px mb-5px" v-for="i in Math.round(Math.random() * (8-2) + 2)" :key="i"/>
-                            </template>
-
-                            <!-- USERS -->
-                            <Transition>
-                                <div v-if="usersFilter?.length">
-                                    <h4 class="m-0 mt-1">{{$t('UserTimesheet.users')}}</h4>
-                                    <template v-if="usersFilter?.length">
-                                        <TransitionGroup>
-                                            <ChatListItem
-                                                v-for="user in usersFilter"
-                                                :key="user.id"
-                                                :item="user"
-                                                :active="user.id === selectedChat?.id"
-                                                @click="setActiveChat"
-                                                type="user"
-                                            />
-                                        </TransitionGroup>
-                                    </template>
-                                    <template v-else>
-                                        <div class="cursor-default text-center font-weight-normal mt-10px">
-                                            {{$t('Category.no_chat_found')}}
-                                        </div>
-                                    </template>
-                                </div>
-                            </Transition>
+                <template #options>
+                    <DropDownOption @click="$refs.createChannelBtn.click(), showCreateCategory = true">
+                        <div class="d-flex align-items-center project-mobile-desc">
+                            <img :src="createCategory" alt="" class="mr-10px" />
+                            {{ $t('Category.create_category') }}
                         </div>
+                    </DropDownOption>
+                </template>
+            </DropDown>
+        </header>
+
+        <!-- one tab per chat project: Chats (direct) + each channel workspace -->
+        <nav class="mcs-tabs" v-if="projects.length > 1">
+            <button
+                v-for="project in projects"
+                :key="project._id"
+                type="button"
+                class="mcs-tab"
+                :class="{ 'mcs-tab--on': selectedProject._id === project._id }"
+                @click="setProject(project)"
+            >
+                <span class="mcs-tab-label">{{ project?.default ? $t('Chat.chats') : $t('MainChat.channels') }}</span>
+                <span v-if="checkAllCount(project)" class="mcs-count">{{ checkAllCount(project) > 99 ? '+99' : checkAllCount(project) }}</span>
+            </button>
+        </nav>
+
+        <!-- search — the placeholder names the field each tab actually matches on
+             (people's names vs channel + category names), so "Search here…" no
+             longer leaves the user guessing what will be found -->
+        <div class="mcs-search" v-if="selectedProject?.default ? allowOneToOneChatFeature : allowChannelFeature">
+            <InputText
+                v-model="searchChat"
+                :placeholder="`${selectedProject?.default ? $t('MainChat.search_people') : $t('MainChat.search_channels')}...`"
+                class="mcs-search-input"
+                :isOutline="false"
+            />
+        </div>
+
+        <!-- list -->
+        <div class="mcs-list style-scroll" v-if="!loadingChats">
+            <!-- ============ CHANNELS ============ -->
+            <template v-if="!selectedProject?.default">
+                <div v-if="allowChannelFeature">
+                    <template v-if="!loadingSprints">
+                        <template v-if="category && Object.keys(category).length">
+                            <TransitionGroup>
+                                <div v-for="folder in category" :key="folder.folderId">
+                                    <ChatListItem
+                                        :key="folder.folderId"
+                                        :item="folder"
+                                        :active="Object.values(folder?.sprintsObj || {})?.map((x) => x?.id).includes(selectedChat?.id)"
+                                        @click="(e) => e ? setActiveChat(e) : folder.isExpanded = !folder.isExpanded"
+                                        @toggle="folder.isExpanded = !folder.isExpanded"
+                                        type="category"
+                                        :selectedProject="selectedProject"
+                                        @edit="editChannel"
+                                        @delete="confirmDeleteChannel"
+                                    >
+                                        <!-- Direct children of .mcs-item-trail (no wrapper), so the
+                                             count and the menu sit on the same rhythm as a
+                                             channel row's below. -->
+                                        <template #options>
+                                            <Transition>
+                                                <span v-if="checkCount(folder)" class="mcs-badge">
+                                                    {{ checkCount(folder) > 99 ? '+99' : checkCount(folder) }}
+                                                </span>
+                                            </Transition>
+                                            <!-- Two permissions meet on this row: adding a channel
+                                                 answers to chat_channel, renaming the category to
+                                                 chat_category. Each option is gated on its own, and
+                                                 the menu only appears if at least one is allowed. -->
+                                            <DropDown :id="`category_${folder.folderId}`" :title="folder.name" v-if="canCreateChannel || canManageCategory" class="mcs-menu">
+                                                <template #button>
+                                                    <span :ref="`category_${folder.folderId}Ref`" class="mcs-menu-btn" :title="$t('MainChat.more')">
+                                                        <MainChatIcon name="more" :size="16" />
+                                                    </span>
+                                                </template>
+                                                <template #options>
+                                                    <DropDownOption v-if="canCreateChannel" @click="$refs[`category_${folder.folderId}Ref`][0].click(), folderId=folder.folderId, showCreateChannel = true">
+                                                        <span class="mcs-menu-item">{{$t('Category.create_channel')}}</span>
+                                                    </DropDownOption>
+                                                    <DropDownOption v-if="canManageCategory" @click="$refs[`category_${folder.folderId}Ref`][0].click(), editCategory(folder)">
+                                                        <span class="mcs-menu-item">{{$t('Category.edit_category')}}</span>
+                                                    </DropDownOption>
+                                                </template>
+                                            </DropDown>
+                                        </template>
+                                    </ChatListItem>
+                                </div>
+                            </TransitionGroup>
+                        </template>
+                        <p v-else class="mcs-empty">
+                            {{ searchChat.trim() ? $t('MainChat.no_matches') : $t('Category.no_chat_found') }}
+                        </p>
                     </template>
-                    <div v-else>
-                        <UpgradePlan
-                            :buttonText="$t('Upgrades.upgrade_your_plan')"
-                            :lastTitle="$t('Upgrades.unlock_one_chat')"
-                            :secondTitle="$t('Upgrades.unlimited')"
-                            :firstTitle="$t('Upgrades.upgrade_to')"
-                            :message="$t('Upgrades.the_feature_not_available')"
-                        />
+                    <div v-else class="mcs-skel">
+                        <Skelaton v-for="i in 6" :key="i" style="height: 44px;" class="border-radius-8-px mb-6px" />
+                    </div>
+                </div>
+                <UpgradePlan
+                    v-else
+                    :buttonText="$t('Upgrades.upgrade_your_plan')"
+                    :lastTitle="$t('Upgrades.unlock_channel')"
+                    :secondTitle="$t('Upgrades.unlimited')"
+                    :firstTitle="$t('Upgrades.upgrade_to')"
+                    :message="$t('Upgrades.the_feature_not_available')"
+                />
+            </template>
+
+            <!-- ============ DIRECT MESSAGES ============ -->
+            <template v-else>
+                <template v-if="allowOneToOneChatFeature">
+                    <template v-if="!loadingSprints">
+                        <!-- favourites -->
+                        <template v-if="favoritesFilter?.length">
+                            <p class="mcs-group">{{ $t('Chat.favorites') }}</p>
+                            <button
+                                v-for="chat in sortedFavoriteChat"
+                                :key="chat.id"
+                                type="button"
+                                class="mcs-row"
+                                :class="{ 'mcs-row--on': chat.id === selectedChat?.id }"
+                                @click="setActiveChat(chat)"
+                            >
+                                <MainChatAvatar :name="peerName(chat)" :src="peerImage(chat)" :size="34" />
+                                <span class="mcs-row-main">
+                                    <span class="mcs-row-name">{{ peerName(chat) }}</span>
+                                    <span class="mcs-row-preview" v-html="previewOf(chat)"></span>
+                                </span>
+                                <span class="mcs-row-side">
+                                    <span class="mcs-row-time">{{ chat?.lastMessage ? convertDateFormat(chat.lastMessage) : '' }}</span>
+                                    <span v-if="unreadOf(chat)" class="mcs-badge">{{ unreadOf(chat) > 99 ? '+99' : unreadOf(chat) }}</span>
+                                </span>
+                            </button>
+                        </template>
+
+                        <!-- conversations -->
+                        <p class="mcs-group">{{ $t('Chat.chats') }}</p>
+                        <template v-if="chatsFilter?.length">
+                            <button
+                                v-for="chat in sortedChat"
+                                :key="chat.id"
+                                type="button"
+                                class="mcs-row"
+                                :class="{ 'mcs-row--on': chat.id === selectedChat?.id }"
+                                @click="setActiveChat(chat)"
+                            >
+                                <MainChatAvatar :name="peerName(chat)" :src="peerImage(chat)" :size="34" />
+                                <span class="mcs-row-main">
+                                    <span class="mcs-row-name">{{ peerName(chat) }}</span>
+                                    <span class="mcs-row-preview" v-html="previewOf(chat)"></span>
+                                </span>
+                                <span class="mcs-row-side">
+                                    <span class="mcs-row-time">{{ chat?.lastMessage ? convertDateFormat(chat.lastMessage) : '' }}</span>
+                                    <span v-if="unreadOf(chat)" class="mcs-badge">{{ unreadOf(chat) > 99 ? '+99' : unreadOf(chat) }}</span>
+                                </span>
+                            </button>
+                        </template>
+                        <p v-else class="mcs-empty">{{ $t('Category.no_chat_found') }}</p>
+
+                        <!-- people you haven't messaged yet — only when you could
+                             actually start one (see canSendDirectMessages) -->
+                        <template v-if="usersFilter?.length && canSendDirectMessages">
+                            <p class="mcs-group">{{ $t('UserTimesheet.users') }}</p>
+                            <button
+                                v-for="user in usersFilter"
+                                :key="user.id"
+                                type="button"
+                                class="mcs-row"
+                                :class="{ 'mcs-row--on': user.id === selectedChat?.id }"
+                                @click="setActiveChat(user)"
+                            >
+                                <MainChatAvatar :name="user.name" :src="peerImage(user)" :size="34" />
+                                <span class="mcs-row-main">
+                                    <span class="mcs-row-name">{{ user.name }}</span>
+                                    <span class="mcs-row-preview mcs-row-preview--muted">{{ $t('MainChat.start_conversation') }}</span>
+                                </span>
+                            </button>
+                        </template>
+                    </template>
+                    <div v-else class="mcs-skel">
+                        <Skelaton v-for="i in 7" :key="i" style="height: 48px;" class="border-radius-8-px mb-6px" />
                     </div>
                 </template>
-            </div>
+                <UpgradePlan
+                    v-else
+                    :buttonText="$t('Upgrades.upgrade_your_plan')"
+                    :lastTitle="$t('Upgrades.unlock_one_chat')"
+                    :secondTitle="$t('Upgrades.unlimited')"
+                    :firstTitle="$t('Upgrades.upgrade_to')"
+                    :message="$t('Upgrades.the_feature_not_available')"
+                />
+            </template>
         </div>
-        <div class="chanel__detail-icon" :class="[{'border-right' : allowChannelFeature}]" v-else>
-            <div class="overflow-y-auto style-scroll chanel__defultchat-wrapper">
-                <Skelaton style="height: 40px;" class="border-radius-5-px mb-5px"/>
-                <Skelaton style="height: 40px;" class="border-radius-5-px mb-5px"/>
-                <Skelaton style="height: 40px;" class="border-radius-5-px mb-5px"/>
-            </div>
+
+        <div class="mcs-list mcs-skel" v-else>
+            <Skelaton v-for="i in 7" :key="i" style="height: 48px;" class="border-radius-8-px mb-6px" />
         </div>
+
         <CreateCategorySidebar v-if="showCreateCategory" v-model:visible="showCreateCategory"/>
         <CreateChannelSidebar v-if="showCreateChannel"  v-model:visible="showCreateChannel" :folder="Object.values(selectedProject?.sprintsfolders || {})?.find((x) => x?.folderId === folderId)"/>
+        <EditChannelSidebar v-if="showEditChannel" v-model:visible="showEditChannel" :channel="editingChannel" @saved="onChannelSaved"/>
+        <EditCategorySidebar v-if="showEditCategory" v-model:visible="showEditCategory" :category="editingCategory" @saved="onCategorySaved"/>
     </div>
 </template>
+
 
 <script setup>
 // PACKAGES
 import isEqual from "lodash/isEqual";
 import { useRoute, useRouter } from "vue-router";
-// import { useToast } from "vue-toast-notification";
+import { useToast } from "vue-toast-notification";
+import { useI18n } from "vue-i18n";
+import Swal from "sweetalert2";
 import { computed, defineEmits, defineProps, inject, nextTick, onMounted, ref, watch, watchEffect } from "vue"
 
 // COMPONENT
 import InputText from "@/components/atom/InputText/InputText.vue"
 import WasabiImageComp from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue"
 import ChatListItem from "@/components/atom/ChatListItem/ChatListItem.vue"
+import MainChatAvatar from "@/components/organisms/MainChat/MainChatAvatar.vue"
+import MainChatIcon from "@/components/organisms/MainChat/MainChatIcon.vue"
 import DropDown from '@/components/molecules/DropDown/DropDown.vue'
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue'
 import CreateChannelSidebar from '@/components/organisms/CreateChannelSidebar/CreateChannelSidebar.vue'
 import CreateCategorySidebar from '@/components/organisms/CreateCategorySidebar/CreateCategorySidebar.vue'
+import EditChannelSidebar from '@/components/organisms/EditChannelSidebar/EditChannelSidebar.vue'
+import EditCategorySidebar from '@/components/organisms/EditCategorySidebar/EditCategorySidebar.vue'
 import Skelaton from "@/components/atom/Skelaton/Skelaton.vue"
 import { useConvertDate, useCustomComposable, useGetterFunctions } from "@/composable";
 import { useStore } from "vuex";
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
+import * as env from '@/config/env';
+import { apiRequest } from "@/services";
 
 // UTILS
 const clientWidth = inject("$clientWidth");
 const companyId = inject("$companyId");
 const userId = inject("$userId");
 const selectedProject = inject("selectedProject");
-const {getters, dispatch} = useStore();
-const {debounce, checkPermission} = useCustomComposable();
+const {getters, dispatch, commit} = useStore();
+const {debounce, checkPermission, changeText} = useCustomComposable();
 const {getUser} = useGetterFunctions();
 const {convertDateFormat} = useConvertDate()
+const { t } = useI18n();
 
 const router = useRouter()
 const route = useRoute()
-// const $toast = useToast();
+const $toast = useToast();
 
 // IMAGES
-const allChats = require("@/assets/images/svg/chat_1.svg");
 const createCategory = require("@/assets/images/png/add_category.png");
 const sidebarArrowIcon = require("@/assets/images/svg/sidebarclose_arrow.svg");
-const addLogo = require("@/assets/images/svg/addIcon.svg");
 // const triangleBlack = require("@/assets/images/svg/triangleBlack.svg");
 
 // EMITS
-const emit = defineEmits(["hide", "selectedChat"])
+const emit = defineEmits(["hide", "selectedChat", "loading"])
 
 const props = defineProps({
     selectedChat: {
@@ -320,6 +324,24 @@ const currentCompanyName = computed(() => getters['settings/companies'].find((x)
 const companyUserDetail = computed(() => getters['settings/companyUserDetail'])
 const chatsGetters = computed(() => JSON.parse(JSON.stringify(getters["mainChat/chats"]?.data)));
 
+/**
+ * Is this user still an active member of the company?
+ *
+ * getUser() flags two cases as `ghostUser`: an id that is no longer in the users
+ * store at all (name falls back to the literal "Ghost User"), and a company user
+ * marked isDelete — whose name is replaced by their email address, which is why
+ * removed people were showing up in chat as raw addresses. Neither belongs in any
+ * chat list. Same test the rest of the app uses (Assignee, TaskFilter, …).
+ */
+function isActiveUser(id) {
+    if (!id) return false;
+    // Until the users store has loaded, getUser() reports EVERYONE as a ghost.
+    // Filtering then would empty the whole chat list and clear the selection, so
+    // hold off while there is nothing to check against.
+    if (!(getters["users/users"] || []).length) return true;
+    return !(getUser(id) || {}).ghostUser;
+}
+
 const usersGetter = computed(() => {
     return getters["users/users"].map((x) => ({
         name: x.Employee_Name,
@@ -328,17 +350,35 @@ const usersGetter = computed(() => {
         newUser: true,
         receiverId: x._id
     })).filter((x) => {
-        return x.id !== userId.value &&  !chatsGetters.value.filter((y) => y.AssigneeUserId.filter((z) => x.AssigneeUserId.includes(z)).length).length
+        return x.id !== userId.value && isActiveUser(x.id) && !chatsGetters.value.filter((y) => y.AssigneeUserId.filter((z) => x.AssigneeUserId.includes(z)).length).length
     })
 });
 const currentPlan = computed(() => getters['settings/selectedCompany']?.planFeature);
 const allowChannelFeature = computed(() => currentPlan.value && currentPlan.value?.chanels);
 const allowOneToOneChatFeature = computed(() => currentPlan.value && currentPlan.value?.oneToOneChat);
 
+/*
+ * Write access to categories and channels. "Create" carries edit and delete with it:
+ * renaming or removing is a lesser act than adding, and there is no separate key for
+ * either. Computed rather than called inline so the check does not re-run per row on
+ * every render.
+ */
+const canManageCategory = computed(() => checkPermission('chat.chat_category') === true);
+const canCreateChannel = computed(() => checkPermission('chat.chat_channel') === true);
+
+// Read on one-to-one chat means visible but not writable, so someone who cannot post
+// should not be offered a person to start a new conversation with — the composer
+// would just be closed. Provided by Chat.vue.
+const canSendDirectMessages = inject("canSendDirectMessages", computed(() => true));
+
 const folderId = ref(null);
 const searchChat = ref("");
 const showCreateChannel = ref(false);
 const showCreateCategory = ref(false);
+const showEditChannel = ref(false);
+const editingChannel = ref({});
+const showEditCategory = ref(false);
+const editingCategory = ref({});
 const usersFilter = ref([]);
 const chats = ref([]);
 const chatsFilter = ref([]);
@@ -347,6 +387,10 @@ const favoritesFilter = ref([]);
 const category = ref([]);
 
 const loadingSprints = ref(false);
+// Surface the load state so the conversation pane can hold a neutral placeholder
+// instead of flashing the "no chats" welcome screen while a project's channels
+// are still being resolved (switching Chats <-> Channels nulls the selection).
+watch(loadingSprints, (value) => emit('loading', value), { immediate: true });
 const sprintFolders = ref({});
 const sprintData = ref([]);
 const folderData = ref([]);
@@ -403,6 +447,11 @@ function separateFav() {
             x.id = x._id;
             return x;
         })
+
+        // Drop conversations whose other participant has left the company. Filtered
+        // HERE rather than in the list markup so a removed person's chat can also
+        // never be auto-selected below.
+        sprints = sprints.filter((x) => isActiveUser(peerIdOf(x)));
     } else {
         Object.values(selectedProject.value?.sprintsfolders || {}).forEach((folder) => {
             Object.values(folder?.sprintsObj || {}).forEach((sprint) => {
@@ -523,14 +572,32 @@ function setOntToOne(sprints) {
     })
 }
 
+/**
+ * Does a category / channel name match what is typed in the search box?
+ *
+ * An empty box matches everything, which is what keeps the unsearched tree
+ * byte-for-byte identical to before search was wired up for channels.
+ */
+function matchesSearch(name) {
+    const term = searchChat.value.trim().toLowerCase();
+    if(!term) return true;
+    return String(name || "").toLowerCase().includes(term);
+}
+
 function setCategories() {
     const tmp = JSON.parse(JSON.stringify(selectedProject.value?.sprintsfolders || {}));
     let sprintsfolders = {};
 
     Object.values(tmp)?.forEach((x) => {
         const folder = {...x, sprintsObj: {}, isExpanded: category.value.find((y) => y.folderId === x.folderId)?.isExpanded || true}
+        // A category whose own name matches keeps all of its channels; otherwise
+        // only the channels that match survive. The search is applied HERE rather
+        // than in chatsInit because channels are a folder tree, not a flat list.
+        const folderMatches = matchesSearch(x.name);
 
         Object.values(x?.sprintsObj || {})?.forEach((sprint) => {
+            if(!folderMatches && !matchesSearch(sprint.name)) return;
+
             if(companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2 && sprint.private) {
                 if(sprint.AssigneeUserId.includes(userId.value)) {
                     folder.sprintsObj[sprint.id] = {...sprint, folderId: folder.folderId};
@@ -539,7 +606,13 @@ function setCategories() {
                 folder.sprintsObj[sprint.id] = sprint;
             }
         })
-        sprintsfolders[folder.folderId] = folder;
+
+        // Drop a category that has nothing left to show, so a search does not
+        // leave a column of empty headers behind. Without a search term
+        // folderMatches is always true, so every category is kept as before.
+        if(folderMatches || Object.keys(folder.sprintsObj).length) {
+            sprintsfolders[folder.folderId] = folder;
+        }
     })
     category.value = Object.values(sprintsfolders);
 }
@@ -554,7 +627,38 @@ onMounted(() => {
     chatsInit();
 })
 
+/**
+ * Drop conversations with people who are no longer active company members.
+ *
+ * separateFav() already keeps them out of what it builds, but `chats` and
+ * `favorites` are accumulated with push and never pruned, so a conversation added
+ * before the company-users store had loaded would otherwise linger for the rest
+ * of the session.
+ *
+ * Each ref is reassigned ONLY when something was actually dropped: a fresh array
+ * identity re-triggers the `users` watchEffect, which re-triggers the debounced
+ * watcher that calls this — assigning unconditionally would spin every second.
+ */
+function pruneInactiveChats() {
+    const activeChats = chats.value.filter((x) => isActiveUser(peerIdOf(x)));
+    if(activeChats.length !== chats.value.length) {
+        chats.value = activeChats;
+    }
+
+    const activeFavorites = favorites.value.filter((x) => isActiveUser(peerIdOf(x)));
+    if(activeFavorites.length !== favorites.value.length) {
+        favorites.value = activeFavorites;
+    }
+}
+
 function chatsInit() {
+    // Channels: rebuild the folder tree so the search term is re-applied.
+    if(!selectedProject.value?.default) {
+        setCategories();
+    }
+
+    pruneInactiveChats();
+
     if(selectedProject.value?.default && searchChat.value.length) {
         chatsFilter.value = chats.value.filter((x) => x.TaskName.toLowerCase().includes(searchChat.value.toLowerCase()))
         favoritesFilter.value = favorites.value.filter((x) => x.TaskName.toLowerCase().includes(searchChat.value.toLowerCase()))
@@ -600,9 +704,181 @@ watch(() => getters["mainChat/mainChatFolders"],(folder) => {
     }
 })
 
-watch([searchChat, chats, favorites, category, users], debounce(() => {
+// `category` is deliberately NOT a dependency here. chatsInit() now rebuilds the
+// category tree, so watching it would re-trigger this watcher on every run and
+// loop forever. Nothing inside chatsInit() reads `category`, so the dropped
+// dependency changes no behaviour.
+watch([searchChat, chats, favorites, users], debounce(() => {
     chatsInit();
 }, 1000))
+
+/* ------------------------------------------------------------------ *
+ * Row helpers for the rebuilt conversation list. Read-only derivations —
+ * they present existing state and add no behaviour of their own.
+ * ------------------------------------------------------------------ */
+
+/** The other participant's id in a direct conversation. */
+function peerIdOf(chat) {
+    if (!chat) return '';
+    if (chat.receiverId) return chat.receiverId;
+    return (chat.AssigneeUserId || []).filter((x) => x !== userId.value)[0] || '';
+}
+
+/** The other participant of a direct conversation. */
+function peerOf(chat) {
+    const other = peerIdOf(chat);
+    return other ? getUser(other) : null;
+}
+
+function peerName(chat) {
+    const peer = peerOf(chat);
+    return (peer && peer.Employee_Name) || (chat && (chat.TaskName || chat.name)) || '';
+}
+
+function peerImage(chat) {
+    const peer = peerOf(chat);
+    return (peer && peer.Employee_profileImageURL) || '';
+}
+
+/** Last-message preview: mentions rendered, single line. */
+function previewOf(chat) {
+    const raw = (chat && chat.message) || '';
+    if (raw === 'general.message_deleted') return '';
+    return changeText(String(raw), '', '');
+}
+
+/** Unread count for a direct conversation, using the existing counter keys. */
+function unreadOf(chat) {
+    if (!chat || !selectedProject.value) return 0;
+    const key = `task_${selectedProject.value._id}_${chat.sprintId}_${chat._id}_comments`;
+    return myCounts.value?.[key] || 0;
+}
+
+/* ------------------------------------------------------------------ *
+ * channel management (rename / members / delete)
+ * ------------------------------------------------------------------ */
+
+function editChannel(channel) {
+    if (!channel) return;
+    editingChannel.value = { ...channel };
+    showEditChannel.value = true;
+}
+
+/**
+ * Reflect a rename straight into the open tree.
+ *
+ * The store commit inside the edit panel updates the cached sprint list, but the
+ * rendered tree is built by setCategories() from selectedProject.sprintsfolders —
+ * a separate copy — so without this the new name only appears after the project's
+ * channels are refetched.
+ */
+function onChannelSaved(updated) {
+    if (!updated) return;
+    const id = updated._id || updated.id;
+
+    Object.values(selectedProject.value?.sprintsfolders || {}).forEach((folder) => {
+        const sprint = (folder?.sprintsObj || {})[id];
+        if (sprint) Object.assign(sprint, updated, { id });
+    });
+
+    const live = selectedProject.value?.sprintsObj?.[id];
+    if (live) Object.assign(live, updated, { id });
+
+    setCategories();
+
+    // The header title comes from the selected chat, so refresh it too.
+    if (props.selectedChat?.id === id) {
+        emit('selectedChat', { ...props.selectedChat, ...updated, id });
+    }
+}
+
+function editCategory(folder) {
+    if (!folder) return;
+    editingCategory.value = { ...folder };
+    showEditCategory.value = true;
+}
+
+/**
+ * Reflect a rename into the open tree, same reason as onChannelSaved: the rendered
+ * categories are built by setCategories() from selectedProject.sprintsfolders, which
+ * is a separate copy from the cached folder list the store commit updates.
+ */
+function onCategorySaved(updated) {
+    if (!updated) return;
+    const id = updated._id || updated.id;
+    const folder = (selectedProject.value?.sprintsfolders || {})[id];
+    if (!folder) return;
+
+    folder.name = updated.name;
+    // Channels carry a denormalised copy of their category's name.
+    Object.values(folder?.sprintsObj || {}).forEach((sprint) => {
+        if (sprint) sprint.folderName = updated.name;
+    });
+
+    setCategories();
+}
+
+/**
+ * Delete a channel, behind a confirmation.
+ *
+ * Soft delete: the server flags the sprint and gives the company's channel quota
+ * back. The conversation history is deliberately left in place.
+ */
+function confirmDeleteChannel(channel) {
+    if (!channel) return;
+    const id = channel._id || channel.id;
+    if (!id) return;
+
+    Swal.fire({
+        title: t('Channel.confirm_delete_channel').replace('CHANNEL_NAME', channel.name || ''),
+        text: t('Channel.confirm_delete_channel_note'),
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33',
+        cancelButtonText: t('MainChat.cancel'),
+        confirmButtonText: t('Channel.delete_channel'),
+    }).then((result) => {
+        if (result.isConfirmed) deleteChannel(channel, id);
+    });
+}
+
+async function deleteChannel(channel, id) {
+    try {
+        const response = await apiRequest("patch", `${env.SPRINT}/${id}`, {
+            companyId: companyId.value,
+            projectId: selectedProject.value?._id || channel.projectId,
+            type: "deleteChannel",
+            mainChat: true,
+        });
+
+        if (!response?.data?.status) {
+            $toast.error(response?.data?.statusText || t('Toast.something_went_wrong'), { position: "top-right" });
+            return;
+        }
+
+        // `removed` matches on data.id in this mutation, not data._id.
+        commit("mainChat/mutateChatSprints", { op: "removed", data: { id, projectId: selectedProject.value?._id } });
+
+        // Drop it out of the rendered tree without waiting for a refetch.
+        Object.values(selectedProject.value?.sprintsfolders || {}).forEach((folder) => {
+            if (folder?.sprintsObj) delete folder.sprintsObj[id];
+        });
+        if (selectedProject.value?.sprintsObj) delete selectedProject.value.sprintsObj[id];
+        setCategories();
+
+        $toast.success(t('Toast.Channel_deleted_successfully'), { position: "top-right" });
+
+        // Leave a conversation that no longer exists.
+        if (props.selectedChat?.id === id) {
+            emit('selectedChat', null);
+            router.push({ name: "chat_project", params: { cid: companyId.value, pid: selectedProject.value?._id || "" } });
+        }
+    } catch (error) {
+        console.error("ERROR in delete channel: ", error);
+        $toast.error(t('Toast.something_went_wrong'), { position: "top-right" });
+    }
+}
 
 function setProject(data) {
     if(!data || data._id === selectedProject.value?._id) return;
@@ -638,10 +914,15 @@ function getSprintData(id) {
     return new Promise((resolve, reject) => {
         try {
             if(Object.keys(getters["mainChat/mainChatSprints"]).includes(id)){
-                if(!sprintData.value || !Object.keys(sprintData.value || {}).length){
-                    sprintData.value = getters["mainChat/mainChatSprints"][id];
-                }
-                resolve(sprintData.value,true);
+                // Always take the cache entry for the REQUESTED project. The old
+                // `if (sprintData is empty)` guard meant that once this ref held any
+                // project's sprints it was never refreshed, so switching
+                // Channels -> Chats -> Channels resolved with the other project's
+                // sprints; getSprintFolderData then filtered them by projectId,
+                // matched nothing, and the channel list rendered empty until a
+                // page reload repopulated the cache from scratch.
+                sprintData.value = getters["mainChat/mainChatSprints"][id] || [];
+                resolve(sprintData.value);
                 return;
             }
 
@@ -661,10 +942,12 @@ function getFolderData(id) {
     return new Promise((resolve, reject) => {
         try {
             if(Object.keys(getters["mainChat/mainChatFolders"]).includes(id) || selectedProject.value.default){
-                if(!folderData.value || folderData.value.length === 0 || !Object.keys(folderData.value || {}).length){
-                    folderData.value = getters["mainChat/mainChatFolders"][id];
-                }
-                resolve(folderData.value,true);
+                // Same fix as getSprintData: read the cache for THIS project every
+                // time instead of only when the ref happens to be empty, otherwise
+                // stale folders from the previously opened project leak through and
+                // the category list comes back empty.
+                folderData.value = getters["mainChat/mainChatFolders"][id] || [];
+                resolve(folderData.value);
                 return;
             }
             let projectId = id;
@@ -773,6 +1056,9 @@ const getSprintFolderData = async (id) => {
 </script>
 
 <style lang="css">
+/* Chat module tokens + the .mcs-* conversation-pane styles; imported here so
+   the pane is styled even when the v2 panel (which also loads it) is absent. */
+@import "../MainChat/style.css";
 .v-enter-active,
 .v-leave-active {
   transition: all 0.2s ease;

@@ -123,8 +123,111 @@
                                                 </tr>
                                             </tbody>
                                         </table>
+                                        <button
+                                            v-if="logsHasMore"
+                                            type="button"
+                                            class="intg-logs-more"
+                                            :disabled="logsBusy"
+                                            @click="loadMoreLogs"
+                                        >{{ logsBusy ? $t('Integrations.loading') : $t('Integrations.load_more') }}</button>
                                     </div>
                                 </div>
+                            </div>
+
+                            <!-- ───────────────────────────────────────────────
+                                 AHE-3838 — cloud storage for attachments.
+                                 Workspace-level app registration per provider.
+                                 Each person then connects their OWN account,
+                                 because everyone has their own drive.
+                            ──────────────────────────────────────────────── -->
+                            <div class="intg-list-wrap intg-cloud">
+                                <h4 class="intg-section-title">{{ $t('Integrations.cloud_title') }}</h4>
+                                <p class="intg-desc">{{ $t('Integrations.cloud_desc') }}</p>
+
+                                <div v-if="cloudRedirectUri" class="intg-cloud-redirect">
+                                    <span class="intg-cloud-redirect-lbl">{{ $t('Integrations.cloud_redirect_uri') }}</span>
+                                    <code class="intg-secret-code">{{ cloudRedirectUri }}</code>
+                                    <button type="button" class="btn_btn intg-ghost-btn" @click="copyRedirectUri">{{ $t('Integrations.copy') }}</button>
+                                    <div class="intg-hint">{{ $t('Integrations.cloud_redirect_hint') }}</div>
+                                </div>
+
+                                <div v-for="p in cloudProviders" :key="p.provider" class="intg-row intg-cloud-row">
+                                    <div class="intg-row-top">
+                                        <div class="intg-row-main">
+                                            <span class="intg-cloud-ic">{{ p.icon }}</span>
+                                            <div class="intg-row-text">
+                                                <div class="intg-row-name">
+                                                    {{ p.name }}
+                                                    <span v-if="p.configured" class="intg-cloud-pill on">{{ $t('Integrations.cloud_ready') }}</span>
+                                                    <span v-else class="intg-cloud-pill">{{ $t('Integrations.cloud_not_setup') }}</span>
+                                                </div>
+                                                <div class="intg-row-meta">
+                                                    <template v-if="p.configured && p.oauth">
+                                                        <span v-if="p.connected">{{ $t('Integrations.cloud_your_account') }}: {{ p.accountEmail || $t('Integrations.cloud_connected') }}</span>
+                                                        <span v-else-if="p.connectionStatus === 'reauth_required'">{{ $t('Integrations.cloud_reauth') }}</span>
+                                                        <span v-else>{{ $t('Integrations.cloud_not_connected') }}</span>
+                                                    </template>
+                                                    <span v-else-if="p.configured">{{ $t('Integrations.cloud_no_signin_needed') }}</span>
+                                                    <span v-else>{{ p.setupHint }}</span>
+                                                </div>
+                                                <button
+                                                    v-if="p.requirements && p.requirements.length"
+                                                    type="button" class="intg-link intg-cloud-stepstoggle"
+                                                    @click="toggleCloudSteps(p)"
+                                                >{{ isCloudStepsOpen(p) ? $t('Integrations.cloud_hide_steps') : $t('Integrations.cloud_show_steps', { count: p.requirements.length }) }}</button>
+                                            </div>
+                                        </div>
+                                        <div class="intg-row-actions">
+                                            <!-- Per-user connect: available to everyone once an admin
+                                                 has entered the workspace credentials. -->
+                                            <button
+                                                v-if="p.configured && p.oauth && !p.connected"
+                                                type="button" class="intg-link" @click="connectCloud(p)"
+                                            >{{ $t('Integrations.cloud_connect') }}</button>
+                                            <button
+                                                v-if="p.configured && p.oauth && p.connected"
+                                                type="button" class="intg-link intg-danger" @click="disconnectCloud(p)"
+                                            >{{ $t('Integrations.cloud_disconnect') }}</button>
+                                            <button
+                                                type="button" class="intg-link" @click="toggleCloudForm(p)"
+                                            >{{ cloudEditing === p.provider ? $t('Integrations.cancel') : (p.configured ? $t('Integrations.edit') : $t('Integrations.cloud_setup')) }}</button>
+                                            <button
+                                                v-if="p.configured"
+                                                type="button" class="intg-link intg-danger" @click="removeCloud(p)"
+                                            >{{ $t('Integrations.delete') }}</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Per-provider setup checklist. Each line is
+                                         something whose omission silently breaks a
+                                         specific capability. -->
+                                    <ol v-if="isCloudStepsOpen(p) && p.requirements && p.requirements.length" class="intg-cloud-reqs">
+                                        <li v-for="(req, i) in p.requirements" :key="i" v-html="formatRequirement(req)"></li>
+                                        <li v-if="p.needsRedirectUri" class="intg-cloud-reqs__uri">
+                                            {{ $t('Integrations.cloud_redirect_uri') }}:
+                                            <code>{{ cloudRedirectUri }}</code>
+                                            <button type="button" class="intg-link" @click="copyRedirectUri">{{ $t('Integrations.copy') }}</button>
+                                        </li>
+                                    </ol>
+
+                                    <div v-if="cloudEditing === p.provider" class="intg-cloud-form">
+                                        <div v-for="f in p.fields" :key="f.key" class="inputfield position-re">
+                                            <label>{{ f.label }}</label>
+                                            <input
+                                                class="logininput"
+                                                :type="f.secret ? 'password' : 'text'"
+                                                autocomplete="off"
+                                                v-model.trim="cloudForm[f.key]"
+                                                :placeholder="f.secret && p.secrets && p.secrets[f.key] ? $t('Integrations.cloud_secret_set') : ''"
+                                            />
+                                        </div>
+                                        <div class="mysetiing_save d-flex" style="gap:10px; flex-wrap:wrap;">
+                                            <button type="button" class="btn_btn mysetting_save_btn" :disabled="isSpinner" @click="saveCloud(p)">{{ $t('Integrations.save') }}</button>
+                                            <button type="button" class="btn_btn intg-ghost-btn" @click="cloudEditing = ''">{{ $t('Integrations.cancel') }}</button>
+                                        </div>
+                                    </div>
+                                </div>
+
                             </div>
                         </div>
                     </div>
@@ -143,14 +246,20 @@ export default { name: 'IntegrationsSettings' };
 <script setup>
 import * as env from '@/config/env';
 import { useToast } from 'vue-toast-notification';
-import { ref, computed, inject, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
 import { apiRequest } from '../../../services';
 import { useI18n } from 'vue-i18n';
+import {
+    fetchCloudSettings,
+    saveCloudSettings,
+    clearCloudSettings,
+    connectCloudProvider,
+    disconnectCloudProvider,
+} from '@/composable/cloudPicker';
 
 const { t } = useI18n();
 const $toast = useToast();
-const userId = inject('$userId');
 
 const isSpinner = ref(false);
 const webhooks = ref([]);
@@ -159,6 +268,9 @@ const newSecret = ref('');
 const editingId = ref('');
 const logsFor = ref('');
 const logs = ref([]);
+const logsHasMore = ref(false);
+const logsNextSkip = ref(0);
+const logsBusy = ref(false);
 
 const formatOptions = [
     { value: 'slack', label: 'Slack' },
@@ -240,7 +352,9 @@ const submitForm = async () => {
         if (editingId.value) {
             res = await apiRequest('put', `${env.WEBHOOKS}/${editingId.value}`, body);
         } else {
-            res = await apiRequest('post', env.WEBHOOKS, { ...body, userData: { id: userId.value } });
+            // No userData: the server takes the owner from the session token now, since a
+            // caller-supplied id would decide whose integrations it can later read.
+            res = await apiRequest('post', env.WEBHOOKS, body);
         }
         if (!ok(res)) {
             $toast.error((res && res.data && res.data.statusText) || t('Toast.something_went_wrong'), { position: 'top-right' });
@@ -298,18 +412,45 @@ const removeWebhook = async (hook) => {
     }
 };
 
-const viewLogs = async (hook) => {
-    if (logsFor.value === hook._id) { logsFor.value = ''; return; }
+// Delivery logs are paged: a webhook firing on every task event builds thousands of rows,
+// and the panel shows a handful. LOGS_PAGE must match nothing on the server — it caps the
+// request there — this is only what we ask for.
+const LOGS_PAGE = 10;
+
+const loadLogs = async (hookId, append = false) => {
     try {
-        isSpinner.value = true;
-        const res = await apiRequest('get', `${env.WEBHOOKS}/${hook._id}/logs`);
-        logs.value = ok(res) ? (res.data.data || []) : [];
-        logsFor.value = hook._id;
+        if (append) logsBusy.value = true; else isSpinner.value = true;
+        const skip = append ? logsNextSkip.value : 0;
+        const res = await apiRequest('get', `${env.WEBHOOKS}/${hookId}/logs?skip=${skip}&limit=${LOGS_PAGE}`);
+        if (!ok(res)) return;
+        const page = res.data.data || [];
+        logs.value = append ? [...logs.value, ...page] : page;
+        // Trust the server's own count rather than inferring from page length: a full page
+        // is not evidence of more, and a short one is not proof there is nothing left.
+        logsHasMore.value = res.data.hasMore === true;
+        logsNextSkip.value = typeof res.data.nextSkip === 'number' ? res.data.nextSkip : logs.value.length;
     } catch (e) {
         $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
     } finally {
         isSpinner.value = false;
+        logsBusy.value = false;
     }
+};
+
+const viewLogs = async (hook) => {
+    if (logsFor.value === hook._id) { logsFor.value = ''; return; }
+    // Opening a different webhook starts a fresh list — carrying the previous one's rows
+    // or its paging offset would show one hook's deliveries under another's name.
+    logs.value = [];
+    logsHasMore.value = false;
+    logsNextSkip.value = 0;
+    await loadLogs(hook._id, false);
+    logsFor.value = hook._id;
+};
+
+const loadMoreLogs = () => {
+    if (logsBusy.value || !logsHasMore.value || !logsFor.value) return;
+    loadLogs(logsFor.value, true);
 };
 
 const copySecret = async () => {
@@ -317,7 +458,136 @@ const copySecret = async () => {
     catch (e) { /* ignore */ }
 };
 
-onMounted(() => { fetchEvents(); fetchWebhooks(); });
+// ── AHE-3838 · cloud storage for attachments ───────────────────────────────
+//
+// Two levels here, and the UI keeps them visibly separate:
+//   the app registration  workspace-wide, owner/admin only
+//   the account grant     per user, because everyone has their own drive
+const cloudProviders = ref([]);
+const cloudRedirectUri = ref('');
+const cloudEditing = ref('');
+const cloudForm = ref({});
+
+const loadCloudSettings = async () => {
+    try {
+        const data = await fetchCloudSettings();
+        cloudProviders.value = data.providers || [];
+        cloudRedirectUri.value = data.redirectUri || '';
+    } catch (error) {
+        // Non-fatal: the webhooks half of this page must still work.
+        console.error('Could not load cloud storage settings', error);
+        cloudProviders.value = [];
+    }
+};
+
+const toggleCloudForm = (p) => {
+    if (cloudEditing.value === p.provider) { cloudEditing.value = ''; return; }
+    // Prefill the non-secret values. Secrets are never sent to us, so their
+    // inputs start blank and a blank one means "keep what's stored".
+    cloudForm.value = { ...(p.config || {}) };
+    cloudEditing.value = p.provider;
+};
+
+const saveCloud = async (p) => {
+    isSpinner.value = true;
+    try {
+        await saveCloudSettings(p.provider, cloudForm.value);
+        cloudEditing.value = '';
+        await loadCloudSettings();
+        $toast.success(t('Integrations.cloud_saved', { provider: p.name }), { position: 'top-right' });
+    } catch (error) {
+        $toast.error(error?.message || t('Toast.something_went_wrong'), { position: 'top-right' });
+    } finally {
+        isSpinner.value = false;
+    }
+};
+
+const removeCloud = async (p) => {
+    // Only ever the caller's own credentials and grant — nobody else is affected.
+    if (!window.confirm(t('Integrations.cloud_confirm_remove', { provider: p.name }))) return;
+    isSpinner.value = true;
+    try {
+        await clearCloudSettings(p.provider);
+        await loadCloudSettings();
+        $toast.success(t('Integrations.cloud_removed', { provider: p.name }), { position: 'top-right' });
+    } catch (error) {
+        $toast.error(error?.message || t('Toast.something_went_wrong'), { position: 'top-right' });
+    } finally {
+        isSpinner.value = false;
+    }
+};
+
+const connectCloud = async (p) => {
+    try {
+        // Full-page redirect to the provider; we come back to this same page.
+        await connectCloudProvider(p.provider);
+    } catch (error) {
+        $toast.error(error?.message || t('Toast.something_went_wrong'), { position: 'top-right' });
+    }
+};
+
+const disconnectCloud = async (p) => {
+    isSpinner.value = true;
+    try {
+        await disconnectCloudProvider(p.provider);
+        await loadCloudSettings();
+        $toast.success(t('Integrations.cloud_disconnected', { provider: p.name }), { position: 'top-right' });
+    } catch (error) {
+        $toast.error(error?.message || t('Toast.something_went_wrong'), { position: 'top-right' });
+    } finally {
+        isSpinner.value = false;
+    }
+};
+
+// Setup steps are collapsed for a provider that's already working, and open by
+// default for one that still needs configuring — that's when you need them.
+const cloudStepsOpen = ref({});
+const toggleCloudSteps = (p) => { cloudStepsOpen.value[p.provider] = !isCloudStepsOpen(p); };
+const isCloudStepsOpen = (p) => {
+    const explicit = cloudStepsOpen.value[p.provider];
+    return explicit === undefined ? !p.configured : explicit;
+};
+
+/**
+ * Render the light markup used in provider requirement strings: **bold** and
+ * `code`. HTML is escaped FIRST, so even though these strings are our own
+ * constants today, the renderer can never emit markup that came from data.
+ */
+const formatRequirement = (text) => String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>');
+
+const copyRedirectUri = async () => {
+    try {
+        await navigator.clipboard.writeText(cloudRedirectUri.value);
+        $toast.success(t('Integrations.copied'), { position: 'top-right' });
+    } catch (error) {
+        $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
+    }
+};
+
+onMounted(() => {
+    fetchEvents();
+    fetchWebhooks();
+    loadCloudSettings();
+    // Coming back from a provider's consent screen — reflect the result and
+    // strip the query so a reload doesn't re-announce it.
+    const params = new URLSearchParams(window.location.search);
+    const outcome = params.get('cloudStorage');
+    if (outcome === 'connected') {
+        $toast.success(t('Integrations.cloud_connected_toast'), { position: 'top-right' });
+    } else if (outcome === 'error') {
+        $toast.error(params.get('reason') || t('Toast.something_went_wrong'), { position: 'top-right' });
+    }
+    if (outcome) {
+        params.delete('cloudStorage'); params.delete('reason'); params.delete('provider');
+        const qs = params.toString();
+        window.history.replaceState({}, '', window.location.pathname + (qs ? `?${qs}` : ''));
+    }
+});
 </script>
 
 <style scoped>
@@ -375,6 +645,112 @@ onMounted(() => { fetchEvents(); fetchWebhooks(); });
 .intg-logs-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .intg-logs-table th { text-align: left; color: #8A909C; font-weight: 600; padding: 4px 8px; }
 .intg-logs-table td { padding: 4px 8px; color: #1F212A; border-top: 1px solid #F2F4F8; }
+.intg-logs-more {
+    display: block;
+    width: 100%;
+    margin-top: 8px;
+    padding: 7px 0;
+    border: 1px solid #E3E6EF;
+    border-radius: 6px;
+    background: #FAFBFD;
+    color: #2F3990;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.intg-logs-more:hover:not(:disabled) { background: #F2F4FB; }
+.intg-logs-more:disabled { opacity: 0.6; cursor: default; }
 .intg-ok { color: #1B7F3B; }
 .intg-fail { color: #E5484D; }
+
+/* AHE-3838 — cloud storage for attachments */
+.intg-cloud { margin-top: 30px; padding-top: 22px; border-top: 1px solid #EDEFF5; }
+.intg-cloud .intg-desc { margin-bottom: 14px; }
+.intg-cloud-redirect {
+    background: #FBFCFF;
+    border: 1px dashed #C9D0F8;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.intg-cloud-redirect-lbl { font-size: 12.5px; font-weight: 600; color: #1F212A; }
+.intg-cloud-redirect .intg-hint { flex-basis: 100%; margin: 0; }
+.intg-cloud-row { display: block; }
+/* Keep the actions pinned top-right regardless of how long the provider's hint
+   is. `.intg-row-top` wraps by default and `.intg-row-main` has no flex-basis, so
+   Google's longer setup hint pushed the buttons onto their own line while
+   Dropbox's shorter one happened to fit — the two rows disagreed. Scoped to cloud
+   rows so the webhook rows above keep their existing wrapping behaviour. */
+.intg-cloud-row .intg-row-top { flex-wrap: nowrap; align-items: flex-start; }
+.intg-cloud-row .intg-row-main { flex: 1 1 auto; min-width: 0; }
+.intg-cloud-row .intg-row-actions { flex: 0 0 auto; align-items: flex-start; white-space: nowrap; }
+@media (max-width: 640px) {
+    /* Too narrow to hold both columns — let it stack rather than crush the text. */
+    .intg-cloud-row .intg-row-top { flex-wrap: wrap; }
+}
+.intg-cloud-ic {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    flex: none;
+    font-size: 17px;
+    background: #F4F5FB;
+    border-radius: 8px;
+}
+.intg-cloud-pill {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 8px;
+    padding: 1px 8px;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: #6B7280;
+    background: #F1F2F6;
+    border-radius: 999px;
+    vertical-align: middle;
+}
+.intg-cloud-pill.on { color: #1B7F3B; background: #E4F5EA; }
+.intg-cloud-form {
+    margin-top: 12px;
+    padding: 14px;
+    background: #FBFCFF;
+    border: 1px solid #EDEFF5;
+    border-radius: 8px;
+}
+.intg-cloud-form .inputfield { margin-bottom: 12px; }
+
+.intg-cloud-stepstoggle {
+    margin-top: 4px;
+    padding: 0;
+    font-size: 12px;
+}
+.intg-cloud-reqs {
+    margin: 10px 0 0;
+    padding: 12px 14px 12px 32px;
+    background: #FBFCFF;
+    border: 1px solid #EDEFF5;
+    border-radius: 8px;
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: #4A4B63;
+}
+.intg-cloud-reqs li { margin-bottom: 5px; }
+.intg-cloud-reqs li:last-child { margin-bottom: 0; }
+.intg-cloud-reqs strong { color: #1F212A; font-weight: 600; }
+.intg-cloud-reqs code {
+    padding: 1px 5px;
+    background: #EEF0FE;
+    border-radius: 4px;
+    font-size: 11.5px;
+    color: #2F3990;
+    word-break: break-all;
+}
+.intg-cloud-reqs__uri { padding-top: 4px; }
+.intg-cloud-reqs__uri .intg-link { margin-left: 6px; }
 </style>

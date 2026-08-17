@@ -146,6 +146,32 @@ export const setCompanyUserStatus = ({ commit }) => {
     });
 }
 
+export const setProjectSkills = ({ commit }) => {
+    return new Promise((resolve, reject) => {
+        try {
+            apiRequest("get", env.SETTING_PROJECT_SKILLS)
+                .then((res) => {
+                    if (res.status === 200) {
+                        const data = res.data;
+                        commit("mutateProjectSkills", {
+                            data: data[0]?.settings || [],
+                            op: "inital"
+                        })
+                        resolve(data[0]);
+                    } else {
+                        resolve([]);
+                    }
+                })
+                .catch((error) => {
+                    console.error("ERROR in get project skills: ", error);
+                    reject(error);
+                })
+        } catch (error) {
+            reject(error);
+        }
+    })
+}
+
 export const setDesignations = ({ commit }) => {
     return new Promise((resolve, reject) => {
         try {

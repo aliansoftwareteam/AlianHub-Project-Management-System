@@ -1,119 +1,191 @@
+<!--
+    My Clips — anchored popover, styled to match the Notepad popover.
+
+      list   : one row per clip (type badge, title, date), with hover actions for
+               play / convert to task / rename / copy link / delete.
+      player : the selected clip expands inline; its media url is resolved lazily
+               on first play (the stored value is a storage key, not a url).
+
+    Replaces the previous full-height sidebar.
+-->
 <template>
-    <div v-if="modelValue" class="clips__overlay" @click.self="close">
-        <div class="clips__panel" @click="openMenuId = null">
-            <div class="d-flex align-items-center justify-content-between clips__head">
-                <span class="font-size-16 font-weight-700">{{ $t('Clips.my_clips') }}</span>
-                <div class="d-flex align-items-center">
-                    <button class="btn-primary font-size-12 mr-10px clips__add-btn" @click="recordNew">+ {{ $t('Clips.record_new') }}</button>
-                    <span class="cursor-pointer font-size-16 clips__close" @click="close">&#10005;</span>
+    <div v-if="modelValue" class="cl__overlay" @click.self="close">
+        <div class="cl__pop" @click="openMenuId = null">
+            <!-- ── Header ─────────────────────────────────────────────── -->
+            <div class="cl__head">
+                <span class="cl__htitle">{{ $t('Clips.my_clips') }}</span>
+                <div class="cl__hmenuwrap">
+                    <button type="button" class="cl__hbtn" :class="{ 'is-on': showSearch }" :title="$t('Clips.search')" @click.stop="toggleSearch">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+                    </button>
+                </div>
+                <button type="button" class="cl__hbtn" :title="$t('Reminders.close')" @click.stop="close">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <div v-if="showSearch" class="cl__searchbar">
+                <input ref="searchInput" v-model="search" class="cl__searchinput" :placeholder="$t('Clips.search_placeholder')" />
+            </div>
+
+            <div v-if="isLoading" class="cl__state">{{ $t('Clips.loading') }}</div>
+            <div v-else-if="!visibleClips.length" class="cl__state">
+                {{ search ? $t('Clips.no_results') : $t('Clips.empty') }}
+            </div>
+
+            <div v-else class="cl__list" @scroll="openMenuId = null">
+                <div v-for="clip in visibleClips" :key="clip._id" class="cl__row">
+                    <span class="cl__type" :class="clip.mediaType === 'video' ? 'is-video' : 'is-audio'">
+                        <svg v-if="clip.mediaType === 'video'" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"></path><rect x="2" y="6" width="14" height="12" rx="2"></rect></svg>
+                        <svg v-else width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" x2="12" y1="19" y2="22"></line></svg>
+                    </span>
+
+                    <div class="cl__main" @click="togglePlay(clip)">
+                        <input
+                            v-if="renameId === clip._id"
+                            ref="renameInput"
+                            v-model="renameValue"
+                            class="cl__renameinput"
+                            :maxlength="120"
+                            :placeholder="$t('Clips.rename_placeholder')"
+                            @click.stop
+                            @keyup.enter="commitRename(clip)"
+                            @blur="commitRename(clip)"
+                        />
+                        <div v-else class="cl__title" :title="clip.title">{{ clip.title || $t('Clips.untitled') }}</div>
+                        <div class="cl__meta">
+                            <span>{{ formatDate(clip.createdAt) }}</span>
+                            <span v-if="clip.durationSec">· {{ formatDuration(clip.durationSec) }}</span>
+                            <span v-if="clip.convertedTaskId" class="cl__converted">{{ $t('Clips.converted_badge') }}</span>
+                        </div>
+                    </div>
+
+                    <div class="cl__actions" @click.stop>
+                        <button type="button" class="cl__a" :title="playingId === clip._id ? $t('Clips.hide') : $t('Clips.play')" @click="togglePlay(clip)">
+                            <svg v-if="playingId !== clip._id" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>
+                            <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 15l-6-6-6 6"></path></svg>
+                        </button>
+                        <button type="button" class="cl__a" :title="$t('Clips.convert_action')" @click="startConvert(clip)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                        </button>
+                        <div class="cl__menuwrap">
+                            <button type="button" class="cl__a" :title="$t('Clips.options')" @click="toggleMenu(clip, $event)">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Inline player -->
+                    <div v-if="playingId === clip._id" class="cl__player" @click.stop>
+                        <template v-if="playUrls[clip._id]">
+                            <video v-if="clip.mediaType === 'video'" :src="playUrls[clip._id]" class="cl__media" controls autoplay></video>
+                            <audio v-else :src="playUrls[clip._id]" class="cl__media cl__media--audio" controls autoplay></audio>
+                        </template>
+                        <div v-else class="cl__resolving">{{ $t('Clips.loading') }}</div>
+                    </div>
                 </div>
             </div>
 
-            <div v-if="isLoading" class="gray81 font-size-12 clips__empty">{{ $t('Clips.loading') }}</div>
-            <div v-else-if="!clips.length" class="gray81 font-size-12 clips__empty">{{ $t('Clips.empty') }}</div>
+            <button type="button" class="cl__new" @click.stop="recordNew">
+                <span class="cl__rec"></span> {{ $t('Clips.record_new') }}
+            </button>
+        </div>
 
-            <div v-else class="clips__list">
-                <div
-                    v-for="clip in clips"
-                    :key="clip._id"
-                    class="clips__item"
-                    :class="{ 'clips__item--menu-open': openMenuId === clip._id }"
-                >
-                    <div class="clips__item-head">
-                        <span class="clips__badge" :class="clip.mediaType === 'video' ? 'clips__badge--video' : 'clips__badge--audio'">
-                            {{ clip.mediaType === 'video' ? $t('Clips.video_badge') : $t('Clips.audio_badge') }}
-                        </span>
-                        <button class="clips__menu-btn" :title="$t('Clips.options')" @click.stop="toggleMenu(clip)">
-                            <img :src="horizontalDots" alt="options" class="vertical-middle">
-                        </button>
-                    </div>
+        <!-- Row overflow menu — fixed so the scrolling list cannot clip it. -->
+        <div v-if="openMenuId" class="cl__menu" :style="menuStyle" @click.stop>
+            <button type="button" class="cl__mitem" @click="startRename(menuClip)">{{ $t('Clips.rename') }}</button>
+            <button type="button" class="cl__mitem" @click="copyLink(menuClip)">{{ $t('Clips.copy_link') }}</button>
+            <button type="button" class="cl__mitem cl__mitem--danger" @click="askDelete(menuClip)">{{ $t('Clips.delete') }}</button>
+        </div>
 
-                    <div v-if="openMenuId === clip._id" class="clips__menu" @click.stop>
-                        <div class="clips__menu-item" @click="startRename(clip)">{{ $t('Clips.rename') }}</div>
-                        <div class="clips__menu-item" @click="copyLink(clip)">{{ $t('Clips.copy_link') }}</div>
-                        <div class="clips__menu-item clips__menu-item--danger" @click="remove(clip)">{{ $t('Clips.delete') }}</div>
-                    </div>
-
-                    <!-- Rename input (inline) -->
-                    <input
-                        v-if="renameId === clip._id"
-                        v-model="renameValue"
-                        class="clips__rename-input font-size-13"
-                        :placeholder="$t('Clips.rename_placeholder')"
-                        :maxlength="120"
-                        @keyup.enter="commitRename(clip)"
-                        @blur="commitRename(clip)"
-                    />
-                    <span v-else class="clips__title font-size-13 font-weight-600" :title="clip.title">{{ clip.title }}</span>
-
-                    <span class="clips__date gray81 font-size-11">{{ formatDate(clip.createdAt) }}</span>
-
-                    <!-- Player: lazily resolves the stored url to a playable url on first open -->
-                    <div class="clips__player">
-                        <template v-if="playUrls[clip._id]">
-                            <video v-if="clip.mediaType === 'video'" :src="playUrls[clip._id]" class="clips__media" controls></video>
-                            <audio v-else :src="playUrls[clip._id]" class="clips__media clips__media--audio" controls></audio>
-                        </template>
-                        <button v-else type="button" class="clips__play-btn font-size-12" :disabled="resolvingId === clip._id" @click="resolvePlay(clip)">
-                            <span class="clips__play-tri">&#9658;</span> {{ resolvingId === clip._id ? $t('Clips.loading') : $t('Clips.play') }}
-                        </button>
-                    </div>
+        <!-- Delete confirmation -->
+        <div v-if="pendingDelete" class="cl__confirmwrap" @click.self="pendingDelete = null">
+            <div class="cl__confirm">
+                <span class="cl__cicon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>
+                </span>
+                <h3 class="cl__ctitle">{{ $t('Clips.confirm_delete_title') }}</h3>
+                <p class="cl__cdesc">{{ $t('Notepad.confirm_delete_desc') }}</p>
+                <div class="cl__cactions">
+                    <button type="button" class="cl__cbtn" @click="pendingDelete = null">{{ $t('Projects.cancel') }}</button>
+                    <button type="button" class="cl__cbtn cl__cbtn--danger" @click="confirmDelete">{{ $t('Clips.delete') }}</button>
                 </div>
             </div>
         </div>
+
+        <!-- Reuses the notepad's convert dialog: it only reads title/content, so a
+             clip can drive it, with the recording passed through as an attachment. -->
+        <ConvertNoteToTask
+            v-if="convertClip"
+            :note="{ title: convertClip.title, content: '' }"
+            :dialogTitle="$t('Clips.convert_title')"
+            :attachment="clipAttachment(convertClip)"
+            @close="convertClip = null"
+            @converted="onConverted"
+        />
     </div>
 </template>
 
 <script setup>
 // PACKAGES
-import { defineProps, defineEmits, inject, ref, watch } from "vue";
+import { computed, inject, nextTick, ref, watch } from "vue";
 import { useToast } from "vue-toast-notification";
 import { useI18n } from "vue-i18n";
 
-// IMAGE
-import horizontalDots from "@/assets/images/svg/horizontalDots.svg";
+// COMPONENTS
+import ConvertNoteToTask from "@/components/molecules/Notepad/ConvertNoteToTask.vue";
 
 // UTILS
+import { apiRequest } from "@/services";
 import { listClips, renameClip, deleteClip } from "@/services/clips";
 import { useClipRecorder } from "@/composables/useClipRecorder";
 import { storageHelper } from "@/composable/commonFunction";
+import { useCustomComposable } from "@/composable";
 
 const { t } = useI18n();
 const $toast = useToast();
 const companyId = inject("$companyId");
+const userId = inject("$userId");
 const { handleStorageImageRequest } = storageHelper();
 const { openRecorder } = useClipRecorder();
+const { makeUniqueId } = useCustomComposable();
 
 const props = defineProps({
-    modelValue: {
-        type: Boolean,
-        default: false,
-    },
+    modelValue: { type: Boolean, default: false },
 });
-
 const emit = defineEmits(["update:modelValue"]);
 
 const clips = ref([]);
 const isLoading = ref(false);
 const openMenuId = ref(null);
+const menuClip = ref(null);
+const menuStyle = ref({});
 const renameId = ref(null);
 const renameValue = ref("");
-const resolvingId = ref(null);
-// Map of clipId -> resolved playable url (signed / public). Lazily filled.
+const renameInput = ref(null);
+const playingId = ref(null);
 const playUrls = ref({});
+const pendingDelete = ref(null);
+const convertClip = ref(null);
+const showSearch = ref(false);
+const search = ref("");
+const searchInput = ref(null);
 
 function close() {
     emit("update:modelValue", false);
 }
 
-watch(() => props.modelValue, (open) => {
-    if (open) {
-        openMenuId.value = null;
-        renameId.value = null;
-        playUrls.value = {};
-        fetchClips();
-    }
+const visibleClips = computed(() => {
+    const term = search.value.trim().toLowerCase();
+    if (!term) return clips.value;
+    return clips.value.filter((c) => String(c.title || "").toLowerCase().includes(term));
 });
+
+function toggleSearch() {
+    showSearch.value = !showSearch.value;
+    if (!showSearch.value) search.value = "";
+    else nextTick(() => searchInput.value && searchInput.value.focus());
+}
 
 function fetchClips() {
     isLoading.value = true;
@@ -125,42 +197,75 @@ function fetchClips() {
         .finally(() => { isLoading.value = false; });
 }
 
-function toggleMenu(clip) {
-    openMenuId.value = openMenuId.value === clip._id ? null : clip._id;
+function recordNew() {
+    openMenuId.value = null;
+    openRecorder();
+}
+
+// The row menu is position:fixed, so its coordinates come from the trigger and it
+// flips upward when there is not enough room below.
+const MENU_H = 132;
+const MENU_W = 156;
+function toggleMenu(clip, event) {
+    if (openMenuId.value === clip._id) {
+        openMenuId.value = null;
+        return;
+    }
+    const rect = event && event.currentTarget && event.currentTarget.getBoundingClientRect();
+    if (rect) {
+        const flipUp = rect.bottom + MENU_H > window.innerHeight;
+        menuStyle.value = {
+            top: flipUp ? `${Math.max(8, rect.top - MENU_H)}px` : `${rect.bottom + 4}px`,
+            left: `${Math.max(8, rect.right - MENU_W)}px`,
+        };
+    }
+    menuClip.value = clip;
+    openMenuId.value = clip._id;
 }
 
 function formatDate(value) {
     if (!value) return "";
     const d = new Date(value);
-    if (isNaN(d.getTime())) return "";
-    return d.toLocaleString();
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleString([], { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 }
 
-// Resolve the stored relative url to an actually-playable url (signed/public),
-// using the same storage-helper the attachment list uses for previews.
-function resolvePlay(clip) {
-    if (playUrls.value[clip._id] || resolvingId.value) return;
-    resolvingId.value = clip._id;
-    handleStorageImageRequest({
-        companyId: companyId.value,
-        data: { url: clip.url },
-    })
-        .then((res) => {
-            const resolved = res && (res.url || res.downloadUrl);
-            playUrls.value = { ...playUrls.value, [clip._id]: resolved || clip.url };
-        })
-        .catch((error) => {
-            console.error("ERROR resolving clip url: ", error);
-            // Fall back to the raw stored url so the user can still attempt playback.
-            playUrls.value = { ...playUrls.value, [clip._id]: clip.url };
-        })
-        .finally(() => { resolvingId.value = null; });
+function formatDuration(sec) {
+    const total = Math.max(0, Math.round(Number(sec) || 0));
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+// Expand/collapse the inline player. The stored value is a storage key, so the
+// playable url is resolved on first open and then cached.
+function togglePlay(clip) {
+    openMenuId.value = null;
+    if (playingId.value === clip._id) {
+        playingId.value = null;
+        return;
+    }
+    playingId.value = clip._id;
+    if (playUrls.value[clip._id]) return;
+    resolveUrl(clip)
+        .then((url) => { playUrls.value = { ...playUrls.value, [clip._id]: url }; })
+        .catch(() => { playUrls.value = { ...playUrls.value, [clip._id]: clip.url }; });
+}
+
+function resolveUrl(clip) {
+    return handleStorageImageRequest({ companyId: companyId.value, data: { url: clip.url } })
+        .then((res) => (res && (res.url || res.downloadUrl)) || clip.url);
 }
 
 function startRename(clip) {
     openMenuId.value = null;
+    if (!clip) return;
     renameId.value = clip._id;
     renameValue.value = clip.title || "";
+    nextTick(() => {
+        const el = Array.isArray(renameInput.value) ? renameInput.value[0] : renameInput.value;
+        if (el) el.focus();
+    });
 }
 
 function commitRename(clip) {
@@ -186,16 +291,13 @@ function commitRename(clip) {
 
 async function copyLink(clip) {
     openMenuId.value = null;
+    if (!clip) return;
     const done = () => $toast.success(t("Clips.copied"), { position: "top-right" });
     const fail = () => $toast.error(t("Clips.copy_failed"), { position: "top-right" });
-    // The stored value is an internal storage path (on Wasabi it's an object key,
-    // not openable). Resolve it to a real url the same way playback does — reuse an
-    // already-resolved one if present, else resolve on demand.
     let text = playUrls.value[clip._id] || "";
     if (!text) {
         try {
-            const res = await handleStorageImageRequest({ companyId: companyId.value, data: { url: clip.url } });
-            text = (res && (res.url || res.downloadUrl)) || clip.url || "";
+            text = await resolveUrl(clip);
         } catch (error) {
             console.error("ERROR resolving clip link: ", error);
             text = clip.url || "";
@@ -222,152 +324,73 @@ async function copyLink(clip) {
     }
 }
 
-function remove(clip) {
+function askDelete(clip) {
     openMenuId.value = null;
-    const ok = typeof window !== "undefined" && typeof window.confirm === "function"
-        ? window.confirm(t("Clips.delete_confirm"))
-        : true;
-    if (!ok) return;
+    pendingDelete.value = clip;
+}
+
+function confirmDelete() {
+    const clip = pendingDelete.value;
+    pendingDelete.value = null;
+    if (!clip) return;
     deleteClip(clip._id)
         .then((response) => {
             if (response.data && response.data.status) {
                 clips.value = clips.value.filter((c) => c._id !== clip._id);
-                $toast.success(t("Clips.deleted"), { position: "top-right" });
+                if (playingId.value === clip._id) playingId.value = null;
             } else {
-                $toast.error(t("Clips.delete_failed"), { position: "top-right" });
+                $toast.error(t("Toast.something_went_wrong"), { position: "top-right" });
             }
         })
-        .catch((error) => {
-            console.error("ERROR in delete clip: ", error);
-            $toast.error(t("Clips.delete_failed"), { position: "top-right" });
-        });
+        .catch((error) => console.error("ERROR in delete clip: ", error));
 }
 
-// Open the global recorder (library-only). When the user saves, refetch so the
-// new clip shows up. The recorder itself is mounted at the app shell.
-function recordNew() {
-    openRecorder(null, () => {
-        fetchClips();
-    });
+// --- convert to task ----------------------------------------------------
+function startConvert(clip) {
+    openMenuId.value = null;
+    convertClip.value = clip;
 }
+
+// Task-attachment record for the clip. The media is already in storage, so the
+// task just points at the same key — nothing is re-uploaded. Shape matches the
+// entries TaskDetailTab writes.
+function clipAttachment(clip) {
+    if (!clip || !clip.url) return null;
+    const ext = String(clip.url).includes(".") ? String(clip.url).split(".").pop() : "webm";
+    return {
+        filename: `${clip.title || "clip"}.${ext}`,
+        extension: ext,
+        size: Number(clip.size) || 0,
+        id: makeUniqueId(17),
+        createdAt: new Date(),
+        userId: userId?.value || userId,
+        type: clip.mediaType === "video" ? "video" : "audio",
+        url: clip.url,
+    };
+}
+
+function onConverted({ taskId }) {
+    const clip = convertClip.value;
+    convertClip.value = null;
+    if (!clip || !taskId) return;
+    clip.convertedTaskId = String(taskId);
+    apiRequest("patch", `/api/v1/clips/${clip._id}`, { convertedTaskId: String(taskId) })
+        .catch((error) => console.error("ERROR in stamp converted clip: ", error));
+}
+
+watch(() => props.modelValue, (open) => {
+    if (open) {
+        openMenuId.value = null;
+        renameId.value = null;
+        playingId.value = null;
+        pendingDelete.value = null;
+        convertClip.value = null;
+        showSearch.value = false;
+        search.value = "";
+        playUrls.value = {};
+        fetchClips();
+    }
+});
 </script>
 
-<style scoped>
-.clips__overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.35);
-    z-index: 1000;
-    display: flex;
-    justify-content: flex-end;
-}
-.clips__panel {
-    background: #fff;
-    width: min(400px, 92vw);
-    height: 100%;
-    padding: 16px 18px;
-    overflow-y: auto;
-    box-shadow: -8px 0 30px rgba(0, 0, 0, 0.18);
-    /* Mounted at the app shell (navy Header) — explicit dark text so the heading
-       and inherited-colour text don't render white-on-white. */
-    color: #2b2b2b;
-}
-.clips__head { margin-bottom: 14px; }
-.clips__add-btn { color: #fff; }
-.clips__close { color: #9a9a9a; }
-.clips__close:hover { color: #e84a4a; }
-.clips__empty { padding: 32px 12px; text-align: center; }
-.clips__list { display: flex; flex-direction: column; gap: 12px; }
-.clips__item {
-    position: relative;
-    border: 1px solid #ececf0;
-    border-radius: 8px;
-    padding: 10px;
-    background: #fcfcfd;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-    display: flex;
-    flex-direction: column;
-}
-.clips__item--menu-open { z-index: 5; }
-.clips__item-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-height: 18px;
-    margin-bottom: 4px;
-}
-.clips__badge {
-    font-size: 10px;
-    font-weight: 600;
-    border-radius: 10px;
-    padding: 2px 8px;
-}
-.clips__badge--video { color: #2f3990; background: #eef0ff; }
-.clips__badge--audio { color: #2e7d32; background: #e7f5e8; }
-.clips__menu-btn {
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    padding: 0 2px;
-    line-height: 1;
-}
-.clips__menu {
-    position: absolute;
-    top: 26px;
-    right: 8px;
-    z-index: 10;
-    background: #fff;
-    border: 1px solid #e6e6e6;
-    border-radius: 8px;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
-    padding: 6px;
-    min-width: 150px;
-}
-.clips__menu-item {
-    font-size: 13px;
-    color: #3a3a3a;
-    padding: 7px 8px;
-    border-radius: 6px;
-    cursor: pointer;
-}
-.clips__menu-item:hover { background: #f5f6fa; }
-.clips__menu-item--danger { color: #e84a4a; }
-.clips__title {
-    color: #2b2b2b;
-    word-break: break-word;
-}
-.clips__rename-input {
-    width: 100%;
-    border: 1px solid #2f3990;
-    border-radius: 6px;
-    padding: 5px 8px;
-    outline: none;
-    color: #2b2b2b;
-}
-.clips__date { margin-top: 2px; }
-.clips__player { margin-top: 8px; }
-.clips__media {
-    width: 100%;
-    max-height: 220px;
-    border-radius: 6px;
-    background: #000;
-}
-.clips__media--audio {
-    max-height: none;
-    background: transparent;
-}
-.clips__play-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: #eef0ff;
-    color: #1b1b38;
-    border: none;
-    border-radius: 6px;
-    padding: 6px 12px;
-    cursor: pointer;
-}
-.clips__play-btn:hover { background: #e2e5ff; }
-.clips__play-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-.clips__play-tri { font-size: 10px; }
-</style>
+<style scoped src="./panel.css"></style>

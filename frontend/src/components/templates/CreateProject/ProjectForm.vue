@@ -48,6 +48,37 @@
                 <div class="text-red" v-if="theModel.projectCode.isUniqueProjectCode !== ''">{{$t('PlaceHolder.' + theModel.projectCode.isUniqueProjectCode)}}</div>
             </div>
         </div>
+        <div class="form-group d-flex align-items-center" id="createprojectsource_driver">
+            <label :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}" >{{ $t('ProjectDetails.source') }}<span class="text-red asterisk">*</span></label>
+            <div class="input-field-group">
+                <ProjectSourceSelect v-model="theModel.source.value" @changed="onSourceChange"/>
+                <div class="text-red">{{theModel.source.error}}</div>
+            </div>
+        </div>
+        <div class="form-group d-flex align-items-center" id="createprojectproposalid_driver">
+            <label :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}" >
+                {{ $t('ProjectDetails.proposal_id') }}<span class="text-red asterisk" v-if="isUpwork(theModel.source.value)">*</span>
+            </label>
+            <div class="input-field-group">
+                <InputText
+                    class="form-control login-input"
+                    :placeHolder="$t('PlaceHolder.Enter_Proposal_Id')"
+                    autocomplete="off"
+                    v-model.trim="theModel.proposalId.value"
+                    @keyup="onProposalIdChange()"
+                    maxlength="100"
+                    type="text"
+                />
+                <div class="font-size-12 gray81" v-if="isUpwork(theModel.source.value)">{{ $t('Projects.proposal_id_format_hint') }}</div>
+                <div class="text-red">{{theModel.proposalId.error}}</div>
+            </div>
+        </div>
+        <div class="form-group d-flex align-items-center" id="createprojectskills_driver">
+            <label :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}" >{{ $t('ProjectDetails.skills') }}</label>
+            <div class="input-field-group">
+                <SkillsSelect v-model="theModel.skills.value" :bordered="true" :showAll="true" @changed="syncModel()"/>
+            </div>
+        </div>
         <div class="form-group d-flex align-items-center" id="createprojectduedate_driver">
             <label :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}" >{{ $t('Projects.due_date') }}</label>
             <VueDatePicker class="text-capitalize" :placeholder="$t('PlaceHolder.Select_Project_Due_Date')" v-model="theModel.dueDate.value" @input="updateDueDate(event)" auto-apply  :close-on-auto-apply="true" :min-date="new Date()" :enable-time-picker="false"/>
@@ -82,6 +113,9 @@ import InputText from "@/components/atom/InputText/InputText.vue";
 import { useValidation } from "@/composable/Validation.js";
 // import DueDateCompo from "@/components/molecules/DueDateCompo/DueDateCompo.vue"
 import Assignee from '@/components/molecules/Assignee/Assignee.vue';
+import SkillsSelect from '@/components/molecules/SkillsSelect/SkillsSelect.vue';
+import ProjectSourceSelect from '@/components/molecules/ProjectSourceSelect/ProjectSourceSelect.vue';
+import { isUpwork } from '@/utils/projectSource';
 import VueDatePicker from '@vuepic/vue-datepicker';
 import '@vuepic/vue-datepicker/dist/main.css';
 const  { checkErrors } = useValidation();
@@ -94,9 +128,20 @@ const  { checkErrors } = useValidation();
             default: () => ({}),
         },
     });
-    const theModel = ref(props.modelValue);
+    // The template binds `theModel.<field>.value` directly, so a caller whose
+    // model is missing a field would crash the whole create sidebar rather than
+    // just losing that input. Fill in the optional ones defensively.
+    const ensureFields = (model) => {
+        if(!model || typeof model !== 'object') return model;
+        const defaults = { proposalId: '', source: '', skills: [] };
+        Object.keys(defaults).forEach((key) => {
+            if(!model[key]) model[key] = { value: defaults[key], rules: "", name: key, error: "" };
+        });
+        return model;
+    }
+    const theModel = ref(ensureFields(props.modelValue));
     watch(()=> props.modelValue,(val)=>{
-        theModel.value = val;
+        theModel.value = ensureFields(val);
     })
     const { getters} = useStore();
     var emloyeeArray = computed(() => {
@@ -161,6 +206,21 @@ const  { checkErrors } = useValidation();
             theModel.value.projectCode.value = dataVal.toUpperCase();
         }
         emit('update:modelValue', theModel.value)
+    }
+    // Push optional-field edits (proposal id, skills) to the parent form model
+    const syncModel = () => {
+        emit('update:modelValue', theModel.value)
+    }
+    // Errors clear as the user fixes them; the blocking check runs on submit
+    // (checkSourceFields in CreateProjectSidebar / TemplateAllDetail).
+    const onSourceChange = () => {
+        theModel.value.source.error = '';
+        if(!isUpwork(theModel.value.source.value)) theModel.value.proposalId.error = '';
+        syncModel();
+    }
+    const onProposalIdChange = () => {
+        theModel.value.proposalId.error = '';
+        syncModel();
     }
     // Regex for validate alpha numeric
     const removeSpecialCharacter = () => {

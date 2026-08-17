@@ -75,12 +75,7 @@
                                     <div class="d-flex align-items-center">
                                         <span v-if="data.convertType === undefined || data.convertType === ''" class="font-size-16 color94">{{$t('general.Select_Task_Type')}}</span>
                                         <div class="d-flex align-items-center">
-                                            <img v-if="data.convertType?.taskImage?.includes('http')" :src="data.convertType ? data.convertType?.taskImage : ''" class="position-re border-radius-2-px convert__type">
-                                            <WasabiImage
-                                                v-else
-                                                class="position-re vertical-middle task__image"
-                                                :data="{url: data.convertType?.taskImage}"
-                                            />
+                                            <TaskTypeIcon :taskType="data.convertType" class="position-re border-radius-2-px convert__type" />
                                             <span class="pl-10px" :class="{'font-size-13' : clientWidth > 767, 'font-size-16' : clientWidth <= 767}">{{data.convertType ? data.convertType.name : ''}}</span>
                                         </div>
                                         <span class="red position-ab font-size-11 mt-50px" v-if="(data.convertType === undefined || data.convertType === '')">{{errorMsgType}}</span>
@@ -296,7 +291,7 @@ import DropDown from '@/components/molecules/DropDown/DropDown.vue'
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue'
 import { useStore } from "vuex";
 import { useGetterFunctions } from "@/composable";
-import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
+import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
 
 const emit = defineEmits(["checkAllModel", "checkTaskType", "finalConfirm", "changeStatus","update:modelValue" ,"changeTaskType","assigneeConfirm","closeModel"]);
 const clientWidth = inject("$clientWidth");

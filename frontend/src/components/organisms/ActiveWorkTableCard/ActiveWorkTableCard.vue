@@ -80,6 +80,7 @@ const load = async () => {
         const payload = {
             employeeIds: Array.isArray(employeeIds) ? employeeIds : [],
             projectIds: props.cardData?.projectId || [],
+            projectMode: props.cardData?.projectMode || 'all',
             isParentTask: props.cardData?.isParentTask !== false,
             dateFrom,
             dateTo,

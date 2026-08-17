@@ -42,13 +42,13 @@
                                 <template v-if="message.type === 'image'">
                                     <div class="d-flex flex-column" @click.prevent="previewImageFun()">
                                         <ImageIcon
-                                            v-if="message.mediaURL.includes('http')"
+                                            v-if="message.mediaURL?.includes('http')"
                                             :src="message.mediaURL"
                                             :alt="message.mediaOriginalName"
-                                            :extension="message.mediaOriginalName.split('.').pop()"
+                                            :extension="message.mediaOriginalName?.split('.').pop()"
                                             class="comment-media comment__image" />
                                         <WasabiImageComp v-else
-                                            :data="{url: message.mediaURL,title: message.mediaOriginalName, filename: message.mediaOriginalNamem, extension: message.mediaOriginalName.split('.').pop()}"
+                                            :data="{url: message.mediaURL,title: message.mediaOriginalName, filename: message.mediaOriginalNamem, extension: message.mediaOriginalName?.split('.').pop()}"
                                             @downloadUrl="handleDownloadUrl" class="comment-media comment__image" />
                                     </div>
                                 </template>
@@ -71,10 +71,10 @@
 
                                 <template v-else-if="message.type !== 'text' && message.type !== 'link'">
                                     <div class="d-flex flex-column" @click.prevent="previewImageFun()">
-                                        <ImageIcon v-if="message.mediaURL.includes('http')" :src="message.mediaURL" :extension="message.mediaName.split('.').pop()" :alt="message.mediaName" class="comment-media"/>
+                                        <ImageIcon v-if="message.mediaURL?.includes('http')" :src="message.mediaURL" :extension="message.mediaName?.split('.').pop()" :alt="message.mediaName" class="comment-media"/>
                                         <WasabiImageComp
                                             v-else
-                                            :data="{url: message.mediaURL, title: message.mediaOriginalName, filename: message.mediaOriginalNamem, extension: message.mediaOriginalName.split('.').pop()}"
+                                            :data="{url: message.mediaURL, title: message.mediaOriginalName, filename: message.mediaOriginalNamem, extension: message.mediaOriginalName?.split('.').pop()}"
                                             class="comment-media comment__image"
                                             @downloadUrl="(eve) => {downloadurl(eve)}"
                                         />
@@ -298,7 +298,7 @@ function previewImageFun() {
     let previewData = {
         title: props.message.mediaOriginalName,
         filename: props.message.mediaOriginalName,
-        extension: props.message.mediaOriginalName.split(".").pop(),
+        extension: props.message.mediaOriginalName?.split(".").pop(),
         type: props.message.type,   
         url: downloadValue.value ? downloadValue.value : props.message.mediaURL,
         downloadUrl: downloadValue.value ? downloadValue.value : props.message.mediaURL,
@@ -310,6 +310,11 @@ function previewImageFun() {
 async function processUrl(message) {
     if (message.type !== "video" || message.type !== "audio" || message.type !== "image") {
         let properUrl = message.downloadURL || message.mediaURL;
+
+        // AHE-3834 — text/link messages carry no media URL. Without this guard
+        // `properUrl.includes` threw (undefined) or, when mediaURL was an empty
+        // string, fired a pointless storage request for every text message.
+        if (!properUrl) return;
 
         if (!properUrl.includes("http")) {
 

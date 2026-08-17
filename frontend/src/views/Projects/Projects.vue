@@ -126,7 +126,22 @@
                                     </div>
                                     <img :src="publicFolder" class="vertical-middle" alt="public-folder" v-if="clientWidth > 767 && !projectData.isPrivateSpace"/>
                                 </div>
-                                <div class="list-head-mid h-100" :class="{'desktop-view' : clientWidth > 767}" id="projectview_driver">
+                            </div>
+                            <ProjectActionsBar
+                                :projectData="projectData"
+                                :clientWidth="clientWidth"
+                                :users="users"
+                                :teams="teams"
+                                @openSidebar="open"
+                                @openWatcher="openProjectWatcher = true"
+                                @changeAssignee="(type, $event) => changeAssignee(type, $event)"
+                                @openPermissionSidebar="openPermissionSidebar"
+                                @startEditName="projectName.value = projectData?.ProjectName; editProject = true"
+                                @openColorAvatar="showColorAvatar = true; assignAvatarData({id: projectData._id, name: projectData.ProjectName, icon: projectData?.projectIcon})"
+                                @archiveProject="(val) => { showSidebar = true; archive = val }"
+                            />
+                        </div>
+                        <div class="project-views-row" id="projectview_driver">
                                     <template v-if="clientWidth > 765">
                                         <div class="d-flex align-items-center overflow-x-auto view_list_scroll h-100">
                                             <ViewsList
@@ -227,21 +242,6 @@
                                         </div>
                                     </template>
                                 </div>
-                            </div>
-                            <ProjectActionsBar
-                                :projectData="projectData"
-                                :clientWidth="clientWidth"
-                                :users="users"
-                                :teams="teams"
-                                @openSidebar="open"
-                                @openWatcher="openProjectWatcher = true"
-                                @changeAssignee="(type, $event) => changeAssignee(type, $event)"
-                                @openPermissionSidebar="openPermissionSidebar"
-                                @startEditName="projectName.value = projectData?.ProjectName; editProject = true"
-                                @openColorAvatar="showColorAvatar = true; assignAvatarData({id: projectData._id, name: projectData.ProjectName, icon: projectData?.projectIcon})"
-                                @archiveProject="(val) => { showSidebar = true; archive = val }"
-                            />
-                        </div>
                         <div v-if="showLoader" class="d-flex box-shadow-6 position-fi z-index-10 right-22px bottom-22px bg-white p-10px border-radius-5-px align-items-center">
                             <div class="progress-container d-flex align-items-center position-re">
                                 <div class="progress-circle" :style="circleStyle">
@@ -266,11 +266,12 @@
                                             activeTab !== 'WhiteboardView' &&
                                             activeTab !== 'CanvasView' &&
                                             activeTab !== 'MapView' &&
+                                            activeTab !== 'ProjectDashboard' &&
                                             (clientWidth > 767 || activeTab !== 'ProjectDetail')
                                 },
                                 {'board-veiw-main-parent': activeTab === 'ProjectKanban'}
                             ]"
-                            :style="{height: clientWidth > 767 ? 'calc(100% - 48px)' : 'calc(100% - 62px)'}"
+                            :style="{height: clientWidth > 767 ? 'calc(100% - 80px)' : 'calc(100% - 62px)'}"
                         >
                             <ProjectFiltersToolbar
                                 :activeTab="activeTab"
@@ -301,7 +302,7 @@
                                 @manageFilterUsers="manageFilterUsers"
                                 @changeAssignee="(type, $event) => changeAssignee(type, $event)"
                                 @openAi="openAiSidebar = true"
-                                @openAiAssist="showAiTaskCreator = true"
+                                @openAiAssist="openAiTaskCreator()"
                                 @update:showArchived="(v) => showArchived = v"
                                 @openCalendar="calendartoggle = true; rangeObjectFRun(calendarDate ? new Date(calenderSelectDate) : new Date())"
                                 @handleStartEndDate="handleStartEndDate"
@@ -313,7 +314,7 @@
                             <AiTaskCreator v-if="projectData && projectData._id" v-model="showAiTaskCreator" :projectId="String(projectData._id)" :sprints="aiSprints" :activeSprintId="aiActiveSprintId" @done="onAiTasksCreated" />
                             <component
                                 v-if="(clientWidth <= 767 && isVisible == true && isRuleData == false) || (clientWidth > 767 && isRuleData == false)"
-                                :class="[{'showProjectDetailRight':activeTab !== 'ProjectListView' && activeTab !== 'Calendar' && activeTab != 'EmbedViewItem' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports' && activeTab !== 'GanttView' && activeTab !== 'RecurringTasks' && activeTab !== 'TimelineView' && activeTab !== 'MindMapView' && activeTab !== 'WhiteboardView' && activeTab !== 'CanvasView' && activeTab !== 'MapView'}]"
+                                :class="[{'showProjectDetailRight':activeTab !== 'ProjectListView' && activeTab !== 'Calendar' && activeTab != 'EmbedViewItem' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports' && activeTab !== 'GanttView' && activeTab !== 'RecurringTasks' && activeTab !== 'TimelineView' && activeTab !== 'MindMapView' && activeTab !== 'WhiteboardView' && activeTab !== 'CanvasView' && activeTab !== 'MapView' && activeTab !== 'ProjectDashboard'}]"
                                 :is="getView(activeTab)"
                                 :data="selectedEmbedView"
                                 :sprints="sprints"
@@ -335,7 +336,7 @@
                                 :sprintLoading="sprintLoading"
                                 :commentType="'project'"
                             />
-                            <ProjectDetailRightSide v-if="activeTab !== 'ProjectListView' && clientWidth > 767 && activeTab !== 'Calendar' && activeTab != 'EmbedView' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports' && activeTab !== 'GanttView' && activeTab !== 'RecurringTasks' && activeTab !== 'TimelineView' && activeTab !== 'MindMapView' && activeTab !== 'WhiteboardView' && activeTab !== 'CanvasView'" :projectData="projectData" @rightSideBarEmit="handleEmitProjectRightSide" @description="handleDescription"/>
+                            <ProjectDetailRightSide v-if="activeTab !== 'ProjectListView' && clientWidth > 767 && activeTab !== 'Calendar' && activeTab != 'EmbedView' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports' && activeTab !== 'GanttView' && activeTab !== 'RecurringTasks' && activeTab !== 'TimelineView' && activeTab !== 'MindMapView' && activeTab !== 'WhiteboardView' && activeTab !== 'CanvasView' && activeTab !== 'ProjectDashboard'" :projectData="projectData" @rightSideBarEmit="handleEmitProjectRightSide" @description="handleDescription"/>
                         </div>
                         <div class="position-ab z-index-1 p-5px border-radius-5-px text-center p0x-15px archived_wrapper" v-if="projectData?.deletedStatusKey === 2">
                             <div>
@@ -485,6 +486,7 @@ const MindMapViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "
 const WhiteboardViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-whiteboard" */ '@/views/Projects/WhiteboardView/WhiteboardView.vue'));
 const CanvasViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-canvas" */ '@/views/Projects/CanvasView/CanvasView.vue'));
 const MapViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-map" */ '@/views/Projects/MapView/MapView.vue'));
+const DashboardViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-dashboard" */ './DashboardView/DashboardView.vue'));
 import NotFound from '../NotFound.vue';
 
 // EXTRACTED PIECES
@@ -523,16 +525,74 @@ const currentVideoUrl = ref(0);
 const openAiSidebar = ref(false);
 const showDriverSidebar = ref(false);
 const showAiTaskCreator = ref(false);
-// Sprints for the "Plan with AI" tasks-only picker: [{ id, name }] from the
-// project's sprint map (non-deleted). Active default = the sprint being viewed
-// (route param), else the first.
-const aiSprints = computed(() => {
-    const obj = projectData.value && projectData.value.sprintsObj;
-    if (!obj) return [];
-    return Object.values(obj)
-        .filter((s) => s && s.id && (s.deletedStatusKey === 0 || s.deletedStatusKey === undefined))
-        .map((s) => ({ id: String(s.id), name: s.name || 'Sprint' }));
-});
+// Sprints for the "Plan with AI" tasks-only picker: [{ id, name }].
+//
+// A project keeps its sprints in two places — `sprintsObj` holds the ones at the
+// root, and each folder in `sprintsfolders` has its own `sprintsObj`. Reading
+// only the first meant every sprint inside a folder was missing from the picker,
+// so a project that organises its sprints into folders offered almost nothing to
+// choose from.
+//
+// Folder sprints are labelled "Folder / Sprint": two folders can easily hold a
+// sprint of the same name, and without the prefix they'd be indistinguishable.
+//
+// Built into a REF when the modal opens — deliberately not a computed.
+//
+// As a computed consumed by the template it joined this view's render effect, and
+// walking `sprintsfolders` registered a reactive dependency on every folder and
+// every sprint nested inside one. Clicking a sprint mutates that state
+// (expansion / selection), which then invalidated the render effect and cascaded
+// into the project-list watchers further down: the list re-filtered and the
+// selection fell back to the first project. The original version read only root
+// `sprintsObj`, so it never observed folder state and the problem did not exist.
+//
+// A ref filled on open owns no reactive dependencies, so nothing here can feed
+// back into rendering.
+const aiSprints = ref([]);
+
+const buildAiSprints = () => {
+    const project = projectData.value;
+    if (!project) return [];
+
+    const isLive = (x) => x && (x.deletedStatusKey === 0 || x.deletedStatusKey === undefined);
+    const out = [];
+    const seen = new Set();
+    const push = (sprint, prefix) => {
+        if (!isLive(sprint) || !sprint.id) return;
+        const id = String(sprint.id);
+        if (seen.has(id)) return;   // never offer the same sprint twice
+        seen.add(id);
+        const name = sprint.name || 'Sprint';
+        out.push({ id, name: prefix ? `${prefix} / ${name}` : name });
+    };
+
+    // Root-level sprints first, so the common case stays at the top.
+    Object.values(project.sprintsObj || {}).forEach((s) => push(s, ''));
+
+    // Then each folder's sprints. Folders are keyed by id, and a deleted folder's
+    // sprints are not offered.
+    Object.values(project.sprintsfolders || {}).forEach((folder) => {
+        if (!isLive(folder)) return;
+        const folderName = folder.name || 'Folder';
+        Object.values(folder.sprintsObj || {}).forEach((s) => push(s, folderName));
+    });
+
+    return out;
+};
+
+/**
+ * Fill the list, then open. Order matters: AiTaskCreator's own open-watcher calls
+ * reset(), which seeds its selection from `props.sprints[0]` — so the list has to
+ * be there before the flag flips, rather than racing two watchers on the same
+ * tick. Building it here also means the project's sprint maps are read at exactly
+ * one moment, never during rendering.
+ */
+const openAiTaskCreator = () => {
+    aiSprints.value = buildAiSprints();
+    showAiTaskCreator.value = true;
+};
+
+// Active default = the sprint being viewed (route param), else the first.
 const aiActiveSprintId = computed(() => {
     const rid = route.params && route.params.sprintId;
     if (rid && aiSprints.value.some((s) => s.id === String(rid))) return String(rid);
@@ -1174,6 +1234,8 @@ function getView(val) {
             return CanvasViewComp;
         case 'MapView':
             return MapViewComp;
+        case 'ProjectDashboard':
+            return DashboardViewComp;
         default:
             return NotFound;
     }

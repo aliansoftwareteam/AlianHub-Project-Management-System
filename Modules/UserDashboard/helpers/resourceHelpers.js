@@ -126,7 +126,7 @@ function bucketForStatus(statusName, statusType) {
  * @returns {Promise<{loggedByUserTask:Object.<string,number>, taskMap:Object.<string,object>, userIds:Set<string>}>}
  */
 async function getLoggedAndTasksInRange(companyId, opts = {}) {
-    const { fromSec, toSec, projectIds = [], statusKeys = [], visibleUserIds = null, taskMatch = null } = opts;
+    const { fromSec, toSec, projectIds = [], projectMode = 'all', statusKeys = [], visibleUserIds = null, taskMatch = null } = opts;
 
     const tsFilter = { LogStartTime: { $gte: fromSec, $lte: toSec } };
     if (Array.isArray(visibleUserIds)) {
@@ -154,8 +154,9 @@ async function getLoggedAndTasksInRange(companyId, opts = {}) {
             .filter((id) => mongoose.Types.ObjectId.isValid(id))
             .map((id) => new mongoose.Types.ObjectId(id));
         const taskFilter = { _id: { $in: validIds }, deletedStatusKey: 0 };
-        if (projectIds.length) {
-            taskFilter.ProjectID = { $in: projectIds.map((id) => new mongoose.Types.ObjectId(String(id))) };
+        const lgProjClause = projectScopeClause(projectMode, projectIds);
+        if (lgProjClause) {
+            taskFilter.ProjectID = lgProjClause;
         }
         if (statusKeys.length) {
             taskFilter.statusKey = { $in: statusKeys.map(Number) };
@@ -231,6 +232,26 @@ async function getSprintTypeMap(companyId, sprintIds = []) {
  * self-scope `$or:[{AssigneeUserId},{Task_Leader}]`). Everything is folded into
  * $and so multiple $or groups coexist. Mutates and returns the filter.
  */
+/**
+ * Build a project-scope match clause from a card's saved scope.
+ *   mode 'all'      → null (no restriction — all accessible projects)
+ *   mode 'include'  → { $in:  ids }
+ *   mode 'exclude'  → { $nin: ids }
+ * Empty ids → null (no restriction). Pass { string: true } for the timesheet
+ * `ProjectId` field (stored as a String) vs task/project `_id` (ObjectId).
+ *
+ * @returns {object|null} clause for ProjectID/_id/ProjectId, or null
+ */
+function projectScopeClause(mode, ids, { string = false } = {}) {
+    const valid = (ids || []).filter((id) => mongoose.Types.ObjectId.isValid(String(id)));
+    if (!valid.length) return null; // no ids → all accessible (new 'all' cards send [])
+    const vals = string ? valid.map(String) : valid.map((id) => new mongoose.Types.ObjectId(String(id)));
+    if (mode === 'exclude') return { $nin: vals };
+    // include, OR a legacy card whose mode is 'all' but still carries saved ids —
+    // treat those ids as an include list so old cards keep their existing scope.
+    return { $in: vals };
+}
+
 function applyTaskMatch(taskFilter, taskMatch) {
     if (!taskMatch || typeof taskMatch !== "object" || !Object.keys(taskMatch).length) return taskFilter;
     const andParts = [];
@@ -253,4 +274,5 @@ module.exports = {
     getUserNameMap,
     getSprintTypeMap,
     applyTaskMatch,
+    projectScopeClause,
 };

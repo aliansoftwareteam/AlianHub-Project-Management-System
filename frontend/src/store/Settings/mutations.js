@@ -164,6 +164,24 @@ export const mutateDesignations = (state, payload) => {
     }
 }
 
+export const mutateProjectSkills = (state, payload) => {
+    const {data, op} = payload;
+    if(op === "inital") {
+        state.projectSkills = data || [];
+    } else if(op === "added") {
+        const index = state.projectSkills.findIndex((skill) => skill.slug === data.slug);
+        if(index === -1) {
+            state.projectSkills.push(data);
+        }
+    } else if(op === "modified") {
+        // Keyed on key, not slug: a rename moves only the display name.
+        const index = state.projectSkills.findIndex((skill) => skill.key === data.key);
+        if(index !== -1) {
+            state.projectSkills[index] = data;
+        }
+    }
+}
+
 export const mutateProjectMilestoneStatus = (state, payload) => {
     const {data, op, countType} = payload;
     if(op === "inital"){

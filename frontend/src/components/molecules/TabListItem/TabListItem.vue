@@ -1,6 +1,6 @@
 <template>
     <li
-        v-if="tabKey === 'time-log' ? checkApps('TimeTracking') : true"
+        v-if="tabKey === 'time-log' ? (checkApps('TimeTracking') || getAppState('TimeTracking') === 'disabled') : true"
         role="presentation"
         :class="{ active: isActive }"
         class="cursor-pointer"
@@ -35,7 +35,7 @@
 <script setup>
 import { defineProps, defineEmits } from 'vue';
 import { useCustomComposable } from '@/composable';
-const { checkApps } = useCustomComposable();
+const { checkApps, getAppState } = useCustomComposable();
 
 defineEmits(["changeTab"]);
 defineProps({

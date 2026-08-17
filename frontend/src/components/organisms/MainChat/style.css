@@ -1,0 +1,1309 @@
+/*
+ * Main Chat module styles.
+ *
+ * Imported once by MainChatPanel.vue. Component <style src> blocks in this repo
+ * are NOT scoped, so every class here is prefixed `mc-` to guarantee it cannot
+ * leak into another component (the ProjectFilter/TaskFilter stylesheets already
+ * caused exactly that kind of bug by shipping an unprefixed rule).
+ *
+ * Colours are the app's own tokens: navy #2f3990 for primary, #DFE1E6-family
+ * hairlines, Roboto via the inherited font stack.
+ */
+
+/* The left list header, the conversation header and the details header must be
+   EXACTLY the same height, or their bottom borders do not line up and the seam
+   shows as a notch where the panes meet. One variable keeps them honest. */
+:root { --mc-header-h: 56px; }
+
+.mc {
+    --mc-navy: #2f3990;
+    --mc-navy-soft: #eceefb;
+    --mc-navy-line: #c8cdf0;
+    --mc-ink: #171b26;
+    --mc-body: #3d4356;
+    --mc-muted: #8b91a1;
+    --mc-line: #e4e6ee;
+    --mc-canvas: #f6f7fb;
+    --mc-alert: #ff4757;
+
+    /* Transcript rhythm, in one place. Inside a run the bubbles nearly touch; a new
+       run gets clear air above it. These two numbers are the whole grouping feel. */
+    --mc-gap-group: 2px;
+    --mc-gap-run: 9px;
+
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    background: #fff;
+    font-family: 'Roboto', sans-serif;
+    color: var(--mc-body);
+}
+
+/* ---------------- header ---------------- */
+.mc-head {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 16px;
+    border-bottom: 1px solid var(--mc-line);
+    min-height: var(--mc-header-h);
+    box-sizing: border-box;
+}
+/* The back-to-list control on narrow screens. Sits before the conversation icon, so it
+   reads as "out of here" rather than as one more action on the conversation. */
+.mc-head-back {
+    flex: none;
+    width: 20px; height: 20px;
+    cursor: pointer;
+    opacity: .7;
+    transition: opacity .12s ease;
+}
+.mc-head-back:hover { opacity: 1; }
+.mc-head-id { min-width: 0; display: flex; flex-direction: column; }
+.mc-head-name {
+    font-size: 14.5px; font-weight: 700; color: var(--mc-ink);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mc-head-sub { font-size: 11.5px; color: var(--mc-muted); }
+
+/*
+ * Live typing, at the foot of the transcript.
+ *
+ * Deliberately shaped like an incoming message — avatar on the left, bubble with the
+ * received corner — so it reads as something about to arrive rather than as a status
+ * line. The row matches .mc-b's geometry so the bubble lands on the same left edge as
+ * the messages above it.
+ */
+.mc-typing-row {
+    display: flex; align-items: flex-end; gap: 9px;
+    padding: 2px 4px 4px; flex: none;
+}
+.mc-typing-avs { display: inline-flex; align-items: center; flex: none; }
+/* several people: overlap the avatars into a small stack instead of a wide row */
+.mc-typing-avs > *:not(:first-child) { margin-left: -12px; }
+.mc-typing-avs > * { box-shadow: 0 0 0 2px var(--mc-canvas); }
+
+.mc-typing-bub {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 46px; height: 30px; padding: 0 14px; box-sizing: border-box;
+    background: #fff; border: 1px solid var(--mc-line);
+    border-radius: 14px 14px 14px 4px;
+}
+.mc-typing-dots { display: inline-flex; align-items: center; gap: 3px; }
+.mc-typing-dots b {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--mc-navy); opacity: .3;
+    animation: mc-typing-bounce 1.2s ease-in-out infinite;
+}
+.mc-typing-dots b:nth-child(2) { animation-delay: .16s; }
+.mc-typing-dots b:nth-child(3) { animation-delay: .32s; }
+@keyframes mc-typing-bounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: .3; }
+    30% { transform: translateY(-4px); opacity: 1; }
+}
+
+.mc-typing-enter-active, .mc-typing-leave-active { transition: opacity .18s ease, transform .18s ease; }
+.mc-typing-enter-from, .mc-typing-leave-to { opacity: 0; transform: translateY(6px); }
+
+@media (prefers-reduced-motion: reduce) {
+    .mc-typing-dots b { animation: none; opacity: .65; }
+    .mc-typing-enter-active, .mc-typing-leave-active { transition: none; }
+}
+.mc-head-actions { margin-left: auto; display: flex; align-items: center; gap: 2px; }
+
+.mc-icon-btn {
+    width: 30px; height: 30px; border: 0; background: transparent;
+    border-radius: 7px; display: grid; place-items: center;
+    cursor: pointer; padding: 0;
+    /* was --mc-muted (#8b91a1): too faint against white to read as a control */
+    color: #5b6270;
+}
+.mc-icon-btn:hover { background: var(--mc-canvas); color: var(--mc-navy); }
+.mc-icon-btn:disabled { color: #c2c7d4; cursor: default; background: transparent; }
+/* lit while its right-hand pane is open */
+.mc-icon-btn--on, .mc-icon-btn--on:hover { background: var(--mc-navy-soft); color: var(--mc-navy); }
+.mc-icon-btn:focus-visible { outline: 2px solid var(--mc-navy); outline-offset: 1px; }
+.mc-icon-btn img { width: 16px; height: 16px; }
+
+/* ---------------- avatars ---------------- */
+.mc-av {
+    flex: none; border-radius: 50%; display: grid; place-items: center;
+    color: #fff; font-weight: 700; position: relative; overflow: visible;
+    background: #5b63c4; line-height: 1;
+}
+.mc-av img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+/* WasabiImageComp adds its own wrapper (plus a skeleton while it resolves, and a
+   fallback icon on failure) — all of it has to fill the round frame, not sit inside it */
+.mc-av .mc-av-img,
+.mc-av .mc-av-img > * {
+    width: 100%; height: 100%; display: block; border-radius: 50%; overflow: hidden;
+}
+.mc-av--28 { width: 28px; height: 28px; font-size: 11px; }
+.mc-av--34 { width: 34px; height: 34px; font-size: 12.5px; }
+.mc-av-dot {
+    position: absolute; right: -1px; bottom: -1px;
+    width: 9px; height: 9px; border-radius: 50%;
+    border: 2px solid #fff; background: #c2c7d4;
+}
+.mc-av-dot--on { background: #2bb673; }
+
+/* ---------------- feed ---------------- */
+/* Holds the scroller plus the floating jump button. The button has to be positioned
+   against this, not against .mc-feed: inside a scroller, `bottom` is measured from the
+   bottom of the CONTENT, which is off-screen exactly when the reader has scrolled up. */
+.mc-feed-wrap {
+    flex: 1 1 auto; min-height: 0; position: relative;
+    display: flex; flex-direction: column;
+}
+.mc-feed {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden;
+    background: var(--mc-canvas);
+    padding: 12px 14px 6px;
+    position: relative;
+    display: flex; flex-direction: column;
+}
+.mc-feed-spacer { flex: 1 1 auto; }
+
+.mc-older { display: flex; justify-content: center; padding: 4px 0 10px; }
+.mc-older button {
+    border: 1px solid var(--mc-line); background: #fff; color: var(--mc-body);
+    border-radius: 999px; padding: 4px 14px; font-size: 12px; cursor: pointer;
+    font-family: inherit;
+}
+.mc-older button:hover { border-color: var(--mc-navy-line); color: var(--mc-navy); }
+
+.mc-day { display: flex; align-items: center; gap: 10px; margin: 12px 0 8px; }
+.mc-day::before, .mc-day::after { content: ""; flex: 1; height: 1px; background: var(--mc-line); }
+.mc-day span {
+    font-size: 11px; color: var(--mc-muted); background: #fff;
+    border: 1px solid var(--mc-line); border-radius: 999px; padding: 2px 10px;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+
+.mc-empty {
+    margin: auto; text-align: center; color: var(--mc-muted);
+    font-size: 13px; display: flex; flex-direction: column; gap: 4px; padding: 30px 0;
+}
+.mc-empty b { color: var(--mc-ink); font-size: 14px; }
+
+/*
+ * Jump to the newest message — a floating circular control centred at the bottom of
+ * the feed. White on the canvas so it reads as an overlay rather than a message, and
+ * it inverts to navy on hover so the target is unmistakable.
+ *
+ * Every transform below has to carry the centring translateX(-50%): a transform that
+ * omits it replaces the centring outright and the button snaps to the middle-left.
+ */
+.mc-jump {
+    position: absolute; left: 50%; bottom: 14px; z-index: 3;
+    transform: translateX(-50%);
+    /* A squircle rather than a circle: smaller, and it speaks the module's own
+       language — the tabs, the count badges and the row menu are all rounded squares,
+       while circles here belong to avatars. The slightly tighter bottom corners give
+       it a faint downward lean toward what it does. */
+    width: 30px; height: 30px; padding: 0;
+    border: 1px solid var(--mc-navy-line, #c8cdf0);
+    border-radius: 11px 11px 8px 8px;
+    background: #fff; color: var(--mc-navy, #2f3990);
+    display: grid; place-items: center; cursor: pointer;
+    box-shadow: 0 4px 12px rgba(23, 27, 38, .13);
+    transition: background-color .14s ease, color .14s ease, border-color .14s ease,
+                box-shadow .14s ease, transform .14s ease;
+}
+.mc-jump:hover {
+    background: var(--mc-navy, #2f3990); color: #fff;
+    border-color: var(--mc-navy, #2f3990);
+    box-shadow: 0 7px 16px rgba(47, 57, 144, .28);
+    transform: translateX(-50%) translateY(-1px);
+}
+.mc-jump:focus-visible { outline: 2px solid var(--mc-navy, #2f3990); outline-offset: 2px; }
+/* unseen arrivals ride on the same control instead of a second one */
+.mc-jump-count {
+    position: absolute; top: -6px; right: -6px;
+    min-width: 16px; height: 16px; padding: 0 3px; box-sizing: border-box;
+    border-radius: 6px; border: 2px solid var(--mc-canvas, #f6f7fb);
+    background: #e42b2b; color: #fff;
+    font-size: 9px; font-weight: 700; line-height: 1;
+    display: grid; place-items: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.mc-jump-enter-active, .mc-jump-leave-active {
+    transition: opacity .16s ease, transform .16s ease;
+}
+.mc-jump-enter-from, .mc-jump-leave-to {
+    opacity: 0; transform: translateX(-50%) translateY(8px) scale(.9);
+}
+@media (prefers-reduced-motion: reduce) {
+    .mc-jump, .mc-jump-enter-active, .mc-jump-leave-active { transition: none; }
+    .mc-jump:hover { transform: translateX(-50%); }
+}
+
+/* ---------------- message: shared ---------------- */
+.mc-msg { position: relative; }
+/*
+ * Hover actions sit INLINE with the message, on its inner side:
+ *   your messages (right-aligned)  -> toolbar to the LEFT of the bubble
+ *   everyone else (left-aligned)   -> toolbar to the RIGHT of the bubble
+ * i.e. mirrored, always pointing back toward the middle of the transcript.
+ *
+ * It stays in the flow and is toggled with `visibility`, not `display`, so the
+ * space is already reserved and the bubble does not jump sideways on hover.
+ * Bubbles cap at 68% of the column, so there is always room for it.
+ */
+.mc-msg-tools {
+    display: flex;
+    visibility: hidden;
+    flex: none;
+    gap: 3px;
+    align-items: center;
+    background: #fff;
+    border: 1px solid var(--mc-line);
+    border-radius: 10px;
+    padding: 3px;
+    box-shadow: 0 2px 8px rgba(23, 27, 38, .10);
+}
+/* descendant, NOT `>`: the toolbar now lives inside .mc-b-stack > .mc-b-line,
+   so a direct-child selector here matches nothing and it never appears */
+.mc-msg:hover .mc-msg-tools,
+.mc-msg:focus-within .mc-msg-tools { visibility: visible; }
+/* the mirror: place the toolbar before the bubble on your own messages */
+.mc-b--me .mc-b-line > .mc-msg-tools { order: -1; }
+
+/* emoji picker, opened from the toolbar's react button */
+.mc-react { position: relative; display: flex; align-items: center; }
+.mc-msg-tools .mc-react-btn--on { background: var(--mc-navy-soft); color: var(--mc-navy); }
+.mc-picker {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 2px;
+    padding: 5px;
+    background: #fff;
+    border: 1px solid var(--mc-line);
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(23, 27, 38, .16);
+    z-index: 5;
+}
+.mc-picker .mc-picker-emoji {
+    width: 30px; height: 30px; border: 0; background: transparent; cursor: pointer;
+    border-radius: 8px; font-size: 16px; line-height: 1; padding: 0;
+    display: grid; place-items: center;
+}
+.mc-picker .mc-picker-emoji:hover { background: var(--mc-canvas); transform: scale(1.12); }
+@media (prefers-reduced-motion: reduce) { .mc-picker .mc-picker-emoji:hover { transform: none; } }
+.mc-msg-tools button {
+    width: 28px; height: 28px; border: 0; background: transparent; cursor: pointer;
+    border-radius: 8px; color: #5b6270; display: grid; place-items: center;
+    padding: 0; font-family: inherit;
+}
+.mc-msg-tools button:hover { background: #eceefb; color: var(--mc-navy); }
+.mc-msg-tools button:focus-visible { outline: 2px solid var(--mc-navy); outline-offset: -1px; }
+/* the DropDown wrapper around the ⋮ trigger must not add its own box */
+.mc-msg-tools > div { display: flex; align-items: center; }
+
+.mc-deleted { font-style: italic; color: var(--mc-muted); font-size: 12.5px; }
+.mc-pending { opacity: .62; }
+.mc-failed-note {
+    font-size: 11px; color: var(--mc-alert); display: flex; align-items: center; gap: 6px;
+}
+.mc-failed-note button {
+    border: 0; background: none; color: var(--mc-alert); text-decoration: underline;
+    cursor: pointer; font-size: 11px; padding: 0; font-family: inherit;
+}
+
+/* the whole row is the preview target, so it has to read as clickable */
+.mc-file { display: flex; align-items: center; gap: 9px; min-width: 0; cursor: pointer; }
+.mc-file:hover .mc-file-name { text-decoration: underline; }
+.mc-file-ic {
+    width: 30px; height: 30px; border-radius: 6px; flex: none;
+    background: var(--mc-navy-soft); color: var(--mc-navy);
+    display: grid; place-items: center; font-size: 10px; font-weight: 700;
+    text-transform: uppercase;
+}
+.mc-file-name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc-file-meta { font-size: 11px; color: var(--mc-muted); }
+.mc-file img.mc-file-thumb { max-width: 220px; max-height: 160px; border-radius: 8px; display: block; }
+
+/*
+ * Media placeholder.
+ *
+ * WasabiImageComp already renders a skeleton while it resolves a signed URL, but
+ * it inherited only max-width/max-height from us, so it collapsed and the bubble
+ * showed as an empty coloured block for a few hundred ms after switching
+ * conversation. This reserves the space and shimmers it, then collapses to the
+ * asset's own size the moment it paints.
+ */
+/*
+ * A compact thumbnail with a hairline border — not a full-size preview. Click
+ * opens the previewer, so the message list only needs enough to recognise the
+ * attachment.
+ *
+ * The cap also matters for the failure path: when a URL cannot be resolved the
+ * shared image component swaps in the app's large placeholder graphic, which
+ * previously stretched to the full width of the bubble.
+ */
+.mc-media {
+    display: inline-block;
+    max-width: 180px;
+    min-width: 104px;
+    min-height: 78px;
+    box-sizing: border-box;
+    border: 1px solid var(--mc-line);
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    background-color: #fff;
+    background-image: linear-gradient(90deg, rgba(23, 27, 38, 0) 20%, rgba(23, 27, 38, .07) 50%, rgba(23, 27, 38, 0) 80%);
+    background-size: 220% 100%;
+    background-repeat: no-repeat;
+    animation: mc-shimmer 1.25s ease-in-out infinite;
+}
+/* painted: stop shimmering, drop the reserved minimum, keep the thin frame */
+.mc-media--ready {
+    min-width: 0;
+    min-height: 0;
+    animation: none;
+    background-image: none;
+}
+/* nothing inside may exceed the thumbnail — including the fallback graphic */
+.mc-media img, .mc-media video {
+    display: block;
+    max-width: 100%;
+    width: auto;
+    height: auto;
+    max-height: 170px;
+    border-radius: 0;
+}
+@keyframes mc-shimmer {
+    0% { background-position: 120% 0; }
+    100% { background-position: -120% 0; }
+}
+@media (prefers-reduced-motion: reduce) { .mc-media { animation: none; } }
+.mc-bar { height: 3px; border-radius: 3px; background: var(--mc-line); overflow: hidden; margin-top: 6px; }
+.mc-bar i { display: block; height: 100%; width: 40%; background: var(--mc-navy); animation: mc-bar 1.1s ease-in-out infinite; }
+@keyframes mc-bar { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
+@media (prefers-reduced-motion: reduce) { .mc-bar i { animation: none; width: 100%; } }
+
+/* message extras: pin marker, edited note, reactions, menu items */
+.mc-pin { color: var(--mc-navy); flex: none; }
+.mc-edited { font-size: 10px; color: var(--mc-muted); margin-left: 6px; }
+.mc-bub--me .mc-edited { color: rgba(255, 255, 255, .75); }
+/* Width only. The spacer exists to keep continuations aligned under the avatar, but its
+   34px HEIGHT set a floor on every continuation row — dead space around a short bubble,
+   since the row is a flex box sized by its tallest child. */
+.mc-av--ghost { visibility: hidden; height: 0; min-height: 0; }
+/* the bar must never impose a minimum height of its own */
+.mc-rx { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-height: 0; line-height: 1; }
+.mc-rx--me { justify-content: flex-end; }
+
+/* ReactionBar is now used ONLY to render existing reaction chips: the "add"
+   affordance moved into the hover toolbar, because two separate hover targets
+   under one message made the bubble shift as the pointer travelled between
+   them. Hiding it here (rather than editing the shared component) keeps task
+   comments' own reaction UI untouched. */
+.mc-msg .mc-rx .reaction-bar__add { display: none !important; }
+
+/*
+ * Reaction chips are ATTACHED to the bubble they belong to.
+ *
+ * They used to sit in the gap below the bubble, which put them roughly midway
+ * between two messages — so it was ambiguous which message had been reacted to.
+ * Now they are lifted onto the bubble's lower edge (a negative top margin) and
+ * ringed in the feed colour, so they read as pinned to that bubble and clearly
+ * sit in front of it.
+ *
+ * The margin is on the CHIPS, not the row: an empty reaction row must not pull
+ * the following content upwards, and the row is empty for most messages.
+ */
+.mc-msg .mc-rx .reaction-bar__chip {
+    position: relative;
+    z-index: 1;
+    margin-top: -10px;
+    border: 1px solid var(--mc-line);
+    background: #fff;
+    border-radius: 999px;
+    padding: 1px 8px;
+    line-height: 1.6;
+    color: var(--mc-body);
+    /* ring in the feed background so the chip separates from the bubble edge */
+    box-shadow: 0 0 0 2px var(--mc-canvas);
+}
+.mc-msg .mc-rx .reaction-bar__chip--mine {
+    border-color: var(--mc-navy-line);
+    background: var(--mc-navy-soft);
+    color: var(--mc-navy);
+    font-weight: 600;
+}
+.mc-msg .mc-rx .reaction-bar__count { margin-left: 2px; font-variant-numeric: tabular-nums; }
+/* indent from the bubble's rounded corner rather than sitting flush to it */
+.mc-msg .mc-rx { padding: 0 8px; }
+.mc-msg.mc-b--me .mc-rx { padding: 0 8px 0 0; }
+.mc-menu-item { display: block; padding: 2px 4px; font-size: 13px; white-space: nowrap; }
+.mc-menu-item--danger { color: #e84a4a; }
+.mc-comp-reply--edit { border-left-color: var(--mc-navy); }
+/* CommentInput sits INSIDE our bordered composer box, and its textarea carries
+   its own 1px border from CommentInput/style.css — which read as a double
+   border. The outer box owns the frame (it also holds the attach/send buttons,
+   per the reference), so the inner field is stripped back to a bare input.
+   Scoped under .mc-comp so task/project comments keep their own field chrome. */
+.mc-comp-input-wrap { flex: 1 1 auto; min-width: 0; }
+.mc-comp .write-message {
+    border: 0 !important;
+    background: transparent !important;
+    padding: 6px 2px !important;
+    height: 34px;
+    min-height: 34px;
+    font-size: 13.5px;
+    font-weight: 400;
+}
+.mc-comp .write-message:focus { outline: none !important; box-shadow: none !important; }
+/* the box itself carries the focus ring instead */
+.mc-comp-box:focus-within { border-color: var(--mc-navy); box-shadow: 0 0 0 3px rgba(47, 57, 144, .11); }
+
+/* The mention list ships as `position: fixed` with only `bottom` set, so with no
+   `left` it pinned itself to the VIEWPORT's left edge and floated over the
+   transcript. Re-anchor it to the composer so it opens directly above the input. */
+.mc-comp .show__userlist {
+    position: absolute !important;
+    left: 14px;
+    bottom: 78px;
+    width: 268px;
+    max-width: calc(100% - 28px);
+    max-height: 280px;
+    border: 1px solid var(--mc-line);
+    /* the container radius must clear the rows' own 10px so corners look right */
+    border-radius: 14px !important;
+    box-shadow: 0 12px 30px rgba(23, 27, 38, .16);
+    padding: 6px;
+    box-sizing: border-box;
+}
+/* Mention list contents. The rows are <li> inside a <ul>, so they are targeted
+   directly — a `> div` selector matches nothing here. */
+.mc-comp .show__userlist ul { gap: 2px; }
+.mc-comp .show__userlist li {
+    gap: 10px;
+    padding: 9px 12px !important;
+    border-radius: 10px;
+    font-size: 14px;
+    color: var(--mc-body);
+    line-height: 1.3;
+}
+.mc-comp .show__userlist li span {
+    font-size: 14px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* the highlighted row follows the row radius instead of bleeding to the edges */
+.mc-comp .show__userlist li.bg-blue {
+    background: var(--mc-navy) !important;
+    color: #fff;
+}
+/* smaller avatar keeps the row compact */
+.mc-comp .show__userlist .user__profile,
+.mc-comp .show__userlist .user__profile img {
+    width: 26px !important;
+    height: 26px !important;
+    min-width: 26px;
+    margin-right: 0 !important;
+}
+
+.mc-quote {
+    border-left: 3px solid var(--mc-navy-line); padding: 1px 0 1px 8px;
+    margin-bottom: 5px; font-size: 12.5px; color: var(--mc-muted);
+}
+.mc-quote b { color: var(--mc-body); font-weight: 600; }
+
+/* ---------------- direction A: grouped rows (channels) ---------------- */
+.mc-g {
+    display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 10px;
+    padding: 5px 8px; border-radius: 7px;
+}
+.mc-g:hover { background: #eef0f6; }
+.mc-g-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.mc-g-name { font-size: 13.5px; font-weight: 700; color: var(--mc-ink); }
+.mc-g-name--me { color: var(--mc-navy); }
+.mc-g-time { font-size: 10.5px; color: var(--mc-muted); font-variant-numeric: tabular-nums; }
+.mc-g-body { font-size: 13.5px; word-break: break-word; white-space: pre-wrap; }
+
+.mc-g--cont { grid-template-columns: 34px minmax(0, 1fr); padding: 1px 8px; }
+.mc-g-stamp {
+    font-size: 10px; color: transparent; text-align: right; padding-top: 3px;
+    font-variant-numeric: tabular-nums; user-select: none;
+}
+.mc-g--cont:hover .mc-g-stamp { color: var(--mc-muted); }
+
+/* ---------------- direction B: bubbles (one-to-one) ---------------- */
+.mc-b { display: flex; gap: 9px; align-items: flex-end; padding: 2px 4px; }
+/*
+ * Rhythm has to back up the corners: within a run the bubbles sit close, and a new
+ * run gets clear air above it. Without this the joined corners have nothing to join
+ * to — every gap looked the same, so the grouping never read.
+ */
+.mc-msg.mc-b { padding-top: var(--mc-gap-run); padding-bottom: 0; }
+.mc-msg.mc-b--cont { padding-top: var(--mc-gap-group); }
+.mc-b--me { justify-content: flex-end; }
+.mc-b-stack { display: flex; flex-direction: column; gap: 3px; max-width: 74%; min-width: 0; }
+/* one row holding the bubble and its hover actions; `center` is what puts the
+   toolbar level with the bubble instead of with the whole stack */
+.mc-b-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.mc-b--me .mc-b-line { justify-content: flex-end; }
+.mc-b-meta { display: flex; align-items: baseline; gap: 7px; padding-left: 2px; }
+.mc-b-meta--me { justify-content: flex-end; padding-right: 2px; }
+.mc-b-name { font-size: 12.5px; font-weight: 700; color: var(--mc-ink); }
+.mc-b-time { font-size: 10px; color: var(--mc-muted); font-variant-numeric: tabular-nums; }
+
+.mc-bub {
+    background: #fff; border: 1px solid var(--mc-line);
+    padding: 7px 12px; font-size: 13.5px; word-break: break-word; white-space: pre-wrap;
+    align-self: flex-start;
+    /* A one-character message must still read as a bubble: without a floor the
+       box collapses to a circle. */
+    min-width: 46px;
+    box-sizing: border-box;
+}
+
+/*
+ * Grouped bubble corners, the way Instagram / WhatsApp do it.
+ *
+ * Each run of same-author messages has a "spine" — the side the sender is on: left for
+ * everyone else, right for you. Corners along that spine FACING AN ADJACENT BUBBLE
+ * tighten to --mc-r-join, so the run reads as one block with a near-straight edge. The
+ * outer corners stay at --mc-r-out, and only the LAST bubble of a run keeps the tail
+ * notch (--mc-r-tail).
+ *
+ * This replaces the previous rule, which had it backwards: the tail sat on the FIRST
+ * bubble and every continuation was uniformly round, so a burst read as separate
+ * messages that happened to be near each other.
+ *
+ * Order is top-left, top-right, bottom-right, bottom-left.
+ */
+.mc-bub {
+    --mc-r-out: 14px;
+    --mc-r-join: 5px;
+    --mc-r-tail: 4px;
+}
+
+/* received — spine on the left */
+.mc-bub--g-single { border-radius: var(--mc-r-out) var(--mc-r-out) var(--mc-r-out) var(--mc-r-tail); }
+.mc-bub--g-first  { border-radius: var(--mc-r-out) var(--mc-r-out) var(--mc-r-out) var(--mc-r-join); }
+.mc-bub--g-mid    { border-radius: var(--mc-r-join) var(--mc-r-out) var(--mc-r-out) var(--mc-r-join); }
+.mc-bub--g-last   { border-radius: var(--mc-r-join) var(--mc-r-out) var(--mc-r-out) var(--mc-r-tail); }
+
+/* your own — spine on the right, so the tightened corners mirror */
+.mc-bub--me.mc-bub--g-single { border-radius: var(--mc-r-out) var(--mc-r-out) var(--mc-r-tail) var(--mc-r-out); }
+.mc-bub--me.mc-bub--g-first  { border-radius: var(--mc-r-out) var(--mc-r-out) var(--mc-r-join) var(--mc-r-out); }
+.mc-bub--me.mc-bub--g-mid    { border-radius: var(--mc-r-out) var(--mc-r-join) var(--mc-r-join) var(--mc-r-out); }
+.mc-bub--me.mc-bub--g-last   { border-radius: var(--mc-r-out) var(--mc-r-join) var(--mc-r-tail) var(--mc-r-out); }
+/* room for the reaction chips that overlap the lower edge */
+.mc-bub--reacted { padding-bottom: 14px; }
+/* room for the pinned chip resting on the top edge */
+.mc-bub--pinned { padding-top: 15px; }
+
+.mc-bub--me {
+    background: var(--mc-navy); border-color: var(--mc-navy); color: #fff;
+    align-self: flex-end;
+}
+.mc-bub--me .mc-quote { border-left-color: rgba(255, 255, 255, .5); color: rgba(255, 255, 255, .82); }
+.mc-bub--me .mc-quote b,
+.mc-bub--me .mc-file-meta { color: rgba(255, 255, 255, .85); }
+.mc-bub--me .mc-file-ic { background: rgba(255, 255, 255, .18); color: #fff; }
+.mc-bub--me .mc-bar { background: rgba(255, 255, 255, .28); }
+.mc-bub--me .mc-bar i { background: #fff; }
+
+/*
+ * Photos and video are the content, so they get NO bubble: no fill, no border,
+ * no padding — just the asset at a sensible size with rounded corners. The
+ * bubble chrome around an image only read as a thick coloured frame.
+ *
+ * Documents keep their bubble, because there the chrome IS the affordance
+ * (icon + file name + size). Declared after the navy rules and with two classes
+ * so it beats `.mc-bub--me` on specificity, not on ordering.
+ */
+.mc-bub.mc-bub--media {
+    background: transparent;
+    border-color: transparent;
+    padding: 0;
+    border-radius: 0;
+    min-width: 0;
+    /* the thumbnail owns its own border and corners */
+    overflow: visible;
+}
+/* without the navy backdrop these need the normal muted colours, not the
+   on-navy white variants */
+.mc-bub--media .mc-edited { color: var(--mc-muted); display: block; margin: 4px 0 0; }
+.mc-bub--me.mc-bub--media .mc-edited { color: var(--mc-muted); }
+.mc-bub--me.mc-bub--media .mc-quote { border-left-color: var(--mc-navy-line); color: var(--mc-muted); }
+/* keep reaction chips off the picture itself */
+.mc-bub.mc-bub--media.mc-bub--reacted { padding-bottom: 0; }
+/* media renders bare, with no padding to add — the chip overlaps the asset instead */
+.mc-bub.mc-bub--media.mc-bub--pinned { padding-top: 0; }
+
+/* ---------------- composer ---------------- */
+.mc-comp {
+    flex: none; border-top: 1px solid var(--mc-line); background: #fff;
+    padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 7px;
+    /* positioning context for the re-anchored @-mention list */
+    position: relative;
+}
+.mc-comp-reply {
+    display: flex; align-items: center; gap: 8px; background: var(--mc-canvas);
+    border-left: 3px solid var(--mc-navy-line); border-radius: 0 6px 6px 0;
+    padding: 6px 10px; font-size: 12.5px; color: var(--mc-muted);
+}
+.mc-comp-reply span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc-comp-reply b { color: var(--mc-body); }
+.mc-comp-reply button { margin-left: auto; }
+
+.mc-comp-files { display: flex; flex-wrap: wrap; gap: 8px; }
+.mc-comp-chip {
+    display: flex; align-items: center; gap: 7px; border: 1px solid var(--mc-line);
+    border-radius: 7px; padding: 5px 8px; font-size: 12px; background: var(--mc-canvas);
+    max-width: 240px;
+}
+.mc-comp-chip span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.mc-comp-box {
+    display: flex; align-items: flex-end; gap: 8px;
+    border: 1px solid var(--mc-line); border-radius: 10px; padding: 6px 8px 6px 12px;
+    background: #fff;
+}
+.mc-comp-box--focus { border-color: var(--mc-navy); box-shadow: 0 0 0 3px rgba(47, 57, 144, .11); }
+.mc-comp-input {
+    flex: 1 1 auto; min-width: 0; border: 0; outline: 0; resize: none;
+    font-family: inherit; font-size: 13.5px; line-height: 1.5; color: var(--mc-body);
+    background: transparent; max-height: 132px; padding: 5px 0;
+}
+.mc-comp-input::placeholder { color: var(--mc-muted); }
+.mc-comp-tools { display: flex; align-items: center; gap: 2px; flex: none; }
+.mc-send {
+    width: 32px; height: 32px; flex: none; border: 0; cursor: pointer;
+    border-radius: 7px; background: var(--mc-navy); color: #fff;
+    display: grid; place-items: center; padding: 0;
+}
+.mc-send:disabled { background: var(--mc-canvas); color: var(--mc-muted); cursor: default; border: 1px solid var(--mc-line); }
+.mc-send:focus-visible { outline: 2px solid var(--mc-navy); outline-offset: 2px; }
+.mc-ico { display: block; flex: none; }
+/*
+ * Pinned marker above a bubble. Small and amber rather than another navy chip, so a
+ * pinned message is identifiable at a glance while scanning — and it sits outside the
+ * meta line so a continuation still shows it.
+ */
+/*
+ * ATTACHED to the bubble it belongs to, the same way reaction chips are.
+ *
+ * Floating in the gap above the bubble put it roughly midway between two messages, so
+ * it was ambiguous which one was pinned. A negative bottom margin drops it onto the
+ * bubble's top edge, and .mc-bub--pinned adds the matching top padding so it cannot
+ * sit over the first line of text.
+ */
+.mc-pinned {
+    position: relative; z-index: 1;
+    display: inline-flex; align-items: center; gap: 4px; align-self: flex-start;
+    margin: 0 0 -9px; padding: 1px 7px 1px 5px;
+    border-radius: 6px; background: #fff5d6; color: #8a5a00;
+    border: 1px solid #f0dca8;
+    font-size: 10px; font-weight: 700; letter-spacing: .02em;
+    text-transform: uppercase; line-height: 1.5;
+}
+/* indent from the bubble's rounded corner rather than sitting flush to it */
+.mc-pinned { margin-left: 8px; }
+.mc-pinned--me { align-self: flex-end; margin-left: 0; margin-right: 8px; }
+
+/* pinned rows in the side pane: the unpin control only shows on hover */
+.mc-srch-item { position: relative; }
+.mc-srch-unpin {
+    position: absolute; top: 8px; right: 6px;
+    width: 20px; height: 20px; border: 0; border-radius: 6px; padding: 0;
+    background: transparent; color: var(--mc-muted, #8b91a1); cursor: pointer;
+    display: grid; place-items: center; opacity: 0;
+    transition: opacity .12s ease, background-color .12s ease, color .12s ease;
+}
+.mc-srch-item:hover .mc-srch-unpin { opacity: 1; }
+.mc-srch-unpin:hover { background: rgba(228, 43, 43, .1); color: #e42b2b; }
+
+/*
+ * Links inside a bubble. Two colours needed: navy reads on the white bubbles of other
+ * people's messages, white on the navy of your own. `overflow-wrap: anywhere` because
+ * a long URL is one unbroken token and would otherwise push the bubble past the pane.
+ */
+.mc-bub a {
+    color: var(--mc-navy, #2f3990);
+    text-decoration: underline; text-underline-offset: 2px;
+    overflow-wrap: anywhere;
+}
+.mc-bub a:hover { text-decoration-thickness: 2px; }
+.mc-bub--me a { color: #fff; }
+
+/* ------------------------------------------------------------------ *
+ * Voice note recorder — a small popover anchored to its own button in the
+ * composer's tool row, so it never displaces the input.
+ * ------------------------------------------------------------------ */
+.mc-rec { position: relative; display: inline-flex; }
+/* the trigger pulses red while a take is running, visible even with the panel shut */
+.mc-rec-live { color: #e42b2b !important; }
+.mc-rec-live::after {
+    content: ''; position: absolute; inset: 0; border-radius: 7px;
+    box-shadow: 0 0 0 0 rgba(228, 43, 43, .45);
+    animation: mc-rec-pulse 1.6s ease-out infinite;
+    pointer-events: none;
+}
+@keyframes mc-rec-pulse {
+    to { box-shadow: 0 0 0 8px rgba(228, 43, 43, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .mc-rec-live::after { animation: none; } }
+
+.mc-rec-pop {
+    position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 20;
+    width: 232px; box-sizing: border-box; padding: 12px;
+    background: #fff; border: 1px solid var(--mc-line, #e4e6ee);
+    border-radius: 12px; box-shadow: 0 12px 30px rgba(23, 27, 38, .16);
+}
+.mc-rec-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.mc-rec-title { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 700; color: var(--mc-ink, #171b26); }
+.mc-rec-dot { width: 8px; height: 8px; border-radius: 50%; background: #e42b2b; flex: none; }
+.mc-rec-dot--live { animation: mc-rec-blink 1.1s ease-in-out infinite; }
+@keyframes mc-rec-blink { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .mc-rec-dot--live { animation: none; } }
+
+.mc-rec-label { display: block; font-size: 11px; color: var(--mc-muted, #8b91a1); margin-bottom: 4px; }
+.mc-rec-select {
+    width: 100%; box-sizing: border-box; height: 32px; margin-bottom: 10px;
+    border: 1px solid var(--mc-line, #e4e6ee); border-radius: 8px;
+    background: #fff; font-family: inherit; font-size: 12.5px; padding: 0 8px;
+    color: var(--mc-body, #3d4356);
+}
+
+.mc-rec-primary {
+    width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    border: 0; border-radius: 9px; padding: 9px 12px; cursor: pointer;
+    background: #e42b2b; color: #fff; font-family: inherit; font-size: 12.5px; font-weight: 600;
+}
+.mc-rec-primary:hover { background: #c92222; }
+.mc-rec-primary .mc-rec-dot { background: #fff; }
+.mc-rec-primary--stop { background: var(--mc-navy, #2f3990); flex: 1 1 auto; }
+.mc-rec-primary--stop:hover { background: #262f78; }
+.mc-rec-ghost {
+    border: 1px solid var(--mc-line, #e4e6ee); background: #fff; color: var(--mc-body, #3d4356);
+    border-radius: 9px; padding: 9px 12px; cursor: pointer; font-family: inherit;
+    font-size: 12.5px; font-weight: 600; flex: none;
+}
+.mc-rec-ghost:hover { background: var(--mc-canvas, #f6f7fb); }
+
+.mc-rec-meter { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+.mc-rec-time { font-size: 20px; font-weight: 700; color: var(--mc-ink, #171b26); font-variant-numeric: tabular-nums; }
+.mc-rec-state { font-size: 11px; color: var(--mc-muted, #8b91a1); text-transform: uppercase; letter-spacing: .06em; }
+.mc-rec-actions { display: flex; gap: 8px; }
+.mc-rec-hint { margin: 8px 0 0; font-size: 11px; color: var(--mc-muted, #8b91a1); line-height: 1.4; }
+.mc-rec-error { margin: 0 0 10px; font-size: 11.5px; color: #e42b2b; line-height: 1.4; }
+
+/* Stands in for the composer when posting is closed. Quiet, not an error — this is a
+   setting working as intended, not a failure. */
+.mc-comp-locked {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 14px 16px; border: 1px dashed var(--mc-line, #e4e6ee);
+    border-radius: 12px; background: var(--mc-canvas, #f6f7fb);
+    color: var(--mc-muted, #8b91a1); font-size: 12.5px; text-align: center;
+}
+
+.mc-comp-hint { display: flex; gap: 14px; font-size: 11px; color: var(--mc-muted); flex-wrap: wrap; }
+.mc-kbd {
+    border: 1px solid var(--mc-line); border-radius: 4px; padding: 0 4px;
+    font-size: 10.5px; color: var(--mc-body);
+}
+
+/* ---------------- 3-pane shell ---------------- */
+/* .mc is the conversation column; .mc-shell puts the detail pane beside it. */
+.mc-shell { display: flex; height: 100%; min-height: 0; }
+.mc-shell > .mc { flex: 1 1 auto; min-width: 0; }
+
+.mc-info {
+    flex: none; width: 350px; border-left: 1px solid var(--mc-line, #e4e6ee);
+    background: #fff; display: flex; flex-direction: column; min-height: 0;
+    font-family: 'Roboto', sans-serif;
+}
+.mc-info-top {
+    flex: none; display: flex; align-items: center; gap: 8px;
+    padding: 9px 12px 9px 16px; border-bottom: 1px solid #e4e6ee; min-height: var(--mc-header-h);
+    box-sizing: border-box;
+}
+.mc-info-title { font-size: 13.5px; font-weight: 700; color: #171b26; }
+.mc-info-top .mc-icon-btn { margin-left: auto; }
+
+.mc-info-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 18px 16px 24px; }
+
+.mc-info-id { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+/* One rule for all four representations (photo, initials, channel image, glyph,
+   hash) so they land at the same size — scale() keeps the 34px layout box, hence
+   the margins that make room for the painted 71px. */
+.mc-info-id .mc-info-ico { transform: scale(2.1); margin: 22px 0 26px; }
+.mc-info-name { font-size: 16px; font-weight: 700; color: #171b26; word-break: break-word; }
+.mc-info-role { font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: #8b91a1; }
+
+.mc-info-facts {
+    margin: 20px 0 0; display: grid; grid-template-columns: auto minmax(0, 1fr);
+    gap: 7px 12px; font-size: 12.5px;
+}
+.mc-info-facts dt { color: #8b91a1; }
+.mc-info-facts dd { margin: 0; color: #3d4356; word-break: break-word; }
+
+.mc-info-section { margin-top: 24px; }
+.mc-info-section-head {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px; font-weight: 700; color: #171b26; margin-bottom: 9px;
+}
+.mc-info-count {
+    background: #f1f2f7; color: #5b6270; border-radius: 999px;
+    font-size: 11px; padding: 1px 8px; font-variant-numeric: tabular-nums;
+}
+.mc-info-none { margin: 0; font-size: 12px; color: #8b91a1; }
+
+/*
+ * Every shared item is listed rather than capped at a handful, so each section
+ * scrolls inside its own box. Caps are stated in rows (tile row / list row) so a
+ * section always cuts off mid-row — a half-visible row is what tells the reader
+ * there is more below.
+ */
+.mc-info-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+    max-height: 330px; overflow-y: auto; overflow-x: hidden;
+    /* room for the scrollbar so it never sits on top of a tile */
+    padding-right: 4px; margin-right: -4px;
+}
+.mc-info-tile {
+    aspect-ratio: 1 / 1; border-radius: 7px; overflow: hidden; background: #f6f7fb;
+    display: grid; place-items: center; cursor: pointer;
+}
+.mc-info-tile img, .mc-info-tile video { width: 100%; height: 100%; object-fit: cover; max-width: none; max-height: none; }
+/*
+ * Inside a square tile the message-list presentation is wrong: the thumbnail's
+ * minimum size overflows the tile, and its own frame doubles up with the tile's.
+ * Fill the tile instead, and let the TILE take the click — a <video> would
+ * otherwise swallow it into its native controls.
+ */
+.mc-info-tile .mc-media {
+    display: block; width: 100%; height: 100%;
+    min-width: 0; min-height: 0; max-width: none;
+    border: 0; border-radius: 0;
+}
+/* pointer-events applies to descendants too, so this covers the <video> controls
+   and the storage component's loading skeleton alike */
+.mc-info-tile .mc-media { pointer-events: none; }
+
+.mc-info-docs, .mc-info-members { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.mc-info-docs li, .mc-info-members li { display: flex; align-items: center; gap: 9px; min-width: 0; font-size: 12.5px; }
+.mc-info-docs, .mc-info-members { max-height: 250px; overflow-y: auto; overflow-x: hidden; padding-right: 4px; margin-right: -4px; }
+.mc-info-doc-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #3d4356; }
+/* document rows open the previewer, same as the media tiles above them */
+.mc-info-docs li.mc-info-doc { cursor: pointer; }
+.mc-info-docs li.mc-info-doc:hover .mc-info-doc-name { text-decoration: underline; }
+/* long names (people are often listed by email) must not force the pane wider */
+.mc-info-member-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #3d4356; }
+.mc-info-members li { flex: none; }
+
+/*
+ * Channel icon: an uploaded image, a chosen glyph, or the hash as a last resort.
+ * Sized to match MainChatAvatar exactly so a channel and a person line up in the
+ * header and in the details pane.
+ */
+.mc-cicon {
+    flex: none; display: inline-grid; place-items: center; overflow: hidden;
+    border-radius: 50%; background: var(--mc-navy-soft, #eceefb); color: var(--mc-navy, #2f3990);
+    font-weight: 700; line-height: 1; vertical-align: middle;
+}
+.mc-cicon--34 { width: 34px; height: 34px; font-size: 15px; }
+.mc-cicon--28 { width: 28px; height: 28px; font-size: 13px; }
+.mc-cicon img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mc-cicon--hash { font-size: 17px; }
+.mc-cicon--28.mc-cicon--hash { font-size: 14px; }
+
+/*
+ * "Where you left off" divider.
+ *
+ * Full-width green band, matching the one the previous chat drew, so the boundary
+ * is unmissable on open — it is deliberately louder than a day divider.
+ */
+.mc-unread {
+    display: flex; align-items: center; justify-content: center;
+    margin: 14px 0 10px; padding: 0 2px;
+}
+.mc-unread span {
+    width: 100%; box-sizing: border-box; text-align: center;
+    background: #d4ffdb; color: #1f7a34;
+    border-radius: 10px; padding: 9px 12px;
+    font-size: 12px; font-weight: 600; letter-spacing: .01em;
+}
+
+/* ------------------------------------------------------------------ *
+ * Search pane — shares .mc-info's shell (width, border, header strip) so the
+ * two right-hand panes are visually interchangeable.
+ * ------------------------------------------------------------------ */
+.mc-srch-box { flex: none; position: relative; padding: 12px 16px 8px; }
+.mc-srch-input {
+    width: 100%; box-sizing: border-box; height: 36px; padding: 0 30px 0 12px;
+    border: 1px solid #e4e6ee; border-radius: 9px; background: #f6f7fb;
+    font-family: inherit; font-size: 13px; color: #171b26; outline: none;
+}
+.mc-srch-input:focus { border-color: #2f3990; background: #fff; box-shadow: 0 0 0 3px rgba(47, 57, 144, .1); }
+.mc-srch-clear {
+    position: absolute; right: 20px; top: 50%; transform: translateY(-25%);
+    border: 0; background: none; padding: 4px; cursor: pointer; line-height: 0;
+}
+
+.mc-srch-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 4px 10px 20px; }
+.mc-srch-hint { margin: 18px 6px; font-size: 12.5px; color: #8b91a1; text-align: center; line-height: 1.5; }
+.mc-srch-count {
+    margin: 4px 6px 8px; font-size: 10.5px; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: #8b91a1;
+}
+.mc-srch-more { padding: 10px 6px; font-size: 12px; color: #8b91a1; text-align: center; }
+
+.mc-srch-row {
+    width: 100%; display: flex; align-items: flex-start; gap: 9px; text-align: left;
+    border: 0; background: transparent; cursor: pointer; font-family: inherit;
+    padding: 8px 8px; border-radius: 9px; margin: 1px 0;
+}
+.mc-srch-row:hover { background: #f1f2f7; }
+.mc-srch-main { min-width: 0; display: flex; flex-direction: column; gap: 3px; flex: 1 1 auto; }
+.mc-srch-meta { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.mc-srch-meta b { font-size: 12.5px; font-weight: 700; color: #171b26; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc-srch-meta i { margin-left: auto; flex: none; font-style: normal; font-size: 10.5px; color: #8b91a1; }
+/* two lines, then ellipsis — enough to judge a hit without a wall of text */
+.mc-srch-text {
+    font-size: 12.5px; color: #3d4356; line-height: 1.45; overflow: hidden;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    word-break: break-word;
+}
+.mc-srch-file { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.mc-srch-file-name { font-size: 12.5px; color: #3d4356; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc-srch-file .mc-file-ic { width: 26px; height: 26px; font-size: 9px; }
+.mc-srch mark { background: #fff3bf; color: inherit; border-radius: 2px; padding: 0 1px; }
+
+.mc-srch-skel { display: flex; flex-direction: column; gap: 10px; padding: 10px 6px; }
+.mc-srch-skel span {
+    display: block; height: 42px; border-radius: 8px; background: #f1f2f7;
+    background-image: linear-gradient(90deg, rgba(23, 27, 38, 0) 20%, rgba(23, 27, 38, .06) 50%, rgba(23, 27, 38, 0) 80%);
+    background-size: 220% 100%; background-repeat: no-repeat;
+    animation: mc-shimmer 1.25s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) { .mc-srch-skel span { animation: none; } }
+
+/* a search hit that IS on screen: brief tint so the eye lands on it */
+.mc-msg--flash { animation: mc-flash 1.6s ease-out 1; border-radius: 10px; }
+@keyframes mc-flash {
+    0%, 40% { background: rgba(47, 57, 144, .12); }
+    100% { background: transparent; }
+}
+@media (prefers-reduced-motion: reduce) { .mc-msg--flash { animation: none; background: rgba(47, 57, 144, .12); } }
+
+@media (max-width: 1200px) {
+    .mc-info { display: none; }
+}
+
+/* ---------------- skeleton ---------------- */
+.mc-skel { display: flex; flex-direction: column; gap: 14px; padding: 8px; }
+.mc-skel-row { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 10px; }
+.mc-skel-b { background: #e9ebf2; border-radius: 6px; height: 12px; animation: mc-pulse 1.4s ease-in-out infinite; }
+.mc-skel-b--av { border-radius: 50%; height: 34px; width: 34px; }
+.mc-skel-b--w1 { width: 34%; }
+.mc-skel-b--w2 { width: 62%; margin-top: 7px; }
+@keyframes mc-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+@media (prefers-reduced-motion: reduce) { .mc-skel-b { animation: none; } }
+
+@media (max-width: 767px) {
+    .mc-b-stack { max-width: 84%; }
+    .mc-feed { padding: 10px 10px 6px; }
+}
+
+/* ==========================================================================
+ * Sidebar restyle.
+ *
+ * The conversation list keeps its existing markup and logic (channels,
+ * categories, favourites, create-channel, route sync all still work) and is
+ * restyled here instead. Every selector is scoped under a chat-only class
+ * — `.chanel__detail-icon`, `.chanel__defultchat-wrapper`,
+ * `.chat__chanel-icons` — so these overrides cannot reach the rest of the app
+ * even though this sheet is global.
+ * ========================================================================== */
+
+/* ==========================================================================
+ * Conversation pane (rebuilt layout) — MainChatSidebar.vue
+ * ========================================================================== */
+.mcs {
+    display: flex; flex-direction: column; height: 100%; min-height: 0;
+    width: 100%; background: #fff; font-family: 'Roboto', sans-serif;
+    border-right: 1px solid #e4e6ee; position: relative;
+}
+
+.mcs-top {
+    flex: none; display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; min-height: var(--mc-header-h); box-sizing: border-box;
+    border-bottom: 1px solid #e4e6ee;
+}
+.mcs-workspace {
+    width: 32px; height: 32px; flex: none; border-radius: 9px; overflow: hidden;
+    background: #2f3990; color: #fff; display: grid; place-items: center;
+    font-size: 13px; font-weight: 700;
+}
+.mcs-workspace img { width: 100%; height: 100%; object-fit: cover; }
+.mcs-workspace-name {
+    font-size: 14px; font-weight: 700; color: #171b26; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mcs-top-menu { margin-left: auto; }
+.mcs-icon {
+    width: 30px; height: 30px; flex: none; border: 0; background: transparent;
+    border-radius: 7px; display: grid; place-items: center; cursor: pointer; padding: 0;
+}
+.mcs-icon:hover { background: #f1f2f7; }
+.mcs-icon img { width: 16px; height: 16px; }
+
+/* gap is 10px, not 4px, so a corner badge on the left tab lands in the gap rather
+   than on top of its neighbour — sibling tabs share a stacking context, so an
+   overlap would be decided by DOM order, not intent */
+.mcs-tabs { flex: none; display: flex; gap: 10px; padding: 12px 14px 4px; }
+.mcs-tab {
+    position: relative;
+    flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    border: 0; background: #f6f7fb; color: #5b6270; cursor: pointer;
+    border-radius: 8px; padding: 10px; font-family: inherit;
+    font-size: 12.5px; font-weight: 600;
+}
+.mcs-tab:hover { background: #eceefb; color: #2f3990; }
+.mcs-tab--on { background: #2f3990; color: #fff; }
+.mcs-tab--on:hover { background: #2f3990; color: #fff; }
+/*
+ * Tab count — a notification badge pinned to the tab's top-right corner rather than
+ * a chip sitting inline next to the label. Rounded square, matching the row badges
+ * in the list below.
+ *
+ * Two things fall out of taking it out of the flow: the label stays optically
+ * centred whether or not there is a count (an inline chip pushed every label off
+ * centre), and the white ring lets the red read cleanly against both the navy of
+ * the active tab and the grey of the inactive one — so one rule covers both.
+ */
+.mcs-count {
+    position: absolute; top: -7px; right: -7px; z-index: 2;
+    background: #e42b2b; color: #fff;
+    border: 2px solid #fff; border-radius: 7px;
+    min-width: 20px; height: 20px; box-sizing: border-box;
+    font-size: 10.5px; font-weight: 700; line-height: 1;
+    /* grid + place-items centres on both axes in one declaration; no
+       letter-spacing, which adds a trailing gap after the last digit and pulls
+       centred text off to the left. The 1px top bias is the same optical
+       correction as .mcs-badge — see the note there. */
+    padding: 1px 4px 0;
+    display: grid; place-items: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.mcs-search { flex: none; padding: 8px 12px 10px; }
+.mcs-search-input .form-control,
+.mcs-search-input input {
+    background: #f6f7fb; border: 1px solid #e4e6ee !important;
+    border-radius: 9px !important; height: 36px !important;
+    font-size: 13px; padding: 0 12px;
+}
+.mcs-search-input .form-control:focus,
+.mcs-search-input input:focus {
+    border-color: #2f3990 !important; background: #fff;
+    box-shadow: 0 0 0 3px rgba(47,57,144,.1);
+}
+
+.mcs-list {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden;
+    padding: 2px 8px 20px;
+}
+.mcs-group {
+    margin: 12px 6px 5px; font-size: 10.5px; font-weight: 700;
+    letter-spacing: .08em; text-transform: uppercase; color: #8b91a1;
+}
+.mcs-empty { margin: 14px 6px; font-size: 12.5px; color: #8b91a1; text-align: center; }
+.mcs-skel { padding: 8px; }
+
+/* conversation row */
+.mcs-row {
+    width: 100%; display: flex; align-items: center; gap: 10px;
+    border: 0; background: transparent; cursor: pointer; text-align: left;
+    padding: 8px 9px; border-radius: 9px; font-family: inherit; margin: 1px 0;
+}
+.mcs-row:hover { background: #f1f2f7; }
+.mcs-row--on { background: #eceefb; }
+.mcs-row--on .mcs-row-name { color: #2f3990; }
+.mcs-row:focus-visible { outline: 2px solid #2f3990; outline-offset: -2px; }
+.mcs-row-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.mcs-row-name {
+    font-size: 13.5px; font-weight: 600; color: #171b26;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mcs-row-preview {
+    font-size: 12px; color: #8b91a1; line-height: 1.35;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mcs-row-preview--muted { font-style: italic; }
+.mcs-row-side {
+    flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
+}
+.mcs-row-time { font-size: 10.5px; color: #8b91a1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/*
+ * Unread count — solid rounded square, one definition for every place a count
+ * appears (category, channel, direct row, tab). A filled chip carries at a glance
+ * in a dense list where an outline reads as just another border; tabular numerals
+ * keep 1 and 11 the same width so the rows do not shift.
+ */
+/* ------------------------------------------------------------------ *
+ * Category / channel row trailing controls.
+ *
+ * One right-aligned strip in a fixed order — lock, count, menu — with a single
+ * gap, so every row reads down the column instead of each control landing
+ * wherever the name block happened to end.
+ * ------------------------------------------------------------------ */
+.mcs-item-trail {
+    flex: none; display: flex; align-items: center; gap: 8px;
+    margin-left: 8px;
+}
+/*
+ * Reserved whether or not the row is private, so the count next to it starts at the
+ * same x on every row instead of shifting by the width of a missing lock.
+ *
+ * Both this and the menu are coloured, not faded. The old assets were a fixed pale
+ * grey (the dots SVG is hardcoded `fill="#CFCFCF"`), so opacity could only ever take
+ * weight away from them — there was nothing to turn up. Inline glyphs on
+ * `currentColor` mean the weight is a colour choice.
+ */
+.mcs-lock-slot { width: 13px; flex: none; display: inline-flex; align-items: center; justify-content: center; }
+.mcs-lock { display: block; color: #6b7280; }
+
+/*
+ * The menu is revealed on hover, but it must still OCCUPY its space when hidden —
+ * `display: none` would let the count slide sideways the moment the pointer
+ * arrives. Hence opacity, and a fixed-width button so a row with a menu and a row
+ * without one still align.
+ */
+.mcs-menu { flex: none; line-height: 0; }
+.mcs-menu-btn {
+    width: 22px; height: 22px; border-radius: 6px;
+    display: inline-grid; place-items: center; cursor: pointer;
+    color: #5b6270;
+    opacity: 0; transition: opacity .12s ease, background-color .12s ease, color .12s ease;
+}
+.mcs-item:hover .mcs-menu-btn,
+.mcs-item:focus-within .mcs-menu-btn { opacity: 1; }
+/* pointing at the button itself still steps up, so the affordance keeps its feedback */
+.mcs-menu-btn:hover { background: rgba(23, 27, 38, .07); color: var(--mc-ink, #171b26); }
+/* touch: no hover to reveal on, so keep it permanently visible */
+@media (hover: none) {
+    .mcs-menu-btn { opacity: 1; }
+}
+
+/* menu rows — quiet by default, red only for the destructive one */
+.mcs-menu-item { font-size: 13px; color: #3d4356; white-space: nowrap; }
+.mcs-menu-item--danger { color: #e42b2b; }
+
+.mcs-badge {
+    background: #e42b2b; color: #fff; border: 0;
+    border-radius: 6px; font-size: 11px; font-weight: 700;
+    min-width: 20px; height: 18px; box-sizing: border-box;
+    line-height: 1;
+    /*
+     * Optical centring, not geometric. Geometric centring puts the 11px line box
+     * dead centre, but a digit only fills the part of it above the baseline — the
+     * descender space below stays empty, so the numeral reads as sitting high. The
+     * 1px top bias pays that back. Digits are the only content here, so there is no
+     * mixed-baseline case to break.
+     */
+    padding: 1px 4px 0;
+    display: grid; place-items: center;
+    font-variant-numeric: tabular-nums;
+}
+
+/* search / project header strip (legacy markup, kept for the old surface) */
+.chanel__detail-icon .chanel__searchinput-wrapper {
+    background: #fff !important;
+    border-bottom: 1px solid #e4e6ee;
+    padding: 10px 12px !important;
+    min-height: 56px;
+    box-sizing: border-box;
+}
+.chanel__detail-icon .chanel__searchinput-wrapper > span,
+.chanel__detail-icon .chanel__searchinput-wrapper > div > span {
+    font-size: 14.5px;
+    font-weight: 700;
+    color: #171b26;
+}
+.chanel__detail-icon .chanel__searchinput .form-control,
+.chanel__detail-icon .chanel__searchinput input {
+    background: #f6f7fb;
+    border: 1px solid #e4e6ee !important;
+    border-radius: 8px !important;
+    height: 34px !important;
+    font-size: 13px;
+    padding: 0 10px;
+}
+.chanel__detail-icon .chanel__searchinput .form-control:focus,
+.chanel__detail-icon .chanel__searchinput input:focus {
+    border-color: #2f3990 !important;
+    box-shadow: 0 0 0 3px rgba(47, 57, 144, .1);
+    background: #fff;
+}
+
+/* list container */
+.chanel__detail-icon .chanel__defultchat-wrapper { padding: 8px 8px 14px; }
+
+/* rows — replaces the flat 10px block + purple active state */
+.chanel__defultchat-wrapper .hover-bg-light-gray {
+    padding: 7px 9px !important;
+    border-radius: 8px !important;
+    margin: 1px 0 !important;
+    transition: background-color .12s ease;
+}
+.chanel__defultchat-wrapper .hover-bg-light-gray:hover { background: #f1f2f7 !important; }
+.chanel__defultchat-wrapper .hover-bg-light-gray.bg-light-gray.purple,
+.chanel__defultchat-wrapper .hover-bg-light-gray.bg-light-gray {
+    background: #eceefb !important;
+}
+.chanel__defultchat-wrapper .hover-bg-light-gray.purple span,
+.chanel__defultchat-wrapper .hover-bg-light-gray.purple .font-weight-700 {
+    color: #2f3990 !important;
+}
+
+/* name / preview typography */
+.chanel__defultchat-wrapper .without_img-text__msg_wrapper > div:first-child span {
+    font-size: 13.5px !important;
+    font-weight: 600 !important;
+    color: #171b26;
+}
+.chanel__defultchat-wrapper .without_img-text__msg_wrapper > div:last-child {
+    font-size: 12px !important;
+    color: #8b91a1 !important;
+    line-height: 1.35;
+}
+.chanel__defultchat-wrapper .user_photo-name_wrapper { gap: 9px; min-width: 0; }
+
+/* unread pill — solid, not an outlined box */
+.chanel__defultchat-wrapper .border-red.red {
+    background: #ff4757 !important;
+    border-color: #ff4757 !important;
+    color: #fff !important;
+    border-radius: 999px !important;
+    min-width: 18px;
+    height: 18px;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    font-size: 10.5px !important;
+    font-weight: 700;
+    padding: 0 5px !important;
+}
+
+/* channel "#" glyph */
+.chanel__defultchat-wrapper .mr-5px { color: #8b91a1; font-weight: 600; }
+
+/* project rail on the far left */
+.chat__chanel-icons { background: #fbfbfd; }

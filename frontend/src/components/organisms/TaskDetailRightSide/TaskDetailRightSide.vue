@@ -1,6 +1,39 @@
 <template>
     <div class="task-detail-right-side">
         <div>
+            <div class="start-in-tracker-wrap" v-if="isAssignee && !isTaskCompleted">
+                <button
+                    type="button"
+                    class="start-in-tracker-btn"
+                    @click="startInTracker"
+                    title="Start this task in the AlianHub desktop tracker"
+                >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                    Start Tracker
+                </button>
+            </div>
+
+            <Modal
+                :modelValue="showTrackerModal"
+                title="Start Tracker"
+                acceptButtonText="Start tracking"
+                bodyClasses="tracker-modal-body"
+                @close="showTrackerModal = false"
+                @accept="confirmStartTracker"
+            >
+                <template #body>
+                    <div class="tracker-modal-task">{{ task?.TaskKey }} · {{ task?.TaskName }}</div>
+                    <label class="tracker-modal-label">What are you working on?</label>
+                    <textarea
+                        v-model="trackerComment"
+                        rows="4"
+                        class="tracker-modal-textarea"
+                        placeholder="Add a comment for this session…"
+                        @input="trackerCommentError = ''"
+                    ></textarea>
+                    <div class="tracker-modal-error" v-if="trackerCommentError">{{ trackerCommentError }}</div>
+                </template>
+            </Modal>
             <h4 class="details-heading">{{$t('ProjectDetails.details')}}</h4>
             <div class="d-flex task-detail-right-side-label" v-if="checkPermission('task.task_list',project?.isGlobalPermission)!==null && checkPermission('task.task_status',project?.isGlobalPermission) !== null">
                 <h4>{{$t('ProjectDetails.status')}}</h4>
@@ -168,6 +201,7 @@
                 <div v-if="Object.keys(task || {}).length && !isMainSpinner" class="d-flex align-items-center estimated-with-ai">
                     <EstimatedTimeInput
                         :task="task"
+                        :editable="canEditEstimatedHours"
                         @update:totalEstimatedTime="(val) => updateTotalEstimatedTime(val)"
                     />
                     <!--
@@ -175,10 +209,13 @@
                       title attribute matches the project's existing tooltip
                       convention (see BulkActionBar.vue / CheckList.vue).
                       Disabled + spinner state while a request is in flight.
-                      Shown whenever the Estimated row is visible — the per-user
-                      edit-permission gate (`=== true`) was removed on request.
+                      Hidden unless the user can actually write the estimate:
+                      the old gate was `=== true`, which wrongly excluded the
+                      Own/Everyone values too and so was dropped; this uses the
+                      correct writable test instead of no test at all.
                     -->
                     <button
+                        v-if="canEditEstimatedHours"
                         type="button"
                         class="ai-estimate-btn"
                         :class="{ 'is-loading': isAiEstimateLoading }"
@@ -192,6 +229,30 @@
                     </button>
                 </div>
             </div>
+            <!-- AHE — reason required when RE-updating an already-set estimate; the
+                 reason is written to the task Activity Log by the backend. -->
+            <Modal
+                :modelValue="showEstimateReasonModal"
+                :closeOnBackdrop="false"
+                :acceptButtonText="$t('Home.Confirm')"
+                :cancelButtonText="$t('Projects.cancel')"
+                @accept="submitEstimateReason"
+                @close="cancelEstimateReason"
+            >
+                <template #header>
+                    <h3 class="m-0 font-size-16 font-weight-600 black">Reason for changing estimated hours</h3>
+                </template>
+                <template #body>
+                    <textarea
+                        v-model.trim="estimateReasonText"
+                        class="w-100 border-radius-6-px font-size-14"
+                        style="min-height:90px; resize:vertical; border:1px solid #DFE1E6; outline:none; padding:8px;"
+                        placeholder="Why are you changing the estimated hours?"
+                        @input="estimateReasonError = false"
+                    ></textarea>
+                    <span v-if="estimateReasonError" class="red font-size-12">Please enter a reason.</span>
+                </template>
+            </Modal>
             <div class="d-flex task-detail-right-side-label" v-if="checkApps('TimeEstimates') && checkPermission('task.task_estimated_hours',project?.isGlobalPermission) !== null">
                 <h4>{{$t('UserTimesheet.task_planning')}}</h4>
                 <Skelaton v-if="isMainSpinner" style="height: 24px;" class="w-100px border-radius-7-px"/>
@@ -235,6 +296,8 @@ import { useI18n } from "vue-i18n";
 import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import { openInTracker, isTrackerCapableDevice } from '@/utils/trackerDeepLink';
+import Modal from '@/components/atom/Modal/Modal.vue';
 
 // Icon for the "Generate estimate using AI" sidebar button. Same asset
 // the SubTasks / Checklist / Sprints components use for their AI actions
@@ -254,6 +317,7 @@ const dateFormat = inject('$dateFormat');
 const project = inject('selectedProject');
 
 const $toast = useToast();
+
 const props = defineProps({
     task: {
         type: Object,
@@ -289,6 +353,64 @@ const props = defineProps({
     },
     clientWidth: Number,
 })
+
+// Only assignees of the task can start tracking it.
+const isAssignee = computed(() => (props.task?.AssigneeUserId || []).includes(userId.value));
+
+// Only OPEN tasks can be tracked — hide "Start Tracker" on completed/closed
+// tasks. A task is completed when its status type is 'close' (the same rule the
+// per-task completion checks use in Task.vue / TaskDetail.vue + bucketForStatus).
+const isTaskCompleted = computed(() => {
+    const ty = props.task?.status?.type || props.task?.statusType || '';
+    return ty === 'close';
+});
+
+// Start Tracker modal (project Modal component) — collects a comment, then deep-links.
+const showTrackerModal = ref(false);
+const trackerComment = ref('');
+const trackerCommentError = ref('');
+
+const startInTracker = () => {
+    if (!isTrackerCapableDevice()) {
+        $toast.warning('Open this on a desktop with the AlianHub Tracker installed.');
+        return;
+    }
+    trackerComment.value = '';
+    trackerCommentError.value = '';
+    showTrackerModal.value = true;
+};
+
+const confirmStartTracker = () => {
+    const comment = (trackerComment.value || '').trim();
+    if (!comment) {
+        trackerCommentError.value = 'Please enter a comment';
+        return;
+    }
+    const res = openInTracker({
+        taskId: props.task?._id,
+        projectId: props.task?.ProjectID,
+        sprintId: props.task?.sprintId,
+        folderId: props.task?.folderObjId || '',
+        comment,
+    }, {
+        // If the tracker doesn't come to the foreground shortly, it's either not
+        // installed or too old to support the myapp:// deep link — one generic
+        // toast covers both (the web can't tell them apart).
+        onNotOpened: () => $toast.warning(t('Toast.tracker_not_opened')),
+    });
+    showTrackerModal.value = false;
+    if (res.ok) {
+        $toast.success('Opening the tracker…');
+        return;
+    }
+    if (res.reason === 'unsupported') {
+        $toast.warning('Open this on a desktop with the AlianHub Tracker installed.');
+    } else if (res.reason === 'missing') {
+        $toast.error('Task details are incomplete to start the tracker.');
+    } else {
+        $toast.error('Could not open the tracker.');
+    }
+};
 //ref
 const taskLeaderData = ref(getUser(props.task?.Task_Leader));
 const assigneeInProgress = ref({});
@@ -296,6 +418,18 @@ const isSpinner = ref(false);
 // In-flight flag for the manual AI-estimate request — drives both the
 // button's spinner state and the click-debounce.
 const isAiEstimateLoading = ref(false);
+
+// task_estimated_hours is a "selection field" permission, so its stored value
+// is null (None) | false (Read) | 1 (Own) | 2 (Everyone) | true (Read & Write).
+// Writable therefore means true/1/2 — mirroring isWritable() in
+// Config/permissionGuard.js. The plain `=== true` test used by the other rows
+// is wrong for this key because it also locks out Own/Everyone, which is why
+// the AI button's gate had previously been dropped altogether. Read (false)
+// must keep the value visible but non-editable.
+const canEditEstimatedHours = computed(() => {
+    const permission = checkPermission('task.task_estimated_hours', project.value?.isGlobalPermission);
+    return permission === true || permission === 1 || permission === 2;
+});
 watch(() => props.task,(val) => {
     taskLeaderData.value = getUser(val?.Task_Leader);
 });
@@ -694,7 +828,33 @@ const updateStartDate = (event) => {
         $toast.error(t('Toast.Start_date_not_updated'),{position: 'top-right'});
     }
 }
+// AHE — re-updating an already-set estimate requires a reason (logged to the
+// task Activity Log). The first-ever set (previous 0) saves directly.
+const showEstimateReasonModal = ref(false);
+const pendingEstimateValue = ref(null);
+const estimateReasonText = ref('');
+const estimateReasonError = ref(false);
+
 const updateTotalEstimatedTime = (value) => {
+    // Defence in depth: the input is display-only and the AI button is hidden
+    // without write access, so this should be unreachable — but never persist
+    // an estimate for a read-only (or None) permission.
+    if (!canEditEstimatedHours.value) {
+        return;
+    }
+    const previous = Number(props.task.totalEstimatedTime) || 0;
+    if (previous > 0 && value !== previous) {
+        // Re-update — prompt for a reason before persisting.
+        pendingEstimateValue.value = value;
+        estimateReasonText.value = '';
+        estimateReasonError.value = false;
+        showEstimateReasonModal.value = true;
+        return;
+    }
+    persistEstimate(value);
+}
+
+const persistEstimate = (value, reason = '') => {
     const userData = getUserData();
 
     const firebaseObj = {
@@ -702,7 +862,8 @@ const updateTotalEstimatedTime = (value) => {
     }
     let obj = {
         'previousEstimatedTime': props.task.totalEstimatedTime,
-        'userName' : userData.Employee_Name
+        'userName' : userData.Employee_Name,
+        ...(reason ? { reason } : {})
     }
     const projectData = {
         _id: project.value._id,
@@ -721,6 +882,26 @@ const updateTotalEstimatedTime = (value) => {
     })
 }
 
+const submitEstimateReason = () => {
+    if (!estimateReasonText.value || !estimateReasonText.value.trim()) {
+        estimateReasonError.value = true;
+        return;
+    }
+    persistEstimate(pendingEstimateValue.value, estimateReasonText.value.trim());
+    showEstimateReasonModal.value = false;
+    pendingEstimateValue.value = null;
+    estimateReasonText.value = '';
+    estimateReasonError.value = false;
+}
+
+const cancelEstimateReason = () => {
+    // Abort the change — nothing persists, so the input reverts to the task's value.
+    showEstimateReasonModal.value = false;
+    pendingEstimateValue.value = null;
+    estimateReasonText.value = '';
+    estimateReasonError.value = false;
+}
+
 const displayTime = (time) => {
   const totalMinutes = time || 0
   const hours = Math.floor(totalMinutes / 60)
@@ -737,6 +918,9 @@ const displayTime = (time) => {
 // the same channel that drives `props.task`.
 const generateAiEstimate = async () => {
     if (isAiEstimateLoading.value) return;
+    // The trigger is hidden without write access; this also blocks the request
+    // itself, since it writes the estimate straight through the API.
+    if (!canEditEstimatedHours.value) return;
     const taskId = props.task && props.task._id;
     if (!taskId) {
         $toast.error('Task is not available', { position: 'top-right' });

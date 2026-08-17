@@ -145,7 +145,8 @@ exports.handleProfileGetForUser = async (req,res) => {
         return;
     }
     
-    const signedUrl = await generateSignedUrl("USER_PROFILES", req.body.path, req);
+    const domainUrl = `${req.protocol}://${req.get('host')}`;
+    const signedUrl = await generateSignedUrl("USER_PROFILES", req.body.path, domainUrl);
 
     if(signedUrl) {
         return res.status(200).send({ status:true ,statusText: signedUrl });
@@ -172,7 +173,8 @@ exports.handleTaskTypeImageGet = async (req,res) => {
             return;
         }
         
-        const signedUrl = await generateSignedUrl(req.body.companyId, req.body.path, req);
+        const domainUrl = `${req.protocol}://${req.get('host')}`;
+        const signedUrl = await generateSignedUrl(req.body.companyId, req.body.path, domainUrl);
 
         if(signedUrl) {
             return res.status(200).send({ status:true ,statusText: signedUrl });

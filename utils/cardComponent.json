@@ -383,9 +383,7 @@
                         "name": "time_tracker"
                     },
                     {
-                        "id": {
-                            "$numberLong": "3"
-                        },
+                        "id": 3,
                         "name": "task"
                     }
                 ],
@@ -692,9 +690,7 @@
                         "name": "time_tracker"
                     },
                     {
-                        "id": {
-                            "$numberLong": "3"
-                        },
+                        "id": 3,
                         "name": "task"
                     }
                 ],
@@ -1265,9 +1261,7 @@
                         "name": "time_tracker"
                     },
                     {
-                        "id": {
-                            "$numberLong": "3"
-                        },
+                        "id": 3,
                         "name": "task"
                     }
                 ],
@@ -1499,9 +1493,7 @@
                 "groupBy": "data",
                 "type": "dropdown",
                 "name": "groupBy",
-                "value": {
-                    "$numberLong": "0"
-                },
+                "value": 0,
                 "placeHolder": "group_by",
                 "options": [
                     {
@@ -1521,6 +1513,19 @@
                         "name": "none"
                     }
                 ],
+                "rules": "",
+                "info": "",
+                "hidden": false,
+                "disabled": false
+            },
+            {
+                "label": "enable_date_range",
+                "groupBy": "data",
+                "type": "radio",
+                "name": "enableDateRange",
+                "value": false,
+                "placeHolder": "",
+                "options": [],
                 "rules": "",
                 "info": "",
                 "hidden": false,
@@ -1996,7 +2001,8 @@
                 "info": "",
                 "hidden": false,
                 "disabled": false
-            }
+            },
+            { "label": "location", "groupBy": "data", "type": "dropdown", "name": "projectId", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false }
         ],
         "key": "ProjectPulseCard",
         "image": "PieChartWorkload",
@@ -2295,6 +2301,7 @@
         "permission": [],
         "fields": [
             { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "Next Up", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false },
+            { "label": "location", "groupBy": "data", "type": "dropdown", "name": "projectId", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
             { "label": "next_up_limit", "groupBy": "data", "type": "text", "name": "limit", "value": "8", "placeHolder": "8", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
             { "label": "add_filter", "type": "filter", "name": "filter", "value": [], "placeHolder": "filter", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false, "groupBy": "filter" }
         ],
@@ -2310,6 +2317,7 @@
         "permission": [],
         "fields": [
             { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "My Achievements", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false },
+            { "label": "location", "groupBy": "data", "type": "dropdown", "name": "projectId", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
             {
                 "label": "timerange",
                 "groupBy": "data",
@@ -2363,6 +2371,7 @@
         "permission": [],
         "fields": [
             { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "Due Soon", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false },
+            { "label": "location", "groupBy": "data", "type": "dropdown", "name": "projectId", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
             { "label": "due_soon_days", "groupBy": "data", "type": "text", "name": "days", "value": "7", "placeHolder": "7", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
             { "label": "add_filter", "type": "filter", "name": "filter", "value": [], "placeHolder": "filter", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false, "groupBy": "filter" }
         ],
@@ -2419,5 +2428,43 @@
         "image": "Calculation",
         "cardType": "project_progress",
         "backgroundColor": "#0f766e"
+    },
+    {
+        "_id": "6a3700000000000000000701",
+        "name": "task_status_summary_card_title",
+        "description": "task_status_summary_card_description",
+        "permission": [],
+        "fields": [
+            { "label": "card_name", "groupBy": "display", "type": "text", "name": "fieldName", "value": "Tasks Summary by Status", "placeHolder": "card_name", "options": [], "rules": "required | min:3 | max:100", "info": "", "hidden": false, "disabled": false },
+            { "label": "location", "groupBy": "data", "type": "dropdown", "name": "projectId", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
+            { "label": "status", "groupBy": "data", "type": "dropdown", "name": "statusArray", "value": [], "placeHolder": "select", "options": [], "rules": "", "info": "", "hidden": false, "disabled": false },
+            {
+                "label": "timerange",
+                "groupBy": "data",
+                "type": "dropdown",
+                "name": "timerange",
+                "value": 3,
+                "placeHolder": "select",
+                "options": [
+                    { "id": 0, "name": "auto_range" },
+                    { "id": 1, "name": "today" },
+                    { "id": 2, "name": "yesterday" },
+                    { "id": 3, "name": "this_week" },
+                    { "id": 4, "name": "last_week" },
+                    { "id": 5, "name": "this_month" },
+                    { "id": 6, "name": "last_month" },
+                    { "id": 7, "name": "this_year" },
+                    { "id": 8, "name": "last_30_days" }
+                ],
+                "rules": "",
+                "info": "",
+                "hidden": false,
+                "disabled": false
+            }
+        ],
+        "key": "TaskStatusSummaryCard",
+        "image": "PieChartWorkload",
+        "cardType": "task",
+        "backgroundColor": "#2f3990"
     }
 ]

@@ -16,6 +16,298 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.30.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.29.0...v14.30.0) (2026-08-14)
+
+
+### 🚀 Features
+
+* **ai-assist:** show tokens and cost on the generated plan ([586f55a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/586f55a02ba336f57e2f5ba9b8a9961d8826e842))
+* **ai:** apply the company planning rules to generated work ([a61e799](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a61e799ac1f2a0bc519b3100515656411bb70366))
+* **ai:** drive every AI feature from LLM_PROVIDER, and apply the company planning rules ([cb89f9a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/cb89f9a6b66c35709b41f04dd16b432e0ff8e60a))
+* **task-type-icon:** add coloured boundary box and hover tooltip ([7d00a49](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7d00a4921427eb77b856047fef0e817f7d7f0517))
+* **task-type-icons:** offline icon library for task types + migration script ([815c80b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/815c80b95f0db6c52362bd7c8edfd7638bdb9b12))
+* **task-type-settings:** fix icon overlap, fill height, drag handle ([44f976e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/44f976ef8a3a813d9dc667e9a691ac2a45e925db))
+* **task-type:** fill wizard task-type step; shrink-to-fit lists ([e637431](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e6374317e54afbad0032a0287b429f038369a203))
+* **task-type:** mobile responsive fill for task-type config ([9afe3d9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9afe3d9ed9318bb4a5bff6084d4d3fe53a562e46))
+* **tracker:** show library task-type icons in the time tracker ([f1cc33b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f1cc33baf3a400f40db76ccacef13bbc6700efab))
+
+
+### 🐛 Bug Fixes
+
+* **ai:** give plan generation an output budget that fits the models ([e4cb1fc](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e4cb1fcb47b49ec0aeb3b1a92156c57989f940cf))
+* **ui:** stop the sprint hours chip overlapping the share controls ([91e7f37](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/91e7f3791f486a1d6b9a1e2891631d02654ab3af))
+* **ui:** style the confirm button on the bulk delete and archive dialogs ([6ee08f7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6ee08f79fdc69ffe782957de852407e24563410e))
+
+
+### 📘 Documentation
+
+* **claude:** make Rule 2 tiered and collapse PRD into task.md ([64b51b5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/64b51b502a3918d39f613b87cd5d7798a64b8442))
+
+## [14.29.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.28.1...v14.29.0) (2026-08-14)
+
+
+### 🚀 Features
+
+* **chat:** audio and video calling in main chat ([8525584](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8525584bcfc93cc020eef81ee3ede50a4bdbd491))
+
+## [14.28.1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.28.0...v14.28.1) (2026-08-14)
+
+
+### 🐛 Bug Fixes
+
+* **sprint:** archive and restore a sprint nested in a folder ([e694c12](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e694c12abd0f778ed497b97defd8a8c64280097f))
+
+## [14.28.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.27.0...v14.28.0) (2026-08-11)
+
+
+### 🚀 Features
+
+* **sprints:** show planned, logged and overdue hours in the sprint header ([3700dcc](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3700dccdb9eb3cb8205ada0778c92c98e4c5dbf3))
+
+
+### 🐛 Bug Fixes
+
+* **tasks:** keep the default assignee after the create row resets ([200ea4a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/200ea4abbc68e846dce789e3c3091056e43ef1e3))
+
+## [14.27.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.26.0...v14.27.0) (2026-08-11)
+
+
+### 🚀 Features
+
+* **dashboard:** add the Overdue Hours column to the Tasks Summary card ([7c5d5a9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7c5d5a9102432f330747cefc34693a0e1ce3a135))
+* **dashboard:** match the Tasks Summary card to the Workload Timesheet ([56febde](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/56febde9b091c8396482eba6afbab7139d01e340))
+
+## [14.26.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.25.0...v14.26.0) (2026-08-10)
+
+
+### 🚀 Features
+
+* **dashboard:** per-person hours, status defaults and paged drill-down ([aea493c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/aea493cd3e79bc35f013b42bf7605d8706425d7d))
+* **webhooks:** scope integrations to their owner, and page the logs ([68a3ce5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/68a3ce5942af21b164aa4019c2fb2b2c5c04e784))
+
+## [14.25.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.24.0...v14.25.0) (2026-08-08)
+
+
+### 🚀 Features
+
+* **tracker:** make the estimate-hours cap a company setting ([6cb6ba6](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6cb6ba62a9f4ffef49e67c60dc60a12ed9e53337))
+* **tracker:** show the app version, and release 5.1.5 ([eec8f85](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/eec8f856f63da3f95c0c9f0e1def6efd23862680))
+
+
+### 🐛 Bug Fixes
+
+* **projects:** search the whole project, not just your own tasks ([17fdc27](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/17fdc272b404c406ec2f7517c74daa698b45bbe3))
+* **tracker:** logout no longer blocks forever on a stuck offline queue ([6680600](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6680600f1173da60dda20557fe4b822084e9a4c0))
+
+## [14.24.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.23.0...v14.24.0) (2026-08-07)
+
+
+### 🚀 Features
+
+* break Tasks Summary by Status down per person ([386cd6c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/386cd6ccdb232c8b45a1e0b61cb6f625550a1f92))
+* docs module — linked docs on tasks and read-only public links ([b0a2132](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b0a2132b3bf760ecb1edf91795d7b6e361491a57))
+* **inbox:** filter Archive by notifications or mentions ([a50cd0e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a50cd0e1a8f9777029979f37075f91c3aa655225))
+* **inbox:** unified inbox for notifications and mentions ([0327fbf](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0327fbfaca5ebd4d21153adc25f2b1a72d33a98f))
+
+
+### 🐛 Bug Fixes
+
+* **inbox:** show who acted, clear rows live, and land on a real tab ([2b9457f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2b9457f98d28673e429874ea39bb6d277fb1ab28))
+
+
+### ♻️ Refactors
+
+* **header:** drop the bell and @ dropdowns for the Inbox ([31ee0d7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/31ee0d7a34a7ce1c8244b0d787932dce8fa57e7b))
+
+## [14.23.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.22.0...v14.23.0) (2026-08-06)
+
+
+### 🚀 Features
+
+* **dashboard:** add a Tasks Summary by Status card ([bdaa211](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bdaa2112c27b8299b844233cd11b20e72ace0d8d))
+* **sprint:** show total estimated hours in the sprint header ([f840b85](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f840b85c61d45393071490b537c1fa4421bf1d85))
+
+
+### 🐛 Bug Fixes
+
+* **dashboard:** send milestone card links to their own project ([da7f56f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/da7f56f1f298bb994d59ebd0e5bf492ba88f2d52))
+
+## [14.22.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.21.0...v14.22.0) (2026-08-04)
+
+
+### 🚀 Features
+
+* **attachments:** attach files from Google Drive and Dropbox (AHE-3838) ([8de543f124a420354eb149115e4e2677a21f25e8](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8de543f124a420354eb149115e4e2677a21f25e8))
+* **attachments:** add "import a copy" for cloud files ([5371f1e96f101b44677126ddd66376751c3dea88](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5371f1e96f101b44677126ddd66376751c3dea88))
+* **cloud-storage:** per-user OAuth and picker tokens, private to each user ([081575e9152de119983300078f070500c3a255c4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/081575e9152de119983300078f070500c3a255c4))
+* **cloud-storage:** show the full setup checklist per provider ([0bcf8521ab4584f90984537fc85591cb7c9aaea3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0bcf8521ab4584f90984537fc85591cb7c9aaea3))
+
+
+### 🐛 Bug Fixes
+
+* **ai-assist:** list sprints inside folders in the Plan with AI picker ([ce6e55dab1db81039b04a3219b9c7b23027e79a5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ce6e55dab1db81039b04a3219b9c7b23027e79a5))
+* **ai-assist:** build the sprint list on open, not as a render-time computed ([cfc12e5c6f957478dc9c78a62d8f1801379e95ee](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/cfc12e5c6f957478dc9c78a62d8f1801379e95ee))
+* **attachments:** derive Drive previews from the file id, no API call ([2b8f8e530c826f0790aa352bcdeddf6ebda3c5b1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2b8f8e530c826f0790aa352bcdeddf6ebda3c5b1))
+* **attachments:** reject non-http schemes on a linked file's URL ([495891181e2b7b325f827a360fe50fbc4da2506c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/495891181e2b7b325f827a360fe50fbc4da2506c))
+* **attachments:** use the provider's real thumbnail, not its type glyph ([4c7eb26e9b05515bd706a3233f1df69d93513c4f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4c7eb26e9b05515bd706a3233f1df69d93513c4f))
+* **cloud-storage:** crash in the thumbnail handler's catch block ([099934b53c2d3ffe802322e416fd2882e2299744](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/099934b53c2d3ffe802322e416fd2882e2299744))
+* **cloud-storage:** error boundary so this feature can never crash the server ([390103162df6548618be88a786fe0dc732abc7b8](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/390103162df6548618be88a786fe0dc732abc7b8))
+* **cloud-storage:** make credentials per-user, not shared per workspace ([7af69b3d1dca656119bb751aefc9c167cd5392d8](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7af69b3d1dca656119bb751aefc9c167cd5392d8))
+* **cloud-storage:** pass setAppId so drive.file grants access to picked files ([638a41ce40db97e04437611f7c4343de8faee75c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/638a41ce40db97e04437611f7c4343de8faee75c))
+* **cloud-storage:** pin the Set up button top-right on every provider row ([6cca97644c284e5d9b7db82d9b57f3d256b87d93](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6cca97644c284e5d9b7db82d9b57f3d256b87d93))
+* **cloud-storage:** return to the origin consent started from ([1f786dc053515920429b610dbc224e113f9d76f9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1f786dc053515920429b610dbc224e113f9d76f9))
+* **epics:** compute epic progress from tasks instead of a stale counter (AHE-3853) ([48613c8fdfd8a9e17c104e88e89969402476b6df](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/48613c8fdfd8a9e17c104e88e89969402476b6df))
+* drop the dimmed backdrop from the reminders popover ([2ae9a88fc79f33ea5ddfc270b34deda1119e4b01](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2ae9a88fc79f33ea5ddfc270b34deda1119e4b01))
+
+
+### ♻️ Refactors
+
+* **cloud-storage:** configure providers on Settings → Integrations ([ed66cd501a478e50cc9e253ddf029fcc29265a12](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ed66cd501a478e50cc9e253ddf029fcc29265a12))
+* **cloud-storage:** anyone may connect their own account — no owner/admin gate ([af0fee16e4454ed06da088666709c2d5c054beb4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/af0fee16e4454ed06da088666709c2d5c054beb4))
+
+## [14.21.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.20.0...v14.21.0) (2026-08-03)
+
+
+### 🚀 Features
+
+* **clips:** rebuild clips as a popover, add convert to task, simplify recording ([23209c9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/23209c934ba73b3b308b13ec78b6e65c5e511450))
+* **notepad:** rebuild the notepad as a popover with archive and note editor ([fb1fb87](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fb1fb879ed9a2b62fcc7a326bcc59efd90dadcf2))
+* rebuild the main chat module with its own UI and fix live delivery ([e2df6d3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e2df6d3c5d0d7c232d2111aee0b0e99cb7a95441))
+* **reminders:** add general-purpose reminders with notifications, email and attachments ([0bc2618](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0bc2618f965d8829eb63dbe3477702da8ee34ce5))
+* **reminders:** add "Assigned by me" view for reminders raised for others ([ec30a08](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ec30a088ea20ec7c04c068c40e314ab19e281094))
+* **tasks:** self-assign new tasks by default in the inline create row ([68ca920](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/68ca92090497347864bd0d6eda0e339268ea74ec))
+
+## [14.20.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.19.0...v14.20.0) (2026-07-30)
+
+
+### 🚀 Features
+
+* add read-only permission level for task estimated hours ([1c85018](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1c85018f31dc5e6deb4fe16af42f5ac4f976db0d))
+* add Talk to Text voice-to-task with uniform header icons ([3d9a981](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3d9a981f971de1e4ff11b39566f14b4ae9fa74a7))
+* **project-skills:** expand the seeded skill catalog ([956346d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/956346d1caa16648100827b6691e868dd19b64cd))
+* **skills-select:** add search filter to the skills dropdown ([d53fd03](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d53fd03bc22182b5146f496eae7d5146c07d0318))
+
+## [14.19.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.18.0...v14.19.0) (2026-07-28)
+
+
+### 🚀 Features
+
+* **project-dashboard:** add role-scoped Project Dashboard view ([7cae5ef](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7cae5efa7ae87417057b0224a3d86562222ffbab))
+* **projects:** optional proposal id on projects ([#412](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/issues/412)) ([76e635e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/76e635e25ccf883fd4dfb1bc23b62207070edba8))
+* **projects:** representational "app not enabled" teaser blocks + unlock checklist ([5b8f62a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5b8f62aac8d890361caab9fbe7053c4a380f7a20))
+* **projects:** required skills on projects, managed in company settings ([cee4590](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/cee459054762c92f0a1c085088d29fcf2103231f))
+* **projects:** required source field with Upwork proposal id rules ([3386e2c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3386e2c9c69c0b3e5d4cbd18671502150532838e))
+* **tasks:** reason prompt on estimate change + TL timesheet flag ([42088ff](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/42088ff8d2c5138c9d43e83b458c8635b1da1882))
+* **tracker:** persistent alert when the tracker auto-stops ([f3d7624](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f3d7624d1e2c6ee3e92c87753dcd1bc514d5364c))
+
+
+### 🐛 Bug Fixes
+
+* **chat:** harden main-chat authorization and fix reliability/perf bugs ([3f9d4be](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3f9d4becde0c25fe8958dea3e681acad4acb87cc))
+* **projects:** center and constrain the time log tab app teaser ([e09c679](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e09c679e81dbcfa0c189bfd14782208022e0ab81))
+* **projects:** translate the AI wizard proposal id labels ([6880c0a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6880c0afbba5a4e15c717f19e29fbe4d67d733be))
+
+## [14.18.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.17.0...v14.18.0) (2026-07-25)
+
+
+### 🚀 Features
+
+* **tracker:** gate tracking on task estimated hours ([fe4101e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fe4101eb2b06f5d465e6582c316a12432979239c))
+
+## [14.17.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.16.0...v14.17.0) (2026-07-23)
+
+
+### 🚀 Features
+
+* **tracker:** custom idle notification via a shared notification template ([c937681](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c93768187da9bdc7e720605a43049884e6f57d16))
+
+
+### 🐛 Bug Fixes
+
+* prevent comment count overlapping the project view tab label ([ecfb350](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ecfb350b85ddeec4db095f77ba126e376a59e3bd))
+
+## [14.16.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.15.0...v14.16.0) (2026-07-22)
+
+
+### 🚀 Features
+
+* **dashboard:** add refresh button to Task List card ([2b6f5a0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2b6f5a071acd3197c6eec68dad74324a07e2dfeb))
+* **projects:** compact project sidebar header and "+ New" menu ([3157419](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/315741975bfed3ebda577ac37573a7548c1c74b4))
+* **projects:** move view switcher to its own row + lighter header ([65361ef](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/65361ef6c353843b624f919cb633f972ccd8d358))
+
+
+### 🐛 Bug Fixes
+
+* **dashboard:** base achievements on-time on last worklog, status fallback ([32c780b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/32c780bb1ffd2009cdd89a05f459dc8571946562))
+* **dashboard:** count on-time via last worklog when status flip is late ([4abd197](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4abd19730400bb7e3e0d7513c7de8986fda9a899))
+* **dashboard:** exclude chat tasks and zero-evidence completions from member cards ([a159d52](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a159d528308073f6dc61401a01558af2058d16de))
+* **dashboard:** relabel achievements 'Needs Improvement' tab to 'Over Estimate' ([00d2ea5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/00d2ea5ef87f9a7d8f70483b4461653a85c64858))
+* **kanban:** clean up card checkbox and drop task type from board cards ([baa4c7e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/baa4c7e04c198a6d24f7e565dfecb21c7459d624))
+* **projects:** only grow view tabs on hover when the user has the view menu ([c4e5488](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c4e548889e4c89247734998710efa6a187572c6b))
+* **projects:** stop the filter search stretching when the toolbar wraps ([ef47b9c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ef47b9ca76df58cbe9b17f102efc23c568ce2346))
+
+## [14.15.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.14.0...v14.15.0) (2026-07-20)
+
+
+### 🚀 Features
+
+* **dashboard:** all-projects toggle for card project selector ([3d8d639](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3d8d6393d496af1f77ca2bfb46df35bd7dff0a77))
+* **dashboard:** project scope selector (all/include/exclude) + wire personal cards ([837a75c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/837a75c9083d0c336442643b939e9e5ed4afc121))
+* **dashboard:** project-scope selector + time tracker UX/deep-link improvements ([fa513ff](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fa513ff79d5182b1f83423b1c0e8f84736f59c13))
+* **dashboard:** roll out project scope (include/exclude) to remaining cards ([0ab39a9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0ab39a940fd48c318d53a2193f58f3d4a8ba0c5e))
+* **tracker:** collapsible Today's Tasks rows with grouped totals ([acecc66](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/acecc66c4495e0c2f6ff9fc8f67fe7134d664206))
+* **tracker:** compact start sheet, running-screen polish, open-in-web ([6e39a02](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6e39a023dc4b0849eb39d7208acfaa6d91938505))
+* **tracker:** hide Start Tracker on completed tasks ([b320866](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b3208665bcadb5bd6ac2b2e2e114ac3083e88fa8))
+* **tracker:** notify on idle instead of auto-stopping ([94b14ae](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/94b14ae087c983c8f97978bf429a19151779bdea))
+* **tracker:** prompt on deep-link start while already tracking ([692cf6b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/692cf6bf714a623c332a14b01d8ea53b47971e0a))
+* **tracker:** toast when the Start Tracker deep link doesn't open ([b79502b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b79502b459f576435882f97ece5780659c54918a))
+* **tracker:** toast when the Start Tracker deep link doesn't open ([fd03f1b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fd03f1b4bd98da4700dc46cc6ddac9f2ad9ad5db))
+
+
+### 🐛 Bug Fixes
+
+* **dashboard:** address CodeRabbit review on [#387](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/issues/387) ([9fe8d2c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9fe8d2cb2acf12aa40dd3e8a06d50ee6b21c455d))
+* **dashboard:** correct my-achievements ownership/completion and add projectpulse project filter ([f331718](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f3317186ff30889a891c525394876eaed7d314fb))
+* **dashboard:** free resources pool from store companyUsers, excluding deleted/admin ([5f80e4e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5f80e4e3ea750f9656be4b2688e479e25dbb0ddf))
+* **tracker:** exclude soft-deleted tasks from By-Task search ([9d49423](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9d4942384eb1ad703a1a1e8fb24f748c145a3079))
+
+## [14.14.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.13.0...v14.14.0) (2026-07-17)
+
+
+### 🚀 Features
+
+* **tracker:** deep link to start a task in the desktop tracker from web ([bb463cf](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bb463cf909108f9699812adeda1ee034068aebff))
+* **tracker:** edit comment on running screen restarts session ([e900276](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e90027612d2929973ca6159d1e6a4622bf1e2cd1))
+* **tracker:** pop-in/pop-out animation for the screenshot notification ([cbe69f0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/cbe69f01e569cc5ea409c5073c7e573478ac36cc))
+* **tracker:** rework header/form UI, add task search & today's logged hours ([b52313c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b52313c57e91a06dca27538878654061b3a02a7d))
+
+
+### 🐛 Bug Fixes
+
+* **storage:** getUserProfile returns a valid signed URL ([b52313c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b52313c57e91a06dca27538878654061b3a02a7d))
+* **tracker:** address CodeRabbit review on [#384](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/issues/384) ([de42749](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/de427491e40a762cd5007a51a52e7904b82e1359))
+* **tracker:** hide header refresh button while tracking ([d6f141e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d6f141e737a89b12ebc623f487ed5375412c1e4d))
+* **tracker:** replace dead Firebase default task image with local asset ([2991c0f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2991c0f6a8983edd982a2414dadb74db190be481))
+
+
+### ♻️ Refactors
+
+* **tracker:** use project Modal for the Start Tracker prompt ([f8442f5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f8442f50995684917bdd13482fc4357786bdd8e6))
+
+## [14.13.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.12.0...v14.13.0) (2026-07-17)
+
+
+### 🚀 Features
+
+* **dashboard:** task-list date filter, ETA links, resize + RBAC/conf… ([fc589f2](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fc589f2d94776d10bffd1396c2a6b89468ce0275))
+* **dashboard:** task-list date filter, ETA links, resize + RBAC/config fixes ([67f66d0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/67f66d02ccb8b9d1618a6784e6aa399a14f61f3b))
+
+
+### 🐛 Bug Fixes
+
+* **dashboard:** key task-list load paths off merged filterQuery ([591cfff](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/591cfffa4dfabe74192542638163d7d78fa0344b))
+* **dashboard:** keyboard-accessible task links in Team Logged vs ETA card ([0ec6fd8](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0ec6fd88b68b3d927e7f7dfb6efebebd4ef69d2c))
+
 ## [14.12.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.11.0...v14.12.0) (2026-07-16)
 
 

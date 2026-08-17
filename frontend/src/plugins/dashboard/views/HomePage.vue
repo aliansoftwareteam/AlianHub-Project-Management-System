@@ -52,7 +52,7 @@
                             :title="item?.cardData?.fieldName"
                             :id="item.i"
                             :showRefresh="isRefreshable(item.componentId)"
-                            :periodOptions="periodOptionsFor(item.componentId)"
+                            :periodOptions="periodOptionsFor(item)"
                             :periodValue="periodValueFor(item)"
                             @period-change="(val) => handlePeriodChange(item, val)"
                             @delete-card="handleRemoveCard(item.i)"
@@ -80,7 +80,7 @@
                         :title="item?.cardData?.fieldName"
                         :id="item.i"
                         :showRefresh="isRefreshable(item.componentId)"
-                        :periodOptions="periodOptionsFor(item.componentId)"
+                        :periodOptions="periodOptionsFor(item)"
                         :periodValue="periodValueFor(item)"
                         @period-change="(val) => handlePeriodChange(item, val)"
                         @delete-card="handleRemoveCard(item.i)"
@@ -160,7 +160,7 @@
                     <div v-if="!Object.keys(filterCardComponent).length" class="font-size-13 p0x-15px gray81 center_no_record_found">{{$t('UserTimesheet.no_records_found')}}</div>
                 </div>
                 <div v-else-if="cardTab === 2 && Object.keys(fieldArray)?.length">
-                    <CardFieldComponent :cardType="fieldArray?.cardType" :componentId="fieldArray?.key" :isEditCard="isEditCard" :allProjectsArray="props.allProjectsArray" @closeSidebar="handleCardClose" :fieldsArray="fieldArray?.fields" ref="childRef" @handleFunction="handleCardAddOnDashboard"/>
+                    <CardFieldComponent :cardType="fieldArray?.cardType" :componentId="fieldArray?.key" :isEditCard="isEditCard" :savedProjectMode="editProjectMode" :allProjectsArray="props.allProjectsArray" @closeSidebar="handleCardClose" :fieldsArray="fieldArray?.fields" ref="childRef" @handleFunction="handleCardAddOnDashboard"/>
                 </div>
             </template>
         </AdvanceSearchModal>
@@ -192,7 +192,7 @@
     </div>
 </template>
 <script setup>
-    import {  ref, reactive, onMounted, inject, computed, watch,defineExpose, nextTick,provide } from 'vue';
+    import {  ref, reactive, onMounted, onBeforeUnmount, inject, computed, watch,defineExpose, nextTick,provide } from 'vue';
     import { GridLayout, GridItem } from 'grid-layout-plus';
     import useCustomFieldImage from '@/composable/customFieldIcon.js';
     import AdvanceSearchModal from '@/components/atom/Modal/Modal.vue';
@@ -229,6 +229,7 @@
     import OnLeaveCard from "@/components/organisms/OnLeaveCard/OnLeaveCard.vue";
     import NextUpCard from "@/components/organisms/NextUpCard/NextUpCard.vue";
     import MyAchievementsCard from "@/components/organisms/MyAchievementsCard/MyAchievementsCard.vue";
+    import TaskStatusSummaryCard from "@/components/organisms/TaskStatusSummaryCard/TaskStatusSummaryCard.vue";
     import MyLeaveCard from "@/components/organisms/MyLeaveCard/MyLeaveCard.vue";
     import DueSoonCard from "@/components/organisms/DueSoonCard/DueSoonCard.vue";
     import MyTimeCard from "@/components/organisms/MyTimeCard/MyTimeCard.vue";
@@ -289,6 +290,8 @@
     const filterCardComponent = ref([]);
     const currentLayout = ref({});
     const isEditCard = ref(false);
+    // Saved project scope mode for the card being edited (not a catalog field).
+    const editProjectMode = ref('');
     const isShowModal = ref(props.isShowModalToggle || false);
     const cardTab = ref(props.cardTabIndex || 0);
     const search = ref('');
@@ -436,6 +439,8 @@
                 return NextUpCard;
             case 'MyAchievementsCard':
                 return MyAchievementsCard;
+            case 'TaskStatusSummaryCard':
+                return TaskStatusSummaryCard;
             case 'MyLeaveCard':
                 return MyLeaveCard;
             case 'DueSoonCard':
@@ -529,12 +534,17 @@
             } else {
                 let makeUid = makeUniqueId();
                 let minMax = getCardsComponentsSize(fieldArray.value.key) ?? {"minW": 3,"maxW": 12,"minH": 5,"maxH": 18};
-                let newPosition = findNextCardPositionOnLayout(3,5,gridCol.value);
+                // Start at the card's own minimum when that is larger than the default
+                // 3x5 — a card created below its minimum is one the user has to resize
+                // before it is readable, and the slot is searched at the wrong size too.
+                let newW = Math.max(3, Number(minMax.minW) || 3);
+                let newH = Math.max(5, Number(minMax.minH) || 5);
+                let newPosition = findNextCardPositionOnLayout(newW, newH, gridCol.value);
                 let posi = {
                     "x": newPosition.x ? newPosition.x : (layout.value.length * 2) % (gridCol.value || 12),
                     "y": newPosition.y ? newPosition.y : layout.value.length + (gridCol.value || 12),
-                    "w": 3,
-                    "h": 5,
+                    "w": newW,
+                    "h": newH,
                     ...minMax
                 }
                 let object = {
@@ -635,6 +645,7 @@
 
             isEditCard.value = true;
             editCardId.value = uid;
+            editProjectMode.value = cardData?.projectMode || '';
             fields.forEach(element => {
                 if(element.name === 'filter') {
                     if (filterData && filterData.length > 0) {
@@ -692,6 +703,46 @@
     const move = () => {
         isMoving.value = true;
     };
+
+    // Auto-scroll while dragging/resizing a card near a viewport edge.
+    // grid-layout-plus maps the pointer to viewport coords with no auto-scroll,
+    // so a card at the bottom of the screen can't be grown/moved past the edge —
+    // the cursor can't travel below the screen and nothing scrolls. We nudge the
+    // dashboard's scroll host when the cursor nears the top/bottom edge.
+    // ponytail: fixed 60px edge zone; find the scroll host lazily per drag.
+    const EDGE = 60;
+    let scrollHost = null;
+    let scrollVy = 0;
+    let scrollRAF = 0;
+    const getScrollHost = () => {
+        const grid = document.querySelector('.vgl-layout');
+        let el = grid ? grid.parentElement : null;
+        while (el && el !== document.body) {
+            const oy = getComputedStyle(el).overflowY;
+            if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight) return el;
+            el = el.parentElement;
+        }
+        return document.scrollingElement || document.documentElement;
+    };
+    const scrollTick = () => {
+        if (!scrollVy || !isMoving.value || !scrollHost) { scrollRAF = 0; return; }
+        scrollHost.scrollTop += scrollVy;
+        scrollRAF = requestAnimationFrame(scrollTick);
+    };
+    const onDragPointerMove = (e) => {
+        if (!isMoving.value) { scrollVy = 0; scrollHost = null; return; }
+        if (!scrollHost) scrollHost = getScrollHost();
+        const fromBottom = window.innerHeight - e.clientY;
+        if (fromBottom < EDGE) scrollVy = Math.ceil((EDGE - fromBottom) / 3);
+        else if (e.clientY < EDGE) scrollVy = -Math.ceil((EDGE - e.clientY) / 3);
+        else scrollVy = 0;
+        if (scrollVy && !scrollRAF) scrollRAF = requestAnimationFrame(scrollTick);
+    };
+    onMounted(() => document.addEventListener('pointermove', onDragPointerMove, true));
+    onBeforeUnmount(() => {
+        document.removeEventListener('pointermove', onDragPointerMove, true);
+        if (scrollRAF) cancelAnimationFrame(scrollRAF);
+    });
     const layoutUpdatedEvent = async(newLayout) => {
         try {
             if(!isMoving.value) return;
@@ -739,6 +790,7 @@
     };
     const handleCard = (val) => {
         fieldArray.value = val;
+        editProjectMode.value = ''; // new card → CardFieldComponent defaults to 'all'
         cardTab.value = 2;
     };
     const handleCardClose = () => {
@@ -799,7 +851,7 @@
         'WorkedTasksTableCard', 'TeamCategoryBreakdownCard', 'TeamLoggedVsEtaCard',
         'TasksByStatusCard', 'TasksByProjectCard', 'TotalTasksCard',
         'NextUpCard', 'MyAchievementsCard', 'MyLeaveCard', 'DueSoonCard', 'MyTimeCard',
-        'MilestoneReportCard',
+        'MilestoneReportCard', 'TaskStatusSummaryCard', 'TASKLIST',
     ].includes(cid);
 
     // ── Dashboard-level date range ──────────────────────────────────
@@ -843,7 +895,7 @@
     const PROJECT_PERIOD_CARDS = [
         'RunningProjectsCard', 'UsersByCategoryCard', 'ProjectPulseCard',
         'WorkedTasksTableCard', 'TeamCategoryBreakdownCard', 'TeamLoggedVsEtaCard', 'OnLeaveCard',
-        'MyAchievementsCard', 'MyTimeCard', 'MilestoneReportCard',
+        'MyAchievementsCard', 'MyTimeCard', 'MilestoneReportCard', 'TaskStatusSummaryCard',
     ];
     const PROJECT_PERIOD_OPTIONS = [
         { id: 0, label: 'Auto' },
@@ -853,9 +905,16 @@
     const PROJECT_PERIOD_DEFAULT = {
         RunningProjectsCard: 1, UsersByCategoryCard: 3, ProjectPulseCard: 1,
         WorkedTasksTableCard: 3, TeamCategoryBreakdownCard: 3, TeamLoggedVsEtaCard: 3, OnLeaveCard: 1,
-        MyAchievementsCard: 5, MyTimeCard: 3, MilestoneReportCard: 5,
+        MyAchievementsCard: 5, MyTimeCard: 3, MilestoneReportCard: 5, TaskStatusSummaryCard: 3, TASKLIST: 0,
     };
-    const periodOptionsFor = (cid) => (PROJECT_PERIOD_CARDS.includes(cid) ? PROJECT_PERIOD_OPTIONS : []);
+    // TASKLIST shows the period dropdown only when its date-range toggle is on.
+    const periodOptionsFor = (item) => {
+        const cid = item && item.componentId;
+        if (cid === 'TASKLIST') {
+            return (item.cardData && item.cardData.enableDateRange) ? PROJECT_PERIOD_OPTIONS : [];
+        }
+        return PROJECT_PERIOD_CARDS.includes(cid) ? PROJECT_PERIOD_OPTIONS : [];
+    };
     const periodValueFor = (item) => {
         // NOTE: can't use `|| default` — 0 (Auto) is a valid saved value.
         const v = Number(item && item.cardData && item.cardData.timerange);

@@ -69,6 +69,13 @@
                         </template>
                     </DropDown>
                     </div>
+                    <div v-if="dateRangeEnabled" class="d-flex align-items-center tasklist-range ml-10px">
+                        <span class="tasklist-range-label">{{ $t('dashboardCard.tasklist_date_range') }}</span>
+                        <select v-model="dateRangeField" class="form-control tasklist-range-field">
+                            <option value="DueDate">{{ $t('Header.DueDate') }}</option>
+                            <option value="createdAt">{{ $t('Header.created_date') }}</option>
+                        </select>
+                    </div>
                 </div>
             </div>
             <div class="list_view_dashboard style-scroll" v-if="groupedTasks.length || (!searchTask ? allTaskGetters.length : searchTaskData.length)" id="list_scroll"  @scroll="scrollFunction">
@@ -179,6 +186,7 @@ import { useCustomComposable, useGetterFunctions } from '../../../../composable'
 import { apiRequest } from '../../../../services';
 import * as env from '@/config/env';
 import { buildFilterQuery, teamIdToUserId } from "@/composable/commonFunction";
+import { resolveCardRange } from "@/composable/useResourceWorkload";
 
 const triangleBlack = require('@/assets/images/svg/triangleBlack.svg');
 const horizontalDots = require("@/assets/images/svg/horizontalDots.svg");
@@ -245,6 +253,12 @@ const props = defineProps({
     companyUserDetail: {
         type: Object,
         default: () => {}
+    },
+    // Incremented by the card-header refresh icon (HomePage refreshKeys).
+    // Watched below to re-run the active load path.
+    refreshTrigger: {
+        type: Number,
+        default: 0
     }
 })
 
@@ -261,6 +275,10 @@ const allSprintsFlat  = ref([]);
 const filterUsers = ref([])
 const assigneeFilterOptions = ref([]);
 const groupById = ref(0);
+// cardData.groupBy may arrive as a plain number, a numeric string, or a stale
+// Mongo extended-JSON object ({ $numberLong: "0" }). Coerce to a number so the
+// `=== 4` grouping checks work and the list loads.
+const normalizeGroupId = (g) => Number(g && typeof g === 'object' ? g.$numberLong : g) || 0;
 const searchTask = ref(false);
 const taskNameSearch = ref(true)
 const taskKeySearch = ref(false)
@@ -320,6 +338,67 @@ const headers = ref([
 ])
 const filteredHeaders = ref([]);
 
+// ── Optional card-level date filter (config toggle: enableDateRange).
+// When enabled, the card header shows the standard period dropdown (Auto/Today/
+// This Week/… — same as sibling cards) and a Due/Created field selector here.
+// The resolved window becomes a dbDate clause merged into filterQuery, so it
+// rides the exact "Add filter" rails: the short-circuit in searchMongoDB, the
+// grouped-view reroute, and both query push-sites all apply it unchanged.
+const dateRangeEnabled = computed(() => !!props.cardData?.enableDateRange);
+const dateRangeField = ref('DueDate');   // 'DueDate' | 'createdAt'
+// Period lives in the card-header dropdown; 0 = Auto → dashboard global range.
+const globalRange = inject('dashboardGlobalRange', null);
+const timerange = computed(() => {
+    const v = Number(props.cardData?.timerange);
+    return Number.isFinite(v) && v >= 0 && v <= 8 ? v : 0;
+});
+const dateRangeClause = computed(() => {
+    if (!dateRangeEnabled.value) return null;
+    const { dateFrom, dateTo } = resolveCardRange(timerange.value, globalRange && globalRange.value);
+    if (!dateFrom || !dateTo) return null;
+    return { [dateRangeField.value]: { dbDate: { $gte: new Date(dateFrom), $lte: new Date(dateTo) } } };
+});
+// Single source of truth for filterQuery: filterData rows + the date clause.
+function syncFilterQuery() {
+    const rows = Array.isArray(props.filterData)
+        ? props.filterData
+        : (props.filterData ? Object.values(props.filterData) : []);
+    const base = rows.length ? buildFilterQuery(rows, userId.value) : {};
+    if (dateRangeClause.value) {
+        base.$and = Array.isArray(base.$and) ? base.$and : [];
+        base.$and.push(dateRangeClause.value);
+    }
+    filterQuery.value = base;
+}
+// Any filter active — advanced-filter rows OR the date-range clause. Load paths
+// must key off this (not props.filterData), else a date-only filter is bypassed.
+const hasActiveFilter = computed(() => Object.keys(filterQuery.value).length > 0);
+// Re-run the active load path after a date-filter change (mirrors filterData watcher).
+function applyDateRange() {
+    if (!currentCompany.value?.planFeature?.listView) return;
+    syncFilterQuery();
+    isLoading.value = true;
+    skip.value = 0;
+    const hasFilter = Object.keys(filterQuery.value).length > 0;
+    if (groupById.value === 4) {
+        hasFilter ? searchMongoDB() : fetchTasks(15, '');
+    } else if (hasFilter) {
+        searchMongoDB();
+    } else {
+        processProjects(groupById.value, true, groupedTasks, false, true);
+    }
+}
+// Header refresh icon → reload the list via the active load path.
+watch(() => props.refreshTrigger, (n, o) => { if (n !== o) applyDateRange(); });
+watch(dateRangeField, () => { if (dateRangeEnabled.value) applyDateRange(); });
+// Period dropdown change (persists to cardData.timerange) and enable/disable toggle.
+watch(timerange, () => { if (dateRangeEnabled.value) applyDateRange(); });
+watch(dateRangeEnabled, () => applyDateRange());
+// Auto (0) follows the dashboard global range.
+watch(() => globalRange && globalRange.value, () => {
+    if (dateRangeEnabled.value && timerange.value === 0) applyDateRange();
+}, { deep: true });
+
 watch(() => taskDetail.value, (newVal,oldVal) => {
     if (JSON.stringify(newVal) !== JSON.stringify(oldVal)) {
         let taskArray = !searchTask.value ? allTaskGetters.value : searchTaskData.value;
@@ -334,24 +413,26 @@ watch(() => props.cardData.projectId, async(newIds,oldIds) => {
     if(oldIds === undefined || JSON.stringify(newIds) === JSON.stringify(oldIds)) {
         return;
     }
-    filteredProjects.value = filterProjectsByIds(props.allProjectsArrayFilter, newIds);
+    filteredProjects.value = filterProjectsByIds(props.allProjectsArrayFilter, newIds, props.cardData.projectMode);
     await getAllSprints();
+    syncFilterQuery();
+    const hasFilter = Object.keys(filterQuery.value).length > 0;
     if(groupById.value === 4) {
-        if(props.filterData && props.filterData.length) {
-            skip.value = 0;
-            searchMongoDB();
-        }
-        else{
-            skip.value = 0;
-            fetchTasks(15,"");
-        }
+        skip.value = 0;
+        hasFilter ? searchMongoDB() : fetchTasks(15,"");
     }
     else {
         await processProjects(groupById.value, true, groupedTasks, false, true);
+        if(hasFilter) searchMongoDB();
     }
 }, { immediate: true });
 
-function filterProjectsByIds(projectArray, idsArray) {
+function filterProjectsByIds(projectArray, idsArray, mode = 'all') {
+    // exclude → everything except the selected ids (new projects auto-included).
+    if (mode === 'exclude' && idsArray && idsArray.length) {
+        return projectArray.filter(project => !idsArray.includes(project._id));
+    }
+    // all (empty) → every accessible project; include → only the selected.
     if(!idsArray || idsArray.length === 0) {
         return projectArray;
     }
@@ -383,7 +464,7 @@ function init(group, refetch, projects, sprints, groupedTasksData, isBoard, isIn
         groupBy(group, refetch, projects, sprints, groupedTasksData, isBoard, 'list', false, fetchTask, (resp) => {
             setTimeout(() => {
                 resolve(resp);
-                if(props.filterData && props.filterData.length > 0){
+                if(hasActiveFilter.value){
                     return;
                 }
                 isLoading.value = false;
@@ -406,15 +487,16 @@ async function handleInit () {
     }
     let fields = props.cardData?.fields || []
     filteredHeaders.value = fields.length === 0 ? [] : headers.value.filter(item => fields.includes(item.id));
-    groupById.value = props.cardData.groupBy;
-    filteredProjects.value = filterProjectsByIds(props.allProjectsArrayFilter, props.cardData.projectId);
+    groupById.value = normalizeGroupId(props.cardData.groupBy);
+    filteredProjects.value = filterProjectsByIds(props.allProjectsArrayFilter, props.cardData.projectId, props.cardData.projectMode);
     if(filteredProjects.value.length === 0) return;
     isLoading.value = true;
     await getAllSprints()
 
+    syncFilterQuery();
+    const hasFilter = Object.keys(filterQuery.value).length > 0;
     if(groupById.value === 4) {
-        if(props.filterData && props.filterData.length) {
-            filterQuery.value = buildFilterQuery(props.filterData,userId.value);
+        if(hasFilter) {
             skip.value = 0;
             await searchMongoDB();
             isLoading.value = false;
@@ -426,8 +508,7 @@ async function handleInit () {
     }
     else {
         await processProjects(groupById.value, true, groupedTasks, false, true);
-        if(props.filterData && props.filterData.length) {
-            filterQuery.value = buildFilterQuery(props.filterData,userId.value);
+        if(hasFilter) {
             await searchMongoDB();
         }
         assigneeFilterOptions.value = [];
@@ -510,13 +591,15 @@ watch(() => props.filterData, (newValue,oldVal) => {
     if(oldVal === undefined) return;
     if ((newValue && newValue.length > 0) || (oldVal && oldVal.length > 0 && (!newValue || newValue.length === 0))) {
         isLoading.value = true;
-        filterQuery.value = buildFilterQuery(Object.values(newValue),userId.value);
+        syncFilterQuery();
         setTimeout(() => {
             skip.value = 0;
             searchMongoDB();
         }, 1000);
     }
-    if((oldVal && oldVal.length > 0 && (!newValue || newValue.length === 0))) {
+    // Only fall back to the unfiltered list when NO filter remains — a still-active
+    // date-range filter must keep the search path (handled by the branch above).
+    if((oldVal && oldVal.length > 0 && (!newValue || newValue.length === 0)) && !hasActiveFilter.value) {
         skip.value = 0;
         fetchTasks(15);
     }
@@ -525,10 +608,11 @@ watch(() => props.filterData, (newValue,oldVal) => {
 watch(() => props.cardData.groupBy, async(newVal,oldVal) => {
     if(oldVal === newVal) return;
     isLoading.value = true;
-    groupById.value = newVal;
+    groupById.value = normalizeGroupId(newVal);
+    syncFilterQuery();
+    const hasFilter = Object.keys(filterQuery.value).length > 0;
     if(groupById.value === 4) {
-        if(props.filterData && props.filterData.length) {
-            filterQuery.value = buildFilterQuery(props.filterData,userId.value);
+        if(hasFilter) {
             skip.value = 0;
             await searchMongoDB();
             isLoading.value = false;
@@ -540,8 +624,7 @@ watch(() => props.cardData.groupBy, async(newVal,oldVal) => {
     }
     else {
         await processProjects(groupById.value, true, groupedTasks, false, true);
-        if(props.filterData && props.filterData.length) {
-            filterQuery.value = buildFilterQuery(props.filterData,userId.value);
+        if(hasFilter) {
             searchMongoDB();
         }
     }
@@ -867,7 +950,7 @@ const scrollFunction = (e) => {
     if(groupById.value === 4) {
         debouncer(50).then(() => {
             if (e.target.scrollTop + e.target.clientHeight >= e.target.scrollHeight - 50) {
-                if(props.filterData && props.filterData.length > 0) {
+                if(hasActiveFilter.value) {
                     searchMongoDB()
                 }
                 else{
@@ -909,7 +992,7 @@ function toggleTask(task,e) {
             };
             let obs = new IntersectionObserver((e) => {
                 if(e[0] && e[0]?.isIntersecting) {
-                    let storeSprintTasks = props.filterData && props.filterData.length > 0 ? searchTaskData.value : getters["projectData/alltasks"] || [];
+                    let storeSprintTasks = hasActiveFilter.value ? searchTaskData.value : getters["projectData/alltasks"] || [];
                     if(storeSprintTasks.length && storeSprintTasks.find((x) => x._id === task._id)) {
                         fetchSubTask(task, true);
                     }
@@ -929,7 +1012,7 @@ function toggleTask(task,e) {
     }
 }
 function fetchSubTask(task) {
-    if(props.filterData && props.filterData.length > 0) {
+    if(hasActiveFilter.value) {
         searchMongoDB(task._id);
     }
     else{
@@ -939,7 +1022,7 @@ function fetchSubTask(task) {
 function checkSubTaskScroll(e, task) {
     debouncer(50)
     .then(() => {
-        if(props.filterData && props.filterData.length > 0) {
+        if(hasActiveFilter.value) {
             searchMongoDB(task._id);
         }
         else{
@@ -1051,4 +1134,17 @@ function filterSprintsIdQuery () {
 
 <style>
 @import "./style.css";
+
+.tasklist-range { gap: 6px; }
+.tasklist-range-label { font-size: 12px; font-weight: 600; color: #3a3f52; white-space: nowrap; }
+.tasklist-range-field {
+    font-size: 12px;
+    height: 30px;
+    width: auto;
+    min-width: 110px;
+    padding: 2px 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    color: #3a3f52;
+}
 </style>

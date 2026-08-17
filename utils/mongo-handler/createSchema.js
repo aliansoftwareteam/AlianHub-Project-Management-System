@@ -104,6 +104,8 @@ epicsSchema.index({ ProjectID: 1, deletedStatusKey: 1 });
 const pagesSchema = new Schema(schema.pages, {strict: true, timestamps: true});
 pagesSchema.index({ parentPageId: 1, deletedStatusKey: 1 });
 pagesSchema.index({ ProjectID: 1, deletedStatusKey: 1 });
+// "Which docs are attached to this task?" is asked on every task detail open.
+pagesSchema.index({ linkedTasks: 1, deletedStatusKey: 1 });
 const pageVersionsSchema = new Schema(schema.pageVersions, {strict: true, timestamps: true});
 pageVersionsSchema.index({ pageId: 1, createdAt: -1 });
 const publicSharesSchema = new Schema(schema.publicShares, {strict: true, timestamps: true});
@@ -119,6 +121,12 @@ const remindersSchema = new Schema(schema.reminders, {strict: true, timestamps: 
 remindersSchema.index({ userId: 1, fired: 1, reminderAt: 1 });
 const notesSchema = new Schema(schema.notes, {strict: true, timestamps: true});
 notesSchema.index({ userId: 1, deletedStatusKey: 1 });
+const generalReminderQueueSchema = new Schema(schema.general_reminder_queue, {strict: true, timestamps: true});
+generalReminderQueueSchema.index({ notifyAt: 1 });
+generalReminderQueueSchema.index({ reminderId: 1 }, { unique: true });
+const generalRemindersSchema = new Schema(schema.general_reminders, {strict: true, timestamps: true});
+generalRemindersSchema.index({ userId: 1, fired: 1, notifyAt: 1 });
+generalRemindersSchema.index({ userId: 1, deletedStatusKey: 1, remindAt: 1 });
 const clipsSchema = new Schema(schema.clips, {strict: true, timestamps: true});
 clipsSchema.index({ userId: 1, deletedStatusKey: 1 });
 const timesheetApprovalSchema = new Schema(schema.timesheetApproval, {strict: true, timestamps: true});
@@ -153,6 +161,10 @@ const automationRulesSchema = new Schema(schema.automationRules, {strict: true, 
 automationRulesSchema.index({ deletedStatusKey: 1 });
 const integrationConnectionsSchema = new Schema(schema.integrationConnections, {strict: true, timestamps: true});
 integrationConnectionsSchema.index({ type: 1, deletedStatusKey: 1 });
+const cloudStorageConnectionsSchema = new Schema(schema.cloudStorageConnections, {strict: true, timestamps: true});
+// Every lookup is "this user's connection to this provider" — unique so a
+// double-tap on Connect can't leave two rows with divergent refresh tokens.
+cloudStorageConnectionsSchema.index({ userId: 1, provider: 1 }, { unique: true });
 // Global search: one combined text index per collection.
 taskSchema.index({ TaskName: 'text', rawDescription: 'text' });
 projectsSchema.index({ ProjectName: 'text' });
@@ -233,6 +245,8 @@ module.exports = {
     recurringTasksSchema,
     remindersSchema,
     notesSchema,
+    generalRemindersSchema,
+    generalReminderQueueSchema,
     clipsSchema,
     timesheetApprovalSchema,
     billingRatesSchema,
@@ -247,6 +261,7 @@ module.exports = {
     calendarFeedsSchema,
     automationRulesSchema,
     integrationConnectionsSchema,
+    cloudStorageConnectionsSchema,
     historySchema,
     userIdSchema, 
     usersSchema,

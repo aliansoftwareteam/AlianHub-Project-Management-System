@@ -108,8 +108,7 @@
                             <h5>{{ $t('Projects.task_type') }}</h5>
                             <ul class="d-flex align-items-center">
                                 <li class="item" v-for="(item, index) in finalObject?.TemplateTaskType" :key="index" :title="item.name">
-                                    <img v-if="item?.taskImage.includes('http')" class="task-type-image-block" :src="item?.taskImage" :alt="item.name" />
-                                    <WasabiImage v-else class="task-type-image-block" :data="{ url: item?.taskImage }" />
+                                    <TaskTypeIcon :taskType="item" class="task-type-image-block" />
                                 </li>
                             </ul>
                         </div>
@@ -175,14 +174,15 @@ import { useI18n } from "vue-i18n";
 
 // Components
 import Sidebar from "@/components/molecules/Sidebar/Sidebar.vue";
-import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
+import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
+import { iconForName, colorForName } from "@/utils/iconLibrary";
 
 // Define the component
 defineComponent({
     name: "CreateProjectWithAIComponent",
     components: {
         Sidebar,
-        WasabiImage
+        TaskTypeIcon
     },
 })
 
@@ -314,6 +314,16 @@ const handleGenerate = async () => {
         const response = await apiRequest("post", `${env.PROJECT_TEMPLATE}/ai-generate`, params);
         const data = response.data.data;
         finalObject.value = { ...data };
+        // Auto-assign a curated library icon to each AI-generated task type
+        // (keyword map → generic fallback), tinted with the theme primary.
+        if (Array.isArray(finalObject.value.TemplateTaskType)) {
+            finalObject.value.TemplateTaskType = finalObject.value.TemplateTaskType.map((tt) => ({
+                ...tt,
+                iconType: 'library',
+                iconValue: iconForName(tt.name),
+                iconColor: colorForName(tt.name),
+            }));
+        }
         activeTab.value = 3;
         isGenerateWithAI.value = true;
 

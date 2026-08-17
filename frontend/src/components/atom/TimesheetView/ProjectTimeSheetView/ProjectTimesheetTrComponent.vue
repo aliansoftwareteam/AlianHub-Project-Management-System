@@ -5,6 +5,8 @@
             <div class="d-flex align-items-center">
                 <div class="d-flex align-items-center">
                     <p class="user_hrs_name" :title="trData.projectName">{{ trData.projectName }}</p>
+                    <!-- AHE — red dot: a task in this project had its estimated hours re-updated. -->
+                    <span v-if="trData.hasEstimateChanged" title="A task in this project had its estimated hours changed" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#E5484D;margin-left:6px;flex:none;"></span>
                     <img v-if="trData.status == 'close' || !(trData.deletedStatusKey == 0 || trData.deletedStatusKey == undefined)" :src="logk_icon" alt="loclIcon" class="ml-5px"/>
                 </div>
                 <div>
@@ -99,7 +101,8 @@
                             <div class="d-flex align-items-center">
                                 
                                 <div class="d-flex align-items-center">
-                                    <p class="user_hrs_name" :title="taskObject.TaskName">{{ taskObject.TaskName }}</p>
+                                    <!-- AHE — red task name when this task's estimate was re-updated. -->
+                                    <p class="user_hrs_name" :style="taskObject.estimateChangedFlag ? 'color:#E5484D;font-weight:600;' : ''" :title="taskObject.TaskName">{{ taskObject.TaskName }}</p>
                                 </div>
                                 <div class="blue text-decoration-underline cursor-pointer" @click="taskDetailOpen(taskObject)" >{{taskObject.TaskCode}}  </div>
                                 <div class="inner_div displayRate d-flex">
@@ -231,6 +234,13 @@
     const table_arrow = ref(require("@/assets/images/table_arrow.png"))
     const theModel = ref(props.modelValue);
     const trData = ref(props.projectTrData);
+    // AHE — trData is snapshotted from the prop on mount, but the parent sets
+    // `hasEstimateChanged` asynchronously (after a rollup lookup), so sync that
+    // field onto the snapshot when it arrives — otherwise the red project dot
+    // never appears.
+    watch(() => props.projectTrData && props.projectTrData.hasEstimateChanged, (val) => {
+        if (trData.value) trData.value.hasEstimateChanged = val;
+    }, { immediate: true });
     const fullLoggedData = ref(props.fullLoggedData);
     const fullEstimatedData = ref(props.fullEstimatedData);
     const projectTaskArray = ref([]);
@@ -296,6 +306,7 @@
                                 id: uniqueTaskIds[i],
                                 TaskName: singleTaskData.TaskName,
                                 TaskCode: singleTaskData.TaskKey,
+                                estimateChangedFlag: singleTaskData.estimateChangedFlag,
                                 taskLoggedHours: tmpfullLoggedData.filter((x) => x.taskId == uniqueTaskIds[i]).reduce((a,b) => a + b.logMinutes, 0),
                                 manuallyLoggedHours: tmpfullLoggedData.filter((x) => x.taskId == uniqueTaskIds[i] && (x.logType === 0 || !x.logType)).reduce((a,b) => a + b.logMinutes, 0),
                                 trackdLoggedHours: tmpfullLoggedData.filter((x) => x.taskId == uniqueTaskIds[i] && x.logType === 1).reduce((a,b) => a + b.logMinutes, 0),
