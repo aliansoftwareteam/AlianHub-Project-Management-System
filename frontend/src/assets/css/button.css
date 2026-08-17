@@ -56,6 +56,53 @@
     height: 30px;
     font-family: 'Roboto', sans-serif;
 }
+/* The confirm button on a type-to-confirm dialog (bulk Delete / Archive).
+   It was referenced by name but never defined, so the moment the typed phrase
+   matched, the button dropped every style and fell back to the browser default
+   — the one state where it matters most. Sized to sit level with the Cancel
+   button beside it, which runs at font-size 16 rather than the 30px the other
+   button classes here assume. */
+.archive-delete-btn-bg-red {
+    cursor: pointer;
+    background: #E5484D;
+    border: none;
+    border-radius: 4px;
+    color: #FFFFFF;
+    height: 38px;
+    padding: 0 18px;
+    font-weight: 500;
+    font-family: 'Roboto', sans-serif;
+    transition: background 0.15s ease;
+}
+.archive-delete-btn-bg-red:hover {
+    background: #C93B3F;
+}
+.archive-delete-btn-bg-red:active {
+    background: #B22F33;
+}
+.archive-delete-btn-bg-red:focus-visible {
+    outline: 2px solid #E5484D;
+    outline-offset: 2px;
+}
+
+/* Archive is reversible — the dialog says the tasks can be restored — so it
+   does not wear Delete's red. Same shape, the app's primary navy. */
+.archive-confirm-btn {
+    cursor: pointer;
+    background: #2F3990;
+    border: none;
+    border-radius: 4px;
+    color: #FFFFFF;
+    height: 38px;
+    padding: 0 18px;
+    font-weight: 500;
+    font-family: 'Roboto', sans-serif;
+    transition: background 0.15s ease;
+}
+.archive-confirm-btn:hover { background: #27306F; }
+.archive-confirm-btn:active { background: #1F2757; }
+.archive-confirm-btn:focus-visible { outline: 2px solid #2F3990; outline-offset: 2px; }
+
 .btn-secondary {
     cursor: pointer;
     background: #959595;

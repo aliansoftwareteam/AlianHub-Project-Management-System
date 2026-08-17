@@ -13,6 +13,7 @@
             "TaskTypeKey": number,                        // must match one of the project's task type keys (given)
             "status": string,                             // must match one of the project's task status names (given)
             "priority": "Low" | "Medium" | "High",
+            "estimatedHours": number,                     // <= 2; OMIT when subtasks are present
             "AssigneeUserId": string[],                   // member ids only; default []
             "descriptionBlocks": [
               { "type": "paragraph", "data": { "text": string } },
@@ -20,6 +21,13 @@
               { "type": "list",      "data": { "style": "ordered", "items": string[] } },
               { "type": "header",    "data": { "text": "Acceptance criteria", "level": 4 } },
               { "type": "list",      "data": { "style": "unordered", "items": string[] } }
+            ],
+            "subtasks": [                                 // only when the work exceeds 2h
+              {
+                "TaskName": string,                       // 2-200 chars
+                "estimatedHours": number,                 // <= 2, required on each
+                "descriptionBlocks": [ { "type": "paragraph", "data": { "text": string } } ]
+              }
             ]
           }
         ]

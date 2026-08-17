@@ -16,6 +16,47 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.30.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.29.0...v14.30.0) (2026-08-14)
+
+
+### 🚀 Features
+
+* **ai-assist:** show tokens and cost on the generated plan ([586f55a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/586f55a02ba336f57e2f5ba9b8a9961d8826e842))
+* **ai:** apply the company planning rules to generated work ([a61e799](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a61e799ac1f2a0bc519b3100515656411bb70366))
+* **ai:** drive every AI feature from LLM_PROVIDER, and apply the company planning rules ([cb89f9a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/cb89f9a6b66c35709b41f04dd16b432e0ff8e60a))
+* **task-type-icon:** add coloured boundary box and hover tooltip ([7d00a49](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7d00a4921427eb77b856047fef0e817f7d7f0517))
+* **task-type-icons:** offline icon library for task types + migration script ([815c80b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/815c80b95f0db6c52362bd7c8edfd7638bdb9b12))
+* **task-type-settings:** fix icon overlap, fill height, drag handle ([44f976e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/44f976ef8a3a813d9dc667e9a691ac2a45e925db))
+* **task-type:** fill wizard task-type step; shrink-to-fit lists ([e637431](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e6374317e54afbad0032a0287b429f038369a203))
+* **task-type:** mobile responsive fill for task-type config ([9afe3d9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9afe3d9ed9318bb4a5bff6084d4d3fe53a562e46))
+* **tracker:** show library task-type icons in the time tracker ([f1cc33b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f1cc33baf3a400f40db76ccacef13bbc6700efab))
+
+
+### 🐛 Bug Fixes
+
+* **ai:** give plan generation an output budget that fits the models ([e4cb1fc](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e4cb1fcb47b49ec0aeb3b1a92156c57989f940cf))
+* **ui:** stop the sprint hours chip overlapping the share controls ([91e7f37](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/91e7f3791f486a1d6b9a1e2891631d02654ab3af))
+* **ui:** style the confirm button on the bulk delete and archive dialogs ([6ee08f7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6ee08f79fdc69ffe782957de852407e24563410e))
+
+
+### 📘 Documentation
+
+* **claude:** make Rule 2 tiered and collapse PRD into task.md ([64b51b5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/64b51b502a3918d39f613b87cd5d7798a64b8442))
+
+## [14.29.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.28.1...v14.29.0) (2026-08-14)
+
+
+### 🚀 Features
+
+* **chat:** audio and video calling in main chat ([8525584](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8525584bcfc93cc020eef81ee3ede50a4bdbd491))
+
+## [14.28.1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.28.0...v14.28.1) (2026-08-14)
+
+
+### 🐛 Bug Fixes
+
+* **sprint:** archive and restore a sprint nested in a folder ([e694c12](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e694c12abd0f778ed497b97defd8a8c64280097f))
+
 ## [14.28.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.27.0...v14.28.0) (2026-08-11)
 
 

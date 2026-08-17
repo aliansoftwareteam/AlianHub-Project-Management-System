@@ -23,7 +23,13 @@ const DEFAULT_DEEPSEEK_BASE_URL = 'https://api.deepseek.com';
 // answer — the budget has to cover CoT + the full plan. The old 8192 value
 // (a DeepSeek-V3-era limit) was far too low and truncated large plans
 // mid-output, surfacing as "ran out of output token budget".
-const DEEPSEEK_MAX_OUTPUT_TOKENS = 65536;
+// V4 models generate up to 384,000 tokens, sharing a 1M context window with the
+// prompt. 262144 stays clear of that ceiling so a long brief plus a long plan
+// cannot collide with the context limit, while being roomy enough for the
+// largest plans — 65536 was a V3-era figure and truncated them mid-output.
+// This is a guard against a pathological request, not a target: a plan only
+// spends what it needs, and DeepSeek output runs $0.28 per million.
+const DEEPSEEK_MAX_OUTPUT_TOKENS = 262144;
 
 // DeepSeek's reasoning model (`deepseek-reasoner`, i.e. R1) ignores
 // sampling params like `temperature` / `top_p`. We omit `temperature`
