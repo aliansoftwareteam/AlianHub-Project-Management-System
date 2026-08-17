@@ -1,7 +1,9 @@
 <template>
     <div class="tok">
-        <!-- AI Bot developer -->
-        <div class="tok-card">
+        <!-- AI Bot developer — hidden: the Development tab and the pairing card
+             below no longer depend on this per-user flag. Flip to v-if="true"
+             to bring the enable/disable control back. -->
+        <div v-if="false" class="tok-card">
             <div class="tok-head">
                 <div>
                     <h3 class="m-0">AI Bot developer</h3>
@@ -16,8 +18,8 @@
             </div>
         </div>
 
-        <!-- Connect this computer (one-time per machine) — shown only once the AI Bot is enabled for this user -->
-        <div v-if="aiBotEnabled" class="tok-card">
+        <!-- Connect this computer (one-time per machine) -->
+        <div class="tok-card">
             <div class="tok-head">
                 <div>
                     <h3 class="m-0">Connect this computer</h3>

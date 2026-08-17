@@ -45,7 +45,7 @@
                 />
                 <TimeLog v-else-if="activeTab === 'time-log'" :task="task" :isMainSpinner="isSpinner" />
                 <DevelopmentChat
-                    v-else-if="activeTab === 'development' && aiBotEnabled && Object.keys(projectData).length && Object.keys(task).length"
+                    v-else-if="activeTab === 'development' && Object.keys(projectData).length && Object.keys(task).length"
                     :taskId="task?._id"
                     :projectId="projectData._id"
                     :sprintId="task?.sprintId"
@@ -102,11 +102,9 @@
     import TimeLog from '@/views/TimeLog/TimeLog.vue'
     import DevelopmentChat from '@/components/organisms/Development/DevelopmentChat.vue'
     import { useCustomComposable } from '@/composable';
-    import { useAiBot } from '@/composable/useAiBot';
 
     const {getters} = useStore();
     const { checkPermission } = useCustomComposable();
-    const { aiBotEnabled } = useAiBot(); // Development tab shows only when THIS user has enabled the AI Bot (per-user, client-side)
 
     const props = defineProps({
         task: Object,
@@ -188,12 +186,6 @@
             router.replace({query: {detailTab: "task-detail-tab"}})
         }
         activeTab.value = route.query.detailTab ? route.query.detailTab : 'task-detail-tab'
-        // Guard a stale deep link: if 'development' is selected but the AI Bot
-        // isn't enabled for this user, fall back to the default tab.
-        if (activeTab.value === 'development' && !aiBotEnabled.value) {
-            activeTab.value = 'task-detail-tab'
-            router.replace({query: {...route.query, detailTab: 'task-detail-tab'}})
-        }
     })
 
     const myCounts = computed(() => getters["users/myCounts"]?.data?.[`task_${projectData.value._id}_${props.task.sprintId}_${props.task._id}_comments`] || 0)
@@ -219,13 +211,11 @@
             activeIcon:require('@/assets/images/svg/tab4Icon.svg'),
             inactiveIcon:require('@/assets/images/svg/tab4Icon.svg'),
         },
-        // Development tab: visible ONLY when this user has enabled the AI Bot
-        // (per-user, client-side flag). Other members don't see the tab at all.
-        ...(aiBotEnabled.value && {'development':{
+        'development':{
             name: 'development',
             activeIcon:require('@/assets/images/svg/integrationPuzzle.svg'),
             inactiveIcon:require('@/assets/images/svg/integrationPuzzle.svg'),
-        }})
+        }
     }));
 
     const changeTab = (tab) => {
