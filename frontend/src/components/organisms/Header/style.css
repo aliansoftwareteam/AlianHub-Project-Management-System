@@ -92,6 +92,42 @@ img.profile-image.header-profile-image {
   height: 35px;
   border: 0 !important;
 }
+/* Desktop header action group (company name, icons, profile, version).
+   One uniform gap for every item, replacing the old per-item mix of
+   mr-2/pr-2 (2rem) and mr-1/pr-1 (1rem) margins+paddings, which produced
+   unequal gaps and wasted horizontal space. flex-end keeps the group flush
+   right so the gap stays exact instead of being stretched by
+   justify-content-between when there is spare width. */
+.header__actions {
+  gap: 12px;
+  justify-content: flex-end !important;
+}
+/* Breathing room around the icon cluster: separate it from the company name on
+   the left and the avatar on the right (12px gap + 10px = 22px on each side). */
+.header__actions #company_dropdown_driver {
+  margin-right: 10px;
+}
+.header__actions #profile_menu_driver {
+  margin-left: 10px;
+}
+/* Uniform 18px icons. Scoped to the action group so the same assets keep their
+   natural size wherever else they are used (e.g. the mobile header).
+   NOTE the direct-child combinator: UserProfile's root is also `.position-re`
+   with an <img> child, so a descendant selector here would shrink the avatar. */
+.header__actions > .position-re > img,
+.header__actions .question__icon {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+}
+.header__actions .help__icon {
+  height: 18px;
+}
+/* The unread dot is left-anchored (left: 14px) tuned for the old mixed sizes;
+   align it to the top-right corner of the uniform 18px icon. */
+.header__actions .notification-tick {
+  left: 12px;
+}
 .app-version{
   font-size: 13px;
   line-height: 19px;

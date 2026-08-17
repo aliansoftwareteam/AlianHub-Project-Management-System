@@ -201,6 +201,7 @@
                 <div v-if="Object.keys(task || {}).length && !isMainSpinner" class="d-flex align-items-center estimated-with-ai">
                     <EstimatedTimeInput
                         :task="task"
+                        :editable="canEditEstimatedHours"
                         @update:totalEstimatedTime="(val) => updateTotalEstimatedTime(val)"
                     />
                     <!--
@@ -208,10 +209,13 @@
                       title attribute matches the project's existing tooltip
                       convention (see BulkActionBar.vue / CheckList.vue).
                       Disabled + spinner state while a request is in flight.
-                      Shown whenever the Estimated row is visible — the per-user
-                      edit-permission gate (`=== true`) was removed on request.
+                      Hidden unless the user can actually write the estimate:
+                      the old gate was `=== true`, which wrongly excluded the
+                      Own/Everyone values too and so was dropped; this uses the
+                      correct writable test instead of no test at all.
                     -->
                     <button
+                        v-if="canEditEstimatedHours"
                         type="button"
                         class="ai-estimate-btn"
                         :class="{ 'is-loading': isAiEstimateLoading }"
@@ -225,6 +229,30 @@
                     </button>
                 </div>
             </div>
+            <!-- AHE — reason required when RE-updating an already-set estimate; the
+                 reason is written to the task Activity Log by the backend. -->
+            <Modal
+                :modelValue="showEstimateReasonModal"
+                :closeOnBackdrop="false"
+                :acceptButtonText="$t('Home.Confirm')"
+                :cancelButtonText="$t('Projects.cancel')"
+                @accept="submitEstimateReason"
+                @close="cancelEstimateReason"
+            >
+                <template #header>
+                    <h3 class="m-0 font-size-16 font-weight-600 black">Reason for changing estimated hours</h3>
+                </template>
+                <template #body>
+                    <textarea
+                        v-model.trim="estimateReasonText"
+                        class="w-100 border-radius-6-px font-size-14"
+                        style="min-height:90px; resize:vertical; border:1px solid #DFE1E6; outline:none; padding:8px;"
+                        placeholder="Why are you changing the estimated hours?"
+                        @input="estimateReasonError = false"
+                    ></textarea>
+                    <span v-if="estimateReasonError" class="red font-size-12">Please enter a reason.</span>
+                </template>
+            </Modal>
             <div class="d-flex task-detail-right-side-label" v-if="checkApps('TimeEstimates') && checkPermission('task.task_estimated_hours',project?.isGlobalPermission) !== null">
                 <h4>{{$t('UserTimesheet.task_planning')}}</h4>
                 <Skelaton v-if="isMainSpinner" style="height: 24px;" class="w-100px border-radius-7-px"/>
@@ -289,6 +317,7 @@ const dateFormat = inject('$dateFormat');
 const project = inject('selectedProject');
 
 const $toast = useToast();
+
 const props = defineProps({
     task: {
         type: Object,
@@ -389,6 +418,18 @@ const isSpinner = ref(false);
 // In-flight flag for the manual AI-estimate request — drives both the
 // button's spinner state and the click-debounce.
 const isAiEstimateLoading = ref(false);
+
+// task_estimated_hours is a "selection field" permission, so its stored value
+// is null (None) | false (Read) | 1 (Own) | 2 (Everyone) | true (Read & Write).
+// Writable therefore means true/1/2 — mirroring isWritable() in
+// Config/permissionGuard.js. The plain `=== true` test used by the other rows
+// is wrong for this key because it also locks out Own/Everyone, which is why
+// the AI button's gate had previously been dropped altogether. Read (false)
+// must keep the value visible but non-editable.
+const canEditEstimatedHours = computed(() => {
+    const permission = checkPermission('task.task_estimated_hours', project.value?.isGlobalPermission);
+    return permission === true || permission === 1 || permission === 2;
+});
 watch(() => props.task,(val) => {
     taskLeaderData.value = getUser(val?.Task_Leader);
 });
@@ -787,7 +828,33 @@ const updateStartDate = (event) => {
         $toast.error(t('Toast.Start_date_not_updated'),{position: 'top-right'});
     }
 }
+// AHE — re-updating an already-set estimate requires a reason (logged to the
+// task Activity Log). The first-ever set (previous 0) saves directly.
+const showEstimateReasonModal = ref(false);
+const pendingEstimateValue = ref(null);
+const estimateReasonText = ref('');
+const estimateReasonError = ref(false);
+
 const updateTotalEstimatedTime = (value) => {
+    // Defence in depth: the input is display-only and the AI button is hidden
+    // without write access, so this should be unreachable — but never persist
+    // an estimate for a read-only (or None) permission.
+    if (!canEditEstimatedHours.value) {
+        return;
+    }
+    const previous = Number(props.task.totalEstimatedTime) || 0;
+    if (previous > 0 && value !== previous) {
+        // Re-update — prompt for a reason before persisting.
+        pendingEstimateValue.value = value;
+        estimateReasonText.value = '';
+        estimateReasonError.value = false;
+        showEstimateReasonModal.value = true;
+        return;
+    }
+    persistEstimate(value);
+}
+
+const persistEstimate = (value, reason = '') => {
     const userData = getUserData();
 
     const firebaseObj = {
@@ -795,7 +862,8 @@ const updateTotalEstimatedTime = (value) => {
     }
     let obj = {
         'previousEstimatedTime': props.task.totalEstimatedTime,
-        'userName' : userData.Employee_Name
+        'userName' : userData.Employee_Name,
+        ...(reason ? { reason } : {})
     }
     const projectData = {
         _id: project.value._id,
@@ -814,6 +882,26 @@ const updateTotalEstimatedTime = (value) => {
     })
 }
 
+const submitEstimateReason = () => {
+    if (!estimateReasonText.value || !estimateReasonText.value.trim()) {
+        estimateReasonError.value = true;
+        return;
+    }
+    persistEstimate(pendingEstimateValue.value, estimateReasonText.value.trim());
+    showEstimateReasonModal.value = false;
+    pendingEstimateValue.value = null;
+    estimateReasonText.value = '';
+    estimateReasonError.value = false;
+}
+
+const cancelEstimateReason = () => {
+    // Abort the change — nothing persists, so the input reverts to the task's value.
+    showEstimateReasonModal.value = false;
+    pendingEstimateValue.value = null;
+    estimateReasonText.value = '';
+    estimateReasonError.value = false;
+}
+
 const displayTime = (time) => {
   const totalMinutes = time || 0
   const hours = Math.floor(totalMinutes / 60)
@@ -830,6 +918,9 @@ const displayTime = (time) => {
 // the same channel that drives `props.task`.
 const generateAiEstimate = async () => {
     if (isAiEstimateLoading.value) return;
+    // The trigger is hidden without write access; this also blocks the request
+    // itself, since it writes the estimate straight through the API.
+    if (!canEditEstimatedHours.value) return;
     const taskId = props.task && props.task._id;
     if (!taskId) {
         $toast.error('Task is not available', { position: 'top-right' });

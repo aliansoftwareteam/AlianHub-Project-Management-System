@@ -72,6 +72,8 @@ const dbCollections = {
     RECURRING_TASKS: "recurring_tasks",
     REMINDERS: "reminders",
     NOTES: "notes",
+    GENERAL_REMINDERS: "general_reminders",
+    GENERAL_REMINDER_QUEUE: "general_reminder_queue",
     CLIPS: "clips",
     TIMESHEET_APPROVAL: "timesheet_approval",
     BILLING_RATES: "billing_rates",
@@ -86,6 +88,7 @@ const dbCollections = {
     CALENDAR_FEEDS: "calendar_feeds",
     AUTOMATION_RULES: "automation_rules",
     INTEGRATION_CONNECTIONS: "integration_connections",
+    CLOUD_STORAGE_CONNECTIONS: "cloud_storage_connections",
     DEV_MESSAGES: "dev_messages",
     DEV_PAIRINGS: "dev_pairings",
     DEV_PROJECT_REPOS: "dev_project_repos",
@@ -104,6 +107,7 @@ const settingsCollectionDocs = {
     COMPANY_USER_STATUS:'company_user_status',
     ROLES: 'roles',
     DESIGNATIONS: 'designations',
+    PROJECT_SKILLS: "project_skills",
     HOURLY_MILESTONE_RANGE:'hourly_milestone_range',
     HOURLY_MILESTONE_WEEKLY_RANGE:'hourly_milestone_weekly_range'
 }

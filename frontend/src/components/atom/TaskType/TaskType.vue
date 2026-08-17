@@ -4,12 +4,7 @@
             <template #button>
                 <div :ref="id" :class="`task__type-width ${isBoardView ? `task__type-width-board` : `task__type-width-list`}`">
                     <slot name="head">
-                        <img v-if="modelValue?.taskImage?.includes('http')" :src="modelValue?.taskImage" alt="task_type"  class="position-re vertical-middle task__image">
-                        <WasabiImage
-                            v-else
-                            class="position-re vertical-middle task__image"
-                            :data="{url: modelValue?.taskImage}"
-                        />
+                        <TaskTypeIcon :taskType="modelValue" class="position-re vertical-middle task__image" />
                     </slot>
                 </div>
             </template>
@@ -17,12 +12,7 @@
             <template #options>
                 <DropDownOption v-for="(item, typeIndex) in options" :key="typeIndex" @click="$emit('update:modelValue', item), $emit('select', item,convertTaskType), $refs[id].click()">
                     <div class="d-flex align-items-center">
-                        <img v-if="item?.taskImage?.includes('http')" :src="item?.taskImage" alt="task_type" :title="taskType?.name" class="task__type-image vertical-middle ml-6px">
-                        <WasabiImage 
-                            v-else
-                            class="task__type-image vertical-middle ml-6px"
-                            :data="{url: item?.taskImage}"
-                        />
+                        <TaskTypeIcon :taskType="item" :title="item?.name" class="task__type-image vertical-middle ml-6px" />
                         <span class="ml-5px" >{{item.name}}</span>
                     </div>
                 </DropDownOption>
@@ -38,7 +28,7 @@ import {defineProps, defineEmits} from 'vue';
 // COMPONENTS
 import DropDown from '@/components/molecules/DropDown/DropDown.vue';
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
-import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
+import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
 
 defineProps({
     id: {

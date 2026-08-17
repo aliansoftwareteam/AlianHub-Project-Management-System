@@ -243,7 +243,7 @@ const totalHours = computed(() => {
 
 function showEtaSidebar() {
     if(!props.permission) {
-        $toast.error(t(`Toast.Access denied`), {position: 'top-right'})
+        $toast.error(t(`Toast.Access_Denied`), {position: 'top-right'})
         return;
     }
     let assigneePermissionCheck = companyUser.value.roleType !== 1 && companyUser.value.roleType !== 2 && props.permission !== 2 ? props.task?.AssigneeUserId?.length && props.task.AssigneeUserId.includes(userId.value) : props.task?.AssigneeUserId?.length;

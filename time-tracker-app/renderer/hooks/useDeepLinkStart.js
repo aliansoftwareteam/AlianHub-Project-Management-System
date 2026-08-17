@@ -4,6 +4,7 @@ import { DateTime } from 'luxon';
 import { apiRequest } from '../utils/services';
 import { setComment, setTrackerStartTime } from '../store/timelog';
 import { DEFAULT_TASK_IMAGE } from '../utils/imageDefaults';
+import { estimateStatusFromTask, isEstimateLimitEnabled } from '../utils/estimateLimit';
 
 // Start a tracker session from a deep link (myapp://…?taskId=&comment=).
 // Fetches just what start needs (task + project/folder/sprint names), guards to
@@ -17,13 +18,10 @@ export function useDeepLinkStart(setLoading = () => {}) {
   const { user } = useSelector((s) => s.user);
   const { filteredProjects: projectOption } = useSelector((s) => s.project);
 
-  const getTaskTypeImage = (projectName, key) => {
+  const getTaskTypeData = (projectName, key) => {
     const project = (projectOption || []).find((x) => x.label === projectName);
-    if (project?.taskTypeCounts?.length > 0) {
-      const match = project.taskTypeCounts.find((item) => item.value === key);
-      if (match?.taskImage) return match.taskImage;
-    }
-    return DEFAULT_TASK_IMAGE;
+    const match = project?.taskTypeCounts?.find((item) => item.value === key);
+    return match || { taskImage: DEFAULT_TASK_IMAGE };
   };
 
   const start = async ({ taskId, comment }) => {
@@ -58,7 +56,19 @@ export function useDeepLinkStart(setLoading = () => {}) {
       const sprintName = task.sprintArr?.name || '';
       const taskName = task.TaskName || '';
       const description = (comment && comment.trim()) || taskName;
-      const taskTypeImage = getTaskTypeImage(projectName, task.TaskType);
+      const taskTypeData = getTaskTypeData(projectName, task.TaskType);
+
+      // AHE-3831 — a task needs an estimate with time left to be tracked
+      // (no estimate, or estimate already met, both block the start), unless the company
+      // has the cap switched off. This site reads the task from the deep link rather than
+      // fetching it, so it passes the company switch in itself.
+      const est = estimateStatusFromTask(task, isEstimateLimitEnabled(currentCompany));
+      if (est.blockStart) {
+        setLoading(false);
+        try { window.ipc.send('estimate:limit', { reason: est.blockReason, taskName }); } catch (e) { /* best-effort */ }
+        console.warn(`Deep-link start blocked: ${est.blockReason}`);
+        return false;
+      }
 
       window.ipc.send('start-listen-event');
       const startRes = await apiRequest('post', `/api/v3/timeTracker/start`, {
@@ -72,7 +82,7 @@ export function useDeepLinkStart(setLoading = () => {}) {
       });
       if (startRes?.data?.status) {
         dispatch(setTrackerStartTime(startRes.data.statusText));
-        dispatch(setComment({ comment: description, sprintId, taskId, projectId, taskName, projectName, folderName, sprintName, taskTypeImage }));
+        dispatch(setComment({ comment: description, sprintId, taskId, projectId, taskName, projectName, folderName, sprintName, taskTypeImage: taskTypeData?.taskImage || DEFAULT_TASK_IMAGE, taskTypeData, remainingMinutes: est.hasEstimate ? est.remainingMinutes : null }));
         setLoading(false);
         router.push('/trackerRunning');
         return true;

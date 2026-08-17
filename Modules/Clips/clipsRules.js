@@ -44,6 +44,10 @@ function sanitizeClipPayload(body) {
     if (b.size !== undefined) out.size = Number(b.size) || 0;
     if (b.durationSec !== undefined) out.durationSec = Number(b.durationSec) || 0;
     if (b.source !== undefined) out.source = normalizeSource(b.source);
+    // Set once a clip has been converted into a task (same marker notes use).
+    if (b.convertedTaskId !== undefined) {
+        out.convertedTaskId = b.convertedTaskId ? String(b.convertedTaskId) : '';
+    }
     return out;
 }
 

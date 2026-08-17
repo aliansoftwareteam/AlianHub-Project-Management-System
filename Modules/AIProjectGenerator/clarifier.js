@@ -20,6 +20,7 @@
 
 const logger = require('../../Config/loggerConfig');
 const { getProvider } = require('./llmProvider');
+const { usageFromResult, addUsage, summarize } = require('./usage');
 const { ClarifyQuestionsSchema, tryParseJson } = require('./schemaValidator');
 const {
     buildClarifySystemPrompt,
@@ -80,11 +81,14 @@ async function generateClarifyingQuestions({ description, additionalRequirements
     };
 
     let validated = tryValidate(firstAttempt.content);
-    let usedTokens = firstAttempt.totalTokens || 0;
+    // Split kept, not collapsed — output tokens cost several times what input
+    // tokens do, so a bare total cannot be priced.
+    let usage = usageFromResult(firstAttempt);
+    let repairAttempt = null;
 
     if (!validated.ok) {
         logger.warn(`AIPG clarify first-pass validation failed: ${validated.error}`);
-        const repairAttempt = await provider.chat({
+        repairAttempt = await provider.chat({
             systemPrompt,
             messages: [
                 { role: 'user', content: userMessage },
@@ -93,9 +97,10 @@ async function generateClarifyingQuestions({ description, additionalRequirements
             ],
             jsonMode: true,
             maxTokens,
-            temperature: 0.2,
+            temperature: 0.0,
         });
-        usedTokens += repairAttempt.totalTokens || 0;
+        // Counted before the guards below: a failed repair still burned tokens.
+        usage = addUsage(usage, usageFromResult(repairAttempt));
 
         if (repairAttempt.truncated) {
             const err = new Error('The AI ran out of token budget on the clarify repair attempt.');
@@ -112,11 +117,13 @@ async function generateClarifyingQuestions({ description, additionalRequirements
         }
     }
 
+    const modelId = (repairAttempt && repairAttempt.model) || firstAttempt.model || '';
     return {
         understanding: validated.value.understanding || '',
         questions: validated.value.questions || [],
-        tokens: usedTokens,
-        model: (provider && provider.name) || 'unknown',
+        usage: summarize(usage, modelId),
+        provider: (provider && provider.name) || 'unknown',
+        model: modelId || (provider && provider.name) || 'unknown',
     };
 }
 

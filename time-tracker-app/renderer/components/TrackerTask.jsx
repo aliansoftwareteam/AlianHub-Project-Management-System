@@ -5,7 +5,8 @@ import { setComment, setTrackerStartTime } from '../store/timelog';
 import { DateTime } from 'luxon';
 import { apiRequest } from '../utils/services';
 import { DEFAULT_TASK_IMAGE } from '../utils/imageDefaults';
-import WasabiImage from './WasabiImage/WasabiImage';
+import { fetchEstimateStatus } from '../utils/estimateLimit';
+import TaskTypeIcon from './TaskTypeIcon/TaskTypeIcon';
 
 export default function TrackerTask({
   selectedTaskData,
@@ -29,6 +30,14 @@ export default function TrackerTask({
     }
     setIsSpinner(true);
     try {
+      const taskId = selectedTaskData?.fullData?.TicketID || selectedTaskData?.fullData?._id;
+      // AHE-3831 — a task needs an estimate with time left to be tracked.
+      const est = await fetchEstimateStatus(currentCopany?._id, taskId);
+      if (est.ok && est.blockStart) {
+        setTaskModalError(est.blockMessage);
+        setIsSpinner(false);
+        return;
+      }
       window.ipc.send("start-listen-event");
       let obj = {
         userId: user?._id || "",
@@ -43,7 +52,7 @@ export default function TrackerTask({
       const response = await apiRequest('post', url, obj);
       if (response?.data?.status) {
         dispatch(setTrackerStartTime(response.data.statusText));
-        let taskTypeImage = getTaskTypeImage(selectedTaskData?.projectName,selectedTaskData?.fullData?.taskData?.TaskType)
+        const taskTypeData = getTaskTypeData(selectedTaskData?.projectName, selectedTaskData?.fullData?.taskData?.TaskType);
         dispatch(setComment({
           comment: taskComment,
           sprintId : selectedTaskData?.fullData?.sprintArray?._id || selectedTaskData?.fullData?.taskData?.sprintData?.[0]?._id || selectedTaskData?.fullData?.taskData?.sprintId,
@@ -53,7 +62,9 @@ export default function TrackerTask({
           projectName: selectedTaskData?.projectName,
           folderName: selectedTaskData?.folderName || '',
           sprintName: selectedTaskData?.sprintName,
-          taskTypeImage: taskTypeImage
+          taskTypeImage: taskTypeData?.taskImage || DEFAULT_TASK_IMAGE,
+          taskTypeData: taskTypeData,
+          remainingMinutes: est.hasEstimate ? est.remainingMinutes : null
         }));
         setIsSpinner(false);
         onClose();
@@ -73,17 +84,10 @@ export default function TrackerTask({
     }
   };
 
-  const getTaskTypeImage = (projectName, key) => {
-    let project = projects.find((x) => x.ProjectName === projectName);
-    let imgUrl = DEFAULT_TASK_IMAGE;
-    if (project?.taskTypeCounts?.length > 0) {
-      const match = project.taskTypeCounts.find((item) => item.value === key);
-      if (match?.taskImage) {
-        imgUrl = match?.taskImage;
-      }
-    }
-
-    return imgUrl;
+  const getTaskTypeData = (projectName, key) => {
+    const project = projects.find((x) => x.ProjectName === projectName);
+    const match = project?.taskTypeCounts?.find((item) => item.value === key);
+    return match || { taskImage: DEFAULT_TASK_IMAGE };
   };
 
   return (
@@ -104,9 +108,8 @@ export default function TrackerTask({
         {selectedTaskData.sprintName && ` / ${selectedTaskData.sprintName}`}
       </div>
       <p className="text-sm font-medium text-gray-800 mt-1 mb-3 flex items-center gap-1.5">
-        <WasabiImage
-          url={getTaskTypeImage(selectedTaskData.projectName, selectedTaskData?.fullData?.taskData?.TaskType)}
-          isUser={false}
+        <TaskTypeIcon
+          taskType={getTaskTypeData(selectedTaskData.projectName, selectedTaskData?.fullData?.taskData?.TaskType)}
           className="!w-[16px] !h-[16px] shrink-0"
         />
         <span className="truncate" title={selectedTaskData.taskName}>{selectedTaskData.taskName}</span>

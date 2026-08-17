@@ -47,6 +47,7 @@ const { HandleHistory } = require('../Tasks/helpers/helper');
 const { HandleBothNotification } = require('../Tasks/helpers/handleNotification');
 const { checkProjectPlan, removeProjectCount } = require('../createProject/controller');
 const { estimateAndPersist: estimateTaskTimeWithAI } = require('../EstimatedTime/aiTaskEstimator');
+const planRules = require('./planRules');
 const sseEmitter = require('./sseEmitter');
 
 // Concurrency cap for fire-and-forget AI estimates after bulk task insert —
@@ -67,6 +68,10 @@ function fireTaskEstimatesInBackground(companyId, docs, userData) {
                     companyId,
                     taskId: String(d._id),
                     task: d,
+                    // Company rule: no task carries more than two hours. Passed
+                    // rather than baked into the estimator so the manual
+                    // "estimate this task" button keeps its own behaviour.
+                    maxMinutes: planRules.MAX_TASK_MINUTES,
                     // Pass the run's actor so the estimate's activity-log entry
                     // is attributed consistently (defaults to "AlianHub AI").
                     userData,
@@ -107,10 +112,24 @@ const STATUS_PALETTE = [
 const DEFAULT_STATUS_TEXT = STATUS_PALETTE[1];
 const DEFAULT_STATUS_BG = `${DEFAULT_STATUS_TEXT}35`;
 
-// System-wide excluded views — Gantt / Timeline are never enabled by default
-// on any project (manual or AI), so we drop them when reading the company
-// `project_tab_components` catalog.
-const ALWAYS_EXCLUDED_VIEW_KEYS = new Set(['gantt', 'timeline']);
+// The views an AI-created project starts with. Deliberately an allowlist and
+// not a list of exclusions: the company catalog grows over time, and under a
+// blocklist every view added to it — Dashboard, Map, Canvas, Docs — silently
+// turned up on new AI projects until someone remembered to exclude it. Adding
+// a view to the catalog should not change what this creates.
+//
+// Matched on keyName, which is stable; `name` is the display label and a
+// company can rename it.
+const AI_PROJECT_VIEW_KEYS = new Set([
+    'projectlistview',   // List
+    'projectkanban',     // Board
+    'projectdetail',     // Project Details
+    'comments',          // Comments
+    'activitylog',       // Activity
+]);
+
+// Fallback for a catalog row with no keyName, matched on the display name.
+const AI_PROJECT_VIEW_NAMES = new Set(['list', 'board', 'project details', 'comments', 'activity']);
 
 // View key that should be the project's default landing tab if present.
 // Falls back to whatever is first if List isn't in the catalog.
@@ -360,10 +379,10 @@ function pickRequiredComponents(tabComponents) {
     let defaultPicked = false;
     const shaped = tabComponents
         .filter((v) => {
-            const lowerName = String(v.name || '').toLowerCase();
-            const lowerKey = String(v.keyName || '').toLowerCase();
-            if (ALWAYS_EXCLUDED_VIEW_KEYS.has(lowerName) || ALWAYS_EXCLUDED_VIEW_KEYS.has(lowerKey)) return false;
-            return true;
+            const lowerName = String(v.name || '').trim().toLowerCase();
+            const lowerKey = String(v.keyName || '').trim().toLowerCase();
+            if (lowerKey) return AI_PROJECT_VIEW_KEYS.has(lowerKey);
+            return AI_PROJECT_VIEW_NAMES.has(lowerName);
         })
         .map((v) => {
             const lowerName = String(v.name || '').toLowerCase();
@@ -371,7 +390,16 @@ function pickRequiredComponents(tabComponents) {
             const isDefault = !defaultPicked && (PREFERRED_DEFAULT_VIEW_KEY.has(lowerName) || PREFERRED_DEFAULT_VIEW_KEY.has(lowerKey));
             if (isDefault) defaultPicked = true;
             return {
-                _id: v._id ? new mongoose.Types.ObjectId(v._id) : new mongoose.Types.ObjectId(),
+                // A STRING, not an ObjectId — deleting a view is a
+                // `$pull: { ProjectRequiredComponent: { _id: <id> } }` where the
+                // id arrives from the browser as a string, and this field is
+                // declared as an untyped Array so Mongoose casts nothing. An
+                // ObjectId here never equals that string: the pull matched
+                // nothing, the request still succeeded, and the view reappeared
+                // on the next load. The manual create path stores a string
+                // (CreateProjectSidebar.vue) and its backend compares against a
+                // stringified catalog id, so a string is the canonical form.
+                _id: String(v._id || new mongoose.Types.ObjectId()),
                 activeIcon: v.activeIcon,
                 icon: v.icon,
                 createdAt: v.createdAt ? new Date(v.createdAt) : new Date(),
@@ -531,6 +559,12 @@ function buildProjectDoc({ plan, context, companyId, uid, projectIdHint, project
         AssigneeUserId: assignees,
         DueDate: '',
         description: proj.description || '',
+        // Set by the controller from the user's input, never by the LLM.
+        proposalId: proj.proposalId || '',
+        proposalIdNumeric: proj.proposalIdNumeric || '',
+        source: proj.source || 'other',
+        // Filtered against the company list by the controller.
+        skills: Array.isArray(proj.skills) ? proj.skills : [],
         projectIcon: normalizeProjectIcon(proj.projectIcon),
         isPrivateSpace: !!proj.isPrivateSpace,
         isGlobalPermission: true,
@@ -687,6 +721,12 @@ function buildTaskDoc({ task, projectDoc, sprintDoc, statusByName, taskTypeByKey
         TaskType: taskType ? (taskType.value || taskType.name || 'task') : 'task',
         TaskTypeKey: taskType ? taskType.key : 0,
         ParentTaskId: parentTaskId ? String(parentTaskId) : '',
+        // Taken straight from the plan and capped, so a task that was split
+        // shows its slice immediately rather than waiting on the background
+        // estimator — which never runs for sub-tasks at all.
+        ...(Number(task.estimatedHours) > 0
+            ? { totalEstimatedTime: Math.min(Math.round(Number(task.estimatedHours) * 60), planRules.MAX_TASK_MINUTES) }
+            : {}),
         ProjectID: projectDoc._id,
         CompanyId: projectDoc.CompanyId,
         status: {
@@ -837,7 +877,14 @@ async function createTasksForSprint({ companyId, projectDoc, sprintDoc, tasks, s
     // is not blocked by the per-task LLM calls. Only top-level tasks are
     // estimated — sub-tasks are small, and estimating each would multiply the
     // per-task LLM calls.
-    fireTaskEstimatesInBackground(companyId, parentDocs, userData);
+    // A parent that was split carries no estimate by design — the hours live on
+    // its sub-tasks. Estimating it here would put the whole job back on the
+    // parent, breaking the two-hour rule and double-counting in any roll-up.
+    // Tasks that already carry a plan estimate are skipped for the same reason.
+    const needsEstimate = parentDocs.filter(
+        (d) => !(d.subTasks > 0) && !(Number(d.totalEstimatedTime) > 0),
+    );
+    fireTaskEstimatesInBackground(companyId, needsEstimate, userData);
 
     return docs;
 }
@@ -999,16 +1046,26 @@ async function executePlan({ plan, companyId, uid, userData, jobId }) {
         // 7. Sprints (sequential).
         emit({ event: 'progress', step: 'sprint', status: 'started', total: plan.sprints.length });
         const sprintRecords = [];
-        for (const sprint of plan.sprints) {
-            emit({ event: 'progress', step: 'sprint', status: 'progress', name: sprint.sprintName });
+        // Sprint names are weekly date ranges, computed here rather than asked
+        // of the model: an LLM does not reliably know today's date and is worse
+        // at date arithmetic, and a wrong date would be baked into the name for
+        // good. The model still decides how the work is sliced — only the label
+        // is ours. Format matches the ranges the team already writes by hand.
+        const weeklyNames = planRules.weeklySprintNames({
+            prefix: projectDoc.ProjectCode,
+            count: plan.sprints.length,
+        });
+        for (const [sprintIndex, sprint] of plan.sprints.entries()) {
+            const sprintName = weeklyNames[sprintIndex] || sprint.sprintName;
+            emit({ event: 'progress', step: 'sprint', status: 'progress', name: sprintName });
             const sprintDoc = await createSprint({
                 companyId,
                 projectId: projectDoc._id,
                 projectName: projectDoc.ProjectName,
-                sprintName: sprint.sprintName,
+                sprintName,
                 userData,
             });
-            tracker.sprints.push({ id: sprintDoc._id.toString(), name: sprint.sprintName });
+            tracker.sprints.push({ id: sprintDoc._id.toString(), name: sprintName });
             sprintRecords.push({ sprint, sprintDoc });
         }
         emit({ event: 'progress', step: 'sprint', status: 'done', completed: tracker.sprints.length });
@@ -1389,16 +1446,26 @@ async function executeTasksIntoProject({ tasksPlan, projectId, companyId, uid, u
         const sprints = Array.isArray(tasksPlan.sprints) ? tasksPlan.sprints : [];
         emit({ event: 'progress', step: 'sprint', status: 'started', total: sprints.length });
         const sprintRecords = [];
-        for (const sprint of sprints) {
-            emit({ event: 'progress', step: 'sprint', status: 'progress', name: sprint.sprintName });
+        // Same weekly labelling as a new project, so sprints added later match
+        // the ones already there. Numbered from the current week: this flow has
+        // no view of which weeks the project has already used, so a sprint for
+        // a week that already exists is possible and is the user's call to
+        // rename, not something to guess at here.
+        const weeklyNames = planRules.weeklySprintNames({
+            prefix: projectDoc.ProjectCode,
+            count: sprints.length,
+        });
+        for (const [sprintIndex, sprint] of sprints.entries()) {
+            const sprintName = weeklyNames[sprintIndex] || sprint.sprintName;
+            emit({ event: 'progress', step: 'sprint', status: 'progress', name: sprintName });
             const sprintDoc = await createSprint({
                 companyId,
                 projectId: projectDoc._id,
                 projectName: projectDoc.ProjectName,
-                sprintName: sprint.sprintName,
+                sprintName,
                 userData,
             });
-            tracker.sprints.push({ id: sprintDoc._id.toString(), name: sprint.sprintName });
+            tracker.sprints.push({ id: sprintDoc._id.toString(), name: sprintName });
             sprintRecords.push({ sprint, sprintDoc });
         }
         emit({ event: 'progress', step: 'sprint', status: 'done', completed: tracker.sprints.length });

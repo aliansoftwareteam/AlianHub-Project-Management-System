@@ -2,7 +2,7 @@
     <div class="convert__overlay" @click.self="close">
         <div class="convert__dialog">
             <div class="d-flex align-items-center justify-content-between convert__head">
-                <span class="font-size-15 font-weight-700">{{ $t('Notepad.convert_title') }}</span>
+                <span class="font-size-15 font-weight-700">{{ dialogTitle || $t('Notepad.convert_title') }}</span>
                 <span class="cursor-pointer font-size-16 convert__close" @click="close">&#10005;</span>
             </div>
 
@@ -53,6 +53,10 @@ import { useGetterFunctions } from "@/composable";
 import { taskPlanPermission } from "@/composable/commonFunction";
 import { deriveTaskName } from "@/utils/notepadConvert";
 
+// Must match the editor the task description is rendered with
+// (frontend/package.json → @editorjs/editorjs).
+const EDITORJS_VERSION = "2.30.7";
+
 const { t } = useI18n();
 const $toast = useToast();
 const { getters, dispatch } = useStore();
@@ -63,9 +67,22 @@ const companyId = inject("$companyId");
 const userId = inject("$userId");
 
 const props = defineProps({
+    // Source object. Only `title` and `content` are read, so any feature that can
+    // supply those can reuse this dialog (Clips passes a clip this way).
     note: {
         type: Object,
         required: true,
+    },
+    // Heading override, so the dialog can read "Convert clip to task" etc.
+    dialogTitle: {
+        type: String,
+        default: "",
+    },
+    // Optional task-attachment record to attach to the created task — used by
+    // Clips so the recording is playable from the task itself.
+    attachment: {
+        type: Object,
+        default: null,
     },
 });
 
@@ -206,6 +223,28 @@ function convert() {
             };
             if (sprint.folderId) {
                 obj.folderObjId = sprint.folderId;
+            }
+
+            // Carry the note's body across as the task description. Editor.js is
+            // the task description format (descriptionBlock), with rawDescription
+            // as the plain-text mirror used by search and previews — same shape
+            // the AI generator writes (Modules/AIProjectGenerator/orchestrator.js).
+            const noteBody = props.note && typeof props.note.content === "string" ? props.note.content : "";
+            const bodyLines = noteBody.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+            if (bodyLines.length) {
+                obj.descriptionBlock = {
+                    time: Date.now(),
+                    version: EDITORJS_VERSION,
+                    blocks: bodyLines.map((text) => ({ type: "paragraph", data: { text } })),
+                };
+                obj.rawDescription = bodyLines.join("\n");
+            }
+
+            // Carry a media attachment across when one was supplied (Clips), so the
+            // recording is playable from the task without re-uploading anything —
+            // the file already lives in storage.
+            if (props.attachment && props.attachment.url) {
+                obj.attachments = [{ ...props.attachment }];
             }
 
             const projectData = {

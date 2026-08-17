@@ -8,6 +8,7 @@ const socketEmitter = require('../../event/socketEventEmitter');
 const { escapeRegex } = require("../../utils/escapeRegex");
 const { parseMentionIds } = require("./helpers/parseMentions");
 const { handleNotificationtFun } = require("../notification/prepare-notification-data/controllerV2");
+const { getRoleType, isPrivileged } = require("../../Config/permissionGuard");
 
 /* @mention delivery: record the mention (feeds the in-app "mentions" tab, which
  * queries the mentions collection by mentionIds) and fire the notification
@@ -69,6 +70,9 @@ exports.save = async (req, res) => {
     try {
         const { data } = req.body
         const convertData = replaceObjectKey(data, ["objId"]);
+        // SEC (AHE-3834) — the author is the authenticated caller, never a client-supplied
+        // userId. Legit callers already send their own id, so this is transparent.
+        if (req.uid) convertData.userId = req.uid;
         // @mentions: extract the [Name](userId) tokens the editor inserts so the
         // comment records who was mentioned (drives the mention notification).
         const mentionIds = parseMentionIds(convertData.message);
@@ -123,6 +127,29 @@ exports.update = async (req, res) => {
                 status: false,
                 message: `'id' parameter is required.`
             });
+        }
+
+        // SEC (AHE-3834) — a comment may only be edited/soft-deleted by its author
+        // (or an Owner/Admin). Non-owners may ONLY toggle `pinnedMessage` — the sole
+        // field the UI lets any member change. Matches every legit caller (edit/delete
+        // are own-only in the UI, pin is member-wide) and blocks editing/deleting/
+        // re-authoring someone else's message.
+        const existingComment = await MongoDbCrudOpration(
+            req.headers['companyid'],
+            { type: SCHEMA_TYPE.COMMENTS, data: [{ _id: new mongoose.Types.ObjectId(id) }] },
+            'findOne'
+        );
+        if (!existingComment) {
+            return res.status(404).json({ status: false, message: 'Comment not found.' });
+        }
+        const isOwner = String(existingComment.userId) === String(req.uid);
+        const changedKeys = Object.keys(data || {});
+        const pinOnly = changedKeys.length > 0 && changedKeys.every((k) => k === 'pinnedMessage');
+        if (!isOwner && !pinOnly) {
+            const roleType = await getRoleType(req.headers['companyid'], req.uid);
+            if (!isPrivileged(roleType)) {
+                return res.status(403).json({ status: false, message: 'Not allowed to modify this comment.' });
+            }
         }
 
         const params = {
@@ -244,7 +271,7 @@ exports.getPaginatedMessages = async (req, res) => {
  */
 exports.searchMessageFromMainChat = async (req, res) => {
     try {
-        const { searchText, projectId, sprintId, taskId, skip = 0, limit = 25, isPinnedMessage } = req.query;
+        const { searchText, projectId, sprintId, taskId, skip = 0, limit = 25, isPinnedMessage, sort = 'asc' } = req.query;
 
         const query = {
             type: SCHEMA_TYPE.COMMENTS,
@@ -257,6 +284,12 @@ exports.searchMessageFromMainChat = async (req, res) => {
                     ...(searchText && searchText !== ''
                         ? {
                               $or: [
+                                  // mediaName is the GENERATED storage filename
+                                  // ("My_Report_1739..pdf"), so searching the name the
+                                  // user actually sees only matched by luck — spaces and
+                                  // punctuation are rewritten on upload. Search the
+                                  // original name too.
+                                  { mediaOriginalName: { $regex: escapeRegex(searchText), $options: "i" } },
                                   { mediaName: { $regex: escapeRegex(searchText), $options: "i" } },
                                   { message: { $regex: escapeRegex(searchText), $options: "i" } }
                               ]
@@ -269,7 +302,10 @@ exports.searchMessageFromMainChat = async (req, res) => {
                     isDeleted: { $ne: true }
                 },
                 {},
-                { sort: { createdAt: 1 } },
+                // Oldest-first stays the default so the existing pinned-messages /
+                // filter sidebar is unaffected; free-text search opts into
+                // newest-first, where the recent hit is the one you want.
+                { sort: { createdAt: sort === 'desc' ? -1 : 1 } },
                 { skip: parseInt(skip) },
                 { limit: parseInt(limit) }
             ]

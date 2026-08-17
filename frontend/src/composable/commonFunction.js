@@ -202,6 +202,11 @@ export const projectComponentsIcons = (key) => {
             icon: require("@/assets/images/svg/component-inactive-icons/comp_map_inactive.svg"),
             activeIcon: require("@/assets/images/svg/component-active-icons/comp_map_active.svg"),
             keyName: "MapView"
+        },
+        {
+            icon: require("@/assets/images/svg/component-inactive-icons/comp_dashboard_inactive.svg"),
+            activeIcon: require("@/assets/images/svg/component-active-icons/comp_dashboard_active.svg"),
+            keyName: "ProjectDashboard"
         }
     ];
 
@@ -714,6 +719,18 @@ export const getCardsComponentsSize = (key) => {
             // table. Needs width for the category columns and height for rows.
             return {
                 "minW": 4,
+                "maxW": 12,
+                "minH": 8,
+                "maxH": 22
+            };
+        case 'TaskStatusSummaryCard':
+            // Tasks Summary by Status — a person per row with Planned, Logged and a
+            // column per status, so it needs half the grid (6 of 12 ≈ 945px on a 1920
+            // screen) before the status columns start squeezing each other. Expressed in
+            // columns rather than pixels because the grid lays out in columns: a hard
+            // 945px floor would overrun its own cell on a smaller screen.
+            return {
+                "minW": 6,
                 "maxW": 12,
                 "minH": 8,
                 "maxH": 22

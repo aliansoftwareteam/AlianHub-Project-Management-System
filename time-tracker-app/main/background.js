@@ -11,8 +11,15 @@ const trayIconPath = assetPath('traylogo.png')
 // Prod: next export copies public/ into app/. Dev: read straight from renderer/public.
 const notificationHtmlPath = isProd ? path.join(__dirname, 'notification.html') : path.join(__dirname, '..', 'renderer', 'public', 'notification.html')
 const notificationTemplateHtmlPath = isProd ? path.join(__dirname, 'notification-template.html') : path.join(__dirname, '..', 'renderer', 'public', 'notification-template.html')
+// AHE-3835 — the persistent "tracker stopped" alert card (distinct from the
+// routine white notification-template.html toast).
+const notificationAlertHtmlPath = isProd ? path.join(__dirname, 'notification-alert.html') : path.join(__dirname, '..', 'renderer', 'public', 'notification-alert.html')
 let notification = null;
 let screenshotNotificationWindow = null;
+// AHE-3835 — persistent stop-alert state.
+let stoppedAlertWindow = null;   // the single live alert window (one at a time)
+let lastTaskCtx = null;          // { taskId, taskName, comment } — reported by the renderer on start
+let pendingStoppedAlert = null;  // a lock/sleep stop deferred until the user returns
 
 // Store permissions state in a config file
 const permissionsConfigPath = path.join(app.getPath('userData'), 'permissions.json')
@@ -432,6 +439,53 @@ ipcMain.on('stop-listen-event', () => {
   mainWindow.webContents.send('tracking:status', { active: false })
 })
 
+// AHE-3831 / AHE-3835 — the renderer hit an estimate gate. A live auto-stop
+// (estimate reached mid-session) surfaces the NEW persistent "tracker stopped"
+// alert; the other two reasons are START-blocks (not stops), so they keep the
+// routine informational white toast.
+ipcMain.on('estimate:limit', (event, data) => {
+  const d = data || {}
+  if (d.reason === 'autostopped') {
+    try {
+      showTrackerStoppedAlert({ reason: 'estimate', taskName: d.taskName || (lastTaskCtx && lastTaskCtx.taskName) || '' })
+    } catch (e) { /* best-effort */ }
+    return
+  }
+  const name = d.taskName ? `"${d.taskName}"` : 'This task'
+  let title = 'Tracker reached task estimate hours limit'
+  let subtitle
+  if (d.reason === 'no-estimate') {
+    title = 'Add estimated hours to start the tracker'
+    subtitle = `${name} has no estimated hours set.`
+  } else {
+    subtitle = `${name} has already reached its estimated hours.`
+  }
+  try {
+    showNotification({ title, subtitle })
+  } catch (e) { /* notifications are best-effort */ }
+})
+
+// AHE-3835 — the renderer reports the actively-tracked task so the stop alert can
+// name it (lock/sleep) and Resume knows what to restart. Read-only: this never
+// changes tracking behaviour.
+ipcMain.on('tracker:context', (event, data) => {
+  const d = data || {}
+  if (d.taskId) lastTaskCtx = { taskId: String(d.taskId), taskName: d.taskName || '', comment: d.comment || '' }
+})
+
+// AHE-3835 — actions from the stop alert (notification-alert.html).
+ipcMain.on('alert:dismiss', () => { closeStoppedAlert() })
+ipcMain.on('alert:resume', () => {
+  closeStoppedAlert()
+  if (mainWindow && !mainWindow.isDestroyed()) { mainWindow.show(); mainWindow.focus() }
+  if (!lastTaskCtx || !lastTaskCtx.taskId) return
+  // Reuse the proven deep-link start path — its assignee + estimate checks apply,
+  // so an estimate-exceeded task correctly refuses and explains why.
+  const params = new URLSearchParams({ type: 'trackerStart', taskId: lastTaskCtx.taskId })
+  if (lastTaskCtx.comment) params.set('comment', lastTaskCtx.comment)
+  deliverTrackerDeepLink(`myapp://open?${params.toString()}`)
+})
+
 // TIME-05: configurable idle threshold (value in minutes; 0 disables auto-pause).
 ipcMain.on('idle:set-threshold', (event, value) => {
   const minutes = Number(value)
@@ -542,14 +596,18 @@ function sendNotification(dataUrl) {
 function showNotification({ title, subtitle = '', image = null, timeout = 10000 }) {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
   const windowWidth = 372;
-  // Taller when there's a media/preview image; compact for text-only.
-  const windowHeight = image ? 282 : 92;
+  // Best-guess starting height; the renderer measures its real laid-out content
+  // and we resize to fit (see 'notification:size' below), so content of ANY
+  // length — a 1–3 line title, with or without a media preview — is shown in
+  // full and never clipped. The card stays anchored bottom-right and grows
+  // upward, so its bottom is always above the taskbar.
+  const initialHeight = image ? 282 : 120;
 
   const win = new BrowserWindow({
     width: windowWidth,
-    height: windowHeight,
+    height: initialHeight,
     x: width - windowWidth,
-    y: height - windowHeight,
+    y: height - initialHeight,
     frame: false,
     alwaysOnTop: true,
     skipTaskbar: true,
@@ -562,11 +620,31 @@ function showNotification({ title, subtitle = '', image = null, timeout = 10000 
     }
   });
 
+  // Show only once — either after the first size report, or via the fallback.
+  let shown = false;
+  const showOnce = () => {
+    if (shown || win.isDestroyed()) return;
+    shown = true;
+    win.showInactive(); // don't steal focus from the user's current input
+  };
+
+  // Fit the window to the content the renderer actually rendered, keeping the
+  // bottom edge above the taskbar. Scoped to THIS window (event.sender check) so
+  // concurrent notifications never resize each other.
+  const sizeHandler = (event, data) => {
+    if (win.isDestroyed() || event.sender !== win.webContents) return;
+    const h = Math.max(60, Math.min(Math.round((data && data.height) || initialHeight), height - 20));
+    win.setBounds({ x: width - windowWidth, y: height - h, width: windowWidth, height: h });
+    showOnce();
+  };
+  ipcMain.on('notification:size', sizeHandler);
+
   win.loadFile(notificationTemplateHtmlPath);
   win.webContents.on('did-finish-load', () => {
     win.webContents.send('logo-path', iconPath);
     win.webContents.send('notification:render', { title, subtitle, image, timeout });
-    win.showInactive(); // don't steal focus from the user's current input
+    // Fallback: show at the initial height if no size report arrives shortly.
+    setTimeout(showOnce, 400);
 
     const closeHandler = () => {
       if (!win.isDestroyed()) win.close();
@@ -580,18 +658,96 @@ function showNotification({ title, subtitle = '', image = null, timeout = 10000 
     win.once('closed', () => {
       clearTimeout(autoCloseTimer);
       ipcMain.removeListener('notification:close', closeHandler);
+      ipcMain.removeListener('notification:size', sizeHandler);
     });
   });
 }
 
+// AHE-3835 — the PERSISTENT "tracker stopped" alert. Unlike showNotification()
+// (routine white toast that auto-dismisses), this is a distinct amber card that
+// stays until the user clicks Resume or Dismiss — so a user who had stepped away
+// when the tracker stopped still sees it on return. One instance at a time.
+function closeStoppedAlert() {
+  if (stoppedAlertWindow && !stoppedAlertWindow.isDestroyed()) stoppedAlertWindow.close()
+  stoppedAlertWindow = null
+}
+
+function showTrackerStoppedAlert({ reason, taskName = '', stoppedAt = Date.now() } = {}) {
+  closeStoppedAlert() // never let alerts stack in the corner
+
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize
+  const windowWidth = 372
+  const initialHeight = 190
+
+  const win = new BrowserWindow({
+    width: windowWidth,
+    height: initialHeight,
+    x: width - windowWidth,
+    y: height - initialHeight,
+    frame: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    transparent: true,
+    show: false,
+    webPreferences: { nodeIntegration: true, contextIsolation: false },
+  })
+  stoppedAlertWindow = win
+
+  let shown = false
+  const showOnce = () => {
+    if (shown || win.isDestroyed()) return
+    shown = true
+    win.showInactive() // never steal focus from the user's current input
+  }
+
+  // Fit the window to the card's real height (reason / task length varies).
+  // Scoped to THIS window so it can never resize a later alert.
+  const sizeHandler = (event, data) => {
+    if (win.isDestroyed() || event.sender !== win.webContents) return
+    const h = Math.max(120, Math.min(Math.round((data && data.height) || initialHeight), height - 20))
+    win.setBounds({ x: width - windowWidth, y: height - h, width: windowWidth, height: h })
+    showOnce()
+  }
+  ipcMain.on('alert:size', sizeHandler)
+
+  win.loadFile(notificationAlertHtmlPath)
+  win.webContents.on('did-finish-load', () => {
+    win.webContents.send('alert:render', { reason, taskName, stoppedAt })
+    setTimeout(showOnce, 400) // fallback if no size report arrives
+  })
+
+  win.once('closed', () => {
+    ipcMain.removeListener('alert:size', sizeHandler)
+    if (stoppedAlertWindow === win) stoppedAlertWindow = null
+  })
+}
+
+// Show a stop that happened while the screen was locked / asleep — but only once
+// the user RETURNS (unlock / resume), never into a locked or black screen.
+function surfacePendingStoppedAlert() {
+  if (!pendingStoppedAlert) return
+  const p = pendingStoppedAlert
+  pendingStoppedAlert = null
+  try {
+    showTrackerStoppedAlert({ reason: p.reason, taskName: (lastTaskCtx && lastTaskCtx.taskName) || '', stoppedAt: p.stoppedAt })
+  } catch (e) { /* best-effort */ }
+}
+
 powerMonitor.on('suspend', () => {
-  mainWindow.webContents.send('stop-tracker', true);
+  // A running session is about to be stopped by sleep — remember it and show the
+  // alert on resume (showing it now, into a sleeping screen, would be pointless).
+  if (isTracking) pendingStoppedAlert = { reason: 'suspended', stoppedAt: Date.now() }
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('stop-tracker', true);
 });
 // HANDLE LOCK SCREEN
 powerMonitor.on('lock-screen', () => {
-  mainWindow.webContents.send('stop-tracker', true);
-  // win.webContents.send('lock-screen', true);
+  if (isTracking) pendingStoppedAlert = { reason: 'locked', stoppedAt: Date.now() }
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('stop-tracker', true);
 });
+// Surface the deferred stop alert when the user comes back.
+powerMonitor.on('unlock-screen', () => { surfacePendingStoppedAlert() });
+powerMonitor.on('resume', () => { surfacePendingStoppedAlert() });
 
 // Add this handler to check permissions status
 ipcMain.handle('check-permissions', async () => {

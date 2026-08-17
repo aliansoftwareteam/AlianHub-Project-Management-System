@@ -105,7 +105,7 @@
                                 <div class="d-flex align-items-center" v-if="item.name.value === 'TaskTypeKey'">
                                     <span v-for="(option, i) in item.displayData" :key="i">
                                         <span v-if="i < numberOfItem" class="d-flex align-items-center">
-                                            <WasabiIamgeCompp v-if="option.taskImage" :data="{url: option.taskImage}" :style="{ margin:  clientWidth > 767 ? '0px 5px' : '0px 8px 0 13px', maxWidth: '14px'}" />
+                                            <TaskTypeIcon v-if="option.taskImage" :taskType="option" :style="{ margin:  clientWidth > 767 ? '0px 5px' : '0px 8px 0 13px', maxWidth: '14px'}" />
                                             <span class="font-size-12 mr-5-px" :class="{'ml-5-px': !option.taskImage, 'font-size-12' : clientWidth > 767 , 'font-size-14' : clientWidth <= 767}">{{ option.name }}</span>
                                         </span>
                                     </span>
@@ -220,7 +220,7 @@
                                             <div v-for="(option, i) in taskTypeArray.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1)" :key="i" class="dropdown-item checkbox-dropdown" :class="{'border-radius-6-px' : clientWidth > 767 , 'border-radius-8-px' : clientWidth <= 767}">
                                                 <label :for="'tasktype'+i" class="cursor-pointer d-flex align-items-center lebel-items font-size-14 GunPowder">
                                                     <CheckboxComponent :id="'tasktype'+i" :value="option.key" v-model="item.values" @change="handleChecked(item)"/>
-                                                    <WasabiIamgeCompp v-if="option.taskImage" :data="{url: option.taskImage}" :style="{ margin:  clientWidth > 767 ? '0px 5px' : '0px 8px 0 13px', maxWidth: '14px'}" />
+                                                    <TaskTypeIcon v-if="option.taskImage" :taskType="option" :style="{ margin:  clientWidth > 767 ? '0px 5px' : '0px 8px 0 13px', maxWidth: '14px'}" />
                                                     <span :class="{'ml-5-px': !option.taskImage, 'font-size-14' : clientWidth > 767 , 'font-size-16' : clientWidth <= 767}">{{ option.name }}</span>
                                                 </label>
                                             </div>
@@ -356,6 +356,7 @@ import CalenderCompo from '@/components/atom/CalenderCompo/CalenderCompo.vue';
 import CustomDropDown from '@/components/molecules/DropDown/CustomDropDown.vue';
 import CheckboxComponent from '@/components/atom/Checkbox/CheckboxComponent.vue';
 import WasabiIamgeCompp from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
+import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue'
 import InputText from "@/components/atom/InputText/InputText.vue";
 // import { useI18n } from "vue-i18n";

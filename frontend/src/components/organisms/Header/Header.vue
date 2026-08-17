@@ -19,14 +19,14 @@
                 <small v-if="clientWidth > 990">(Ctrl + K)</small>
             </template>
         </small>
-        <div class="d-flex align-items-center justify-content-between z-index-5" v-if="clientWidth > 990">
+        <div class="d-flex align-items-center justify-content-between z-index-5 header__actions" v-if="clientWidth > 990">
             <!-- COMPANY SELECTION -->
             <div class="d-flex" id="company_dropdown_driver">
             <span v-if="rules && Object.keys(rules).length" class="company-text">{{$t('settingslider.Company')}}</span>
             <template v-if="rules && Object.keys(rules).length">
                 <DropDown id="company_selection" v-if="filteredCompanies.length" class="company_name_displayed">
                     <template #button>
-                        <div class="cursor-pointer text-capitalize dropdown_wrapper pr-22px text-ellipsis" :title="selectedCompany && selectedCompany.Cst_CompanyName ? selectedCompany.Cst_CompanyName : 'N/A'" :class="{'mr-2' : clientWidth > 1440, 'mr-1' : clientWidth<=1440}">
+                        <div class="cursor-pointer text-capitalize dropdown_wrapper pr-22px text-ellipsis" :title="selectedCompany && selectedCompany.Cst_CompanyName ? selectedCompany.Cst_CompanyName : 'N/A'">
                             {{selectedCompany && selectedCompany.Cst_CompanyName ? selectedCompany.Cst_CompanyName : "N/A"}}
                         </div>
                     </template>
@@ -45,39 +45,46 @@
                         </DropDownOption>
                     </template>
                 </DropDown>
-                <div class="text-capitalize font-size-13 font-weight-500 text-ellipsis company_name_displayed" :class="{'mr-2' : clientWidth > 1440, 'mr-1' : clientWidth<=1440}" v-else :title="selectedCompany && selectedCompany.Cst_CompanyName ? selectedCompany.Cst_CompanyName : 'N/A'">
+                <div class="text-capitalize font-size-13 font-weight-500 text-ellipsis company_name_displayed" v-else :title="selectedCompany && selectedCompany.Cst_CompanyName ? selectedCompany.Cst_CompanyName : 'N/A'">
                     {{selectedCompany && selectedCompany.Cst_CompanyName ? selectedCompany.Cst_CompanyName : "N/A"}}
                 </div>
             </template>
             </div>
-            <router-link class="position-re" :class="{'mr-2' : clientWidth > 1440, 'pr-1' : clientWidth<=1440}" :to="{name: 'chats', params: {cid: companyId}}" v-if="checkPermission('chat') == true">
+            <router-link class="position-re" :to="{name: 'chats', params: {cid: companyId}}" v-if="canOpenChat">
                 <img src="@/assets/images/svg/chat_icon.svg" class="cursor-pointer" id="chat_driver"/>
                 <span v-if="totalMainCounts" class="notification-tick blinking"></span>
             </router-link>
-            <div class="position-re" :class="{'mr-2' : clientWidth > 1440, 'mr-1' : clientWidth<=1440}" v-if="rules && Object.keys(rules).length">
-                <img src="@/assets/images/svg/header_notification.svg" class="cursor-pointer" id="notification_driver" @click="openNotificationsDropdown()">
-                <span :class="{'notification-tick': totalNotification}" class="blinking"></span>
-            </div>
-            <div class="position-re" :class="{'pr-2' : clientWidth > 1440, 'pr-1' : clientWidth<=1440}" v-if="rules && Object.keys(rules).length">
-                <img src="@/assets/images/comment_mention.png" class="cursor-pointer" id="mention_driver" @click="getMentions(!mentions.length), showNotification = 1, notificationVisible = true">
-                <span :class="{'notification-tick': totalMentions > 0}" class="blinking"></span>
-            </div>
-            <div class="position-re" :class="{'mr-2' : clientWidth > 1440, 'mr-1' : clientWidth<=1440}" v-if="rules && Object.keys(rules).length">
+            <!--
+              Inbox. The bell and @ dropdowns that used to sit either side of this were
+              removed: the Inbox does everything they did, and keeping both meant the same
+              row could be marked read twice, through two different endpoints.
+            -->
+            <router-link class="position-re" :to="{name: 'inbox', params: {cid: companyId}}" v-if="rules && Object.keys(rules).length">
+                <img src="@/assets/images/svg/inbox_icon.svg" class="cursor-pointer" id="inbox_driver" :title="$t('Inbox.title')">
+                <span :class="{'notification-tick': inboxUnreadCount > 0}" class="blinking"></span>
+            </router-link>
+            <div class="position-re" v-if="rules && Object.keys(rules).length">
                 <img src="@/assets/images/svg/notepad_icon.svg" class="cursor-pointer" id="notepad_driver" :title="$t('Notepad.title')" @click="notepadVisible = true">
             </div>
-            <div class="position-re" :class="{'mr-2' : clientWidth > 1440, 'mr-1' : clientWidth<=1440}" v-if="rules && Object.keys(rules).length">
+            <div class="position-re" v-if="rules && Object.keys(rules).length">
                 <img src="@/assets/images/svg/clips_icon.svg" class="cursor-pointer" id="clips_driver" :title="$t('Clips.title')" @click="clipsVisible = true">
             </div>
-            <div class="position-re" :class="{'pr-2' : clientWidth > 1440, 'pr-1' : clientWidth<=1440}" v-if="rules && Object.keys(rules).length && (companyUser.roleType === 1 || companyUser.roleType === 2)">
+            <div class="position-re" v-if="rules && Object.keys(rules).length">
+                <img src="@/assets/images/svg/reminder_icon.svg" class="cursor-pointer" id="reminder_driver" :title="$t('Reminders.header_tooltip')" @click="reminderVisible = true">
+            </div>
+            <div class="position-re" v-if="rules && Object.keys(rules).length">
+                <img src="@/assets/images/svg/mic_icon.svg" class="cursor-pointer" id="talk_to_text_driver" :title="$t('TalkToText.title')" @click="talkToTextVisible = true">
+            </div>
+            <div class="position-re" v-if="rules && Object.keys(rules).length && (companyUser.roleType === 1 || companyUser.roleType === 2)">
                 <img src="@/assets/images/svg/tour_image.svg" class="cursor-pointer" id="tour_icon" @click="getTourDetails(),tourVisible = true">
             </div>
-            <div :class="{'pr-2' : clientWidth > 1440, 'pr-1' : clientWidth<=1440}">
+            <div>
                 <a :href="brandSettings && brandSettings?.helpLink ? brandSettings?.helpLink : 'javascript:void(0)'" :target="brandSettings && brandSettings?.helpLink  ? '_blank' : ''" class="help__icon">
                     <img :src="questionMarkIcon" alt="help" class="question__icon">
                 </a>
             </div>
             <div id="profile_menu_driver">
-            <DropDown class="pr-1" :id="'profile_menu'">
+            <DropDown :id="'profile_menu'">
                 <template #button>
                     <div class="header-profile-wrapper" ref="profile_menu_dd">
                         <UserProfile
@@ -110,10 +117,14 @@
 
         <ClipsPanel v-model="clipsVisible" />
 
+        <ReminderPanel v-model="reminderVisible" />
+
         <!-- Single GLOBAL clip recorder: mounted here at the app shell (sibling of
              router-view in App.vue) so an in-progress recording survives task
              open/close + route changes. Controlled by the useClipRecorder composable. -->
         <ClipRecorder />
+
+        <TalkToTextPopover v-model="talkToTextVisible" />
 
         <Sidebar
             title="Test"
@@ -207,15 +218,16 @@
                                 </DropDown>
                             </div>
                         </template>
-                        <router-link  v-if="rules && Object.keys(rules).length && checkPermission('chat') == true" class="p-1 cursor-pointer border-radius-7-px mobile-menu-list" @click="visible = false" :class="{'active-list-mobile' : $route.name.includes('chat')}" :to="{name: 'chats', params: {cid: companyId}}">
+                        <router-link  v-if="canOpenChat" class="p-1 cursor-pointer border-radius-7-px mobile-menu-list" @click="visible = false" :class="{'active-list-mobile' : $route.name.includes('chat')}" :to="{name: 'chats', params: {cid: companyId}}">
                             {{$t('Header.Chat')}}
                         </router-link>
-                        <div  v-if="rules && Object.keys(rules).length" class="p-1 cursor-pointer border-radius-7-px mobile-menu-list" @click="openNotificationsDropdown(true)">
-                            {{$t('Header.Notification')}}
-                        </div>
-                        <div v-if="rules && Object.keys(rules).length" class="p-1 cursor-pointer border-radius-7-px mobile-menu-list" @click="getMentions(!mentions.length), showNotification = 1, notificationVisible = true, visible = false">
-                            @{{$t('Header.mention')}}
-                        </div>
+                        <!-- One entry where Notification and @mention used to be two. The
+                             desktop bar shows the Inbox as an icon; on mobile there was no
+                             entry for it at all, so removing those two without this would
+                             have left no way in from here. -->
+                        <router-link v-if="rules && Object.keys(rules).length" class="p-1 cursor-pointer border-radius-7-px mobile-menu-list" @click="visible = false" :to="{name: 'inbox', params: {cid: companyId}}">
+                            {{$t('Inbox.title')}}
+                        </router-link>
                         <div v-if="rules && Object.keys(rules).length && (companyUser.roleType === 1 || companyUser.roleType === 2)" class="p-1 cursor-pointer border-radius-7-px mobile-menu-list" @click="getTourDetails(),tourVisible = true,visible = false">
                             {{$t('Header.Tours')}}
                         </div>
@@ -234,65 +246,6 @@
             </template>
         </Sidebar>
 
-        <Sidebar width="550px" :title="!showNotification ? $t('Header.Notifications') : $t('Header.mentions')" v-model:visible="notificationVisible">
-            <template #head>
-                <div class="d-flex align-items-center justify-content-between assignee-headtitle text-capitalize">
-                    {{!showNotification ? $t('Header.Notifications') : $t('Header.mentions')}}
-                </div>
-                <div class="d-flex align-items-center justify-content-between">
-                    <!-- Unread / Archive toggle. Only applies to notifications, not mentions. -->
-                    <button
-                        v-if="!showNotification"
-                        class="outline-primary mr-10px"
-                        @click="switchNotificationFilter(notificationFilter === 'unread' ? 'archived' : 'unread')">
-                        {{ notificationFilter === 'unread' ? $t('Header.View_Archive') : $t('Header.View_Unread') }}
-                    </button>
-                    <!-- Show "Mark all as read" whenever there are unread items visible. Using
-                         `notifications.length` (the list is already filtered to unread on this
-                         view) instead of the server-side `totalNotification` counter, which
-                         can lag behind and falsely hide the button. -->
-                    <button v-if="!showNotification ? (notificationFilter === 'unread' && notifications.length > 0) : totalMentions > 0" class="outline-primary mr-10px" @click="markAllRead(!showNotification ? 'notifications' : 'mentions')">{{$t('Header.Mark_all_as_read')}}</button>
-                    <img :src="closeBlueImage" alt="closeButton" class="cursor-pointer" @click="notificationVisible = false"/>
-                </div>
-            </template>
-            <template #body>
-                <Spinner :isSpinner="isSpinner" v-if="isSpinner && !notifications.length"/>
-                <div class="overflow-y-auto style-scroll mh-100" v-else>
-                    <template v-if="(!showNotification ? notifications : mentions).length">
-                        <div v-for="item in (!showNotification ? notifications : mentions)" :key="item.id" :class="{'bg-light-gray': !item.seen, 'bg-white': item.seen}" class="border-bottom notification">
-                            <div class="d-flex p-1 position-re cursor-pointer" @click="markRead(item, !showNotification ? 'notifications' : 'mentions')">
-                                <!-- <img v-if="!showNotification" @click.stop="markRead(item, !showNotification ? 'notifications' : 'mentions', false), notifications.length < 1 ? getNotifications(true) : ''" :src="notificationClose" alt="notificationClose" class="position-ab d-none notification-close-icon"> -->
-
-                                <UserProfile :showDot="false" :data="{
-                                        image: getUser(item['userId']).Employee_profileImageURL,
-                                        title: getUser(item['userId']).Employee_Name
-                                    }"
-                                    width="45px"
-                                    :thumbnail="'40x40'"
-                                />
-                                <!-- <img :src="getUser(item[!showNotification ? 'UserId' : 'userId']).Employee_profileImageURL" :alt="getUser(item[!showNotification ? 'UserId' : 'userId']).Employee_Name" class="profile-image"> -->
-
-                                <div class="d-flex ml-1 flex-column comment__notification-message">
-                                    <strong>{{getUser(item['userId']).Employee_Name}}</strong>
-                                    <div v-html="!showNotification ? item.message : `<p>${changeText(item.comment_message)}</p>`"></div>
-
-                                    <span class="">{{ getDateAndTime(new Date(item?.createdAt).getTime()) }}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div v-if="(!showNotification ? !noNotifications : !noMentions)" class="text-center cursor-pointer blue py-10px" @click="!showNotification ? getNotifications(true) : getMentions(true)">
-                            <span>{{$t('Header.load_more')}}</span>
-                        </div>
-                    </template>
-                    <template v-else>
-                        <div class="text-center cursor-pointer red py-10px">
-                            <span>{{$t('Filters.no_data_found')}}</span>
-                        </div>
-                    </template>
-                </div>
-            </template>
-        </Sidebar>
         <Sidebar width="550px" :title="'Take a Tour'" v-model:visible="tourVisible" className='tour_sidebar'>
             <template #head>
                 <div class="d-flex align-items-center justify-content-between assignee-headtitle text-capitalize">
@@ -337,7 +290,7 @@
 
 <script setup>
 // PACKAGE
-import { computed, defineComponent, defineEmits, inject, onMounted, ref, watch, watchEffect } from "vue";
+import { computed, defineComponent, defineEmits, inject, onMounted, onUnmounted, ref, watch, watchEffect } from "vue";
 import { useRouter } from "vue-router";
 import {version} from "../../../../../package.json";
 import {useHelper} from "./helper"
@@ -351,28 +304,25 @@ import WasabiIamgeCompp from "@/components/atom/WasabiIamgeCompp/WasabiIamgeComp
 import Sidebar from "@/components/molecules/Sidebar/Sidebar.vue";
 import NotepadPanel from "@/components/molecules/Notepad/NotepadPanel.vue";
 import ClipsPanel from "@/components/molecules/Clips/ClipsPanel.vue";
+import ReminderPanel from "@/components/molecules/GeneralReminder/ReminderPanel.vue";
 import ClipRecorder from "@/components/molecules/ClipRecorder/ClipRecorder.vue";
+import TalkToTextPopover from "@/components/molecules/TalkToText/TalkToTextPopover.vue";
 import DropDown from "@/components/molecules/DropDown/DropDown.vue";
 import DropDownOption from "@/components/molecules/DropDownOption/DropDownOption.vue";
 import DropDownRouterOption from "@/components/molecules/DropDownRouterOption/DropDownRouterOption.vue";
-import Spinner from "@/components/atom/SpinnerComp/SpinnerComp.vue"
 import UserProfile from "@/components/atom/UserProfile/UserProfile.vue"
-import { useProjects } from '@/composable/projects';
 import * as env from '@/config/env';
 import { apiRequest, apiRequestWithoutCompnay,useAuth } from "@/services";
-import { UPDATE_UNREADREAD_COMMENTS_COUNT, USER_ID_COLLECTION, APP_NOTIFICATION } from "@/config/env";
-import { clearFilterSignal } from "@/views/Projects/helper";
 
 // INTERFACES
 const companyId = inject("$companyId");
 const {getters,commit} = useStore();
 const userId = inject("$userId");
 const {getUser} = useGetterFunctions()
-const {changeText,checkPermission} = useCustomComposable();
+const {checkPermission} = useCustomComposable();
 const clientWidth = inject("$clientWidth");
-const {openRoute, menu} = useHelper();
+const {menu} = useHelper();
 const {getProjects} = useMainChat();
-const {getDateAndTime} = useProjects();
 const { logOut } = useAuth();
 const router = useRouter();
 
@@ -431,6 +381,8 @@ onMounted(() => {
             console.error("ERROR in get projects chat:", error);
         })
     }
+
+    loadInboxCount();
 })
 
 const tourImages = {
@@ -451,14 +403,83 @@ const getImageData = (dataImage) => {
 
 // DATA
 const visible = ref(false);
-const showNotification = ref(0);
-const notificationVisible = ref(false);
 const tourVisible = ref(false);
 const notepadVisible = ref(false);
 const clipsVisible = ref(false);
+const reminderVisible = ref(false);
+const talkToTextVisible = ref(false);
 const myCounts = computed(() => getters["users/myCounts"]?.data || {})
 const totalNotification = computed(() => myCounts.value?.notification_counts);
 const totalMentions = computed(() => myCounts.value?.mention_counts)
+
+// Unread groups on the Inbox's Primary tab.
+//
+// Its own request rather than a slice of myCounts, because "important" is decided by
+// the Inbox's own rules and grouping — a number the existing counts payload has no way
+// to produce. Kept out of the render path entirely: it starts at 0, the dot simply
+// appears if the call comes back with something, and a failure leaves it at 0 rather
+// than blocking a header that every page depends on.
+/**
+ * The inbox dot: shown only when something is genuinely unread.
+ *
+ * It deliberately does NOT read myCounts. That is a stored counters document maintained
+ * by increments, and increments drift — on this instance it reads 8 notifications and 2
+ * mentions where the collections actually hold 154 and 5. A dot driven by that lights up
+ * with nothing behind it, or stays dark when there is something.
+ *
+ * /inbox/counts counts the rows themselves, so it cannot drift.
+ *
+ * myCounts is still used, but as a TRIGGER rather than a source: it changes over a socket
+ * the moment a notification arrives, so watching it re-checks the truth at exactly the
+ * right time. Live, and correct.
+ */
+const inboxUnreadCount = ref(0);
+// Debounced, because reading ten notifications in the bell moves myCounts ten times and
+// only the final state matters. Bursts collapse into one check.
+let inboxCountTimer = null;
+const loadInboxCount = () => {
+    clearTimeout(inboxCountTimer);
+    inboxCountTimer = setTimeout(() => {
+        apiRequest("get", `${env.INBOX}/counts`).then((response) => {
+            if (response?.data?.status) inboxUnreadCount.value = Number(response.data.data?.all) || 0;
+        }).catch(() => {
+            // Deliberately NOT zeroed. A failed request is not evidence of an empty inbox,
+            // and the checks after this one are all event-driven — myCounts changing, or
+            // leaving the inbox. Zeroing here turned a single failure into a permanently
+            // dark dot: restarting the API while the page is open fails the mount check,
+            // and with the counters collection quiet nothing ever asks again.
+        });
+    }, 400);
+};
+
+// These two watches sit HERE, not up beside onMounted, because `watch` evaluates its
+// getter immediately during setup — referencing totalNotification above its own `const`
+// threw "Cannot access 'totalNotification' before initialization" and took the whole
+// header down. onMounted is fine either way: its callback runs after setup completes.
+//
+// myCounts moves over a socket whenever a notification or mention arrives, and again when
+// one is read. That is the cue to re-check the real unread count, so the dot tracks
+// reality without polling for it.
+watch(() => [totalNotification.value, totalMentions.value], () => {
+    loadInboxCount();
+})
+
+// Leaving the inbox is the other moment it goes stale: things were just read there.
+watch(() => router.currentRoute.value.name, (to, from) => {
+    if (from === 'inbox' && to !== 'inbox') loadInboxCount();
+})
+
+// Coming back to the tab is the recovery path. Every other check above is driven by
+// something happening inside this tab, so a check that failed while the tab was in the
+// background — or while the API was restarting — would never be retried. Cheaper than
+// polling, and it lands exactly when the user is about to look at the dot.
+const recheckInboxCount = () => { if (!document.hidden) loadInboxCount(); };
+onMounted(() => { document.addEventListener('visibilitychange', recheckInboxCount); });
+onUnmounted(() => {
+    document.removeEventListener('visibilitychange', recheckInboxCount);
+    clearTimeout(inboxCountTimer);
+})
+
 const companyUser = ref(getters['settings/companyUserDetail']);
 
 const dispatchEventForFilet = () => {
@@ -491,20 +512,6 @@ const totalMainCounts = computed(() => {
     return total;
 })
 
-const batchSize = ref(10)
-// NOTIFICATION
-const notifications = ref([]);
-const noNotifications = ref(false);
-const notificationSkip = ref(0);
-// 'unread' (default, shown when the bell first opens) | 'archived' (View Archive)
-const notificationFilter = ref('unread');
-
-// MENTIONS
-const mentions = ref([]);
-const noMentions = ref(false);
-const firstMention = ref("");
-const lastMention = ref("");
-
 const companies = computed(() => {
     return (getters["settings/companies"] || []);
 })
@@ -521,7 +528,6 @@ watch(clientWidth,(newVal)=>{
 })
 
 const tourList = ref([]);
-const isSpinner = ref(false);
 const selectedCompany = ref("");
 watchEffect(async () => {
     selectedCompany.value = companies.value.find((company) => company._id === companyId.value);
@@ -530,238 +536,29 @@ const rules = computed(() => {
     return getters['settings/rules']
 })
 
+/**
+ * May this user open the Chat module?
+ *
+ * `checkPermission('chat')` reads the PARENT "Chat" row — the module gate. The finer
+ * keys (one_to_one_chat, chat_category, chat_channel) govern what you can do once
+ * inside, not whether you get in.
+ *
+ * The old test was `== true`, i.e. Read & Write only, so a role granted **Read** on
+ * Chat had the icon hidden and no way into a module it was explicitly allowed to
+ * read. Only None hides it now. Owner/Admin still short-circuit to true inside
+ * checkPermission.
+ *
+ * The `rules` guard matches every other icon in this row: before the rule set loads
+ * checkPermission returns null for everyone, so without it the icon flickers in.
+ */
+const canOpenChat = computed(() => {
+    if (!rules.value || !Object.keys(rules.value).length) return false;
+    const permission = checkPermission('chat');
+    return permission !== null && permission !== undefined;
+})
+
 const logout = () => {
     logOut({islogOut:true});
-}
-
-function getNotifications(loadMore = false) {
-    isSpinner.value = true;
-    if (loadMore) {
-        if (notifications?.value?.length > 0) {
-            notificationSkip.value = notifications?.value?.length
-            batchSize.value  = notifications?.value?.length + 10
-        }
-    }
-
-    const url = `${APP_NOTIFICATION}/notification?userId=${userId.value}&loadMore=${loadMore}&batchSize=${batchSize.value}&notificationSkip=${notificationSkip.value}&filter=${notificationFilter.value}`;
-    apiRequest("get", url).then((response) => {
-        if (response.data.status) {
-            const data = response.data.data;
-
-            if (data.length <= 0) {
-                if (loadMore) {
-                    noNotifications.value = true;
-                }
-                isSpinner.value = false;
-                return;
-            }
-
-            let uniqueNotifications = data
-                .map((x) => ({
-                    ...x,
-                    seen: x.notSeen === undefined || !x.notSeen.includes(userId.value),
-                }))
-                .filter(newNotif => !notifications.value.some(existingNotif => existingNotif._id === newNotif._id));
-
-            if (loadMore) {
-                notifications.value = [...notifications.value, ...uniqueNotifications];
-            } else {
-                notifications.value = [...uniqueNotifications, ...notifications.value];
-            }
-            isSpinner.value = false;
-        }
-    })
-    .catch((error) => {
-        isSpinner.value = false;
-        console.error(`Error in getNotifications hook => ${error}`);
-    });
-}
-
-function switchNotificationFilter(newFilter) {
-    if (newFilter !== 'unread' && newFilter !== 'archived') return;
-    if (notificationFilter.value === newFilter) return;
-    notificationFilter.value = newFilter;
-    // Reset paging state so the new filter starts a fresh fetch.
-    notifications.value = [];
-    notificationSkip.value = 0;
-    batchSize.value = 10;
-    noNotifications.value = false;
-    getNotifications(false);
-}
-
-function openNotificationsDropdown(closeMobileMenu = false) {
-    // Always land in the Unread view when the bell opens — matches the
-    // "initially only unread" UX requirement. The "View Archive" button in
-    // the dropdown head flips this to 'archived'.
-    notificationFilter.value = 'unread';
-    notifications.value = [];
-    notificationSkip.value = 0;
-    batchSize.value = 10;
-    noNotifications.value = false;
-    showNotification.value = 0;
-    notificationVisible.value = true;
-    if (closeMobileMenu) {
-        visible.value = false;
-    }
-    getNotifications(false);
-}
-
-async function getMentions(loadMore = false) {
-    if (mentions.value.length === 0 || !loadMore) {
-        isSpinner.value = true;
-    }
-
-    const lastCreatedAt = lastMention.value?.createdAt || '';
-    const firstCreatedAt = firstMention.value?.createdAt || '';
-    const url = `${APP_NOTIFICATION}/mentions?userId=${userId.value}&mentions=${mentions?.value?.length || 0}&lastMention=${lastCreatedAt}&firstMention=${firstCreatedAt}&loadMore=${loadMore}`;
-
-    try {
-
-        const response = await apiRequest("get", url);
-        const res = response.data;
-
-        if (res.status) {
-            let data = res.data || [];
-            const mentionsData = data?.map((mention) => ({
-                ...mention,
-                id: mention._id,
-                seen: mention.notSeen === undefined || !mention.notSeen.includes(userId.value)
-            }));
-            if (!mentionsData || mentionsData.length === 0) {
-                isSpinner.value = false;
-                if (loadMore) {
-                    noMentions.value = true;
-                }
-                return;
-            }
-
-            if (loadMore) {
-                lastMention.value = mentionsData[mentionsData.length - 1];
-            }
-
-            if (!loadMore) {
-                firstMention.value = mentionsData[0];
-            }
-
-            const uniqueMentions = mentionsData.filter(
-                (newMention) => !mentions.value.some((existing) => existing.id === newMention.id)
-            );
-
-            const tmp = uniqueMentions.map((x) => ({
-                ...x,
-                id: x.id,
-                seen: x.notSeen === undefined || !x.notSeen.includes(userId.value)
-            }));
-
-            if (loadMore) {
-                mentions.value = [...mentions.value, ...tmp];
-            } else {
-                mentions.value = [...tmp, ...mentions.value];
-            }
-        }
-    } catch (error) {
-        console.error(`Error in getMentions hook:`, error);
-        if (!loadMore && mentions.value.length === 0) {
-            noMentions.value = true;
-        }
-    } finally {
-        if (mentions.value.length > 0 || !loadMore) {
-            isSpinner.value = false;
-        }
-    }
-}
-
-function markRead(data, key, redirect = true) {
-    // Once an item is marked read it stops belonging to the "unread" view.
-    // Drop it from the local list so the dropdown doesn't keep showing it
-    // while the user is filtered to unread.
-    const dropFromUnreadList = () => {
-        if (key === 'notifications' && notificationFilter.value === 'unread') {
-            notifications.value = notifications.value.filter((x) => x._id !== data._id);
-        }
-    };
-
-    if(data.notSeen && !data.notSeen.includes(userId.value)) {
-        if(redirect) {
-            clearFilterSignal.value++;
-            openRoute(data, key,{gettersVal: getters});
-            notificationVisible.value = false;
-            data.seen = true;
-        } else {
-            notifications.value = notifications.value.filter((x) => x._id !== data._id);
-        }
-        dropFromUnreadList();
-        return;
-    }
-
-    const params = {
-        id: data._id,
-        key: key,
-        userId: userId.value
-    }
-    apiRequest("put", `${APP_NOTIFICATION}/mark-read`, params).then(() => {
-        if(redirect) {
-            clearFilterSignal.value++;
-            openRoute(data, key,{gettersVal: getters});
-            notificationVisible.value = false;
-            data.seen = true;
-        } else {
-            notifications.value = notifications.value.filter((x) => x._id !== data._id);
-        }
-        dropFromUnreadList();
-
-        if(key === 'notifications' ? totalNotification.value <= 0 : totalMentions.value <= 0) return;
-
-        // UPDATE COUNTS OF MENTIONS
-        let mentionCounts = {
-            companyId : companyId.value,
-            key : key === 'notifications' ? 5 : 4,
-            userIds: [userId.value],
-            readAll: false,
-            read: true
-        }
-        apiRequest("post", UPDATE_UNREADREAD_COMMENTS_COUNT, mentionCounts).catch((error) => {
-            console.error(error,"ERROR");
-        })
-
-        // Delete message from global database
-        apiRequest("delete", `${APP_NOTIFICATION}/mark-read/${key}/${data._id}`).catch((error) => {
-            console.error(`Error in deleting ${key} from global: ${error}`);
-        })
-    })
-    .catch((error) => {
-        console.error(`Error in mark ${key} seen: ${error}`);
-    })
-}
-
-function markAllRead(key) {
-
-    if(key === 'notifications') {
-        notifications.value.filter((x) => !x.seen).forEach((data) => data.seen = true);
-        // After marking everything read, all items belong to "archived" — so
-        // clear them out of the dropdown if the user is on the Unread view.
-        if (notificationFilter.value === 'unread') {
-            notifications.value = [];
-        }
-    } else {
-        mentions.value.filter((x) => !x.seen).forEach((data) => data.seen = true);
-    }
-
-    const notifyParams = {
-        userId: userId.value,
-        key: key
-    };
-    apiRequest("put", `${APP_NOTIFICATION}/mark-all-read`, notifyParams).catch((error) => {
-        console.error(`Error in update ${key} info in mark-all-read: ${error}`);
-    })
-
-    const params = {
-        userId: userId.value,
-        key: key
-    };
-    apiRequest("put", USER_ID_COLLECTION, params).catch((error) => {
-        console.error(`Error in update ${key} seen info: `, error);
-    })
 }
 
 function getTourDetails() {

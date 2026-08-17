@@ -1,0 +1,392 @@
+/* General-purpose reminder dialog. Scoped to this component — no global
+   selectors, so it cannot affect any existing screen. */
+
+/* The overlay owns the scrolling. The dialog and its body must NOT create a
+   scroll container, otherwise the absolutely-positioned chip popovers (date /
+   assignee / notify) get clipped at the body's edge instead of overlapping the
+   footer. */
+.gr__overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+    overflow-y: auto;
+    background: rgba(23, 24, 36, 0.45);
+}
+
+.gr__dialog {
+    width: 100%;
+    max-width: 560px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 18px 60px rgba(23, 24, 36, 0.25);
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+}
+
+/* Header */
+.gr__head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 1px solid #EDEDF3;
+}
+/* Plain dialog title — not a tab. */
+.gr__title {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: #191A2B;
+}
+.gr__close {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    color: #8A8CA6;
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+}
+.gr__close:hover {
+    background: #F2F2F8;
+    color: #191A2B;
+}
+
+/* Body */
+.gr__body {
+    padding: 16px;
+    overflow: visible;
+}
+.gr__name {
+    width: 100%;
+    border: 0;
+    outline: none;
+    font-size: 17px;
+    color: #191A2B;
+    padding: 2px 0 6px;
+}
+.gr__name::placeholder {
+    color: #A5A6BA;
+}
+.gr__adddesc {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 4px 0;
+    font-size: 13px;
+    color: #8A8CA6;
+    background: transparent;
+    border: 0;
+}
+.gr__adddesc:hover {
+    color: #2F3990;
+}
+.gr__desc {
+    width: 100%;
+    margin-top: 4px;
+    padding: 8px 10px;
+    font-size: 13px;
+    color: #191A2B;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    outline: none;
+    resize: vertical;
+    font-family: inherit;
+}
+.gr__desc:focus {
+    border-color: #AEB5DC;
+}
+
+/* Chips */
+.gr__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+}
+.gr__chipwrap {
+    position: relative;
+}
+.gr__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 10px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: #4A4B58;
+    background: #fff;
+    border: 1px solid #E1E1EF;
+    border-radius: 8px;
+    white-space: nowrap;
+}
+.gr__chip:hover {
+    border-color: #AEB5DC;
+    background: #F5F7FF;
+}
+.gr__avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #2F3990;
+    color: #fff;
+    font-size: 9.5px;
+    font-weight: 600;
+}
+
+/* Popovers */
+.gr__pop {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 30;
+    width: max-content;
+    min-width: 268px;
+    padding: 10px;
+    background: #fff;
+    border: 1px solid #E5E7EB;
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(23, 24, 36, 0.14);
+}
+.gr__pop--list {
+    padding: 6px;
+    max-height: 260px;
+    overflow-y: auto;
+}
+.gr__poptitle {
+    padding: 6px 8px 4px;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #9092AC;
+}
+.gr__presets {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+.gr__preset {
+    flex: 1;
+    padding: 6px 8px;
+    font-size: 12px;
+    line-height: 1.2;
+    white-space: nowrap;
+    color: #4A4B58;
+    background: #F4F4FA;
+    border: 0;
+    border-radius: 6px;
+}
+.gr__preset:hover {
+    background: #EAEEFF;
+    color: #2F3990;
+}
+.gr__dtinput {
+    width: 100%;
+    padding: 7px 8px;
+    font-size: 13px;
+    color: #191A2B;
+    border: 1px solid #E5E7EB;
+    border-radius: 7px;
+    outline: none;
+    font-family: inherit;
+}
+.gr__dtinput:focus {
+    border-color: #AEB5DC;
+}
+.gr__popfoot {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+}
+.gr__popdone {
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    background: #2F3990;
+    border: 0;
+    border-radius: 6px;
+}
+.gr__popdone:hover {
+    background: #262E75;
+}
+.gr__opt {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 8px;
+    padding: 7px 8px;
+    font-size: 13px;
+    color: #191A2B;
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    text-align: left;
+}
+.gr__opt:hover {
+    background: #F4F4FA;
+}
+.gr__opt.is-sel {
+    color: #2F3990;
+    font-weight: 500;
+}
+.gr__tick {
+    margin-left: auto;
+    color: #2F3990;
+    flex: none;
+}
+.gr__sep {
+    height: 1px;
+    margin: 5px 0;
+    background: #EDEDF3;
+}
+.gr__custom {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    font-size: 12px;
+    color: #6B6B70;
+}
+.gr__custominput {
+    width: 62px;
+    padding: 5px 7px;
+    font-size: 12.5px;
+    border: 1px solid #E5E7EB;
+    border-radius: 6px;
+    outline: none;
+    font-family: inherit;
+}
+.gr__custominput:focus {
+    border-color: #AEB5DC;
+}
+
+/* Attachments */
+.gr__attach {
+    margin-top: 14px;
+    padding: 10px;
+    border: 1px solid #E5E7EB;
+    border-radius: 10px;
+}
+.gr__attachhead {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #9092AC;
+    margin-bottom: 8px;
+}
+.gr__file {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 9px;
+    margin-bottom: 6px;
+    background: #FAFAFD;
+    border: 1px solid #EDEDF3;
+    border-radius: 7px;
+}
+.gr__fileok {
+    color: #177C5C;
+    flex: none;
+}
+.gr__filename {
+    flex: 1;
+    min-width: 0;
+    font-size: 12.5px;
+    color: #191A2B;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.gr__filex {
+    display: inline-flex;
+    color: #9092AC;
+    background: transparent;
+    border: 0;
+    flex: none;
+}
+.gr__filex:hover {
+    color: #A32D2D;
+}
+.gr__drop {
+    padding: 10px;
+    font-size: 12px;
+    color: #9092AC;
+    text-align: center;
+    border: 1px dashed #D6D8E7;
+    border-radius: 8px;
+}
+.gr__browse {
+    color: #2F3990;
+    font-weight: 500;
+    text-decoration: underline;
+}
+.gr__hiddenfile {
+    display: none;
+}
+
+/* Footer */
+.gr__foot {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-top: 1px solid #EDEDF3;
+}
+.gr__clip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    color: #6B6B70;
+    background: transparent;
+    border: 1px solid #E1E1EF;
+    border-radius: 8px;
+}
+.gr__clip:hover,
+.gr__clip.is-on {
+    color: #2F3990;
+    background: #EAEEFF;
+    border-color: #AEB5DC;
+}
+.gr__create {
+    margin-left: auto;
+    padding: 8px 16px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #fff;
+    background: #2F3990;
+    border: 0;
+    border-radius: 8px;
+}
+.gr__create:hover:not(:disabled) {
+    background: #262E75;
+}
+.gr__create:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+    .gr__overlay {
+        padding: 8vh 12px 32px;
+    }
+    .gr__pop {
+        min-width: 240px;
+    }
+}

@@ -40,12 +40,24 @@ const verifyJWTTokenWithCRoute = [
     // "/api/v1/removeSprintOperations",
     "/api/v1/sprint",
     "/api/v1/sprint/:id",
+    // Sprint analytics (Modules/Sprints: burndown, hours). A prefix, so every route
+    // added under it is guarded by default — these were unauthenticated and took the
+    // company purely from a header, which is a company id anyone can type.
+    "/api/v2/sprints",
+    // Call signalling support (Modules/Calls). The ICE endpoint mints a short-lived TURN
+    // credential, so it must be behind a login — an unauthenticated relay credential is a
+    // relay for the whole internet.
+    "/api/v2/calls",
     "/api/v1/folder",
     "/api/v1/folder/:id",
     "/api/v1/taskIndex",
     "/api/v1/updateTaskIndexOnload",
     "/api/tasks",
     "/api/v2/tasks",
+    // Wiki pages (Modules/Pages). These were reachable without a token: the prefix was in
+    // neither JWT list, and app.use only guards the prefixes it is given. The handlers now
+    // take the author from req.uid, which this is what sets.
+    "/api/v2/pages",
     "/api/v1/importTasks",
     "/api/v1/wasabi/retriveObject",
     "/api/v1/wasabi/deleteFile",
@@ -125,6 +137,7 @@ const verifyJWTTokenWithCRoute = [
     '/api/v1/comments',
     '/api/v1/main-chats',
     '/api/v1/notes',
+    '/api/v1/general-reminders',
     '/api/v1/app-notification',
     '/api/v1/activity-log',
     '/api/v1/setting/category',
@@ -167,6 +180,9 @@ const verifyJWTTokenWithCRoute = [
     // above. Safe: nothing public lives under /api/v1/ai/project (the SSE
     // stream is /api/v1/ai-progress, a different prefix).
     '/api/v1/ai/project',
+    // Talk to Text speech-to-text (Modules/AI/transcribe) — JWT + companyId so
+    // only authenticated users can spend the STT quota.
+    '/api/v1/ai/transcribe',
     // Personal API tokens (Modules/ApiTokens). app.use prefix-matching
     // covers /:id, /:id/logs and /me too. Routes were previously
     // unauthenticated (trusted body userData) — now JWT-protected; the
@@ -199,6 +215,9 @@ const verifyJWTTokenWithCRoute = [
     // Cross-project Portfolio rollup (Modules/Portfolio, REP-01) — JWT+company;
     // prefix-matches /portfolio, /portfolio/:id, /portfolio/:id/rollup.
     '/api/v1/portfolio',
+    // Per-project Dashboard metrics (Modules/ProjectDashboard) — JWT+company so
+    // req.uid is populated for the server-side, role-based data scoping.
+    '/api/v1/project-dashboard',
     // Custom report builder (Modules/CustomReports, REP-02) — JWT+company;
     // prefix-matches /reports/custom, /reports/custom/run, /reports/custom/:id.
     '/api/v1/reports/custom',
@@ -214,6 +233,29 @@ const verifyJWTTokenWithCRoute = [
     '/api/v1/calendar/feeds',
     '/api/v1/automations',
     '/api/v1/integrations',
+    // Cloud storage attachments (AHE-3838). The OAuth callback is NOT under
+    // this prefix — it lives at /api/v1/cloud-oauth/callback because a provider
+    // redirect carries no JWT; its signed `state` authenticates it instead.
+    '/api/v1/cloud-storage',
+    // Inbox. Every route reads or writes the CALLER'S OWN notifications, and the
+    // controller takes the user from req.uid — which only this middleware sets. Without
+    // the prefix listed here no JWT runs, req.uid is empty, and every request is
+    // (correctly) refused as unauthenticated.
+    '/api/v1/inbox',
+    // Public-share management (Modules/PublicShares). Creating a share MINTS a
+    // login-free link to company data, so it has to be an authenticated act —
+    // these were in neither list, and app.use only guards the prefixes it is
+    // given. req.uid is also what records who published the link. The public
+    // pages themselves (/share/:token) live outside /api and stay open, which
+    // is the entire point of them.
+    '/api/v2/public-shares',
+    '/api/v2/intake',
+    // Outgoing webhooks (Modules/Webhooks). A webhook belongs to the member who created
+    // it, and every route is scoped to req.uid — which only this middleware sets. These
+    // were in neither list, so the owner was taken from the request body instead: with
+    // the list now filtered by owner, that would have been a way to read someone else's
+    // integrations rather than merely to mislabel one.
+    '/api/v2/webhooks',
 ];
 const verifyJWTToken = [
     "/api/v2/company/delete",

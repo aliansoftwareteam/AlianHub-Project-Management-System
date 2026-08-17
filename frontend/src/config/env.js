@@ -46,6 +46,7 @@ module.exports.AI_PROJECT_EVENTS = "/api/v1/ai-progress";
 module.exports.AI_PROJECT_TASKS_BASE = "/api/v1/ai/project";
 // "Write with AI" for the task/project description editor (Modules/AI)
 module.exports.AI_WRITE_DESCRIPTION = "/api/v1/ai/description";
+module.exports.AI_TRANSCRIBE = "/api/v1/ai/transcribe";
 module.exports.WASABI_UPLOAD_FILE = "/api/v1/wasabi/uploadFile";
 module.exports.WASABI_UPLOAD64_FILE = "/api/v1/wasabi/uploadFile_64";
 module.exports.WASABI_RETRIVE_USER_PROFILE = "/api/v1/wasabi/retriveUserProfile";
@@ -56,6 +57,8 @@ module.exports.MONGO_OPRATION = '/api/v1/mongoOpration';
 module.exports.TASKTYPE = '/api/v1/projectSetting/taskType';
 module.exports.TASKSTATUS = '/api/v1/projectSetting/taskStatus';
 module.exports.SPRINT = '/api/v1/sprint';
+module.exports.SPRINT_HOURS = '/api/v2/sprints/hours';
+module.exports.CALL_ICE_CONFIG = '/api/v2/calls/ice-config';
 module.exports.FOLDER = '/api/v1/folder';
 module.exports.REMOVE_USER_NOTIFICATION = '/api/v1/removeUserNotification';
 module.exports.GENERATETOKEN = '/api/v1/generateToken';
@@ -140,6 +143,9 @@ module.exports.GET_BUCKET_SIZE = '/api/v1/getBucketSize';
 //FILES ROUTES
 module.exports.REMOVE_FILE = '/api/v1/storage/removeFile';
 module.exports.GET_SIGNED_OR_PUBLIC_URL = '/api/v1/generateSignedUrl';
+// General-purpose (standalone) reminders — Modules/GeneralReminders. Distinct
+// from the task-scoped reminder flow at /api/v1/reminders.
+module.exports.GENERAL_REMINDERS = '/api/v1/general-reminders';
 module.exports.UPLOAD_FILE = '/api/v1/storage/uploadFile';
 module.exports.UPLOAD_FILE_64 = '/api/v1/storage/uploadFileBase64';
 module.exports.GETPROMPTS = '/api/v1/getPrompts';
@@ -183,6 +189,7 @@ module.exports.PROJECT_STATUS_SETTING_TEMPLATE = '/api/v1/setting/projectStatus'
 module.exports.RULES = '/api/v1/securityPermissions';
 module.exports.PROJECTS_APPS = '/api/v1/projects-apps';
 module.exports.PROJECTS_TABS = '/api/v1/projectTabs';
+module.exports.PROJECT_DASHBOARD = '/api/v1/project-dashboard';
 module.exports.TIMESHEET = '/api/v1/timesheet';
 module.exports.TIMESHEET_APPROVAL = '/api/v2/timesheet-approval';
 module.exports.SSO_CONFIG = '/api/v2/sso/config';
@@ -200,6 +207,8 @@ module.exports.EMAIL_IN = '/api/v1/email-in';
 module.exports.CALENDAR_FEED = '/api/v1/calendar';
 module.exports.AUTOMATIONS = '/api/v1/automations';
 module.exports.INTEGRATIONS = '/api/v1/integrations';
+// AHE-3838 — cloud storage attachments (Google Drive / Dropbox).
+module.exports.CLOUD_STORAGE = '/api/v1/cloud-storage';
 module.exports.EXPORT_CSV = '/api/v1/export/csv';
 module.exports.EXPORT_XLSX = '/api/v1/export/xlsx';
 module.exports.MAIN_CHATS = '/api/v1/main-chats'
@@ -207,6 +216,7 @@ module.exports.ACTIVITYLOG = '/api/v1/activity-log'
 module.exports.SETTING_CATEGORY = '/api/v1/setting/category';
 module.exports.SETTING_ROLES = '/api/v1/setting/roles';
 module.exports.SETTING_DESIGNATION = '/api/v1/setting/designation';
+module.exports.SETTING_PROJECT_SKILLS = '/api/v1/setting/skills';
 module.exports.SETTING_COMPANY_USER_STATUS = '/api/v1/setting/companyUserStatus';
 module.exports.FILE_EXTENSIONS = '/api/v1/fileExtensions';
 module.exports.COMMON_DATE_FORMATE = '/api/v1/commonDateFormate';
@@ -246,3 +256,5 @@ module.exports.API_OAUTH_GITHUB = '/api/v1/github';
 module.exports.API_OAUTH_GOOGLE = '/api/v1/google';
 module.exports.API_OAUTH_GITLAB = '/api/v1/gitlab';
 module.exports.GET_CHANGELOG = '/api/v2/changelog';
+module.exports.TASKS_BY_STATUS = '/api/v1/dashboard/tasks-by-status';
+module.exports.INBOX = '/api/v1/inbox';

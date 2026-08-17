@@ -73,6 +73,51 @@
                 <span class="black project-amount cursor-pointer  hover__on-projectrightside text-ellipsis" :class="{'font-size-13 font-weight-400' : clientWidth > 767 ,'font-size-16' : clientWidth <=767}"
                 :style="[{padding : clientWidth > 767 ? '2px' : '10px 0px'}]" :title="projectData?.ProjectCurrency?.symbol + ' ' + (projectData.milestoneAmount ? getCommaSeperatedNumber(projectData.milestoneAmount) : 0) ">{{projectData?.ProjectCurrency?.symbol}} {{projectData.milestoneAmount ? getCommaSeperatedNumber(projectData.milestoneAmount) : 0}}</span>
             </div>
+            <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_source',projectData?.isGlobalPermission) !== null">
+                <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.source')}}</h4>
+                <ProjectSourceSelect
+                    class="hover__on-projectrightside"
+                    mode="inline"
+                    :modelValue="projectSource"
+                    :editable="checkPermission('project.project_source',projectData?.isGlobalPermission) === true"
+                    @changed="updateSource"
+                />
+            </div>
+            <div class="d-flex project-right-side-label">
+                <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">
+                    {{$t('ProjectDetails.proposal_id')}}<span class="text-red asterisk" v-if="isUpworkSource">*</span>
+                </h4>
+                <InputText
+                    v-if="proposalIdEditable"
+                    class="hover__on-projectrightside--input box-sizing-box font-size-13 font-weight-400"
+                    inputId="project-proposal-id"
+                    height="36px"
+                    width="calc(100% - 38%)"
+                    :isDirectFocus="true"
+                    :maxLength="100"
+                    :placeHolder="$t('PlaceHolder.Enter_Proposal_Id')"
+                    :title="proposalIdHint"
+                    v-model.trim="proposalIdValue"
+                    @blur="updateProposalId"
+                    @enter="updateProposalId"
+                />
+                <span v-else
+                    class="black projectKeyClass hover__on-projectrightside text-ellipsis"
+                    :class="[{'font-size-13 font-weight-400' : clientWidth > 767 ,'font-size-16' : clientWidth <=767}, canEditDetails ? 'cursor-pointer' : 'cursor-default']"
+                    :style="[{padding : clientWidth > 767 ? '10px 10px 10px 0' : '10px 0px'}]"
+                    :title="projectData.proposalId || proposalIdHint"
+                    @click="editProposalId()"
+                >{{projectData.proposalId ? projectData.proposalId : 'N/A'}}</span>
+            </div>
+            <div class="d-flex project-right-side-label">
+                <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.skills')}}</h4>
+                <SkillsSelect
+                    class="hover__on-projectrightside"
+                    :modelValue="projectData.skills || []"
+                    :editable="canEditDetails"
+                    @update:modelValue="updateSkills"
+                />
+            </div>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_start_date',projectData?.isGlobalPermission) !== null">
                 <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.start_date')}}</h4>
                 <StartEndDate
@@ -131,8 +176,9 @@
                 </template>
             </div>
         </div>
-        <div class="position-re">
-            <div v-if="checkPermission('project.project_custom_field',projectData?.isGlobalPermission) !== null && checkApps('CustomFields')">
+        <div class="position-re" v-if="checkPermission('project.project_custom_field',projectData?.isGlobalPermission) !== null">
+            <!-- App enabled for this project: existing behavior (feature, or blurred feature + upgrade overlay when the plan doesn't include it). -->
+            <div v-if="checkApps('CustomFields')">
                 <div v-if="projectData" :class="[{'pointer-event-none opacity-5 blur-3-px':!currentCompany?.planFeature?.customFields}]">
                     <CustomFieldProjectDetailView
                         @blurUpdate="submitHandler"
@@ -154,6 +200,11 @@
                     />
                 </div>
             </div>
+            <!-- App available on the plan but not switched on for this project: representational teaser. -->
+            <AppTeaserBlock
+                v-else-if="getAppState('CustomFields', projectData) === 'disabled'"
+                appKey="CustomFields"
+            />
         </div>
         <ConfirmModal :modelValue="showConfirmModal" :acceptButtonText="$t('Home.Confirm')"
                     :cancelButtonText="$t('Projects.cancel')" maxlength="150" :header="false" :showCloseIcon="false" @close="showConfirmModal = false">
@@ -200,9 +251,14 @@ import { projectAssignee, projectAssigneeRemove, projectCurrency, projectDueDate
 import { useConvertDate, useCustomComposable, useGetterFunctions } from '@/composable';
 import StartEndDate from '@/components/molecules/FixMilestoneDate/FixMilestoneDate.vue';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
+import AppTeaserBlock from '@/components/molecules/AppTeaserBlock/AppTeaserBlock.vue';
 import UserProfile from '@/components/atom/UserProfile/UserProfile.vue';
+import InputText from '@/components/atom/InputText/InputText.vue';
+import SkillsSelect from '@/components/molecules/SkillsSelect/SkillsSelect.vue';
+import ProjectSourceSelect from '@/components/molecules/ProjectSourceSelect/ProjectSourceSelect.vue';
+import { DEFAULT_SOURCE, checkProposalId, cleanProposalId } from '@/utils/projectSource';
 
-const { checkPermission,checkApps } = useCustomComposable();
+const { checkPermission,checkApps,getAppState } = useCustomComposable();
 const {convertDateFormat} = useConvertDate();
 
 const { t } = useI18n();
@@ -235,13 +291,23 @@ const customFieldObject = ref({});
 const sourceEditable = ref(false);
 const showConfirmModal = ref(false);
 const CustomFieldData = ref(JSON.parse(JSON.stringify(getters["settings/customFields"])));
+const proposalIdValue = ref('');
+const proposalIdEditable = ref(false);
 
 //computed
 const users = computed(() => getters["users/users"]);
 const teams = computed(() => getters["settings/teams"]);
+const projectSkills = computed(() => getters["settings/projectSkills"]);
+// Projects created before the field exists read as the default rather than blank.
+const projectSource = computed(() => props.projectData?.source || DEFAULT_SOURCE);
+const isUpworkSource = computed(() => projectSource.value === 'upwork');
+// Shown on hover instead of a hint row: this panel's rows are fixed-height, so an
+// extra line would push into the field below it.
+const proposalIdHint = computed(() => (isUpworkSource.value ? t('Projects.proposal_id_format_hint') : ''));
 const currentCompany = computed(() => getters["settings/selectedCompany"]);
 const companyOwner = computed(() => { return getters["settings/companyOwnerDetail"];});
 const showCustomField = computed(() => checkPermission("project.project_custom_field", props?.projectData?.isGlobalPermission, {gettersVal: getters}));
+const canEditDetails = computed(() => checkPermission('project.project_details', props?.projectData?.isGlobalPermission) === true);
 
 //user detail
 const user = getUser(userId.value);
@@ -766,6 +832,139 @@ const updateBillingPeriod = (event) => {
     })
     .catch((err)=>{
         console.error(err,"Error in Project Billing Period Update");
+        $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
+    })
+}
+
+// open the proposal id for inline editing
+const editProposalId = () => {
+    if(!canEditDetails.value) return;
+    proposalIdValue.value = props.projectData.proposalId || '';
+    proposalIdEditable.value = true;
+}
+
+// update the source of project
+const updateSource = (source) => {
+    // Switching to Upwork needs a proposal id first — the server rejects it
+    // anyway, so stop here and say which field to fill rather than round-trip
+    // to a 400. The row keeps showing the old source because local state is
+    // only updated on success.
+    if(source === 'upwork' && !(props.projectData.proposalId || '').trim()){
+        $toast.error(t('Projects.proposal_id_required_upwork'), { position: 'top-right' });
+        return;
+    }
+    const object = { updateObject: { source } }
+    apiRequest("put",`${env.PROJECT}/${props.projectData._id}`,object).then((res) => {
+        if(res.status === 200){
+            $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
+            let historyObj = {
+                'message': `<b>${userData.Employee_Name}</b> has changed <b> Source</b> as <b>${t('Projects.source_' + source)}</b>.`,
+                'key' : 'Project_Source',
+            }
+            apiRequest("post", env.HANDLE_HISTORY, {
+                "type": 'project',
+                "companyId": companyId.value,
+                "projectId": props.projectData._id,
+                "taskId": null,
+                "object": historyObj,
+                "userData": userData
+            })
+            commit('projectData/projectLocalUpdate', {itemData:  {...props.projectData , ...object.updateObject}});
+        }else{
+            $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
+        }
+    })
+    .catch((err)=>{
+        // The server refuses Upwork without a proposal id — surface that reason
+        // rather than a generic failure, since it tells the user what to do.
+        const message = err?.response?.data?.message;
+        console.error(err,"Error in Project Source Update");
+        $toast.error(message || t('Toast.something_went_wrong'), { position: 'top-right' });
+    })
+}
+
+// update the proposal id of project
+const updateProposalId = ({value}) => {
+    proposalIdEditable.value = false;
+    // Sanitize on commit rather than per keystroke: a pasted proposal URL becomes
+    // the bare id, and the trailing slash goes. Rewriting mid-typing would fight
+    // the cursor. The server applies the same rule, so this is what the user sees
+    // being saved, not a second source of truth.
+    const newValue = cleanProposalId(value);
+    proposalIdValue.value = newValue;
+    // blur fires on every exit, so skip the round trip when nothing changed
+    if(newValue === (props.projectData.proposalId || '')) return;
+    if(isUpworkSource.value && !newValue){
+        $toast.error(t('Projects.proposal_id_required_upwork'), { position: 'top-right' });
+        return;
+    }
+    if(checkProposalId(projectSource.value, newValue) === 'format'){
+        $toast.warning(t('Projects.proposal_id_format_warning'), { position: 'top-right' });
+    }
+    let object = {
+        updateObject : {
+            proposalId: newValue
+        }
+    }
+    apiRequest("put",`${env.PROJECT}/${props.projectData._id}`,object).then((res) => {
+        if(res.status === 200){
+            $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
+            let historyObj = {
+                'message': `<b>${userData.Employee_Name}</b> has changed <b> Proposal ID</b> as <b>${newValue || 'N/A'}</b>.`,
+                'key' : 'Project_ProposalId',
+            }
+            apiRequest("post", env.HANDLE_HISTORY, {
+                "type": 'project',
+                "companyId": companyId.value,
+                "projectId": props.projectData._id,
+                "taskId": null,
+                "object": historyObj,
+                "userData": userData
+            })
+            commit('projectData/projectLocalUpdate', {itemData:  {...props.projectData , ...object.updateObject}});
+        }else{
+            $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
+        }
+    })
+    .catch((err)=>{
+        console.error(err,"Error in Project Proposal ID Update");
+        $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
+    })
+}
+
+// update the required skills of project
+const updateSkills = (slugs) => {
+    const object = {
+        updateObject : {
+            skills: slugs
+        }
+    }
+    apiRequest("put",`${env.PROJECT}/${props.projectData._id}`,object).then((res) => {
+        if(res.status === 200){
+            $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
+            const skillNames = slugs.map((slug) => {
+                const match = projectSkills.value.find((s) => s.slug === slug);
+                return match ? match.name : slug;
+            });
+            let historyObj = {
+                'message': `<b>${userData.Employee_Name}</b> has changed <b> Skills</b> as <b>${skillNames.join(', ') || 'N/A'}</b>.`,
+                'key' : 'Project_Skills',
+            }
+            apiRequest("post", env.HANDLE_HISTORY, {
+                "type": 'project',
+                "companyId": companyId.value,
+                "projectId": props.projectData._id,
+                "taskId": null,
+                "object": historyObj,
+                "userData": userData
+            })
+            commit('projectData/projectLocalUpdate', {itemData:  {...props.projectData , ...object.updateObject}});
+        }else{
+            $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
+        }
+    })
+    .catch((err)=>{
+        console.error(err,"Error in Project Skills Update");
         $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
     })
 }

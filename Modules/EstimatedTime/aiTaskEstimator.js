@@ -625,12 +625,22 @@ async function runEstimate(companyId, task) {
 }
 
 async function persistEstimate(companyId, taskId, minutes, opts = {}) {
-    const { userData, previousMinutes } = opts;
+    const { userData, previousMinutes, maxMinutes } = opts;
+    // The company cap, applied at the single point every estimate is written.
+    // Prompting the model to stay under a limit is a request; this is where the
+    // limit actually holds — including when the model ignores it, when the
+    // calibration multiplier pushes a value back over, and on any future caller
+    // that forgets the rule exists.
+    let finalMinutes = minutes;
+    if (Number.isFinite(Number(maxMinutes)) && Number(maxMinutes) > 0
+        && Number.isFinite(Number(minutes)) && Number(minutes) > Number(maxMinutes)) {
+        finalMinutes = Math.round(Number(maxMinutes));
+    }
     const updateQuery = {
         type: SCHEMA_TYPE.TASKS,
         data: [
             { _id: new mongoose.Types.ObjectId(taskId) },
-            { $set: { totalEstimatedTime: minutes } },
+            { $set: { totalEstimatedTime: finalMinutes } },
             { returnDocument: 'after' },
         ],
     };
@@ -640,7 +650,7 @@ async function persistEstimate(companyId, taskId, minutes, opts = {}) {
             socketEmitter.emit('update', {
                 type: 'update',
                 data: result,
-                updatedFields: { totalEstimatedTime: minutes },
+                updatedFields: { totalEstimatedTime: finalMinutes },
                 module: 'task',
             });
         } catch (_e) { /* socket emit best-effort */ }
@@ -648,7 +658,7 @@ async function persistEstimate(companyId, taskId, minutes, opts = {}) {
         // Activity-log entry — mirrors the manual estimate-edit history
         // (key "task_total_estimate") so the AI estimate shows in the task's
         // Activity tab. Best-effort: never throws, never blocks the estimate.
-        logEstimateHistory({ companyId, result, taskId, minutes, userData, previousMinutes });
+        logEstimateHistory({ companyId, result, taskId, minutes: finalMinutes, userData, previousMinutes });
     }
     return result;
 }
@@ -714,7 +724,7 @@ function logEstimateHistory({ companyId, result, taskId, minutes, userData, prev
  *   work_items?: string[], reasoning?: string, basedOnSamples?: number,
  *   reason?: string}>}
  */
-async function estimateAndPersist({ companyId, taskId, task, force = false, userData } = {}) {
+async function estimateAndPersist({ companyId, taskId, task, force = false, userData, maxMinutes } = {}) {
     try {
         if (!companyId || !taskId || !task) {
             return { status: false, reason: 'missing required input' };
@@ -744,7 +754,7 @@ async function estimateAndPersist({ companyId, taskId, task, force = false, user
         }
 
         // Persist the SAME stored field, same shape, as always.
-        await persistEstimate(companyId, taskId, estimate.minutes, { userData, previousMinutes });
+        await persistEstimate(companyId, taskId, estimate.minutes, { userData, previousMinutes, maxMinutes });
 
         return {
             status: true,

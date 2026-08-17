@@ -4,16 +4,10 @@
             <div class="advancefilter__body--list--left d-flex align-items-center">
                 <div class="advancefilter__body--list--left--image">
                     <div v-if="findParticularProject(props.taskObj.ProjectID)?.taskTypeCounts.find((otr)=> otr.key === props.taskObj.TaskTypeKey)?.taskImage">
-                        <WasabiImage
-                            class="onlyComment" 
-                            v-if="!findParticularProject(props.taskObj.ProjectID)?.taskTypeCounts.find((otr)=> otr.key === props.taskObj.TaskTypeKey)?.taskImage?.includes('http')"
-                            :data="{
-                                url: findParticularProject(props.taskObj.ProjectID)?.taskTypeCounts.find((otr)=> otr.key === props.taskObj.TaskTypeKey)?.taskImage,
-                                filename: findParticularProject(props.taskObj.ProjectID)?.taskTypeCounts.find((otr)=> otr.key === props.taskObj.TaskTypeKey)?.taskImage?.split('/')?.pop(),
-                                extension: findParticularProject(props.taskObj.ProjectID)?.taskTypeCounts.find((otr)=> otr.key === props.taskObj.TaskTypeKey)?.taskImage?.split('/')?.pop()?.split('.')?.pop()
-                            }"
+                        <TaskTypeIcon
+                            class="onlyComment"
+                            :taskType="findParticularProject(props.taskObj.ProjectID)?.taskTypeCounts.find((otr)=> otr.key === props.taskObj.TaskTypeKey) || {}"
                         />
-                        <img class="onlyComment" v-else :src="findParticularProject(props.taskObj.ProjectID)?.taskTypeCounts.find((otr)=> otr.key === props.taskObj.TaskTypeKey)?.taskImage">
                     </div>
                 </div>
                 <div class="advancefilter__body--list--left--content advancefilter__body--projectname">
@@ -76,7 +70,7 @@
     import { useToast } from 'vue-toast-notification';
     import {filterFun} from '@/components/molecules/AdvanceSearch/helper';
     import TaskDetail from '@/views/TaskDetail/TaskDetail.vue';
-    import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
+    import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
     import { useRoute, useRouter } from 'vue-router';
     import { useI18n } from "vue-i18n";
     const { t } = useI18n();

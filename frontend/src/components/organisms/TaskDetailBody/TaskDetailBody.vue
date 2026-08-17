@@ -18,6 +18,8 @@
                     :isSupport="isSupport"
                     :subTasksArray="subTasksArray"
                     :isMainSpinner="isSpinner"
+                    :docsRefreshKey="docsRefreshKey"
+                    @openDoc="openDoc"
                 />
                 <Comments
                     v-else-if="activeTab === 'comment' && Object.keys(projectData).length && Object.keys(task).length"
@@ -73,6 +75,15 @@
                 :isSupport="isSupport"
                 :isMainSpinner="isSpinner"
             />
+
+            <!-- Opened from the task's Linked Docs section. Mounted here, next to the tab,
+                 so it survives while the doc is open. -->
+            <PagesPanel
+                v-if="projectData && Object.keys(projectData || {}).length"
+                v-model="showDocs"
+                :projectData="projectData"
+                :openDocId="openDocId"
+            />
         </div>
     </div>
 </template>
@@ -85,6 +96,7 @@
     import TabListHeader from '@/components/molecules/TabListHeader/TabListHeader.vue'
     import TaskDetailTab from '@/components/molecules/TaskDetailTab/TaskDetailTab.vue'
     import TaskDetailRightSide from '@/components/organisms/TaskDetailRightSide/TaskDetailRightSide.vue'
+    import PagesPanel from '@/components/molecules/Pages/PagesPanel.vue'
     import Comments from '@/views/Projects/Comments/Comments.vue'
     import ActivityLog from '@/components/templates/ActivityLog/ActivityLog.vue'
     import TimeLog from '@/views/TimeLog/TimeLog.vue'
@@ -138,6 +150,23 @@
 
         return sprintData || null;
     })
+
+    // Docs panel, opened from the task's Linked Docs section. The id is handed to the panel
+    // so it opens ON that doc rather than on an empty "pick something" state — the click
+    // already said which one.
+    const showDocs = ref(false);
+    const openDocId = ref('');
+    const openDoc = (doc) => {
+        if (!doc || !doc._id) return;
+        openDocId.value = String(doc._id);
+        showDocs.value = true;
+    };
+    // A doc can be renamed or deleted while the panel is open, so the list that opened it
+    // is re-read on the way out rather than left showing the old title.
+    const docsRefreshKey = ref(0);
+    watch(showDocs, (open, wasOpen) => {
+        if (wasOpen && !open) docsRefreshKey.value += 1;
+    });
 
     const router = useRouter();
     const route = useRoute();

@@ -3,7 +3,7 @@ import * as mutations from './mutations';
 
 const state = {
     users: [],
-    myCounts: [],
+    myCounts: {},
 }
 
 const getters = {

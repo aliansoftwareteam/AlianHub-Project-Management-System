@@ -20,6 +20,7 @@
 'use strict';
 
 const { z } = require('zod');
+const { MAX_TASK_HOURS } = require('./planRules');
 
 const HEX_COLOR = /^#?[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/;
 
@@ -97,6 +98,9 @@ const DescriptionBlock = z.discriminatedUnion('type', [
 // needs no 5-block description.
 const SubTaskSchema = z.object({
     TaskName: z.string().min(2).max(200),
+    // A sub-task exists to carry a slice of work that did not fit the two-hour
+    // cap, so it needs its own estimate — the parent deliberately carries none.
+    estimatedHours: z.number().positive().max(MAX_TASK_HOURS).nullable().optional(),
     // Sub-tasks get a real (but short) description — a paragraph, optionally a
     // brief steps list — not the full task "What to do / Acceptance criteria"
     // 5-block skeleton. min(1) so a sub-task is never created description-less.
@@ -124,7 +128,9 @@ const TaskSchema = z.object({
     DueDate: DateLike.optional(),
     AssigneeUserId: z.array(z.string()).default([]),
     priority: z.enum(['Low', 'Medium', 'High', 'Urgent']),
-    estimatedHours: z.number().nonnegative().nullable().optional(),
+    // Capped, not merely requested: a plan that breaks the company rule is
+    // rejected here and goes back for repair rather than being created.
+    estimatedHours: z.number().nonnegative().max(MAX_TASK_HOURS).nullable().optional(),
     // Optional sub-tasks created under this task (AI-Assist).
     subtasks: z.array(SubTaskSchema).max(20).optional(),
 }).superRefine((task, ctx) => {
@@ -137,6 +143,30 @@ const TaskSchema = z.object({
     // Optional [5+]: additional paragraph blocks (e.g. "Depends on: ...").
     const b = task.descriptionBlocks;
     const issue = (msg) => ctx.addIssue({ code: z.ZodIssueCode.custom, message: msg, path: ['descriptionBlocks'] });
+
+    // Company rule: work too big for one task is split, and the hours then live
+    // on the sub-tasks. Enforced rather than merely asked for — the sub-tasks
+    // are deliberately skipped by the background estimator, so a sub-task the
+    // model forgot to estimate would stay at zero for good, and a parent that
+    // kept its own estimate would count the same work twice in every roll-up.
+    if (Array.isArray(task.subtasks) && task.subtasks.length) {
+        if (Number(task.estimatedHours) > 0) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: `Task "${task.TaskName}" has sub-tasks, so it must not carry its own estimatedHours — put the hours on the sub-tasks.`,
+                path: ['estimatedHours'],
+            });
+        }
+        task.subtasks.forEach((sub, i) => {
+            if (!(Number(sub.estimatedHours) > 0)) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: `Sub-task "${sub.TaskName}" needs its own estimatedHours (at most ${MAX_TASK_HOURS}).`,
+                    path: ['subtasks', i, 'estimatedHours'],
+                });
+            }
+        });
+    }
 
     if (b[0]?.type !== 'paragraph') issue('first block must be a paragraph (context)');
     if (b[1]?.type !== 'header' || b[1]?.data?.text?.toLowerCase().trim() !== 'what to do') {
@@ -174,6 +204,10 @@ const ProjectSchema = z.object({
     DueDate: DateLike.optional(),
     isPrivateSpace: z.boolean().default(false),
     ProjectType: z.string().min(1).max(60).optional().default('Fix'),
+    // Accepted so the model's picks survive into the plan and can be pre-ticked
+    // on review. The execute request is authoritative and filters against the
+    // company list, so a slug invented here is never persisted.
+    skills: z.array(z.string().min(1).max(60)).max(15).optional().default([]),
 
     // No min/max — the AI decides per project. Safety caps only.
     projectStatusData: z.array(StatusEntrySchema).min(1).max(20),

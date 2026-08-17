@@ -39,12 +39,54 @@
                     :title="$t('ClipRecorder.record_clip')" @click="$emit('record-clip')">
                     <img src="@/assets/images/svg/clip_record_icon.svg" alt="record clip" />
                 </button>
-                <label for="UploadedFile" v-if="permission === true">
+                <!-- The "+" opens a source menu when this workspace has cloud
+                     providers set up; with none it stays exactly what it was — a
+                     plain label wired straight to the file input. -->
+                <div v-if="permission === true" class="attach-add position-re">
                     <div class="cursor-link cursor-pointer" v-if="props.isMainSpinner === true || isLoadingAttachments">
                         <Skelaton style="height: 30px;width: 25px;" class="border-radius-6-px mb-5px" />
                     </div>
-                    <img v-else class="cursor-link cursor-pointer" src="@/assets/images/black_plus.png" />
-                </label>
+                    <label v-else-if="!cloudProviders.length" for="UploadedFile">
+                        <img class="cursor-link cursor-pointer" src="@/assets/images/black_plus.png" />
+                    </label>
+                    <template v-else>
+                        <img
+                            class="cursor-link cursor-pointer"
+                            src="@/assets/images/black_plus.png"
+                            :alt="$t('Attachments.attach_from')"
+                            @click.stop="toggleSourceMenu"
+                        />
+                        <div v-if="showSourceMenu" class="attach-sourcemenu" @click.stop>
+                            <button type="button" class="attach-sourcemenu__item" @click="pickFromComputer">
+                                <img src="@/assets/images/svg/draganddropImg.svg" alt="" />
+                                <span>{{ $t('Attachments.upload_from_computer') }}</span>
+                            </button>
+                            <div class="attach-sourcemenu__sep"></div>
+                            <button
+                                v-for="p in cloudProviders"
+                                :key="p.provider"
+                                type="button"
+                                class="attach-sourcemenu__item"
+                                :disabled="cloudBusy === p.provider"
+                                @click="chooseCloudSource(p)"
+                            >
+                                <img :src="providerIcon(p.provider)" :alt="p.name" />
+                                <span>{{ p.name }}</span>
+                                <span v-if="!p.connected" class="attach-sourcemenu__hint">{{ $t('Attachments.connect_provider', { provider: '' }).trim() }}</span>
+                                <span v-else-if="cloudBusy === p.provider" class="attach-sourcemenu__hint">…</span>
+                            </button>
+                            <!-- Link vs import. Linking is the default (nothing is
+                                 copied, edits in the drive stay live); importing
+                                 takes a snapshot into our storage so teammates can
+                                 always open it regardless of drive sharing. -->
+                            <div class="attach-sourcemenu__sep"></div>
+                            <label class="attach-sourcemenu__mode">
+                                <input type="checkbox" v-model="importCopy" />
+                                <span>{{ $t('Attachments.import_copy') }}</span>
+                            </label>
+                        </div>
+                    </template>
+                </div>
                 <input type="file" id="UploadedFile" hidden multiple ref="attach_files" :accept="extensions"
                     @change.prevent.stop="uploadFiles" />
             </div>
@@ -92,6 +134,8 @@ import JSZip from "jszip";
 import ImagesPreviewer from "@/components/organisms/ImagePreviewer/ImagesPreviewer.vue";
 import * as env from "@/config/env";
 import { storageHelper } from "@/composable/commonFunction";
+import { isCloudAttachment, openCloudAttachment, CLOUD_PROVIDERS } from "@/utils/cloudAttachment";
+import { fetchCloudProviders, pickCloudFiles, connectCloudProvider } from "@/composable/cloudPicker";
 import Skelaton from "../Skelaton/Skelaton.vue";
 const { handleStorageImageRequest } = storageHelper();
 const { t } = useI18n();
@@ -135,7 +179,7 @@ const props = defineProps({
     }
 });
 const showDropZone = ref(false);
-const emit = defineEmits(["update:add", "update:delete", "seAll","updateProjectAttachment","record-clip"]);
+const emit = defineEmits(["update:add", "update:delete", "seAll","updateProjectAttachment","record-clip","update:cloud-add"]);
 // eslint-disable-next-line
 const extensions = ref("");
 extensions.value = props.extensions.map(exe => exe.name).join();
@@ -151,6 +195,76 @@ const sliderMain = ref(null);
 const loadMoreTrigger = ref(null);
 const isLoadingAttachments = ref(false);
 let observer = null;
+
+// ── cloud sources (AHE-3838) ───────────────────────────────────────────────
+// Empty until the workspace configures a provider, and the menu is only rendered
+// when it is non-empty — so an instance that never sets one up keeps the original
+// single-click "+" behaviour.
+const cloudProviders = ref([]);
+const showSourceMenu = ref(false);
+const cloudBusy = ref('');
+// Link is the default. Remembered per browser so someone who always wants copies
+// doesn't have to re-tick it on every attach.
+const IMPORT_COPY_KEY = 'alianhub:cloudAttachImportCopy';
+const importCopy = ref(localStorage.getItem(IMPORT_COPY_KEY) === '1');
+watch(importCopy, (val) => {
+    try { localStorage.setItem(IMPORT_COPY_KEY, val ? '1' : '0'); } catch (e) { /* private mode */ }
+});
+
+const providerIcon = (key) => (CLOUD_PROVIDERS[key] ? CLOUD_PROVIDERS[key].icon : '');
+
+const closeSourceMenu = () => { showSourceMenu.value = false; };
+
+const toggleSourceMenu = () => { showSourceMenu.value = !showSourceMenu.value; };
+
+const pickFromComputer = () => {
+    closeSourceMenu();
+    const input = document.getElementById('UploadedFile');
+    if (input) input.click();
+};
+
+const chooseCloudSource = async (provider) => {
+    // Not connected yet → send them through consent first. The server round-trips
+    // the current path so they land back here.
+    if (!provider.connected) {
+        closeSourceMenu();
+        try {
+            await connectCloudProvider(provider.provider);
+        } catch (error) {
+            $toast.error(error?.message || t('Attachments.cloud_attach_failed'), { position: 'top-right' });
+        }
+        return;
+    }
+    cloudBusy.value = provider.provider;
+    const mode = importCopy.value ? 'import' : 'link';
+    try {
+        // The mode is passed in, not just emitted afterwards: Dropbox's Chooser
+        // decides which kind of link it returns at the moment it opens.
+        const files = await pickCloudFiles({ provider: provider.provider, multiple: true, mode });
+        closeSourceMenu();
+        if (!files || !files.length) return;   // cancelled
+        emit('update:cloud-add', { provider: provider.provider, files, mode });
+    } catch (error) {
+        closeSourceMenu();
+        if (error?.code === 'not_connected' || error?.code === 'reauth_required') {
+            // The grant is gone (revoked, password change). Re-consent rather
+            // than showing an error the user can do nothing with.
+            try { await connectCloudProvider(provider.provider); return; } catch (_e) { /* fall through */ }
+        }
+        $toast.error(error?.message || t('Attachments.cloud_attach_failed'), { position: 'top-right' });
+    } finally {
+        cloudBusy.value = '';
+    }
+};
+
+const loadCloudProviders = async () => {
+    const list = await fetchCloudProviders();
+    // Only providers the workspace actually set up are offered.
+    cloudProviders.value = (list || []).filter((p) => p.configured);
+};
+
+// Close the menu on any outside click, matching the other popovers in the app.
+const onDocumentClick = () => { if (showSourceMenu.value) closeSourceMenu(); };
 
 // COLLAB-04 / global clips: the "Record clip" button no longer mounts a local
 // recorder. It emits `record-clip` to the task container (which owns taskClass),
@@ -183,6 +297,8 @@ onMounted(() => {
     if (props.isMainSpinner === false) {
         setupIntersectionObserver(true);
     }
+    if (props.permission === true) loadCloudProviders();
+    document.addEventListener('click', onDocumentClick);
 });
 
 watch(() => props.isMainSpinner, (newVal) => {
@@ -200,6 +316,7 @@ onUnmounted(() => {
     if (observer) {
         observer.disconnect();
     }
+    document.removeEventListener('click', onDocumentClick);
 });
 
 
@@ -326,7 +443,24 @@ const handleDragOver = (event) => {
 };
 
 const handleAttachmentClick = (event, index) => {
-    openPreviewer(index);
+    // A cloud-linked file has no bytes on our side, so there is nothing for the
+    // previewer to show — hand off to the provider instead.
+    const attachment = visibleAttachments.value[index];
+    if (isCloudAttachment(attachment)) {
+        if (!openCloudAttachment(attachment)) {
+            $toast.error(t('Attachments.cloud_link_missing'), { position: 'top-right' });
+        }
+        return;
+    }
+    // `transformedAttachments` (the previewer's list) skips cloud links, so the
+    // tile index is not the previewer index once one is present. Count the
+    // previewable tiles ahead of this one instead of assuming they line up —
+    // otherwise the previewer opens on the wrong file.
+    const previewIndex = visibleAttachments.value
+        .slice(0, index)
+        .filter((item) => !isCloudAttachment(item))
+        .length;
+    openPreviewer(previewIndex);
 };
 
 const openPreviewer = (index) => {
@@ -339,8 +473,18 @@ const closePreviewer = () => {
 };
 
 async function downloadAllImages() {
+    // Cloud-linked files can't go in the zip — we hold a link, not the bytes.
+    // Say so rather than quietly shipping a zip that's missing files.
+    const all = props.selectedData?.attachments ?? [];
+    const downloadable = all.filter((attachment) => !isCloudAttachment(attachment));
+    const skipped = all.length - downloadable.length;
+    if (skipped > 0) {
+        $toast.info(t('Attachments.cloud_skipped_in_zip', { count: skipped }), { position: 'top-right' });
+    }
+    if (!downloadable.length) return;
+
     if (!env?.STORAGE_TYPE || env.STORAGE_TYPE !== 'server') {
-        const attachments = props.selectedData?.attachments ?? [];
+        const attachments = downloadable;
         const zip = new JSZip();
 
         const filenameMap = new Map();
@@ -388,7 +532,7 @@ async function downloadAllImages() {
             saveAs(zipBlob, `${zipName}_attachments.zip`);
         });
     } else {
-        const attachments = props.selectedData?.attachments ?? [];
+        const attachments = downloadable;
         const zip = new JSZip();
 
         const filenameMap = new Map();
@@ -457,8 +601,12 @@ function saveAs(blob, filename) {
 }
 
 async function fetchAttachmentUrls(attachments) {
+    // Cloud-linked files are dropped here rather than presigned: there is no
+    // Wasabi object behind them, so handleStorageImageRequest would fail, and
+    // the previewer can't render a third-party link anyway. handleAttachmentClick
+    // maps tile index → previewer index to account for the gap.
     return await Promise.all(
-        attachments.map(async (attachment) => {
+        attachments.filter((attachment) => !isCloudAttachment(attachment)).map(async (attachment) => {
             const baseName = attachment.filename.replace(/\.[^/.]+$/, "");
             let properUrl = attachment.url;
 

@@ -6,8 +6,70 @@ const socketEmitter = require('../../event/socketEventEmitter');
 const { validateEpicInput, validateAssignInput, countDeltas, isObjectIdString, EPIC_STATUSES, EPIC_PRIORITIES, parseEpicDates } = require('./helpers/epicRules');
 
 // Epics: a grouping layer above tasks with progress roll-up. Tasks carry an
-// optional epicId; epics keep denormalised taskCount/completedCount which
-// the assign flow maintains and /recount can rebuild from scratch.
+// optional epicId.
+//
+// Progress is COMPUTED FROM THE TASKS on every read — see countsForProject.
+// The stored taskCount/completedCount fields are a cache only; nothing renders
+// them directly any more.
+//
+// Why (AHE-3853): those stored fields were maintained by $inc in the assign flow
+// alone, using the task's status at the moment it joined the epic. Nothing told
+// an epic that one of its tasks had since been completed, deleted, restored, or
+// bulk-moved — so `completedCount` froze at whatever it was on assignment and
+// every epic sat at 0%. Keeping counters correct by hooking every writer is what
+// failed: `statusType` is written from six places across mongo_helper.js,
+// mergeDuplicate.js, structural.js and bulk.js, and any path that forgets the
+// hook corrupts the number silently and permanently. One aggregation at read
+// time cannot drift, and epics-per-project is small enough that the cost is
+// irrelevant.
+
+/**
+ * Live task/completed counts for every epic in a project, as
+ * { [epicId]: { taskCount, completedCount } }.
+ *
+ * One aggregation for the whole project rather than a query per epic. Excludes
+ * soft-deleted tasks, which is what makes a deleted task stop inflating its
+ * epic. "Completed" is statusType === 'close', the same definition /recount and
+ * the assign flow use.
+ *
+ * Never throws: progress is decoration, so a failure here must not take the
+ * epic list down with it — the caller falls back to the stored values.
+ */
+const countsForProject = async (companyId, projectId) => {
+    try {
+        const rows = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS,
+            data: [[
+                {
+                    $match: {
+                        ProjectID: new mongoose.Types.ObjectId(projectId),
+                        epicId: { $exists: true, $ne: null },
+                        deletedStatusKey: { $ne: 1 },
+                    },
+                },
+                {
+                    $group: {
+                        _id: '$epicId',
+                        taskCount: { $sum: 1 },
+                        completedCount: { $sum: { $cond: [{ $eq: ['$statusType', 'close'] }, 1, 0] } },
+                    },
+                },
+            ]],
+        }, 'aggregate');
+        const map = {};
+        (rows || []).forEach((row) => {
+            if (!row || !row._id) return;
+            map[String(row._id)] = {
+                taskCount: Number(row.taskCount) || 0,
+                completedCount: Number(row.completedCount) || 0,
+            };
+        });
+        return map;
+    } catch (error) {
+        logger.error(`ERROR in epic count aggregation: ${error.message}`);
+        return null;
+    }
+};
 
 /* POST /api/v2/epics  body: { name, description?, color?, projectId, userData } */
 exports.createEpic = async (req, res) => {
@@ -63,7 +125,22 @@ exports.listEpics = async (req, res) => {
                 { sort: { createdAt: 1 } },
             ],
         }, 'find');
-        return res.send({ status: true, statusText: 'Epics fetched.', data: epics || [] });
+
+        // Overlay live counts. If the aggregation failed we fall through to the
+        // stored values rather than reporting zeros — stale is better than wrong.
+        const counts = await countsForProject(companyId, projectId);
+        const data = (epics || []).map((epic) => {
+            const plain = epic && epic.toObject ? epic.toObject() : { ...epic };
+            const live = counts && counts[String(plain._id)];
+            if (counts) {
+                // An epic with no matching tasks is absent from the aggregation,
+                // which legitimately means zero — don't leave a stale count there.
+                plain.taskCount = live ? live.taskCount : 0;
+                plain.completedCount = live ? live.completedCount : 0;
+            }
+            return plain;
+        });
+        return res.send({ status: true, statusText: 'Epics fetched.', data });
     } catch (error) {
         logger.error(`ERROR in list epics: ${error.message}`);
         return res.send({ status: false, statusText: error.message });

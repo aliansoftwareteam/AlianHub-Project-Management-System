@@ -18,6 +18,8 @@
 const fs = require('fs');
 const path = require('path');
 
+const { MAX_TASK_HOURS } = require('./planRules');
+
 const PROMPTS_DIR = path.join(__dirname, 'prompts');
 
 // Strip BOM + normalize line endings so files authored on different OSes
@@ -125,7 +127,7 @@ function buildSystemPrompt() {
  * @param {string} [args.briefText]          - Extracted text from an uploaded brief
  * @param {Array}  [args.members]            - { id, name, role } member list
  */
-function buildUserMessage({ description, additionalRequirements, briefText, members, clarifications }) {
+function buildUserMessage({ description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills }) {
     const sections = [];
 
     const desc = String(description || '').trim();
@@ -157,6 +159,49 @@ function buildUserMessage({ description, additionalRequirements, briefText, memb
             `Available members (use these ids exactly in AssigneeUserId / LeadUserId, otherwise leave those arrays empty):\n${JSON.stringify(slim, null, 2)}`,
         );
     }
+
+    // The team's own choice of technology, and the strongest signal in this
+    // message. It goes ABOVE the catalog below because the two look alike and
+    // do opposite jobs: this one decides what the work IS, the catalog only
+    // supplies vocabulary for labelling it afterwards. Without this block the
+    // model has no platform to plan against and invents a generic custom
+    // build — a WordPress site came back with a hand-written server and REST
+    // endpoints, which is work WordPress exists to make unnecessary.
+    if (Array.isArray(selectedSkills) && selectedSkills.length) {
+        sections.push(
+            `The team has already chosen what this project is built with: ${selectedSkills.slice(0, 20).join(', ')}.\n`
+            + 'Plan the work FOR that choice. Sprints and tasks must be the ones that technology actually '
+            + 'requires, named in its own vocabulary and built from its own pieces — and must leave out work '
+            + 'it makes unnecessary. A project on a CMS, for instance, already has a backend, an admin UI and '
+            + 'form handling, so planning a custom server or REST endpoints for it would be wrong.',
+        );
+    }
+
+    if (Array.isArray(availableSkills) && availableSkills.length) {
+        sections.push(
+            `The company's project skills (pick the ones this project genuinely needs for "skills", using these exact slugs — never invent a slug, and leave the array empty if none apply):\n${JSON.stringify(availableSkills.slice(0, 120), null, 2)}`,
+        );
+    }
+
+    // The same directive AI-Assist uses for its sub-tasks toggle, which is the
+    // one place this reliably works. Stating the rule in the system prompt was
+    // not enough: the model produced one split task out of forty. It sits in
+    // the USER message, last, where the model weights it most heavily.
+    //
+    // Unconditional here, unlike AI-Assist — splitting oversized work is a
+    // company rule for every project, not a per-run option.
+    sections.push(
+        `SUB-TASKS (company rule — you MUST use them): no task may carry more than ${MAX_TASK_HOURS} hours. `
+        + `Give every task an "estimatedHours". When the honest estimate for a task exceeds ${MAX_TASK_HOURS} hours, `
+        + 'you MUST break it down with a "subtasks" array on that task instead of shrinking the estimate — each entry '
+        + `is { "TaskName": "...", "estimatedHours": <= ${MAX_TASK_HOURS}, "descriptionBlocks": [ ... ] }. `
+        + 'Give each sub-task a SHORT description: at least one paragraph saying what it involves; it does NOT need '
+        + 'the full "What to do" / "Acceptance criteria" skeleton that top-level tasks use. The sub-task estimates '
+        + 'add up to the honest total, and the parent task then carries NO "estimatedHours" of its own. '
+        + 'A plan in which every task is flat is WRONG unless every single task genuinely fits in '
+        + `${MAX_TASK_HOURS} hours — real projects almost always contain multi-part work that does not. `
+        + 'Only genuinely single-step tasks stay flat. Never nest sub-tasks under sub-tasks.',
+    );
 
     sections.push(
         'Reminder: emit ONE JSON object only. needsClarification MUST be false. Include the full "plan" object.',

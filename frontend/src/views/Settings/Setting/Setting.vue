@@ -13,6 +13,8 @@
                     :editPermission="checkPermission('settings.milestone_weekly_range')" />
                 <settingFileExtesnsions v-if="checkPermission('settings.settings_file_extensions') !== null"
                     :editPermission="checkPermission('settings.settings_file_extensions')" />
+                <SettingProjectSkills v-if="checkPermission('settings.settings_edit_company') !== null"
+                    :editPermission="checkPermission('settings.settings_edit_company') === true" />
             </div>
             <div class="task_priority_wrapper">
                 <ShareRefferalCode/>
@@ -43,6 +45,7 @@ import SettingTaskPriorityVue from "@/components/molecules/Setting/SettingTaskPr
 import SettingMilestoneWeeklyRange from "@/components/molecules/Setting/SettingMilestoneWeeklyRange.vue";
 import SettingMilestoneStatus from "@/components/molecules/Setting/SettingMilestoneStatus.vue";
 import settingFileExtesnsions from "@/components/molecules/Setting/SettingFileExtensions.vue";
+import SettingProjectSkills from "@/components/molecules/Setting/SettingProjectSkills.vue";
 import SettingCurrency from "@/components/molecules/Setting/SettingCurrencys.vue";
 import SettingScreenshotRetention from "@/components/molecules/Setting/SettingScreenshotRetention.vue";
 import SettingAutoCloseProjects from "@/components/molecules/Setting/SettingAutoCloseProjects.vue";
