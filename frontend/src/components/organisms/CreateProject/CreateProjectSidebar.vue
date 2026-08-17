@@ -16,7 +16,7 @@
                     <button class="btn outline-primary d-flex align-items-center justify-content-center create-project-cancelbtn" :class="{'cursor-pointer' : (!isSpinner || !isSpinnerForTemplate) , 'cursor-default pointer-event-none' : (isSpinner || isSpinnerForTemplate)}" :disabled="(isSpinner || isSpinnerForTemplate)" @click="handleCloseSidebar">{{$t('Projects.cancel')}}</button>
                 </template>
             <template #body>
-                <div class="bg-light-gray mobile-common-background h-100" :class="{'p-015' : !isDisplayTemplate , 'addUseTemplate' : isDisplayTemplate, 'wizard-tt-fill' : activeIndex === 3 && !isDisplayTemplate, 'wizard-step-fill' : (activeIndex === 3 || activeIndex === 4 || activeIndex === 5) && !isDisplayTemplate}" >
+                <div class="bg-light-gray mobile-common-background h-100" :class="{'p-015' : !isDisplayTemplate , 'addUseTemplate' : isDisplayTemplate, 'wizard-tt-fill' : activeIndex === 3 && !isDisplayTemplate, 'wizard-status-fill' : (activeIndex === 4 || activeIndex === 5) && !isDisplayTemplate, 'wizard-step-fill' : (activeIndex === 3 || activeIndex === 4 || activeIndex === 5) && !isDisplayTemplate}" >
                     <div class="header-sidebar default-background-header d-flex bg-white border-radius-8-px">
                         <div id="create-project-loading" class="createProjectWizardSlider createProjectBlankUseTemplateWrapper w-100" :class="{'p-020' : !isDisplayTemplate}">
                             <template v-if="checkProjectPlan() === true">
@@ -1009,6 +1009,35 @@ const  { checkAllFields } = useValidation();
     .wizard-tt-fill .taskyou_need_right .ddf__root { min-height: 0; display: flex; flex-direction: column; }
     .wizard-tt-fill .taskyou_need_right .status_ul { flex: 1 1 auto; max-height: none !important; min-height: 0; overflow-y: auto; }
     .wizard-tt-fill .taskyou_need_right .addStatusBtn { flex: none; padding-top: 12px; }
+
+    /* Status steps (project-status / task-status), desktop: same intent as the task-type step —
+       fill the body height so the columns use the space and Prev/Next pins to the bottom (no dead
+       space below it). The section is the scroll area here because the status right column has
+       several sections (active / done / close) rather than one list to scroll. */
+    .wizard-status-fill { display: flex; flex-direction: column; box-sizing: border-box; }
+    .wizard-status-fill > .header-sidebar { flex: 1 1 auto; min-height: 0; }
+    .wizard-status-fill > .header-sidebar > .createProjectWizardSlider { display: flex; flex-direction: column; min-height: 0; }
+    .wizard-status-fill #project-step-container { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+    .wizard-status-fill .conditional-btn-wrapper { flex: none; }
+    .wizard-status-fill .statusHeader,
+    .wizard-status-fill #project-step-container > .taskStatusSection { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+    .wizard-status-fill .statusHeader > .bg-light-gray,
+    .wizard-status-fill .statusHeader > div:first-child,
+    .wizard-status-fill #project-step-container > .taskStatusSection > .bg-light-gray { flex: none; }
+    /* the section is NOT a shared scroll — each column scrolls on its own (below). */
+    .wizard-status-fill .taskStatusSection { flex: 1 1 auto; min-height: 0; max-height: none !important; overflow: hidden !important; display: flex; flex-direction: column; }
+    .wizard-status-fill .usetemplatesWrapper { flex: none; }
+    .wizard-status-fill #project-step-container .statusTaskWrapper { flex: 1 1 auto; min-height: 0; }
+    /* left: templates list is content-height (flex-grow 0 → no gap before +New) and scrolls on its
+       own only when it is taller than the column. */
+    .wizard-status-fill .taskStatusLeft { display: flex; flex-direction: column; min-height: 0; }
+    .wizard-status-fill .taskStatusLeft .templated_name_ul { flex: 0 1 auto; min-height: 0; max-height: none !important; overflow-y: auto; }
+    .wizard-status-fill .taskStatusLeft .add_template,
+    .wizard-status-fill .taskStatusLeft .err_temp_status { flex: none; }
+    /* right: its own scroll, independent of the templates list (override project-status's 308px cap). */
+    .wizard-status-fill .taskStatusRight { display: flex; flex-direction: column; min-height: 0; max-height: none !important; overflow-y: auto !important; }
+    .wizard-status-fill .taskStatusRight .status_ul { max-height: none !important; }
+    .wizard-status-fill .taskStatusRight .addStatusBtn { flex: none; }
 }
 
 /* Mobile: the three shell steps (task-type / project-status / task-status) each show ONE
