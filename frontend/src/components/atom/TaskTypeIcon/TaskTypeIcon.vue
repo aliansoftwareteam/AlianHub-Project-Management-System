@@ -86,8 +86,14 @@ watch(isLibrary, (lib) => {
    frames the icon outward instead of shrinking it, keeping each call-site's declared
    icon size intact. Tint + hairline derive from the icon's own colour via color-mix,
    so the badge always matches the icon and stays legible for pale strokes. */
+/* Default size so uploaded images render even where the caller's size class lives in a
+   CSS chunk that page never loads (e.g. .task__type-image ships with the task-list). */
 .tticon__box {
     box-sizing: content-box;
+    width: 15px;
+    height: 15px;
+    object-fit: contain;
+    flex: none;
     padding: 2px;
     border-radius: 4px;
     vertical-align: middle;
@@ -99,8 +105,8 @@ watch(isLibrary, (lib) => {
    per-call-site classes/inline styles (e.g. 13–14px task__type-image). Does not
    affect uploaded images (they don't get this class). */
 .tticon--lib {
-    width: 17px !important;
-    height: 17px !important;
+    width: 15px !important;
+    height: 15px !important;
     vertical-align: middle;
     flex: none;
 }
