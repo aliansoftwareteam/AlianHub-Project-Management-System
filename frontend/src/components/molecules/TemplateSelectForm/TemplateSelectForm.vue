@@ -60,7 +60,7 @@
             <span class="tsf-active-template text-ellipsis text-capitalize" :title="modelValue && modelValue.TemplateName">{{ modelValue && modelValue.TemplateName }}</span>
             <button v-if="activeDirty" type="button" class="tsf-save-template" :class="{ 'pointer-event-none': isSaving }" @click="saveActive()">{{ $t('Templates.save_template') }}</button>
         </div>
-        <div class="tsf-list-scroll"><slot name="list" /></div>
+        <slot name="list" />
     </div>
 </div>
 </template>
@@ -224,10 +224,6 @@ defineExpose({ closeInputs });
     line-height: 16px;
     cursor: pointer;
 }
-/* Transparent wrapper — it only groups the slot so the pinned sub-header is a sibling. The
-   wizard's .taskStatusSection is the actual scroll area (both mobile and desktop layouts
-   treat the slot content as direct children of the right column). */
-.tsf-list-scroll { display: contents; }
 @media (max-width: 767px) {
     /* touch has no hover → show the per-row edit/delete icons inline on the templates sub-step */
     .taskStatusLeft ul.templated_name_ul li span.task-leftside.tsf-actions-mobile img.taskleftEditIcon,

@@ -48,6 +48,7 @@
                     </ul>
                 </div>
                 <DragDropField :group="{ name: 'task_status_group' }"
+                    class="tsf-fill-list"
                     :isDeletable="true" :isChangeColor="true"
                     v-model="theModel.taskStatusField.value.ActiveStatusList"
                     categoryTytpe="active"

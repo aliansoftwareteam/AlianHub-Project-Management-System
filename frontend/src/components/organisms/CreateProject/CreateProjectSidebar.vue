@@ -1051,33 +1051,36 @@ const  { checkAllFields } = useValidation();
     .wizard-step-fill #project-step-container { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; max-height: none !important; overflow: hidden !important; }
     .wizard-step-fill .conditional-btn-wrapper { flex: none; }
 
-    /* form root: statusHeader (task-type/task-status) or the taskStatusSection.statusTaskWrapper
-       root (project-status) — fills and stacks its title above the columns. */
+    /* form root fills + stacks the step title above the columns. */
     .wizard-step-fill .statusHeader,
     .wizard-step-fill #project-step-container > .taskStatusSection { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
     .wizard-step-fill .statusHeader > .bg-light-gray,
     .wizard-step-fill .statusHeader > div:first-child,
     .wizard-step-fill #project-step-container > .taskStatusSection > .bg-light-gray { flex: none; }
-    /* the section below the fixed step header is THE scroll area — it has a bounded height (the
-       same flex:1 chain that pins the footer), so a long list scrolls here while the step header
-       + Prev/Next stay put. TemplateSelectForm's sub-header is position:sticky within this scroll.
-       overflow-y:auto must beat the form's own .style-scroll{overflow:auto/340px}. */
+    /* the section is the scroll area (identical to the task-status step): the column content scrolls
+       here while the gray step header + Prev/Next stay put; the sub-header is position:sticky. */
     .wizard-step-fill .taskStatusSection { flex: 1 1 auto; min-height: 0; max-height: none !important; overflow-y: auto !important; display: flex; flex-direction: column; }
-
-    /* the always-present empty .usetemplatesWrapper is also a .statusTaskWrapper — don't stretch it. */
     .wizard-step-fill .usetemplatesWrapper { flex: none; }
     .wizard-step-fill #project-step-container .statusTaskWrapper { flex: 1 1 auto; min-height: 0; }
+
+    /* under 480px style.css sets .statusTaskWrapper{flex-wrap:wrap}; force nowrap so tall content
+       scrolls in the section instead of wrapping into a second column. */
+    .wizard-step-fill #project-step-container,
+    .wizard-step-fill .statusHeader,
+    .wizard-step-fill .taskStatusSection,
+    .wizard-step-fill .statusTaskWrapper,
     .wizard-step-fill .taskStatusLeft,
-    .wizard-step-fill .taskStatusRight { display: flex; flex-direction: column; min-height: 0; }
-    /* uncap the desktop list heights (140px left / 220px right) so nothing clips; lists grow to
-       fill a short column but never shrink below content, so a long list overflows into the
-       section scroll above. */
+    .wizard-step-fill .taskStatusRight { flex-wrap: nowrap; }
+
+    /* columns flow their content into the section scroll; max-height:none overrides project-status's
+       leftover scoped 300px cap so it matches the task-status step (which has no such cap). */
+    .wizard-step-fill .taskStatusLeft,
+    .wizard-step-fill .taskStatusRight { display: flex; flex-direction: column; min-height: 0; max-height: none !important; overflow: visible !important; }
+    /* uncap the desktop list heights (140px left / 220px right) so nothing clips inside the scroll. */
     .wizard-step-fill .taskStatusLeft .templated_name_ul,
     .wizard-step-fill .taskStatusRight .status_ul { max-height: none !important; overflow: visible !important; }
-    .wizard-step-fill .taskStatusLeft .templated_name_ul { flex: 1 0 auto; min-height: 0; }
-    .wizard-step-fill .taskyou_need_right .ddf__root { flex: 1 0 auto; min-height: 0; display: flex; flex-direction: column; }
     .wizard-step-fill .taskStatusLeft .add_template,
     .wizard-step-fill .taskStatusLeft .err_temp_status,
-    .wizard-step-fill .taskyou_need_right .addStatusBtn { flex: none; }
+    .wizard-step-fill .taskStatusRight .addStatusBtn { flex: none; }
 }
 </style>

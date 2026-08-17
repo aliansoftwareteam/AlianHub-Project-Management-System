@@ -1,11 +1,12 @@
 <!-- =========================================================================================
     Created By : Dipsha Kalariya
     Commnet : This component is used to display project status detail for blank project form as step-5 in create project module.
-    Now a thin wrapper over the reusable <TemplateSelectForm>: it owns the project-status
-    data, store/API operations and the right-column list; the shell owns the template picker UI.
+    Thin wrapper over the reusable <TemplateSelectForm>. The right column mirrors the task-status
+    step (DragDropField-based active/done lists + fixed close row) so it shares that step's fill
+    and scroll behaviour, but every action is wired to the project-status store/API/data.
 ========================================================================================== -->
 <template>
-<div class="taskStatusSection statusTaskWrapper">
+<div class="statusHeader">
     <div class="bg-light-gray text-center mb-30px"
     :style="[{padding : clientWidth > 767 ? '16.5px' : '18.5px'}]"
     :class="{'border-radius-5-px': clientWidth > 767 , 'border-radius-8-px': clientWidth <= 767}"
@@ -13,11 +14,12 @@
         <h3 v-if="fromWhich == ''" :class="{'task-heading-desktop': clientWidth > 767 , 'task-heading-mobile': clientWidth <= 767}">{{$t('Projects.project_status')}}</h3>
         <h3 v-else :class="{'task-heading-desktop': clientWidth > 767 , 'task-heading-mobile': clientWidth <= 767}">{{$t('Projects.what_project')}}?</h3>
     </div>
+    <div class="taskStatusSection style-scroll">
     <TemplateSelectForm
         :templates="templateList"
         :modelValue="theModel.projectStatusField.value"
         :isSaving="isSpinner"
-        rightClass="style-scroll"
+        rightClass="status_right status_new_right"
         @update:modelValue="setTemplateData"
         @create="onCreateTemplate"
         @rename="onRenameTemplate"
@@ -26,117 +28,79 @@
         @left-focus="onLeftFocus"
     >
         <template #list>
-            <label class="status_lable" :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}">{{ $t('Projects.active_status') }}</label>
-            <draggable v-model="theModel.projectStatusField.value.projectActiveStatus" tag="ul" class="status_ul" @update:modelValue="$emit('update:modelValue',$event)" :item-key="makeUniqueId(5)" :group="'project_status_group'" :move="checkMove" @change="updateItem(theModel.projectStatusField.value.projectActiveStatus,$event,'active')">
-                <template #item="{ element, index }">
-                    <li class=" d-flex align-items-center justify-content-between closeStatus position-re">
-                        <span class="taskInnerData"  v-if="!element.isEditable">
-                            <div class="d-flex align-items-center  position-re" >
-                                <span class="drag-image-wrapper position-ab" v-if="element.default !== true">
-                                    <img :src="dragIcon" class="dragImage position-re" :style="[{top : clientWidth > 767 ? '2px !important' : '4.5px !important'}]"/>
-                                </span>
-                            <input v-if="!element.isAddNewStatus && element.textColor" :id="`ActiveTaskStatus${index}`" type="color" v-model.trim="element.textColor" @input="element.backgroundColor = element.textColor+'35'" class="ignore-drag input__ignore-drag p-0 mr-8px d-inline-block border-radius-2-px border-0 bg-transparent" disabled>
-                            <span :class="{'taskInnerData-desktop': clientWidth > 767 , 'taskInnerData-mobile': clientWidth <= 767}">{{ element.name }}</span>
-                            </div>
-                        </span>
-                        <input v-if="element.isEditable" class="statusInputText form-control edit-input" type="text" v-model.trim="element.name" @keypress.enter.prevent="manageSelectedOption(element,'active')" @input="$emit('resetTaskTypeErr')"/>
-                        <img :src="saveData" class="cursor-pointer" v-if="element.isEditable" @click="manageSelectedOption(element,'active')">
-                        <img :src="deletered" class="cursor-pointer ml-10px" v-if="element.isEditable" @click="element.isEditable = false, element.name = taskTypeNameData,$emit('disableNext',false)">
-                        <span class="taskInnerData task-dropdown" v-if="!element.isEditable && element.default!== true">
-                            <DropDown id="" class="status_change_dropdown" v-if="element.default ? false : true">
-                                <template #button>
-                                    <button class="btn-white border cursor-pointer dot-btn">
-                                        <img :src="dotcolor">
-                                    </button>
-                                </template>
-                                <template #options>
-                                    <DropDownOption @click="deleteProjectStatus(element,'active')" class="mobile-delete-status">
-                                        <img :src="deleteIcon" class="mr-10px"> {{$t('Templates.remove')}}
-                                    </DropDownOption>
-                                </template>
-                            </DropDown>
-                        </span>
-                    </li>
-                </template>
-            </draggable>
+            <h3 :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}">{{ $t('Projects.active_status') }}</h3>
+            <DragDropField
+                :group="{ name: 'project_status_group' }"
+                class="tsf-fill-list"
+                v-if="theModel.projectStatusField.value && Object.keys(theModel.projectStatusField.value).length > 0"
+                :isDeletable="true" :isChangeColor="true"
+                v-model="theModel.projectStatusField.value.projectActiveStatus"
+                categoryTytpe="active"
+                @change:DraggableOption="updateItem"
+                @enter:updateFieldValue="onStatusEdit"
+                @click:updateFieldValue="onStatusEdit"
+                @input:deleteFieldValue="(element) => deleteProjectStatus(element,'active')"
+                @resetTaskTypeErr="$emit('resetTaskTypeErr')"
+                @disbaleButton="(val)=>{$emit('disableNext',val)}"
+                :addTaskType="addTaskType"
+                :useDataArray="useDataArray"
+                :projectData="projectData"
+            />
             <div class="addStatusBtn searchValue">
                 <button class="cursor-pointer btn btn-primary ml-0" type="button" v-if="!addTaskType" @click="taskTypeName = '',isTaskSidebarOpen = true">+ {{$t('Projects.add_status')}}</button>
             </div>
-            <div>
-                <label class="task-done-status" :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}">{{$t('Projects.done_status')}}</label>
-                <draggable v-model="theModel.projectStatusField.value.projectDoneStatus" tag="ul" class="status_ul" @update:modelValue="$emit('update:modelValue',$event)" :item-key="makeUniqueId(5)" :group="'project_status_group'" :move="checkMove" @change="updateItem(theModel.projectStatusField.value.projectDoneStatus,$event,'done')">
-                    <template #item="{ element, index }">
-                        <li class=" d-flex align-items-center justify-content-between closeStatus">
-                            <span class="taskInnerData"  v-if="!element.isEditable">
-                                <div class="d-flex align-items-center  position-re">
-                                    <span class="drag-image-wrapper position-ab" v-if="element.default !== true">
-                                        <img :src="dragIcon" class="dragImage position-re" :style="[{top : clientWidth > 767 ? '2px !important' : '4.5px !important'}]"/>
-                                    </span>
-                                <input v-if="!element.isAddNewStatus && element.textColor" :id="`ActiveTaskStatus${index}`" type="color" v-model.trim="element.textColor" @input="element.backgroundColor = element.textColor+'35'" class="ignore-drag input__ignore-drag p-0 mr-8px d-inline-block border-radius-2-px border-0 bg-transparent" disabled>
-                                {{ element.name }}
-                                </div>
-                            </span>
-                            <input v-if="element.isEditable" class="statusInputText form-control edit-input" type="text" v-model.trim="element.name" @keypress.enter.prevent="manageSelectedOption(element,'done')" @input="$emit('resetTaskTypeErr')"/>
-                            <img :src="saveData" class="cursor-pointer" v-if="element.isEditable" @click="manageSelectedOption(element,'done')">
-                            <img :src="deletered" class="cursor-pointer ml-10px" v-if="element.isEditable" @click="element.isEditable = false, element.name = taskTypeNameData,$emit('disableNext',false)">
-                            <span class="taskInnerData task-dropdown" v-if="!element.isEditable && element.default!== true">
-                                <DropDown id="" class="status_change_dropdown">
-                                    <template #button>
-                                        <button class="btn-white border cursor-pointer dot-btn">
-                                            <img :src="dotcolor">
-                                        </button>
-                                    </template>
-                                    <template #options>
-                                        <DropDownOption @click="deleteProjectStatus(element,'done')" class="mobile-delete-status">
-                                            <img :src="deleteIcon" class="mr-10px"> {{$t('Templates.remove')}}
-                                        </DropDownOption>
-                                    </template>
-                                </DropDown>
-                            </span>
+            <h3 :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}">{{$t('Projects.done_status')}}</h3>
+            <DragDropField
+                :group="{ name: 'project_status_group' }"
+                v-if="theModel.projectStatusField.value && Object.keys(theModel.projectStatusField.value).length > 0"
+                :isDeletable="true" :isChangeColor="true"
+                v-model="theModel.projectStatusField.value.projectDoneStatus"
+                categoryTytpe="done"
+                @change:DraggableOption="updateItem"
+                @enter:updateFieldValue="onStatusEdit"
+                @click:updateFieldValue="onStatusEdit"
+                @input:deleteFieldValue="(element) => deleteProjectStatus(element,'done')"
+                @resetTaskTypeErr="$emit('resetTaskTypeErr')"
+                @disbaleButton="(val)=>{$emit('disableNext',val)}"
+                :addTaskType="addTaskType"
+                :useDataArray="useDataArray"
+                :projectData="projectData"
+            />
+            <div v-if="theModel.projectStatusField.value.projectCompletedStatus && Object.keys(theModel.projectStatusField.value.projectCompletedStatus).length > 0">
+                <h3 :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile mt-030': clientWidth <= 767}">{{$t('Projects.close_status')}}</h3>
+                <div class="statuInputwrapper activeStatus">
+                    <ul class="status_ul">
+                        <li class="d-flex align-items-center justify-content-between">
+                            <div class="d-flex align-items-center w-100 ml-16px">
+                                <input type="color" v-model.trim="theModel.projectStatusField.value.projectCompletedStatus.textColor" class="p-0 mr-8px d-inline-block border-radius-2-px border-0 bg-transparent cursor-pointer project__status-icon" disabled>
+                                <span class="style_changes_value" :class="{'taskInnerData-desktop': clientWidth > 767 , 'taskInnerData-mobile': clientWidth <= 767}" :style="[{'color': theModel.projectStatusField.value.projectCompletedStatus.textColor}]">{{theModel.projectStatusField.value.projectCompletedStatus.name}}</span>
+                            </div>
                         </li>
-                    </template>
-                </draggable>
-            </div>
-            <div class="mt-30px"  v-if="theModel.projectStatusField.value.projectCompletedStatus && Object.keys(theModel.projectStatusField.value.projectCompletedStatus).length > 0">
-                <label class="status_lable" :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}">{{$t('Projects.close_status')}}</label>
-                <div class="statuInputwrapper d-flex align-items-center justify-content-between closeStatus" :style="[{'border-color': theModel.projectStatusField.value.projectCompletedStatus?.backgroundColor}]">
-                    <div class="d-flex align-items-center" :class="[{'edit_name_value':theModel.projectStatusField.value.projectCompletedStatus?.isEditable}]">
-                        <input type="color" class="color-input p-0 mr-8px d-inline-block border-radius-2-px border-0 bg-transparent" ref="closeStatus"  v-model="theModel.projectStatusField.value.projectCompletedStatus.textColor" @input="theModel.projectStatusField.value.projectCompletedStatus.backgroundColor = theModel.projectStatusField.value.projectCompletedStatus?.textColor+'35'"  disabled>
-                        <span class="style_changes_value text-ellipsis" v-if="!theModel.projectStatusField.value.projectCompletedStatus?.isEditable" :style="[{'color': theModel.projectStatusField.value.projectCompletedStatus?.textColor}]" :class="{'font-size-13px' : clientWidth >767 , 'font-size-16px' : clientWidth > 767 }">{{theModel.projectStatusField.value.projectCompletedStatus?.name}} </span>
-                    </div>
+                    </ul>
                 </div>
             </div>
         </template>
     </TemplateSelectForm>
+    </div>
     <TaskStatusSidebar v-if="isTaskSidebarOpen" :isTaskSidebarOpen="isTaskSidebarOpen" @closesidebar="isTaskSidebarOpen = false" :title="$t('Projects.list_of_project_status')" :options="statusOPtion" @selected="updateTaskStatus" @removed="removeTaskStatus" :isAddStatus="true" :type="'project_status'" :useDataArray="useDataArray"/>
 </div>
 </template>
 <script setup>
-import draggable from 'vuedraggable';
 import { useStore } from "vuex";
 import { ref, defineProps, onMounted, defineComponent , inject, watch} from 'vue';
 import {useToast} from 'vue-toast-notification';
-import { useCustomComposable } from "@/composable";
+import DragDropField from '@/components/atom/DragDropField/DragDropField.vue';
 import TaskStatusSidebar from '@/components/molecules/TaskStatusSidebar/TaskStatusSidebar.vue';
 import TemplateSelectForm from '@/components/molecules/TemplateSelectForm/TemplateSelectForm.vue';
-import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
-import DropDown from '@/components/molecules/DropDown/DropDown.vue';
 import cloneDeep from 'lodash/cloneDeep'; // Import a cloning library
 import { useI18n } from "vue-i18n";
 import * as env from '@/config/env';
 import { apiRequest } from '@/services/index';
 const { t } = useI18n();
 const { getters, commit } = useStore();
-const {makeUniqueId} = useCustomComposable();
     defineComponent({
         name: "Projects-Status-form",
     })
-    const deletered = require("@/assets/images/svg/deletered.svg");
-    const saveData = require("@/assets/images/save.png");
-    const dragIcon = require("@/assets/images/svg/Swip.svg");
-    const dotcolor = require("@/assets/images/svg/three_dot.svg");
-    const deleteIcon = require("@/assets/images/svg/redDelete_Icon.svg");
-    const taskTypeNameData = ref('');
     const isSpinner = ref(false);
     const props = defineProps({
         modelValue : {
@@ -246,15 +210,10 @@ const {makeUniqueId} = useCustomComposable();
             statusOPtion.value = [...theModel.value.projectStatusField.value.projectActiveStatus, ...theModel.value.projectStatusField.value.projectDoneStatus, theModel.value.projectStatusField.value.projectCompletedStatus];
         }
     })
-    function deleteProjectStatus (element,type) {
-        emit('updateStatus',element,'add');
-        let arr = type === 'active' ? theModel.value.projectStatusField.value.projectActiveStatus :theModel.value.projectStatusField.value.projectDoneStatus;
-        let findInd = arr.findIndex((x) => {
-            return x.value === element.value
-        })
-        if(findInd !== -1) {
-            arr.splice(findInd,1);
-        }
+
+    // Keep the selected template flagged dirty (Save Template) after any status edit, mirroring
+    // the other handlers so the change persists to the store.
+    function markTemplateDirty(){
         let indexKey = templateList.value.findIndex((x)=>{
             return x._id == theModel.value.projectStatusField.value._id
         });
@@ -265,38 +224,43 @@ const {makeUniqueId} = useCustomComposable();
             templateList.value[indexKey].projectCompletedStatus = {...theModel.value.projectStatusField.value.projectCompletedStatus};
             commit("settings/mutateProjectStatus", {data: templateList.value[indexKey], op: "modified"});
         }
+    }
+
+    function deleteProjectStatus (element,type) {
+        emit('updateStatus',element,'add');
+        let arr = type === 'active' ? theModel.value.projectStatusField.value.projectActiveStatus :theModel.value.projectStatusField.value.projectDoneStatus;
+        let findInd = arr.findIndex((x) => {
+            return x.value === element.value
+        })
+        if(findInd !== -1) {
+            arr.splice(findInd,1);
+        }
+        markTemplateDirty();
         emit('update:modelValue', theModel.value);
     }
 
-    function checkMove (e) {
-       return !(e.draggedContext.element.default);
-    }
-
-    function updateItem(item, event,type){
+    function updateItem(item, event, type){
+        // reorder / move between active <-> done, emitted by DragDropField
         if(event.added !== undefined){
             event.added.element.type = type;
         }
-        let indexKey = templateList.value.findIndex((x)=>{
-            return x._id == theModel.value.projectStatusField.value._id
-        });
         if(type === 'active'){
             theModel.value.projectStatusField.value.projectActiveStatus = item
         }
         if(type === 'done'){
             theModel.value.projectStatusField.value.projectDoneStatus = item;
         }
-        if(indexKey !== -1 && theModel.value.projectStatusField.value.TemplateName !== 'Custom'){
-            templateList.value[indexKey].isShowSave = true;
-            if(type === 'active'){
-                templateList.value[indexKey].projectActiveStatus = [...item];
-            }
-            if(type === 'done'){
-                templateList.value[indexKey].projectDoneStatus = [...item];
-            }
-            commit("settings/mutateProjectStatus", {data: templateList.value[indexKey], op: "modified"});
-        }
+        markTemplateDirty();
         emit('update:modelValue', theModel.value);
     }
+
+    function onStatusEdit(element){
+        // inline rename save of a status row (DragDropField edit mode)
+        if(element) element.isEditable = false;
+        markTemplateDirty();
+        emit('update:modelValue', theModel.value);
+    }
+
     function setTemplateData(itemData) {
         theModel.value.projectStatusField.value = {};
         theModel.value.projectStatusField.value = itemData;
@@ -427,16 +391,7 @@ const {makeUniqueId} = useCustomComposable();
         }else if(event.type === 'done'){
             theModel.value.projectStatusField.value.projectDoneStatus = [...theModel.value.projectStatusField.value.projectDoneStatus,event];
         }
-        let indexKey = templateList.value.findIndex((x)=>{
-            return x._id == theModel.value.projectStatusField.value._id
-        });
-        if(indexKey !== -1 && theModel.value.projectStatusField.value.TemplateName !== 'Custom'){
-            templateList.value[indexKey].isShowSave = true;
-            templateList.value[indexKey].projectActiveStatus = [...theModel.value.projectStatusField.value.projectActiveStatus];
-            templateList.value[indexKey].projectDoneStatus = [...theModel.value.projectStatusField.value.projectDoneStatus];
-            templateList.value[indexKey].projectCompletedStatus = {...theModel.value.projectStatusField.value.projectCompletedStatus};
-            commit("settings/mutateProjectStatus", {data: templateList.value[indexKey], op: "modified"});
-        }
+        markTemplateDirty();
         emit('settingValue',theModel.value)
     }
 
@@ -459,16 +414,7 @@ const {makeUniqueId} = useCustomComposable();
                 theModel.value.projectStatusField.value.projectDoneStatus.splice(doneIndex,1);
             }
         }
-        let indexKey = templateList.value.findIndex((x)=>{
-            return x._id == theModel.value.projectStatusField.value._id
-        });
-        if(indexKey !== -1 && theModel.value.projectStatusField.value.TemplateName !== 'Custom'){
-            templateList.value[indexKey].isShowSave = true;
-            templateList.value[indexKey].projectActiveStatus = [...theModel.value.projectStatusField.value.projectActiveStatus];
-            templateList.value[indexKey].projectDoneStatus = [...theModel.value.projectStatusField.value.projectDoneStatus];
-            templateList.value[indexKey].projectCompletedStatus = {...theModel.value.projectStatusField.value.projectCompletedStatus};
-            commit("settings/mutateProjectStatus", {data: templateList.value[indexKey], op: "modified"});
-        }
+        markTemplateDirty();
     }
 
     async function onDeleteTemplate(temp) {
@@ -485,41 +431,4 @@ const {makeUniqueId} = useCustomComposable();
 </script>
 <style scoped>
 @import './style.css';
-.closeStatus {
-    list-style: none;
-    border: 1px solid #ececec!important;
-    border-radius: 5px;
-    padding: 0px 10px 0px 23px;
-    margin-bottom: 10px;
-}
-input.form-control.edit-input{
-    margin: 1px 8px 1px 0px;
-    background-color: #f1f1f1;
-    border: 0px;
-}
-input.form-control.edit-input1 {
-    margin: 1px 8px 1px 0px;
-    background-color: #f1f1f1;
-    border: 0;
-}
-.input__ignore-drag{
-    width: 12px;
-    height: 12px;
-}
-.taskStatusSection .add_new_temp{
-    flex-grow: 1;
-    padding-right: 56px !important;
-    box-sizing: border-box;
-}
-.taskStatusSection.statusTaskWrapper :deep(.taskStatusRight){overflow: auto;max-height: 308px;}
-.taskStatusSection.statusTaskWrapper {overflow: unset;max-height: fit-content;}
-@media(max-width:1366px){
-    .taskStatusSection.statusTaskWrapper :deep(.taskStatusRight){overflow: auto;max-height: 308px;}
-    .taskStatusSection.statusTaskWrapper {overflow: unset;max-height: fit-content;}
-}
-@media(max-width:767px){
-    .closeStatus{height: 40px;}
-    .taskStatusSection.statusTaskWrapper :deep(.taskStatusRight){max-height: 300px;}
-}
-
 </style>
