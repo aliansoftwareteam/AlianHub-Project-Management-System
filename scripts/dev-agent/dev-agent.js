@@ -328,6 +328,24 @@ async function fetchComments(cfg, projectId, taskId) {
     } catch (e) { return []; }
 }
 
+// Prior Development-tab conversation. The task memory file only carries what the
+// agent chose to write down, so without this an earlier instruction it didn't
+// record is lost on the next turn.
+async function fetchDevChat(cfg, taskId) {
+    if (!taskId) return [];
+    try {
+        const res = await api(cfg, 'GET', `/api/v2/dev-agent/messages?taskId=${encodeURIComponent(taskId)}`);
+        const rows = res && res.data;
+        return Array.isArray(rows) ? rows : [];
+    } catch (e) { return []; }
+}
+
+// The agent's live-progress message holds the whole activity log (dozens of
+// lines, rewritten in place as it works) — that is a UI artifact, not
+// conversation, so it must never reach the prompt. Both headers come from
+// renderProgress() below.
+const isProgressLog = (text) => /^(🧾 Activity —|⚙️ Working…)/.test(String(text || '').trim());
+
 // Verify the AI's work before it becomes a PR (A1): syntax-check every changed JS file
 // with `node --check` (instant, no deps) so a parse error is caught + self-fixed here,
 // not in CI. Build/lint/test verification comes in a later pass (it needs a non-blocking
@@ -454,12 +472,13 @@ function readContext(dir, taskKey) {
     } catch (e) { return ''; }
 }
 
-function buildPrompt({ taskKey, taskName, description, instruction, pushable, contextPath, contextText, comments, meta }) {
+function buildPrompt({ taskKey, taskName, description, instruction, pushable, contextPath, contextText, comments, chat, meta }) {
     return [
         `You are developing AlianHub task ${taskKey}: ${taskName}.`,
         meta ? `\n${meta}` : '',
         description ? `\nTask description / acceptance criteria:\n${description}` : '',
         comments ? `\nTask discussion so far (oldest → newest) — requirements and clarifications often live in the comments, so read them and honour them:\n${comments}` : '',
+        chat ? `\nDevelopment tab conversation so far (oldest → newest) — the instructions you were already given on this task, and your own replies. Honour them as still standing unless the instruction for this turn contradicts them; where two conflict, the later one wins:\n${chat}` : '',
         contextText ? `\nPrior development context for this task (from ${contextPath}, written on earlier turns — possibly by other developers on other machines). Read it and continue from where it left off; do NOT redo work already done:\n${contextText}` : '',
         `\nThe user's instruction for this turn:\n${instruction}`,
         '',
@@ -503,7 +522,7 @@ function ensureTrusted(dir) {
 // Develop ONE turn. If the target is pushable (has a git remote), work on the
 // task branch and open/update a PR. Otherwise just build in the folder and let
 // the developer test locally. Returns { prUrl, note }.
-async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, description, instruction, onProgress, cancel, conv, comments, meta }) {
+async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, description, instruction, onProgress, cancel, conv, comments, chat, meta }) {
     ensureTrusted(dir);
     const cv = conv || conventional({ TaskName: taskName }, taskKey);
     const ctxPath = contextRel(taskKey);
@@ -526,7 +545,7 @@ async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, descri
             run('git', ['checkout', '-B', branch], dir);                     // fresh
         }
 
-        const prompt = buildPrompt({ taskKey, taskName, description, instruction, pushable, contextPath: ctxPath, contextText: readContext(dir, taskKey), comments, meta });
+        const prompt = buildPrompt({ taskKey, taskName, description, instruction, pushable, contextPath: ctxPath, contextText: readContext(dir, taskKey), comments, chat, meta });
         console.log('\n🤖  Claude Code …\n');
         const result = await runClaude(cfg, dir, prompt, onEvent, cancel);
 
@@ -580,7 +599,7 @@ async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, descri
     }
 
     // Local folder — no remote. Build freely; the developer tests locally.
-    const prompt = buildPrompt({ taskKey, taskName, description, instruction, pushable, contextPath: ctxPath, contextText: readContext(dir, taskKey), comments, meta });
+    const prompt = buildPrompt({ taskKey, taskName, description, instruction, pushable, contextPath: ctxPath, contextText: readContext(dir, taskKey), comments, chat, meta });
     console.log(`\n🤖  Claude Code (local folder — building in place) …\n`);
     const result = await runClaude(cfg, dir, prompt, onEvent, cancel);
 
@@ -746,13 +765,22 @@ async function handleMessage(cfg, msg) {
             const comments = commentRows
                 .map((c) => { const b = htmlToText(c.message || c.comment || c.text || '').slice(0, 500); return b ? `- ${c.userName || c.createdByName || 'comment'}: ${b}` : ''; })
                 .filter(Boolean).slice(-15).join('\n');
+            // The turn's own instruction is passed separately, so drop it here —
+            // otherwise the agent reads it twice, once as history.
+            const chat = (await fetchDevChat(cfg, msg.taskId))
+                .filter((m) => String(m._id) !== String(msg._id) && !isProgressLog(m.text))
+                .map((m) => {
+                    const body = String(m.text || '').trim().slice(0, 600);
+                    return body ? `- ${m.role === 'agent' ? 'AI agent' : 'developer'}: ${body}` : '';
+                })
+                .filter(Boolean).slice(-20).join('\n');
             const metaBits = [];
             if (task.Task_Priority || task.priority) metaBits.push(`Priority: ${task.Task_Priority || task.priority}`);
             if (task.sprintName || task.SprintName) metaBits.push(`Sprint: ${task.sprintName || task.SprintName}`);
             const { prUrl, note, pushed, branch, verifyOk, verifyReport } = await developTurn(cfg, {
                 dir, base, pushable, taskKey, taskName: task.TaskName || '(untitled task)',
                 description: htmlToText(task.description || task.rawDescription || ''), instruction: msg.text,
-                comments, meta: metaBits.join(' · '), conv, onProgress, cancel,
+                comments, chat, meta: metaBits.join(' · '), conv, onProgress, cancel,
             });
             if (pushable && pushed && !prUrl) {
                 // PR gate (Point 2): developed + pushed — wait for approval to open the PR.
