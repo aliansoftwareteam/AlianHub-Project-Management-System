@@ -28,7 +28,7 @@
                     {{ taskName }}
                 </h4>
                 </template>
-                <span v-else>
+                <span v-else class="task-name__edit">
                     <InputText
                         input-id="taskNameEdit"
                         v-model="editTaskName"
