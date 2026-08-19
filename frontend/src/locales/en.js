@@ -986,6 +986,7 @@ export default {
         "Whiteboard View": "Whiteboard",
         "Canvas View": "Canvas",
         "Map View": "Map",
+        Docs: "Docs",
         Comment: "Comment",
         to_unlock_list_view: "To Unlock List View",
         error_message_for_empty: "Please select at least one view",
@@ -1042,6 +1043,8 @@ export default {
             "Pin tasks onto a world map to see where your work happens — placements are saved to your browser.",
         dashboard_view:
             "A project overview at a glance — task totals, completion, and estimated vs remaining hours, scoped to your role.",
+        docs_view:
+            "Write and organise the project's documents — a page tree on the left, the document you are editing on the right.",
         list_view:
             "Use List view to organize your tasks in anyway imaginable – sort, filter, group, and customize columns.",
         kanban_view:

@@ -1,5 +1,5 @@
 <template>
-    <div v-if="modelValue" class="pg" @click.self="requestClose">
+    <div v-if="isOpen" class="pg" :class="{ 'pg--embedded': embedded }" @click.self="embedded ? null : requestClose()">
         <div class="pg__shell">
             <!-- ─── Sidebar: the page tree ─────────────────────────────── -->
             <aside class="pg__side">
@@ -87,7 +87,7 @@
                             <button type="button" class="pg__icon-btn pg__icon-btn--danger" :title="$t('Projects.delete')" @click="deletePage">
                                 <span v-html="ICONS.trash"></span>
                             </button>
-                            <button type="button" class="pg__icon-btn" :title="$t('Projects.close')" @click="requestClose">
+                            <button v-if="!embedded" type="button" class="pg__icon-btn" :title="$t('Projects.close')" @click="requestClose">
                                 <span v-html="ICONS.close"></span>
                             </button>
                         </div>
@@ -194,7 +194,7 @@
 
                 <!-- Nothing open yet. -->
                 <div v-else class="pg__blank">
-                    <button type="button" class="pg__icon-btn pg__blank-close" :title="$t('Projects.close')" @click="requestClose">
+                    <button v-if="!embedded" type="button" class="pg__icon-btn pg__blank-close" :title="$t('Projects.close')" @click="requestClose">
                         <span v-html="ICONS.close"></span>
                     </button>
                     <span class="pg__blank-icon" v-html="ICONS.doc"></span>
@@ -251,6 +251,10 @@ const props = defineProps({
     // Open straight onto this doc. Set when the panel is opened from somewhere that
     // already named one — the Docs list on a task, for instance.
     openDocId: { type: String, default: '' },
+    // Rendered as a project view rather than an overlay: no backdrop, fills its
+    // container, and there is nothing to close back to — so the close controls
+    // and click-outside are dropped.
+    embedded: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['update:modelValue']);
@@ -347,7 +351,11 @@ const toggle = (id) => {
 
 const nameOf = (id) => (id ? (getUser(String(id))?.Employee_Name || '—') : '—');
 
-watch(() => props.modelValue, (open) => {
+// Embedded as a view there is no open/close cycle, so it is open from the start
+// and the watch below must fire immediately or the tree would never load.
+const isOpen = computed(() => props.embedded || props.modelValue);
+
+watch(isOpen, (open) => {
     if (open) {
         fetchPages();
         // The tree lists this project's docs; a doc opened from a task may be linked from
@@ -360,12 +368,12 @@ watch(() => props.modelValue, (open) => {
         showLinker.value = false;
         showShare.value = false;
     }
-});
+}, { immediate: true });
 
 // Opening the panel twice from two different docs without closing it in between: the
 // watch above only fires on open, so the id changing while open has to be honoured too.
 watch(() => props.openDocId, (id) => {
-    if (id && props.modelValue) openPage(id);
+    if (id && isOpen.value) openPage(id);
 });
 
 function fetchPages() {
@@ -757,6 +765,24 @@ onBeforeUnmount(() => {
     display: flex;
     overflow: hidden;
     box-shadow: 0 18px 48px rgba(23, 25, 35, 0.22);
+}
+/* As a project view it sits in the page flow, so it drops the backdrop, the
+   centring and the floating-card treatment and simply fills its container. */
+.pg--embedded {
+    position: static;
+    inset: auto;
+    background: transparent;
+    z-index: auto;
+    display: block;
+    height: 100%;
+}
+.pg--embedded .pg__shell {
+    width: 100%;
+    height: 100%;
+    min-height: 520px;
+    border-radius: 8px;
+    box-shadow: none;
+    border: 1px solid #eef0f6;
 }
 
 /* ── sidebar ─────────────────────────────────────────── */
