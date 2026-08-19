@@ -385,6 +385,13 @@ function fetchPages() {
         if (!expanded.value.size) {
             expanded.value = new Set(pages.value.filter((p) => p.parentPageId).map((p) => String(p.parentPageId)));
         }
+        // As a view, landing on "pick a doc" reads as an empty project even when
+        // it has docs, so start on the first one. Only when nothing is open and
+        // no doc was asked for — and with no docs at all the empty state is still
+        // the right answer. The panel keeps its picker: it is opened FROM a doc.
+        if (props.embedded && !current.value && !props.openDocId && rows.value.length) {
+            openPage(rows.value[0]._id);
+        }
     })
     .catch((error) => console.error('ERROR in fetch pages: ', error));
 }
