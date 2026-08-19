@@ -115,9 +115,21 @@ const PAGE_STYLE = `
     .doc p{margin:0 0 12px}
     .doc ol,.doc ul{margin:0 0 12px;padding-left:26px}
     .doc li{margin:3px 0}
+    /* Checklists. The editor writes a checked run and an unchecked run as two
+       separate <ul data-checked>, so the marker comes from the list and the
+       negative margin keeps consecutive runs reading as one list. */
+    .doc ul[data-checked]>li{list-style:none;position:relative}
+    .doc ul[data-checked]>li::before{content:'\\2610';position:absolute;left:-21px;top:0;color:#6b7280;font-size:15px}
+    .doc ul[data-checked="true"]>li::before{content:'\\2611';color:#4b5162}
+    .doc ul[data-checked]+ul[data-checked]{margin-top:-12px}
     .doc blockquote{margin:0 0 12px;padding:2px 0 2px 14px;border-left:4px solid #e0e0e0;color:#555}
     .doc pre{background:#f6f7f9;border-radius:6px;padding:12px 14px;overflow-x:auto;font-size:13px;white-space:pre-wrap;word-break:break-word}
     .doc img{max-width:100%;height:auto}
+    /* The editor gives a video no dimensions, so without this an embed collapses
+       to a few pixels. 16:9, and it shrinks with the column. */
+    .doc iframe.ql-video{display:block;width:100%;max-width:680px;aspect-ratio:16/9;height:auto;min-height:200px;border:0;border-radius:8px;background:#000}
+    .doc iframe.ql-video.ql-align-center{margin-left:auto;margin-right:auto}
+    .doc iframe.ql-video.ql-align-right{margin-left:auto}
     .doc a{color:#5b4ccc}
     .doc table{border-collapse:collapse}
     .doc td,.doc th{border:1px solid #e6e6e6;padding:6px 10px}
@@ -144,8 +156,14 @@ const ICON_CARET = '<svg viewBox="0 0 12 12" width="9" height="9" aria-hidden="t
  *
  * connect-src 'self' is what lets the page fetch another doc page; nothing else
  * may be reached. */
+const EMBED_HOSTS = 'https://www.youtube.com https://youtube.com https://www.youtube-nocookie.com '
+    + 'https://player.vimeo.com https://www.loom.com https://loom.com';
+
 const cspFor = (nonce) => "default-src 'none'; img-src https: data:; style-src 'unsafe-inline'; "
     + `script-src 'nonce-${nonce}'; connect-src 'self'; `
+    // Video embeds only, and only the players sanitizeDocHtml already accepts —
+    // two independent gates on the same short list.
+    + `frame-src ${EMBED_HOSTS}; `
     + "form-action 'self'; base-uri 'none'; frame-ancestors 'none'";
 
 // `bare` drops the centred, padded card shell: a docs share is full-bleed, with
