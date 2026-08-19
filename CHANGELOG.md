@@ -21,8 +21,6 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ### 🐛 Bug Fixes
 
-* **public-share:** keep a link that carries a port ([730be4b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/730be4b6d0f3ebcb55e43b174f2703ce1e47056f))
-* **public-share:** keep a link that carries a port ([ab43ec5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ab43ec57a1532529c8d8da006084e8e6e224d9bb))
 * **public-share:** keep a link that carries a port ([c4a84ed](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c4a84edabde26485e2f792fece14ad8f0518d2b3))
 
 ## [14.31.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.30.0...v14.31.0) (2026-08-19)
