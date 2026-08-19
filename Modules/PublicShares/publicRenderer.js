@@ -5,6 +5,7 @@ const logger = require("../../Config/loggerConfig");
 const { isShareToken, validateIntakeSubmission, escapeHtml, sanitizeDocHtml } = require('./helpers/shareRules');
 const reportRules = require('../CustomReports/helpers/reportRules'); // REP-09 — share saved reports
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 
 // Unauthenticated public pages, server-rendered as plain HTML so the public
 // surface needs no SPA route, login or token. The share token resolves the
@@ -43,15 +44,10 @@ const PAGE_STYLE = `
     .dk__side::-webkit-scrollbar-track,.dk__main::-webkit-scrollbar-track{background:transparent}
     .dk__side::-webkit-scrollbar-thumb,.dk__main::-webkit-scrollbar-thumb{background:#d3d6de;border-radius:8px}
     .dk__side::-webkit-scrollbar-thumb:hover,.dk__main::-webkit-scrollbar-thumb:hover{background:#b9bdc9}
-    /* Every page of the share is in the document; :target picks the one on
-       screen, so switching pages costs no reload and no script. The default
-       pane is last in source order, which lets a targeted pane hide it with a
-       following-sibling selector — no :has() needed, so there is no browser
-       where this degrades to a blank page. */
-    .pane{display:none;flex:1;min-height:0;flex-direction:column}
-    .pane:target{display:flex}
-    .pane--default{display:flex}
-    .pane:target ~ .pane--default{display:none}
+    /* The one live region: the breadcrumb and the body are replaced together
+       when another page is opened. */
+    .pg-live{display:flex;flex-direction:column;flex:1;min-height:0}
+    .pg-live.is-loading{opacity:.55}
     .dk__bar{display:flex;align-items:center;gap:6px;flex:0 0 46px;height:46px;padding:0 16px;border-bottom:1px solid #eef0f3;font-size:13px;background:#fff;overflow:hidden;white-space:nowrap}
     .crumb{display:inline-flex;align-items:center;gap:5px;color:#6b7280;text-decoration:none;max-width:260px;overflow:hidden;text-overflow:ellipsis}
     a.crumb:hover{color:#111}
@@ -64,11 +60,20 @@ const PAGE_STYLE = `
     .dk__side{flex:0 0 320px;min-height:0;overflow-y:auto;background:#fff;border-right:1px solid #eef0f3;padding:14px 8px 20px}
     .dk__side-label{font-size:12px;color:#8b90a0;padding:2px 10px 8px}
     .dk__tree{display:flex;flex-direction:column}
-    .dk__row{display:flex;align-items:center;gap:6px;padding:6px 10px;margin:1px 4px;border-radius:6px;font-size:13.5px;color:#3b4252;text-decoration:none;overflow:hidden}
+    /* The row is the highlight and the hit area; the link fills what is left of
+       it so the caret beside it stays independently clickable. */
+    .dk__item{display:flex;align-items:center;gap:6px;margin:1px 4px;border-radius:6px;overflow:hidden}
+    .dk__item:hover{background:#f4f5f8}
+    .dk__item.is-current{background:#eceef3}
+    .dk__row{flex:1;min-width:0;display:flex;align-items:center;gap:6px;padding:6px 8px 6px 0;font-size:13.5px;color:#3b4252;text-decoration:none;overflow:hidden}
+    .dk__item.is-current .dk__row{font-weight:600;color:#111}
     .dk__row-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    a.dk__row:hover{background:#f4f5f8}
-    .dk__row.is-current{background:#eceef3;font-weight:600;color:#111}
-    .dk__caret{display:inline-flex;width:11px;flex:0 0 11px;color:#9aa0b0}
+    .dk__caret{display:inline-flex;align-items:center;justify-content:center;width:14px;height:18px;flex:0 0 14px;color:#9aa0b0}
+    .dk__caret--btn{cursor:pointer;border-radius:3px}
+    .dk__caret--btn:hover{background:#e2e5ec;color:#4b5162}
+    .dk__caret svg{transition:transform .12s ease}
+    .dk__item.is-collapsed>.dk__caret svg{transform:rotate(-90deg)}
+    .dk__item.is-hidden{display:none}
     /* The whole right-hand pane is the sheet. The column inside only centres the
        text — giving IT the white background left a floating white strip on grey. */
     .dk__main{flex:1;min-width:0;min-height:0;overflow-y:auto;display:flex;justify-content:center;align-items:flex-start;background:#fff;padding:0 40px}
@@ -129,25 +134,121 @@ const ICON_DOC = '<svg class="ic" viewBox="0 0 16 16" width="13" height="13" ari
 const ICON_DOC_BOX = '<span class="dk__doc-box">' + ICON_DOC + '</span>';
 const ICON_CARET = '<svg viewBox="0 0 12 12" width="9" height="9" aria-hidden="true"><path fill="currentColor" d="M2 4l4 4 4-4z"/></svg>';
 
-/* A shared page is read-only and static: no script of ours, and none of theirs.
- * This is the backstop behind sanitizeDocHtml — anything that slipped past the
- * allow-list still has no way to execute. */
-const CSP = "default-src 'none'; img-src https: data:; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'";
+/* One script of ours, none of theirs.
+ *
+ * script-src carries a per-response nonce and never 'unsafe-inline', so the
+ * navigation script below runs while anything injected does not: an attacker
+ * cannot guess the nonce, and inline handlers (onclick=) stay blocked outright.
+ * That keeps the backstop behind sanitizeDocHtml — which already strips <script>
+ * and every on* attribute by allow-list — rather than trading it away.
+ *
+ * connect-src 'self' is what lets the page fetch another doc page; nothing else
+ * may be reached. */
+const cspFor = (nonce) => "default-src 'none'; img-src https: data:; style-src 'unsafe-inline'; "
+    + `script-src 'nonce-${nonce}'; connect-src 'self'; `
+    + "form-action 'self'; base-uri 'none'; frame-ancestors 'none'";
 
 // `bare` drops the centred, padded card shell: a docs share is full-bleed, with
 // its own breadcrumb bar and sidebar. Boards and reports keep the original shell.
-const htmlPage = (title, body, bare) => `<!DOCTYPE html>
+/* Opens another page of the share without reloading: fetch its markup, swap the
+ * live region, and move the address bar with history so back/forward and a
+ * copied URL keep working.
+ *
+ * Progressive enhancement — every link is a real href, so with this script
+ * blocked, failed or unsupported the page still navigates, just with a reload.
+ * Only the page being read is ever fetched, which is why a shared doc can be
+ * any size. */
+const NAV_SCRIPT = (token) => `
+(function () {
+  var live = document.getElementById('pg-live');
+  if (!live || !window.fetch || !window.history || !history.pushState) return;
+  var base = '/share/${token}';
+  var busy = false;
+  // Which branches the reader folded away. Kept here rather than in the markup
+  // because every page swap replaces the sidebar, and a collapsed tree that
+  // sprang open again on each click would be worse than not collapsing at all.
+  var collapsed = Object.create(null);
+  function applyCollapse() {
+    var items = live.querySelectorAll('.dk__item');
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      it.classList.remove('is-collapsed', 'is-hidden');
+      if (collapsed[it.getAttribute('data-id')]) it.classList.add('is-collapsed');
+      var anc = (it.getAttribute('data-anc') || '').split(' ');
+      for (var j = 0; j < anc.length; j++) {
+        if (anc[j] && collapsed[anc[j]]) { it.classList.add('is-hidden'); break; }
+      }
+    }
+  }
+  function toggle(id) {
+    if (collapsed[id]) delete collapsed[id]; else collapsed[id] = true;
+    applyCollapse();
+  }
+  function show(data, id, push) {
+    live.innerHTML = '<div class="dk__bar">' + data.bar + '</div>' + data.body;
+    document.title = data.title;
+    var url = id ? base + '?p=' + encodeURIComponent(id) : base;
+    if (push) history.pushState({ p: id }, '', url);
+    applyCollapse();
+  }
+  function open(id, push) {
+    if (busy) return;
+    busy = true;
+    live.className = 'pg-live is-loading';
+    fetch(base + '/page/' + encodeURIComponent(id), { headers: { Accept: 'application/json' } })
+      .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+      .then(function (data) { show(data, id, push); })
+      .catch(function () { window.location.href = base + '?p=' + encodeURIComponent(id); })
+      .then(function () { busy = false; live.className = 'pg-live'; });
+  }
+  document.addEventListener('click', function (e) {
+    if (e.defaultPrevented || !e.target.closest) return;
+    // The twisty is checked first and returns: folding a branch must never also
+    // open the page sitting next to it.
+    var t = e.target.closest('.dk__caret[data-toggle]');
+    if (t) { e.preventDefault(); toggle(t.getAttribute('data-toggle')); return; }
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    var a = e.target.closest('a[data-pg]');
+    if (!a) return;
+    e.preventDefault();
+    open(a.getAttribute('data-pg'), true);
+  });
+  // The twisty carries role="button", so it owes the keyboard the same action.
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    var t = e.target.closest ? e.target.closest('.dk__caret[data-toggle]') : null;
+    if (!t) return;
+    e.preventDefault();
+    toggle(t.getAttribute('data-toggle'));
+  });
+  window.addEventListener('popstate', function (e) {
+    var id = e.state && e.state.p;
+    if (id) open(id, false); else window.location.reload();
+  });
+})();`;
+
+const htmlPage = (title, body, bare, opts) => {
+    const o = opts || {};
+    const script = o.live && o.nonce
+        ? `<script nonce="${o.nonce}">${NAV_SCRIPT(escapeHtml(o.token || ''))}</` + 'script>'
+        : '';
+    return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex"><title>${escapeHtml(title)}</title><style>${PAGE_STYLE}</style></head>
-<body${bare ? ' class="bare"' : ''}><div class="wrap${bare ? ' wrap--bare' : ''}">${body}<div class="footer">Shared via AlianHub</div></div></body></html>`;
+<body${bare ? ' class="bare"' : ''}><div class="wrap${bare ? ' wrap--bare' : ''}">${body}<div class="footer">Shared via AlianHub</div></div>${script}</body></html>`;
+};
 
-/* Every public response goes out with the same locked-down headers. */
-const sendPage = (res, status, title, body, bare) => res
-    .status(status)
-    .set('Content-Security-Policy', CSP)
-    .set('X-Content-Type-Options', 'nosniff')
-    .set('Referrer-Policy', 'no-referrer')
-    .send(htmlPage(title, body, bare));
+/* Every public response goes out with the same locked-down headers. The nonce is
+ * generated per response — a fixed one would be as good as 'unsafe-inline'. */
+const sendPage = (res, status, title, body, bare, opts) => {
+    const nonce = crypto.randomBytes(16).toString('base64');
+    return res
+        .status(status)
+        .set('Content-Security-Policy', cspFor(nonce))
+        .set('X-Content-Type-Options', 'nosniff')
+        .set('Referrer-Policy', 'no-referrer')
+        .send(htmlPage(title, body, bare, { ...(opts || {}), nonce }));
+};
 
 // Password gate (server-rendered) shown when a share is password-protected.
 const passwordForm = (token, wrong) => `<h1>Password required</h1>
@@ -279,25 +380,29 @@ function orderTree(nodes) {
     return out;
 }
 
-async function renderPage(companyId, share, requestedId) {
+/**
+ * Resolve everything a doc share needs to render one page: the shared subtree,
+ * which page was asked for, that page's document, and the display names.
+ *
+ * ONLY the requested page's content is loaded. The tree carries titles, not
+ * bodies, so the work here is independent of how large the other pages are —
+ * a shared doc can be any size.
+ */
+async function buildDocContext(companyId, share, requestedId) {
     const page = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.PAGES,
         data: [{ _id: share.entityId }],
     }, 'findOne');
-    if (!page || page.deletedStatusKey === 1) {
-        return { title: 'Doc', body: '<h1>This doc is no longer available.</h1>' };
-    }
+    if (!page || page.deletedStatusKey === 1) return { error: 'This doc is no longer available.' };
     // Marked private after the link was made. Private means private — the link
     // stops working rather than outliving the decision.
-    if (String(page.visibility || '') === 'private') {
-        return { title: 'Doc', body: '<h1>This doc is no longer shared.</h1>' };
-    }
+    if (String(page.visibility || '') === 'private') return { error: 'This doc is no longer shared.' };
 
     const tree = orderTree(await collectSharedTree(companyId, page));
-    // The id in the URL is attacker-controlled, so it is only honoured when it
-    // is provably inside this share's own subtree. Anything else falls back to
-    // the root — never fetched — otherwise the token would read any doc in the
-    // company by id.
+    // The id in the request is attacker-controlled, so it is only honoured when
+    // it is provably inside this share's own subtree. Anything else falls back
+    // to the root — never fetched — otherwise the token would read any doc in
+    // the company by id.
     const wanted = String(requestedId || '');
     const selected = tree.find((n) => n._id === wanted) || tree[0];
 
@@ -307,122 +412,109 @@ async function renderPage(companyId, share, requestedId) {
             type: SCHEMA_TYPE.PAGES,
             data: [{ _id: selected._id, deletedStatusKey: 0 }],
         }, 'findOne');
-    if (!current) {
-        return { title: 'Doc', body: '<h1>This doc is no longer available.</h1>' };
-    }
+    if (!current) return { error: 'This doc is no longer available.' };
 
-    // Every page of the subtree is rendered into the one response and switched
-    // with :target, so reading a sub-page costs no reload. That only holds while
-    // the payload stays sane — beyond these bounds the panes are dropped and
-    // each page is fetched from the server as before. The sidebar is repeated
-    // per pane (CSS can only restyle the target and what follows it), so the
-    // page count matters as much as the content size.
-    const INLINE_MAX_PAGES = 25;
-    const INLINE_MAX_CONTENT_BYTES = 300 * 1024;
+    // One lookup for the byline plus every row of the subpages table.
+    const children = tree.filter((n) => n.parentPageId === selected._id);
+    const names = await resolveNames(
+        children.map((c) => c.ownerId).concat([current.updatedBy, current.createdBy]),
+    );
 
-    const docs = await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.PAGES,
-        data: [{ _id: { $in: tree.map((n) => n._id) }, deletedStatusKey: 0 }],
-    }, 'find').catch(() => []);
-    const docById = new Map((docs || []).map((d) => [String(d._id), d]));
-    docById.set(String(page._id), page);
+    return { tree, selected, current, children, names, byId: new Map(tree.map((n) => [n._id, n])) };
+}
 
-    const totalBytes = tree.reduce((sum, n) => {
-        const d = docById.get(n._id);
-        return sum + String((d && d.content && d.content.html) || '').length;
-    }, 0);
-    const inline = tree.length > 1
-        && tree.length <= INLINE_MAX_PAGES
-        && totalBytes <= INLINE_MAX_CONTENT_BYTES
-        && tree.every((n) => docById.has(n._id));
-
-    const names = await resolveNames(tree.map((n) => n.ownerId).concat([page.updatedBy, page.createdBy]));
-    const byId = new Map(tree.map((n) => [n._id, n]));
+/* The breadcrumb bar and the sidebar+document body for one page. Returned
+ * separately so the client can swap them without touching the page shell. */
+function renderDocPane(share, ctx) {
+    const { tree, selected, current, children, names, byId } = ctx;
     const hasKids = new Set(tree.map((n) => n.parentPageId).filter(Boolean));
-    // In-page anchor when everything is inlined, a server round-trip otherwise.
-    const link = inline
-        ? (id) => `#pg-${escapeHtml(id)}`
-        : (id) => `/share/${escapeHtml(share.token)}?p=${escapeHtml(id)}`;
+    const title = current.title || 'Untitled doc';
+    // A real URL, so the link works when opened directly, copied, or when the
+    // script below never runs. data-pg lets the script recognise it without
+    // parsing anything.
+    const link = (id) => `/share/${escapeHtml(share.token)}?p=${escapeHtml(id)}`;
 
-    const paneFor = (node) => {
-        const doc = docById.get(node._id) || {};
-        const nodeTitle = doc.title || node.title || 'Untitled doc';
+    const trail = [];
+    for (let n = selected; n; n = byId.get(n.parentPageId)) {
+        trail.unshift(n);
+        if (!n.parentPageId) break;
+    }
+    const crumbs = trail.map((n, i) => (i === trail.length - 1
+        ? `<span class="crumb is-last">${ICON_DOC}${escapeHtml(n.title || 'Untitled')}</span>`
+        : `<a class="crumb" data-pg="${escapeHtml(n._id)}" href="${link(n._id)}">${ICON_DOC}${escapeHtml(n.title || 'Untitled')}</a>`
+    )).join('<span class="crumb-sep">/</span>');
 
-        // Breadcrumb: the path from the shared root down to this page. Walked
-        // through the tree we already built, so it can never name a page
-        // outside this share.
-        const trail = [];
-        for (let n = node; n; n = byId.get(n.parentPageId)) {
-            trail.unshift(n);
+    // Ancestor ids per row, so collapsing a branch can hide everything beneath it
+    // without the client having to rebuild the tree.
+    const ancestorsOf = (node) => {
+        const out = [];
+        for (let n = byId.get(node.parentPageId); n; n = byId.get(n.parentPageId)) {
+            out.push(n._id);
             if (!n.parentPageId) break;
         }
-        const crumbs = trail.map((n, i) => (i === trail.length - 1
-            ? `<span class="crumb is-last">${ICON_DOC}${escapeHtml(n.title || 'Untitled')}</span>`
-            : `<a class="crumb" href="${link(n._id)}">${ICON_DOC}${escapeHtml(n.title || 'Untitled')}</a>`
-        )).join('<span class="crumb-sep">/</span>');
-
-        let side = '<aside class="dk__side">'
-            + '<div class="dk__side-label">Pages</div><div class="dk__tree">';
-        for (const row of tree) {
-            const isCurrent = row._id === node._id;
-            const label = escapeHtml(row.title || 'Untitled');
-            const indent = 12 + (row.depth * 16);
-            // The caret marks a page that has children. It is decoration, not a
-            // control: the whole tree is already expanded, and there is no
-            // script on this page to collapse it with.
-            const caret = hasKids.has(row._id) ? `<span class="dk__caret">${ICON_CARET}</span>` : '<span class="dk__caret"></span>';
-            const inner = `${caret}${ICON_DOC}<span class="dk__row-title">${label}</span>`;
-            side += isCurrent
-                ? `<span class="dk__row is-current" style="padding-left:${indent}px">${inner}</span>`
-                : `<a class="dk__row" style="padding-left:${indent}px" href="${link(row._id)}">${inner}</a>`;
-        }
-        side += '</div></aside>';
-
-        // Direct children only — the sidebar already carries the whole tree, so
-        // this is "what is under the page you are reading", as in ClickUp.
-        const children = tree.filter((n) => n.parentPageId === node._id);
-        let subpages = '';
-        if (children.length) {
-            subpages = '<div class="dk__subs"><table><thead><tr><th>Subpages</th><th class="dk__owner-col">Owner</th></tr></thead><tbody>';
-            for (const child of children) {
-                const who = names.get(child.ownerId) || '';
-                subpages += `<tr><td><a class="dk__sub-link" href="${link(child._id)}">${ICON_DOC_BOX}${escapeHtml(child.title || 'Untitled')}</a></td>`
-                    + `<td class="dk__owner-col">${who ? avatar(who) : ''}</td></tr>`;
-            }
-            subpages += '</tbody></table></div>';
-        }
-
-        const who = names.get(String(doc.updatedBy || doc.createdBy || '')) || '';
-        const meta = `<div class="dk__meta">${who ? `${avatar(who)}<span class="dk__author">${escapeHtml(who)}</span><span class="dk__dot">•</span>` : ''}`
-            + `<span class="dk__updated">Last updated ${escapeHtml(formatStamp(doc.updatedAt || doc.createdAt))}</span></div>`;
-
-        const main = '<section class="dk__main"><div class="dk__doc-col">'
-            + `<h1 class="dk__title">${escapeHtml(nodeTitle)}</h1>`
-            + meta
-            + `<div class="doc">${sanitizeDocHtml(doc.content && doc.content.html) || ''}</div>`
-            + subpages
-            + '</div></section>';
-
-        return `<div class="dk__bar">${crumbs}</div><div class="dk">${side}${main}</div>`;
+        return out;
     };
 
-    const title = (docById.get(selected._id) || {}).title || selected.title || 'Untitled doc';
+    let side = '<aside class="dk__side"><div class="dk__side-label">Pages</div><div class="dk__tree">';
+    for (const row of tree) {
+        const isCurrent = row._id === selected._id;
+        const label = escapeHtml(row.title || 'Untitled');
+        const indent = 12 + (row.depth * 16);
+        // The caret is a SIBLING of the link, never inside it — nested in the
+        // anchor, every click on the twisty also opened the page.
+        const caret = hasKids.has(row._id)
+            ? `<span class="dk__caret dk__caret--btn" data-toggle="${escapeHtml(row._id)}" role="button" tabindex="0" aria-label="Show or hide sub-pages">${ICON_CARET}</span>`
+            : '<span class="dk__caret"></span>';
+        const body = `${ICON_DOC}<span class="dk__row-title">${label}</span>`;
+        const target = isCurrent
+            ? `<span class="dk__row">${body}</span>`
+            : `<a class="dk__row" data-pg="${escapeHtml(row._id)}" href="${link(row._id)}">${body}</a>`;
+        side += `<div class="dk__item${isCurrent ? ' is-current' : ''}" data-id="${escapeHtml(row._id)}"`
+            + ` data-anc="${escapeHtml(ancestorsOf(row).join(' '))}" style="padding-left:${indent}px">${caret}${target}</div>`;
+    }
+    side += '</div></aside>';
 
-    if (!inline) {
-        return { title, body: paneFor(selected), bare: true };
+    // Direct children only — the sidebar already carries the whole tree, so this
+    // is "what is under the page you are reading", as in ClickUp.
+    let subpages = '';
+    if (children.length) {
+        subpages = '<div class="dk__subs"><table><thead><tr><th>Subpages</th><th class="dk__owner-col">Owner</th></tr></thead><tbody>';
+        for (const child of children) {
+            const who = names.get(child.ownerId) || '';
+            subpages += `<tr><td><a class="dk__sub-link" data-pg="${escapeHtml(child._id)}" href="${link(child._id)}">${ICON_DOC_BOX}${escapeHtml(child.title || 'Untitled')}</a></td>`
+                + `<td class="dk__owner-col">${who ? avatar(who) : ''}</td></tr>`;
+        }
+        subpages += '</tbody></table></div>';
     }
 
-    // The pane shown when there is no #hash goes LAST and carries the default
-    // class: `.pane:target ~ .pane--default` can then hide it as soon as any
-    // other pane is targeted. Ordering it this way avoids :has(), so the page
-    // does not depend on a selector some browsers may not support — with no
-    // fallback a missing :has() would render nothing at all.
-    const others = tree.filter((n) => n._id !== selected._id);
-    let body = '';
-    for (const node of others) body += `<div class="pane" id="pg-${escapeHtml(node._id)}">${paneFor(node)}</div>`;
-    body += `<div class="pane pane--default" id="pg-${escapeHtml(selected._id)}">${paneFor(selected)}</div>`;
+    const who = names.get(String(current.updatedBy || current.createdBy || '')) || '';
+    const meta = `<div class="dk__meta">${who ? `${avatar(who)}<span class="dk__author">${escapeHtml(who)}</span><span class="dk__dot">•</span>` : ''}`
+        + `<span class="dk__updated">Last updated ${escapeHtml(formatStamp(current.updatedAt || current.createdAt))}</span></div>`;
 
-    return { title, body, bare: true };
+    const main = '<section class="dk__main"><div class="dk__doc-col">'
+        + `<h1 class="dk__title">${escapeHtml(title)}</h1>`
+        + meta
+        + `<div class="doc">${sanitizeDocHtml(current.content && current.content.html) || ''}</div>`
+        + subpages
+        + '</div></section>';
+
+    return { title, bar: crumbs, body: `<div class="dk">${side}${main}</div>` };
+}
+
+async function renderPage(companyId, share, requestedId) {
+    const ctx = await buildDocContext(companyId, share, requestedId);
+    if (ctx.error) return { title: 'Doc', body: `<h1>${escapeHtml(ctx.error)}</h1>` };
+    const pane = renderDocPane(share, ctx);
+    return {
+        title: pane.title,
+        body: `<div id="pg-live" class="pg-live"><div class="dk__bar">${pane.bar}</div>${pane.body}</div>`,
+        bare: true,
+        // Swapping pages in the browser is pointless behind a password: the gate
+        // is stateless and re-asked per request, so the fragment endpoint refuses
+        // and every navigation would have to reload anyway.
+        live: !share.passwordHash,
+        pageId: ctx.selected._id,
+    };
 }
 
 /* Display names for a set of user ids, in ONE query — the subpages table would
@@ -467,6 +559,39 @@ const formatStamp = (value) => {
     return `${date} at ${time}`;
 };
 
+/* GET /share/:token/page/:pageId — one page of a shared doc, as JSON, for the
+ * in-page navigation. Everything the full render enforces is enforced here too:
+ * this is a second door into the same data, not a shortcut past the checks.
+ *
+ * The requested id is validated against the share's own subtree by
+ * buildDocContext, which falls back to the root rather than fetching anything
+ * outside it, and the content is sanitised by the same renderer. */
+exports.renderDocFragment = async (req, res) => {
+    try {
+        const resolved = await resolveShare(req.params.token);
+        if (!resolved) return res.status(404).json({ error: 'not found' });
+        const { companyId, share } = resolved;
+        if (share.entityType !== 'page') return res.status(404).json({ error: 'not found' });
+        // The password gate is stateless and re-asked per request, so there is no
+        // unlocked session for this endpoint to trust. Refuse and let the browser
+        // fall back to a full navigation, which asks for the password properly.
+        if (share.passwordHash) return res.status(403).json({ error: 'password required' });
+
+        const ctx = await buildDocContext(companyId, share, req.params.pageId);
+        if (ctx.error) return res.status(404).json({ error: ctx.error });
+        const pane = renderDocPane(share, ctx);
+        return res
+            .set('Content-Security-Policy', "default-src 'none'")
+            .set('X-Content-Type-Options', 'nosniff')
+            .set('Referrer-Policy', 'no-referrer')
+            .set('Cache-Control', 'no-store')
+            .json({ title: pane.title, bar: pane.bar, body: pane.body, id: ctx.selected._id });
+    } catch (error) {
+        logger.error(`ERROR in render doc fragment: ${error.message}`);
+        return res.status(500).json({ error: 'failed' });
+    }
+};
+
 /* GET /share/:token — read-only board grouped by status. */
 exports.renderShare = async (req, res) => {
     try {
@@ -496,7 +621,9 @@ exports.renderShare = async (req, res) => {
         // any id that is not inside it.
         if (share.entityType === 'page') {
             const rendered = await renderPage(companyId, share, req.query && req.query.p);
-            return sendPage(res, 200, rendered.title, rendered.body, rendered.bare);
+            return sendPage(res, 200, rendered.title, rendered.body, rendered.bare, {
+                live: rendered.live, token: share.token,
+            });
         }
 
         const [sprint, tasks] = await Promise.all([
