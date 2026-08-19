@@ -28,6 +28,71 @@ const PAGE_STYLE = `
     input,textarea{width:100%;box-sizing:border-box;border:1px solid #ddd;border-radius:6px;padding:8px;font-size:14px;font-family:inherit}
     button{margin-top:14px;background:#7b68ee;border:none;color:#fff;border-radius:6px;padding:9px 18px;font-size:14px;cursor:pointer}
     .footer{margin-top:26px;text-align:center;color:#aaa;font-size:12px}
+    /* ── Docs share ────────────────────────────────────────────────────────
+       Full-bleed: a breadcrumb bar across the top, the page tree down the left,
+       the document on a white sheet to the right. */
+    .wrap--bare{max-width:none;margin:0}
+    /* The window itself never scrolls: the breadcrumb bar and the footer stay put
+       and the two panes scroll on their own. */
+    body.bare{padding:0;background:#fff;height:100vh;overflow:hidden}
+    body.bare .wrap{display:flex;flex-direction:column;height:100vh;min-height:0}
+    body.bare .footer{flex:0 0 auto;margin:0;padding:16px 0 20px;background:#fff;border-top:1px solid #eef0f3}
+    /* Thin scrollbars on the panes — Firefox first, then WebKit/Blink. */
+    .dk__side,.dk__main{scrollbar-width:thin;scrollbar-color:#d3d6de transparent}
+    .dk__side::-webkit-scrollbar,.dk__main::-webkit-scrollbar{width:8px;height:8px}
+    .dk__side::-webkit-scrollbar-track,.dk__main::-webkit-scrollbar-track{background:transparent}
+    .dk__side::-webkit-scrollbar-thumb,.dk__main::-webkit-scrollbar-thumb{background:#d3d6de;border-radius:8px}
+    .dk__side::-webkit-scrollbar-thumb:hover,.dk__main::-webkit-scrollbar-thumb:hover{background:#b9bdc9}
+    .dk__bar{display:flex;align-items:center;gap:6px;flex:0 0 46px;height:46px;padding:0 16px;border-bottom:1px solid #eef0f3;font-size:13px;background:#fff;overflow:hidden;white-space:nowrap}
+    .crumb{display:inline-flex;align-items:center;gap:5px;color:#6b7280;text-decoration:none;max-width:260px;overflow:hidden;text-overflow:ellipsis}
+    a.crumb:hover{color:#111}
+    .crumb.is-last{color:#111;font-weight:600}
+    .crumb-sep{color:#c9ccd6}
+    .ic{flex:0 0 auto;opacity:.75;vertical-align:-2px}
+    /* min-height:0 is what actually lets the panes below scroll — without it a
+       flex child refuses to shrink past its content and the window scrolls instead. */
+    .dk{display:flex;align-items:stretch;flex:1;min-height:0;background:#fff}
+    .dk__side{flex:0 0 320px;min-height:0;overflow-y:auto;background:#fff;border-right:1px solid #eef0f3;padding:14px 8px 20px}
+    .dk__side-label{font-size:12px;color:#8b90a0;padding:2px 10px 8px}
+    .dk__tree{display:flex;flex-direction:column}
+    .dk__row{display:flex;align-items:center;gap:6px;padding:6px 10px;margin:1px 4px;border-radius:6px;font-size:13.5px;color:#3b4252;text-decoration:none;overflow:hidden}
+    .dk__row-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    a.dk__row:hover{background:#f4f5f8}
+    .dk__row.is-current{background:#eceef3;font-weight:600;color:#111}
+    .dk__caret{display:inline-flex;width:11px;flex:0 0 11px;color:#9aa0b0}
+    /* The whole right-hand pane is the sheet. The column inside only centres the
+       text — giving IT the white background left a floating white strip on grey. */
+    .dk__main{flex:1;min-width:0;min-height:0;overflow-y:auto;display:flex;justify-content:center;align-items:flex-start;background:#fff;padding:0 40px}
+    /* No min-height here: .dk already guarantees a full-height pane, and having
+       both stack their own min-height plus padding made a short doc scroll. */
+    .dk__doc-col{width:100%;max-width:760px;padding:40px 0 64px}
+    .dk__title{font-size:34px;font-weight:700;letter-spacing:-.4px;margin:0 0 12px;line-height:1.2}
+    .dk__meta{display:flex;align-items:center;gap:8px;font-size:13px;color:#9aa0b0;margin-bottom:26px}
+    .dk__author{color:#4b5162}
+    .dk__dot{color:#c9ccd6}
+    .dk__avatar{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:#7b68ee;color:#fff;font-size:10px;font-weight:700;flex:0 0 20px}
+    /* The document sits directly on the sheet — no card inside a card. */
+    .dk__doc-col .doc{border:none;border-radius:0;padding:0;background:transparent;font-size:15px;line-height:1.75}
+    .dk__subs{margin-top:40px}
+    .dk__subs table{width:100%;border-collapse:collapse}
+    .dk__subs th{text-align:left;font-size:12.5px;font-weight:500;color:#9aa0b0;padding:0 0 8px;border-bottom:1px solid #eef0f3}
+    .dk__subs td{padding:12px 0;border-bottom:1px solid #f2f3f6;font-size:14px}
+    .dk__owner-col{width:90px;text-align:left}
+    .dk__sub-link{display:inline-flex;align-items:center;gap:10px;color:#111;font-weight:600;text-decoration:none}
+    .dk__sub-link:hover{color:#5b4ccc}
+    .dk__doc-box{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;background:#f2f3f6;color:#6b7280;flex:0 0 26px}
+    /* Side-by-side needs width; below this the tree sits above the document. */
+    /* Stacked, the two panes are no longer side by side, so pane-scrolling makes
+       no sense — hand scrolling back to the page or the content is unreachable. */
+    @media (max-width:860px){
+        body.bare{height:auto;overflow:auto}
+        body.bare .wrap{height:auto;min-height:100vh}
+        .dk{display:block;min-height:0}
+        .dk__side{overflow:visible;border-right:none;border-bottom:1px solid #eef0f3;padding-bottom:10px}
+        .dk__main{overflow:visible;padding:0 16px}
+        .dk__doc-col{padding:22px 0 40px}
+        .dk__title{font-size:26px}
+    }
     .doc{background:#fff;border:1px solid #e6e6e6;border-radius:10px;padding:20px 24px;font-size:15px;line-height:1.7}
     .doc>*:first-child{margin-top:0}
     .doc>*:last-child{margin-bottom:0}
@@ -49,23 +114,31 @@ const PAGE_STYLE = `
     .ql-indent-4{padding-left:12em}.ql-indent-5{padding-left:15em}
 `;
 
+/* Inline SVG rather than an icon font or image: the CSP forbids outside
+ * requests, and these are markup, not script. */
+const ICON_DOC = '<svg class="ic" viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path fill="currentColor" d="M9.5 1H4a1.5 1.5 0 0 0-1.5 1.5v11A1.5 1.5 0 0 0 4 15h8a1.5 1.5 0 0 0 1.5-1.5V5L9.5 1Zm0 1.6L11.9 5H9.5V2.6ZM5 7.5h6v1H5v-1Zm0 3h6v1H5v-1Z"/></svg>';
+const ICON_DOC_BOX = '<span class="dk__doc-box">' + ICON_DOC + '</span>';
+const ICON_CARET = '<svg viewBox="0 0 12 12" width="9" height="9" aria-hidden="true"><path fill="currentColor" d="M2 4l4 4 4-4z"/></svg>';
+
 /* A shared page is read-only and static: no script of ours, and none of theirs.
  * This is the backstop behind sanitizeDocHtml — anything that slipped past the
  * allow-list still has no way to execute. */
 const CSP = "default-src 'none'; img-src https: data:; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'";
 
-const htmlPage = (title, body) => `<!DOCTYPE html>
+// `bare` drops the centred, padded card shell: a docs share is full-bleed, with
+// its own breadcrumb bar and sidebar. Boards and reports keep the original shell.
+const htmlPage = (title, body, bare) => `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex"><title>${escapeHtml(title)}</title><style>${PAGE_STYLE}</style></head>
-<body><div class="wrap">${body}<div class="footer">Shared via AlianHub</div></div></body></html>`;
+<body${bare ? ' class="bare"' : ''}><div class="wrap${bare ? ' wrap--bare' : ''}">${body}<div class="footer">Shared via AlianHub</div></div></body></html>`;
 
 /* Every public response goes out with the same locked-down headers. */
-const sendPage = (res, status, title, body) => res
+const sendPage = (res, status, title, body, bare) => res
     .status(status)
     .set('Content-Security-Policy', CSP)
     .set('X-Content-Type-Options', 'nosniff')
     .set('Referrer-Policy', 'no-referrer')
-    .send(htmlPage(title, body));
+    .send(htmlPage(title, body, bare));
 
 // Password gate (server-rendered) shown when a share is password-protected.
 const passwordForm = (token, wrong) => `<h1>Password required</h1>
@@ -133,7 +206,71 @@ async function renderReport(companyId, share) {
  * reaches the page (see sanitizeDocHtml) and the page is served under a CSP that
  * permits no script at all.
  */
-async function renderPage(companyId, share) {
+// Sharing a doc shares the doc AND everything nested under it, to any depth.
+// Walked level by level from the shared root rather than recursively per page,
+// so depth costs one query per level instead of one per node.
+//
+// Two bounds, because this is reachable without a login: a `visited` set (a
+// corrupt parent chain could otherwise loop forever) and a hard page cap.
+const SHARED_TREE_MAX_DEPTH = 12;
+const SHARED_TREE_MAX_PAGES = 500;
+
+async function collectSharedTree(companyId, rootPage) {
+    const nodes = [{ _id: String(rootPage._id), title: rootPage.title, depth: 0 }];
+    const visited = new Set([String(rootPage._id)]);
+    let frontier = [rootPage._id];
+
+    for (let depth = 1; depth <= SHARED_TREE_MAX_DEPTH && frontier.length; depth += 1) {
+        // A private sub-page stays private: excluded here, and because the walk
+        // never descends into what it excluded, its own children stay out too.
+        // eslint-disable-next-line no-await-in-loop
+        const children = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.PAGES,
+            data: [
+                { parentPageId: { $in: frontier }, deletedStatusKey: 0, visibility: { $ne: 'private' } },
+                'title parentPageId order updatedBy createdBy',
+                { sort: { order: 1 } },
+            ],
+        }, 'find').catch(() => []);
+
+        const next = [];
+        for (const child of (children || [])) {
+            const id = String(child._id);
+            if (visited.has(id) || nodes.length >= SHARED_TREE_MAX_PAGES) continue;
+            visited.add(id);
+            nodes.push({
+                _id: id,
+                title: child.title,
+                depth,
+                parentPageId: String(child.parentPageId || ''),
+                ownerId: String(child.updatedBy || child.createdBy || ''),
+            });
+            next.push(child._id);
+        }
+        frontier = next;
+    }
+    return nodes;
+}
+
+// Order the flat level-by-level list so each page is followed by its own
+// children — the reading order of the tree, not the order it was fetched in.
+function orderTree(nodes) {
+    const byParent = new Map();
+    for (const n of nodes.slice(1)) {
+        const key = n.parentPageId || '';
+        if (!byParent.has(key)) byParent.set(key, []);
+        byParent.get(key).push(n);
+    }
+    const out = [];
+    const walk = (node) => {
+        out.push(node);
+        for (const child of (byParent.get(node._id) || [])) walk(child);
+    };
+    walk(nodes[0]);
+    return out;
+}
+
+async function renderPage(companyId, share, requestedId) {
     const page = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.PAGES,
         data: [{ _id: share.entityId }],
@@ -146,13 +283,136 @@ async function renderPage(companyId, share) {
     if (String(page.visibility || '') === 'private') {
         return { title: 'Doc', body: '<h1>This doc is no longer shared.</h1>' };
     }
-    const title = page.title || 'Untitled doc';
-    const html = sanitizeDocHtml(page.content && page.content.html);
-    let body = `<h1>${escapeHtml(title)}</h1>`;
-    body += '<div class="muted">read-only public doc</div>';
-    body += `<div class="doc">${html || '<p style="color:#999">This doc is empty.</p>'}</div>`;
-    return { title, body };
+
+    const tree = orderTree(await collectSharedTree(companyId, page));
+    // The id in the URL is attacker-controlled, so it is only honoured when it
+    // is provably inside this share's own subtree. Anything else falls back to
+    // the root — never fetched — otherwise the token would read any doc in the
+    // company by id.
+    const wanted = String(requestedId || '');
+    const selected = tree.find((n) => n._id === wanted) || tree[0];
+
+    const current = selected._id === String(page._id)
+        ? page
+        : await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.PAGES,
+            data: [{ _id: selected._id, deletedStatusKey: 0 }],
+        }, 'findOne');
+    if (!current) {
+        return { title: 'Doc', body: '<h1>This doc is no longer available.</h1>' };
+    }
+
+    const title = current.title || 'Untitled doc';
+    const html = sanitizeDocHtml(current.content && current.content.html);
+    const byId = new Map(tree.map((n) => [n._id, n]));
+    const hasKids = new Set(tree.map((n) => n.parentPageId).filter(Boolean));
+    const link = (id) => `/share/${escapeHtml(share.token)}?p=${escapeHtml(id)}`;
+    const owner = await resolveOwner(current);
+
+    // Breadcrumb: the path from the shared root down to the page being read.
+    // Walked through the tree we already built, so it can never name a page
+    // outside this share.
+    const trail = [];
+    for (let node = selected; node; node = byId.get(node.parentPageId)) {
+        trail.unshift(node);
+        if (!node.parentPageId) break;
+    }
+    const crumbs = trail.map((node, i) => (i === trail.length - 1
+        ? `<span class="crumb is-last">${ICON_DOC}${escapeHtml(node.title || 'Untitled')}</span>`
+        : `<a class="crumb" href="${link(node._id)}">${ICON_DOC}${escapeHtml(node.title || 'Untitled')}</a>`
+    )).join('<span class="crumb-sep">/</span>');
+
+    let side = '<aside class="dk__side">'
+        + '<div class="dk__side-label">Pages</div><div class="dk__tree">';
+    for (const node of tree) {
+        const isCurrent = node._id === selected._id;
+        const label = escapeHtml(node.title || 'Untitled');
+        const indent = 12 + (node.depth * 16);
+        // The caret marks a page that has children. It is decoration, not a
+        // control: the whole tree is already expanded, and there is no script
+        // on this page to collapse it with.
+        const caret = hasKids.has(node._id) ? `<span class="dk__caret">${ICON_CARET}</span>` : '<span class="dk__caret"></span>';
+        const inner = `${caret}${ICON_DOC}<span class="dk__row-title">${label}</span>`;
+        side += isCurrent
+            ? `<span class="dk__row is-current" style="padding-left:${indent}px">${inner}</span>`
+            : `<a class="dk__row" style="padding-left:${indent}px" href="${link(node._id)}">${inner}</a>`;
+    }
+    side += '</div></aside>';
+
+    // Direct children only — the sidebar already carries the whole tree, so this
+    // is "what is under the page you are reading", as in ClickUp.
+    const children = tree.filter((n) => n.parentPageId === selected._id);
+    let subpages = '';
+    if (children.length) {
+        const names = await resolveNames(children.map((c) => c.ownerId));
+        subpages = '<div class="dk__subs"><table><thead><tr><th>Subpages</th><th class="dk__owner-col">Owner</th></tr></thead><tbody>';
+        for (const child of children) {
+            const who = names.get(child.ownerId) || '';
+            subpages += `<tr><td><a class="dk__sub-link" href="${link(child._id)}">${ICON_DOC_BOX}${escapeHtml(child.title || 'Untitled')}</a></td>`
+                + `<td class="dk__owner-col">${who ? avatar(who) : ''}</td></tr>`;
+        }
+        subpages += '</tbody></table></div>';
+    }
+
+    const meta = `<div class="dk__meta">${owner.name ? `${avatar(owner.name)}<span class="dk__author">${escapeHtml(owner.name)}</span><span class="dk__dot">•</span>` : ''}`
+        + `<span class="dk__updated">Last updated ${escapeHtml(formatStamp(current.updatedAt || current.createdAt))}</span></div>`;
+
+    const main = '<section class="dk__main"><div class="dk__doc-col">'
+        + `<h1 class="dk__title">${escapeHtml(title)}</h1>`
+        + meta
+        + `<div class="doc">${html || ''}</div>`
+        + subpages
+        + '</div></section>';
+
+    return {
+        title,
+        body: `<div class="dk__bar">${crumbs}</div><div class="dk">${side}${main}</div>`,
+        wide: true,
+        bare: true,
+    };
 }
+
+/* Display names for a set of user ids, in ONE query — the subpages table would
+ * otherwise issue a lookup per row. Users live in the GLOBAL db, not the company
+ * one. Best-effort throughout: a name that cannot be resolved is simply omitted
+ * rather than failing the page. */
+async function resolveNames(userIds) {
+    const ids = [...new Set((userIds || []).map(String).filter(Boolean))];
+    const out = new Map();
+    if (!ids.length) return out;
+    try {
+        const users = await MongoDbCrudOpration('global', {
+            type: SCHEMA_TYPE.USERS,
+            data: [{ _id: { $in: ids } }, 'Employee_Name Employee_FName Employee_LName'],
+        }, 'find');
+        for (const u of (users || [])) {
+            const name = u.Employee_Name || [u.Employee_FName, u.Employee_LName].filter(Boolean).join(' ');
+            if (name) out.set(String(u._id), String(name));
+        }
+    } catch (e) { /* names are decoration — never fail the page for them */ }
+    return out;
+}
+
+async function resolveOwner(page) {
+    const uid = String(page.updatedBy || page.createdBy || '');
+    const names = await resolveNames([uid]);
+    return { name: names.get(uid) || '' };
+}
+
+// Initial-in-a-circle. Real avatars live behind signed storage URLs that would
+// expire on a public page, so the initial is the honest version.
+const avatar = (name) => {
+    const initial = escapeHtml(String(name || '?').trim().charAt(0).toUpperCase() || '?');
+    return `<span class="dk__avatar">${initial}</span>`;
+};
+
+const formatStamp = (value) => {
+    const d = value ? new Date(value) : null;
+    if (!d || Number.isNaN(d.getTime())) return 'unknown';
+    const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    return `${date} at ${time}`;
+};
 
 /* GET /share/:token — read-only board grouped by status. */
 exports.renderShare = async (req, res) => {
@@ -178,10 +438,12 @@ exports.renderShare = async (req, res) => {
             return sendPage(res, 200, rendered.title, rendered.body);
         }
 
-        // A shared doc renders the document itself.
+        // A shared doc renders the document itself, plus everything nested under
+        // it. `?p=` picks which page of that subtree to show; renderPage rejects
+        // any id that is not inside it.
         if (share.entityType === 'page') {
-            const rendered = await renderPage(companyId, share);
-            return sendPage(res, 200, rendered.title, rendered.body);
+            const rendered = await renderPage(companyId, share, req.query && req.query.p);
+            return sendPage(res, 200, rendered.title, rendered.body, rendered.bare);
         }
 
         const [sprint, tasks] = await Promise.all([
