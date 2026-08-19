@@ -18,6 +18,7 @@ exports.init = (app) => {
 
     // Unauthenticated public pages (server-rendered HTML), rate-limited by IP.
     app.get('/share/:token', publicReadLimiter, renderer.renderShare);
+    app.get('/share/:token/page/:pageId', publicReadLimiter, renderer.renderDocFragment); // in-page navigation
     app.post('/share/:token', publicReadLimiter, renderer.renderShare);        // password unlock (re-renders)
     app.post('/share/:token/intake', publicWriteLimiter, renderer.submitIntake);
 }

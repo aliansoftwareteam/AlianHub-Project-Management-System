@@ -73,12 +73,35 @@ const ALLOWED_TAGS = new Set([
     'blockquote', 'pre', 'code',
     'ol', 'ul', 'li',
     'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-    'a', 'img',
+    'a', 'img', 'iframe',
     'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'caption',
 ]);
 const VOID_TAGS = new Set(['br', 'hr', 'img']);
 // Removed WITH their contents. Anything else only loses its tags.
-const STRIPPED_TAGS = 'script|style|svg|math|iframe|object|embed|template|noscript|form|input|button|select|textarea|link|meta|base';
+const STRIPPED_TAGS = 'script|style|svg|math|object|embed|template|noscript|form|input|button|select|textarea|link|meta|base';
+
+/**
+ * The editor's video button stores a provider embed as an <iframe class="ql-video">,
+ * so a doc with a video renders nothing unless iframes are allowed. They are —
+ * but ONLY pointing at these players.
+ *
+ * An arbitrary iframe on a public page is a phishing and clickjacking surface,
+ * so the host is the gate, not the tag: an <iframe> whose src is not on this
+ * list is dropped whole. cspFor() names the same hosts in frame-src, so a src
+ * that ever slipped past this still could not load.
+ */
+const SAFE_EMBED_SRC = new RegExp(
+    '^https://(?:'
+    + 'www\\.youtube\\.com/embed/'
+    + '|youtube\\.com/embed/'
+    + '|www\\.youtube-nocookie\\.com/embed/'
+    + '|player\\.vimeo\\.com/video/'
+    + '|www\\.loom\\.com/embed/'
+    + '|loom\\.com/embed/'
+    + ')[\\w\\-/?=&.%]*$',
+    'i',
+);
+exports.SAFE_EMBED_SRC = SAFE_EMBED_SRC;
 // Inline styles carry the editor's colours and alignment. Layout and anything
 // that can fetch or execute is not on the list.
 const ALLOWED_STYLE_PROPS = new Set([
@@ -87,6 +110,24 @@ const ALLOWED_STYLE_PROPS = new Set([
 ]);
 const SAFE_HREF = /^(?:https?:\/\/|mailto:|#|\/)/i;
 const SAFE_IMG_SRC = /^(?:https?:\/\/|data:image\/(?:png|jpe?g|gif|webp);base64,)/i;
+const HREF_HAS_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+
+/**
+ * Docs written before the editor started absolutising links hold hrefs like
+ * "www.alianhub.com". With no scheme a browser resolves that against the share
+ * page itself, so give it https:// — otherwise the link fails SAFE_HREF below
+ * and is dropped, leaving text that looks like a link and does nothing.
+ *
+ * Only a value with NO scheme is touched. Anything carrying one — javascript:,
+ * data:, vbscript: — is left exactly as it was, so it still faces SAFE_HREF and
+ * is still rejected.
+ */
+const absoluteHref = (value) => {
+    const raw = String(value || '').trim();
+    if (!raw || HREF_HAS_SCHEME.test(decodeForSchemeCheck(raw))) return raw;
+    if (raw.startsWith('#') || raw.startsWith('/')) return raw;
+    return `https://${raw}`;
+};
 
 /**
  * Resolve a URL attribute the way a browser would before deciding it is safe.
@@ -136,6 +177,7 @@ const cleanClass = (value) => String(value || '')
 const cleanAttrs = (tag, raw) => {
     const kept = [];
     let hasHref = false;
+    let hasEmbedSrc = false;
     const ATTR = /([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/g;
     let match;
     while ((match = ATTR.exec(raw))) {
@@ -148,12 +190,24 @@ const cleanAttrs = (tag, raw) => {
             const style = cleanStyle(value);
             if (style) kept.push(`style="${attrValue(style)}"`);
         } else if (name === 'href' && tag === 'a') {
-            if (SAFE_HREF.test(decodeForSchemeCheck(value))) {
-                kept.push(`href="${attrValue(value)}"`);
+            const href = absoluteHref(value);
+            if (SAFE_HREF.test(decodeForSchemeCheck(href))) {
+                kept.push(`href="${attrValue(href)}"`);
                 hasHref = true;
             }
         } else if (name === 'src' && tag === 'img') {
             if (SAFE_IMG_SRC.test(decodeForSchemeCheck(value))) kept.push(`src="${attrValue(value)}"`);
+        } else if (name === 'src' && tag === 'iframe') {
+            if (SAFE_EMBED_SRC.test(decodeForSchemeCheck(value))) {
+                kept.push(`src="${attrValue(value)}"`);
+                hasEmbedSrc = true;
+            }
+        } else if (name === 'allowfullscreen' && tag === 'iframe') {
+            kept.push('allowfullscreen');
+        } else if (name === 'data-checked' && tag === 'ul' && (value === 'true' || value === 'false')) {
+            // The editor stores a checklist as <ul data-checked="true|false">.
+            // Dropping it left plain bullets, losing the ticks entirely.
+            kept.push(`data-checked="${value}"`);
         } else if ((name === 'alt' || name === 'title') && (tag === 'img' || tag === 'a')) {
             kept.push(`${name}="${attrValue(value)}"`);
         } else if ((name === 'width' || name === 'height') && tag === 'img' && /^\d{1,4}$/.test(value)) {
@@ -163,6 +217,12 @@ const cleanAttrs = (tag, raw) => {
     }
     // A link out of a public page opens away from it and carries nothing back.
     if (tag === 'a' && hasHref) kept.push('target="_blank"', 'rel="noopener noreferrer nofollow"');
+    // An embed with no accepted src is not an embed — signal the caller to drop
+    // the element rather than emit a bare <iframe> pointing nowhere.
+    if (tag === 'iframe') {
+        if (!hasEmbedSrc) return null;
+        kept.push('loading="lazy"', 'referrerpolicy="strict-origin-when-cross-origin"');
+    }
     return kept.length ? ` ${kept.join(' ')}` : '';
 };
 
@@ -187,6 +247,7 @@ const sanitizeDocHtml = (html) => {
     const TAG = /<(\/?)([a-zA-Z][a-zA-Z0-9-]*)((?:"[^"]*"|'[^']*'|[^>])*)>/g;
     let out = '';
     let last = 0;
+    let droppedEmbed = 0;
     let match;
     while ((match = TAG.exec(working))) {
         out += text(working.slice(last, match.index));
@@ -195,10 +256,15 @@ const sanitizeDocHtml = (html) => {
         const tag = match[2].toLowerCase();
         if (!ALLOWED_TAGS.has(tag)) continue;          // drop the tag, keep the text
         if (closing) {
+            // The opener of a rejected embed was dropped, so its closer must go
+            // too or the output carries a stray </iframe>.
+            if (tag === 'iframe') { if (droppedEmbed > 0) droppedEmbed -= 1; else out += '</iframe>'; continue; }
             if (!VOID_TAGS.has(tag)) out += `</${tag}>`;
             continue;
         }
-        out += `<${tag}${cleanAttrs(tag, match[3])}>`;
+        const attrs = cleanAttrs(tag, match[3]);
+        if (attrs === null) { droppedEmbed += 1; continue; }   // embed with no accepted src
+        out += `<${tag}${attrs}>`;
     }
     return out + text(working.slice(last));
 };
