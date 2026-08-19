@@ -43,6 +43,15 @@ const PAGE_STYLE = `
     .dk__side::-webkit-scrollbar-track,.dk__main::-webkit-scrollbar-track{background:transparent}
     .dk__side::-webkit-scrollbar-thumb,.dk__main::-webkit-scrollbar-thumb{background:#d3d6de;border-radius:8px}
     .dk__side::-webkit-scrollbar-thumb:hover,.dk__main::-webkit-scrollbar-thumb:hover{background:#b9bdc9}
+    /* Every page of the share is in the document; :target picks the one on
+       screen, so switching pages costs no reload and no script. The default
+       pane is last in source order, which lets a targeted pane hide it with a
+       following-sibling selector — no :has() needed, so there is no browser
+       where this degrades to a blank page. */
+    .pane{display:none;flex:1;min-height:0;flex-direction:column}
+    .pane:target{display:flex}
+    .pane--default{display:flex}
+    .pane:target ~ .pane--default{display:none}
     .dk__bar{display:flex;align-items:center;gap:6px;flex:0 0 46px;height:46px;padding:0 16px;border-bottom:1px solid #eef0f3;font-size:13px;background:#fff;overflow:hidden;white-space:nowrap}
     .crumb{display:inline-flex;align-items:center;gap:5px;color:#6b7280;text-decoration:none;max-width:260px;overflow:hidden;text-overflow:ellipsis}
     a.crumb:hover{color:#111}
@@ -302,74 +311,118 @@ async function renderPage(companyId, share, requestedId) {
         return { title: 'Doc', body: '<h1>This doc is no longer available.</h1>' };
     }
 
-    const title = current.title || 'Untitled doc';
-    const html = sanitizeDocHtml(current.content && current.content.html);
+    // Every page of the subtree is rendered into the one response and switched
+    // with :target, so reading a sub-page costs no reload. That only holds while
+    // the payload stays sane — beyond these bounds the panes are dropped and
+    // each page is fetched from the server as before. The sidebar is repeated
+    // per pane (CSS can only restyle the target and what follows it), so the
+    // page count matters as much as the content size.
+    const INLINE_MAX_PAGES = 25;
+    const INLINE_MAX_CONTENT_BYTES = 300 * 1024;
+
+    const docs = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.PAGES,
+        data: [{ _id: { $in: tree.map((n) => n._id) }, deletedStatusKey: 0 }],
+    }, 'find').catch(() => []);
+    const docById = new Map((docs || []).map((d) => [String(d._id), d]));
+    docById.set(String(page._id), page);
+
+    const totalBytes = tree.reduce((sum, n) => {
+        const d = docById.get(n._id);
+        return sum + String((d && d.content && d.content.html) || '').length;
+    }, 0);
+    const inline = tree.length > 1
+        && tree.length <= INLINE_MAX_PAGES
+        && totalBytes <= INLINE_MAX_CONTENT_BYTES
+        && tree.every((n) => docById.has(n._id));
+
+    const names = await resolveNames(tree.map((n) => n.ownerId).concat([page.updatedBy, page.createdBy]));
     const byId = new Map(tree.map((n) => [n._id, n]));
     const hasKids = new Set(tree.map((n) => n.parentPageId).filter(Boolean));
-    const link = (id) => `/share/${escapeHtml(share.token)}?p=${escapeHtml(id)}`;
-    const owner = await resolveOwner(current);
+    // In-page anchor when everything is inlined, a server round-trip otherwise.
+    const link = inline
+        ? (id) => `#pg-${escapeHtml(id)}`
+        : (id) => `/share/${escapeHtml(share.token)}?p=${escapeHtml(id)}`;
 
-    // Breadcrumb: the path from the shared root down to the page being read.
-    // Walked through the tree we already built, so it can never name a page
-    // outside this share.
-    const trail = [];
-    for (let node = selected; node; node = byId.get(node.parentPageId)) {
-        trail.unshift(node);
-        if (!node.parentPageId) break;
-    }
-    const crumbs = trail.map((node, i) => (i === trail.length - 1
-        ? `<span class="crumb is-last">${ICON_DOC}${escapeHtml(node.title || 'Untitled')}</span>`
-        : `<a class="crumb" href="${link(node._id)}">${ICON_DOC}${escapeHtml(node.title || 'Untitled')}</a>`
-    )).join('<span class="crumb-sep">/</span>');
+    const paneFor = (node) => {
+        const doc = docById.get(node._id) || {};
+        const nodeTitle = doc.title || node.title || 'Untitled doc';
 
-    let side = '<aside class="dk__side">'
-        + '<div class="dk__side-label">Pages</div><div class="dk__tree">';
-    for (const node of tree) {
-        const isCurrent = node._id === selected._id;
-        const label = escapeHtml(node.title || 'Untitled');
-        const indent = 12 + (node.depth * 16);
-        // The caret marks a page that has children. It is decoration, not a
-        // control: the whole tree is already expanded, and there is no script
-        // on this page to collapse it with.
-        const caret = hasKids.has(node._id) ? `<span class="dk__caret">${ICON_CARET}</span>` : '<span class="dk__caret"></span>';
-        const inner = `${caret}${ICON_DOC}<span class="dk__row-title">${label}</span>`;
-        side += isCurrent
-            ? `<span class="dk__row is-current" style="padding-left:${indent}px">${inner}</span>`
-            : `<a class="dk__row" style="padding-left:${indent}px" href="${link(node._id)}">${inner}</a>`;
-    }
-    side += '</div></aside>';
-
-    // Direct children only — the sidebar already carries the whole tree, so this
-    // is "what is under the page you are reading", as in ClickUp.
-    const children = tree.filter((n) => n.parentPageId === selected._id);
-    let subpages = '';
-    if (children.length) {
-        const names = await resolveNames(children.map((c) => c.ownerId));
-        subpages = '<div class="dk__subs"><table><thead><tr><th>Subpages</th><th class="dk__owner-col">Owner</th></tr></thead><tbody>';
-        for (const child of children) {
-            const who = names.get(child.ownerId) || '';
-            subpages += `<tr><td><a class="dk__sub-link" href="${link(child._id)}">${ICON_DOC_BOX}${escapeHtml(child.title || 'Untitled')}</a></td>`
-                + `<td class="dk__owner-col">${who ? avatar(who) : ''}</td></tr>`;
+        // Breadcrumb: the path from the shared root down to this page. Walked
+        // through the tree we already built, so it can never name a page
+        // outside this share.
+        const trail = [];
+        for (let n = node; n; n = byId.get(n.parentPageId)) {
+            trail.unshift(n);
+            if (!n.parentPageId) break;
         }
-        subpages += '</tbody></table></div>';
+        const crumbs = trail.map((n, i) => (i === trail.length - 1
+            ? `<span class="crumb is-last">${ICON_DOC}${escapeHtml(n.title || 'Untitled')}</span>`
+            : `<a class="crumb" href="${link(n._id)}">${ICON_DOC}${escapeHtml(n.title || 'Untitled')}</a>`
+        )).join('<span class="crumb-sep">/</span>');
+
+        let side = '<aside class="dk__side">'
+            + '<div class="dk__side-label">Pages</div><div class="dk__tree">';
+        for (const row of tree) {
+            const isCurrent = row._id === node._id;
+            const label = escapeHtml(row.title || 'Untitled');
+            const indent = 12 + (row.depth * 16);
+            // The caret marks a page that has children. It is decoration, not a
+            // control: the whole tree is already expanded, and there is no
+            // script on this page to collapse it with.
+            const caret = hasKids.has(row._id) ? `<span class="dk__caret">${ICON_CARET}</span>` : '<span class="dk__caret"></span>';
+            const inner = `${caret}${ICON_DOC}<span class="dk__row-title">${label}</span>`;
+            side += isCurrent
+                ? `<span class="dk__row is-current" style="padding-left:${indent}px">${inner}</span>`
+                : `<a class="dk__row" style="padding-left:${indent}px" href="${link(row._id)}">${inner}</a>`;
+        }
+        side += '</div></aside>';
+
+        // Direct children only — the sidebar already carries the whole tree, so
+        // this is "what is under the page you are reading", as in ClickUp.
+        const children = tree.filter((n) => n.parentPageId === node._id);
+        let subpages = '';
+        if (children.length) {
+            subpages = '<div class="dk__subs"><table><thead><tr><th>Subpages</th><th class="dk__owner-col">Owner</th></tr></thead><tbody>';
+            for (const child of children) {
+                const who = names.get(child.ownerId) || '';
+                subpages += `<tr><td><a class="dk__sub-link" href="${link(child._id)}">${ICON_DOC_BOX}${escapeHtml(child.title || 'Untitled')}</a></td>`
+                    + `<td class="dk__owner-col">${who ? avatar(who) : ''}</td></tr>`;
+            }
+            subpages += '</tbody></table></div>';
+        }
+
+        const who = names.get(String(doc.updatedBy || doc.createdBy || '')) || '';
+        const meta = `<div class="dk__meta">${who ? `${avatar(who)}<span class="dk__author">${escapeHtml(who)}</span><span class="dk__dot">•</span>` : ''}`
+            + `<span class="dk__updated">Last updated ${escapeHtml(formatStamp(doc.updatedAt || doc.createdAt))}</span></div>`;
+
+        const main = '<section class="dk__main"><div class="dk__doc-col">'
+            + `<h1 class="dk__title">${escapeHtml(nodeTitle)}</h1>`
+            + meta
+            + `<div class="doc">${sanitizeDocHtml(doc.content && doc.content.html) || ''}</div>`
+            + subpages
+            + '</div></section>';
+
+        return `<div class="dk__bar">${crumbs}</div><div class="dk">${side}${main}</div>`;
+    };
+
+    const title = (docById.get(selected._id) || {}).title || selected.title || 'Untitled doc';
+
+    if (!inline) {
+        return { title, body: paneFor(selected), bare: true };
     }
 
-    const meta = `<div class="dk__meta">${owner.name ? `${avatar(owner.name)}<span class="dk__author">${escapeHtml(owner.name)}</span><span class="dk__dot">•</span>` : ''}`
-        + `<span class="dk__updated">Last updated ${escapeHtml(formatStamp(current.updatedAt || current.createdAt))}</span></div>`;
+    // The pane shown when there is no #hash goes LAST and carries the default
+    // class: `.pane:target ~ .pane--default` can then hide it as soon as any
+    // other pane is targeted. Ordering it this way avoids :has(), so the page
+    // does not depend on a selector some browsers may not support — with no
+    // fallback a missing :has() would render nothing at all.
+    const others = tree.filter((n) => n._id !== selected._id);
+    let body = '';
+    for (const node of others) body += `<div class="pane" id="pg-${escapeHtml(node._id)}">${paneFor(node)}</div>`;
+    body += `<div class="pane pane--default" id="pg-${escapeHtml(selected._id)}">${paneFor(selected)}</div>`;
 
-    const main = '<section class="dk__main"><div class="dk__doc-col">'
-        + `<h1 class="dk__title">${escapeHtml(title)}</h1>`
-        + meta
-        + `<div class="doc">${html || ''}</div>`
-        + subpages
-        + '</div></section>';
-
-    return {
-        title,
-        body: `<div class="dk__bar">${crumbs}</div><div class="dk">${side}${main}</div>`,
-        wide: true,
-        bare: true,
-    };
+    return { title, body, bare: true };
 }
 
 /* Display names for a set of user ids, in ONE query — the subpages table would
