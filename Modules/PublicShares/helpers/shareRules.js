@@ -110,7 +110,13 @@ const ALLOWED_STYLE_PROPS = new Set([
 ]);
 const SAFE_HREF = /^(?:https?:\/\/|mailto:|#|\/)/i;
 const SAFE_IMG_SRC = /^(?:https?:\/\/|data:image\/(?:png|jpe?g|gif|webp);base64,)/i;
-const HREF_HAS_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+// A colon alone does not mean a scheme: in "www.alianhub.com:8443/docs" it
+// introduces a port. Requiring a non-digit after it separates the two, so a
+// host:port link is absolutised instead of being read as an unknown scheme and
+// dropped. A dangerous scheme is never followed by a digit ("javascript:alert"),
+// and one that were — "javascript:1234" — becomes https://javascript:1234, an
+// ordinary https url to a host called javascript, not an executable one.
+const HREF_HAS_SCHEME = /^[a-z][a-z0-9+.-]*:(?!\d)/i;
 
 /**
  * Docs written before the editor started absolutising links hold hrefs like
