@@ -811,6 +811,7 @@ export default {
         page_unsaved: "Unsaved changes",
         page_edited_by: "Edited by {who} on {when}",
         page_discard_confirm: "This doc has unsaved changes. Leave without saving?",
+        page_unsaved_lost_on_switch: "You switched projects with unsaved changes — they were not saved.",
         page_delete_confirm: "Delete this doc? This cannot be undone.",
         page_delete_with_children: "Delete this doc and every sub-page under it? This cannot be undone.",
         untitled_page: "Untitled doc",

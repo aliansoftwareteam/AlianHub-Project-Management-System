@@ -376,6 +376,30 @@ watch(() => props.openDocId, (id) => {
     if (id && isOpen.value) openPage(id);
 });
 
+// Switching projects does not remount this component — only the injected project
+// changes — so nothing above re-ran and the previous project's tree and open doc
+// stayed on screen until a tab change or reload forced a rebuild.
+watch(() => (props.projectData && props.projectData._id) || '', (id, previous) => {
+    if (!id || !previous || id === previous) return;
+    // Nothing here autosaves (see isDirty), and the switch has already happened,
+    // so a confirm could not undo it. Say plainly that the edits are going rather
+    // than dropping them in silence.
+    if (isDirty.value) {
+        $toast.warning(t('Projects.page_unsaved_lost_on_switch'), { position: 'top-right' });
+    }
+    current.value = null;
+    draftTitle.value = '';
+    contentHtml.value = '';
+    savedSnapshot.value = { title: '', html: '' };
+    baselinePending.value = false;
+    pages.value = [];
+    expanded.value = new Set();
+    query.value = '';
+    showLinker.value = false;
+    showShare.value = false;
+    if (isOpen.value) fetchPages();
+});
+
 function fetchPages() {
     apiRequest('get', `/api/v2/pages?projectId=${props.projectData._id}`)
     .then((response) => {
