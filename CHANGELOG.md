@@ -23,10 +23,7 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 * **create-project:** rebuild project-status on the task-status structure ([747833a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/747833aa4caedbe5d34f1d142417a84f052818e4))
 * **create-project:** reusable template-select form + mobile stepper ([fc4bc39](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fc4bc395636b0564bcdfdf7fa34007d67de91b4a))
-* **create-project:** reusable template-select form + status steps rebuild ([802b2d4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/802b2d40b72a64a43d3fcf21f512d33620d1b0ed))
 * **create-project:** status drag-by-icon + desktop status-step fill ([df7301a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/df7301a540b804eedb5e3534aabf0693b59c21d7))
-* **docs:** add a Docs project view and share nested sub-pages publicly ([438e462](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/438e462debff8b461fd67aa9887a6bad2e251fb3))
-* **docs:** add a Docs project view with public sharing of nested docs ([426998c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/426998c402b10507cc5d6769c24deeb12e1200d3))
 * **docs:** add Docs as a project view ([ba65d1a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ba65d1a9a658456efb34665595c532a38ca5641e))
 * **docs:** open the first doc when the Docs view loads ([90de697](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/90de697d18b640ce2dae05a0977093d53cd3af31))
 * **public-share:** fetch doc pages on demand, and make the twisty work ([deaad31](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/deaad315369f7edbcc2d75dfb9da600af6d5ead3))
