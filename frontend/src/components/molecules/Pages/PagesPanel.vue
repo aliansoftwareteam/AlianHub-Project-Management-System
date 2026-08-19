@@ -700,7 +700,29 @@ function openEditor() {
  * and Quill's html are routinely different with nobody having typed a character — which is
  * why closing an untouched doc still asked about unsaved changes.
  */
+// Typing "www.alianhub.com" into the link box stored it verbatim, and a href with
+// no scheme is resolved against the current page — so the link went to
+// localhost:8080/www.alianhub.com instead of the site. Give a scheme-less URL an
+// https:// prefix before Quill stores it.
+//
+// Anything that already carries a scheme is passed straight through to Quill's own
+// sanitiser, so its protocol whitelist still rejects javascript: and friends — this
+// only fills in what the user left out.
+const URL_HAS_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+function patchLinkSanitizer(quill) {
+    const Link = quill && quill.constructor && quill.constructor.import('formats/link');
+    if (!Link || Link.__alianhubAbsolute) return;
+    const original = Link.sanitize.bind(Link);
+    Link.sanitize = (value) => {
+        const url = String(value == null ? '' : value).trim();
+        if (!url || URL_HAS_SCHEME.test(url) || url.startsWith('#') || url.startsWith('/')) return original(url);
+        return original(`https://${url}`);
+    };
+    Link.__alianhubAbsolute = true;
+}
+
 function onEditorReady(quill) {
+    patchLinkSanitizer(quill);
     // Flush first. The stored html was written straight into the element, and Quill only
     // takes it in when its MutationObserver next runs — a microtask later. Reading before
     // that returns our own string rather than Quill's rendering of it, and the difference

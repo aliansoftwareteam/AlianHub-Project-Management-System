@@ -87,6 +87,24 @@ const ALLOWED_STYLE_PROPS = new Set([
 ]);
 const SAFE_HREF = /^(?:https?:\/\/|mailto:|#|\/)/i;
 const SAFE_IMG_SRC = /^(?:https?:\/\/|data:image\/(?:png|jpe?g|gif|webp);base64,)/i;
+const HREF_HAS_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+
+/**
+ * Docs written before the editor started absolutising links hold hrefs like
+ * "www.alianhub.com". With no scheme a browser resolves that against the share
+ * page itself, so give it https:// — otherwise the link fails SAFE_HREF below
+ * and is dropped, leaving text that looks like a link and does nothing.
+ *
+ * Only a value with NO scheme is touched. Anything carrying one — javascript:,
+ * data:, vbscript: — is left exactly as it was, so it still faces SAFE_HREF and
+ * is still rejected.
+ */
+const absoluteHref = (value) => {
+    const raw = String(value || '').trim();
+    if (!raw || HREF_HAS_SCHEME.test(decodeForSchemeCheck(raw))) return raw;
+    if (raw.startsWith('#') || raw.startsWith('/')) return raw;
+    return `https://${raw}`;
+};
 
 /**
  * Resolve a URL attribute the way a browser would before deciding it is safe.
@@ -148,8 +166,9 @@ const cleanAttrs = (tag, raw) => {
             const style = cleanStyle(value);
             if (style) kept.push(`style="${attrValue(style)}"`);
         } else if (name === 'href' && tag === 'a') {
-            if (SAFE_HREF.test(decodeForSchemeCheck(value))) {
-                kept.push(`href="${attrValue(value)}"`);
+            const href = absoluteHref(value);
+            if (SAFE_HREF.test(decodeForSchemeCheck(href))) {
+                kept.push(`href="${attrValue(href)}"`);
                 hasHref = true;
             }
         } else if (name === 'src' && tag === 'img') {
