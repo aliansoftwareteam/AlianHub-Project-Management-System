@@ -201,7 +201,6 @@ const normalizeSettings = (input) => {
         background: colour(src.background, '#f5f6fa'),
         buttonColor: colour(src.buttonColor, '#2f3a8f'),
         answersInDescription: src.answersInDescription !== false,
-        showResubmit: src.showResubmit === true,
         hideBranding: src.hideBranding === true,
     };
 };

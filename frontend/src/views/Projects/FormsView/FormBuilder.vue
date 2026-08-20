@@ -305,7 +305,7 @@ const emit = defineEmits(['saved', 'deleted', 'dirty', 'update:showSubmissions']
 // build, which is where the choices it holds are actually visible.
 const TABS = ['build', 'preview'];
 const THEMES = ['light', 'dark'];
-const TOGGLES = ['answersInDescription', 'showResubmit', 'hideBranding'];
+const TOGGLES = ['answersInDescription', 'hideBranding'];
 const ALIGNMENTS = ['left', 'center', 'right'];
 const BACKGROUNDS = ['#f5f6fa', '#ffffff', '#eef2ff', '#eefaf3', '#fff7e6', '#fdeef1', '#f3eefa', '#1f2130'];
 const BUTTON_COLORS = ['#2f3a8f', '#4b5563', '#6473e8', '#2f80ed', '#24c110', '#f5a623', '#ec4141', '#9759c0'];
@@ -462,7 +462,7 @@ const hydrate = () => {
         createTask: true,
         titleAlign: 'left', titleDivider: true,
         layout: 'two', theme: 'light', background: '#f5f6fa', buttonColor: '#2f3a8f',
-        answersInDescription: true, showResubmit: false, hideBranding: false,
+        answersInDescription: true, hideBranding: false,
         ...(props.form.settings || {}),
     };
     // Read from the form itself, not only from the reply to Publish, so the

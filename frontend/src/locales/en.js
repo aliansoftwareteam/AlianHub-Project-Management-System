@@ -890,7 +890,6 @@ export default {
         form_enter_url: "https://",
         form_enter_phone: "Enter phone",
         form_answersInDescription: "Add answers to the task description",
-        form_showResubmit: "Show resubmit button",
         form_hideBranding: "Hide AlianHub branding",
         form_publish: "Publish",
         form_unpublish: "Unpublish",

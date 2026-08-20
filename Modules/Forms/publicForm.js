@@ -76,7 +76,6 @@ const PAGE_STYLE = `
     button{margin-top:26px;border:none;color:#fff;border-radius:8px;padding:12px 22px;font-size:14px;
         font-weight:600;cursor:pointer;width:100%}
     button:hover{filter:brightness(.94)}
-    .again{display:inline-block;margin-top:14px;font-size:13px;text-decoration:none;border-radius:7px;padding:8px 14px;border:1px solid #d7d9e6}
     .note{margin-top:18px;font-size:13px;padding:11px 13px;border-radius:8px}
     .note.err{background:#fdf1f0;color:#a33227;border:1px solid #f0cfcb}
     /* Sent confirmation. The form stays on screen so another submission needs no
@@ -110,9 +109,8 @@ const themeStyle = (s) => {
     .head--rule{border-bottom-color:${edge}}
     .intro,.help,.footer{color:${muted}}
     input[type=text],input[type=date],input[type=email],input[type=url],input[type=tel],
-    input[type=number],textarea,select,.money .sym,.again{background:${surface};color:${ink};
+    input[type=number],textarea,select,.money .sym{background:${surface};color:${ink};
         border-color:${dark ? '#3b3f5a' : '#d7d9e6'}}
-    .again{color:${ink}}
     button{background:${s.buttonColor}}`;
 };
 
@@ -316,7 +314,6 @@ function formBody(form, token, questions, opts) {
     const fieldErrors = o.errors ? Object.keys(o.errors).length : 0;
     if (o.reason && !fieldErrors) body += `<div class="note err">${escapeHtml(o.reason)}</div>`;
     body += '<button type="submit">Submit</button></form>';
-    if (o.again) body += `<a class="again" href="/form/${escapeHtml(token)}">Submit another response</a>`;
     return body;
 }
 
@@ -334,7 +331,6 @@ exports.renderForm = async (req, res) => {
         return send(res, 200, form.title || 'Form',
             formBody(form, req.params.token, visibleQuestions(form), {
                 banner: justSent ? sentBanner(form) : '',
-                again: justSent && settings.showResubmit,
                 settings,
             }), settings);
     } catch (error) {
