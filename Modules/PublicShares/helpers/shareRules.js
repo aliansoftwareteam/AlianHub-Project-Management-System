@@ -3,7 +3,7 @@
 
 const crypto = require('crypto');
 
-const ENTITY_TYPES = Object.freeze(['sprint', 'report', 'page']);
+const ENTITY_TYPES = Object.freeze(['sprint', 'report', 'page', 'form']);
 const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
 // Accept legacy 16-byte (32-hex) tokens and new 32-byte (64-hex) tokens.
 const TOKEN_PATTERN = /^[0-9a-f]{32,64}$/;

@@ -268,6 +268,7 @@
                                             activeTab !== 'MapView' &&
                                             activeTab !== 'ProjectDashboard' &&
                                             activeTab !== 'DocsView' &&
+                                            activeTab !== 'FormsView' &&
                                             (clientWidth > 767 || activeTab !== 'ProjectDetail')
                                 },
                                 {'board-veiw-main-parent': activeTab === 'ProjectKanban'}
@@ -315,7 +316,7 @@
                             <AiTaskCreator v-if="projectData && projectData._id" v-model="showAiTaskCreator" :projectId="String(projectData._id)" :sprints="aiSprints" :activeSprintId="aiActiveSprintId" @done="onAiTasksCreated" />
                             <component
                                 v-if="(clientWidth <= 767 && isVisible == true && isRuleData == false) || (clientWidth > 767 && isRuleData == false)"
-                                :class="[{'showProjectDetailRight':activeTab !== 'ProjectListView' && activeTab !== 'Calendar' && activeTab != 'EmbedViewItem' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports' && activeTab !== 'GanttView' && activeTab !== 'RecurringTasks' && activeTab !== 'TimelineView' && activeTab !== 'MindMapView' && activeTab !== 'WhiteboardView' && activeTab !== 'CanvasView' && activeTab !== 'MapView' && activeTab !== 'ProjectDashboard' && activeTab !== 'DocsView'}]"
+                                :class="[{'showProjectDetailRight':activeTab !== 'ProjectListView' && activeTab !== 'Calendar' && activeTab != 'EmbedViewItem' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports' && activeTab !== 'GanttView' && activeTab !== 'RecurringTasks' && activeTab !== 'TimelineView' && activeTab !== 'MindMapView' && activeTab !== 'WhiteboardView' && activeTab !== 'CanvasView' && activeTab !== 'MapView' && activeTab !== 'ProjectDashboard' && activeTab !== 'DocsView' && activeTab !== 'FormsView'}]"
                                 :is="getView(activeTab)"
                                 :data="selectedEmbedView"
                                 :sprints="sprints"
@@ -337,7 +338,7 @@
                                 :sprintLoading="sprintLoading"
                                 :commentType="'project'"
                             />
-                            <ProjectDetailRightSide v-if="activeTab !== 'ProjectListView' && clientWidth > 767 && activeTab !== 'Calendar' && activeTab != 'EmbedView' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports' && activeTab !== 'GanttView' && activeTab !== 'RecurringTasks' && activeTab !== 'TimelineView' && activeTab !== 'MindMapView' && activeTab !== 'WhiteboardView' && activeTab !== 'CanvasView' && activeTab !== 'ProjectDashboard' && activeTab !== 'DocsView'" :projectData="projectData" @rightSideBarEmit="handleEmitProjectRightSide" @description="handleDescription"/>
+                            <ProjectDetailRightSide v-if="activeTab !== 'ProjectListView' && clientWidth > 767 && activeTab !== 'Calendar' && activeTab != 'EmbedView' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports' && activeTab !== 'GanttView' && activeTab !== 'RecurringTasks' && activeTab !== 'TimelineView' && activeTab !== 'MindMapView' && activeTab !== 'WhiteboardView' && activeTab !== 'CanvasView' && activeTab !== 'ProjectDashboard' && activeTab !== 'DocsView' && activeTab !== 'FormsView'" :projectData="projectData" @rightSideBarEmit="handleEmitProjectRightSide" @description="handleDescription"/>
                         </div>
                         <div class="position-ab z-index-1 p-5px border-radius-5-px text-center p0x-15px archived_wrapper" v-if="projectData?.deletedStatusKey === 2">
                             <div>
@@ -489,6 +490,7 @@ const CanvasViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "p
 const MapViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-map" */ '@/views/Projects/MapView/MapView.vue'));
 const DashboardViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-dashboard" */ './DashboardView/DashboardView.vue'));
 const DocsViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-docs" */ '@/views/Projects/DocsView/DocsView.vue'));
+const FormsViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-forms" */ '@/views/Projects/FormsView/FormsView.vue'));
 import NotFound from '../NotFound.vue';
 
 // EXTRACTED PIECES
@@ -1240,6 +1242,8 @@ function getView(val) {
             return DashboardViewComp;
         case 'DocsView':
             return DocsViewComp;
+        case 'FormsView':
+            return FormsViewComp;
         default:
             return NotFound;
     }
