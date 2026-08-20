@@ -282,8 +282,22 @@ exports.listSubmissions = async (req, res) => {
 
         const data = (rows || []).map((row) => {
             const values = {};
+            const files = {};
             for (const a of (Array.isArray(row.answers) ? row.answers : [])) {
-                if (a && a.questionId) values[a.questionId] = a.value === undefined ? '' : String(a.value);
+                if (!a || !a.questionId) continue;
+                values[a.questionId] = a.value === undefined ? '' : String(a.value);
+                // The descriptor, so the table can offer the file itself rather
+                // than just its name. The storage key is only useful to an
+                // authenticated read, which is the only way it is ever fetched.
+                if (a.file && a.file.url) {
+                    files[a.questionId] = {
+                        filename: a.file.filename || String(a.value || ''),
+                        extension: a.file.extension || '',
+                        size: Number(a.file.size) || 0,
+                        type: a.file.type || '',
+                        url: a.file.url,
+                    };
+                }
             }
             return {
                 _id: row._id,
@@ -291,6 +305,7 @@ exports.listSubmissions = async (req, res) => {
                 taskKey: row.taskKey || '',
                 taskId: row.taskId || '',
                 values,
+                files,
             };
         });
 

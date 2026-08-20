@@ -43,7 +43,14 @@
                             <td class="fs__when">{{ when(row.submittedAt) }}</td>
                             <td v-if="anyTask" class="fs__task">{{ row.taskKey || '—' }}</td>
                             <td v-for="c in columns" :key="c.id">
-                                <span v-if="row.values[c.id]" class="fs__val">{{ row.values[c.id] }}</span>
+                                <button v-if="row.files && row.files[c.id]" type="button" class="fs__file"
+                                    :disabled="opening === `${row._id}:${c.id}`"
+                                    :title="$t('Projects.form_open_file')" @click="openFile(row, c.id)">
+                                    <FormIcon name="external" />
+                                    <span class="fs__val">{{ row.files[c.id].filename }}</span>
+                                    <span class="fs__size">{{ readableSize(row.files[c.id].size) }}</span>
+                                </button>
+                                <span v-else-if="row.values[c.id]" class="fs__val">{{ row.values[c.id] }}</span>
                                 <span v-else class="fs__blank">—</span>
                             </td>
                         </tr>
@@ -65,12 +72,18 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount, defineProps } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount, inject, defineProps } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import { downloadExport } from '@/composable/exportDownload';
+import { storageHelper } from '@/composable/commonFunction';
+import FormIcon from './FormIcon.vue';
 
 const { t } = useI18n();
+// The same pair every other attachment in the app uses to turn a storage key into
+// a url. It is an authenticated call, so no public read path is added here.
+const companyId = inject('$companyId');
+const { handleStorageImageRequest } = storageHelper();
 const props = defineProps({
     formId: { type: String, required: true },
     formTitle: { type: String, default: '' },
@@ -96,6 +109,41 @@ const when = (value) => {
     if (!value) return '—';
     const d = new Date(value);
     return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString();
+};
+
+const opening = ref('');
+
+const readableSize = (bytes) => {
+    const n = Number(bytes) || 0;
+    if (!n) return '';
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+    return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+/* Opened in a new tab rather than fetched into the page: the helper returns a
+ * short-lived signed url, and the browser already knows whether to display the
+ * file or download it. */
+const openFile = async (row, columnId) => {
+    const file = row.files && row.files[columnId];
+    if (!file || opening.value) return;
+    opening.value = `${row._id}:${columnId}`;
+    err.value = '';
+    try {
+        // Both drivers resolve { url, downloadUrl } — not a bare string. `url`
+        // displays inline where the browser can (pdf, image) and downloads the
+        // rest, which is the "view or download" behaviour wanted here.
+        const resolved = await handleStorageImageRequest({
+            companyId: (companyId && companyId.value) || companyId,
+            data: { url: file.url },
+        });
+        const href = typeof resolved === 'string' ? resolved
+            : (resolved && (resolved.url || resolved.downloadUrl));
+        if (href) window.open(href, '_blank', 'noopener');
+        else err.value = t('Toast.something_went_wrong');
+    } catch (e) {
+        err.value = (e && e.message) || t('Toast.something_went_wrong');
+    } finally { opening.value = ''; }
 };
 
 const query = (extra) => {
@@ -204,6 +252,13 @@ watch(() => props.formId, () => { term.value = ''; load(1); });
 .fs__val { display: inline-block; max-width: 320px; overflow: hidden; text-overflow: ellipsis;
     vertical-align: bottom; }
 .fs__blank { color: #d3d6e2; }
+.fs__file { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #e3e5f0;
+    background: #fff; border-radius: 7px; padding: 4px 9px; font-family: inherit; font-size: 12.5px;
+    color: #2f3990; cursor: pointer; max-width: 260px; }
+.fs__file:hover:not(:disabled) { background: #f4f5fb; border-color: #b9c0ea; }
+.fs__file:disabled { opacity: .6; cursor: default; }
+.fs__file .fs__val { max-width: 150px; }
+.fs__size { color: #9aa0b4; font-variant-numeric: tabular-nums; }
 .fs__pager { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
 .fs__range { flex: 1 1 auto; font-size: 12px; color: #9aa0b4; font-variant-numeric: tabular-nums; }
 .fs__page-btn { border: 1px solid #d7d9e6; background: #fff; color: #3b4252; border-radius: 7px;

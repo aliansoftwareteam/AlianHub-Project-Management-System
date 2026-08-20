@@ -38,6 +38,10 @@
             <input v-else-if="type.widget === 'range'" v-model="answer" class="ff__range" type="range"
                 min="0" max="100" step="5" :disabled="!live">
 
+            <div v-else-if="type.widget === 'file'" class="ff__drop">
+                {{ $t('Projects.form_drop_hint') }}
+            </div>
+
             <div v-else-if="type.widget === 'money'" class="ff__money">
                 <span class="ff__sym">$</span>
                 <input v-model="answer" class="ff__input" type="number" step="0.01" :disabled="!live">
@@ -97,6 +101,8 @@ const placeholder = computed(() => t(`Projects.${PLACEHOLDER[props.type.widget] 
 .ff__star { font-size: 22px; line-height: 1; color: #c9ccdb; cursor: pointer; }
 .ff__star.is-on { color: #f5a623; }
 .ff__range { width: 100%; }
+.ff__drop { border: 1px dashed #d7d9e6; border-radius: 9px; padding: 16px; text-align: center;
+    font-size: 13px; color: #9aa0b4; background: #fff; }
 .ff__money { display: flex; }
 .ff__sym { border: 1px solid #d7d9e6; border-right: 0; border-radius: 7px 0 0 7px; padding: 9px 11px; font-size: 14px; }
 .ff__money .ff__input { border-radius: 0 7px 7px 0; }
