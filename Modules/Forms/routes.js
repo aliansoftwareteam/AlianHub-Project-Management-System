@@ -1,6 +1,7 @@
 const rateLimit = require('express-rate-limit');
 const ctrl = require('./controller');
 const publicForm = require('./publicForm');
+const formUpload = require('./helpers/formUpload');
 
 // The public form is unauthenticated, so cap it by IP: reading is cheap but
 // scriptable, and every submission writes a task. Matched to the public-share
@@ -26,5 +27,7 @@ exports.init = (app) => {
     // PUBLIC — server-rendered, no login. Deliberately NOT under /api/v2/forms:
     // that prefix requires a token, and these must not.
     app.get('/form/:token', publicReadLimiter, publicForm.renderForm);
-    app.post('/form/:token', publicWriteLimiter, publicForm.submitForm);
+    // formUpload.parse is a pass-through for a non-multipart post, so a form
+    // with no file question is unaffected by it.
+    app.post('/form/:token', publicWriteLimiter, formUpload.parse, publicForm.submitForm);
 }

@@ -21,6 +21,7 @@ const GROUPS = Object.freeze([
     { key: 'multi_select', title: 'Multi-select' },
     { key: 'contact_info', title: 'Contact info' },
     { key: 'number', title: 'Number' },
+    { key: 'uploads', title: 'Uploads' },
     { key: 'layout', title: 'Layout' },
 ]);
 
@@ -43,6 +44,7 @@ const TYPES = Object.freeze({
     location: { group: 'contact_info', title: 'Location', widget: 'text' },
     money: { group: 'number', title: 'Money', widget: 'money' },
     number: { group: 'number', title: 'Number', widget: 'number' },
+    files: { group: 'uploads', title: 'Files', widget: 'file' },
     info_block: { group: 'layout', title: 'Information Block', widget: 'info', input: false },
 });
 
@@ -105,7 +107,7 @@ const resolveSpan = (question, layout) => {
     if (SPANS.includes(given)) return given;
     const meta = typeOf(question && question.type);
     // Long text and an information block read badly in a narrow column.
-    if (meta && (meta.widget === 'textarea' || meta.widget === 'info')) return GRID_COLUMNS;
+    if (meta && ['textarea', 'info', 'file'].includes(meta.widget)) return GRID_COLUMNS;
     return layout === 'two' ? 6 : GRID_COLUMNS;
 };
 

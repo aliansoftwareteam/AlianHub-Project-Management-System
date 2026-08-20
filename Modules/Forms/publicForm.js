@@ -7,6 +7,7 @@ const { taskMongo } = require('../Tasks/helpers/task_class_Mongo'); // canonical
 const { mapSubmission, buildDescription, buildDescriptionBlock } = require('./helpers/submissionRules');
 const { normalizeSettings, hydrateStored } = require('./helpers/formRules');
 const { typeOf, resolveSpan, GRID_COLUMNS } = require('./helpers/questionTypes');
+const { storeSubmissionFiles, messageFor, REPICK, ACCEPT_ATTR, MAX_FILE_BYTES, MAX_FILES } = require('./helpers/formUpload');
 
 // The public half of Forms: an unauthenticated page, and the submission that
 // becomes a task.
@@ -64,6 +65,12 @@ const PAGE_STYLE = `
     .money{display:flex;align-items:center;gap:0}
     .money .sym{border:1px solid #d7d9e6;border-right:0;border-radius:7px 0 0 7px;padding:9px 11px;font-size:14px}
     .money input{border-radius:0 7px 7px 0}
+    /* A file input, given a drop-zone look without any script: the native control
+       already handles picking and dropping. */
+    .drop{display:block;border:1px dashed #d7d9e6;border-radius:9px;padding:16px;text-align:center;cursor:pointer}
+    .drop:hover{border-color:#7b8ce0;background:#fafbff}
+    .drop input{display:block;width:100%;font-size:13px;cursor:pointer}
+    .drop .hint{display:block;margin-top:8px;font-size:11.5px;color:#9aa0b4}
     .info{border-left:3px solid #c9d0f5;padding:2px 0 2px 12px;margin:0;font-size:14px;line-height:1.6;white-space:pre-wrap}
     /* Two classes deep on purpose: themeStyle is appended after this block and
        re-sets border-color on input[type=...] selectors of equal specificity, so a
@@ -262,6 +269,12 @@ function renderQuestion(q, values, errors, layout) {
         case 'range':
             field = `<input id="${id}" name="${id}" type="range" min="0" max="100" step="5" value="${one || '0'}">`;
             break;
+        case 'file':
+            field = `<label class="drop" for="${id}">`
+                + `<input id="${id}" name="${id}" type="file" accept="${ACCEPT_ATTR}"${req}>`
+                + `<span class="hint">Up to ${Math.round(MAX_FILE_BYTES / (1024 * 1024))} MB`
+                + `${MAX_FILES > 1 ? `, at most ${MAX_FILES} files per submission` : ''}</span></label>`;
+            break;
         case 'money':
             field = '<div class="money"><span class="sym">$</span>'
                 + `<input id="${id}" name="${id}" type="number" step="0.01" value="${one}"${req}></div>`;
@@ -306,7 +319,11 @@ function formBody(form, token, questions, opts) {
     if (o.banner) body += o.banner;
     // novalidate: the page validates on the server and renders its own message
     // per field, which the native popup would otherwise pre-empt.
-    body += `<form method="POST" action="/form/${escapeHtml(token)}" novalidate><div class="grid">`;
+    // multipart only when a file can be sent: it is a heavier encoding, and the
+    // upload middleware is a pass-through for everything else.
+    const carriesFile = questions.some((q) => (typeOf(q.type) || {}).widget === 'file');
+    const enc = carriesFile ? ' enctype="multipart/form-data"' : '';
+    body += `<form method="POST" action="/form/${escapeHtml(token)}"${enc} novalidate><div class="grid">`;
     body += questions.map((q) => renderQuestion(q, o.values, o.errors, s.layout)).join('');
     body += '</div>';
     // Only when no field could carry the message. Repeating "one or more fields
@@ -341,6 +358,9 @@ exports.renderForm = async (req, res) => {
 
 /* POST /form/:token — a submission becomes a task. */
 exports.submitForm = async (req, res) => {
+    // Set once the files are stored; runs on every exit so a refused submission
+    // leaves no temp file behind, matching "a rejection stores nothing".
+    let cleanupFiles = null;
     try {
         const resolved = await resolveForm(req.params.token);
         if (!resolved) return gone(res);
@@ -349,7 +369,39 @@ exports.submitForm = async (req, res) => {
         const settings = normalizeSettings(form.settings);
         const questions = visibleQuestions(form);
 
-        const mapped = mapSubmission(form, req.body || {}, { requireTaskName: settings.createTask });
+        // A file arrives beside the answers and has to be stored before the
+        // mapping runs, because the mapper is pure — no fs, no req — which is what
+        // makes it testable without standing Wasabi up.
+        //
+        // Ordering is deliberate: the form is resolved, each file is matched to a
+        // visible question of the right type on THIS form, checked, and only then
+        // written. A file for a question that does not exist never reaches the
+        // tenant's bucket.
+        const uploads = await storeSubmissionFiles({
+            companyId, form, questions, incoming: req.files || [],
+        });
+        cleanupFiles = uploads.cleanup;
+
+        const fileErrors = { ...uploads.errors };
+        // Multer aborted before the token was resolved, so its message is attached
+        // to a question here, where the form is finally known.
+        if (req.uploadError) {
+            const target = questions.find((q) => q.id === req.uploadError.field
+                && (typeOf(q.type) || {}).widget === 'file');
+            if (target) fileErrors[target.id] = `${messageFor(req.uploadError.code)} ${REPICK}`;
+            else {
+                cleanupFiles();
+                return send(res, 200, form.title || 'Form', formBody(form, req.params.token, questions, {
+                    reason: messageFor(req.uploadError.code), settings,
+                }), settings);
+            }
+        }
+
+        const mapped = mapSubmission(form, req.body || {}, {
+            requireTaskName: settings.createTask,
+            files: uploads.files,
+            fileErrors,
+        });
         if (!mapped.valid) {
             // Re-rendered rather than redirected, because the answers already typed
             // have to survive, and a redirect could only carry them in the url —
@@ -402,6 +454,9 @@ exports.submitForm = async (req, res) => {
             deletedStatusKey: 0,
             startDate: new Date(),
         }, mapped.taskFields, {
+            // Declared on the tasks schema as an untyped Array, so the descriptor's
+            // own keys survive; an undeclared sibling field would not.
+            attachments: mapped.attachments || [],
             rawDescription: answerText,
             // The editor reads this one; rawDescription alone showed an empty
             // description on the task.
@@ -451,5 +506,7 @@ exports.submitForm = async (req, res) => {
     } catch (error) {
         logger.error(`ERROR in submit public form: ${error.message}`);
         return send(res, 500, 'Error', '<h1>Something went wrong.</h1>');
+    } finally {
+        if (cleanupFiles) cleanupFiles();
     }
 };

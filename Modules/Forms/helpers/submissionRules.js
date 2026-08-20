@@ -64,6 +64,7 @@ const INVALID_MESSAGE = Object.freeze({
     number: 'Enter a number.',
     money: 'Enter an amount.',
     date: 'Enter a valid date.',
+    file: 'Choose a file to attach.',
     select: 'Choose one of the options.',
     radio: 'Choose one of the options.',
     checkboxes: 'Choose one of the options.',
@@ -86,9 +87,15 @@ const wasGiven = (raw) => {
 /* One answer, coerced to what its type promises. Returns null when the answer is
  * unusable, which is treated as "not given" — a submitter cannot smuggle a value
  * past a type by sending a shape the widget could never produce. */
-const coerce = (q, raw) => {
+const coerce = (q, raw, opts) => {
     const meta = typeOf(q.type);
     if (!meta) return null;
+
+    // A file never arrives in the body: it is stored before the mapping runs and
+    // handed in as a descriptor, so this stays pure and testable without Wasabi.
+    if (meta.widget === 'file') {
+        return (opts && opts.files && opts.files.get(q.id)) || null;
+    }
 
     if (isMulti(q.type)) {
         const given = Array.isArray(raw) ? raw : [raw];
@@ -165,6 +172,7 @@ const mapSubmission = (form, answers, opts) => {
     const body = (answers && typeof answers === 'object' && !Array.isArray(answers)) ? answers : {};
     const taskFields = {};
     const transcript = [];
+    const attachments = [];
     const errors = {};
 
     for (const q of questions) {
@@ -172,11 +180,20 @@ const mapSubmission = (form, answers, opts) => {
         if (!meta || meta.input === false || q.hidden) continue;
 
         const raw = body[q.id];
-        const value = coerce(q, raw);
+        const value = coerce(q, raw, opts);
         if (value === null) {
-            // Typed something unusable is a different failure from typing nothing.
-            if (wasGiven(raw)) errors[q.id] = invalidMessage(q);
-            else if (q.required) errors[q.id] = 'This field is required.';
+            // A message the handler already produced for this question wins: it
+            // says why the file was refused, which is more use than "required".
+            if (opts && opts.fileErrors && opts.fileErrors[q.id]) {
+                errors[q.id] = opts.fileErrors[q.id];
+            } else if (meta.widget === 'file') {
+                if (q.required) errors[q.id] = 'This field is required.';
+            } else if (wasGiven(raw)) {
+                // Typed something unusable is a different failure from nothing.
+                errors[q.id] = invalidMessage(q);
+            } else if (q.required) {
+                errors[q.id] = 'This field is required.';
+            }
             continue;
         }
 
@@ -193,6 +210,14 @@ const mapSubmission = (form, answers, opts) => {
             } else {
                 taskFields[target.field] = asText(value).slice(0, target.cap || MAX_ANSWER_LENGTH);
             }
+        }
+
+        if (meta.widget === 'file') {
+            attachments.push(value);
+            // The filename, not the storage key: the key is not a url and leaking
+            // its layout into a task description serves nobody.
+            transcript.push({ questionId: q.id, label: q.label, value: value.filename, mapped: false, file: value });
+            continue;
         }
 
         transcript.push({ questionId: q.id, label: q.label, value: asText(value), mapped: Boolean(q.mapTo) });
@@ -222,10 +247,13 @@ const mapSubmission = (form, answers, opts) => {
         .map((q) => ({ questionId: q.id, label: q.label, value: '' }));
     for (const row of record) {
         const hit = transcript.find((tItem) => tItem.questionId === row.questionId);
-        if (hit) row.value = hit.value;
+        if (hit) {
+            row.value = hit.value;
+            if (hit.file) row.file = hit.file;
+        }
     }
 
-    return { valid: true, reason: '', errors, taskFields, transcript, record };
+    return { valid: true, reason: '', errors, taskFields, transcript, record, attachments };
 };
 
 /**
