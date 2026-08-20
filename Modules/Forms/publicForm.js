@@ -88,12 +88,15 @@ const PAGE_STYLE = `
     /* Sent confirmation. The form stays on screen so another submission needs no
        navigation, and the banner takes itself away after a couple of seconds.
        Done in CSS because this page runs no script — the policy forbids it. */
-    .note.ok{display:flex;align-items:center;gap:9px;background:#eef8f2;color:#1c6b41;border:1px solid #c8e6d5;
-        overflow:hidden;animation:sent-away .45s ease 2s forwards}
+    /* Sits above the form, so it needs room beneath it or the first label touches
+       it. The collapse below has to zero this margin too. */
+    .note.ok{display:flex;align-items:center;gap:9px;margin-bottom:20px;background:#eef8f2;color:#1c6b41;
+        border:1px solid #c8e6d5;overflow:hidden;animation:sent-away .45s ease 2s forwards}
     .note.ok .tick{flex:0 0 20px;width:20px;height:20px;border-radius:50%;background:#1c7a43;color:#fff;
         display:flex;align-items:center;justify-content:center;font-size:12px}
     @keyframes sent-away{
-        to{opacity:0;visibility:hidden;max-height:0;margin-top:0;padding-top:0;padding-bottom:0;border-width:0}
+        to{opacity:0;visibility:hidden;max-height:0;margin-top:0;margin-bottom:0;
+            padding-top:0;padding-bottom:0;border-width:0}
     }
     @media (prefers-reduced-motion:reduce){.note.ok{animation-duration:.01s}}
     .footer{margin-top:22px;text-align:center;font-size:12px}
