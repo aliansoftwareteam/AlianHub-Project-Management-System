@@ -233,6 +233,18 @@ const mapSubmission = (form, answers, opts) => {
             errors,
         };
     }
+    // Nothing answered at all is not a submission. Without this, a form whose
+    // fields are all optional records an empty row for anyone who clicks Submit —
+    // a task-filing form is only saved from it by the task-name rule below.
+    // Form-level rather than per-field, because no single field is at fault.
+    if (!transcript.length) {
+        return {
+            valid: false,
+            reason: 'Fill in at least one field before submitting.',
+            errors,
+        };
+    }
+
     // Only a form that files a task needs one. A response-only form has nothing
     // to name.
     const needsName = !opts || opts.requireTaskName !== false;
