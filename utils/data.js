@@ -1918,6 +1918,14 @@ exports.importProjectTabComponents = (companyName) => {
             value: "docsview",
             setAsDefault: false,
             viewStatus: false
+        },
+        {
+            name: "Forms",
+            sortIndex: 20,
+            keyName: "FormsView",
+            value: "formsview",
+            setAsDefault: false,
+            viewStatus: false
         }
     ];
     return new Promise(async (resolve, reject) => {

@@ -165,6 +165,13 @@ const cloudStorageConnectionsSchema = new Schema(schema.cloudStorageConnections,
 // Every lookup is "this user's connection to this provider" — unique so a
 // double-tap on Connect can't leave two rows with divergent refresh tokens.
 cloudStorageConnectionsSchema.index({ userId: 1, provider: 1 }, { unique: true });
+const formsSchema = new Schema(schema.forms, {strict: true, timestamps: true});
+// "the forms in this project" is the only way a form is ever listed.
+formsSchema.index({ ProjectID: 1, deletedStatusKey: 1 });
+const formSubmissionsSchema = new Schema(schema.form_submissions, {strict: true, timestamps: true});
+// The response table is always "this form's submissions, newest first".
+formSubmissionsSchema.index({ formId: 1, createdAt: -1 });
+
 // Global search: one combined text index per collection.
 taskSchema.index({ TaskName: 'text', rawDescription: 'text' });
 projectsSchema.index({ ProjectName: 'text' });
@@ -262,6 +269,8 @@ module.exports = {
     automationRulesSchema,
     integrationConnectionsSchema,
     cloudStorageConnectionsSchema,
+    formsSchema,
+    formSubmissionsSchema,
     historySchema,
     userIdSchema, 
     usersSchema,
