@@ -82,7 +82,9 @@ async function buildSnapshots(companyId, form, req) {
     // cannot be pointed at someone else's sprint. `projectId` is stored as a
     // string here, unlike ProjectID on the form.
     if (!form.sprintId) {
-        return { ok: false, reason: 'Choose where submissions should go before publishing.' };
+        // Reached on publish AND on a save that re-takes the snapshot, so the
+        // wording cannot assume publishing.
+        return { ok: false, reason: 'Choose where submissions should go.' };
     }
     const sprint = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.SPRINTS,
@@ -481,18 +483,36 @@ exports.updateForm = async (req, res) => {
             }
             set.defaults = normalizeDefaults(b.defaults);
         }
+        const willCreateTask = normalizeSettings(
+            b.settings !== undefined ? b.settings : existing.settings,
+        ).createTask;
+
         if (b.questions !== undefined) {
             const norm = normalizeQuestions(b.questions);
             if (!norm.valid) return res.send({ status: false, statusText: norm.reason });
-            const willCreateTask = normalizeSettings(
-                b.settings !== undefined ? b.settings : existing.settings,
-            ).createTask;
             if (existing.state === 'live' && willCreateTask
                 && norm.questions.length && !hasTaskName(norm.questions)) {
                 return res.send({ status: false, statusText: NO_TASK_NAME });
             }
             set.questions = norm.questions;
         }
+        // The snapshot is what an anonymous submission builds its task from, and it
+        // is taken at publish time. Without this, changing the target sprint or the
+        // task type on a form that is ALREADY live saved the preference and kept
+        // filing tasks from the old snapshot — the choice appeared to do nothing
+        // until someone unpublished and published again. Only re-taken when an
+        // input it depends on actually changed, so editing a question does not
+        // trigger three extra queries.
+        const snapshotInputsChanged = set.sprintId !== undefined || set.defaults !== undefined;
+        if (existing.state === 'live' && willCreateTask && snapshotInputsChanged) {
+            const current = existing.toObject ? existing.toObject() : existing;
+            const refreshed = await buildSnapshots(companyId, { ...current, ...set }, req);
+            // Refused rather than silently left stale: the failure is caused by the
+            // very change being saved, so the reason is the useful thing to return.
+            if (!refreshed.ok) return res.send({ status: false, statusText: refreshed.reason });
+            Object.assign(set, refreshed.set);
+        }
+
         if (b.state !== undefined) {
             // Checked against what the form WILL be after this write, not what
             // it is now — otherwise adding questions and publishing in one call
