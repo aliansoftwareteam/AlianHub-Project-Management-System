@@ -25,11 +25,9 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 * add the forms builder view ([d6b5d2c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d6b5d2cdca93fb0718093c5dc2a116b2fb3dc888))
 * add the forms module ([a3dab80](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a3dab80ab3e041958b925d3a85f26fe69dc68eff))
 * let a public share point at a form ([db37147](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/db371477fdab8d154143ecf1b9a505aa12a78580))
-* multi-purpose forms module with public forms and a response table ([3cbf3c9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3cbf3c9256a9435d99072bcc7464429eda3f8af5))
 * open a submitted file from the response table ([388bc14](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/388bc1441b444bf1f38e94b823e0066c64c704de))
 * register the forms and form-submissions collections ([77d94e9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/77d94e98148ef9657ab9d36690c678d4855fec11))
 * register the forms view in the project view switcher ([9218250](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/92182506c9f32d087e5b79e60c4371c63af54d91))
-* show a parent task's estimate as its own plus its subtasks' ([c4d973b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c4d973baf662d07e4ca134cf73f8b1c96a5e41e7))
 * show a parent task's estimate as its own plus its subtasks' ([b94a891](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b94a891d8409912d75bcc33028d9e9300d0c2897))
 
 
