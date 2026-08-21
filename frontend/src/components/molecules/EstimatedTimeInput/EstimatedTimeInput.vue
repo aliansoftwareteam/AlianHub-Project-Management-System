@@ -3,6 +3,7 @@
     v-if="!isEditing"
     class="time-display"
     :class="{ 'time-display--readonly': !editable }"
+    :title="breakdownTitle"
     @click="startEditing"
 >
     {{ displayTime }}
@@ -45,7 +46,9 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onUnmounted } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { apiRequest } from '@/services'
+import * as env from '@/config/env'
 
 const props = defineProps({
   task: {
@@ -73,13 +76,61 @@ const editHours = ref(0)
 const editMinutes = ref(0)
 const blurTimer = ref(null)
 
-// Computed property for display time
-const displayTime = computed(() => {
-  const totalMinutes = props.task.totalEstimatedTime || 0
+// Sum of this task's subtasks' estimates.
+//
+// Asked of the server rather than added up from the subtask list on screen: that
+// list is a loaded slice (TaskDetail fetches a limited number and counts the rest
+// separately), so summing it would quietly undercount a task with many subtasks.
+// The query mirrors fetchSubtaskCount in views/TaskDetail/TaskDetail.vue, which
+// already aggregates children by ParentTaskId the same way.
+const subtaskMinutes = ref(0)
+
+const loadSubtaskEstimate = () => {
+  const parentId = props.task && props.task._id
+  // task.subTasks is the count the sidebar already trusts for its progress badge.
+  // No children means no request at all, which is the common case.
+  if (!parentId || !(Number(props.task.subTasks) > 0)) {
+    subtaskMinutes.value = 0
+    return
+  }
+  const findQuery = [
+    { $match: { ParentTaskId: String(parentId), deletedStatusKey: { $in: [0, undefined] } } },
+    { $group: { _id: null, estimate: { $sum: { $ifNull: ['$totalEstimatedTime', 0] } } } },
+  ]
+  apiRequest('post', `${env.TASK}/find`, { findQuery })
+    .then((response) => {
+      const row = response && response.data && response.data[0]
+      subtaskMinutes.value = row ? (Number(row.estimate) || 0) : 0
+    })
+    .catch((error) => {
+      // Fall back to the task's own estimate — the figure shown before this
+      // existed — rather than leaving the field broken.
+      subtaskMinutes.value = 0
+      console.error('ERROR loading subtask estimate total: ', error)
+    })
+}
+
+onMounted(loadSubtaskEstimate)
+// Reload when the sidebar switches task, and when a subtask is added or removed.
+watch(() => [props.task && props.task._id, Number(props.task && props.task.subTasks) || 0].join(':'), loadSubtaskEstimate)
+
+const ownMinutes = computed(() => props.task.totalEstimatedTime || 0)
+
+const asHm = (totalMinutes) => {
   const hours = Math.floor(totalMinutes / 60)
   const minutes = totalMinutes % 60
   return `${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m`
-})
+}
+
+// A parent's estimate is its own plus its subtasks'.
+const displayTime = computed(() => asHm(ownMinutes.value + subtaskMinutes.value))
+
+// Editing writes only the task's own value (see startEditing / saveTime below),
+// so typing 2h against 8h of subtasks shows 10h. The tooltip says so, otherwise
+// the number looks like it ignored what was typed.
+const breakdownTitle = computed(() => (subtaskMinutes.value
+  ? `This task ${asHm(ownMinutes.value)} + subtasks ${asHm(subtaskMinutes.value)} = ${displayTime.value}`
+  : ''))
 
 // Validation functions
 const validateHours = () => {
