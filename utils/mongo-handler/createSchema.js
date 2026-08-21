@@ -168,6 +168,8 @@ cloudStorageConnectionsSchema.index({ userId: 1, provider: 1 }, { unique: true }
 const devMessagesSchema = new Schema(schema.devMessages, {strict: true, timestamps: true});
 devMessagesSchema.index({ taskId: 1, createdAt: 1 });
 devMessagesSchema.index({ role: 1, status: 1, updatedAt: 1 });
+devMessagesSchema.index({ conversationId: 1, createdAt: 1 });
+devMessagesSchema.index({ projectId: 1, conversationId: 1 });
 const devPairingsSchema = new Schema(schema.devPairings, {strict: true, timestamps: true});
 devPairingsSchema.index({ code: 1 }, { unique: true });
 devPairingsSchema.index({ createdAt: 1 }, { expireAfterSeconds: 3600 });

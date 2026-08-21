@@ -25,6 +25,36 @@ let s3Client = new S3Client({
 });
 
 /**
+ * Read one object's bytes.
+ *
+ * Added for dev-agent attachments, which have to be handed to a runner on
+ * another machine. Every other read in this module answers an HTTP request
+ * directly or mints a presigned url; a caller that just wants the bytes had no
+ * entry point. Reuses the module's own client, so credentials stay in one place.
+ */
+/**
+ * Delete one object by key. Additive helper for callers that are removing the
+ * record which pointed at it; a NoSuchKey is treated as already-gone.
+ */
+exports.deleteObjectByKey = async (bucket, key) => {
+    try {
+        await s3Client.send(new DeleteObjectCommand({ Bucket: String(bucket), Key: String(key) }));
+        return true;
+    } catch (error) {
+        if (error && (error.Code === 'NoSuchKey' || error.name === 'NoSuchKey')) return true;
+        return false;
+    }
+};
+
+exports.getObjectBuffer = async (bucket, key) => {
+    const command = new GetObjectCommand({ Bucket: String(bucket), Key: String(key) });
+    const response = await s3Client.send(command);
+    const chunks = [];
+    for await (const chunk of response.Body) chunks.push(chunk);
+    return { buffer: Buffer.concat(chunks), contentType: response.ContentType || 'application/octet-stream' };
+};
+
+/**
  * Normalize an @aws-sdk/client-s3 error into a structured log line + a
  * reject message that includes the AWS error Code instead of just the
  * generic toString. Wasabi/S3 returns codes like AccessDenied,

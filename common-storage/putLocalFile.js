@@ -61,4 +61,45 @@ const putLocalFile = async ({ companyId, storagePath, tmpPath, filename, size })
     return { key: Array.isArray(stored) ? stored[0] : stored, consumedSource: true };
 };
 
-module.exports = { putLocalFile, STORAGE_ROOT };
+/**
+ * Read a stored file back, honouring STORAGE_TYPE — the counterpart of
+ * putLocalFile, for a caller that needs the bytes rather than a url (the
+ * dev-agent runner, which is on another machine and cannot read local disk).
+ */
+const readStoredFile = async ({ companyId, storagePath }) => {
+    const storageType = String(process.env.STORAGE_TYPE || 'wasabi');
+    if (storageType === 'server') {
+        const src = path.join(STORAGE_ROOT, String(companyId), storagePath);
+        // Resolve first: a key with .. in it must not escape the company's folder.
+        const root = path.join(STORAGE_ROOT, String(companyId));
+        if (!path.resolve(src).startsWith(path.resolve(root))) throw new Error('Invalid path');
+        return { buffer: fs.readFileSync(src), contentType: 'application/octet-stream' };
+    }
+    const { getObjectBuffer } = require('../Modules/storage/wasabi/controller');
+    return getObjectBuffer(String(companyId), storagePath);
+};
+
+/**
+ * Remove a stored file, honouring STORAGE_TYPE — the counterpart of putLocalFile
+ * for a caller deleting the record that pointed at it. Best-effort by design: a
+ * missing object is success, because the goal is "it is gone".
+ */
+const removeStoredFile = async ({ companyId, storagePath }) => {
+    const storageType = String(process.env.STORAGE_TYPE || 'wasabi');
+    try {
+        if (storageType === 'server') {
+            const root = path.join(STORAGE_ROOT, String(companyId));
+            const src = path.join(root, storagePath);
+            // Resolve first: a key with .. in it must not reach outside the company.
+            if (!path.resolve(src).startsWith(path.resolve(root))) return false;
+            if (fs.existsSync(src)) fs.unlinkSync(src);
+            return true;
+        }
+        const { deleteObjectByKey } = require('../Modules/storage/wasabi/controller');
+        return await deleteObjectByKey(String(companyId), storagePath);
+    } catch (e) {
+        return false;
+    }
+};
+
+module.exports = { putLocalFile, readStoredFile, removeStoredFile, STORAGE_ROOT };

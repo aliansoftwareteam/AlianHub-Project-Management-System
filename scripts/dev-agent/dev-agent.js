@@ -173,13 +173,19 @@ function killTree(child) {
 // Run Claude Code headless with streaming JSON events so we can surface a live
 // activity feed. Resolves on success, rejects on non-zero exit. `onEvent` gets
 // each parsed stream-json event (system / assistant / tool_use / result).
-function runClaude(cfg, dir, prompt, onEvent, cancel) {
+function runClaude(cfg, dir, prompt, onEvent, cancel, opts = {}) {
     const TIMEOUT_MS = 30 * 60 * 1000; // watchdog: a hung Claude must not wedge the poller forever
     return new Promise((resolve, reject) => {
         if (cancel && cancel.requested) return reject(new Error('__CANCELLED__')); // stopped before we spawned (C9)
         const { exe, viaCmd } = resolveExe(cfg.claudeBin);
         const file = viaCmd ? (process.env.ComSpec || 'cmd.exe') : exe;
         const claudeArgs = ['-p', '--dangerously-skip-permissions', '--output-format', 'stream-json', '--verbose'];
+        // Continue this chat's session, or start it under a known id.
+        if (opts.resume) claudeArgs.push('--resume', opts.resume);
+        else if (opts.sessionId) claudeArgs.push('--session-id', opts.sessionId);
+        // Token-level deltas, so prose can be shown as it is written rather than
+        // only when the turn ends.
+        if (opts.partial) claudeArgs.push('--include-partial-messages');
         const child = spawn(file, viaCmd ? ['/d', '/c', exe, ...claudeArgs] : claudeArgs, { cwd: dir, shell: false, windowsHide: true, detached: process.platform !== 'win32' });
         if (cancel) cancel.child = child; // expose the child so an emergency Stop can kill it mid-run (Point 3)
         let stderr = ''; let buf = ''; let settled = false; let resultText = '';
@@ -201,31 +207,133 @@ function runClaude(cfg, dir, prompt, onEvent, cancel) {
         child.stderr.on('data', (c) => { stderr += c.toString(); });
         child.on('error', finish);
         child.stdin.on('error', () => {}); // ignore EPIPE if the child already exited (else it throws + kills the runner)
-        child.on('close', (code) => finish(code === 0 ? null : new Error(`claude exited ${code}${stderr ? `\n${stderr.trim().slice(0, 300)}` : ''}`)));
+        child.on('close', (code) => {
+            if (code === 0) return finish(null);
+            const err = new Error(`claude exited ${code}${stderr ? `\n${stderr.trim().slice(0, 300)}` : ''}`);
+            err.stderr = stderr;
+            err.sessionProblem = /session|--resume|not found|already (exists|in use)/i.test(stderr);
+            return finish(err);
+        });
         try { child.stdin.write(prompt); child.stdin.end(); } catch (e) { /* 'error'/'close' will settle */ }
     });
 }
 
-// Turn a stream-json event into a short human activity line (or null to skip).
-function activityLine(ev) {
-    if (!ev || ev.type !== 'assistant' || !ev.message) return null;
+/* Run one chat turn inside the chat's own session.
+ *
+ * Tries to resume; if the session is not on this machine the run is retried under
+ * that id as a NEW session. Either way `resumed` tells the caller whether Claude
+ * already had the history — which decides whether the prompt has to carry it.
+ * A second failure is a real failure and propagates.
+ *
+ * buildFor(resumed) is a callback rather than a string because the prompt differs
+ * between the two cases, and it must not be built twice for the resumed path. */
+async function runClaudeInSession(cfg, dir, buildFor, onEvent, cancel, sessionId) {
+    try {
+        const text = await runClaude(cfg, dir, buildFor(true), onEvent, cancel, { resume: sessionId, partial: true });
+        return { text, resumed: true };
+    } catch (e) {
+        if (/__CANCELLED__/.test(e.message || '')) throw e;
+        if (!e.sessionProblem) throw e;
+        // No session here yet (first turn, another machine, pruned history) —
+        // start it under the same id and hand Claude the conversation as text.
+        const text = await runClaude(cfg, dir, buildFor(false), onEvent, cancel, { sessionId, partial: true });
+        return { text, resumed: false };
+    }
+}
+
+/* Classify a stream-json event.
+ *
+ * Returns { step } for something the agent DID, { prose } for something it SAID,
+ * or null. Keeping them apart is what lets the UI read like a chat — prose as the
+ * reply, tool use as a quiet activity trail underneath — instead of one column of
+ * mixed lines.
+ *
+ * Two sources of prose, deliberately: the token deltas from
+ * --include-partial-messages when they arrive, and the complete `assistant`
+ * message otherwise. The delta envelope is not a contract this runner controls,
+ * so if its shape is not what we expect, prose still lands at each step boundary
+ * from the complete message. Degraded, never broken. */
+function classifyEvent(ev) {
+    if (!ev) return null;
+
+    // Token deltas (best effort — see above).
+    if (ev.type === 'stream_event' && ev.event) {
+        const e = ev.event;
+        if (e.type === 'content_block_delta' && e.delta) {
+            if (e.delta.type === 'text_delta' && typeof e.delta.text === 'string') return { prose: e.delta.text, delta: true };
+        }
+        return null;
+    }
+
+    if (ev.type !== 'assistant' || !ev.message) return null;
     const blocks = ev.message.content || [];
     for (const b of blocks) {
         if (b && b.type === 'tool_use') {
             const inp = b.input || {};
             const file = String(inp.file_path || inp.path || inp.notebook_path || '').split(/[\\/]/).pop();
-            if (b.name === 'Bash') return `▶ ${String(inp.command || '').replace(/\s+/g, ' ').slice(0, 100)}`;
-            if (/^(Edit|MultiEdit|Write|NotebookEdit)$/.test(b.name)) return `✏️ ${b.name} ${file}`;
-            if (b.name === 'Read') return `👀 read ${file}`;
-            if (b.name === 'Grep' || b.name === 'Glob') return `🔎 ${b.name} ${String(inp.pattern || '')}`.slice(0, 70);
-            return `🔧 ${b.name}`;
+            if (b.name === 'Bash') return { step: `▶ ${String(inp.command || '').replace(/\s+/g, ' ').slice(0, 100)}` };
+            if (/^(Edit|MultiEdit|Write|NotebookEdit)$/.test(b.name)) return { step: `✏️ ${b.name} ${file}` };
+            if (b.name === 'Read') return { step: `👀 read ${file}` };
+            if (b.name === 'Grep' || b.name === 'Glob') return { step: `🔎 ${b.name} ${String(inp.pattern || '')}`.slice(0, 70) };
+            return { step: `🔧 ${b.name}` };
         }
     }
-    const txt = blocks.filter((b) => b && b.type === 'text').map((b) => b.text).join(' ').replace(/\s+/g, ' ').trim();
-    return txt ? `💬 ${txt.slice(0, 120)}` : null;
+    const txt = blocks.filter((b) => b && b.type === 'text').map((b) => b.text).join('\n').trim();
+    return txt ? { prose: txt, complete: true } : null;
 }
 
 // ── AlianHub REST (PAT auth) ──────────────────────────────────────────────
+/* Download one attachment into the working folder.
+ *
+ * The bytes come from AlianHub over the same PAT the runner already uses — the
+ * runner never talks to storage directly and holds no storage credentials.
+ * Files land under .alianhub/attachments/ so they sit beside the code the agent
+ * is working on, and so a repo's own .gitignore is easy to point at one folder.
+ */
+async function downloadAttachment(cfg, dir, msg, att) {
+    const folder = path.join(dir, '.alianhub', 'attachments');
+    fs.mkdirSync(folder, { recursive: true });
+    // The name is rebuilt here too: this string arrived over the network, and it
+    // is about to become a path on this machine.
+    const safe = String(att.filename || 'file').split(/[\\/]/).pop().replace(/[^\w.\- ]/g, '').slice(0, 120) || 'file';
+    const dest = path.join(folder, `${att.id}_${safe}`);
+
+    const res = await httpFetch(
+        `${cfg.url}/api/v2/dev-agent/attachment?${scopeQuery(msg)}&id=${encodeURIComponent(att.id)}`,
+        { method: 'GET', headers: { authorization: `Bearer ${cfg.pat}`, companyid: cfg.companyId } },
+    );
+    if (!res.ok) throw new Error(`attachment ${safe} could not be downloaded (HTTP ${res.status})`);
+    fs.writeFileSync(dest, Buffer.from(await res.arrayBuffer()));
+    return { path: dest, name: safe };
+}
+
+/* Every attachment on this instruction, best-effort: one that fails to download
+ * is reported in the prompt rather than aborting the whole turn, since the
+ * instruction itself may still be actionable. */
+async function fetchAttachments(cfg, dir, msg, onProgress) {
+    const list = Array.isArray(msg.attachments) ? msg.attachments : [];
+    if (!list.length) return { files: [], failed: [] };
+    const files = []; const failed = [];
+    for (const att of list) {
+        try {
+            if (onProgress) onProgress(`fetching ${att.filename}`);
+            files.push(await downloadAttachment(cfg, dir, msg, att));
+        } catch (e) {
+            failed.push(String(att.filename || att.id));
+            console.log(`  ⚠ ${e.message}`);
+        }
+    }
+    return { files, failed };
+}
+
+// What this runner understands. The server uses it to avoid handing work to a
+// runner that would mishandle it. Protocol 1 knew only task jobs. Protocol 2 knew
+// them but ran a chat through the task pipeline — branching, committing and refusing
+// a dirty tree — which is the behaviour this surface exists to not have. Protocol 3
+// works in place, in the chat's own Claude session.
+// Bump this whenever the job shape or the turn contract changes.
+const PROTOCOL = 3;
+
 async function api(cfg, method, endpoint, body) {
     let res;
     try {
@@ -235,6 +343,7 @@ async function api(cfg, method, endpoint, body) {
                 'Content-Type': 'application/json',
                 authorization: `Bearer ${cfg.pat}`,
                 companyid: cfg.companyId,
+                'x-dev-agent-protocol': String(PROTOCOL),
             },
             body: body ? JSON.stringify(body) : undefined,
         });
@@ -255,6 +364,36 @@ const slug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').re
 // also avoids a "no git identity configured" failure on a fresh machine. (B8)
 const BOT_GIT = ['-c', 'user.name=AlianHub AI Agent', '-c', 'user.email=ai-bot@alianhub.local'];
 const prWatch = new Map(); // branch → PR opened this session, watched for reviewer feedback (B4)
+
+// A job is scoped to a task (the Development tab) or to a project chat, which has
+// no task at all. These three keep the difference in one place instead of spreading
+// `msg.taskId ? … : …` through the whole flow.
+const isChatJob = (msg) => !String((msg && msg.taskId) || '').trim() && !!String((msg && msg.conversationId) || '').trim();
+const scopeQuery = (msg) => (isChatJob(msg)
+    ? `conversationId=${encodeURIComponent(msg.conversationId)}`
+    : `taskId=${encodeURIComponent(msg.taskId)}`);
+const scopeBody = (msg) => ({ taskId: String((msg && msg.taskId) || ''), conversationId: String((msg && msg.conversationId) || '') });
+// Branch scope for a chat. Stable for the life of the chat, so successive turns
+// build on the same branch and the same pull request.
+const chatKey = (conversationId) => `chat-${String(conversationId).replace(/[^A-Za-z0-9]/g, '').slice(0, 12) || 'x'}`;
+const chatSubject = (text) => (String(text || '').replace(/\s+/g, ' ').trim().slice(0, 80) || 'project chat');
+
+/* A chat is ONE Claude Code session, so the agent genuinely remembers the
+ * conversation instead of being handed a transcript of it every turn.
+ *
+ * The session id is DERIVED from the conversation id rather than stored: it is
+ * then identical on every turn with no round trip, survives a runner restart,
+ * and needs no new field in a strict schema. Claude Code validates the format,
+ * hence the v4 shaping.
+ *
+ * Sessions live on this machine, so resuming can legitimately fail — the first
+ * turn, a different machine, a cleared ~/.claude, a session pruned by age. The
+ * caller treats that as normal and falls back. */
+const sessionUuidFor = (conversationId) => {
+    const h = crypto.createHash('sha256').update(`alianhub-chat:${String(conversationId)}`).digest('hex');
+    const variant = ((parseInt(h[16], 16) & 0x3) | 0x8).toString(16);
+    return [h.slice(0, 8), h.slice(8, 12), `4${h.slice(13, 16)}`, `${variant}${h.slice(17, 20)}`, h.slice(20, 32)].join('-');
+};
 
 // Conventional-commit naming so the branch, commit, and PR title pass this repo's
 // branch-name + commitlint CI (types feat|fix|…; lowercase type + scope; subject not
@@ -331,10 +470,10 @@ async function fetchComments(cfg, projectId, taskId) {
 // Prior Development-tab conversation. The task memory file only carries what the
 // agent chose to write down, so without this an earlier instruction it didn't
 // record is lost on the next turn.
-async function fetchDevChat(cfg, taskId) {
-    if (!taskId) return [];
+async function fetchDevChat(cfg, msg) {
+    if (!msg || (!msg.taskId && !msg.conversationId)) return [];
     try {
-        const res = await api(cfg, 'GET', `/api/v2/dev-agent/messages?taskId=${encodeURIComponent(taskId)}`);
+        const res = await api(cfg, 'GET', `/api/v2/dev-agent/messages?${scopeQuery(msg)}`);
         const rows = res && res.data;
         return Array.isArray(rows) ? rows : [];
     } catch (e) { return []; }
@@ -344,7 +483,12 @@ async function fetchDevChat(cfg, taskId) {
 // lines, rewritten in place as it works) — that is a UI artifact, not
 // conversation, so it must never reach the prompt. Both headers come from
 // renderProgress() below.
-const isProgressLog = (text) => /^(🧾 Activity —|⚙️ Working…)/.test(String(text || '').trim());
+// Separates the agent's prose from its activity trail inside one live message.
+// Kept in sync with the frontend, which splits on the same marker to render them
+// differently. A zero-width-joined bracket so it cannot occur in real prose.
+const PROSE_MARK = '\u2063---activity---\u2063\n';
+const isProgressLog = (text) => /^(🧾 Activity —|⚙️ Working…|⚙️ Starting…|⚙️ working ·)/.test(String(text || '').trim())
+    || String(text || '').includes('\u2063---activity---\u2063');
 
 // Verify the AI's work before it becomes a PR (A1): syntax-check every changed JS file
 // with `node --check` (instant, no deps) so a parse error is caught + self-fixed here,
@@ -464,32 +608,79 @@ async function fetchTask(cfg, taskId) {
 // The per-task shared memory lives IN the repo (.alianhub/tasks/<TaskKey>.md) so
 // it travels between developers — anyone picking up the task, on any machine or
 // Claude account, gets the full history from a git pull/clone. No external store.
-const contextRel = (taskKey) => `.alianhub/tasks/${String(taskKey).replace(/[^A-Za-z0-9._-]/g, '_')}.md`;
+const contextRel = (key) => {
+    const safe = String(key).replace(/[^A-Za-z0-9._-]/g, '_');
+    return safe.startsWith('chat-') ? `.alianhub/chats/${safe}.md` : `.alianhub/tasks/${safe}.md`;
+};
 function readContext(dir, taskKey) {
     try {
         const f = path.join(dir, ...contextRel(taskKey).split('/'));
-        return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').slice(0, 12000) : '';
+        if (!fs.existsSync(f)) return '';
+        const all = fs.readFileSync(f, 'utf8');
+        // The file is APPENDED to each turn, so the newest state is at the end.
+        // Slicing from the start dropped exactly the part that matters once the file
+        // outgrew the cap — the agent was reading its oldest notes and none of its
+        // recent ones.
+        if (all.length <= 12000) return all;
+        const tail = all.slice(-12000);
+        // Start at a line boundary so the agent does not read half a sentence — but
+        // only if that boundary is near the top. A long unbroken block (a pasted diff,
+        // a minified line) can put the first newline thousands of characters in, and
+        // cutting to it would discard nearly the whole window.
+        const cut = tail.indexOf('\n');
+        const body = (cut >= 0 && cut <= 200) ? tail.slice(cut + 1) : tail;
+        return `…(earlier notes trimmed)\n${body}`;
     } catch (e) { return ''; }
 }
 
-function buildPrompt({ taskKey, taskName, description, instruction, pushable, contextPath, contextText, comments, chat, meta }) {
+/* The prompt for a chat turn.
+ *
+ * Deliberately short. The task prompt below tells Claude it is implementing a
+ * ticket, to write a cumulative memory file, and that the runner owns git — all
+ * true there, all wrong here. In a chat the developer may be asking a question,
+ * thinking out loud, or asking for a change; presuming which one produces the
+ * behaviour that stopped this feeling like a desktop client.
+ *
+ * On a resumed session `chat` is empty because Claude already remembers. */
+function buildChatPrompt({ instruction, attachments, chat }) {
     return [
-        `You are developing AlianHub task ${taskKey}: ${taskName}.`,
+        chat ? `Earlier in this conversation (oldest first):\n${chat}\n` : '',
+        instruction,
+        attachments && attachments.length
+            ? `\nFiles attached to this message, already downloaded here — read them, they are part of the request:\n${
+                attachments.map((f) => `- ${f.name} → ${f.path}`).join('\n')}`
+            : '',
+        '',
+        "You are pair-programming with a developer in their own working folder. Answer questions directly; make changes when asked. Match the repository's existing conventions (CLAUDE.md, README, lint config) and keep any change focused on what was asked.",
+        'Do NOT commit, push, or open a pull request — the developer decides what happens to these changes.',
+        'If the request is ambiguous enough that guessing could waste work, ask instead of assuming.',
+    ].filter(Boolean).join('\n');
+}
+
+function buildPrompt({ taskKey, taskName, description, instruction, pushable, contextPath, contextText, comments, chat, meta, attachments, isChat }) {
+    return [
+        isChat
+            ? 'You are working on this project with a developer, in an ongoing chat. There is no ticket — the instruction below is the whole brief.'
+            : `You are developing AlianHub task ${taskKey}: ${taskName}.`,
         meta ? `\n${meta}` : '',
         description ? `\nTask description / acceptance criteria:\n${description}` : '',
         comments ? `\nTask discussion so far (oldest → newest) — requirements and clarifications often live in the comments, so read them and honour them:\n${comments}` : '',
-        chat ? `\nDevelopment tab conversation so far (oldest → newest) — the instructions you were already given on this task, and your own replies. Honour them as still standing unless the instruction for this turn contradicts them; where two conflict, the later one wins:\n${chat}` : '',
-        contextText ? `\nPrior development context for this task (from ${contextPath}, written on earlier turns — possibly by other developers on other machines). Read it and continue from where it left off; do NOT redo work already done:\n${contextText}` : '',
+        chat ? `\nConversation so far (oldest → newest) — the instructions you were already given here, and your own replies. Honour them as still standing unless the instruction for this turn contradicts them; where two conflict, the later one wins:\n${chat}` : '',
+        contextText ? `\nPrior development context (from ${contextPath}, written on earlier turns — possibly by other developers on other machines). Read it and continue from where it left off; do NOT redo work already done:\n${contextText}` : '',
         `\nThe user's instruction for this turn:\n${instruction}`,
+        attachments && attachments.length
+            ? `\nFiles the developer attached to this instruction, already downloaded into this folder — READ them before you start, they are part of the instruction:\n${
+                attachments.map((f) => `- ${f.name} → ${f.path}`).join('\n')}`
+            : '',
         '',
         "Before you code, read this repository's own conventions (CLAUDE.md, README, CONTRIBUTING, and its lint/editor config) and match the existing structure, style, and patterns. Keep the change focused and strictly in scope for the task.",
-        "If the task is too ambiguous or you are missing information needed to implement it safely, do NOT guess — briefly explain what you need and make no changes; a developer will clarify and resend.",
+        "If the instruction is too ambiguous or you are missing information needed to implement it safely, do NOT guess — briefly explain what you need and make no changes; a developer will clarify and resend.",
         "Where the repository has a test setup, add or update a test that covers what you changed.",
         pushable
             ? "Implement it in this repository. Run the repo's tests / build / lint if they are quick, to confirm your change works. Do NOT commit or push — the runner handles git."
             : 'This is a local working folder (it may be empty). Build what is asked directly here — create/scaffold whatever files are needed. Run relevant setup/tests if quick. Do NOT worry about git; the developer will test locally.',
         '',
-        `SHARED TASK MEMORY — before you finish, create or update "${contextPath}" in this repo. Keep it concise and CUMULATIVE so any developer (different machine / Claude account) who continues this task later has the full picture. Append a new dated section covering: what you did this turn, key decisions/assumptions, current state, and what remains (TODO). It is committed with your changes.`,
+        `SHARED MEMORY — before you finish, create or update "${contextPath}" in this repo. Keep it concise and CUMULATIVE so any developer (different machine / Claude account) who continues ${isChat ? 'this line of work' : 'this task'} later has the full picture. Append a new dated section covering: what you did this turn, key decisions/assumptions, current state, and what remains (TODO). It is committed with your changes.`,
     ].join('\n');
 }
 
@@ -522,11 +713,58 @@ function ensureTrusted(dir) {
 // Develop ONE turn. If the target is pushable (has a git remote), work on the
 // task branch and open/update a PR. Otherwise just build in the folder and let
 // the developer test locally. Returns { prUrl, note }.
-async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, description, instruction, onProgress, cancel, conv, comments, chat, meta }) {
+async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, description, instruction, onProgress, onProse, cancel, conv, comments, chat, meta, attachments, isChat, sessionId }) {
     ensureTrusted(dir);
     const cv = conv || conventional({ TaskName: taskName }, taskKey);
     const ctxPath = contextRel(taskKey);
-    const onEvent = (ev) => { const line = activityLine(ev); if (!line) return; if (onProgress) onProgress(line); else console.log(`   ${line}`); };
+    const onEvent = (ev) => {
+        const c = classifyEvent(ev);
+        if (!c) return;
+        if (c.step) { if (onProgress) onProgress(c.step); else console.log(`   ${c.step}`); return; }
+        if (c.prose && onProse) onProse(c.prose, !!c.delta);
+    };
+
+    /* A CHAT turn works exactly where the developer is working: no branch, no
+     * commit, no pull request, and no refusal because the tree is dirty.
+     *
+     * That is the whole point of the surface — Claude Desktop edits your files and
+     * you decide what to do with them. The task Development tab keeps the
+     * branch → push → PR pipeline below, because for ticketed work that pipeline is
+     * the feature.
+     *
+     * What this turn owes the developer is an honest account of what it touched, so
+     * the tree is snapshotted before and after and only the delta is reported —
+     * their own pre-existing edits are not claimed as the agent's. */
+    if (isChat) {
+        const porcelain = () => (run('git', ['status', '--porcelain'], dir, { capture: true, allowFail: true }) || '');
+        const isRepo = run('git', ['rev-parse', '--is-inside-work-tree'], dir, { capture: true, allowFail: true }) === 'true';
+        const before = isRepo ? new Set(porcelain().split('\n').map((l) => l.trim()).filter(Boolean)) : new Set();
+
+        const { text, resumed } = await runClaudeInSession(cfg, dir, (hasHistory) => buildChatPrompt({
+            instruction,
+            attachments,
+            // Only when Claude has NOT got the session already, otherwise the
+            // conversation would arrive twice — once as memory, once as text.
+            chat: hasHistory ? '' : chat,
+        }), onEvent, cancel, sessionId);
+        console.log(`   ${resumed ? '↻ continued this chat\'s session' : '✦ started this chat\'s session'}`);
+
+        let touched = [];
+        if (isRepo) {
+            touched = porcelain().split('\n').map((l) => l.trim()).filter(Boolean).filter((l) => !before.has(l));
+        }
+        const changed = touched.length
+            ? `\n\n---\nFiles changed in your working folder:\n${touched.slice(0, 40).map((l) => `- ${l}`).join('\n')}${touched.length > 40 ? `\n- …and ${touched.length - 40} more` : ''}`
+            : '';
+        return {
+            prUrl: '',
+            pushed: false,
+            branch: '',
+            note: `${String(text || '').trim() || 'Done.'}${changed}`,
+            verifyOk: null,
+            verifyReport: '',
+        };
+    }
 
     if (pushable) {
         const branch = cv.branch;
@@ -545,7 +783,7 @@ async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, descri
             run('git', ['checkout', '-B', branch], dir);                     // fresh
         }
 
-        const prompt = buildPrompt({ taskKey, taskName, description, instruction, pushable, contextPath: ctxPath, contextText: readContext(dir, taskKey), comments, chat, meta });
+        const prompt = buildPrompt({ taskKey, taskName, description, instruction, pushable, contextPath: ctxPath, contextText: readContext(dir, taskKey), comments, chat, meta, attachments, isChat });
         console.log('\n🤖  Claude Code …\n');
         const result = await runClaude(cfg, dir, prompt, onEvent, cancel);
 
@@ -565,7 +803,7 @@ async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, descri
         if (!(cancel && cancel.requested)) {
             onProgress('🔎 self-reviewing the change…');
             const reviewDiff = run('git', ['diff', `origin/${base}...HEAD`], dir, { capture: true, allowFail: true }) || run('git', ['show', 'HEAD'], dir, { capture: true, allowFail: true });
-            await runClaude(cfg, dir, `Review your OWN change for task ${taskKey} before it becomes a pull request — check correctness, security, that it is in-scope and complete, and that it matches the repo's conventions. If you find problems, FIX them now; if it is already good, change nothing. Do NOT commit or push.\n\nDiff so far:\n${String(reviewDiff).slice(0, 40000)}`, onEvent, cancel);
+            await runClaude(cfg, dir, `Review your OWN change before it becomes a pull request — check correctness, security, that it is in-scope and complete, and that it matches the repo's conventions. If you find problems, FIX them now; if it is already good, change nothing. Do NOT commit or push.\n\nDiff so far:\n${String(reviewDiff).slice(0, 40000)}`, onEvent, cancel);
             if (run('git', ['status', '--porcelain'], dir, { capture: true, allowFail: true })) {
                 stageChanges(dir);
                 run('git', [...BOT_GIT, 'commit', '-m', `${cv.headerFor('address self-review')}\n\nvia AlianHub AI dev-agent (Claude Code)`], dir, { allowFail: true });
@@ -595,11 +833,15 @@ async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, descri
         // works too) but DON'T open the PR yet — hand back `pushed` so the caller can ask
         // for approval. openPr (a 'pending_pr' job) opens the PR once the user approves.
         run('git', ['push', '-u', 'origin', branch], dir);
-        return { prUrl: '', pushed: true, branch, note: '', verifyOk: vr.ok, verifyReport: vr.report };
+        // `result` is Claude's own account of what it did and why. It used to be
+        // dropped on every turn that committed anything, so the developer got a
+        // branch name and a lint tick and nothing else — the one exit that returned
+        // it was the "no changes were needed" early return.
+        return { prUrl: '', pushed: true, branch, note: String(result || ''), verifyOk: vr.ok, verifyReport: vr.report };
     }
 
     // Local folder — no remote. Build freely; the developer tests locally.
-    const prompt = buildPrompt({ taskKey, taskName, description, instruction, pushable, contextPath: ctxPath, contextText: readContext(dir, taskKey), comments, chat, meta });
+    const prompt = buildPrompt({ taskKey, taskName, description, instruction, pushable, contextPath: ctxPath, contextText: readContext(dir, taskKey), comments, chat, meta, attachments, isChat });
     console.log(`\n🤖  Claude Code (local folder — building in place) …\n`);
     const result = await runClaude(cfg, dir, prompt, onEvent, cancel);
 
@@ -616,7 +858,7 @@ async function developTurn(cfg, { dir, base, pushable, taskKey, taskName, descri
 
 // Open (or return an existing) PR for a task's already-developed branch. Used by the
 // PR-approval step (Point 2) — no Claude run, just a defensive push + gh pr create.
-function openPr(cfg, dir, base, taskKey, taskName, conv) {
+function openPr(cfg, dir, base, taskKey, taskName, conv, isChat) {
     const cv = conv || conventional({ TaskName: taskName }, taskKey);
     const branch = cv.branch;
     run('git', ['fetch', 'origin'], dir, { allowFail: true });
@@ -631,7 +873,9 @@ function openPr(cfg, dir, base, taskKey, taskName, conv) {
         // Richer PR body (B2): summary + the files it touched, so reviewers have context.
         const stat = run('git', ['diff', '--stat', `origin/${base}...origin/${branch}`], dir, { capture: true, allowFail: true });
         const body = [
-            `Implements AlianHub task **${taskKey} — ${taskName}** via the AlianHub AI dev-agent (Claude Code).`,
+            isChat
+                ? `Requested in an AlianHub project chat via the AlianHub AI dev-agent (Claude Code).\n\n> ${taskName}`
+                : `Implements AlianHub task **${taskKey} — ${taskName}** via the AlianHub AI dev-agent (Claude Code).`,
             stat ? `\n**Files changed**\n\`\`\`\n${stat.slice(0, 2000)}\n\`\`\`` : '',
             '\n_Automated change — please review before merging._',
         ].filter(Boolean).join('\n');
@@ -646,7 +890,7 @@ function openPr(cfg, dir, base, taskKey, taskName, conv) {
 // ── poll mode: watch Development chats and develop each new instruction ────
 async function reply(cfg, msg, { status, text, prUrl }) {
     const body = {
-        taskId: msg.taskId, projectId: msg.projectId, sprintId: msg.sprintId,
+        ...scopeBody(msg), projectId: msg.projectId, sprintId: msg.sprintId,
         parentId: msg._id, status, text, prUrl: prUrl || '',
     };
     // Retry: the work is done, so a transient blip (e.g. the dev server
@@ -675,7 +919,7 @@ async function handleMessage(cfg, msg) {
         // the backend may have handed to another runner.
         if (!/→\s*404/.test(e.message || '')) return;
     }
-    console.log(`\n▶  task ${msg.taskId}: "${String(msg.text).slice(0, 70)}"`);
+    console.log(`\n▶  ${isChatJob(msg) ? `chat ${msg.conversationId}` : `task ${msg.taskId}`}: "${String(msg.text).slice(0, 70)}"`);
     // Keep-alive so a genuinely long task isn't re-claimed as stale by another runner.
     // Emergency-stop token (Point 3): the heartbeat doubles as a cancel poll. If the
     // backend reports the job was stopped, kill the running Claude child at once.
@@ -703,46 +947,78 @@ async function handleMessage(cfg, msg) {
     let lastPost = 0;
     let progressWarned = false;
     const warnOnce = (m) => { if (!progressWarned) { progressWarned = true; console.log(`   (⚠ live progress not reaching the tab: ${m})`); } };
+    /* What the developer sees while a turn runs.
+     *
+     * Prose leads and tool use trails it, because that is the order a person reads:
+     * what is it telling me, then what did it do. Before this, prose was flattened
+     * into the same bullet list as the tool calls and truncated to 120 characters,
+     * so the agent's actual answer was the one thing you could not read.
+     *
+     * PROSE_MARK is what the UI keys on to render the two parts differently, and
+     * what isProgressLog uses to keep this live message out of the next prompt. */
+    let prose = '';
     const renderProgress = (done) => {
         const n = activityLog.length;
         const shown = activityLog.slice(-RENDER_LINES);
         const hidden = n - shown.length;
-        const header = done ? `🧾 Activity — ${n} step${n === 1 ? '' : 's'}` : `⚙️ Working… · ${n} step${n === 1 ? '' : 's'}`;
-        const more = hidden > 0 ? `  … (${hidden} earlier step${hidden === 1 ? '' : 's'})\n` : '';
-        return `${header}\n${more}${shown.map((l) => `• ${l}`).join('\n')}`;
+        const trail = n
+            ? `\n\n${PROSE_MARK}${done ? `🧾 ${n} step${n === 1 ? '' : 's'}` : `⚙️ working · ${n} step${n === 1 ? '' : 's'}`}\n${
+                hidden > 0 ? `  … (${hidden} earlier step${hidden === 1 ? '' : 's'})\n` : ''}${shown.map((l) => `• ${l}`).join('\n')}`
+            : '';
+        const body = prose.trim() || (done ? '' : '⚙️ Starting…');
+        return `${body}${trail}` || '⚙️ Working…';
     };
     const postProgress = (done) => {
         if (!workingId) return Promise.resolve();
         return api(cfg, 'POST', '/api/v2/dev-agent/progress', { messageId: workingId, text: renderProgress(done) })
             .catch((e) => warnOnce(`${e.message} — restart the AlianHub backend so /api/v2/dev-agent/progress exists`));
     };
+    // Tighter than the old 2s: this is now carrying the reply itself, not just a
+    // step counter, so it should read like typing rather than like paging.
+    const POST_EVERY_MS = 700;
+    const maybePost = () => {
+        const now = Date.now();
+        if (now - lastPost < POST_EVERY_MS) return;
+        lastPost = now;
+        postProgress(false);
+    };
     const onProgress = (line) => {
         console.log(`   ${line}`);
         if (!workingId) { warnOnce('no working-message id from the reply'); return; }
         activityLog.push(line);
         if (activityLog.length > KEEP_LINES) activityLog.splice(0, activityLog.length - KEEP_LINES);
-        const now = Date.now();
-        if (now - lastPost < 2000) return; // throttle the live edits
-        lastPost = now;
-        postProgress(false);
+        maybePost();
+    };
+    /* A delta appends; a complete message replaces what its own deltas built, so the
+     * two sources cannot double up when both arrive for the same block. */
+    const onProse = (text, isDelta) => {
+        if (!workingId) return;
+        if (isDelta) prose += text;
+        else if (!prose.endsWith(text.trim())) prose = `${prose.trimEnd()}${prose ? '\n\n' : ''}${text.trim()}`;
+        if (prose.length > 60000) prose = prose.slice(-60000);
+        maybePost();
     };
     // Land the complete transcript at the end (covers lines the throttle skipped).
     const flushProgress = () => postProgress(true);
     let cleanup = null; // pushable workdir to reset if this turn fails, so a dirty tree can't wedge the next turn (C1)
     try {
-        const task = await fetchTask(cfg, msg.taskId);
-        const taskKey = task.TaskKey || msg.taskId;
+        // A chat has no task to read: its identity is the conversation, its branch
+        // scope comes from that id, and its subject is the instruction itself.
+        const isChat = isChatJob(msg);
+        const task = isChat ? {} : await fetchTask(cfg, msg.taskId);
+        const taskKey = isChat ? chatKey(msg.conversationId) : (task.TaskKey || msg.taskId);
+        const taskName = isChat ? chatSubject(msg.text) : (task.TaskName || '(untitled task)');
         const conv = conventional(task, taskKey); // CI-legal branch/commit/PR naming
-        const projectCode = taskKey.includes('-') ? taskKey.split('-')[0] : '';
-        // A bot-assigned job carries no repo — inherit the task's last-used repo (set in the Development tab).
+        const projectCode = !isChat && taskKey.includes('-') ? taskKey.split('-')[0] : '';
+        // A bot-assigned job carries no repo — inherit the thread's last-used repo.
         if (!String(msg.repo || '').trim()) {
             try {
-                const hist = await api(cfg, 'GET', `/api/v2/dev-agent/messages?taskId=${encodeURIComponent(msg.taskId)}`);
+                const hist = await api(cfg, 'GET', `/api/v2/dev-agent/messages?${scopeQuery(msg)}`);
                 const withRepo = [...((hist && hist.data) || [])].reverse().find((m) => m.repo);
                 if (withRepo) { msg.repo = withRepo.repo; msg.base = withRepo.base || msg.base; }
             } catch (e) { /* fall back to config.repos */ }
         }
-        const { dir, base, pushable } = resolveWorkdir(cfg, String(task.ProjectID || ''), projectCode, repoArgsFromLocation(msg.repo, msg.base));
+        const { dir, base, pushable } = resolveWorkdir(cfg, String(task.ProjectID || msg.projectId || ''), projectCode, repoArgsFromLocation(msg.repo, msg.base));
         if (pushable) cleanup = dir;
         onProgress(`📁 ${pushable ? 'repository' : 'local folder'}: ${dir}`); // immediate first update so the tab changes right away
         if (msg.status === 'pending_pr' || msg.status === 'working_pr') {
@@ -750,24 +1026,24 @@ async function handleMessage(cfg, msg) {
             // open the pull request for its branch. No Claude run. ('working_pr' = a stale
             // PR-open job recovered mid-flight — still open the PR, don't re-develop. C5)
             onProgress('🔀 Opening the pull request…');
-            const prUrl = pushable ? openPr(cfg, dir, base, taskKey, task.TaskName || '(untitled task)', conv) : '';
+            const prUrl = pushable ? openPr(cfg, dir, base, taskKey, taskName, conv, isChat) : '';
             const text = prUrl
                 ? `✅ PR opened: ${prUrl}`
                 : (pushable ? '⚠️ Could not open the PR — check that the branch was pushed.' : 'This is a local folder — there is no remote to open a PR against.');
             await reply(cfg, msg, { status: 'done', text, prUrl });
-            if (prUrl) prWatch.set(conv.branch, { taskId: msg.taskId, projectId: msg.projectId, sprintId: msg.sprintId, repo: msg.repo, base, dir, prUrl, lastSeen: new Date().toISOString() }); // watch for reviewer feedback (B4)
+            if (prUrl) prWatch.set(conv.branch, { ...scopeBody(msg), projectId: msg.projectId, sprintId: msg.sprintId, repo: msg.repo, base, dir, prUrl, lastSeen: new Date().toISOString() }); // watch for reviewer feedback (B4)
             console.log(`  ✓ PR: ${prUrl}`);
         } else {
             // Context enrichment (A3): task comments + a metadata line, so the AI works
             // from the real requirements (which usually live in the discussion), not just
             // the one-line description. Description HTML is stripped to readable text.
-            const commentRows = await fetchComments(cfg, String(task.ProjectID || ''), msg.taskId);
+            const commentRows = isChat ? [] : await fetchComments(cfg, String(task.ProjectID || ''), msg.taskId);
             const comments = commentRows
                 .map((c) => { const b = htmlToText(c.message || c.comment || c.text || '').slice(0, 500); return b ? `- ${c.userName || c.createdByName || 'comment'}: ${b}` : ''; })
                 .filter(Boolean).slice(-15).join('\n');
             // The turn's own instruction is passed separately, so drop it here —
             // otherwise the agent reads it twice, once as history.
-            const chat = (await fetchDevChat(cfg, msg.taskId))
+            const chat = (await fetchDevChat(cfg, msg))
                 .filter((m) => String(m._id) !== String(msg._id) && !isProgressLog(m.text))
                 .map((m) => {
                     const body = String(m.text || '').trim().slice(0, 600);
@@ -777,20 +1053,32 @@ async function handleMessage(cfg, msg) {
             const metaBits = [];
             if (task.Task_Priority || task.priority) metaBits.push(`Priority: ${task.Task_Priority || task.priority}`);
             if (task.sprintName || task.SprintName) metaBits.push(`Sprint: ${task.sprintName || task.SprintName}`);
+            // Downloaded before the agent starts, so the files are on disk by the
+            // time the prompt points at them.
+            const { files: attachments, failed: attachFailed } = await fetchAttachments(cfg, dir, msg, onProgress);
+            if (attachFailed.length) onProgress(`could not download: ${attachFailed.join(', ')}`);
+
             const { prUrl, note, pushed, branch, verifyOk, verifyReport } = await developTurn(cfg, {
-                dir, base, pushable, taskKey, taskName: task.TaskName || '(untitled task)',
+                dir, base, pushable, taskKey, taskName,
                 description: htmlToText(task.description || task.rawDescription || ''), instruction: msg.text,
-                comments, chat, meta: metaBits.join(' · '), conv, onProgress, cancel,
+                comments, chat, meta: metaBits.join(' · '), conv, onProgress, onProse, cancel, attachments, isChat,
+                sessionId: isChat ? sessionUuidFor(msg.conversationId) : '',
             });
             if (pushable && pushed && !prUrl) {
                 // PR gate (Point 2): developed + pushed — wait for approval to open the PR.
                 const vtext = verifyReport ? `\n\n🔎 ${verifyOk === false ? '⚠️ verification issues remain — review carefully:' : 'verified:'}\n${verifyReport.slice(0, 800)}` : '';
-                await reply(cfg, msg, { status: 'awaiting_pr', text: `✅ Developed & pushed \`${branch}\`. Review it, then click **Create PR** to open the pull request — or open it yourself on GitHub.${vtext}` });
+                // Claude's account leads; the branch and the verify report follow it.
+                const said = String(note || '').trim();
+                const head = said ? `${said}\n\n---\n` : '';
+                await reply(cfg, msg, { status: 'awaiting_pr', text: `${head}✅ Developed & pushed \`${branch}\`. Review it, then click **Create PR** to open the pull request — or open it yourself on GitHub.${vtext}` });
                 console.log(`  ⏸ awaiting PR approval (${branch})`);
             } else {
-                const text = prUrl ? `✅ Done. PR: ${prUrl}` : `✅ ${note || 'Done.'}`;
+                // A chat's note IS the answer, so it is not dressed up as a build
+                // report — a tick and the word "Done" in front of a paragraph of
+                // prose is exactly what made this read like a CI bot.
+                const text = isChat ? (note || 'Done.') : (prUrl ? `✅ Done. PR: ${prUrl}` : `✅ ${note || 'Done.'}`);
                 await reply(cfg, msg, { status: 'done', text, prUrl });
-                console.log(`  ✓ ${prUrl || note}`);
+                console.log(`  ✓ ${prUrl || String(note).slice(0, 120)}`);
             }
         }
     } catch (e) {
@@ -826,7 +1114,7 @@ async function checkPrFeedback(cfg) {
             if (!items.length) continue;
             w.lastSeen = new Date().toISOString();
             const text = `A reviewer left feedback on the pull request (${w.prUrl}). Address it on the SAME branch, keeping the change focused:\n\n${items.join('\n').slice(0, 4000)}`;
-            await api(cfg, 'POST', '/api/v2/dev-agent/enqueue', { taskId: w.taskId, projectId: w.projectId, sprintId: w.sprintId, text, repo: w.repo, base: w.base }).catch(() => {});
+            await api(cfg, 'POST', '/api/v2/dev-agent/enqueue', { taskId: w.taskId || '', conversationId: w.conversationId || '', projectId: w.projectId, sprintId: w.sprintId, text, repo: w.repo, base: w.base }).catch(() => {});
             console.log(`  💬 review feedback on ${branch} → queued a follow-up for approval`);
         } catch (e) { /* best-effort */ }
     }
@@ -835,6 +1123,28 @@ async function checkPrFeedback(cfg) {
 async function pollLoop(cfg, intervalMs) {
     console.log(`\n👀  Polling ${cfg.url} every ${Math.round(intervalMs / 1000)}s for Development-chat instructions… (Ctrl+C to stop)`);
     const MAX = Math.max(1, Number(cfg.maxConcurrent) || 2); // develop a few tasks at once
+    /* Serialise per working folder.
+     *
+     * resolveWorkdir maps a repo to exactly ONE directory, so two jobs on the same
+     * repo were two headless agents editing the same files and racing on the same
+     * branch — whichever finished last won, and the loser's work was silently
+     * overwritten. Different repos still run in parallel; the same folder queues.
+     *
+     * The folder is only known inside handleMessage, so the chain is keyed on the
+     * repo location the job carries, which is what resolveWorkdir derives it from. */
+    const folderChain = new Map();
+    const runSerialised = (msg, fn) => {
+        const key = String(msg.repo || msg.projectId || 'default').trim().toLowerCase();
+        const prev = folderChain.get(key) || Promise.resolve();
+        const next = prev.then(fn, fn);
+        folderChain.set(key, next);
+        // Keep the chain from growing forever once a folder goes quiet — and swallow
+        // here, because this branch is bookkeeping. Chaining .finally() directly onto
+        // `next` builds a second promise from the same rejection, which nothing
+        // handles: one failing job would take the whole runner down.
+        next.catch(() => {}).then(() => { if (folderChain.get(key) === next) folderChain.delete(key); });
+        return next;
+    };
     const active = new Set();
     let lastFeedback = 0;
     for (;;) {
@@ -847,10 +1157,11 @@ async function pollLoop(cfg, intervalMs) {
                     const id = String(msg._id);
                     if (active.has(id)) continue; // already running on this machine
                     active.add(id);
-                    // Fire-and-forget under the pool cap; the atomic /claim inside prevents
-                    // double-processing across runners, and each job has its own heartbeat +
-                    // cancel token, so they run independently (F1 concurrency).
-                    handleMessage(cfg, msg)
+                    // Under the pool cap, and queued behind anything already running in
+                    // the same working folder. The atomic /claim inside prevents
+                    // double-processing across runners; each job has its own heartbeat
+                    // and cancel token, so jobs in different folders run independently.
+                    runSerialised(msg, () => handleMessage(cfg, msg))
                         .catch((e) => console.error(`task error: ${e.message}`))
                         .finally(() => active.delete(id));
                 }

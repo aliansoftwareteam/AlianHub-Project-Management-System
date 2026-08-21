@@ -8,3 +8,4 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 002 | Make the task-type migration production-ready | active | high | — | active/002-task-type-migration-prod |
 | 003 | Show library task-type icons in the time tracker | done | medium | — | done/003-tracker-task-type-icons |
 | 004 | Reusable template-selection form component (task types + statuses) | active | medium | — | active/004-reusable-template-select-form |
+| 005 | Project-scoped AI dev chat in a full-screen modal | active | high | — | active/005-project-ai-chat-modal |

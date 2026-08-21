@@ -689,11 +689,19 @@ const schema = {
         connectedAt: { type: Date, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
-    // AI dev-agent → per-task "Development" chat. Ephemeral conversation:
-    // user instructions + agent replies. The repo location travels on the
-    // message (temporary), nothing persisted as a binding. Managed by Modules/DevAgent.
+    // AI dev-agent conversation: user instructions + agent replies. The repo
+    // location travels on the message (temporary), nothing persisted as a binding.
+    // Managed by Modules/DevAgent.
+    //
+    // A message carries EXACTLY ONE scope, enforced in the controller:
+    //   taskId         — the task detail's "Development" tab
+    //   conversationId — a project-level chat, which has no task at all
+    // taskId is therefore not required at the schema level. Both fields are
+    // declared because the schema is strict: an undeclared field is dropped
+    // silently, which works in-session and vanishes after a reload.
     devMessages: {
-        taskId: { type: String, required: true },
+        taskId: { type: String, default: '', required: false },
+        conversationId: { type: String, default: '', required: false },
         projectId: { type: String, default: '', required: false },
         sprintId: { type: String, default: '', required: false },
         role: { type: String, default: 'user', required: false },   // user | agent | system
@@ -704,6 +712,9 @@ const schema = {
         prUrl: { type: String, default: '', required: false },
         parentId: { type: String, default: '', required: false },    // agent reply → the user message it answers
         userId: { type: String, default: '', required: false },
+        // Files attached to the instruction: [{id, filename, extension, size, type, url}].
+        // Untyped on purpose — the module re-types every field on the way in.
+        attachments: { type: Array, default: [], required: false },
     },
     // AI dev-agent → device pairing (short-lived, single-use). Stored in the
     // GLOBAL db so the public exchange endpoint can resolve a code without a

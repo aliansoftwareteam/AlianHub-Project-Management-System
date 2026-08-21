@@ -134,6 +134,7 @@
                                 :teams="teams"
                                 @openSidebar="open"
                                 @openWatcher="openProjectWatcher = true"
+                                @openDevChat="openDevChat = true"
                                 @changeAssignee="(type, $event) => changeAssignee(type, $event)"
                                 @openPermissionSidebar="openPermissionSidebar"
                                 @startEditName="projectName.value = projectData?.ProjectName; editProject = true"
@@ -429,6 +430,7 @@
             v-model:permissionSidebar="permissionSidebar"
             :showDriverSidebar="showDriverSidebar"
             :openAiSidebar="openAiSidebar"
+            v-model:openDevChat="openDevChat"
             @confirmArchive="updateProject()"
             @closeCreateSidebar="closeSidebar"
             @closeAiCreator="isActiveAiCreator = false"
@@ -527,6 +529,7 @@ provide('showArchivedProjects', showArchivedProjects);
 
 const currentVideoUrl = ref(0);
 const openAiSidebar = ref(false);
+const openDevChat = ref(false);
 const showDriverSidebar = ref(false);
 const showAiTaskCreator = ref(false);
 // Sprints for the "Plan with AI" tasks-only picker: [{ id, name }].

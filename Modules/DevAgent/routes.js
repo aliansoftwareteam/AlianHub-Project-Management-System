@@ -1,5 +1,6 @@
 const rateLimit = require('express-rate-limit');
 const ctrl = require('./controller');
+const attach = require('./helpers/attachments');
 
 // Throttle the pairing endpoints — the public exchange mints a PAT, so cap attempts (D6).
 const pairLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false });
@@ -8,6 +9,12 @@ exports.init = (app) => {
     // Task "Development" conversation — chat with the AI dev-agent.
     app.post('/api/v2/dev-agent/message', ctrl.postMessage);   // user instruction (JWT)
     app.get('/api/v2/dev-agent/messages', ctrl.listMessages);  // conversation (JWT / PAT)
+    app.get('/api/v2/dev-agent/conversations', ctrl.listConversations); // JWT: MY chats in a project (the chat window's rail)
+    app.post('/api/v2/dev-agent/conversation/delete', ctrl.deleteConversation); // JWT: delete one of my chats + its files
+    // Attachments on an instruction. Multipart only on the upload route: the
+    // message endpoint stays JSON, so nothing that posts to it changes.
+    app.post('/api/v2/dev-agent/attachment', attach.parseOne, ctrl.uploadAttachment); // JWT
+    app.get('/api/v2/dev-agent/attachment', ctrl.downloadAttachment);                 // JWT / PAT (runner fetches)
     app.get('/api/v2/dev-agent/pending', ctrl.listPending);    // runner polls pending (PAT)
     app.post('/api/v2/dev-agent/claim', ctrl.claimMessage);    // runner atomic claim (PAT)
     app.post('/api/v2/dev-agent/heartbeat', ctrl.heartbeat);   // runner keep-alive (PAT)
