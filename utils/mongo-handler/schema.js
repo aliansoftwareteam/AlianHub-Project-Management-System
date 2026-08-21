@@ -790,6 +790,64 @@ const schema = {
         expiresAt: { type: Date, required: false },
         passwordHash: { type: String, required: false },
     },
+    /* Forms — a form belongs to a project and files every submission as a task in
+     * one sprint. That sprint IS the response list: there is no separate response
+     * store, nothing to read them in, and nothing to keep in step with the tasks.
+     *
+     * `questions` is an untyped Array on purpose: a question's shape depends on
+     * what it binds to, and pinning a sub-schema here would mean editing this file
+     * for every new field type. The module validates it instead. Everything else
+     * stays declared — this sub-schema is strict, so an undeclared path is dropped
+     * on save and only shows up later as data that vanished.
+     *
+     * Each question is { id, label, help, fieldKey, fieldSource, required, order }
+     * where fieldSource is 'task' | 'custom' and fieldKey names what it fills.
+     */
+    forms: {
+        title: { type: String, required: true },
+        description: { type: String, default: '', required: false },
+        ProjectID: { type: mongoose.Schema.Types.ObjectId, required: true },
+        // Where submissions land. Held on the form so a submission needs no
+        // lookup and cannot be pointed at another project's sprint.
+        sprintId: { type: mongoose.Schema.Types.ObjectId, required: false },
+        questions: { type: Array, default: [], required: false },
+        // Applied to every submission task.
+        defaults: { type: Object, default: {}, required: false },
+        // Presentation of the public page: layout, theme, colours, toggles.
+        settings: { type: Object, default: {}, required: false },
+        // Shown after submitting.
+        successMessage: { type: String, default: '', required: false },
+        // 'draft' | 'live' — a draft has no working public link.
+        state: { type: String, default: 'draft', required: false },
+        submissionCount: { type: Number, default: 0, required: false },
+        // Taken when the form is published, exactly as an email inbox does it:
+        // the public submission handler has no logged-in user and no company
+        // context, so everything it needs to build a task is frozen here rather
+        // than looked up per submission.
+        CompanyId: { type: String, default: '', required: false },
+        projectSnapshot: { type: Object, default: {}, required: false },
+        sprintArray: { type: Object, default: {}, required: false },
+        userSnapshot: { type: Object, default: {}, required: false },
+        templateSnapshot: { type: Object, default: {}, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // One row per public form submission, stored whether or not a task was
+    // created from it: the form's own response table is the record of what was
+    // submitted, and task creation is optional.
+    form_submissions: {
+        formId: { type: mongoose.Schema.Types.ObjectId, required: true },
+        ProjectID: { type: mongoose.Schema.Types.ObjectId, required: true },
+        CompanyId: { type: String, default: '', required: false },
+        // [{ questionId, label, value }] — the label is copied in as given, so
+        // renaming or deleting a question later cannot rewrite past answers.
+        answers: { type: Array, default: [], required: false },
+        // Empty when the form does not create tasks.
+        taskId: { type: String, default: '', required: false },
+        taskKey: { type: String, default: '', required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Submissions arriving through a public intake form
     intakeItems: {
         publicShareId: { type: mongoose.Schema.Types.ObjectId, required: true },

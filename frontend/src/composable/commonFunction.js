@@ -207,6 +207,18 @@ export const projectComponentsIcons = (key) => {
             icon: require("@/assets/images/svg/component-inactive-icons/comp_dashboard_inactive.svg"),
             activeIcon: require("@/assets/images/svg/component-active-icons/comp_dashboard_active.svg"),
             keyName: "ProjectDashboard"
+        },
+        {
+            // No dedicated docs icon in the set yet — the project-detail glyph is a
+            // document, so it reads correctly until one is designed.
+            icon: require("@/assets/images/svg/component-inactive-icons/comp_project_detail_inactive.svg"),
+            activeIcon: require("@/assets/images/svg/component-active-icons/comp_project_details_active.svg"),
+            keyName: "DocsView"
+        },
+        {
+            icon: require("@/assets/images/svg/component-inactive-icons/comp_forms_inactive.svg"),
+            activeIcon: require("@/assets/images/svg/component-active-icons/comp_forms_active.svg"),
+            keyName: "FormsView"
         }
     ];
 

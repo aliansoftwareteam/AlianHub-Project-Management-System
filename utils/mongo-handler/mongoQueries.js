@@ -89,7 +89,9 @@ const {
     cloudStorageConnectionsSchema,
     devMessagesSchema,
     devPairingsSchema,
-    devProjectReposSchema
+    devProjectReposSchema,
+    formsSchema,
+    formSubmissionsSchema
 } = require('./createSchema');
 
 
@@ -273,6 +275,10 @@ exports.checkType = (type) => {
             return devPairingsSchema
         case SCHEMA_TYPE.DEV_PROJECT_REPOS:
             return devProjectReposSchema
+        case SCHEMA_TYPE.FORMS:
+            return formsSchema
+        case SCHEMA_TYPE.FORM_SUBMISSIONS:
+            return formSubmissionsSchema
         default:
             return ""
     }
@@ -459,6 +465,10 @@ exports.tableType = (type) => {
                 return `${dbCollections.DEV_PAIRINGS}`
         case SCHEMA_TYPE.DEV_PROJECT_REPOS:
                 return `${dbCollections.DEV_PROJECT_REPOS}`
+        case SCHEMA_TYPE.FORMS:
+                return `${dbCollections.FORMS}`
+        case SCHEMA_TYPE.FORM_SUBMISSIONS:
+                return `${dbCollections.FORM_SUBMISSIONS}`
         default:
             return ""
     }
