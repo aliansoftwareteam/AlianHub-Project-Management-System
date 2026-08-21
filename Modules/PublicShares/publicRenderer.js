@@ -644,6 +644,16 @@ exports.renderShare = async (req, res) => {
             });
         }
 
+        // A form is served by Modules/Forms, which owns its own page and the
+        // submission handler. Without this the token would fall through to the
+        // task-board branch below and render an empty "Shared board" — no data
+        // leak, since no sprint matches a form id, but a confusing dead end.
+        // Redirected rather than refused so a /share/ link that was already
+        // copied keeps working.
+        if (share.entityType === 'form') {
+            return res.redirect(302, `/form/${encodeURIComponent(share.token)}`);
+        }
+
         const [sprint, tasks] = await Promise.all([
             MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.SPRINTS,
