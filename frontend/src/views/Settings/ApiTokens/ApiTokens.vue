@@ -18,6 +18,19 @@
             </div>
         </div>
 
+        <!-- Claude sign-in. Same control as the chat window's banner, in the shape
+             that always states where things stand — this is the page you open to
+             check, so silence when signed in would be unhelpful here. -->
+        <div class="tok-card">
+            <div class="tok-head">
+                <div>
+                    <h3 class="m-0">Claude sign-in</h3>
+                    <p class="tok-sub">The AI needs your connected computer to be signed in to Claude. Sign in here and the browser opens on that machine — no terminal needed. If you sign out anywhere, this goes back to showing a Sign in button.</p>
+                </div>
+            </div>
+            <ClaudeAuthStatus variant="row" />
+        </div>
+
         <!-- Connect this computer (one-time per machine) -->
         <div class="tok-card">
             <div class="tok-head">
@@ -39,6 +52,7 @@
 <script setup>
 import { ref } from 'vue';
 import { apiRequest } from '@/services';
+import ClaudeAuthStatus from '@/components/molecules/ClaudeAuthStatus/ClaudeAuthStatus.vue';
 import { useAiBot } from '@/composable/useAiBot';
 
 const botLoading = ref(false);

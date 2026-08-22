@@ -7,7 +7,10 @@
             <li v-if="clientWidth > 767">
                 <img @click="$emit('openSidebar', 'filesLinks')" id="projectviewfiles_driver" :src="fileLinks" class="cursor-pointer"/>
             </li>
-            <li class="ml-10px" v-if="clientWidth > 767" :class="clientWidth>767 ? 'mr-10px' : 'm-0'">
+            <!-- 2px, not 10px: the mic artboard is 30x30 around an 11.5px glyph, so it
+                 carries ~9px of its own padding on each side. With a 10px margin its
+                 optical gaps measured 19.4px and 19.8px against 11.3px elsewhere. -->
+            <li class="ml-2px" v-if="clientWidth > 767" :class="clientWidth>767 ? 'mr-2px' : 'm-0'">
                 <img @click="$emit('openSidebar', 'audio')" id="projectviewaudio_driver" :src="audio" alt="audio" class="cursor-pointer"/>
             </li>
             <li v-if="clientWidth > 767">

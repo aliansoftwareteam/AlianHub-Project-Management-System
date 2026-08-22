@@ -157,12 +157,43 @@ const CHAT_PROTOCOL = 3;
  * runner online, your abandoned chat turn would be judged "a runner is online",
  * never re-offered (it is yours), and never failed — spinning forever while
  * somebody else works. */
-function markRunnerSeen(companyId, protocol, uid) {
+/* Whether the developer's own Claude Code is signed in, reported by their runner on
+   every poll. Without it the only signal was a turn failing with "Not logged in" in
+   its output — telling someone after they typed an instruction, rather than before.
+
+   Kept beside presence because it is the same question in two parts: is that machine
+   there, and is it able to do anything. */
+function markRunnerSeen(companyId, protocol, uid, auth) {
     if (!companyId) return;
     const n = Number(protocol);
-    const seen = { at: Date.now(), protocol: Number.isFinite(n) && n > 0 ? n : 1 };
+    const prev = uid ? runnerSeen.get(`${companyId}:${uid}`) : null;
+    const seen = {
+        at: Date.now(),
+        protocol: Number.isFinite(n) && n > 0 ? n : 1,
+        // Carry the previous answer when this call did not bring one, so a request
+        // that omits it does not read as "signed out".
+        loggedIn: auth && typeof auth.loggedIn === 'boolean' ? auth.loggedIn : !!(prev && prev.loggedIn),
+        authMethod: (auth && auth.authMethod) || (prev && prev.authMethod) || 'unknown',
+    };
     runnerSeen.set(String(companyId), seen);
     if (uid) runnerSeen.set(`${companyId}:${uid}`, seen);
+}
+
+/* A sign-in the window asked for, waiting for that developer's runner to pick it up.
+   In memory on purpose: it is a moment-to-moment handshake, not a record, and a
+   restart should forget it rather than reopen someone's browser later. */
+const signInWanted = new Map();          // `${companyId}:${uid}` -> { email, at }
+const signInUrls = new Map();            // `${companyId}:${uid}` -> { url, at } — fallback when no browser opened
+const SIGN_IN_TTL_MS = 5 * 60 * 1000;
+
+function runnerAuth(companyId, uid) {
+    const seen = runnerSeen.get(`${companyId}:${uid}`);
+    const online = !!seen && (Date.now() - seen.at) < RUNNER_ONLINE_MS;
+    return {
+        online,
+        loggedIn: online ? !!seen.loggedIn : false,
+        authMethod: online ? (seen.authMethod || 'unknown') : 'unknown',
+    };
 }
 function runnerProtocol(companyId) {
     const seen = runnerSeen.get(String(companyId));
@@ -662,12 +693,107 @@ exports.deleteConversation = async (req, res) => {
     }
 };
 
+/* GET /api/v2/dev-agent/runner-state  (JWT) — is MY machine there, and can it work?
+
+   Two separate answers the chat window needs before it lets someone type: whether a
+   runner is polling at all, and whether Claude Code on it is signed in. Being online
+   but signed out looks fine and fails every turn, which is the case this exists for. */
+exports.runnerState = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'] || '';
+        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        if (!req.uid) return res.send({ status: false, statusText: 'A signed-in user is required.' });
+        const state = runnerAuth(companyId, String(req.uid));
+        return res.send({
+            status: true,
+            statusText: 'Runner state fetched.',
+            data: {
+                ...state,
+                protocol: runnerProtocol(companyId),
+                signInPending: !!signInWanted.get(`${companyId}:${req.uid}`),
+                signInUrl: (signInUrls.get(`${companyId}:${req.uid}`) || {}).url || '',
+            },
+        });
+    } catch (error) {
+        logger.error(`ERROR in dev-agent runnerState: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+/* POST /api/v2/dev-agent/auth-login  (JWT) — ask MY machine to sign in to Claude.
+
+   The server cannot sign anyone in; only the machine with the browser can. This drops
+   a request the runner collects on its next poll, which is at most a few seconds. */
+exports.requestSignIn = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'] || '';
+        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        if (!req.uid) return res.send({ status: false, statusText: 'A signed-in user is required.' });
+
+        const state = runnerAuth(companyId, String(req.uid));
+        if (!state.online) {
+            return res.send({
+                status: false,
+                statusText: 'No connected computer of yours is running the AI agent. Open Settings → AI Developer and connect one first.',
+            });
+        }
+        if (state.loggedIn) {
+            return res.send({ status: true, statusText: 'That computer is already signed in.', data: state });
+        }
+
+        // The email only pre-fills the login page, so a failed lookup is not fatal.
+        let email = '';
+        try {
+            const user = await MongoDbCrudOpration('global', {
+                type: SCHEMA_TYPE.USERS, data: [{ _id: String(req.uid) }, { email: 1 }, {}],
+            }, 'findOne');
+            email = (user && user.email) || '';
+        } catch (e) { /* pre-fill is optional */ }
+
+        signInWanted.set(`${companyId}:${req.uid}`, { email, at: Date.now() });
+        return res.send({ status: true, statusText: 'Opening the sign-in on your computer…' });
+    } catch (error) {
+        logger.error(`ERROR in dev-agent requestSignIn: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+/* POST /api/v2/dev-agent/auth-report  (PAT) — the runner says how the sign-in went. */
+exports.reportAuth = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'] || '';
+        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        const b = req.body || {};
+        markRunnerSeen(companyId, req.headers['x-dev-agent-protocol'], req.uid, {
+            loggedIn: b.loggedIn === true,
+            authMethod: String(b.authMethod || ''),
+        });
+        // A machine with no browser to open reports the URL instead, so the window can
+        // show it rather than leaving the developer waiting on nothing.
+        if (b.url) signInUrls.set(`${companyId}:${req.uid}`, { url: String(b.url).slice(0, 500), at: Date.now() });
+        else signInUrls.delete(`${companyId}:${req.uid}`);
+        return res.send({ status: true });
+    } catch (error) {
+        logger.error(`ERROR in dev-agent reportAuth: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
 /* GET /api/v2/dev-agent/pending  — user instructions awaiting the agent. The runner (PAT) polls this. */
 exports.listPending = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
         if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
-        markRunnerSeen(companyId, req.headers['x-dev-agent-protocol'], req.uid); // a runner is polling → mark it online (presence)
+        // The runner reports its Claude sign-in state on every poll. Only pass it on
+        // when the poll actually carried it: sending a default `false` would let a
+        // runner that reports nothing (an older one) assert "signed out" and wipe a
+        // state it knows nothing about.
+        const q = req.query || {};
+        const reported = q.loggedIn === undefined ? null : {
+            loggedIn: q.loggedIn === '1' || q.loggedIn === 'true',
+            authMethod: String(q.authMethod || ''),
+        };
+        markRunnerSeen(companyId, req.headers['x-dev-agent-protocol'], req.uid, reported);
         // A CHAT job may only run on its own developer's machine.
         //
         // /pending was company-wide, so with two people paired, whichever runner
@@ -695,7 +821,20 @@ exports.listPending = async (req, res) => {
         // and failStalePendingIfNoRunner explains why.
         const canChat = Number(req.headers['x-dev-agent-protocol'] || 1) >= CHAT_PROTOCOL;
         const deliverable = (rows || []).filter((r) => canChat || !String(r.conversationId || '').trim());
-        return res.send({ status: true, statusText: 'Pending fetched.', data: deliverable.map(mask) });
+
+        // Handed over once. The runner opens the browser on the developer's machine
+        // and reports back; leaving the flag set would reopen it on every poll.
+        const wantKey = `${companyId}:${req.uid}`;
+        const want = signInWanted.get(wantKey);
+        const fresh = want && (Date.now() - want.at) < SIGN_IN_TTL_MS;
+        if (want) signInWanted.delete(wantKey);
+
+        return res.send({
+            status: true,
+            statusText: 'Pending fetched.',
+            data: deliverable.map(mask),
+            ...(fresh ? { signIn: { requested: true, email: want.email || '' } } : {}),
+        });
     } catch (error) {
         logger.error(`ERROR in dev-agent listPending: ${error.message}`);
         return res.send({ status: false, statusText: error.message });

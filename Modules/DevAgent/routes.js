@@ -15,6 +15,9 @@ exports.init = (app) => {
     // message endpoint stays JSON, so nothing that posts to it changes.
     app.post('/api/v2/dev-agent/attachment', attach.parseOne, ctrl.uploadAttachment); // JWT
     app.get('/api/v2/dev-agent/attachment', ctrl.downloadAttachment);                 // JWT / PAT (runner fetches)
+    app.get('/api/v2/dev-agent/runner-state', ctrl.runnerState); // JWT: is my machine connected and signed in to Claude?
+    app.post('/api/v2/dev-agent/auth-login', ctrl.requestSignIn);// JWT: ask my machine to open the Claude sign-in
+    app.post('/api/v2/dev-agent/auth-report', ctrl.reportAuth);  // PAT: the runner reports how it went
     app.get('/api/v2/dev-agent/pending', ctrl.listPending);    // runner polls pending (PAT)
     app.post('/api/v2/dev-agent/claim', ctrl.claimMessage);    // runner atomic claim (PAT)
     app.post('/api/v2/dev-agent/heartbeat', ctrl.heartbeat);   // runner keep-alive (PAT)

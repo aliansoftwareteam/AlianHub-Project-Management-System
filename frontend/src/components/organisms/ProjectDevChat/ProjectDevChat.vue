@@ -47,29 +47,22 @@
                             :key="c.conversationId"
                             class="pdc__conv"
                             :class="{ 'pdc__conv--on': c.conversationId === activeId }"
+                            :title="rowTitle(c)"
                             @click="activeId = c.conversationId"
                         >
-                            <div class="pdc__conv-top">
-                                <span class="pdc__conv-name" :title="titleOf(c)">{{ titleOf(c) }}</span>
-                                <span class="pdc__conv-when">{{ shortWhen(c.lastAt) }}</span>
-                                <button
-                                    class="pdc__conv-del"
-                                    :title="$t('DevAgent.delete_chat')"
-                                    :aria-label="$t('DevAgent.delete_chat')"
-                                    @click.stop="askDelete(c)"
-                                >
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
-                                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                        <path d="M4 7h16M9 7V4.8A.8.8 0 0 1 9.8 4h4.4a.8.8 0 0 1 .8.8V7M6.5 7l.8 12.2a.9.9 0 0 0 .9.8h7.6a.9.9 0 0 0 .9-.8L17.5 7" />
-                                    </svg>
-                                </button>
-                            </div>
-                            <div v-if="c.lastText" class="pdc__conv-last" :title="c.lastText">
-                                <span v-if="c.lastRole === 'agent'" class="pdc__conv-who">{{ $t('DevAgent.ai_short') }}</span>{{ oneLine(c.lastText) }}
-                            </div>
-                            <span v-if="c.status" class="pdc__chip" :class="'st-' + c.status">
-                                <span v-if="c.isActive" class="pdc__pulse"></span>{{ statusLabel(c.status) }}
-                            </span>
+                            <span class="pdc__dot" :class="dotClass(c)"></span>
+                            <span class="pdc__conv-name">{{ titleOf(c) }}</span>
+                            <button
+                                class="pdc__conv-del"
+                                :title="$t('DevAgent.delete_chat')"
+                                :aria-label="$t('DevAgent.delete_chat')"
+                                @click.stop="askDelete(c)"
+                            >
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+                                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M4 7h16M9 7V4.8A.8.8 0 0 1 9.8 4h4.4a.8.8 0 0 1 .8.8V7M6.5 7l.8 12.2a.9.9 0 0 0 .9.8h7.6a.9.9 0 0 0 .9-.8L17.5 7" />
+                                </svg>
+                            </button>
                         </div>
                     </div>
 
@@ -94,6 +87,8 @@
                             </svg>
                         </button>
                     </div>
+
+                    <ClaudeAuthStatus v-if="modelValue" class="pdc__auth" variant="banner" />
 
                     <div class="pdc__body">
                         <!-- keyed on the chat: switching remounts, so the poll and the draft
@@ -135,7 +130,9 @@
 
 <script setup>
 import { ref, computed, watch, onBeforeUnmount, defineProps, defineEmits } from 'vue';
+import { useI18n } from 'vue-i18n';
 import DevelopmentChat from '@/components/organisms/Development/DevelopmentChat.vue';
+import ClaudeAuthStatus from '@/components/molecules/ClaudeAuthStatus/ClaudeAuthStatus.vue';
 import ConfirmDelete from '@/components/atom/ConfirmDelete/ConfirmDelete.vue';
 import { useToast } from 'vue-toast-notification';
 import { apiRequest } from '@/services';
@@ -146,6 +143,7 @@ const props = defineProps({
 });
 const emit = defineEmits(['update:modelValue']);
 const toast = useToast();
+const { t } = useI18n();
 
 const BASE = '/api/v2/dev-agent';
 const RAIL_POLL_MS = 10000;
@@ -187,6 +185,24 @@ const statusLabel = (s) => ({
 }[s] || s);
 
 const oneLine = (t) => String(t || '').replace(/\s+/g, ' ').trim().slice(0, 140);
+
+/* The list shows a title and nothing else, so the state that used to sit in a chip
+ * and the detail that sat in a preview line move into one dot and the row's tooltip.
+ * A running or failed chat still has to be visible without opening it. */
+const dotClass = (c) => {
+    if (!c) return '';
+    if (c.status === 'error') return 'is-error';
+    if (c.isActive) return 'is-live';
+    return '';
+};
+const rowTitle = (c) => {
+    if (!c) return '';
+    const bits = [titleOf(c)];
+    if (c.status) bits.push(statusLabel(c.status));
+    if (c.lastAt) bits.push(shortWhen(c.lastAt));
+    if (c.lastText) bits.push(`${c.lastRole === 'agent' ? `${t('DevAgent.ai_short')}: ` : ''}${oneLine(c.lastText)}`);
+    return bits.filter(Boolean).join(' · ');
+};
 
 /* A chat is titled by its first instruction. A chat opened with only an attachment
  * has no text to take a title from, so it falls back to the file — otherwise every
@@ -343,6 +359,10 @@ onBeforeUnmount(stop);
     padding: 16px;
 }
 .pdc__shell {
+    /* The rail header carries two lines (name + project) and the thread header one,
+       so left to themselves they resolve to different heights and the rule between
+       them steps instead of running straight across. Both take this height. */
+    --pdc-head-h: 57px;
     background: #fff;
     color: #1f2333;
     border-radius: 14px;
@@ -365,10 +385,13 @@ onBeforeUnmount(stop);
 }
 .pdc__rail-head {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     gap: 8px;
-    padding: 14px 14px 12px;
+    height: var(--pdc-head-h);
+    box-sizing: border-box;
+    flex: 0 0 auto;
+    padding: 8px 14px;
     border-bottom: 1px solid #e9eaf2;
 }
 .pdc__rail-id { min-width: 0; }
@@ -416,32 +439,47 @@ onBeforeUnmount(stop);
 .pdc__rail-note, .pdc__rail-err { padding: 14px 8px; font-size: 12.5px; color: #9aa0b4; line-height: 1.5; }
 .pdc__rail-err { color: #c0392b; }
 
+/* One line per chat, the way a desktop chat client lists them: no card, no border,
+   no preview line, no timestamp. Everything that used to be printed on the row is in
+   its tooltip instead, so the list stays scannable at a glance. */
 .pdc__conv {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
+    align-items: center;
+    gap: 9px;
     width: 100%;
     text-align: left;
-    border: 1px solid transparent;
-    border-radius: 9px;
+    border: 0;
+    border-radius: 6px;
     background: none;
-    padding: 8px 10px;
+    padding: 7px 9px;
     cursor: pointer;
     font-family: inherit;
     min-width: 0;
 }
-.pdc__conv:hover { background: #f1f3fb; }
-.pdc__conv--on { background: #fff; border-color: #dfe2f0; }
-.pdc__conv-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.pdc__conv:hover { background: #eef0f8; }
+.pdc__conv--on { background: #e7eaf6; }
 .pdc__conv-name {
     flex: 1;
-    font-size: 12.5px;
+    font-size: 13px;
     color: #2f3444;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.pdc__conv-when { font-size: 10.5px; color: #b0b5c7; flex: 0 0 auto; }
+/* State without a chip: grey normally, amber while the agent is working, red if the
+   turn failed. The row's tooltip spells it out. */
+.pdc__dot {
+    width: 6px;
+    height: 6px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: #c3c8d8;
+}
+.pdc__dot.is-live { background: #b7791f; }
+.pdc__dot.is-error { background: #c0392b; }
+@media (prefers-reduced-motion: no-preference) {
+    .pdc__dot.is-live { animation: pdc-pulse 1.4s ease-in-out infinite; }
+}
 .pdc__conv-del {
     display: flex;
     align-items: center;
@@ -467,36 +505,7 @@ onBeforeUnmount(stop);
 @media (hover: none) {
     .pdc__conv-del { opacity: 1; }
 }
-.pdc__conv-last {
-    font-size: 11.5px;
-    color: #9aa0b4;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.pdc__conv-who { color: #6473e8; margin-right: 5px; }
-
-.pdc__chip {
-    align-self: flex-start;
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    margin-top: 3px;
-    font-size: 10.5px;
-    border: 1px solid #d7d9e6;
-    border-radius: 20px;
-    padding: 1px 8px;
-    color: #6b7280;
-}
-.pdc__chip.st-working, .pdc__chip.st-awaiting_approval, .pdc__chip.st-pending, .pdc__chip.st-pending_pr { color: #b7791f; border-color: #e6d3a3; }
-.pdc__chip.st-done { color: #1c7a43; border-color: #bfe3cd; }
-.pdc__chip.st-error { color: #c0392b; border-color: #e6bcbc; }
-.pdc__chip.st-awaiting_pr { color: #2563eb; border-color: #bcd0f5; }
-.pdc__pulse { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-@media (prefers-reduced-motion: no-preference) {
-    .pdc__pulse { animation: pdc-pulse 1.4s ease-in-out infinite; }
-    @keyframes pdc-pulse { 50% { opacity: .25; } }
-}
+@keyframes pdc-pulse { 50% { opacity: .25; } }
 
 .pdc__rail-foot {
     padding: 10px 14px;
@@ -512,7 +521,10 @@ onBeforeUnmount(stop);
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 12px 16px;
+    height: var(--pdc-head-h);
+    box-sizing: border-box;
+    flex: 0 0 auto;
+    padding: 8px 16px;
     border-bottom: 1px solid #e9eaf2;
 }
 .pdc__head-text { flex: 1; min-width: 0; }
@@ -544,6 +556,10 @@ onBeforeUnmount(stop);
 .pdc__back { display: none; }
 
 .pdc__body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0 16px 12px; }
+
+/* Placement only. ClaudeAuthStatus brings its own appearance, so styling it from
+   here as well would fight it — the parent just says where it sits. */
+.pdc__auth { margin: 12px 16px 0; }
 
 .pdc__blank {
     flex: 1;

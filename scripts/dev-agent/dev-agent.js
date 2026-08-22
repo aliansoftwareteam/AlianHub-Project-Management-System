@@ -326,6 +326,66 @@ async function fetchAttachments(cfg, dir, msg, onProgress) {
     return { files, failed };
 }
 
+/* Whether Claude Code on THIS machine is signed in.
+ *
+ * `claude auth status --json` answers it directly, which is far better than the old
+ * signal: waiting for a turn to fail and reading "Not logged in" out of stderr. The
+ * developer should be told before they type an instruction, not after it fails.
+ *
+ * Cached briefly because it is asked on every poll and spawning a process each time
+ * would be silly. Any failure to read it counts as "unknown", never as signed in —
+ * claiming a machine is ready when it is not is the worse mistake. */
+let _authCache = { at: 0, value: { loggedIn: false, authMethod: 'unknown' } };
+const AUTH_TTL_MS = 20 * 1000;
+
+function authStatus(cfg, force) {
+    if (!force && Date.now() - _authCache.at < AUTH_TTL_MS) return _authCache.value;
+    let value = { loggedIn: false, authMethod: 'unknown' };
+    try {
+        const r = runResult(cfg.claudeBin, ['auth', 'status', '--json'], process.cwd(), { timeout: 15000 });
+        const line = String(r.out || '').trim();
+        const at = line.indexOf('{');
+        if (at !== -1) {
+            const parsed = JSON.parse(line.slice(at, line.lastIndexOf('}') + 1));
+            value = {
+                loggedIn: parsed.loggedIn === true,
+                authMethod: String(parsed.authMethod || 'unknown'),
+                apiProvider: String(parsed.apiProvider || ''),
+            };
+        }
+    } catch (e) { /* unknown — treated as not signed in */ }
+    _authCache = { at: Date.now(), value };
+    return value;
+}
+
+/* Start the sign-in on this machine, which is the whole point: the runner is already
+ * on the developer's computer, so it can open their browser. They never open a
+ * terminal.
+ *
+ * Detached and unwatched — the flow is finished in the browser, not here. The URL is
+ * captured anyway: if the machine has no browser to open (a remote box, a server),
+ * the link is the only way through, so it is sent back rather than lost. */
+function startSignIn(cfg, email) {
+    const args = ['auth', 'login', '--claudeai'];
+    if (email) args.push('--email', String(email));
+    try {
+        const { exe, viaCmd } = resolveExe(cfg.claudeBin);
+        const file = viaCmd ? (process.env.ComSpec || 'cmd.exe') : exe;
+        const child = spawn(file, viaCmd ? ['/d', '/c', exe, ...args] : args, {
+            cwd: process.cwd(), shell: false, windowsHide: true,
+            stdio: ['ignore', 'pipe', 'pipe'],
+        });
+        let out = '';
+        const grab = (c) => { out += c.toString(); };
+        child.stdout.on('data', grab);
+        child.stderr.on('data', grab);
+        child.on('error', () => {});
+        return { child, url: () => (out.match(/https?:\/\/\S+/) || [''])[0] };
+    } catch (e) {
+        return { child: null, url: () => '', error: e.message };
+    }
+}
+
 // What this runner understands. The server uses it to avoid handing work to a
 // runner that would mishandle it. Protocol 1 knew only task jobs. Protocol 2 knew
 // them but ran a chat through the task pipeline — branching, committing and refusing
@@ -373,6 +433,10 @@ const scopeQuery = (msg) => (isChatJob(msg)
     ? `conversationId=${encodeURIComponent(msg.conversationId)}`
     : `taskId=${encodeURIComponent(msg.taskId)}`);
 const scopeBody = (msg) => ({ taskId: String((msg && msg.taskId) || ''), conversationId: String((msg && msg.conversationId) || '') });
+const authQuery = (cfg) => {
+    const a = authStatus(cfg);
+    return `loggedIn=${a.loggedIn ? '1' : '0'}&authMethod=${encodeURIComponent(a.authMethod || 'unknown')}`;
+};
 // Branch scope for a chat. Stable for the life of the chat, so successive turns
 // build on the same branch and the same pull request.
 const chatKey = (conversationId) => `chat-${String(conversationId).replace(/[^A-Za-z0-9]/g, '').slice(0, 12) || 'x'}`;
@@ -1132,6 +1196,7 @@ async function pollLoop(cfg, intervalMs) {
      *
      * The folder is only known inside handleMessage, so the chain is keyed on the
      * repo location the job carries, which is what resolveWorkdir derives it from. */
+    let signingIn = false;
     const folderChain = new Map();
     const runSerialised = (msg, fn) => {
         const key = String(msg.repo || msg.projectId || 'default').trim().toLowerCase();
@@ -1150,8 +1215,31 @@ async function pollLoop(cfg, intervalMs) {
     for (;;) {
         try {
             if (active.size < MAX) {
-                const res = await api(cfg, 'GET', '/api/v2/dev-agent/pending');
+                const res = await api(cfg, 'GET', `/api/v2/dev-agent/pending?${authQuery(cfg)}`);
                 const pending = (res && res.data) || [];
+
+                // The window asked this machine to sign in. Opening the browser is
+                // something only this side can do.
+                if (res && res.signIn && res.signIn.requested && !signingIn) {
+                    signingIn = true;
+                    console.log('\n🔐  Sign-in requested from AlianHub — opening your browser…');
+                    const started = startSignIn(cfg, res.signIn.email);
+                    // Poll until it lands, then say so; the window is waiting on this.
+                    (async () => {
+                        for (let i = 0; i < 120 && !authStatus(cfg, true).loggedIn; i += 1) {
+                            // eslint-disable-next-line no-await-in-loop
+                            await sleep(5000);
+                        }
+                        const now = authStatus(cfg, true);
+                        signingIn = false;
+                        console.log(now.loggedIn ? '🔐  Signed in.' : '🔐  Sign-in did not complete.');
+                        await api(cfg, 'POST', '/api/v2/dev-agent/auth-report', {
+                            loggedIn: now.loggedIn,
+                            authMethod: now.authMethod,
+                            url: now.loggedIn ? '' : started.url(),
+                        }).catch(() => {});
+                    })();
+                }
                 for (const msg of pending) {
                     if (active.size >= MAX) break;
                     const id = String(msg._id);
