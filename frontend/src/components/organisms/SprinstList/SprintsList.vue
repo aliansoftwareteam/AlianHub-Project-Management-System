@@ -528,6 +528,16 @@ function updateItem(value = null) {
     }
     apiRequest("patch", reqUrl, axiosData)
     .then((res) => {
+        // A refusal arrives as HTTP 200 with status:false. Committing its empty
+        // `data` blanks the row in the store, and the success toast below would
+        // then report the opposite of what happened.
+        if (res?.data?.status === false) {
+            close.value = false;
+            showSidebar.value = false;
+            showSpinner.value = false;
+            $toast.error(res?.data?.statusText || t(`Toast.something_went_wrong`), {position: "top-right"});
+            return;
+        }
         if (props.sprint.isFolder) {
             commit("projectData/mutateFolders",{op:'modified',data:{...res?.data?.data}});
         }
