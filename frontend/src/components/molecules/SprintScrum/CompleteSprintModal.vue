@@ -36,6 +36,19 @@
                         <em class="csm__hint">{{ $t('Scrum.subtasks_travel') }}</em>
                     </div>
 
+                    <!-- Open work under a parent that is already done. It will not
+                         move, because a subtask travels with its parent and its
+                         parent is staying. Said before the button, not after. -->
+                    <div v-if="stranded.length" class="csm__warn">
+                        <span class="csm__warn-head">{{ $t('Scrum.stranded_head', { count: stranded.length }) }}</span>
+                        <ul class="csm__list">
+                            <li v-for="task in stranded" :key="task._id">
+                                <span class="csm__key">{{ task.TaskKey }}</span>{{ task.TaskName }}
+                            </li>
+                        </ul>
+                        <em class="csm__hint">{{ $t('Scrum.stranded_hint') }}</em>
+                    </div>
+
                     <div v-if="preview.notDone.list.length" class="csm__field">
                         <span class="csm__label">{{ $t('Scrum.where_should_it_go') }}</span>
                         <select v-model="destination" class="csm__input">
@@ -101,6 +114,8 @@ const preview = ref(null);
 const destination = ref('next');
 
 const sprintId = computed(() => props.sprint?.id || props.sprint?._id);
+
+const stranded = computed(() => (preview.value?.strandedSubtasks?.list) || []);
 
 // Anything still open, excluding this sprint and the backlog — the backlog has
 // its own entry so it does not depend on being in the passed-in list.
@@ -231,6 +246,17 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey));
 .csm__input:focus { border-color: #2f3a8f; }
 .csm__hint { display: block; margin-top: 6px; font-size: 11.5px; font-style: normal; color: #8b90a0; line-height: 1.45; }
 .csm__msg { margin: 0; font-size: 13px; color: #6b7280; }
+.csm__warn {
+    margin-bottom: 16px;
+    padding: 11px 13px;
+    border: 1px solid #e6d3a3;
+    border-radius: 10px;
+    background: #fdf8ec;
+}
+.csm__warn-head { display: block; font-size: 12.5px; font-weight: 500; color: #7a5c14; }
+.csm__warn .csm__list { max-height: 110px; }
+.csm__warn .csm__list li { border-bottom-color: #f0e6cd; color: #6b5a2e; }
+.csm__warn .csm__hint { color: #8a7440; }
 .csm__problem { margin: 12px 0 0; font-size: 12.5px; color: #b02a2a; }
 
 .csm__actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }

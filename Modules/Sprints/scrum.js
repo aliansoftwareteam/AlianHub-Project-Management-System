@@ -312,6 +312,36 @@ async function planCompletion(companyId, sprint) {
     const tasks = await scopeTasks(companyId, sprint._id);
     const { done, notDone } = rules.splitByDone(tasks);
 
+    /* Unfinished subtasks sitting under a parent that IS finished.
+
+       A subtask is not a sprint item — the parent is, exactly as burndown,
+       velocity and CFD all treat it — so a done parent stays in the closed
+       sprint and takes its subtasks with it. When one of those subtasks is
+       still open, that work quietly ends up buried in a completed sprint.
+
+       Deliberately NOT fixed by calling the parent unfinished: done-ness would
+       then mean something different here than it does on every chart, and the
+       dialog and the burndown would disagree about the same sprint. Deliberately
+       NOT fixed by moving the subtasks on their own either: they render nested
+       under their parent, so a subtask in a different sprint from its parent is
+       invisible rather than rescued.
+
+       So it is surfaced instead, and the person closing the sprint decides. */
+    const doneParentIds = done.map((t) => t._id).filter(Boolean);
+    let strandedSubtasks = [];
+    if (doneParentIds.length) {
+        strandedSubtasks = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS,
+            data: [{
+                sprintId: sprint._id,
+                isParentTask: false,
+                ParentTaskId: { $in: doneParentIds },
+                statusType: { $ne: rules.DONE_STATUS_TYPE },
+                deletedStatusKey: { $in: [0, 2, undefined] },
+            }, `${SCOPE_FIELDS} ParentTaskId`],
+        }, 'find').catch(() => []);
+    }
+
     const committedIds = new Set(((sprint.commitment && sprint.commitment.taskIds) || []).map(String));
     const addedAfterStart = committedIds.size
         ? tasks.filter((t) => !committedIds.has(String(t._id))).length
@@ -326,6 +356,7 @@ async function planCompletion(companyId, sprint) {
         cadence,
         done,
         notDone,
+        strandedSubtasks,
         addedAfterStart,
         suggestedNext: {
             name: rules.nextSprintName(sprint.name),
@@ -360,6 +391,13 @@ exports.completePreview = async (req, res) => {
                 notDone: {
                     ...totals(plan.notDone),
                     list: plan.notDone.map((t) => ({
+                        _id: String(t._id), TaskKey: t.TaskKey || '', TaskName: t.TaskName || '',
+                    })),
+                },
+                // Open work that will NOT move, because its parent is done.
+                strandedSubtasks: {
+                    ...totals(plan.strandedSubtasks),
+                    list: plan.strandedSubtasks.map((t) => ({
                         _id: String(t._id), TaskKey: t.TaskKey || '', TaskName: t.TaskName || '',
                     })),
                 },
@@ -616,6 +654,7 @@ exports.completeSprint = async (req, res) => {
             by: actor.id,
             done: totals(plan.done),
             notDone: totals(plan.notDone),
+            strandedSubtasks: totals(plan.strandedSubtasks),
             addedAfterStart: plan.addedAfterStart,
             movedTo,
             moved: moveSummary,

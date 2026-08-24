@@ -1,5 +1,7 @@
 export default {
     Scrum: {
+        stranded_head: "These {count} will stay in this sprint",
+        stranded_hint: "They are unfinished, but their parent task is done — and a subtask moves with its parent. Finish them, or reopen the parent task, before completing the sprint.",
         sprint_settings: "Sprint settings",
         make_it_a_sprint: "Make it a sprint",
         run_as_sprint: "Run this list as a sprint",
