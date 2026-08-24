@@ -153,7 +153,7 @@
                             @click="$refs[sprint.id]?.click(), startSprint()"
                         >
                             <div class="d-flex align-items-center project-mobile-desc">
-                                <span class="scrum-dot scrum-dot--start"></span>
+                                <img :src="sprintStartIcon" alt="start sprint" class="mr-10px">
                                 {{ $t('Scrum.start_sprint') }}
                             </div>
                         </DropDownOption>
@@ -162,7 +162,7 @@
                             @click="$refs[sprint.id]?.click(), showCompleteSprint = true"
                         >
                             <div class="d-flex align-items-center project-mobile-desc">
-                                <span class="scrum-dot scrum-dot--complete"></span>
+                                <img :src="sprintCompleteIcon" alt="complete sprint" class="mr-10px">
                                 {{ $t('Scrum.complete_sprint') }}
                             </div>
                         </DropDownOption>
@@ -171,7 +171,7 @@
                             @click="$refs[sprint.id]?.click(), showSprintSetup = true"
                         >
                             <div class="d-flex align-items-center project-mobile-desc">
-                                <span class="scrum-dot scrum-dot--settings"></span>
+                                <img :src="sprintSetupIcon" alt="sprint settings" class="mr-10px">
                                 {{ scrumState === 'none' ? $t('Scrum.make_it_a_sprint') : $t('Scrum.sprint_settings') }}
                             </div>
                         </DropDownOption>
@@ -363,6 +363,9 @@ const horizontalDots = require("@/assets/images/svg/horizontalDots.svg");
 const aiIcon = require("@/assets/images/svg/ai_image.svg");
 const inventoryIcon = require("@/assets/images/svg/inventoryIcon.svg");
 const restore_icon = require("@/assets/images/svg/restore_icon.svg");
+const sprintSetupIcon = require("@/assets/images/svg/sprintSetup.svg");
+const sprintStartIcon = require("@/assets/images/svg/sprintStart.svg");
+const sprintCompleteIcon = require("@/assets/images/svg/sprintComplete.svg");
 const deleteIcon = require("@/assets/images/svg/deleteIcon.svg");
 
 defineComponent({
