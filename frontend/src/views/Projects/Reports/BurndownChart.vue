@@ -54,7 +54,12 @@ const series = computed(() => {
     const days = (data.value && data.value.days) || [];
     return [
         { name: 'Ideal', data: days.map((d) => Number(d[idealKey.value]) || 0) },
-        { name: metric.value === 'points' ? 'Remaining points' : 'Remaining tasks', data: days.map((d) => Number(d[actualKey.value]) || 0) },
+        {
+            name: metric.value === 'points' ? 'Remaining points' : 'Remaining tasks',
+            // null = a day the sprint has not reached. Coercing it to 0 would
+            // draw a running sprint as finished for the rest of its box.
+            data: days.map((d) => (d[actualKey.value] === null || d[actualKey.value] === undefined ? null : Number(d[actualKey.value]))),
+        },
     ];
 });
 
