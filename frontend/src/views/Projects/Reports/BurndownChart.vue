@@ -11,6 +11,13 @@
       </div>
       <button class="agile-report__pdf" :disabled="!hasData" @click="exportPdf">Export PDF</button>
     </div>
+    <!-- Only a real sprint has a box to name. A plain list charts from its
+         oldest task to today and has nothing to say here. -->
+    <div v-if="box" class="agile-report__box">
+      <span class="agile-report__state" :class="`is-${box.state}`">{{ box.state }}</span>
+      <span class="agile-report__range">{{ box.range }}</span>
+      <span v-if="box.goal" class="agile-report__goal">{{ box.goal }}</span>
+    </div>
     <div v-if="loading" class="agile-report__msg">Loading…</div>
     <div v-else-if="!selectedSprintId" class="agile-report__msg">Pick a sprint to see its burndown.</div>
     <div v-else-if="!hasData" class="agile-report__msg">{{ emptyMsg || 'No data for this sprint yet.' }}</div>
@@ -46,6 +53,24 @@ const sprintOptions = computed(() =>
 );
 
 const hasData = computed(() => !!(data.value && data.value.days && data.value.days.length));
+
+const shortDate = (value) => {
+    if (!value) return '';
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+};
+
+const box = computed(() => {
+    const d = data.value;
+    if (!d || !d.isScrum || !d.startDate || !d.endDate) return null;
+    const stored = String(d.state || 'planned');
+    const overdue = stored === 'active' && new Date(d.endDate).getTime() < Date.now();
+    return {
+        state: overdue ? 'overdue' : stored,
+        range: `${shortDate(d.startDate)} – ${shortDate(d.endDate)}`,
+        goal: d.goal || '',
+    };
+});
 const categories = computed(() => (data.value && data.value.days ? data.value.days : []).map((d) => d.date));
 const actualKey = computed(() => (metric.value === 'points' ? 'remainingPoints' : 'remainingCount'));
 const idealKey = computed(() => (metric.value === 'points' ? 'idealPoints' : 'ideal'));
@@ -129,4 +154,11 @@ onMounted(() => {
 .agile-report__pdf { margin-left: auto; border: 1px solid #2F3990; color: #2F3990; background: #fff; border-radius: 6px; padding: 6px 14px; font-size: 13px; cursor: pointer; }
 .agile-report__pdf:disabled { opacity: 0.5; cursor: not-allowed; }
 .agile-report__msg { color: #888; font-size: 14px; padding: 40px; text-align: center; }
+.agile-report__box { display: flex; align-items: center; gap: 10px; margin: -4px 0 10px; }
+.agile-report__state { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; background: #eceef7; color: #4b5162; }
+.agile-report__state.is-active { background: #e4f0e8; color: #1c7a43; }
+.agile-report__state.is-overdue { background: #fdece7; color: #b0431f; }
+.agile-report__state.is-closed { background: #eceef7; color: #8b90a0; }
+.agile-report__range { font-size: 12.5px; color: #6b7280; font-variant-numeric: tabular-nums; }
+.agile-report__goal { font-size: 12.5px; font-style: italic; color: #8b90a0; }
 </style>

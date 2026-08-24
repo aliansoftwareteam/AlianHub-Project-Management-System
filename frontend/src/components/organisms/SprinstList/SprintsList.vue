@@ -17,6 +17,7 @@
                     <img v-if="sprint.deletedStatusKey === 2" :src="inventory_2" class="pr-10px" />
                     <img v-if="sprint.isFolder === true" :src="folder">
                     <span class="text-ellipse font-weight-bold text-capitalize ml-10px cursor-pointer font-size-14 color52">{{ sprint.name }}</span>
+                    <SprintStateChip :sprint="sprint" />
                 </div>
                 <div :class="clientWidth <= 480 ? 'pt-1' : ''" class="d-flex align-items-center sprint-head-actions">
                     <template v-if="$route?.query?.tab !== 'Calendar'">
@@ -147,6 +148,33 @@
                                 {{$t('Projects.restore')}}
                             </div>
                         </DropDownOption>
+                        <DropDownOption
+                            v-if="canRunScrum && scrumState === 'planned'"
+                            @click="$refs[sprint.id]?.click(), startSprint()"
+                        >
+                            <div class="d-flex align-items-center project-mobile-desc">
+                                <span class="scrum-dot scrum-dot--start"></span>
+                                {{ $t('Scrum.start_sprint') }}
+                            </div>
+                        </DropDownOption>
+                        <DropDownOption
+                            v-if="canRunScrum && (scrumState === 'active' || scrumState === 'overdue')"
+                            @click="$refs[sprint.id]?.click(), showCompleteSprint = true"
+                        >
+                            <div class="d-flex align-items-center project-mobile-desc">
+                                <span class="scrum-dot scrum-dot--complete"></span>
+                                {{ $t('Scrum.complete_sprint') }}
+                            </div>
+                        </DropDownOption>
+                        <DropDownOption
+                            v-if="canRunScrum"
+                            @click="$refs[sprint.id]?.click(), showSprintSetup = true"
+                        >
+                            <div class="d-flex align-items-center project-mobile-desc">
+                                <span class="scrum-dot scrum-dot--settings"></span>
+                                {{ scrumState === 'none' ? $t('Scrum.make_it_a_sprint') : $t('Scrum.sprint_settings') }}
+                            </div>
+                        </DropDownOption>
                         <DropDownOption @click="$refs[sprint.id]?.click(), showSidebar = true, archive = true" v-if="!showArchiveVar">
                             <div class="d-flex align-items-center project-mobile-desc">
                                 <img :src="inventoryIcon" alt="inventoryIcon" class="mr-10px">
@@ -259,6 +287,19 @@
             :currentFolderId="sprint.folderId"
             @select="moveToFolder"
         />
+        <SprintSetupModal
+            v-if="showSprintSetup"
+            :sprint="sprint"
+            @close="showSprintSetup = false"
+            @saved="onSprintSaved"
+        />
+        <CompleteSprintModal
+            v-if="showCompleteSprint"
+            :sprint="sprint"
+            :siblings="siblingSprints"
+            @close="showCompleteSprint = false"
+            @completed="onSprintCompleted"
+        />
         <SpinnerComp :is-spinner="isCreateSpinner" />
     </div>
 </template>
@@ -280,6 +321,9 @@ import Toggle from "@/components/atom/Toggle/Toggle.vue"
 import Assignee from "@/components/molecules/Assignee/Assignee.vue"
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue"
 import MoveToFolderModal from "@/components/molecules/MoveToFolder/MoveToFolderModal.vue"
+import SprintStateChip from "@/components/molecules/SprintScrum/SprintStateChip.vue"
+import SprintSetupModal from "@/components/molecules/SprintScrum/SprintSetupModal.vue"
+import CompleteSprintModal from "@/components/molecules/SprintScrum/CompleteSprintModal.vue"
 import CalendarViewComponent from '@/views/Projects/ProjectCalendarView/CalendarViewComponent.vue';
 import Skelaton from "@/components/atom/Skelaton/AiSkelaton.vue"
 import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp'
@@ -427,6 +471,84 @@ const isCreateSpinner = ref(false);
 const isError = ref(false);
 const showImportModal = ref(false);
 const showMoveToFolder = ref(false);
+const showSprintSetup = ref(false);
+const showCompleteSprint = ref(false);
+
+// --- Scrum lifecycle ----------------------------------------------------------
+//
+// Mirrors deriveState in Modules/Sprints/scrumRules.js. 'none' means a plain list,
+// which is every sprint until somebody opts one in, so none of this appears for a
+// project that is not running Scrum.
+const scrumState = computed(() => {
+    const s = props.sprint || {};
+    if (s.isScrum !== true) return 'none';
+    const stored = String(s.state || '');
+    if (stored === 'closed') return 'closed';
+    if (stored !== 'active') return 'planned';
+    const end = s.endDate ? new Date(s.endDate) : null;
+    return end && !Number.isNaN(end.getTime()) && end.getTime() < Date.now() ? 'overdue' : 'active';
+});
+
+// A folder, a chat channel and the backlog are not sprints. Gated on the same
+// permission the server gates the lifecycle endpoints on.
+const canRunScrum = computed(() => !props.sprint?.isFolder
+    && props.sprint?.mainChat !== true
+    && !props.sprint?.isBacklog
+    && !showArchiveVar.value
+    && scrumState.value !== 'closed'
+    && checkPermission('project.project_sprint_create', project.value?.isGlobalPermission) === true);
+
+// Every other sprint in this project, so "where should the unfinished work go"
+// can offer somewhere real. Foldered sprints live in their own bucket.
+const siblingSprints = computed(() => {
+    const root = Object.values(project.value?.sprintsObj || {});
+    const foldered = Object.values(project.value?.sprintsfolders || {})
+        .flatMap((folder) => Object.values(folder?.sprintsObj || {}));
+    return [...root, ...foldered];
+});
+
+const applySprintChange = (updated) => {
+    if (!updated) return;
+    commit('projectData/mutateSprints', { op: 'modified', data: { ...updated, id: updated._id } });
+};
+
+const onSprintSaved = (updated) => applySprintChange(updated);
+
+// Unfinished work has just moved into another sprint, so that sprint's task
+// count is stale in the store. Re-read the project's sprints and commit each as
+// a modification — mutateSprints ignores an 'added' op for a sprint it already
+// holds, so re-running the usual load would not refresh anything.
+const refreshSprintCounts = async () => {
+    try {
+        const res = await apiRequest('get', `/api/v1/${env.GET_SPRINT_OR_PROJECT}/${project.value?._id}?collection=sprints`);
+        (res?.data || []).forEach((row) => {
+            commit('projectData/mutateSprints', { op: 'modified', data: { ...row, id: row._id } });
+        });
+    } catch (error) {
+        // The counts stay stale until the next load. Not worth an error toast on
+        // top of a sprint that completed successfully.
+        console.error('ERROR in refresh sprint counts: ', error);
+    }
+};
+
+const onSprintCompleted = async (updated) => {
+    applySprintChange(updated);
+    await refreshSprintCounts();
+};
+
+const startSprint = async () => {
+    try {
+        const res = await apiRequest('post', '/api/v2/sprints/start', { sprintId: props.sprint?.id });
+        if (!res?.data?.status) {
+            $toast.error(res?.data?.statusText || t('Toast.something_went_wrong'), { position: 'top-right' });
+            return;
+        }
+        $toast.success(t('Scrum.sprint_started'), { position: 'top-right' });
+        applySprintChange(res.data.data);
+    } catch (error) {
+        $toast.error(error?.message || t('Toast.something_went_wrong'), { position: 'top-right' });
+    }
+};
 
 // LIST OF FOLDERS A SPRINT CAN BE MOVED INTO (excludes deleted folders + the sprint's own id when it is a folder)
 const folderList = computed(() => {
