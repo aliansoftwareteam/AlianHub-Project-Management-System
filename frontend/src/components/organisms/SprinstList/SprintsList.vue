@@ -17,9 +17,9 @@
                     <img v-if="sprint.deletedStatusKey === 2" :src="inventory_2" class="pr-10px" />
                     <img v-if="sprint.isFolder === true" :src="folder">
                     <span class="text-ellipse font-weight-bold text-capitalize ml-10px cursor-pointer font-size-14 color52">{{ sprint.name }}</span>
-                    <SprintStateChip :sprint="sprint" />
                 </div>
                 <div :class="clientWidth <= 480 ? 'pt-1' : ''" class="d-flex align-items-center sprint-head-actions">
+                    <SprintStateChip :sprint="sprint" />
                     <template v-if="$route?.query?.tab !== 'Calendar'">
                         <button
                             v-if="sprint.isExpanded && !searchedTask && checkPermission('task.task_create',project.isGlobalPermission) === true && checkPermission('task.task_list',project.isGlobalPermission) == true && showArchiveVar === false"
