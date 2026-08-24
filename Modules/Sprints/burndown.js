@@ -17,6 +17,25 @@ const endOfDay = (date) => {
     return d;
 };
 
+const startOfDay = (date) => {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    return d;
+};
+
+// Calendar arithmetic, not milliseconds: stepping a day with +86400000 across a
+// DST boundary drifts, and at the autumn fall-back repeats a date outright.
+const addDays = (date, days) => {
+    const d = new Date(date);
+    d.setDate(d.getDate() + days);
+    return d;
+};
+
+const calendarDaysBetween = (from, to) => Math.round(
+    (new Date(to.getFullYear(), to.getMonth(), to.getDate())
+        - new Date(from.getFullYear(), from.getMonth(), from.getDate())) / 86400000,
+);
+
 const dayKey = (date) => {
     const d = new Date(date);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -85,19 +104,41 @@ exports.getSprintBurndown = async (req, res) => {
                 : null,
         }));
 
-        // Date range: sprint start (or earliest task) → today, capped.
+        // A Scrum sprint has a real time box, so the chart is that box: the ideal
+        // line spans start → end and the series stops on the end date instead of
+        // trailing to today forever. Widening to the earliest task would defeat
+        // the point — work created before the sprint opened is in scope on day
+        // one, not a reason to redraw the sprint as three months long.
+        //
+        // Every other sprint keeps exactly today's behaviour. This is the field
+        // line 90 always reached for; it simply never existed until now, so the
+        // chart has silently been dated from createdAt.
+        const isTimeBoxed = sprint.isScrum === true && !!sprint.startDate && !!sprint.endDate;
+        const now = new Date();
+
         const earliestTask = enriched.reduce((min, task) => (task.createdAt < min ? task.createdAt : min), new Date());
-        let rangeStart = sprint.startDate ? new Date(sprint.startDate) : (sprint.createdAt ? new Date(sprint.createdAt) : earliestTask);
-        if (earliestTask < rangeStart) rangeStart = earliestTask;
-        const rangeEnd = new Date();
-        const totalDays = Math.min(MAX_DAYS, Math.max(1, Math.ceil((endOfDay(rangeEnd) - rangeStart) / 86400000)));
+        let rangeStart;
+        let rangeEnd;
+        if (isTimeBoxed) {
+            rangeStart = startOfDay(new Date(sprint.startDate));
+            rangeEnd = endOfDay(new Date(sprint.endDate));
+        } else {
+            rangeStart = sprint.startDate ? new Date(sprint.startDate) : (sprint.createdAt ? new Date(sprint.createdAt) : earliestTask);
+            if (earliestTask < rangeStart) rangeStart = earliestTask;
+            rangeEnd = now;
+        }
+        const totalDays = Math.min(MAX_DAYS, Math.max(1, calendarDaysBetween(rangeStart, rangeEnd) + 1));
 
         const totalCount = enriched.length;
         const totalEstimate = enriched.reduce((sum, task) => sum + task.estimate, 0);
         const totalPoints = enriched.reduce((sum, task) => sum + task.points, 0);
         const days = [];
         for (let i = 0; i < totalDays; i++) {
-            const cursor = endOfDay(new Date(rangeStart.getTime() + i * 86400000));
+            const cursor = endOfDay(addDays(rangeStart, i));
+            // Days the sprint has not reached yet carry the ideal line only.
+            // Reporting "0 remaining" for next Thursday would read as a finished
+            // sprint; a gap reads as what it is.
+            const unreached = isTimeBoxed && cursor > endOfDay(now);
             const scoped = enriched.filter((task) => task.createdAt <= cursor);
             const completed = scoped.filter((task) => task.completedAt && task.completedAt <= cursor);
             const completedEstimate = completed.reduce((sum, task) => sum + task.estimate, 0);
@@ -108,9 +149,9 @@ exports.getSprintBurndown = async (req, res) => {
             const idealFactor = (totalDays - 1 - i) / Math.max(1, totalDays - 1);
             days.push({
                 date: dayKey(cursor),
-                remainingCount: scoped.length - completed.length,
-                remainingEstimate: Math.max(0, scopedEstimate - completedEstimate),
-                remainingPoints: Math.max(0, scopedPoints - completedPoints),
+                remainingCount: unreached ? null : scoped.length - completed.length,
+                remainingEstimate: unreached ? null : Math.max(0, scopedEstimate - completedEstimate),
+                remainingPoints: unreached ? null : Math.max(0, scopedPoints - completedPoints),
                 ideal: Math.max(0, Math.round(totalCount * idealFactor)),
                 idealPoints: Math.max(0, Math.round(totalPoints * idealFactor)),
             });
@@ -121,6 +162,13 @@ exports.getSprintBurndown = async (req, res) => {
             statusText: 'Burndown computed.',
             data: {
                 sprintName: sprint.name || '',
+                // So the chart can say which box it is drawing, and grey out a
+                // sprint that has not started.
+                isScrum: sprint.isScrum === true,
+                state: sprint.state || '',
+                goal: sprint.goal || '',
+                startDate: sprint.startDate || null,
+                endDate: sprint.endDate || null,
                 totalCount,
                 totalEstimate,
                 totalPoints,
