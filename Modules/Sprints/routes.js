@@ -30,6 +30,7 @@ exports.init = (app) => {
     app.post('/api/v2/sprints/start', canManageSprint, scrum.startSprint);
     app.post('/api/v2/sprints/complete', canManageSprint, scrum.completeSprint);
     app.get('/api/v2/sprints/complete-preview', requirePermission('project.project_sprint_create', { write: false }), scrum.completePreview);
+    app.post('/api/v2/sprints/backlog', canManageSprint, scrum.getBacklog);
 
     app.post('/api/v1/sprint', requirePermission('project.project_sprint_create'), ctrl.addSprint);
     app.patch('/api/v1/sprint/:id', (req, res) => {

@@ -31,6 +31,7 @@ const rules = require('./scrumRules');
 
 const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
 const MAX_GOAL_LENGTH = 500;
+const BACKLOG_NAME = 'Backlog';
 
 // Sprint scope, defined exactly as Modules/Sprints/burndown.js defines it, so
 // the commitment snapshot and the chart can never disagree about what was in.
@@ -96,6 +97,81 @@ async function activeSprintsIn(companyId, projectId, exceptId) {
 const totals = (tasks) => {
     const snap = rules.summariseCommitment(tasks);
     return { tasks: snap.tasks, points: snap.points, minutes: snap.minutes };
+};
+
+const backlogsIn = (companyId, projectId) => MongoDbCrudOpration(companyId, {
+    type: SCHEMA_TYPE.SPRINTS,
+    data: [{
+        projectId: new mongoose.Types.ObjectId(String(projectId)),
+        isBacklog: true,
+        deletedStatusKey: { $ne: 1 },
+    }, '_id name folderId tasks'],
+}, 'find').catch(() => []);
+
+// An ObjectId leads with its creation time, so the smallest one is the original.
+const oldest = (rows) => (rows || []).slice().sort((a, b) => String(a._id).localeCompare(String(b._id)))[0] || null;
+
+/* The one container per project for work that is not in a sprint yet.
+
+   It has to be a sprint doc: tasks.sprintId is required in a strict schema, so
+   "no sprint" is not a state a task can be in. It is created on first use, never
+   in a migration — a project that never touches Scrum never grows one.
+
+   Not a Scrum sprint itself (isScrum stays false): it has no time box, so it can
+   never be started, completed, or counted in velocity. */
+async function ensureBacklog(companyId, projectId, userData) {
+    if (!OBJECT_ID_PATTERN.test(String(projectId || ''))) return { error: 'A valid projectId is required.' };
+
+    const found = oldest(await backlogsIn(companyId, projectId));
+    if (found) return { backlog: found };
+
+    const project = await projectOf(companyId, projectId).catch(() => null);
+    if (!project) return { error: 'Project not found.' };
+
+    const created = await addSprintFun({
+        body: {
+            companyId,
+            projectId: String(projectId),
+            sprintName: BACKLOG_NAME,
+            projectName: project.ProjectName || '',
+            userData: userData || {},
+            mainChat: false,
+        },
+    }).catch((e) => ({ status: false, statusText: (e && e.statusText) || (e && e.message) || '' }));
+
+    if (!created || created.status !== true || !created.data) {
+        return { error: created && created.statusText ? String(created.statusText) : 'Could not create the backlog.' };
+    }
+
+    await patchSprint(companyId, { _id: created.data._id }, { isBacklog: true });
+
+    // Two people opening the same project at once would each pass the check
+    // above. Keep the first and retire the duplicate — it was created moments
+    // ago and cannot hold any tasks yet.
+    const all = await backlogsIn(companyId, projectId);
+    const keep = oldest(all);
+    if (keep && String(keep._id) !== String(created.data._id)) {
+        await patchSprint(companyId, { _id: created.data._id }, { deletedStatusKey: 1, isBacklog: false });
+        return { backlog: keep };
+    }
+    return { backlog: keep || { ...created.data, isBacklog: true } };
+}
+
+exports.ensureBacklog = ensureBacklog;
+
+/* POST /api/v2/sprints/backlog   body: { projectId } */
+exports.getBacklog = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'] || '';
+        if (!companyId) return fail(res, 'companyId is required.');
+        const body = req.body || {};
+        const { backlog, error } = await ensureBacklog(companyId, body.projectId, body.userData);
+        if (error) return fail(res, error);
+        return res.send({ status: true, statusText: 'Backlog ready.', data: backlog });
+    } catch (err) {
+        logger.error(`getBacklog: ${err.message}`);
+        return fail(res, err.message);
+    }
 };
 
 /* POST /api/v2/sprints/scrum
@@ -274,9 +350,9 @@ async function resolveDestination(companyId, sprint, plan, body) {
     const wanted = String(body.incompleteDestination || 'next');
 
     if (wanted === 'backlog') {
-        // Lands with the backlog sprint (AHE-3917). Saying so beats silently
-        // routing the work somewhere the caller did not ask for.
-        return { error: 'Moving unfinished work to the backlog is not available yet. Choose a sprint instead.' };
+        const { backlog, error } = await ensureBacklog(companyId, sprint.projectId, body.userData);
+        if (error) return { error };
+        return { target: backlog, created: false };
     }
 
     if (OBJECT_ID_PATTERN.test(wanted)) {
