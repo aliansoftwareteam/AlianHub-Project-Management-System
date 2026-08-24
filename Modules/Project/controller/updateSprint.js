@@ -1,5 +1,6 @@
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration,validateObjectId } = require("../../../utils/mongo-handler/mongoQueries");
+const scrumRules = require("../../Sprints/scrumRules");
 
 exports.updateSprint = async(req,res) => {
     try {
@@ -11,6 +12,18 @@ exports.updateSprint = async(req,res) => {
 
         if (!validateObjectId(sprintId)) {
             return res.status(400).json({ message: "Invalid sprint ID" });
+        }
+
+        // Same hole as PATCH /api/v1/sprint/:id: the update document arrives
+        // from the client and is applied as given, under a caller-chosen
+        // operator. The only thing that reaches here today is favouriting a
+        // sprint, so refusing the lifecycle fields costs nothing and stops the
+        // state machine being sidestepped through the back door.
+        const lifecycleField = scrumRules.findLifecycleWrite(req.body.updateObject);
+        if (lifecycleField) {
+            return res.status(400).json({
+                message: `"${lifecycleField}" is managed by the sprint lifecycle. Use the start or complete action instead.`,
+            });
         }
 
         let key;
