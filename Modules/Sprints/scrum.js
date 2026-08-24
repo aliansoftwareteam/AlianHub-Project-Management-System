@@ -344,6 +344,82 @@ exports.completePreview = async (req, res) => {
     }
 };
 
+/* GET /api/v2/sprints/report?sprintId=
+
+   What the sprint committed to, what of it landed, what did not, and what was
+   added after it started.
+
+   Committed work is looked up by the id list in the snapshot, not by what is in
+   the sprint now — a task moved out mid-sprint was still committed to, and
+   dropping it would let a team make a bad sprint look good by moving the misses
+   somewhere else. Done-ness is read from wherever the task lives now. */
+exports.sprintReport = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'] || '';
+        const { sprint, error } = await loadSprint(companyId, (req.query || {}).sprintId);
+        if (error) return fail(res, error);
+        if (sprint.isScrum !== true) return fail(res, 'That list is not a sprint.');
+
+        const inSprint = await scopeTasks(companyId, sprint._id);
+        const committedIds = ((sprint.commitment && sprint.commitment.taskIds) || []).map(String);
+
+        let committedTasks;
+        if (committedIds.length) {
+            const objectIds = committedIds
+                .filter((id) => OBJECT_ID_PATTERN.test(id))
+                .map((id) => new mongoose.Types.ObjectId(id));
+            committedTasks = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.TASKS,
+                data: [{ _id: { $in: objectIds }, deletedStatusKey: { $in: [0, 2, undefined] } }, SCOPE_FIELDS],
+            }, 'find').catch(() => []);
+        } else {
+            // Never started, or started before the snapshot existed. The best
+            // available answer is what is in it now — flagged, not pretended.
+            committedTasks = inSprint;
+        }
+
+        const committedSet = new Set(committedIds);
+        const { done, notDone } = rules.splitByDone(committedTasks || []);
+        const addedAfterStart = committedSet.size
+            ? inSprint.filter((t) => !committedSet.has(String(t._id)))
+            : [];
+
+        // Committed work that is no longer in this sprint — moved on at the
+        // close, or moved out by hand while the sprint was running.
+        const movedOut = (committedTasks || []).filter((t) => String(t.sprintId) !== String(sprint._id));
+
+        return res.send({
+            status: true,
+            statusText: 'Sprint report',
+            data: {
+                sprintId: String(sprint._id),
+                sprintName: sprint.name || '',
+                goal: sprint.goal || '',
+                state: rules.deriveState(sprint),
+                startDate: sprint.startDate || null,
+                endDate: sprint.endDate || null,
+                hasCommitment: committedSet.size > 0,
+                committed: totals(committedTasks || []),
+                completed: totals(done),
+                unfinished: totals(notDone),
+                addedAfterStart: totals(addedAfterStart),
+                movedOut: totals(movedOut),
+                closeReport: sprint.closeReport || null,
+                unfinishedList: notDone.map((t) => ({
+                    _id: String(t._id), TaskKey: t.TaskKey || '', TaskName: t.TaskName || '',
+                    movedOut: String(t.sprintId) !== String(sprint._id),
+                })),
+                addedList: addedAfterStart.map((t) => ({
+                    _id: String(t._id), TaskKey: t.TaskKey || '', TaskName: t.TaskName || '',
+                })),
+            },
+        });
+    } catch (err) {
+        logger.error(`sprintReport: ${err.message}`);
+        return fail(res, err.message);
+    }
+};
+
 /* Where unfinished work goes. Returns { target } — a sprintObj bulkMove can use
    — or { error }, or { target: null } when there is nothing to move. */
 async function resolveDestination(companyId, sprint, plan, body) {
