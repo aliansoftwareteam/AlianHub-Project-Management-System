@@ -24,7 +24,6 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 * declare the Scrum lifecycle fields on the sprint schema ([12fef70](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/12fef7059d9b9badeea2e623fe70314a46c4e879))
 * icons for the sprint lifecycle menu items ([4b78387](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4b78387232321453a7a5d71f2e1105bf2d287600))
 * run a sprint from the sprint list ([6b2cc79](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6b2cc79256ae04c43a249dfaf631d1b4cab4568b))
-* scrum sprint management — start, complete, backlog and reports ([ee74e20](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ee74e20a688aee97e0b67b492742467c511681b1))
 * sprint report, and velocity that can see scope creep ([8159d27](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8159d279e4c0ab60596e5950d12659ce3707f17a))
 * start and complete a Scrum sprint ([b04daa1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b04daa17733884c62282d58d65cca75c1ce53f1d))
 * the project backlog sprint ([f7e0eb9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f7e0eb9e3a37e02f1a1f8bca2bfbb7160815d08b))
