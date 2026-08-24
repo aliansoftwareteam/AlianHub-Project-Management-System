@@ -1,8 +1,20 @@
-// Sprint velocity (S4-02). Completed story points per sprint for the most
-// recent N sprints of a project, plus a rolling-3 average. Computed on-the-fly
-// from current task state — committed = total points in the sprint, completed =
-// points of tasks currently in a done-category status (statusType 'close').
-// Read-only; no new collections or cron.
+// Sprint velocity. Committed versus completed story points across a project's
+// most recent closed sprints, plus a rolling-3 average, so the numbers can be
+// used to size the next sprint. Read-only; no new collections or cron.
+//
+// Only real, completed sprints count. Two reasons this used to be wrong:
+//
+//   1. It took EVERY non-deleted doc in the sprints collection, and that
+//      collection also holds chat channels and Forms response lists — they
+//      appeared as bars on the velocity chart.
+//   2. Committed was read as the sprint's CURRENT total points, which makes it
+//      equal to scope by construction: a sprint that doubled in size mid-flight
+//      showed committed == completed + whatever is left, and scope creep was
+//      mathematically invisible. Committed now comes from the snapshot taken
+//      when the sprint started.
+//
+// A closed sprint with no snapshot (started before this existed) is skipped
+// rather than reported as having committed to zero.
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const mongoose = require('mongoose');
@@ -22,23 +34,35 @@ exports.getVelocity = async (req, res) => {
         }
         const projectObjId = new mongoose.Types.ObjectId(projectId);
 
-        // All non-deleted sprints for this project.
         const sprints = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.SPRINTS,
             data: [
-                { projectId: projectObjId, deletedStatusKey: { $ne: 1 } },
-                '_id name createdAt deletedStatusKey',
+                {
+                    projectId: projectObjId,
+                    deletedStatusKey: { $ne: 1 },
+                    isScrum: true,
+                    state: 'closed',
+                    mainChat: { $ne: true },
+                    isBacklog: { $ne: true },
+                },
+                '_id name createdAt startDate endDate commitment closeReport',
             ],
         }, 'find');
 
-        if (!sprints || !sprints.length) {
-            return res.send({ status: true, statusText: 'No sprints yet.', data: { sprints: [] } });
+        const measurable = (sprints || []).filter((s) => s.commitment && s.commitment.at);
+
+        if (!measurable.length) {
+            return res.send({
+                status: true,
+                statusText: 'No completed sprints yet.',
+                data: { sprints: [], skipped: (sprints || []).length },
+            });
         }
 
-        // Oldest-first, then keep the most recent `limit`.
-        const ordered = sprints
+        // By when the sprint ran, not when its container happened to be made.
+        const ordered = measurable
             .slice()
-            .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+            .sort((a, b) => new Date(a.startDate || a.createdAt) - new Date(b.startDate || b.createdAt))
             .slice(-limit);
 
         const sprintIds = ordered.map((s) => s._id);
@@ -50,20 +74,23 @@ exports.getVelocity = async (req, res) => {
             ],
         }, 'find');
 
-        const bySprint = new Map();
-        ordered.forEach((s) => bySprint.set(String(s._id), { committed: 0, completed: 0 }));
+        const completedBySprint = new Map();
+        ordered.forEach((s) => completedBySprint.set(String(s._id), 0));
         (tasks || []).forEach((t) => {
-            const bucket = bySprint.get(String(t.sprintId));
-            if (!bucket) return;
-            const pts = Number(t.points) || 0;
-            bucket.committed += pts;
-            if (t.statusType === DONE_TYPE) bucket.completed += pts;
+            if (t.statusType !== DONE_TYPE) return;
+            const key = String(t.sprintId);
+            if (!completedBySprint.has(key)) return;
+            completedBySprint.set(key, completedBySprint.get(key) + (Number(t.points) || 0));
         });
 
-        const rows = ordered.map((s) => {
-            const b = bySprint.get(String(s._id)) || { committed: 0, completed: 0 };
-            return { sprintId: String(s._id), name: s.name || 'Sprint', committed: b.committed, completed: b.completed };
-        });
+        const rows = ordered.map((s) => ({
+            sprintId: String(s._id),
+            name: s.name || 'Sprint',
+            startDate: s.startDate || null,
+            endDate: s.endDate || null,
+            committed: Number(s.commitment.points) || 0,
+            completed: completedBySprint.get(String(s._id)) || 0,
+        }));
 
         // Rolling-3 average of completed points.
         const withAvg = rows.map((row, i) => {
@@ -72,7 +99,11 @@ exports.getVelocity = async (req, res) => {
             return { ...row, rollingAvg: Math.round(avg * 10) / 10 };
         });
 
-        return res.send({ status: true, statusText: 'Velocity computed.', data: { sprints: withAvg } });
+        return res.send({
+            status: true,
+            statusText: 'Velocity computed.',
+            data: { sprints: withAvg, skipped: (sprints || []).length - measurable.length },
+        });
     } catch (error) {
         logger.error(`ERROR in agile velocity: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
