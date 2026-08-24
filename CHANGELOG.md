@@ -16,6 +16,34 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.33.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.32.0...v14.33.0) (2026-08-24)
+
+
+### 🚀 Features
+
+* declare the Scrum lifecycle fields on the sprint schema ([12fef70](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/12fef7059d9b9badeea2e623fe70314a46c4e879))
+* icons for the sprint lifecycle menu items ([4b78387](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4b78387232321453a7a5d71f2e1105bf2d287600))
+* run a sprint from the sprint list ([6b2cc79](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6b2cc79256ae04c43a249dfaf631d1b4cab4568b))
+* sprint report, and velocity that can see scope creep ([8159d27](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8159d279e4c0ab60596e5950d12659ce3707f17a))
+* start and complete a Scrum sprint ([b04daa1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b04daa17733884c62282d58d65cca75c1ce53f1d))
+* the project backlog sprint ([f7e0eb9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f7e0eb9e3a37e02f1a1f8bca2bfbb7160815d08b))
+* warn about unfinished subtasks under a finished parent ([9c84f38](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9c84f38b74c76b74e1db4ba0de5aaaaa0d23f486))
+
+
+### 🐛 Bug Fixes
+
+* completing a sprint took the server down ([67e93c9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/67e93c9274ffc2ef4789f74bec820274425aebb8))
+* draw the burndown against the sprint's real box ([2657197](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/265719788457b0592f5286d4dc3ecd9f3c8d05aa))
+* keep the backlog and folders out of the burndown picker ([f76b51d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f76b51d5706200ba8f7bae40f477e61f86e5e6a1))
+* show the reason when a sprint action is refused ([0b54343](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0b5434328f0eb07b7f6ba1c345a05f2ba42f1264))
+* stop the sprint state chip breaking the header layout ([f2ec129](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f2ec129e86f32431bd59ac4a792bd638f5a50afc))
+
+
+### 📘 Documentation
+
+* manual test cases for the Scrum sprint lifecycle ([82e42a3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/82e42a3441960f305e4a2b91fb5c484161798e48))
+* test cases for the whole Scrum sprint feature ([0ea0162](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0ea01622711fce4c82866ddeb4ea746bfbe53171))
+
 ## [14.32.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.31.1...v14.32.0) (2026-08-21)
 
 
