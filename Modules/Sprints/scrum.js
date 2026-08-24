@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
+const { dbCollections } = require('../../Config/collections');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
 const HandleHistoryref = require('../Tasks/helpers/helper');
@@ -73,6 +74,30 @@ async function loadSprint(companyId, rawId, { allowBacklog = false } = {}) {
     if (sprint.mainChat === true) return { error: 'That is a chat channel, not a sprint.' };
     if (!allowBacklog && sprint.isBacklog === true) return { error: 'The backlog is not a time-boxed sprint.' };
     return { sprint };
+}
+
+/* Who is doing this, taken from the session rather than the request body.
+
+   Two reasons it is not `req.body.userData`. It is forgeable, so history would
+   be attributable to anyone. And HandleHistory writes `UserId: userData.id`
+   into a schema where that field is REQUIRED — an absent id makes it reject,
+   and moveTaskFunction fires one of those without a .catch, so an empty
+   userData does not merely lose a history line, it takes the server down.
+
+   Users live in the global database, not the company one. */
+async function actingUser(req) {
+    const uid = String((req && req.uid) || '');
+    if (!/^[0-9a-fA-F]{24}$/.test(uid)) return null;
+
+    const user = await MongoDbCrudOpration(dbCollections.GLOBAL, {
+        type: SCHEMA_TYPE.USERS,
+        data: [{ _id: new mongoose.Types.ObjectId(uid) }, { Employee_Name: 1, Employee_Email: 1 }],
+    }, 'findOne').catch(() => null);
+
+    return {
+        id: uid,
+        Employee_Name: (user && (user.Employee_Name || user.Employee_Email)) || 'Someone',
+    };
 }
 
 const projectOf = (companyId, projectId) => MongoDbCrudOpration(companyId, {
@@ -165,7 +190,7 @@ exports.getBacklog = async (req, res) => {
         const companyId = req.headers['companyid'] || '';
         if (!companyId) return fail(res, 'companyId is required.');
         const body = req.body || {};
-        const { backlog, error } = await ensureBacklog(companyId, body.projectId, body.userData);
+        const { backlog, error } = await ensureBacklog(companyId, body.projectId, await actingUser(req));
         if (error) return fail(res, error);
         return res.send({ status: true, statusText: 'Backlog ready.', data: backlog });
     } catch (err) {
@@ -264,11 +289,14 @@ exports.startSprint = async (req, res) => {
             return fail(res, `"${raced[0].name || 'Another sprint'}" started first. Complete it before starting this one.`);
         }
 
-        HandleHistoryref.HandleHistory('project', companyId, String(sprint.projectId), null, {
-            key: 'Sprint_Started',
-            message: `<b>${(req.body && req.body.userData && req.body.userData.Employee_Name) || 'Someone'}</b> started sprint <b>${sprint.name || ''}</b> with <b>${commitment.tasks}</b> task(s) committed.`,
-            sprintId: String(sprint._id),
-        }, (req.body && req.body.userData) || {}).catch((e) => logger.error(`Sprint_Started history: ${e.message}`));
+        const actor = await actingUser(req);
+        if (actor) {
+            HandleHistoryref.HandleHistory('project', companyId, String(sprint.projectId), null, {
+                key: 'Sprint_Started',
+                message: `<b>${actor.Employee_Name}</b> started sprint <b>${sprint.name || ''}</b> with <b>${commitment.tasks}</b> task(s) committed.`,
+                sprintId: String(sprint._id),
+            }, actor).catch((e) => logger.error(`Sprint_Started history: ${e && e.message}`));
+        }
 
         return res.send({ status: true, statusText: 'Sprint started.', data: started });
     } catch (err) {
@@ -426,7 +454,7 @@ async function resolveDestination(companyId, sprint, plan, body) {
     const wanted = String(body.incompleteDestination || 'next');
 
     if (wanted === 'backlog') {
-        const { backlog, error } = await ensureBacklog(companyId, sprint.projectId, body.userData);
+        const { backlog, error } = await ensureBacklog(companyId, sprint.projectId, body.actor || body.userData);
         if (error) return { error };
         return { target: backlog, created: false };
     }
@@ -489,7 +517,7 @@ async function resolveDestination(companyId, sprint, plan, body) {
             projectId: String(sprint.projectId),
             sprintName: plan.suggestedNext.name,
             projectName: (plan.project && plan.project.ProjectName) || '',
-            userData: body.userData || {},
+            userData: body.actor || body.userData || {},
             folder,
             mainChat: false,
         },
@@ -533,11 +561,17 @@ exports.completeSprint = async (req, res) => {
         const plan = await planCompletion(companyId, sprint);
         if (!plan.project) return fail(res, 'The project this sprint belongs to could not be read.');
 
+        // Resolved before anything moves. bulkMove writes a per-task history
+        // entry through a call that has no .catch on it, so handing it a user
+        // without an id crashes the process rather than losing a log line.
+        const actor = await actingUser(req);
+        if (!actor) return fail(res, 'Could not identify who is completing this sprint. Sign in again and retry.');
+
         let movedTo = null;
         let moveSummary = { updated: 0, skipped: 0, errors: 0 };
 
         if (plan.notDone.length) {
-            const destination = await resolveDestination(companyId, sprint, plan, body);
+            const destination = await resolveDestination(companyId, sprint, plan, { ...body, actor });
             if (destination.error) return fail(res, destination.error);
 
             const target = destination.target;
@@ -550,7 +584,7 @@ exports.completeSprint = async (req, res) => {
             // otherwise they orphan in the sprint that just closed.
             const result = await taskMongo.bulkMove({
                 companyId,
-                userData: body.userData || {},
+                userData: actor,
                 taskIds: plan.notDone.map((t) => String(t._id)),
                 sprintObj: {
                     id: String(target._id),
@@ -579,7 +613,7 @@ exports.completeSprint = async (req, res) => {
 
         const closeReport = {
             at: new Date(),
-            by: String(req.uid || ''),
+            by: actor.id,
             done: totals(plan.done),
             notDone: totals(plan.notDone),
             addedAfterStart: plan.addedAfterStart,
@@ -595,9 +629,9 @@ exports.completeSprint = async (req, res) => {
 
         HandleHistoryref.HandleHistory('project', companyId, String(sprint.projectId), null, {
             key: 'Sprint_Completed',
-            message: `<b>${(body.userData && body.userData.Employee_Name) || 'Someone'}</b> completed sprint <b>${sprint.name || ''}</b> — <b>${closeReport.done.tasks}</b> done, <b>${closeReport.notDone.tasks}</b> moved${movedTo ? ` to <b>${movedTo.name}</b>` : ''}.`,
+            message: `<b>${actor.Employee_Name}</b> completed sprint <b>${sprint.name || ''}</b> — <b>${closeReport.done.tasks}</b> done, <b>${closeReport.notDone.tasks}</b> moved${movedTo ? ` to <b>${movedTo.name}</b>` : ''}.`,
             sprintId: String(sprint._id),
-        }, body.userData || {}).catch((e) => logger.error(`Sprint_Completed history: ${e.message}`));
+        }, actor).catch((e) => logger.error(`Sprint_Completed history: ${e && e.message}`));
 
         return res.send({ status: true, statusText: 'Sprint completed.', data: closed });
     } catch (err) {

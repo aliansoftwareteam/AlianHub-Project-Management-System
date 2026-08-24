@@ -319,7 +319,8 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                         }else{
                             historyObj.message = `<b>${userData.Employee_Name}</b> has converted the <b>${serviceFun.sanitizeInput(convertTask.TaskName)}</b> task of <b>(${oldProject.ProjectName}${convertTask.folderObjId ? '/' + convertTask.sprintArray.folderName : ''}/${convertTask.sprintArray.name})</b> sprint to subtask of <b>${serviceFun.sanitizeInput(task.TaskName)}</b> task <b>(${projectData.ProjectName}${task.folderObjId ? '/' + task.sprintArray.folderName : ''}/${task.sprintArray.name})</b> ${isSubTask === true ? '<b>with all its sub tasks</b>' : ''}.`
                         }
-                        exports.HandleHistory('task', companyId, projectData.id, convertTask._id, historyObj, userData);
+                        exports.HandleHistory('task', companyId, projectData.id, convertTask._id, historyObj, userData)
+                            .catch((error) => { logger.error(`ERROR IN CONVERT TASK HISTORY: ${error && error.message}`); });
                     }
                     if(convertTask.sprintId !== task.sprintId || JSON.parse(JSON.stringify(convertTask)).ProjectID !== JSON.parse(JSON.stringify(task)).ProjectID){
                         const incObj = {
@@ -469,7 +470,11 @@ exports.moveTaskFunction = (companyId, projectData, sprintObj, moveTask, oldSpri
                 }else{
                     historyObj.message = `<b>${userData.Employee_Name}</b> has moved <b>${moveTask.TaskName}</b> task from <b>(${oldSprintObj.folderId ?  oldSprintObj.folderName + '/' : ''}${oldSprintObj.name})</b> to <b>(${sprintObj.folderId ? sprintObj.folderName + '/'  : ''}${sprintObj.name})</b> sprint ${isSubTask === true ? '<b>with all its sub tasks</b>' : ''}.`
                 }
-                exports.HandleHistory('task', companyId, projectData.id, moveTask._id, historyObj, userData);
+                // Unhandled, this rejects the whole process rather than losing one
+                // history line: HandleHistory writes a REQUIRED UserId from
+                // userData.id, so any caller that omits it took the server down.
+                exports.HandleHistory('task', companyId, projectData.id, moveTask._id, historyObj, userData)
+                    .catch((error) => { logger.error(`ERROR IN MOVE TASK HISTORY: ${error && error.message}`); });
                 MongoDbCrudOpration(companyId, queryObj, "findOneAndUpdate").then((ele) => {
                     socketEmitter.emit('update', { type: "update", data: ele , updatedFields: obj, module: 'task' });
                     resolve({ status: true, statusText: "MOVE" });
