@@ -159,6 +159,20 @@
                     <div class="errorMessage">{{ formData.city.error }}</div>    
                 </div>
             </div>
+            <div class="row">
+                <div class="col-md-12">
+                    <span class="formLabel">What does your team mainly do?</span>
+                    <select class="install-form-control mt-10" v-model="formData.teamFocus.value">
+                        <option value="">Something else / not sure</option>
+                        <option value="software">Building software</option>
+                        <option value="marketing">Marketing and campaigns</option>
+                        <option value="design">Design and creative work</option>
+                        <option value="support">Customer support</option>
+                        <option value="hiring">Hiring and HR</option>
+                    </select>
+                    <div class="mt-10 font-size-14 grey">Optional. It decides which example project you start with — nothing else, and you can delete it.</div>
+                </div>
+            </div>
             <div>
                 <div class="mt-20 font-size-20">
                     For any further queries, please refer to our <a href="https://help.alianhub.com/app-installation-and-start-guide/4.-installation-guide/4.10-final-step" target="_blank" class="blue font-weight-600">documentation.</a>
@@ -322,6 +336,11 @@
             rules:
             "required",
             name: "country",
+            error:""
+        },
+        teamFocus:{
+            value:"",
+            name: "teamFocus",
             error:""
         },
         phoneCode:{
@@ -621,6 +640,7 @@
                     country: formData.value.country.value,
                     city: formData.value.city.value,
                     state: formData.value.state.value,
+                    teamFocus: formData.value.teamFocus.value,
                     countryCodeObj: countryCodeObj,
                     eventId : evId,
                 }

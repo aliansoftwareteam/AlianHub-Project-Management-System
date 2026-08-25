@@ -33,19 +33,19 @@
                     <div v-if="mainStep && mainStep === 4 && mainStep !== 100">
                         <h1 class="blue title text-center">Verification Your Firebase</h1>
                         <div v-if="stepDesc[`step${mainStep}Desc`][0].subStep === 1" >
-                            <FirebaseVerify @complete="firebaseVerifySubmit"></FirebaseVerify>
+                            <FirebaseVerify @complete="firebaseVerifySubmit" @skip="skipStep(4)"></FirebaseVerify>
                         </div>
                     </div>
                     <div v-if="mainStep && mainStep === 5 && mainStep !== 100">
                         <h1 class="blue title text-center">Artificial Intelligence</h1>
                         <div v-if="stepDesc[`step${mainStep}Desc`][0].subStep === 1" >
-                            <ArtificialIntelligenceVerify @complete="artificialIntelligenceSubmit"></ArtificialIntelligenceVerify>
+                            <ArtificialIntelligenceVerify @complete="artificialIntelligenceSubmit" @skip="skipStep(5)"></ArtificialIntelligenceVerify>
                         </div>
                     </div>
                     <div v-if="mainStep && mainStep === 6 && mainStep !== 100">
                         <h1 class="blue title text-center">Verification Your SMTP</h1>
                         <div v-if="stepDesc[`step${mainStep}Desc`][0].subStep === 1" >
-                            <SMTPVerify @complete="smtpVerifySubmit"></SMTPVerify>
+                            <SMTPVerify @complete="smtpVerifySubmit" @skip="skipStep(6)"></SMTPVerify>
                         </div>
                     </div>
                     <div v-if="mainStep && mainStep === 7 && mainStep !== 100">
@@ -326,6 +326,33 @@
         stepDesc.value.step5Desc[0].status = "inprogress";
         startCallingSteps(stepData.value.data[4], data);
     }
+    // Firebase, the AI key and mail are the three steps a non-technical person cannot answer, and
+    // none of them is needed to run AlianHub for a first look. Skipping moves the wizard on without
+    // calling that step's verification, so the service simply stays unconfigured — the same state a
+    // company is in before anyone sets it up, and each is configurable later from Settings.
+    //
+    // Mail is the one with a real consequence: without it, invitations and password resets cannot be
+    // sent. The step says so before offering the skip.
+    function skipStep(from) {
+        if (from === 4) {
+            mainStep.value = 5;
+            stepDesc.value.step5Desc[0].subStep = 1;
+            stepDesc.value.step5Desc[0].status = "inprogress";
+            return;
+        }
+        if (from === 5) {
+            mainStep.value = 6;
+            stepDesc.value.step6Desc[0].subStep = 1;
+            stepDesc.value.step6Desc[0].status = "inprogress";
+            return;
+        }
+        if (from === 6) {
+            // Step 6 has no verification call of its own to skip — its submit already advances
+            // straight to the database initialisation, so this is the same move.
+            smtpVerifySubmit();
+        }
+    }
+
     function smtpVerifySubmit() {
         mainStep.value = 7;
         stepDesc.value.step7Desc[0].subStep = 2;

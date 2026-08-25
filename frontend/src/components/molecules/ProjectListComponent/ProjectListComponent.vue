@@ -101,10 +101,18 @@
                     </VirtualScroller>
                 </template>
                 <template v-else>
-                    <div class="text-center mt-1">
-                        <h3 class="m-0">
-                            {{!search?.length ? (isSpinner === false && projects.length == 0 ? $t('ProjectSlider.no_project_found') : $t('ProjectSlider.no_result_found')) : $t('ProjectSlider.no_result_found')}}
-                        </h3>
+                    <!-- Genuinely no projects is a different situation from a search that matched
+                         nothing, and only the first one is worth explaining. -->
+                    <EmptyState
+                        v-if="!search?.length && isSpinner === false && projects.length === 0"
+                        :title="$t('EmptyState.no_projects_title')"
+                        :message="$t('EmptyState.no_projects_msg')"
+                        :actionLabel="checkPermission('project.project_create', projectData.isGlobalPermission) === true ? $t('EmptyState.no_projects_action') : ''"
+                        helpPath="projects"
+                        @action="$emit('createProject')"
+                    />
+                    <div v-else class="text-center mt-1">
+                        <h3 class="m-0">{{$t('ProjectSlider.no_result_found')}}</h3>
                         <p v-if="search?.length" class="font-size-14 mt-10px">{{$t('ProjectSlider.try_using_diff')}}</p>
                     </div>
                 </template>
@@ -138,6 +146,7 @@ import { useProjectsHelper, clearFilterSignal } from '../../../views/Projects/he
 import { apiRequest } from '../../../services'
 import * as env from '@/config/env';
 import VirtualScroller from './VirtualScroller.vue'
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue'
 
 // IMAGES
 const horizontalDots = require("@/assets/images/svg/horizontalDots.svg");

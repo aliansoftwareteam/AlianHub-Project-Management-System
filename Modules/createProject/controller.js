@@ -10,6 +10,34 @@ const { getCachedGlobalTemplateData } = require("../../utils/enterpriseHelper");
 const { removeCache } = require('../../utils/commonFunctions');
 const { updateCompanyFun } = require("../Company/controller/updateCompany");
 const projectTemplate = require("../../utils/projectTemplates.json");
+const { seedSampleTasks, sampleTasksForTemplate } = require("../../utils/sampleTasks");
+
+// A project created from a template arrives with columns but nothing in them, which teaches a
+// first-time user nothing. Runs after the sprint exists because a task needs a sprintId, and never
+// throws: sample content is not worth failing a project creation over.
+function seedTemplateSamples (project, createObject, sprintRes) {
+    try {
+        // The demo project composes its own list from the team's answer during setup, so it hands
+        // the rows over directly rather than being looked up by template name.
+        let rows = (createObject && Array.isArray(createObject.sampleTaskRows) && createObject.sampleTaskRows.length)
+            ? createObject.sampleTaskRows
+            : null;
+
+        if (!rows) {
+            const name = (createObject && createObject.TemplateName) || (project && project.TemplateName);
+            // Matched against the BUILT-IN templates only. A company can save its own template under
+            // any name, and one that happened to be called "Support" should not inherit our examples.
+            const isBuiltIn = !!name && Object.values(projectTemplate)
+                .some((t) => t && String(t.TemplateName).trim() === String(name).trim());
+            rows = isBuiltIn ? sampleTasksForTemplate(name) : null;
+        }
+        const sprintId = sprintRes && sprintRes.data && sprintRes.data._id;
+        if (!rows || !sprintId) return;
+        return seedSampleTasks(project, sprintId, rows);
+    } catch (error) {
+        logger.error(`seedTemplateSamples: ${error.message}`);
+    }
+}
 const { resolveProjectSkills } = require("../settings/ProjectSkills/helper");
 const { normaliseSource, cleanProposalId, numericProposalId, validateProposalId } = require("../Project/helpers/projectSourceRules");
 
@@ -576,7 +604,9 @@ exports.createProject = async (req) => {
                                         projectName: createProjectObject.ProjectName
                                     }
                                 }
-                                addSprintFun(addObj).catch((err)=>{
+                                addSprintFun(addObj)
+                                .then((sprintRes) => seedTemplateSamples(respone, createProjectObject, sprintRes))
+                                .catch((err)=>{
                                     logger.error('Create Sprint Error',err)
                                 });
                             }).catch((e)=>{
@@ -595,7 +625,9 @@ exports.createProject = async (req) => {
                                     projectName: createProjectObject.ProjectName
                                 }
                             }
-                            addSprintFun(addObj).catch((err)=>{
+                            addSprintFun(addObj)
+                            .then((sprintRes) => seedTemplateSamples(respone, createProjectObject, sprintRes))
+                            .catch((err)=>{
                                 logger.error('Create Sprint Error',err)
                             });
                         }

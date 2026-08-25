@@ -184,6 +184,8 @@
                     For any further queries, please refer to our <a href="https://help.alianhub.com/app-installation-and-start-guide/4.-installation-guide/4.5-firebase-configuration" target="_blank" class="blue font-weight-600">documentation.</a>
                 </div>
                 <button class="btn-blue btn-login font-roboto-sans bg-blue white cursor-pointer btn-full mt-20" :disabled="!isSubmitSend" :class="{'disabled': !isSubmitSend}" @click="handleSubmit" tabindex="3">Submit</button>
+                <p class="skip-step__note">Push notifications stay off until you add these. Everything else works.</p>
+                <button type="button" class="skip-step font-roboto-sans cursor-pointer" @click="$emit('skip')">Skip for now</button>
             </div>
         </div>
     </div>
@@ -193,7 +195,7 @@
     import InputText from "@/components/atom/InputText/InputText.vue";
     import { useValidation } from "@/composable/Validation.js";
     const  { checkErrors , checkAllFields } = useValidation();
-    const emit = defineEmits(["complete"]);
+    const emit = defineEmits(["complete", "skip"]);
 
     const formData = ref({
         apiKey: {
@@ -276,4 +278,21 @@
 </script>
 <style scoped>
 
+.skip-step__note {
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: #8c8c8c;
+    margin: 14px 0 6px;
+    text-align: center;
+}
+.skip-step {
+    display: block;
+    width: 100%;
+    background: none;
+    border: none;
+    font-size: 13.5px;
+    color: #2f6fdb;
+    text-decoration: underline;
+    padding: 4px 0;
+}
 </style>

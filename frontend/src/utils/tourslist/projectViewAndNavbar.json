@@ -88,5 +88,14 @@
         "side": "bottom",
         "align": "end"
       }
+    },
+    {
+      "element": "#help_driver",
+      "popover": {
+        "title": "help",
+        "description": "help_and_docs_text",
+        "side": "bottom",
+        "align": "end"
+      }
     }
   ]

@@ -17,7 +17,7 @@
             <label :style="`font-weight: ${!item.isParent ? '400' : '600'}`">
                 {{ $t(`SecurityAndPermission.${item.key}`)}}
             </label>
-            <p>{{item.desc}}</p>
+            <p>{{ item.desc || permissionDesc(item.key) }}</p>
         </td>
         <td v-for="(hItem, hIndex) in withoutOwnerRoles.filter((x) => x.key !== 2)" :key="hIndex">
             <div class="d-flex justify-content-around">
@@ -108,7 +108,14 @@
     // import { ValidationFunction } from "@/composable/DefaultValidationFunction";
     import { useStore } from 'vuex';
     import { useRouter } from "vue-router";
+    import { useI18n } from "vue-i18n";
     const {makeUniqueId} = useCustomComposable();
+    const { t, te } = useI18n();
+
+    // The seeded `desc` field is empty on every rule, so the description comes from the locale
+    // instead — which also means companies created before these were written still get them.
+    // te() guards the lookup because a missing key would render as the raw key.
+    const permissionDesc = (key) => (te(`PermissionDesc.${key}`) ? t(`PermissionDesc.${key}`) : '');
     defineProps({
         item: {
             type: Object,

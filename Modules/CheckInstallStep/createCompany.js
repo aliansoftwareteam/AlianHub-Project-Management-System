@@ -9,6 +9,7 @@ const createUserRef = require("../Auth/controller/createUser.js");
 const { dbCollections } = require("../../Config/collections.js");
 // const { installSteps, envVar } = require("./controller.js");
 const mainCtr = require("./controller.js");
+const { createDemoProject } = require("./demoProject.js");
 const installStepsFilePath = __dirname + "/../../installationSteps.json";
 const defaultSubscriptionDataRef = require("./defaultSubscriptionData.js")
 const serviceFun = require("../serviceFunction.js");
@@ -204,6 +205,9 @@ exports.createCompany = (data) => {
             const companyId = JSON.parse(JSON.stringify(companyMongoId));
             let obj = {
                 userId: data.userId,
+                // Asked once during setup. Kept so the sample content and the template order can
+                // suit the team rather than defaulting to a software project for everyone.
+                teamFocus: data.teamFocus || '',
                 Cst_CompanyName:  data.companyName,
                 Cst_Phone:  data.phoneNumber,
                 Cst_Country: data.country,
@@ -249,6 +253,11 @@ exports.createCompany = (data) => {
         
             Promise.allSettled(allProcess).then(async() => {
                 await exports.updateCompnayIdInUserFun(userUpdateObj, companyId,data.userId) // ADD COMPANY ID IN USER DOCUMENT AFTER THE PROCESS COMPLETE
+
+                // Only after the seeds have settled: the sample project needs the company's task
+                // statuses and types to exist. Never awaited and never able to reject, so a company
+                // is created normally whether or not the sample content lands.
+                createDemoProject(companyId, data.userId, data.teamFocus);
                 setTimeout(() => {
                     emitListener(data?.eventId, {step: 3});
                     resolve(companyId);
@@ -467,6 +476,7 @@ exports.createCompanyFromAPIFunction = (userId,obj) => {
                 state: obj.state,
                 email: obj.email,
                 countryCodeObj: obj.countryCodeObj,
+                teamFocus: obj.teamFocus || '',
                 logtimeDays: 8,
                 totalProjects: 0,
                 isInactive: false,
