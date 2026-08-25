@@ -34,8 +34,8 @@ async function createDemoProject(companyId, userId, teamFocus) {
         const tabList = Array.isArray(tabs) ? tabs : [];
         // Picked by keyName, not by the catalogue's viewStatus/setAsDefault flags: the seed writes
         // those false on every row, because they are a per-project choice the create-project screen
-        // makes rather than a catalogue default. Board's keyName is ProjectKanban, not "board".
-        const WANTED = ['ProjectListView', 'ProjectKanban'];
+        // makes rather than a catalogue default.
+        const WANTED = ['ProjectListView', 'ProjectKanban', 'ProjectDetail', 'Comments', 'ActivityLog', 'Workload'];
         const DEFAULT_VIEW = 'ProjectListView';
         let chosen = tabList.filter((t) => t && WANTED.includes(t.keyName));
         if (!chosen.length) chosen = tabList.slice(0, 1);
@@ -45,8 +45,11 @@ async function createDemoProject(companyId, userId, teamFocus) {
         }
 
         // Same shape the create-project screen sends: the flags travel on the selection.
+        // _id as a STRING: createProject matches these against the catalogue with === on a
+        // JSON-stringified id, so an ObjectId here never matches and the view keeps no name —
+        // which renders as "ViewList.undefined" in the tabs.
         const views = chosen.map((v) => ({
-            _id: v._id,
+            _id: String(v._id),
             viewStatus: true,
             setAsDefault: v.keyName === DEFAULT_VIEW,
         }));
@@ -104,8 +107,10 @@ async function createDemoProject(companyId, userId, teamFocus) {
                 taskStatusData: [{ key: 1 }, { key: 3 }, { key: 6 }, { key: 2 }],
                 projectStatusData: statuses.filter((s) => s && s.isDeleted !== true),
                 taskTypeCounts: [{ key: 1 }],
-                // Apps travel as keys, which is what the create-project screen sends.
-                apps: (Array.isArray(apps) ? apps : []).filter((a) => a && a.appStatus === true).map((a) => a.key),
+                // Apps travel as keys. ALL of them, not just the ones the seed marks active — the
+                // sample tasks teach time tracking, tags and custom fields, so the demo project has
+                // those switched on even though a normal new project starts with them off.
+                apps: (Array.isArray(apps) ? apps : []).map((a) => a && a.key).filter(Boolean),
                 ProjectRequiredComponent: views,
                 ProjectRequiredDefaultComponent: defaultViewKey,
             },

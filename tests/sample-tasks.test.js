@@ -79,7 +79,22 @@ describe('seeded sample task documents', () => {
         for (const doc of docs) {
             expect(typeof doc.description).toBe('string');
             expect(doc.description.length).toBeGreaterThan(0);
-            expect(doc.descriptionBlock.blocks[0].data.text).toBe(doc.description);
+            // One paragraph block per line; joined back together they are the plain description.
+            const joined = doc.descriptionBlock.blocks.map((b) => b.data.text).join('\n');
+            expect(joined).toBe(doc.description);
+            expect(doc.descriptionBlock.blocks.length).toBeGreaterThan(1);
+            for (const b of doc.descriptionBlock.blocks) {
+                expect(b.data.text.trim().length).toBeGreaterThan(0);
+            }
+        }
+    });
+
+    test('the demo tasks read as documentation, not one-liners', () => {
+        for (const [title, text] of WELCOME_TASKS) {
+            expect(text.length).toBeGreaterThan(150);
+            expect(text).toMatch(/Try it/);
+            expect(text).toMatch(/\n1\. /);
+            expect(title.length).toBeLessThan(80);
         }
     });
 
