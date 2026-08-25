@@ -157,3 +157,57 @@ describe('first-run checklist visibility', () => {
         expect(src).not.toContain('doneCount.value < items.value.length');
     });
 });
+
+/* The demo project must not depend on what the owner answered during setup. Any option, no option,
+   or an answer we do not recognise must still produce a full sample project — an empty board is the
+   thing this whole change exists to prevent. */
+describe('demo project sample content', () => {
+    const st = require('../utils/sampleTasks.js');
+
+    const INPUTS = ['', 'other', 'software', 'marketing', 'design', 'support', 'hiring',
+        'nonsense', null, undefined, 0, '   ', 'SOFTWARE', ' software ', 'Design'];
+
+    test.each(INPUTS.map((i) => [JSON.stringify(i), i]))('focus %s still yields tasks', (_label, input) => {
+        const rows = st.demoTasksForFocus(input);
+        expect(Array.isArray(rows)).toBe(true);
+        expect(rows.length).toBeGreaterThan(0);
+    });
+
+    test('an unrecognised answer falls back to the product walkthrough', () => {
+        for (const input of ['', null, undefined, 'nonsense', 0]) {
+            expect(st.demoTasksForFocus(input)).toBe(st.WELCOME_TASKS);
+        }
+    });
+
+    test('every known option is offered and resolves', () => {
+        expect(st.TEAM_FOCUS_OPTIONS.length).toBeGreaterThan(1);
+        for (const opt of st.TEAM_FOCUS_OPTIONS) {
+            expect(st.demoTasksForFocus(opt).length).toBeGreaterThanOrEqual(8);
+        }
+    });
+
+    test('the wizard offers exactly the options the backend understands', () => {
+        const fs = require('fs');
+        const path = require('path');
+        const src = fs.readFileSync(path.join(__dirname, '..', 'installation', 'src', 'views',
+            'InstallStep', 'CreateUserAndCompany.vue'), 'utf8');
+        const block = src.slice(src.indexOf('formData.teamFocus.value'));
+        const offered = [...block.slice(0, 900).matchAll(/<option value="([a-z]*)"/g)].map((m) => m[1]);
+        // The blank option is the "not sure" choice and is deliberately not a backend key.
+        for (const value of offered.filter(Boolean)) {
+            expect(st.TEAM_FOCUS_OPTIONS).toContain(value);
+        }
+        expect(offered).toContain('');
+    });
+
+    test('createDemoProject is gated on the company and user only, never on the answer', () => {
+        const fs = require('fs');
+        const path = require('path');
+        const src = fs.readFileSync(path.join(__dirname, '..', 'Modules', 'CheckInstallStep',
+            'demoProject.js'), 'utf8');
+        expect(src).toContain('if (!companyId || !userId) return false;');
+        expect(src).not.toMatch(/if\s*\(\s*!teamFocus/);
+        // and the payload must carry an icon — createProject throws without one
+        expect(src).toContain('projectIcon');
+    });
+});

@@ -44,10 +44,7 @@
                 </div>
                 <button class="btn-blue btn-login font-roboto-sans bg-blue white cursor-pointer btn-full mt-20" :disabled="!isSubmitSend" :class="{'disabled': !isSubmitSend}" @click="handleSubmit" tabindex="3">Submit</button>
                 <p class="skip-step__note">AI features stay off until you add a key. Everything else works.</p>
-                <button type="button" class="skip-step font-roboto-sans cursor-pointer" @click="$emit('skip')">Skip for now</button>
-            </div>
-            <div class="form-group text-center mt-20" v-if="isSubmitSend">
-                <a class="blue font-weight-500 font-18 cursor-pointer" @click="doItLater">I'll Do It Later</a>
+                <a class="blue font-weight-500 font-18 cursor-pointer skip-step" @click="$emit('complete', { isDoItLater: true })">Skip for now</a>
             </div>
         </div>
     </div>
@@ -57,7 +54,7 @@
     import InputText from "@/components/atom/InputText/InputText.vue";
     import { useValidation } from "@/composable/Validation.js";
     const  { checkErrors , checkAllFields } = useValidation();
-    const emit = defineEmits(["complete", "skip"]);
+    const emit = defineEmits(["complete"]);
     import * as env from '@/config/env';
     import { apiRequest } from "../../services";
 
@@ -101,11 +98,6 @@
             }
         })
     }
-    const doItLater = () => {
-        emit("complete", {
-            isDoItLater: true
-        });
-    }
     onMounted(() => {
         apiRequest("get", env.GETAIMODELS).then((res) => {
             if (res?.data?.status) {
@@ -137,12 +129,7 @@
 }
 .skip-step {
     display: block;
-    width: 100%;
-    background: none;
-    border: none;
-    font-size: 13.5px;
-    color: #2f6fdb;
-    text-decoration: underline;
-    padding: 4px 0;
+    text-align: center;
+    margin-top: 4px;
 }
 </style>

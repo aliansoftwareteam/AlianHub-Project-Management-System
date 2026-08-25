@@ -33,19 +33,19 @@
                     <div v-if="mainStep && mainStep === 4 && mainStep !== 100">
                         <h1 class="blue title text-center">Verification Your Firebase</h1>
                         <div v-if="stepDesc[`step${mainStep}Desc`][0].subStep === 1" >
-                            <FirebaseVerify @complete="firebaseVerifySubmit" @skip="skipStep(4)"></FirebaseVerify>
+                            <FirebaseVerify @complete="firebaseVerifySubmit"></FirebaseVerify>
                         </div>
                     </div>
                     <div v-if="mainStep && mainStep === 5 && mainStep !== 100">
                         <h1 class="blue title text-center">Artificial Intelligence</h1>
                         <div v-if="stepDesc[`step${mainStep}Desc`][0].subStep === 1" >
-                            <ArtificialIntelligenceVerify @complete="artificialIntelligenceSubmit" @skip="skipStep(5)"></ArtificialIntelligenceVerify>
+                            <ArtificialIntelligenceVerify @complete="artificialIntelligenceSubmit"></ArtificialIntelligenceVerify>
                         </div>
                     </div>
                     <div v-if="mainStep && mainStep === 6 && mainStep !== 100">
                         <h1 class="blue title text-center">Verification Your SMTP</h1>
                         <div v-if="stepDesc[`step${mainStep}Desc`][0].subStep === 1" >
-                            <SMTPVerify @complete="smtpVerifySubmit" @skip="skipStep(6)"></SMTPVerify>
+                            <SMTPVerify @complete="smtpVerifySubmit"></SMTPVerify>
                         </div>
                     </div>
                     <div v-if="mainStep && mainStep === 7 && mainStep !== 100">
@@ -333,26 +333,6 @@
     //
     // Mail is the one with a real consequence: without it, invitations and password resets cannot be
     // sent. The step says so before offering the skip.
-    function skipStep(from) {
-        if (from === 4) {
-            mainStep.value = 5;
-            stepDesc.value.step5Desc[0].subStep = 1;
-            stepDesc.value.step5Desc[0].status = "inprogress";
-            return;
-        }
-        if (from === 5) {
-            mainStep.value = 6;
-            stepDesc.value.step6Desc[0].subStep = 1;
-            stepDesc.value.step6Desc[0].status = "inprogress";
-            return;
-        }
-        if (from === 6) {
-            // Step 6 has no verification call of its own to skip — its submit already advances
-            // straight to the database initialisation, so this is the same move.
-            smtpVerifySubmit();
-        }
-    }
-
     function smtpVerifySubmit() {
         mainStep.value = 7;
         stepDesc.value.step7Desc[0].subStep = 2;
