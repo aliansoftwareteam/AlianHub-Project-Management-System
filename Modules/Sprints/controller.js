@@ -775,6 +775,13 @@ exports.getPerProjectCount = (companyId,projectId,collectionName) => {
                     resolve(false);
                 }
             })
+            // Without this the promise never settles when anything above throws, and every caller
+            // waits forever — addSprintFun in particular, which is how a project ended up with no
+            // list and no tasks rather than with an error.
+            .catch((error) => {
+                logger.error(`ERROR in getPerProjectCount: ${error && error.message}`);
+                resolve(false);
+            })
         } catch (error) {
             logger.error(`ERROR in getPerProjectCount ${error.message}`);
             reject(error);
@@ -784,6 +791,13 @@ exports.getPerProjectCount = (companyId,projectId,collectionName) => {
 
 exports.checkPlanPermission = async (companyData, totalCreated, type) => {
     try {
+        // A company document without planFeature is normal for a few seconds during creation, and
+        // JSON.parse(JSON.stringify(undefined)) throws rather than returning undefined. That throw
+        // used to escape into a .then with no .catch, so the caller's promise never settled and
+        // sprint creation hung forever. No plan recorded means no per-project cap.
+        if (!companyData || companyData.planFeature === undefined || companyData.planFeature === null) {
+            return true;
+        }
         let planfeatures = JSON.parse(JSON.stringify(companyData.planFeature));
 
         let perProjectData = type === 'sprints' ? planfeatures?.sprintPerProject : planfeatures?.folderPerProject;

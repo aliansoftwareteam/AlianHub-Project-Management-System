@@ -80,16 +80,17 @@ const WELCOME_TASKS = [
     ['Delete this project when you are finished', 'Open the project menu and delete it. Nothing else in your company is affected.'],
 ];
 
+// Checked field by field against schema.tasks rather than copied from a project payload. The
+// required set is TaskName, TaskKey, TaskType, TaskTypeKey, ProjectID, CompanyId, status,
+// isParentTask, Task_Leader, sprintArray, Task_Priority, deletedStatusKey, sprintId, statusType,
+// statusKey — and Task_Leader is a String, not an array, which is what an [] here failed on.
 const TASK_DEFAULTS = {
     AssigneeUserId: [],
     watchers: [],
     DueDate: null,
-    dueDateDeadLine: null,
+    dueDateDeadLine: [],
     ParentTaskId: '',
-    status: 1,
     isParentTask: true,
-    Task_Leader: [],
-    sprintArray: [],
     Task_Priority: 'MEDIUM',
     deletedStatusKey: 0,
     queueListArray: [],
@@ -107,7 +108,7 @@ const TASK_DEFAULTS = {
     subTasks: 0,
 };
 
-function buildTaskDocs(project, sprintId, rows, startingNumber) {
+function buildTaskDocs(project, sprint, rows, startingNumber, ownerId) {
     const projectId = String(project._id);
     const companyId = String(project.CompanyId);
     const code = project.ProjectCode || 'TASK';
@@ -129,24 +130,35 @@ function buildTaskDocs(project, sprintId, rows, startingNumber) {
             TaskKey: `${code}-${startingNumber + i + 1}`,
             ProjectID: projectId,
             CompanyId: companyId,
-            sprintId: String(sprintId),
+            sprintId: String(sprint._id),
+            // Real tasks carry the whole sprint document here, not an array, and Task_Leader is a
+            // user id string. status is an object too — every existing task in the wild has all
+            // three in exactly this shape.
+            sprintArray: sprint,
+            Task_Leader: ownerId,
+            status: { text: 'To Do', key: 1, type: 'default_active' },
             TaskType: (firstType && firstType.name) || 'Task',
             TaskTypeKey: (firstType && firstType.key) !== undefined ? firstType.key : 1,
             groupByStatusIndex: i,
-            createdAt: new Date(),
-            updatedAt: new Date(),
         };
     });
 }
 
 // Never rejects. Sample content failing must not take a project creation down with it.
-async function seedSampleTasks(project, sprintId, rows) {
+async function seedSampleTasks(project, sprint, rows, ownerId) {
     try {
-        if (!project || !project._id || !sprintId || !Array.isArray(rows) || !rows.length) return 0;
+        const leader = String(ownerId || project.projectCreatedBy
+            || (Array.isArray(project.LeadUserId) && project.LeadUserId[0]) || '');
+        // Task_Leader is required and a String, so an empty one fails validation outright.
+        if (!project || !project._id || !sprint || !sprint._id || !leader
+            || !Array.isArray(rows) || !rows.length) {
+            logger.error('seedSampleTasks: nothing to do (missing project, sprint, owner or rows)');
+            return 0;
+        }
 
         const companyId = String(project.CompanyId);
         const startingNumber = Number(project.lastTaskId) || 0;
-        const docs = buildTaskDocs(project, sprintId, rows, startingNumber);
+        const docs = buildTaskDocs(project, sprint, rows, startingNumber, leader);
 
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
@@ -165,7 +177,7 @@ async function seedSampleTasks(project, sprintId, rows) {
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.SPRINTS,
             data: [
-                { _id: sprintId },
+                { _id: sprint._id },
                 { $inc: { tasks: docs.length } },
             ],
         }, 'findOneAndUpdate');
@@ -211,6 +223,7 @@ function demoTasksForFocus(focus) {
 
 module.exports = {
     SAMPLE_TASKS,
+    buildTaskDocs,
     TEAM_FOCUS_OPTIONS,
     demoTasksForFocus,
     WELCOME_TASKS,

@@ -254,10 +254,6 @@ exports.createCompany = (data) => {
             Promise.allSettled(allProcess).then(async() => {
                 await exports.updateCompnayIdInUserFun(userUpdateObj, companyId,data.userId) // ADD COMPANY ID IN USER DOCUMENT AFTER THE PROCESS COMPLETE
 
-                // Only after the seeds have settled: the sample project needs the company's task
-                // statuses and types to exist. Never awaited and never able to reject, so a company
-                // is created normally whether or not the sample content lands.
-                createDemoProject(companyId, data.userId, data.teamFocus);
                 setTimeout(() => {
                     emitListener(data?.eventId, {step: 3});
                     resolve(companyId);
@@ -278,6 +274,14 @@ exports.createCompany = (data) => {
                             updateCompanyFun(SCHEMA_TYPE.GOLBAL,obj,"findOneAndUpdate",companyId)
                             .then(async()=>{
                                 await storeRefferalCode(companyId,data.userId);
+
+                                // Deliberately here and not earlier. The sample project creates a
+                                // sprint, and that path reads companyData.planFeature — which is
+                                // only written by the update just above. Running before it made
+                                // checkPlanPermission throw on undefined inside a .then with no
+                                // .catch, so the sprint promise never settled and the project ended
+                                // up with no list and no tasks.
+                                await createDemoProject(companyId, data.userId, data.teamFocus);
                                 mainCtr.installSteps[7].status = "done";
                                 serviceFun.writeFile(installStepsFilePath, JSON.stringify({installSteps: mainCtr.installSteps, envVar: mainCtr.envVar}, null, 4), () => {
                                     setTimeout(() => {

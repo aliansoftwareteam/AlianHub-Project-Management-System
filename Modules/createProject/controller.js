@@ -31,9 +31,12 @@ function seedTemplateSamples (project, createObject, sprintRes) {
                 .some((t) => t && String(t.TemplateName).trim() === String(name).trim());
             rows = isBuiltIn ? sampleTasksForTemplate(name) : null;
         }
-        const sprintId = sprintRes && sprintRes.data && sprintRes.data._id;
-        if (!rows || !sprintId) return;
-        return seedSampleTasks(project, sprintId, rows);
+        // The whole sprint document, not just its id: a real task stores the sprint inline in
+        // sprintArray, and the owner id in Task_Leader.
+        const sprint = sprintRes && sprintRes.data;
+        if (!rows || !sprint || !sprint._id) return;
+        const ownerId = (createObject && createObject.projectCreatedBy) || (project && project.projectCreatedBy);
+        return seedSampleTasks(project, sprint, rows, ownerId);
     } catch (error) {
         logger.error(`seedTemplateSamples: ${error.message}`);
     }

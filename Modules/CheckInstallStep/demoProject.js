@@ -32,16 +32,25 @@ async function createDemoProject(companyId, userId, teamFocus) {
         ]);
 
         const tabList = Array.isArray(tabs) ? tabs : [];
-        // What a normal new project gets, plus the board — one of the getting-started steps points at
-        // it, and having to add the view first would be friction.
-        const views = tabList.filter((t) => t
-            && (t.viewStatus === true || String(t.value).toLowerCase() === 'board'));
-        if (!views.length) {
+        // Picked by keyName, not by the catalogue's viewStatus/setAsDefault flags: the seed writes
+        // those false on every row, because they are a per-project choice the create-project screen
+        // makes rather than a catalogue default. Board's keyName is ProjectKanban, not "board".
+        const WANTED = ['ProjectListView', 'ProjectKanban'];
+        const DEFAULT_VIEW = 'ProjectListView';
+        let chosen = tabList.filter((t) => t && WANTED.includes(t.keyName));
+        if (!chosen.length) chosen = tabList.slice(0, 1);
+        if (!chosen.length) {
             logger.error(`createDemoProject skipped: ${cid} has no project views seeded yet`);
             return false;
         }
 
-        const defaultView = tabList.find((t) => t && t.setAsDefault === true) || views[0];
+        // Same shape the create-project screen sends: the flags travel on the selection.
+        const views = chosen.map((v) => ({
+            _id: v._id,
+            viewStatus: true,
+            setAsDefault: v.keyName === DEFAULT_VIEW,
+        }));
+        const defaultViewKey = (chosen.find((v) => v.keyName === DEFAULT_VIEW) || chosen[0]).keyName;
         const statuses = (projectStatus && projectStatus[0] && projectStatus[0].settings) || [];
         const firstStatus = statuses.find((s) => s && s.isDeleted !== true);
         if (!firstStatus) {
@@ -95,10 +104,10 @@ async function createDemoProject(companyId, userId, teamFocus) {
                 taskStatusData: [{ key: 1 }, { key: 3 }, { key: 6 }, { key: 2 }],
                 projectStatusData: statuses.filter((s) => s && s.isDeleted !== true),
                 taskTypeCounts: [{ key: 1 }],
-                // Matched by _id against the company's own catalogues.
-                apps: (Array.isArray(apps) ? apps : []).map((a) => ({ _id: a._id })),
-                ProjectRequiredComponent: views.map((v) => ({ _id: v._id })),
-                ProjectRequiredDefaultComponent: defaultView.keyName,
+                // Apps travel as keys, which is what the create-project screen sends.
+                apps: (Array.isArray(apps) ? apps : []).filter((a) => a && a.appStatus === true).map((a) => a.key),
+                ProjectRequiredComponent: views,
+                ProjectRequiredDefaultComponent: defaultViewKey,
             },
         };
 
