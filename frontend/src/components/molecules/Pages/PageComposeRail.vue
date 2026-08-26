@@ -23,6 +23,7 @@
             </button>
         </form>
         <p v-if="notice" class="pcr__notice" :class="{ 'is-answer': Boolean(answer) }">{{ notice }}</p>
+        <WorkspaceAskCitations v-if="answer && citations.length" :citations="citations" />
     </div>
 </template>
 
@@ -31,6 +32,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useToast } from 'vue-toast-notification';
 import { apiRequest } from '@/services';
+import WorkspaceAskCitations from '@/components/molecules/Pages/WorkspaceAskCitations.vue';
 
 const { t } = useI18n();
 const $toast = useToast();
@@ -58,6 +60,7 @@ const instruction = ref('');
 const busy = ref(false);
 const notice = ref('');
 const answer = ref('');
+const citations = ref([]);
 const configured = ref(true);
 
 const needsQuestion = computed(() => action.value === 'ask' || action.value === 'workspace');
@@ -85,6 +88,7 @@ onMounted(() => {
 function showMissing() {
     configured.value = false;
     answer.value = '';
+    citations.value = [];
     notice.value = t('Projects.pages_ai_missing');
 }
 
@@ -96,12 +100,14 @@ function compose() {
     if (busy.value) return;
     if (needsQuestion.value && !instruction.value.trim()) {
         answer.value = '';
+        citations.value = [];
         notice.value = t('Projects.pages_ask_needed');
         return;
     }
     busy.value = true;
     notice.value = '';
     answer.value = '';
+    citations.value = [];
 
     const request = action.value === 'workspace'
         ? apiRequest('post', '/api/v2/pages/ask-workspace', { question: instruction.value })
@@ -125,6 +131,7 @@ function compose() {
         const payload = response.data.data || {};
         if (action.value === 'ask' || action.value === 'workspace' || payload.apply === false) {
             answer.value = payload.markdown || payload.previewText || '';
+            citations.value = action.value === 'workspace' && Array.isArray(payload.citations) ? payload.citations : [];
             notice.value = answer.value;
             return;
         }

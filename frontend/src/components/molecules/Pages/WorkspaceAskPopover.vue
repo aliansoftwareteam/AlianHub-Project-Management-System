@@ -18,6 +18,7 @@
                 </button>
             </form>
             <p v-if="notice" class="wap__notice" :class="{ 'is-answer': Boolean(answer) }">{{ notice }}</p>
+            <WorkspaceAskCitations v-if="answer && citations.length" :citations="citations" />
         </div>
     </div>
 </template>
@@ -27,6 +28,7 @@ import { onMounted, onUnmounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useToast } from 'vue-toast-notification';
 import { apiRequest } from '@/services';
+import WorkspaceAskCitations from '@/components/molecules/Pages/WorkspaceAskCitations.vue';
 
 const { t } = useI18n();
 const $toast = useToast();
@@ -36,6 +38,7 @@ const question = ref('');
 const busy = ref(false);
 const notice = ref('');
 const answer = ref('');
+const citations = ref([]);
 
 function onDocClick(event) {
     if (!open.value) return;
@@ -50,12 +53,14 @@ function ask() {
     if (busy.value) return;
     if (!question.value.trim()) {
         answer.value = '';
+        citations.value = [];
         notice.value = t('Projects.pages_ask_needed');
         return;
     }
     busy.value = true;
     notice.value = '';
     answer.value = '';
+    citations.value = [];
     apiRequest('post', '/api/v2/pages/ask-workspace', { question: question.value })
         .then((response) => {
             if (response.data?.isNotAi || (response.data && response.data.status === false && /not integrated/i.test(response.data.statusText || ''))) {
@@ -68,6 +73,7 @@ function ask() {
             }
             const payload = response.data.data || {};
             answer.value = payload.markdown || payload.previewText || '';
+            citations.value = Array.isArray(payload.citations) ? payload.citations : [];
             notice.value = answer.value;
         })
         .catch((error) => {
