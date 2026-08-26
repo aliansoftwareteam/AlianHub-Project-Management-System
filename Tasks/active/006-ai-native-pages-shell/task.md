@@ -16,7 +16,9 @@ Give AlianHub a first-class, AI-native Pages space next to tasks, and a visual i
 - Design tokens and restyle of the main app shell (header + nav) and Pages screens.
 - Workspace-level Pages route that reuses `Modules/Pages` (nested pages, companyId, JWT).
 - Block editor (existing Editor.js stack) for page bodies, with HTML kept for search/share.
-- AI draft / expand / summarize / outline / rewrite via the existing `llmProvider` factory.
+- AI draft / expand / summarize / outline / rewrite / ask via the existing `llmProvider` factory.
+- Workspace Ask over recent pages + task titles the caller can access.
+- Turn a page into tasks by reusing `AiTaskCreator` / `useAiTaskGenerator`.
 - Restyle project Docs view / Pages panel with the same tokens.
 
 ## Out of scope
@@ -26,12 +28,15 @@ Give AlianHub a first-class, AI-native Pages space next to tasks, and a visual i
 - Copying ClickUp purple, Notion gray, or their IA/iconography.
 
 ## Acceptance criteria
-- [ ] Workspace Pages is reachable from the main nav and can create/nest/edit/save pages.
-- [ ] Page editor is block-based; existing HTML-only pages still open.
-- [ ] AI compose uses the repo's LLM provider and can write or summarize page content.
-- [ ] Header + Pages screens use the new tokens (not #2F3990 / Notion gray).
-- [ ] Auth, companyId scoping, and socket emit-after-mutation patterns preserved.
-- [ ] App frontend builds; page helper unit tests pass.
+- [x] Workspace Pages is reachable from the main nav and can create/nest/edit/save pages.
+- [x] Page editor is block-based; existing HTML-only pages still open.
+- [x] AI compose uses the repo's LLM provider and can write or summarize page content.
+- [x] Ask answers a question about the current page without replacing it.
+- [x] Workspace Ask answers from pages + task titles the caller can access.
+- [x] Turn this page into tasks reuses AiTaskCreator with the page body as initialRequirements.
+- [x] Header + Pages screens use the new tokens (not #2F3990 / Notion gray).
+- [x] Auth, companyId scoping, and socket emit-after-mutation patterns preserved.
+- [x] App frontend builds; page helper unit tests pass.
 
 ## Constraints & notes
 - Extend `Modules/Pages` and `Modules/AIProjectGenerator/llmProvider` rather than forking.

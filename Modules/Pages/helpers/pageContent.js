@@ -230,13 +230,34 @@ function markdownToEditorData(markdown) {
     };
 }
 
+function isBlock(node) {
+    return Boolean(node && typeof node === 'object' && typeof node.type === 'string');
+}
+
+function unwrapBlockList(value, depth = 0) {
+    if (depth > 6) return [];
+    if (Array.isArray(value)) {
+        if (value.length && !isBlock(value[0]) && value[0] && typeof value[0] === 'object') {
+            return unwrapBlockList(value[0], depth + 1);
+        }
+        return value.filter(isBlock);
+    }
+    if (value && typeof value === 'object') {
+        if (Array.isArray(value.blocks) || (value.blocks && typeof value.blocks === 'object')) {
+            return unwrapBlockList(value.blocks, depth + 1);
+        }
+    }
+    return [];
+}
+
 function contentToEditorData(content) {
     if (!content) return emptyEditorData();
-    if (Array.isArray(content.blocks)) {
-        return { time: Date.now(), blocks: content.blocks, version: EDITOR_VERSION };
+    if (Array.isArray(content)) {
+        return { time: Date.now(), blocks: unwrapBlockList(content), version: EDITOR_VERSION };
     }
-    if (content.blocks && Array.isArray(content.blocks.blocks)) {
-        return content.blocks;
+    const unwrapped = content.blocks !== undefined ? unwrapBlockList(content.blocks) : null;
+    if (unwrapped && (unwrapped.length || (content.blocks && !content.html))) {
+        return { time: Date.now(), blocks: unwrapped, version: EDITOR_VERSION };
     }
     const html = content.html || '';
     return {
@@ -246,7 +267,7 @@ function contentToEditorData(content) {
     };
 }
 
-const AI_ACTIONS = ['draft', 'expand', 'summarize', 'outline', 'rewrite'];
+const AI_ACTIONS = ['draft', 'expand', 'summarize', 'outline', 'rewrite', 'ask'];
 
 function isAiAction(action) {
     return AI_ACTIONS.includes(String(action || '').toLowerCase());
@@ -265,4 +286,5 @@ module.exports = {
     markdownToBlocks,
     markdownToEditorData,
     contentToEditorData,
+    unwrapBlockList,
 };

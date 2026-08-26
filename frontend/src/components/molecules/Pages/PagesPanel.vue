@@ -10,6 +10,15 @@
                         <span v-html="ICONS.plus"></span>
                     </button>
                 </div>
+                <div v-if="workspace" class="pg__picker-wrap">
+                    <label class="pg__picker-label">{{ $t('Projects.pages_project_picker') }}</label>
+                    <select v-model="workspaceProjectId" class="pg__picker">
+                        <option value="">{{ $t('Projects.pages_project_none') }}</option>
+                        <option v-for="project in pickerProjects" :key="project._id" :value="String(project._id)">
+                            {{ project.ProjectName || project.ProjectCode || project._id }}
+                        </option>
+                    </select>
+                </div>
 
                 <div class="pg__search-wrap">
                     <span class="pg__search-icon" v-html="ICONS.search"></span>
@@ -67,6 +76,10 @@
 
                             <!-- Linking is what stops a doc being a note nobody finds: a
                                  linked doc surfaces on the task itself. -->
+                            <button v-if="taskProjectId" type="button" class="pg__btn" @click="openTurnIntoTasks">
+                                {{ $t('Projects.pages_turn_into_tasks') }}
+                            </button>
+
                             <button v-if="projectId" type="button" class="pg__btn" @click="showLinker = !showLinker">
                                 {{ $t('Projects.doc_link_tasks') }}<span v-if="linkedTasks.length" class="pg__count">{{ linkedTasks.length }}</span>
                             </button>
@@ -213,6 +226,13 @@
                 </div>
             </section>
         </div>
+        <AiTaskCreator
+            v-if="taskProjectId"
+            v-model="showAiTaskCreator"
+            :projectId="taskProjectId"
+            :sprints="aiSprints"
+            :initialRequirements="aiInitialRequirements"
+        />
     </div>
 </template>
 
@@ -221,10 +241,12 @@
 import { computed, defineProps, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useToast } from "vue-toast-notification";
 import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
 
 import TaskChipPicker from "@/components/molecules/Pages/TaskChipPicker.vue";
 import PageBlockEditor from "@/components/molecules/Pages/PageBlockEditor.vue";
 import PageComposeRail from "@/components/molecules/Pages/PageComposeRail.vue";
+import AiTaskCreator from "@/components/organisms/AiTaskCreator/AiTaskCreator.vue";
 
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
@@ -234,6 +256,7 @@ const { contentToEditorData, blocksToRawText } = pageContent.default || pageCont
 
 const { t } = useI18n();
 const $toast = useToast();
+const { getters, dispatch } = useStore();
 // getUser only resolves a name for display now — the author is taken from the JWT on the
 // server, so nothing here needs the current user's id.
 const { getUser, getTaskStatus } = useGetterFunctions();
@@ -279,7 +302,28 @@ const editorSeed = ref(null);
 const editorKey = ref('');
 const baselinePending = ref(false);
 
-const projectId = computed(() => String((props.projectData && props.projectData._id) || ''));
+const workspaceProjectId = ref('');
+const showAiTaskCreator = ref(false);
+const aiSprints = ref([]);
+const aiInitialRequirements = ref('');
+
+const pickerProjects = computed(() => {
+    const raw = getters['projectData/projects'];
+    const list = raw && Array.isArray(raw.data) ? raw.data : [];
+    return list.filter((project) => project && project._id);
+});
+
+const projectId = computed(() => String(
+    (props.projectData && props.projectData._id)
+    || workspaceProjectId.value
+    || ''
+));
+
+const taskProjectId = computed(() => String(
+    projectId.value
+    || (current.value && current.value.ProjectID)
+    || ''
+));
 const rawDraft = computed(() => blocksToRawText(contentBlocks.value) || contentHtml.value || '');
 
 const query = ref('');
@@ -409,6 +453,22 @@ watch(() => (props.projectData && props.projectData._id) || '', (id, previous) =
     if (isOpen.value) fetchPages();
 });
 
+watch(workspaceProjectId, (id, previous) => {
+    if (!props.workspace || previous === undefined || id === previous) return;
+    if (isDirty.value && !window.confirm(t('Projects.page_discard_confirm'))) {
+        workspaceProjectId.value = previous || '';
+        return;
+    }
+    current.value = null;
+    draftTitle.value = '';
+    contentHtml.value = '';
+    savedSnapshot.value = { title: '', html: '' };
+    baselinePending.value = false;
+    pages.value = [];
+    expanded.value = new Set();
+    if (isOpen.value) fetchPages();
+});
+
 function fetchPages() {
     const queryString = projectId.value ? `?projectId=${projectId.value}` : '';
     apiRequest('get', `/api/v2/pages${queryString}`)
@@ -534,6 +594,38 @@ function deletePage() {
             fetchPages();
         }
     }).catch((error) => console.error('ERROR in delete page: ', error));
+}
+
+function sprintsFromProject(project) {
+    if (!project) return [];
+    const isLive = (x) => x && (x.deletedStatusKey === 0 || x.deletedStatusKey === undefined);
+    const out = [];
+    const seen = new Set();
+    const push = (sprint, prefix) => {
+        if (!isLive(sprint) || !sprint.id) return;
+        const id = String(sprint.id);
+        if (seen.has(id)) return;
+        seen.add(id);
+        const name = sprint.name || 'Sprint';
+        out.push({ id, name: prefix ? `${prefix} / ${name}` : name });
+    };
+    Object.values(project.sprintsObj || {}).forEach((sprint) => push(sprint, ''));
+    Object.values(project.sprintsfolders || {}).forEach((folder) => {
+        if (!isLive(folder)) return;
+        Object.values(folder.sprintsObj || {}).forEach((sprint) => push(sprint, folder.name || 'Folder'));
+    });
+    return out;
+}
+
+function openTurnIntoTasks() {
+    if (!taskProjectId.value) return;
+    const project = pickerProjects.value.find((row) => String(row._id) === taskProjectId.value)
+        || (props.projectData && String(props.projectData._id) === taskProjectId.value ? props.projectData : null);
+    aiSprints.value = sprintsFromProject(project);
+    const title = (draftTitle.value || '').trim();
+    const body = (rawDraft.value || '').trim();
+    aiInitialRequirements.value = [title, body].filter(Boolean).join('\n\n');
+    showAiTaskCreator.value = true;
 }
 
 function requestClose() {
@@ -765,6 +857,9 @@ function onKeydown(e) {
 }
 onMounted(() => {
     document.addEventListener('keydown', onKeydown);
+    if (props.workspace && !pickerProjects.value.length) {
+        dispatch('projectData/setProjects', { roleType: 'currentUser' }).catch(() => {});
+    }
 });
 onBeforeUnmount(() => {
     document.removeEventListener('keydown', onKeydown);
@@ -859,6 +954,30 @@ onBeforeUnmount(() => {
     font-size: 22px; font-weight: 650; color: var(--kiln-ink);
     letter-spacing: -0.03em;
 }
+.pg__picker-wrap {
+    padding: 0 12px 10px;
+}
+.pg__picker-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--kiln-muted);
+    margin-bottom: 4px;
+}
+.pg__picker {
+    width: 100%;
+    height: 32px;
+    border: 1px solid var(--kiln-line);
+    border-radius: var(--kiln-radius-sm);
+    background: var(--kiln-canvas);
+    color: var(--kiln-ink);
+    font-size: 12.5px;
+    padding: 0 8px;
+    outline: none;
+}
+.pg__picker:focus { border-color: var(--kiln-ember); }
 
 .pg__search-wrap { position: relative; padding: 0 12px 10px; }
 .pg__search-icon {

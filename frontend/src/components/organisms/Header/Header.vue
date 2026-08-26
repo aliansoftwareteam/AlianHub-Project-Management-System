@@ -50,6 +50,7 @@
                 </div>
             </template>
             </div>
+            <WorkspaceAskPopover v-if="rules && Object.keys(rules).length" />
             <router-link class="position-re" :to="{name: 'chats', params: {cid: companyId}}" v-if="canOpenChat">
                 <img src="@/assets/images/svg/chat_icon.svg" class="cursor-pointer" id="chat_driver"/>
                 <span v-if="totalMainCounts" class="notification-tick blinking"></span>
@@ -307,6 +308,7 @@ import ClipsPanel from "@/components/molecules/Clips/ClipsPanel.vue";
 import ReminderPanel from "@/components/molecules/GeneralReminder/ReminderPanel.vue";
 import ClipRecorder from "@/components/molecules/ClipRecorder/ClipRecorder.vue";
 import TalkToTextPopover from "@/components/molecules/TalkToText/TalkToTextPopover.vue";
+import WorkspaceAskPopover from "@/components/molecules/Pages/WorkspaceAskPopover.vue";
 import DropDown from "@/components/molecules/DropDown/DropDown.vue";
 import DropDownOption from "@/components/molecules/DropDownOption/DropDownOption.vue";
 import DropDownRouterOption from "@/components/molecules/DropDownRouterOption/DropDownRouterOption.vue";

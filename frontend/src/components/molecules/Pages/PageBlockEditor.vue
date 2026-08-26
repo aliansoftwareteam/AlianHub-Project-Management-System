@@ -74,12 +74,15 @@ function initEditor() {
 
 async function applyBlocks(payload) {
     if (!editor.value || !payload) return;
-    const incoming = contentToEditorData({ blocks: payload.blocks || payload });
+    const incoming = contentToEditorData(
+        payload.blocks !== undefined ? { blocks: payload.blocks } : payload
+    );
     if (payload.mode === 'append') {
         const current = await editor.value.save();
         incoming.blocks = [...(current.blocks || []), ...(incoming.blocks || [])];
     }
-    await editor.value.render(incoming.blocks && incoming.blocks.length ? incoming : emptyEditorData());
+    const data = (incoming.blocks && incoming.blocks.length) ? incoming : emptyEditorData();
+    await editor.value.render(data);
     await emitChange();
 }
 

@@ -15,19 +15,19 @@
                 v-model="instruction"
                 type="text"
                 class="pcr__input"
-                :placeholder="$t('Projects.pages_compose_placeholder')"
+                :placeholder="placeholder"
                 :disabled="busy"
             />
             <button type="submit" class="pcr__go" :disabled="busy">
-                {{ busy ? $t('Projects.pages_composing') : $t('Projects.pages_compose') }}
+                {{ busy ? $t('Projects.pages_composing') : goLabel }}
             </button>
         </form>
-        <p v-if="notice" class="pcr__notice">{{ notice }}</p>
+        <p v-if="notice" class="pcr__notice" :class="{ 'is-answer': Boolean(answer) }">{{ notice }}</p>
     </div>
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useToast } from 'vue-toast-notification';
 import { apiRequest } from '@/services';
@@ -49,13 +49,26 @@ const actions = [
     { key: 'summarize', label: 'Projects.pages_compose_summarize' },
     { key: 'outline', label: 'Projects.pages_compose_outline' },
     { key: 'rewrite', label: 'Projects.pages_compose_rewrite' },
+    { key: 'ask', label: 'Projects.pages_compose_ask' },
+    { key: 'workspace', label: 'Projects.pages_compose_workspace' },
 ];
 
 const action = ref('draft');
 const instruction = ref('');
 const busy = ref(false);
 const notice = ref('');
+const answer = ref('');
 const configured = ref(true);
+
+const needsQuestion = computed(() => action.value === 'ask' || action.value === 'workspace');
+const placeholder = computed(() => {
+    if (action.value === 'ask') return t('Projects.pages_ask_placeholder');
+    if (action.value === 'workspace') return t('Projects.pages_workspace_ask_placeholder');
+    return t('Projects.pages_compose_placeholder');
+});
+const goLabel = computed(() => (
+    needsQuestion.value ? t('Projects.pages_ask') : t('Projects.pages_compose')
+));
 
 onMounted(() => {
     apiRequest('get', '/api/v2/pages/ai-status')
@@ -69,20 +82,40 @@ onMounted(() => {
         });
 });
 
+function showMissing() {
+    configured.value = false;
+    answer.value = '';
+    notice.value = t('Projects.pages_ai_missing');
+}
+
+function isMissing(payload) {
+    return Boolean(payload?.isNotAi || (payload && payload.status === false && /not integrated/i.test(payload.statusText || '')));
+}
+
 function compose() {
     if (busy.value) return;
+    if (needsQuestion.value && !instruction.value.trim()) {
+        answer.value = '';
+        notice.value = t('Projects.pages_ask_needed');
+        return;
+    }
     busy.value = true;
     notice.value = '';
-    apiRequest('post', '/api/v2/pages/ai', {
-        action: action.value,
-        title: props.title,
-        instruction: instruction.value,
-        currentText: props.currentText,
-        pageId: props.pageId || undefined,
-    }).then((response) => {
-        if (response.data?.isNotAi || (response.data && response.data.status === false && /not integrated/i.test(response.data.statusText || ''))) {
-            configured.value = false;
-            notice.value = t('Projects.pages_ai_missing');
+    answer.value = '';
+
+    const request = action.value === 'workspace'
+        ? apiRequest('post', '/api/v2/pages/ask-workspace', { question: instruction.value })
+        : apiRequest('post', '/api/v2/pages/ai', {
+            action: action.value,
+            title: props.title,
+            instruction: instruction.value,
+            currentText: props.currentText,
+            pageId: props.pageId || undefined,
+        });
+
+    request.then((response) => {
+        if (isMissing(response.data)) {
+            showMissing();
             return;
         }
         if (!response.data?.status) {
@@ -90,6 +123,11 @@ function compose() {
             return;
         }
         const payload = response.data.data || {};
+        if (action.value === 'ask' || action.value === 'workspace' || payload.apply === false) {
+            answer.value = payload.markdown || payload.previewText || '';
+            notice.value = answer.value;
+            return;
+        }
         emit('apply', {
             mode: action.value === 'expand' ? 'append' : 'replace',
             blocks: payload.blocks,
@@ -177,5 +215,17 @@ function compose() {
     margin: 0;
     font-size: 12px;
     color: var(--kiln-muted);
+}
+.pcr__notice.is-answer {
+    white-space: pre-wrap;
+    color: var(--kiln-ink);
+    background: var(--kiln-canvas);
+    border: 1px solid var(--kiln-line);
+    border-radius: var(--kiln-radius-sm);
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 1.5;
+    max-height: 220px;
+    overflow: auto;
 }
 </style>
