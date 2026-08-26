@@ -53,6 +53,7 @@
                 class="mc-comp-input-wrap"
                 :reply="{}"
                 :userIds="userIds"
+                :includeAlian="false"
                 :sendMessageAllowed="!disabled"
                 :loadingChat="false"
                 @enter="submit"

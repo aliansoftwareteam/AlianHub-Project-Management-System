@@ -8,8 +8,9 @@
         </div>
         <div class="message d-flex align-items-center mt-1" :style="{marginTop: (!showMessageTime ? '5px' : '')}" :class="{'right-message': message.sent, 'justify-content-between': !message.sent}">
             <div class="d-flex" :style="{paddingLeft: (!message.sent && !showUser ? '35px' : '')}">
+                <div v-if="!message.sent && showUser && isAlianComment" class="alian-mark" aria-hidden="true">A</div>
                 <UserProfile
-                    v-if="!message.sent && showUser"
+                    v-else-if="!message.sent && showUser"
                     :showDot="false"
                     class="cursor-pointer profile-image message__profile-image mr-10px"
                     :data="{
@@ -22,8 +23,8 @@
                 />
                 <div>
                     <div class="cursor-default mb-5px" :class="{'text-right': message.sent, 'text-left': !message.sent}">
-                        <span v-if="showUser" class="font-size-14 font-weight-700 mr-5px color63 show__user">
-                            {{!message.sent ? getUser(message.userId).Employee_Name : ''}}
+                        <span v-if="showUser" class="font-size-14 font-weight-700 mr-5px color63 show__user" :class="{'is-alian': isAlianComment}">
+                            {{!message.sent ? (isAlianComment ? $t('Comments.alian_name') : getUser(message.userId).Employee_Name) : ''}}
                         </span>
                         <span class="font-size-12 font-weight-300 gray text-lowercase show" v-if="showMessageTime">
                             {{getDateType(new Date(message.createdAt).getTime())}}
@@ -31,7 +32,7 @@
                     </div>
                     <div class="d-flex position-re" :class="{'justify-content-end': message.sent}">
                         <span v-if="!message.isDeleted && message.sent && new Date(message.createdAt)?.getTime() !== new Date(message.updatedAt)?.getTime()" class="font-size-10">({{$t('Comments.edited')}})</span>
-                        <div :id="message._id" class="border-radius-10-px p-10px message_id-sent" :class="{'bg-white': !message.sent, 'bg-light-blue': message.sent}" :style="`${message.type !== 'text' || message.type !== 'link' ? 'width: auto;' : ''}`">
+                        <div :id="message._id" class="border-radius-10-px p-10px message_id-sent" :class="{'bg-white': !message.sent && !isAlianComment, 'bg-light-blue': message.sent, 'is-alian': isAlianComment}" :style="`${message.type !== 'text' || message.type !== 'link' ? 'width: auto;' : ''}`">
                             <template v-if="message.isDeleted">
                                 <pre class="red font-italic" v-html="message.userId === userId ? $t('Comments.You_deleted_this_message') : $t('Comments.This_message_is_deleted')"/>
                             </template>
@@ -121,6 +122,7 @@
                                             <span>{{$t('Permissions.Read')}} {{showMore ? $t('Comments.less') : $t('Comments.more')}}</span>
                                         </div>
                                     </template>
+                                    <WorkspaceAskCitations v-if="isAlianComment && alianCitations.length" :citations="alianCitations" />
                                 </template>
                             </template>
                         </div>
@@ -175,7 +177,7 @@
 
 <script setup>
 // PACKAGES
-import { defineComponent, defineProps, inject, onMounted, ref, watch } from 'vue';
+import { defineComponent, defineProps, inject, onMounted, ref, watch, computed } from 'vue';
 import { useConvertDate, useCustomComposable, useGetterFunctions } from '@/composable';
 
 // COMPONENTS
@@ -189,7 +191,9 @@ import UserProfile from "@/components/atom/UserProfile/UserProfile.vue"
 import Spinner from "@/components/atom/SpinnerComp/SpinnerComp.vue"
 import { useProjects } from '@/composable/projects';
 import ReactionBar from '@/components/atom/ReactionBar/ReactionBar.vue';
+import WorkspaceAskCitations from '@/components/molecules/Pages/WorkspaceAskCitations.vue';
 import { apiRequest } from '@/services';
+import { isAlianAuthor } from '@/utils/alianMention';
 
 import { storageHelper } from "@/composable/commonFunction";
 const { handleStorageImageRequest } = storageHelper();
@@ -250,6 +254,12 @@ const props = defineProps({
 })
 
 const showMore = ref(false);
+const isAlianComment = computed(() => isAlianAuthor(props.message && props.message.userId));
+const alianCitations = computed(() => (
+    isAlianComment.value && Array.isArray(props.message && props.message.citations)
+        ? props.message.citations
+        : []
+));
 
 // Reactions render from a local copy so we never mutate the prop directly;
 // socket-driven prop updates (other users reacting) re-sync it via the watch.

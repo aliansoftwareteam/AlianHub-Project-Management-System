@@ -5,13 +5,19 @@
                 <template v-if="filteredUsers.length">
                     <li
                         class="d-flex align-items-center cursor-pointer p5px-p10px"
-                        :class="{'bg-blue white': selectedUserIndex === index}"
+                        :class="{
+                            'bg-blue white': selectedUserIndex === index && !data.isAlian,
+                            'mention-alian': data.isAlian,
+                            'mention-alian-on': data.isAlian && selectedUserIndex === index
+                        }"
                         v-for="(data, index) in filteredUsers"
-                        :key="index"
+                        :key="data.key || index"
                         @mouseover="selectedUserIndex = index"
                         @click="addMention(data)"
                     >
+                        <div v-if="data.isAlian" class="alian-mark" aria-hidden="true">A</div>
                         <UserProfile
+                            v-else
                             :showDot="false"
                             class="user__profile cursor-pointer mr-10px"
                             :data="{
@@ -23,6 +29,7 @@
                             :thumbnail="'30x30'"
                         />
                         <span>{{data.name}}</span>
+                        <span v-if="data.isAlian" class="alian-kicker">{{ $t('Comments.alian_kicker') }}</span>
                     </li>
                 </template>
                 <template v-else>
@@ -110,6 +117,10 @@ const props = defineProps({
         type: Array,
         default: () => []
     },
+    includeAlian: {
+        type: Boolean,
+        default: false
+    },
     showAll: {
         type: Boolean,
         default: false
@@ -137,20 +148,41 @@ const selectionIndex = ref(0);
 const mentionSearch = ref("");
 const users = ref([]);
 
-onMounted(() => {
-    users.value = props.userIds?.map((x) => {
+function alianMentionOption() {
+    return {
+        name: 'Alian',
+        image: '',
+        key: 'alian',
+        ghost: false,
+        isAlian: true
+    };
+}
+
+function rebuildUsers(ids) {
+    const mapped = (ids || []).map((x) => {
         const user = getUser(x);
         return {
             name: user.Employee_Name,
             image: user.Employee_profileImageURL,
             key: user.id,
             ghost: user.ghostUser
-        }
-    })
+        };
+    });
+    const list = [];
+    if (props.includeAlian) list.push(alianMentionOption());
+    if (props.showAll) {
+        list.push({
+            name: 'All',
+            image: defaultProfile.value,
+            key: 'everyone',
+            ghost: false
+        });
+    }
+    users.value = list.concat(mapped);
+}
 
-    // nextTick(() => {
-    //     autoResize()
-    // })
+onMounted(() => {
+    rebuildUsers(props.userIds);
 })
 
 watch(()=> props.loadingChat, (val) => {
@@ -162,23 +194,11 @@ watch(()=> props.loadingChat, (val) => {
 });
 
 watch(()=> props.userIds, (val) => {
-    users.value = val.map((x) => {
-        const user = getUser(x);
-        return {
-            name: user.Employee_Name,
-            image: user.Employee_profileImageURL,
-            key: user.id,
-            ghost: user.ghostUser
-        }
-    })
-    if(props.showAll) {
-        users.value.unshift({
-            name: "All",
-            image: defaultProfile.value,
-            key: "everyone",
-            ghost: false
-        })
-    }
+    rebuildUsers(val);
+})
+
+watch(() => [props.includeAlian, props.showAll], () => {
+    rebuildUsers(props.userIds);
 })
 
 const filteredUsers = computed(() => {

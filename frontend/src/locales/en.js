@@ -864,7 +864,7 @@ export default {
         pages_ask: "Ask",
         pages_ask_needed: "Type a question first.",
         pages_ask_placeholder: "Ask a question about this page…",
-        pages_workspace_ask_placeholder: "Ask across pages and tasks you can open…",
+        pages_workspace_ask_placeholder: "Ask across pages and tasks you can open, or type @Alian…",
         pages_citation_page: "Page",
         pages_citation_task: "Task",
         pages_turn_into_tasks: "Turn into tasks",
@@ -2591,6 +2591,8 @@ export default {
         You_deleted_this_message: "You deleted this message",
         no_user_found: "No User Found",
         unlock_comment_view: "To Unlock Comment View",
+        alian_kicker: "Workspace AI",
+        alian_name: "Alian",
     },
     PlaceHolder: {
         enter_task_type: "Enter Task Type",

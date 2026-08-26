@@ -33,6 +33,7 @@ import { useI18n } from 'vue-i18n';
 import { useToast } from 'vue-toast-notification';
 import { apiRequest } from '@/services';
 import WorkspaceAskCitations from '@/components/molecules/Pages/WorkspaceAskCitations.vue';
+import { extractAlianQuestion } from '@/utils/alianMention';
 
 const { t } = useI18n();
 const $toast = useToast();
@@ -98,7 +99,14 @@ function isMissing(payload) {
 
 function compose() {
     if (busy.value) return;
-    if (needsQuestion.value && !instruction.value.trim()) {
+    const alian = extractAlianQuestion(instruction.value);
+    if (needsQuestion.value && !instruction.value.trim() && !alian.mentioned) {
+        answer.value = '';
+        citations.value = [];
+        notice.value = t('Projects.pages_ask_needed');
+        return;
+    }
+    if (alian.mentioned && !alian.question) {
         answer.value = '';
         citations.value = [];
         notice.value = t('Projects.pages_ask_needed');
@@ -109,8 +117,10 @@ function compose() {
     answer.value = '';
     citations.value = [];
 
-    const request = action.value === 'workspace'
-        ? apiRequest('post', '/api/v2/pages/ask-workspace', { question: instruction.value })
+    const useWorkspace = action.value === 'workspace' || alian.mentioned;
+    const question = alian.mentioned ? alian.question : instruction.value;
+    const request = useWorkspace
+        ? apiRequest('post', '/api/v2/pages/ask-workspace', { question })
         : apiRequest('post', '/api/v2/pages/ai', {
             action: action.value,
             title: props.title,
@@ -129,9 +139,9 @@ function compose() {
             return;
         }
         const payload = response.data.data || {};
-        if (action.value === 'ask' || action.value === 'workspace' || payload.apply === false) {
+        if (useWorkspace || action.value === 'ask' || payload.apply === false) {
             answer.value = payload.markdown || payload.previewText || '';
-            citations.value = action.value === 'workspace' && Array.isArray(payload.citations) ? payload.citations : [];
+            citations.value = useWorkspace && Array.isArray(payload.citations) ? payload.citations : [];
             notice.value = answer.value;
             return;
         }

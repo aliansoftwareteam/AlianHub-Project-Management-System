@@ -2571,6 +2571,11 @@ const schema = {
             type: Array,
             required: false
         },
+        "citations": {
+            type: Array,
+            required: false,
+            default: []
+        },
         "pinnedMessage": {
             type: Boolean,
             default: false,
