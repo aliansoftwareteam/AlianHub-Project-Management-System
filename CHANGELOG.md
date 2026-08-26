@@ -22,7 +22,6 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 ### 🚀 Features
 
 * carry subtasks through bulk move, and add both convert actions in bulk ([92b0098](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/92b0098cf9cb0316be0c3b255abcacdf4f86ef29))
-* **tracker:** say the estimate was passed even when tracking is not capped ([276af38](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/276af38e72dab8a848cac8ea300bc32145911dbd))
 * **tracker:** tell people the estimate was passed, even when tracking is not capped ([8abb21c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8abb21c0ee799bc8b33dad2cf075834bb6039bd0))
 
 
