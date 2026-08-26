@@ -25,6 +25,18 @@ const SENTINEL_KEYS = [
     'task_total_estimate',
 ];
 
+// Off unless a deployment asks for it. The repair deletes the rules collection before it
+// re-inserts it, so on an installation with real traffic a permission check landing in that
+// window fails closed for everyone, and a re-insert that dies halfway leaves nobody with any
+// permissions at all. That is a fine trade on a fresh install and a bad one on a live company
+// with a hundred people in it, so the operator decides, not us.
+//
+// A company created from this version does not need it: it is seeded from the current
+// catalogue. This exists for a company that predates a catalogue entry. Set
+// PERMISSION_RECONCILE=true, restart, open Settings > Security & Permissions once as an admin,
+// then turn it back off.
+const reconcileEnabled = () => process.env.PERMISSION_RECONCILE === 'true';
+
 // Once per company per process. The cache this hangs off lives a week, so this is rare; and because
 // the repair is idempotent there is nothing to persist and no version number to keep in step.
 const attempted = new Set();
@@ -42,6 +54,7 @@ function findMissingSentinels(rules) {
 // unchanged or freshly re-read after a repair.
 async function reconcileCompanyRules(companyId, rules) {
     try {
+        if (!reconcileEnabled()) return rules;
         if (!companyId || attempted.has(String(companyId))) return rules;
 
         // An empty collection means seeding never finished, or is running right now. Re-seeding on
@@ -81,4 +94,6 @@ async function reconcileCompanyRules(companyId, rules) {
     }
 }
 
-module.exports = { reconcileCompanyRules, SENTINEL_KEYS, findMissingSentinels };
+module.exports = {
+    reconcileCompanyRules, SENTINEL_KEYS, findMissingSentinels, reconcileEnabled,
+};
