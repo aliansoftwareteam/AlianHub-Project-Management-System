@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { MongoDbCrudOpration } = require('./mongo-handler/mongoQueries');
 const { removeCache } = require('./commonFunctions');
@@ -68,27 +69,38 @@ const SAMPLE_TASKS = {
 const WELCOME_PROJECT_NAME = 'Welcome to AlianHub';
 const WELCOME_TASKS = [
     ["Start here — this project is a sandbox",
-        "Welcome to AlianHub. This project is example content made just for you — nothing in it touches real work, and deleting it later removes it completely.\nEach task below teaches one core part of the system. Work through them in order like a checklist: open a task, read it, do the small exercise at the end, then set its status to Complete.\nTry it now:\n1. Click this task's name to open it.\n2. What opened is the task detail — the description here, and the fields (Assignee, Priority, dates) beside it.\n3. Change the status from To Do to Complete, and watch this row move on the list."],
+        "Welcome to AlianHub. This project is example content made just for you — nothing in it touches real work, and deleting it later removes it completely.\nEach task below teaches one core part of the system. Work through them in order like a checklist: open a task, read it, do the small exercise at the end, then set its status to Complete.\nTry it now:\n1. Click this task's name to open it.\n2. What opened is the task detail — the description here, and the fields (Assignee, Priority, dates) beside it.\n3. Change the status from To Do to Complete, and watch this row move on the list.",
+        { status: 'in_progress', assign: true, dueInDays: 0, priority: 'HIGH' }],
     ["Open a task to see what it holds",
-        "A task is the basic unit of work in AlianHub. Everything about one piece of work lives on the task itself, so nobody has to dig through chat or email for the context later.\nEvery task holds: a description like this one, an assignee, a status, a priority, start and due dates, attachments, comments, subtasks, and an activity log where every change is recorded automatically.\nTry it:\n1. Open this task and look along the toolbar — hover each icon to see what it does.\n2. Find the Activity section: it already shows when this task was created.\n3. Change any field, look at Activity again, and see the change recorded with your name on it."],
+        "A task is the basic unit of work in AlianHub. Everything about one piece of work lives on the task itself, so nobody has to dig through chat or email for the context later.\nEvery task holds: a description like this one, an assignee, a status, a priority, start and due dates, attachments, comments, subtasks, and an activity log where every change is recorded automatically.\nTry it:\n1. Open this task and look along the toolbar — hover each icon to see what it does.\n2. Find the Activity section: it already shows when this task was created.\n3. Change any field, look at Activity again, and see the change recorded with your name on it.",
+        { status: 'complete', assign: true, dueInDays: -1 }],
     ["Give a task an owner",
-        "The assignee is the person responsible for a task. Work only shows up in someone's own list once it is assigned to them — an unassigned task is a task nobody starts.\nMore than one person can be assigned when the work is genuinely shared, and watchers can follow a task without owning it.\nTry it:\n1. Open this task and click the assignee control.\n2. Pick yourself — your avatar appears on this row in the list.\n3. Use the Me filter at the top of the list to see only the tasks assigned to you."],
+        "The assignee is the person responsible for a task. Work only shows up in someone's own list once it is assigned to them — an unassigned task is a task nobody starts.\nMore than one person can be assigned when the work is genuinely shared, and watchers can follow a task without owning it.\nTry it:\n1. Open this task and click the assignee control.\n2. Pick yourself — your avatar appears on this row in the list.\n3. Use the Me filter at the top of the list to see only the tasks assigned to you.",
+        { assign: true, dueInDays: 1 }],
     ["Set a priority",
-        "Priority says what matters most when everything feels urgent: Urgent, High, Medium or Low, shown as a coloured flag on every row.\nIt earns its keep in the views — sort, group and filter by priority so the team always starts at the top of the pile.\nTry it:\n1. Open this task and set the priority flag to High.\n2. Back on the list, open the Group by control at the top and choose Priority.\n3. The list reorganises into priority groups. Switch Group by back to Status when you are done."],
+        "Priority says what matters most when everything feels urgent: Urgent, High, Medium or Low, shown as a coloured flag on every row.\nIt earns its keep in the views — sort, group and filter by priority so the team always starts at the top of the pile.\nTry it:\n1. Open this task and set the priority flag to High.\n2. Back on the list, open the Group by control at the top and choose Priority.\n3. The list reorganises into priority groups. Switch Group by back to Status when you are done.",
+        { dueInDays: 2, priority: 'URGENT' }],
     ["Leave a comment",
-        "Comments keep the conversation attached to the work. Six months from now the reasoning is still on the task, instead of lost in a chat thread.\nType @ followed by a name to mention someone — they get a notification that points straight at this task.\nTry it:\n1. Open this task and find the comment box at the bottom.\n2. Write anything and post it.\n3. Hover your comment to edit it or add a reaction — comments are a conversation, not just a log."],
+        "Comments keep the conversation attached to the work. Six months from now the reasoning is still on the task, instead of lost in a chat thread.\nType @ followed by a name to mention someone — they get a notification that points straight at this task.\nTry it:\n1. Open this task and find the comment box at the bottom.\n2. Write anything and post it.\n3. Hover your comment to edit it or add a reaction — comments are a conversation, not just a log.",
+        { status: 'in_progress', assign: true, dueInDays: 3, comment: 'This is what a comment looks like — the conversation stays on the task, so the reasoning is still here months later.' }],
     ["Attach a file",
-        "Files belong with the work they are about. Attach designs, documents, screenshots or contracts to the task, and whoever opens it later finds everything in one place.\nTry it:\n1. Open this task.\n2. Drag any file from your computer onto it, or use the paperclip control.\n3. The file appears in the Attachments section — click it to preview it right here, without downloading."],
+        "Files belong with the work they are about. Attach designs, documents, screenshots or contracts to the task, and whoever opens it later finds everything in one place.\nTry it:\n1. Open this task.\n2. Drag any file from your computer onto it, or use the paperclip control.\n3. The file appears in the Attachments section — click it to preview it right here, without downloading.",
+        { dueInDays: 5, priority: 'LOW' }],
     ["Track how long something takes",
-        "AlianHub has time tracking built in, so timesheets fill themselves from real work instead of Friday-evening guesswork.\nStart the timer when you begin and stop it when you pause — or log time afterwards if you forgot. Add an estimate to a task and you can compare the plan against what actually happened.\nTry it:\n1. Open this task and start the timer control.\n2. Stop it after a few seconds — the entry is saved against this task.\n3. Open Time Sheet from the top menu: the time you just logged is already in your day."],
+        "AlianHub has time tracking built in, so timesheets fill themselves from real work instead of Friday-evening guesswork.\nStart the timer when you begin and stop it when you pause — or log time afterwards if you forgot. Add an estimate to a task and you can compare the plan against what actually happened.\nTry it:\n1. Open this task and start the timer control.\n2. Stop it after a few seconds — the entry is saved against this task.\n3. Open Time Sheet from the top menu: the time you just logged is already in your day.",
+        { status: 'in_review', dueInDays: 6 }],
     ["Break a big task into subtasks",
-        "When one task is really several pieces of work, split it into subtasks. The parent keeps the overall picture; each subtask gets its own assignee, status and dates.\nTry it:\n1. Open this task and find the Subtask section.\n2. Add two or three subtasks — the steps of something you are actually doing this week work well.\n3. Close the task and click the expand arrow on this row — your subtasks nest underneath it in the list."],
+        "When one task is really several pieces of work, split it into subtasks. The parent keeps the overall picture; each subtask gets its own assignee, status and dates.\nTry it:\n1. Open this task and find the Subtask section.\n2. Add two or three subtasks — the steps of something you are actually doing this week work well.\n3. Close the task and click the expand arrow on this row — your subtasks nest underneath it in the list.",
+        { status: 'in_progress', assign: true, dueInDays: 8, priority: 'HIGH', subtasks: ['Write the first draft', 'Review it with someone', 'Publish the final version'] }],
     ["Try a different view",
-        "The same tasks can be looked at in different ways, and the tabs above this list switch between them.\nList is the day-to-day view, grouped by status. Board turns statuses into columns you drag cards between — ideal for standups. Project Details, Comments and Activity hold this project's own information, discussion and history. Workload shows who has how much on their plate.\nTry it:\n1. Click Board in the tabs above.\n2. Drag this card from To Do to another column and back — dragging IS changing the status.\n3. Click + View to see what else is available; Calendar and Table are good ones to add next."],
+        "The same tasks can be looked at in different ways, and the tabs above this list switch between them.\nList is the day-to-day view, grouped by status. Board turns statuses into columns you drag cards between — ideal for standups. Project Details, Comments and Activity hold this project's own information, discussion and history. Workload shows who has how much on their plate.\nTry it:\n1. Click Board in the tabs above.\n2. Drag this card from To Do to another column and back — dragging IS changing the status.\n3. Click + View to see what else is available; Calendar and Table are good ones to add next.",
+        { dueInDays: 9 }],
     ["Invite someone",
-        "AlianHub is built for teams. Invite a colleague and you can assign work to each other, comment, and mention each other on tasks.\nNew people join with the Member role: they can work on projects and tasks straight away, but cannot change company settings. Roles and permissions can be adjusted any time in Settings.\nTry it:\n1. Open Settings from your profile menu, then Members.\n2. Enter a colleague's email, keep the Member role, and send the invitation.\n3. Once they accept, assign them one of these tasks and mention them in a comment with @."],
+        "AlianHub is built for teams. Invite a colleague and you can assign work to each other, comment, and mention each other on tasks.\nNew people join with the Member role: they can work on projects and tasks straight away, but cannot change company settings. Roles and permissions can be adjusted any time in Settings.\nTry it:\n1. Open Settings from your profile menu, then Members.\n2. Enter a colleague's email, keep the Member role, and send the invitation.\n3. Once they accept, assign them one of these tasks and mention them in a comment with @.",
+        { dueInDays: 11, priority: 'HIGH' }],
     ["Delete this project when you are finished",
-        "Once you have worked through these tasks, this project has done its job.\nDeleting it removes the project and everything in it — these example tasks, their comments and attachments. Nothing else in your workspace is affected.\nTry it:\n1. Find this project in the left sidebar.\n2. Open its menu (the three dots) and choose Delete.\n3. Confirm — then start your first real project with the + New button, and pick a template that matches your work."],
+        "Once you have worked through these tasks, this project has done its job.\nDeleting it removes the project and everything in it — these example tasks, their comments and attachments. Nothing else in your workspace is affected.\nTry it:\n1. Find this project in the left sidebar.\n2. Open its menu (the three dots) and choose Delete.\n3. Confirm — then start your first real project with the + New button, and pick a template that matches your work.",
+        { dueInDays: 14, priority: 'LOW' }],
 ];
 
 // Checked field by field against schema.tasks rather than copied from a project payload. The
@@ -119,40 +131,130 @@ const TASK_DEFAULTS = {
     subTasks: 0,
 };
 
+// Where a task sits. Resolved against the project's OWN status list rather than hardcoded keys,
+// because a company can edit its statuses and the demo has to follow whatever it actually has.
+function resolveStatus(taskStatusData, want) {
+    const list = Array.isArray(taskStatusData) ? taskStatusData : [];
+    const byType = (t) => list.find((s) => s && s.type === t);
+    const byName = (n) => list.find((s) => s && String(s.name).toLowerCase() === n);
+    const actives = list.filter((s) => s && s.type === 'active');
+
+    let hit = null;
+    if (want === 'in_progress') hit = byName('in progress') || actives[0];
+    else if (want === 'in_review') hit = byName('in review') || actives[1] || actives[0];
+    else if (want === 'done') hit = byType('done') || byName('done') || actives[actives.length - 1];
+    else if (want === 'complete') hit = byType('close') || byName('complete');
+    hit = hit || byType('default_active') || list[0];
+
+    return hit ? { text: hit.name, key: hit.key, type: hit.type } : null;
+}
+
+const dayMs = 24 * 60 * 60 * 1000;
+
+// Rows are [title, description] or [title, description, options]. Template rows carry no options
+// and so come out looking exactly as they did before; only the welcome set uses them, to make the
+// demo project look like a project someone has actually been working in — statuses spread across
+// the board, real owners, dates on the calendar, mixed priorities and one task with subtasks.
 function buildTaskDocs(project, sprint, rows, startingNumber, ownerId) {
     const projectId = String(project._id);
     const companyId = String(project.CompanyId);
     const code = project.ProjectCode || 'TASK';
     const firstType = (project.taskTypeCounts && project.taskTypeCounts[0]) || null;
+    const statuses = project.taskStatusData;
+    const fallback = resolveStatus(statuses) || { text: 'To Do', key: 1, type: 'default_active' };
+    const today = new Date(new Date().setHours(12, 0, 0, 0));
 
-    return rows.map((row, i) => {
-        const [TaskName, text] = row;
-        return {
-            ...TASK_DEFAULTS,
-            TaskName,
-            // The editor reads descriptionBlock; plain `description` is the text mirror alongside it.
-            // Writing only one of the two leaves the task looking empty in one place or the other.
-            description: text,
-            descriptionBlock: {
-                time: Date.now(),
-                blocks: String(text).split('\n').filter((line) => line.trim()).map((line, n) => ({ id: 'manual-entry-' + n, type: 'paragraph', data: { text: line } })),
-                version: '2.30.7',
-            },
-            TaskKey: `${code}-${startingNumber + i + 1}`,
-            ProjectID: projectId,
-            CompanyId: companyId,
-            sprintId: String(sprint._id),
-            // Real tasks carry the whole sprint document here, not an array, and Task_Leader is a
-            // user id string. status is an object too — every existing task in the wild has all
-            // three in exactly this shape.
-            sprintArray: sprint,
-            Task_Leader: ownerId,
-            status: { text: 'To Do', key: 1, type: 'default_active' },
-            TaskType: (firstType && firstType.name) || 'Task',
-            TaskTypeKey: (firstType && firstType.key) !== undefined ? firstType.key : 1,
-            groupByStatusIndex: i,
-        };
+    const describe = (text) => ({
+        description: text,
+        descriptionBlock: {
+            time: Date.now(),
+            blocks: String(text).split('\n').filter((line) => line.trim())
+                .map((line, n) => ({ id: 'manual-entry-' + n, type: 'paragraph', data: { text: line } })),
+            version: '2.30.7',
+        },
     });
+
+    const base = (TaskName, text, n) => ({
+        ...TASK_DEFAULTS,
+        TaskName,
+        ...describe(text),
+        TaskKey: `${code}-${n}`,
+        ProjectID: projectId,
+        CompanyId: companyId,
+        sprintId: String(sprint._id),
+        // Real tasks carry the whole sprint document here, not an array, and Task_Leader is a
+        // user id string. status is an object too — every existing task in the wild has all
+        // three in exactly this shape.
+        sprintArray: sprint,
+        Task_Leader: ownerId,
+        status: fallback,
+        statusType: fallback.type,
+        statusKey: fallback.key,
+        TaskType: (firstType && firstType.name) || 'Task',
+        TaskTypeKey: (firstType && firstType.key) !== undefined ? firstType.key : 1,
+    });
+
+    const docs = [];
+    const comments = [];
+    let n = startingNumber;
+
+    rows.forEach((row, i) => {
+        const [TaskName, text, opts = {}] = row;
+        n += 1;
+
+        // Ids are generated up front so a subtask can name its parent in the same insert.
+        const _id = new mongoose.Types.ObjectId();
+        const doc = { ...base(TaskName, text, n), _id, groupByStatusIndex: i };
+
+        const status = opts.status ? resolveStatus(statuses, opts.status) : null;
+        if (status) {
+            doc.status = status;
+            doc.statusType = status.type;
+            doc.statusKey = status.key;
+        }
+        if (opts.assign) doc.AssigneeUserId = [ownerId];
+        if (opts.priority) doc.Task_Priority = opts.priority;
+        if (opts.dueInDays !== undefined) doc.DueDate = new Date(today.getTime() + (opts.dueInDays * dayMs));
+
+        const kids = Array.isArray(opts.subtasks) ? opts.subtasks : [];
+        doc.subTasks = kids.length;
+        docs.push(doc);
+
+        kids.forEach((kidName, k) => {
+            n += 1;
+            docs.push({
+                ...base(kidName, `An example subtask of "${TaskName}".`, n),
+                _id: new mongoose.Types.ObjectId(),
+                isParentTask: false,
+                ParentTaskId: String(_id),
+                subTasks: 0,
+                groupByStatusIndex: k,
+                ...(k === 0 ? { status: resolveStatus(statuses, 'complete') || fallback } : {}),
+            });
+            if (k === 0) {
+                const last = docs[docs.length - 1];
+                last.statusType = last.status.type;
+                last.statusKey = last.status.key;
+            }
+        });
+
+        if (opts.comment) {
+            comments.push({
+                project: false,
+                projectId,
+                taskId: String(_id),
+                sprintId: String(sprint._id),
+                userId: ownerId,
+                type: 'text',
+                message: opts.comment,
+                isDeleted: false,
+                hasReply: false,
+                mentionIds: [],
+            });
+        }
+    });
+
+    return { docs, comments };
 }
 
 // Never rejects. Sample content failing must not take a project creation down with it.
@@ -169,12 +271,23 @@ async function seedSampleTasks(project, sprint, rows, ownerId) {
 
         const companyId = String(project.CompanyId);
         const startingNumber = Number(project.lastTaskId) || 0;
-        const docs = buildTaskDocs(project, sprint, rows, startingNumber, leader);
+        const { docs, comments } = buildTaskDocs(project, sprint, rows, startingNumber, leader);
 
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
             data: [docs],
         }, 'insertMany');
+
+        // Comments are a nice-to-have: one example so the chat column is not blank. Their own
+        // failure must not lose the tasks that were already written.
+        if (comments.length) {
+            await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.COMMENTS,
+                data: [comments],
+            }, 'insertMany').catch((error) => {
+                logger.error(`seedSampleTasks: example comment skipped — ${error.message}`);
+            });
+        }
 
         // TaskKey numbering comes off lastTaskId, so it has to move or the next real task collides.
         await MongoDbCrudOpration(companyId, {
@@ -185,11 +298,13 @@ async function seedSampleTasks(project, sprint, rows, ownerId) {
             ],
         }, 'findOneAndUpdate');
 
+        // Only parents count towards the sprint total, the same as anywhere else in the app.
+        const parents = docs.filter((d) => d.isParentTask !== false).length;
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.SPRINTS,
             data: [
                 { _id: sprint._id },
-                { $inc: { tasks: docs.length } },
+                { $inc: { tasks: parents } },
             ],
         }, 'findOneAndUpdate');
 
