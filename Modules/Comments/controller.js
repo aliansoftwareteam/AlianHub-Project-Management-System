@@ -7,7 +7,7 @@ const { replaceObjectKey } = require("../Auth/helper");
 const socketEmitter = require('../../event/socketEventEmitter');
 const { escapeRegex } = require("../../utils/escapeRegex");
 const { parseMentionIds } = require("./helpers/parseMentions");
-const { maybeReplyAsAlianSafe } = require("./helpers/alianReply");
+const { maybeReplyAsAlianSafe, emitCommentInsert } = require("./helpers/alianReply");
 const { handleNotificationtFun } = require("../notification/prepare-notification-data/controllerV2");
 const { getRoleType, isPrivileged } = require("../../Config/permissionGuard");
 
@@ -87,14 +87,7 @@ exports.save = async (req, res) => {
         }
 
         const response = await MongoDbCrudOpration(req.headers['companyid'], query, "save");
-        if (data?.objId?.projectId && data?.objId?.taskId && data?.objId?.sprintId) {
-            socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments' });
-        } else if(data?.taskId === "default"){
-            socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments' });
-        }
-        else {
-            socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments_project' });
-        }
+        emitCommentInsert(response);
         if (mentionIds.length && response && response._id) {
             notifyMentions(req.headers['companyid'], response, mentionIds)
                 .catch((err) => logger.error(`[mentions] notify failed: ${err.message}`));

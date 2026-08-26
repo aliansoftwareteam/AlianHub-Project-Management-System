@@ -11,6 +11,7 @@ const {
     citationsForComment,
     buildAlianComment,
 } = require('./alianMention');
+const { serializeCommentForSocket, commentRoomPrefix } = require('./commentThread');
 
 const NO_QUESTION_TEXT = 'Ask a question after @Alian — I will look across pages and tasks you can open.';
 const AI_MISSING_TEXT = 'Connect an LLM in your environment to ask Alian from comments.';
@@ -21,18 +22,15 @@ function asPlain(doc) {
     return doc;
 }
 
-function emitCommentInsert(saved) {
-    const data = asPlain(saved);
-    const isTaskThread = data
-        && data.projectId
-        && data.sprintId
-        && data.taskId
-        && String(data.taskId) !== 'default';
+function emitCommentInsert(saved, source) {
+    const data = serializeCommentForSocket(saved, source);
+    const thread = commentRoomPrefix(data);
+    if (!thread) return;
     socketEmitter.emit('insert', {
         type: 'insert',
         data,
         updatedFields: {},
-        module: isTaskThread ? 'comments' : 'comments_project',
+        module: thread.module,
     });
 }
 
@@ -45,7 +43,7 @@ async function saveAlianComment(companyId, source, message, citations) {
         type: SCHEMA_TYPE.COMMENTS,
         data: payload,
     }, 'save');
-    emitCommentInsert(saved);
+    emitCommentInsert(saved, source);
     return saved;
 }
 
@@ -86,4 +84,5 @@ module.exports = {
     AI_MISSING_TEXT,
     maybeReplyAsAlian,
     maybeReplyAsAlianSafe,
+    emitCommentInsert,
 };

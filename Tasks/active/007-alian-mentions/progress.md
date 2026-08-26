@@ -9,7 +9,7 @@
 - [x] Keep page-content tests green; frontend build
 
 ## Last step
-Draft PR #517 opened. Unit tests (83) and frontend production build passed.
+Fixed live-refresh so Alian follow-ups appear in the open Comments thread without reopening the modal.
 
 ## Blockers
 None.
@@ -25,4 +25,5 @@ None.
 - `jest` — 83 passing (alian-mention, page-content, page-rules, parse-mentions, first-run-checklist).
 - `cd frontend && npm run build` — DONE.
 - Draft PR: https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/517
+- Live-refresh gap: Alian row saved but missing from the open thread until modal reopen. Emit payload now serializes `projectId` / `sprintId` / `taskId` / `_id` to hex strings and `commentSocket` looks up rooms with that prefix. Client insert accepts `userId: alian` and does not require a reload.
 

@@ -1270,7 +1270,15 @@ function getMessages() {
 }
 
 function getMessageId(data = {}) {
-    return data?._id ? String(data._id) : (data?.id ? String(data.id) : "");
+    if (!data) return "";
+    const raw = data._id != null ? data._id : data.id;
+    if (raw == null || raw === "") return "";
+    if (typeof raw === "object") {
+        if (raw.$oid) return String(raw.$oid);
+        if (typeof raw.toHexString === "function") return raw.toHexString();
+    }
+    const id = String(raw);
+    return id === "[object Object]" ? "" : id;
 }
 
 function findMessageIndexById(data = {}) {
@@ -1283,7 +1291,12 @@ function findMessageIndexById(data = {}) {
 }
 
 function decorateIncomingMessage(docData) {
-    const obj = {...docData, sent: docData.userId === userId.value};
+    const obj = {...docData, sent: String(docData.userId) === String(userId.value)};
+    const id = getMessageId(obj);
+    if (id) {
+        obj._id = id;
+        obj.id = id;
+    }
     const messageText = obj.message || "";
     obj.overflow = (obj.type === 'text' || obj.type === 'link')
         ? messageText.length > 465
@@ -1314,10 +1327,12 @@ function upsertIncomingComment(docData, {replaceSending = false, incrementTotal 
             type = docData.type;
             name = docData.mediaName;
         }
-        const sendingIndex = messages.value.findIndex((x) => (x.isSending && x.type === type && x.mediaName === name));
-        if(sendingIndex > -1){
-            messages.value[sendingIndex] = obj;
-            return false;
+        if(type && name) {
+            const sendingIndex = messages.value.findIndex((x) => (x.isSending && x.type === type && x.mediaName === name));
+            if(sendingIndex > -1){
+                messages.value[sendingIndex] = obj;
+                return false;
+            }
         }
     }
 
@@ -1343,7 +1358,8 @@ function handleSocketData() {
     
 
     socket.value.on("commentInsert",(data)=> {
-        let docData = data.fullDocument;
+        let docData = data && (data.fullDocument || data);
+        if(!docData) return;
         upsertIncomingComment(docData, {replaceSending: true, incrementTotal: true});
     })
 

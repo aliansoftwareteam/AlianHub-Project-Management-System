@@ -6,6 +6,7 @@ const {
     findRoomsByPrefix,
 } = require('../helper');
 const socketEmitter = require('../../event/socketEventEmitter');
+const { commentRoomPrefix } = require('../../Modules/Comments/helpers/commentThread');
 
 exports.commentSocketHandler = ({ socket, namespace }) => {
     socket.on('joinCommentRoom', (data) => {
@@ -62,22 +63,15 @@ function setEventName(type) {
 }
 
 const handleCommentChange = (changeData, includeUpdatedFields = false) => {
-    // Both modules share the same emit shape; the only difference is the
-    // prefix used to find subscribed rooms.
-    let prefix;
-    if (changeData.module === 'comments') {
-        const { projectId, sprintId, taskId } = changeData.data;
-        prefix = `comments_${projectId}_${sprintId}_${taskId}`;
-    } else if (changeData.module === 'comments_project') {
-        prefix = `comments_project_${changeData.data.projectId}`;
-    } else {
-        return;
-    }
+    if (!changeData || !changeData.data) return;
+    const thread = commentRoomPrefix(changeData.data);
+    const prefix = thread
+        ? thread.prefix
+        : (changeData.module === 'comments_project'
+            ? `comments_project_${changeData.data.projectId}`
+            : '');
+    if (!prefix) return;
 
-    // SOCKET-PERFORMANCE-PLAN #1 (Phase 2): O(1) prefix lookup replaces the
-    // full-array filter + `uniqueRooms` dedup helper. The Map-based index
-    // is already deduped by construction (key = roomName), so a second-pass
-    // dedup is no longer needed.
     const relatedRooms = findRoomsByPrefix(prefix);
     if (!relatedRooms.length) return;
 
@@ -87,11 +81,11 @@ const handleCommentChange = (changeData, includeUpdatedFields = false) => {
         ...(includeUpdatedFields && { updatedFields: changeData.updatedFields }),
     };
 
-    relatedRooms.forEach(data => {
-        // SOCKET-PERFORMANCE-PLAN #5 (Phase 2): see taskSocket.js — small-Set
-        // membership check beats scanning the namespace's full adapter.rooms.
-        if (!data.socket.rooms.has(data.roomName)) return;
-        data.namespace.to(data.roomName).emit(eventName, emitData);
+    relatedRooms.forEach((entry) => {
+        if (!entry.socket || entry.socket.disconnected) return;
+        const rooms = entry.socket.rooms;
+        if (rooms && typeof rooms.has === 'function' && !rooms.has(entry.roomName)) return;
+        entry.namespace.to(entry.roomName).emit(eventName, emitData);
     });
 };
 
@@ -103,3 +97,5 @@ socketEmitter.on('comments:update', changeData => handleCommentChange(changeData
 socketEmitter.on('comments:insert', changeData => handleCommentChange(changeData, false));
 socketEmitter.on('comments_project:update', changeData => handleCommentChange(changeData, true));
 socketEmitter.on('comments_project:insert', changeData => handleCommentChange(changeData, false));
+
+exports.handleCommentChange = handleCommentChange;
