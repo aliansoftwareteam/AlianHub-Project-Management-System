@@ -1,9 +1,10 @@
 <template>
-    <div v-if="isOpen" class="pg" :class="{ 'pg--embedded': embedded }" @click.self="embedded ? null : requestClose()">
+    <div v-if="isOpen" class="pg" :class="{ 'pg--embedded': embedded, 'pg--workspace': workspace }" @click.self="embedded || workspace ? null : requestClose()">
         <div class="pg__shell">
             <!-- ─── Sidebar: the page tree ─────────────────────────────── -->
             <aside class="pg__side">
                 <div class="pg__side-head">
+                    <span v-if="workspace" class="pg__side-kicker">{{ $t('Projects.pages_space_kicker') }}</span>
                     <span class="pg__side-title">{{ $t('Projects.pages') }}</span>
                     <button type="button" class="pg__icon-btn" :title="$t('Projects.add_page')" @click="createPage(null)">
                         <span v-html="ICONS.plus"></span>
@@ -66,7 +67,7 @@
 
                             <!-- Linking is what stops a doc being a note nobody finds: a
                                  linked doc surfaces on the task itself. -->
-                            <button type="button" class="pg__btn" @click="showLinker = !showLinker">
+                            <button v-if="projectId" type="button" class="pg__btn" @click="showLinker = !showLinker">
                                 {{ $t('Projects.doc_link_tasks') }}<span v-if="linkedTasks.length" class="pg__count">{{ linkedTasks.length }}</span>
                             </button>
 
@@ -87,7 +88,7 @@
                             <button type="button" class="pg__icon-btn pg__icon-btn--danger" :title="$t('Projects.delete')" @click="deletePage">
                                 <span v-html="ICONS.trash"></span>
                             </button>
-                            <button v-if="!embedded" type="button" class="pg__icon-btn" :title="$t('Projects.close')" @click="requestClose">
+                            <button v-if="!embedded && !workspace" type="button" class="pg__icon-btn" :title="$t('Projects.close')" @click="requestClose">
                                 <span v-html="ICONS.close"></span>
                             </button>
                         </div>
@@ -107,8 +108,8 @@
 
                     <!-- The same picker, used to attach rather than to insert text. -->
                     <TaskChipPicker
-                        v-if="showLinker"
-                        :project-id="String(props.projectData._id)"
+                        v-if="showLinker && projectId"
+                        :project-id="projectId"
                         @pick="linkTask"
                         @close="showLinker = false"
                     />
@@ -129,16 +130,24 @@
                          document under the cursor, which is the flicker. Seed it once per
                          doc and only listen after that. -->
                     <div class="pg__doc">
-                        <VueEditor
+                        <PageBlockEditor
                             v-if="mode === 'edit'"
                             :key="editorKey"
-                            :modelValue="editorSeed"
-                            class="pg__editor"
+                            ref="blockEditor"
+                            :seed="editorSeed"
+                            :editor-key="editorKey"
+                            @change="onBlockChange"
                             @ready="onEditorReady"
-                            @update:modelValue="onEditorInput"
                         />
                         <div v-else class="pg__preview ql-editor" v-html="previewHtml"></div>
                     </div>
+                    <PageComposeRail
+                        v-if="mode === 'edit'"
+                        :page-id="current._id ? String(current._id) : ''"
+                        :title="draftTitle"
+                        :current-text="rawDraft"
+                        @apply="onComposeApply"
+                    />
                     <!-- Share. Two separate questions, so they are asked separately: who
                          inside the company can open the doc, and whether it also has a link
                          that needs no login at all. -->
@@ -199,6 +208,7 @@
                     </button>
                     <span class="pg__blank-icon" v-html="ICONS.doc"></span>
                     <p class="pg__blank-text">{{ $t('Projects.select_page') }}</p>
+                    <p class="pg__blank-hint">{{ $t('Projects.pages_blank_hint') }}</p>
                     <button type="button" class="pg__btn pg__btn--primary" @click="createPage(null)">{{ $t('Projects.add_page') }}</button>
                 </div>
             </section>
@@ -209,17 +219,18 @@
 <script setup>
 // PACKAGES
 import { computed, defineProps, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { VueEditor } from "vue3-editor";
 import { useToast } from "vue-toast-notification";
 import { useI18n } from "vue-i18n";
 
-// COMPONENTS
 import TaskChipPicker from "@/components/molecules/Pages/TaskChipPicker.vue";
+import PageBlockEditor from "@/components/molecules/Pages/PageBlockEditor.vue";
+import PageComposeRail from "@/components/molecules/Pages/PageComposeRail.vue";
 
-// UTILS
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useGetterFunctions } from "@/composable";
+import pageContent from '@pageContent';
+const { contentToEditorData, blocksToRawText } = pageContent.default || pageContent;
 
 const { t } = useI18n();
 const $toast = useToast();
@@ -246,15 +257,11 @@ const ICONS = {
 };
 
 const props = defineProps({
-    projectData: { type: Object, required: true },
+    projectData: { type: Object, default: () => ({}) },
     modelValue: { type: Boolean, default: false },
-    // Open straight onto this doc. Set when the panel is opened from somewhere that
-    // already named one — the Docs list on a task, for instance.
     openDocId: { type: String, default: '' },
-    // Rendered as a project view rather than an overlay: no backdrop, fills its
-    // container, and there is nothing to close back to — so the close controls
-    // and click-outside are dropped.
     embedded: { type: Boolean, default: false },
+    workspace: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['update:modelValue']);
@@ -263,16 +270,17 @@ const pages = ref([]);
 const current = ref(null);
 const draftTitle = ref('');
 const contentHtml = ref('');
+const contentBlocks = ref(null);
 const savedSnapshot = ref({ title: '', html: '' });
 const isSaving = ref(false);
+const blockEditor = ref(null);
 
-// What the editor was handed when it mounted. Deliberately NOT contentHtml: that changes
-// on every keystroke, and vue3-editor reacts to a changed modelValue by overwriting Quill's
-// DOM. Bumping editorKey is what remounts the editor onto a different document.
-const editorSeed = ref('');
+const editorSeed = ref(null);
 const editorKey = ref('');
-// Set when a doc is opened, cleared once Quill has told us how it renders that doc.
 const baselinePending = ref(false);
+
+const projectId = computed(() => String((props.projectData && props.projectData._id) || ''));
+const rawDraft = computed(() => blocksToRawText(contentBlocks.value) || contentHtml.value || '');
 
 const query = ref('');
 const expanded = ref(new Set());
@@ -353,7 +361,7 @@ const nameOf = (id) => (id ? (getUser(String(id))?.Employee_Name || '—') : '�
 
 // Embedded as a view there is no open/close cycle, so it is open from the start
 // and the watch below must fire immediately or the tree would never load.
-const isOpen = computed(() => props.embedded || props.modelValue);
+const isOpen = computed(() => props.embedded || props.workspace || props.modelValue);
 
 watch(isOpen, (open) => {
     if (open) {
@@ -380,6 +388,7 @@ watch(() => props.openDocId, (id) => {
 // changes — so nothing above re-ran and the previous project's tree and open doc
 // stayed on screen until a tab change or reload forced a rebuild.
 watch(() => (props.projectData && props.projectData._id) || '', (id, previous) => {
+    if (props.workspace) return;
     if (!id || !previous || id === previous) return;
     // Nothing here autosaves (see isDirty), and the switch has already happened,
     // so a confirm could not undo it. Say plainly that the edits are going rather
@@ -401,7 +410,8 @@ watch(() => (props.projectData && props.projectData._id) || '', (id, previous) =
 });
 
 function fetchPages() {
-    apiRequest('get', `/api/v2/pages?projectId=${props.projectData._id}`)
+    const queryString = projectId.value ? `?projectId=${projectId.value}` : '';
+    apiRequest('get', `/api/v2/pages${queryString}`)
     .then((response) => {
         pages.value = response.data?.status ? (response.data.data || []) : [];
         // Open every branch that has children the first time the panel loads, so the
@@ -435,10 +445,9 @@ function openPage(id) {
             current.value = response.data.data;
             draftTitle.value = current.value.title || '';
             contentHtml.value = (current.value.content && current.value.content.html) || '';
+            contentBlocks.value = contentToEditorData(current.value.content);
             savedSnapshot.value = { title: draftTitle.value, html: contentHtml.value };
-            // A fresh editor for this doc; the snapshot's html is provisional until Quill
-            // says how it renders it (see onEditorReady).
-            editorSeed.value = contentHtml.value;
+            editorSeed.value = current.value.content || { html: contentHtml.value };
             editorKey.value = String(id);
             baselinePending.value = true;
             isPrivate.value = String(current.value.visibility || '') === 'private';
@@ -460,7 +469,7 @@ function createPage(parentPageId) {
     if (!confirmDiscard()) return;
     apiRequest('post', '/api/v2/pages', {
         title: t('Projects.untitled_page'),
-        projectId: props.projectData._id,
+        ...(projectId.value ? { projectId: projectId.value } : {}),
         ...(parentPageId ? { parentPageId: String(parentPageId) } : {}),
     }).then((response) => {
         if (response.data?.status) {
@@ -488,6 +497,7 @@ function savePage() {
     apiRequest('put', `/api/v2/pages/${current.value._id}`, {
         title: sent.title,
         contentHtml: sent.html,
+        contentBlocks: contentBlocks.value,
     }).then((response) => {
         if (response.data?.status) {
             // Compare against what was SENT, not against the fields now: anything typed
@@ -712,59 +722,26 @@ function openPreview() {
  * stands — seeding it with the text as LOADED would silently undo everything typed since.
  */
 function openEditor() {
-    editorSeed.value = contentHtml.value;
+    editorSeed.value = current.value ? current.value.content : { html: contentHtml.value };
     mode.value = 'edit';
 }
 
-/**
- * Quill has rendered the seed. Take what it actually shows as the truth from here on.
- *
- * Quill does not render html back verbatim: an empty body becomes `<p><br></p>` (which it
- * then reports as ''), and anything it has no format for is dropped. So the stored html
- * and Quill's html are routinely different with nobody having typed a character — which is
- * why closing an untouched doc still asked about unsaved changes.
- */
-// Typing "www.alianhub.com" into the link box stored it verbatim, and a href with
-// no scheme is resolved against the current page — so the link went to
-// localhost:8080/www.alianhub.com instead of the site. Give a scheme-less URL an
-// https:// prefix before Quill stores it.
-//
-// Anything that already carries a scheme is passed straight through to Quill's own
-// sanitiser, so its protocol whitelist still rejects javascript: and friends — this
-// only fills in what the user left out.
-const URL_HAS_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
-function patchLinkSanitizer(quill) {
-    const Link = quill && quill.constructor && quill.constructor.import('formats/link');
-    if (!Link || Link.__alianhubAbsolute) return;
-    const original = Link.sanitize.bind(Link);
-    Link.sanitize = (value) => {
-        const url = String(value == null ? '' : value).trim();
-        if (!url || URL_HAS_SCHEME.test(url) || url.startsWith('#') || url.startsWith('/')) return original(url);
-        return original(`https://${url}`);
-    };
-    Link.__alianhubAbsolute = true;
-}
-
-function onEditorReady(quill) {
-    patchLinkSanitizer(quill);
-    // Flush first. The stored html was written straight into the element, and Quill only
-    // takes it in when its MutationObserver next runs — a microtask later. Reading before
-    // that returns our own string rather than Quill's rendering of it, and the difference
-    // would arrive a moment afterwards looking exactly like someone had typed. 'silent'
-    // normalises without announcing a text change.
-    quill.update('silent');
-    const html = quill.getHTML() === '<p><br></p>' ? '' : quill.getHTML();
-    contentHtml.value = html;
-    // Only for a doc just opened. Coming back from preview the editor remounts too, and
-    // adopting a baseline there would mark genuinely unsaved edits as saved.
+function onEditorReady() {
     if (baselinePending.value) {
         baselinePending.value = false;
-        savedSnapshot.value = { ...savedSnapshot.value, html };
+        savedSnapshot.value = { ...savedSnapshot.value, html: contentHtml.value };
     }
 }
 
-function onEditorInput(html) {
+function onBlockChange({ blocks, html }) {
+    contentBlocks.value = blocks;
     contentHtml.value = html;
+}
+
+function onComposeApply(payload) {
+    if (blockEditor.value && blockEditor.value.applyBlocks) {
+        blockEditor.value.applyBlocks(payload);
+    }
 }
 
 function formatStamp(value) {
@@ -775,19 +752,15 @@ function formatStamp(value) {
     return `${day}, ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
-// Ctrl/Cmd+S saves; Esc closes. Both only while the panel is open, and both are
-// removed on unmount so a closed panel does not keep swallowing the shortcut.
 function onKeydown(e) {
-    if (!props.modelValue) return;
+    if (!isOpen.value) return;
     if ((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === 's') {
         e.preventDefault();
         savePage();
     } else if (e.key === 'Escape') {
-        // Esc closes whatever is layered on top first, so it never skips straight past
-        // an open popover to closing the whole panel.
         if (showShare.value) { showShare.value = false; return; }
         if (showLinker.value) { showLinker.value = false; return; }
-        requestClose();
+        if (!props.embedded && !props.workspace) requestClose();
     }
 }
 onMounted(() => {
@@ -802,22 +775,23 @@ onBeforeUnmount(() => {
 .pg {
     position: fixed;
     inset: 0;
-    background: rgba(23, 25, 35, 0.45);
+    background: rgba(27, 47, 40, 0.42);
     z-index: 1000;
     display: flex;
     align-items: center;
     justify-content: center;
+    font-family: var(--kiln-font-body);
 }
 /* A document needs room. The old 960×640 card left about a third of the screen for
    the body; this is the writing surface, so it takes the screen. */
 .pg__shell {
-    background: #fff;
-    border-radius: 12px;
+    background: var(--kiln-canvas);
+    border-radius: var(--kiln-radius);
     width: min(1240px, 96vw);
     height: min(860px, 92vh);
     display: flex;
     overflow: hidden;
-    box-shadow: 0 18px 48px rgba(23, 25, 35, 0.22);
+    box-shadow: var(--kiln-shadow);
 }
 /* As a project view it sits in the page flow, so it drops the backdrop, the
    centring and the floating-card treatment and simply fills its container. */
@@ -833,26 +807,58 @@ onBeforeUnmount(() => {
     width: 100%;
     height: 100%;
     min-height: 520px;
-    border-radius: 8px;
+    border-radius: var(--kiln-radius);
     box-shadow: none;
-    border: 1px solid #eef0f6;
+    border: 1px solid var(--kiln-line);
+}
+.pg--workspace {
+    position: static;
+    inset: auto;
+    background: var(--kiln-paper);
+    z-index: auto;
+    display: block;
+    height: 100%;
+}
+.pg--workspace .pg__shell {
+    width: 100%;
+    height: 100%;
+    min-height: calc(100dvh - var(--kiln-header-h, 58px));
+    border-radius: 0;
+    box-shadow: none;
+    flex-direction: row-reverse;
+    background: var(--kiln-canvas);
 }
 
 /* ── sidebar ─────────────────────────────────────────── */
 .pg__side {
-    width: 260px;
-    flex: 0 0 260px;
-    border-right: 1px solid #edeff5;
-    background: #fafbfd;
+    width: 280px;
+    flex: 0 0 280px;
+    border-right: 1px solid var(--kiln-line);
+    background: var(--kiln-paper);
     display: flex;
     flex-direction: column;
     min-height: 0;
 }
-.pg__side-head {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 14px 12px 10px 16px;
+.pg--workspace .pg__side {
+    border-right: 0;
+    border-left: 1px solid var(--kiln-line);
 }
-.pg__side-title { font-size: 14px; font-weight: 700; color: #1f212a; }
+.pg__side-head {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    padding: 18px 14px 10px 18px;
+    flex-wrap: wrap;
+}
+.pg__side-kicker {
+    display: block; width: 100%;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--kiln-ember);
+    margin-bottom: 2px;
+}
+.pg__side-title {
+    font-family: var(--kiln-font-display);
+    font-size: 22px; font-weight: 650; color: var(--kiln-ink);
+    letter-spacing: -0.03em;
+}
 
 .pg__search-wrap { position: relative; padding: 0 12px 10px; }
 .pg__search-icon {
@@ -866,18 +872,24 @@ onBeforeUnmount(() => {
     border: 1px solid #e3e6ef; border-radius: 7px;
     background: #fff; font-size: 12.5px; color: #1f212a; outline: none;
 }
-.pg__search:focus { border-color: #7b68ee; }
+.pg__search:focus { border-color: var(--kiln-ember); }
 .pg__search::placeholder { color: #b0b6c6; }
 
 .pg__tree { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 8px 12px; }
 .pg__empty { color: #9aa0b4; font-size: 12px; padding: 14px 8px; }
 .pg__row {
     display: flex; align-items: center; gap: 4px;
-    height: 30px; padding-right: 6px;
-    border-radius: 7px; cursor: pointer; color: #3a3f52;
+    min-height: 34px; padding-right: 6px;
+    border-radius: 0; cursor: pointer; color: var(--kiln-ink-soft);
+    border-left: 3px solid transparent;
 }
-.pg__row:hover { background: #f0f2f8; }
-.pg__row.is-active { background: #efecff; color: #2f3990; font-weight: 600; }
+.pg__row:hover { background: var(--kiln-paper-2); }
+.pg__row.is-active {
+    background: transparent;
+    color: var(--kiln-ink);
+    font-weight: 600;
+    border-left-color: var(--kiln-ember);
+}
 .pg__twisty {
     flex: 0 0 14px; width: 14px; height: 14px;
     display: inline-flex; align-items: center; justify-content: center;
@@ -897,7 +909,7 @@ onBeforeUnmount(() => {
     border-radius: 4px; cursor: pointer; opacity: 0;
 }
 .pg__row:hover .pg__row-add { opacity: 1; }
-.pg__row-add:hover { background: #e3e6f5; color: #2f3990; }
+.pg__row-add:hover { background: var(--kiln-paper-2); color: var(--kiln-ember); }
 .pg__row-add :deep(svg) { width: 12px; height: 12px; }
 
 /* ── main ────────────────────────────────────────────── */
@@ -912,11 +924,13 @@ onBeforeUnmount(() => {
 .pg__title {
     flex: 1 1 auto; min-width: 0;
     border: none; outline: none; background: transparent;
-    font-size: 19px; font-weight: 700; color: #1f212a;
+    font-family: var(--kiln-font-display);
+    font-size: 28px; font-weight: 650; color: var(--kiln-ink);
+    letter-spacing: -0.03em;
     padding: 2px 0;
     border-bottom: 1px solid transparent;
 }
-.pg__title:focus { border-bottom-color: #7b68ee; }
+.pg__title:focus { border-bottom-color: var(--kiln-ember); }
 .pg__title::placeholder { color: #c3c7d4; }
 .pg__actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 
@@ -925,7 +939,7 @@ onBeforeUnmount(() => {
     border: 0; background: #fff; padding: 4px 11px;
     font-size: 12px; color: #6b7280; cursor: pointer;
 }
-.pg__seg-btn.is-on { background: #efecff; color: #2f3990; font-weight: 600; }
+.pg__seg-btn.is-on { background: var(--kiln-paper); color: var(--kiln-ink); font-weight: 600; }
 
 .pg__btn {
     border: 1px solid #e3e6ef; background: #fff; border-radius: 7px;
@@ -934,8 +948,8 @@ onBeforeUnmount(() => {
 }
 .pg__btn:hover:not(:disabled) { background: #f5f6fa; }
 .pg__btn:disabled { opacity: .5; cursor: default; }
-.pg__btn--primary { background: #2f3990; border-color: #2f3990; color: #fff; }
-.pg__btn--primary:hover:not(:disabled) { background: #27306f; }
+.pg__btn--primary { background: var(--kiln-ember); border-color: var(--kiln-ember); color: #fffaf3; }
+.pg__btn--primary:hover:not(:disabled) { background: var(--kiln-ember-deep); }
 
 .pg__icon-btn {
     border: 0; background: none; padding: 0; cursor: pointer;
@@ -958,8 +972,8 @@ onBeforeUnmount(() => {
 .pg__links-label { font-size: 11px; color: #9aa0b4; }
 .pg__link {
     display: inline-flex; align-items: center; gap: 5px;
-    font-size: 11px; font-weight: 600; color: #2f3990;
-    background: #efecff; border-radius: 9px; padding: 1px 4px 1px 8px;
+    font-size: 11px; font-weight: 600; color: var(--kiln-ink);
+    background: var(--kiln-paper-2); border-radius: 9px; padding: 1px 4px 1px 8px;
 }
 .pg__link-x { border: 0; background: none; padding: 0 3px; color: #7a80ad; cursor: pointer; font-size: 10px; }
 .pg__link-x:hover { color: #b91c1c; }
@@ -1038,7 +1052,7 @@ onBeforeUnmount(() => {
     display: block; width: 17px; height: 17px; margin: 2px;
     border-radius: 50%; background: #fff; transition: transform .15s ease;
 }
-.pg__switch.is-on { background: #7b68ee; }
+.pg__switch.is-on { background: var(--kiln-ember); }
 .pg__switch.is-on i { transform: translateX(17px); }
 .pg__switch:disabled { opacity: .45; cursor: not-allowed; }
 
@@ -1057,7 +1071,8 @@ onBeforeUnmount(() => {
 .pg__blank-close { position: absolute; top: 14px; right: 16px; }
 .pg__blank-icon { width: 46px; height: 46px; color: #ccd1de; }
 .pg__blank-icon :deep(svg) { width: 100%; height: 100%; }
-.pg__blank-text { color: #9aa0b4; font-size: 13px; margin: 0; }
+.pg__blank-hint { color: var(--kiln-muted); font-size: 13px; margin: 0; max-width: 360px; text-align: center; line-height: 1.5; }
+.pg__blank-text { color: var(--kiln-ink); font-family: var(--kiln-font-display); font-size: 22px; margin: 0; }
 
 @media (max-width: 767px) {
     .pg__side { display: none; }

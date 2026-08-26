@@ -8,7 +8,7 @@
                      not only when the conversation that called them is on screen. -->
                 <CallOverlay />
                 <HeaderComponent v-if="!$route.meta.hideHeader" @change="changeCompany($event)" @filter="handleFilter"/>
-                <div :style="`height: calc(100dvh - ${$route.meta.hideHeader ? '0' : '46'}px);`" class="billing__history-wrapper style-scroll overflow-auto">
+                <div :style="`height: calc(100dvh - ${$route.meta.hideHeader ? '0' : '58'}px);`" class="billing__history-wrapper style-scroll overflow-auto">
                     <AdvanceSearchModal
                         v-if="!$route.meta.preventAdvanceSearch"
                         headerClasses="border-0"

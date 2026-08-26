@@ -12,6 +12,7 @@ import varianceReport from './varianceReport';
 import capacityPlanning from './capacityPlanning';
 import integrations from './integrations';
 import inbox from './inbox';
+import pages from './pages';
 
 import { useCustomComposable } from '@/composable'
 import dashboard from "../plugins/dashboard/router";
@@ -60,6 +61,7 @@ const routes = [
 	// INTEGRATIONS & AUTOMATION HUB (AUTO-01..07)
 	...integrations,
 	...inbox,
+	...pages,
 
 	// CHANGELOG / WHAT'S NEW ROUTE
 	{

@@ -171,7 +171,7 @@ img.profile-image.header-profile-image {
 }
 
 .header__wrapper{
-  height: 46px; 
+  height: var(--kiln-header-h, 58px);
 }
 .help__icon{
   height: 18px;

@@ -2,7 +2,23 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
+const socketEmitter = require("../../event/socketEventEmitter");
 const { validatePageInput, contentTooLarge, htmlToRawText, isObjectIdString } = require('./helpers/pageRules');
+const {
+    emptyEditorData,
+    contentToEditorData,
+    blocksToHtml,
+    blocksToRawText,
+} = require('./helpers/pageContent');
+const { composePage, isAiConfigured } = require('./helpers/pageAi');
+
+const emitPageChange = (type, data) => {
+    try {
+        socketEmitter.emit(type, { type, data, module: 'pages' });
+    } catch (error) {
+        logger.error(`ERROR emitting page ${type}: ${error.message}`);
+    }
+};
 
 // Wiki pages: per-company documentation, optionally scoped to a project.
 //
@@ -41,9 +57,10 @@ exports.createPage = async (req, res) => {
             return res.send({ status: false, statusText: 'linkedTasks must be a list of valid task ids.' });
         }
         const userId = callerId(req);
+        const emptyBlocks = emptyEditorData();
         const doc = {
             title: String(title).trim(),
-            content: { html: '' },
+            content: { html: '', blocks: emptyBlocks },
             rawText: '',
             createdBy: userId,
             updatedBy: userId,
@@ -59,6 +76,7 @@ exports.createPage = async (req, res) => {
             doc.parentPageId = new mongoose.Types.ObjectId(parentPageId);
         }
         const created = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PAGES, data: doc }, 'save');
+        emitPageChange('insert', created);
         return res.send({ status: true, statusText: 'Page created.', data: created });
     } catch (error) {
         logger.error(`ERROR in create page: ${error.message}`);
@@ -77,6 +95,7 @@ exports.listPages = async (req, res) => {
         }
         const projectId = String(req.query?.projectId || '');
         const taskId = String(req.query?.taskId || '');
+        const scope = String(req.query?.scope || '');
         const filter = { deletedStatusKey: 0 };
 
         if (taskId) {
@@ -89,6 +108,8 @@ exports.listPages = async (req, res) => {
                 return res.send({ status: false, statusText: 'projectId must be a valid id.' });
             }
             filter.ProjectID = new mongoose.Types.ObjectId(projectId);
+        } else if (scope === 'all') {
+            // Workspace index: every page this caller is allowed to see.
         } else {
             // Company-wide docs only. Omitting the clause entirely returned EVERY doc in
             // the company — including every project's, private ones among them — to any
@@ -139,12 +160,12 @@ exports.getPage = async (req, res) => {
     }
 };
 
-/* PUT /api/v2/pages/:id  body: { title?, contentHtml?, visibility?, linkedTasks? } */
+/* PUT /api/v2/pages/:id  body: { title?, contentHtml?, contentBlocks?, visibility?, linkedTasks? } */
 exports.updatePage = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
         const { id } = req.params;
-        const { title, contentHtml, visibility, linkedTasks } = req.body || {};
+        const { title, contentHtml, contentBlocks, visibility, linkedTasks } = req.body || {};
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid page id are required.' });
         }
@@ -154,7 +175,17 @@ exports.updatePage = async (req, res) => {
                 return res.send({ status: false, statusText: check.reason });
             }
         }
-        if (contentHtml !== undefined && contentTooLarge({ html: contentHtml })) {
+        const nextContent = {};
+        if (contentBlocks !== undefined) {
+            nextContent.blocks = contentToEditorData({ blocks: contentBlocks });
+        }
+        if (contentHtml !== undefined) {
+            nextContent.html = String(contentHtml);
+        }
+        if ((nextContent.html || nextContent.blocks) && contentTooLarge({
+            html: nextContent.html,
+            blocks: nextContent.blocks,
+        })) {
             return res.send({ status: false, statusText: 'Page content is too large.' });
         }
 
@@ -174,9 +205,12 @@ exports.updatePage = async (req, res) => {
 
         const update = { updatedBy: userId };
         if (title !== undefined) update.title = String(title).trim();
-        if (contentHtml !== undefined) {
-            update.content = { html: String(contentHtml) };
-            update.rawText = htmlToRawText(contentHtml);
+        if (contentHtml !== undefined || contentBlocks !== undefined) {
+            const merged = { ...(existing.content || {}), ...nextContent };
+            if (!merged.html && merged.blocks) merged.html = blocksToHtml(merged.blocks);
+            if (!merged.blocks && merged.html) merged.blocks = contentToEditorData({ html: merged.html });
+            update.content = merged;
+            update.rawText = merged.html ? htmlToRawText(merged.html) : blocksToRawText(merged.blocks);
         }
         if (visibility !== undefined) {
             update.visibility = String(visibility) === 'private' ? 'private' : 'project';
@@ -185,7 +219,6 @@ exports.updatePage = async (req, res) => {
             if (!Array.isArray(linkedTasks) || !linkedTasks.every((x) => isObjectIdString(x))) {
                 return res.send({ status: false, statusText: 'linkedTasks must be a list of valid task ids.' });
             }
-            // Deduped, so linking the same task twice cannot double a row in any list.
             update.linkedTasks = [...new Set(linkedTasks.map(String))].map((x) => new mongoose.Types.ObjectId(x));
         }
         const updated = await MongoDbCrudOpration(companyId, {
@@ -193,6 +226,7 @@ exports.updatePage = async (req, res) => {
             data: [{ _id: pageObjId }, { $set: update }, { returnDocument: 'after' }],
         }, 'findOneAndUpdate');
 
+        emitPageChange('update', updated);
         return res.send({ status: true, statusText: 'Page saved.', data: updated });
     } catch (error) {
         logger.error(`ERROR in update page: ${error.message}`);
@@ -243,9 +277,65 @@ exports.deletePage = async (req, res) => {
             type: SCHEMA_TYPE.PAGES,
             data: [{ _id: { $in: doomed } }, { $set: { deletedStatusKey: 1 } }],
         }, 'updateMany');
+        emitPageChange('update', { _id: id, deletedStatusKey: 1, deleted: doomed.length });
         return res.send({ status: true, statusText: 'Page deleted.', data: { deleted: doomed.length } });
     } catch (error) {
         logger.error(`ERROR in delete page: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+exports.aiStatus = (req, res) => {
+    res.send({
+        status: true,
+        data: { configured: isAiConfigured() },
+    });
+};
+
+/* POST /api/v2/pages/ai  body: { action, title?, instruction?, currentText?, pageId? } */
+exports.composeWithAi = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'] || '';
+        if (!companyId) {
+            return res.send({ status: false, statusText: 'companyId is required.' });
+        }
+        const { action, title, instruction, currentText, pageId } = req.body || {};
+        let bodyText = String(currentText || '');
+        let pageTitle = String(title || '');
+
+        if (pageId && isObjectIdString(pageId) && (!bodyText || !pageTitle)) {
+            const page = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.PAGES,
+                data: [{ _id: new mongoose.Types.ObjectId(pageId), deletedStatusKey: 0 }],
+            }, 'findOne');
+            if (page) {
+                if (String(page.visibility || '') === 'private' && String(page.createdBy || '') !== callerId(req)) {
+                    return res.send({ status: false, statusText: 'Page not found.' });
+                }
+                if (!pageTitle) pageTitle = page.title || '';
+                if (!bodyText) {
+                    bodyText = page.rawText || htmlToRawText((page.content && page.content.html) || '')
+                        || blocksToRawText(contentToEditorData(page.content));
+                }
+            }
+        }
+
+        const result = await composePage({
+            action,
+            title: pageTitle,
+            instruction,
+            currentText: bodyText,
+        });
+        if (!result.status) {
+            return res.send({
+                status: false,
+                statusText: result.reason || 'Could not compose page content.',
+                isNotAi: Boolean(result.isNotAi),
+            });
+        }
+        return res.send({ status: true, statusText: 'Composed.', data: result.data });
+    } catch (error) {
+        logger.error(`ERROR in page AI compose: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
 };

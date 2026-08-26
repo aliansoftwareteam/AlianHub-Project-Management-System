@@ -1,17 +1,21 @@
 <template>
     <div class="d-flex align-items-center header_main_navigation_menu_main">
         <template v-for="(item, index) in menu.filter((xt) => xt.show === true)">
-            <!-- DIRECT LINK -->
-                <router-link :key="'item'+index+item.name" v-if="item.submenu && !item.submenu.length" :to="item.to" :class="{'active': route.name.includes('Project')}" class="cursor-pointer link-item white h-100">
-                    {{ $t(`Header.${item.name}`) }}
-                </router-link>
+            <router-link
+                :key="'item'+index+item.name"
+                v-if="item.submenu && !item.submenu.length"
+                :to="item.to"
+                :class="{'is-active': isLinkActive(item)}"
+                class="cursor-pointer kiln-link h-100"
+            >
+                {{ $t(`Header.${item.name}`) }}
+            </router-link>
 
-            <!-- FOR SUB MENU -->
-            <div :key="'nested-item-'+index+item.name" v-else class="link-item link-dropdown-menu" :class="{'active': isDropdownActive(item)}">
+            <div :key="'nested-item-'+index+item.name" v-else class="kiln-link link-dropdown-menu" :class="{'is-active': isDropdownActive(item)}">
                 <DropDown :id="'nav_menu2'+index+item.name" :title="item.name">
                     <template #button>
                         <div class="cursor-pointer dropdown_wrapper h-100" :id="item.id ? item.id : ''">
-                            <span  class="list-dropdown-item" :id="`list_dropdown_header${item.name}${index}`" ref="timesheet"> {{ $t(`Header.${item.name}`) }}</span>
+                            <span class="list-dropdown-item" :id="`list_dropdown_header${item.name}${index}`" ref="timesheet"> {{ $t(`Header.${item.name}`) }}</span>
                         </div>
                     </template>
                     <template #options>
@@ -32,11 +36,9 @@
 </template>
 
 <script setup>
-// PACKAGES
 import { defineComponent, defineProps } from "vue";
 import { useRoute} from 'vue-router';
 const route = useRoute();
-// COMPONENTS
 import DropDown from "@/components/molecules/DropDown/DropDown.vue";
 import DropDownRouterOption from "@/components/molecules/DropDownRouterOption/DropDownRouterOption.vue";
 defineComponent({
@@ -58,9 +60,12 @@ const handleItemClick = (value,idex)  =>{
     document.getElementById(`list_dropdown_header${value}${idex}`).click()
 }
 
-// A dropdown is active when the current route matches any of its submenu paths.
-// Generalizes the old hardcoded Time_Sheet/Reports check so the Workspace menu
-// (Portfolio / Capacity / Integrations) highlights correctly too.
+const isLinkActive = (item) => {
+    if (item.name === 'Pages') return route.name === 'Pages';
+    if (item.name === 'Projects') return String(route.name || '').includes('Project');
+    return false;
+};
+
 const isDropdownActive = (item) => (item.submenu || []).some(
     (s) => s && s.to && s.to.path && route.path.startsWith(s.to.path)
 );
@@ -68,36 +73,26 @@ const isDropdownActive = (item) => (item.submenu || []).some(
 </script>
 
 <style>
-.link-item {
-    font-weight: 500;
-    font-size: 13px;
-    line-height: 19px;
-    margin-right: 2px;
-    padding: 13px 15.44px;
-    cursor: pointer;
-}
-.link-dropdown-menu
-{
-    padding: 13px 0;
-}
-.active.link-item {
-    background: #3845B3;
-}
-.link-item:last-child {
-    margin-left: 13px;
-}
 .list-dropdown-item{
     padding: 13px 17px 13px 15px;
-
 }
 .dropdown_wrapper{
-    background-image: url('../../../assets/images/png/white_arrow_dd.png');
-    background-repeat: no-repeat;
-    background-position: 98% 50%;
+    padding-right: 18px;
+}
+.kiln-shell .dropdown_wrapper::after {
+    content: "";
+    display: inline-block;
+    width: 0;
+    height: 0;
+    margin-left: 8px;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid var(--kiln-ink-soft);
+    vertical-align: middle;
 }
 @media(max-width:1199px){
     .list-dropdown-item {padding: 15px 17px 15px 8px;}
     .upgrade-now {padding: 5px 8px;margin-right: 10px;}
-    .link-item {margin-right: 0px;}
+    .kiln-link {margin-right: 0px;}
 }
 </style>
