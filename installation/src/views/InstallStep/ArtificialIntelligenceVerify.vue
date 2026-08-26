@@ -43,9 +43,8 @@
                     For any further queries, please refer to our <a href="https://help.alianhub.com/app-installation-and-start-guide/4.-installation-guide/4.6-ai-configuration" target="_blank" class="blue font-weight-600">documentation.</a>
                 </div>
                 <button class="btn-blue btn-login font-roboto-sans bg-blue white cursor-pointer btn-full mt-20" :disabled="!isSubmitSend" :class="{'disabled': !isSubmitSend}" @click="handleSubmit" tabindex="3">Submit</button>
-            </div>
-            <div class="form-group text-center mt-20" v-if="isSubmitSend">
-                <a class="blue font-weight-500 font-18 cursor-pointer" @click="doItLater">I'll Do It Later</a>
+                <p class="skip-step__note">AI features stay off until you add a key. Everything else works.</p>
+                <a class="blue font-weight-500 font-18 cursor-pointer skip-step" @click="$emit('complete', { isDoItLater: true })">Skip for now</a>
             </div>
         </div>
     </div>
@@ -99,11 +98,6 @@
             }
         })
     }
-    const doItLater = () => {
-        emit("complete", {
-            isDoItLater: true
-        });
-    }
     onMounted(() => {
         apiRequest("get", env.GETAIMODELS).then((res) => {
             if (res?.data?.status) {
@@ -126,4 +120,16 @@
 </script>
 <style scoped>
 
+.skip-step__note {
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: #8c8c8c;
+    margin: 14px 0 6px;
+    text-align: center;
+}
+.skip-step {
+    display: block;
+    text-align: center;
+    margin-top: 4px;
+}
 </style>

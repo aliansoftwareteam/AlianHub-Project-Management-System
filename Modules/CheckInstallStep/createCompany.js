@@ -9,6 +9,7 @@ const createUserRef = require("../Auth/controller/createUser.js");
 const { dbCollections } = require("../../Config/collections.js");
 // const { installSteps, envVar } = require("./controller.js");
 const mainCtr = require("./controller.js");
+const { createDemoProject } = require("./demoProject.js");
 const installStepsFilePath = __dirname + "/../../installationSteps.json";
 const defaultSubscriptionDataRef = require("./defaultSubscriptionData.js")
 const serviceFun = require("../serviceFunction.js");
@@ -204,6 +205,9 @@ exports.createCompany = (data) => {
             const companyId = JSON.parse(JSON.stringify(companyMongoId));
             let obj = {
                 userId: data.userId,
+                // Asked once during setup. Kept so the sample content and the template order can
+                // suit the team rather than defaulting to a software project for everyone.
+                teamFocus: data.teamFocus || '',
                 Cst_CompanyName:  data.companyName,
                 Cst_Phone:  data.phoneNumber,
                 Cst_Country: data.country,
@@ -249,6 +253,7 @@ exports.createCompany = (data) => {
         
             Promise.allSettled(allProcess).then(async() => {
                 await exports.updateCompnayIdInUserFun(userUpdateObj, companyId,data.userId) // ADD COMPANY ID IN USER DOCUMENT AFTER THE PROCESS COMPLETE
+
                 setTimeout(() => {
                     emitListener(data?.eventId, {step: 3});
                     resolve(companyId);
@@ -269,6 +274,14 @@ exports.createCompany = (data) => {
                             updateCompanyFun(SCHEMA_TYPE.GOLBAL,obj,"findOneAndUpdate",companyId)
                             .then(async()=>{
                                 await storeRefferalCode(companyId,data.userId);
+
+                                // Deliberately here and not earlier. The sample project creates a
+                                // sprint, and that path reads companyData.planFeature — which is
+                                // only written by the update just above. Running before it made
+                                // checkPlanPermission throw on undefined inside a .then with no
+                                // .catch, so the sprint promise never settled and the project ended
+                                // up with no list and no tasks.
+                                await createDemoProject(companyId, data.userId, data.teamFocus);
                                 mainCtr.installSteps[7].status = "done";
                                 serviceFun.writeFile(installStepsFilePath, JSON.stringify({installSteps: mainCtr.installSteps, envVar: mainCtr.envVar}, null, 4), () => {
                                     setTimeout(() => {
@@ -467,6 +480,7 @@ exports.createCompanyFromAPIFunction = (userId,obj) => {
                 state: obj.state,
                 email: obj.email,
                 countryCodeObj: obj.countryCodeObj,
+                teamFocus: obj.teamFocus || '',
                 logtimeDays: 8,
                 totalProjects: 0,
                 isInactive: false,

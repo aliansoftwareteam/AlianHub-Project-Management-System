@@ -45,8 +45,12 @@
             </template>
             <template v-else>
                 <div class="d-flex align-items-center justify-content-center flex-column mt-1">
-                    <img src="@/assets/images/svg/No-Search-Result.svg" alt="noSearchResult" v-if="project?.deletedStatusKey !== 2" />
-                    <h3 class="mt-1" v-if="project?.deletedStatusKey !== 2">{{ $t('Header.no_data_found') }}</h3>
+                    <EmptyState
+                        v-if="project?.deletedStatusKey !== 2"
+                        :title="!project?.lastTaskId ? $t('EmptyState.no_tasks_title') : $t('EmptyState.no_match_title')"
+                        :message="!project?.lastTaskId ? $t('EmptyState.no_tasks_msg') : $t('EmptyState.no_match_msg')"
+                        helpPath="tasks"
+                    />
                 </div>
             </template>
         </template>
@@ -56,6 +60,8 @@
 <script setup>
 import { ref, computed, onMounted, watch, inject, defineProps, defineEmits } from 'vue';
 import { useStore } from 'vuex';
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
+import { markFirstRunStep, FIRST_RUN_STEPS } from '@/composable/firstRunProgress';
 import isEqual from 'lodash/isEqual';
 
 // Components
@@ -188,6 +194,7 @@ watch([() => props.grouped, () => props.sprints,() => route?.params], ([newGroup
 
 // --- Lifecycle Hooks ---
 onMounted(async () => {
+    markFirstRunStep(FIRST_RUN_STEPS.BOARD_VIEW);
     if (project.value?._id && props.sprints?.length) {
         isLoading.value = true;
 
