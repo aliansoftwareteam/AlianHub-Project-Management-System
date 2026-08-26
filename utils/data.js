@@ -2162,7 +2162,10 @@ exports.importTaskStatusTemplate = (companyName) => {
                     let obj = {
                         data : {
                             ...item,
-                            default: true
+                            // Respect the template's own flag. Forcing true here marked EVERY template as
+                            // the default, so nothing could tell them apart and "the default one" meant
+                            // whichever row the database happened to return first.
+                            default: item.default === true
                         },
                         type : SCHEMA_TYPE.TASK_STATUS_TEMPLATES
                     }
@@ -2200,7 +2203,10 @@ exports.importTaskTypeTemplate = (companyName) => {
                     let obj = {
                         data : {
                             ...item,
-                            default: true
+                            // Respect the template's own flag. Forcing true here marked EVERY template as
+                            // the default, so nothing could tell them apart and "the default one" meant
+                            // whichever row the database happened to return first.
+                            default: item.default === true
                         },
                         type : SCHEMA_TYPE.TASK_TYPE_TEMPLATES
                     }
@@ -2581,7 +2587,10 @@ exports.importProjectStatusTemplate = async (companyName) => {
                     let obj = {
                         data : {
                             ...item,
-                            default: true
+                            // Respect the template's own flag. Forcing true here marked EVERY template as
+                            // the default, so nothing could tell them apart and "the default one" meant
+                            // whichever row the database happened to return first.
+                            default: item.default === true
                         },
                         type : SCHEMA_TYPE.PROJECT_STATUS_TEMPLATES
                     }

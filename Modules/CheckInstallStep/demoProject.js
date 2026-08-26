@@ -4,17 +4,50 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { WELCOME_PROJECT_NAME, demoTasksForFocus } = require('../../utils/sampleTasks');
 
 // A brand-new company lands on an empty dashboard, which teaches nothing. This creates one
-// clearly-labelled sample project whose tasks explain the product by being read, and which the
-// owner can delete in one go from the project menu.
+// clearly-labelled sample project whose tasks explain the product by being read.
 //
-// It goes through the normal createProject path rather than inserting a project document directly,
-// because that path is what assembles the status, type, app and view data a project needs to render.
-// That path expects the same payload the create-project screen sends, so the apps and views are read
-// from the company's own seeded catalogues rather than guessed — their ids differ per company, and
-// createProject matches on them by _id.
+// It must behave exactly like a project someone made by hand — the whole point is that a new user
+// can try everything in it. So it goes through the normal createProject path, and its payload is
+// assembled the same way the create-project screen assembles one: from the company's own seeded
+// TEMPLATES, not from loose keys.
 //
-// Deliberately fire-and-forget and deliberately silent on failure: a company must still be usable if
-// the sample content cannot be created.
+// That distinction is what broke it before. The screen builds taskStatusData out of the task-status
+// template, tagging each entry `default_active`, `active`, `done` or `close`. The create-task form
+// then looks for the entry whose type is `default_active` to decide a new task's status. A project
+// whose statuses carry no type has nothing for it to find, so every new task in the demo project
+// failed validation with a missing statusKey — while the project itself looked perfectly fine.
+//
+// Deliberately fire-and-forget and deliberately silent on failure: a company must still be usable
+// if the sample content cannot be created.
+
+// Mirrors the create-project screen: one flat list, each entry tagged with what it is.
+function buildTaskStatusData(template) {
+    const entry = (src, type) => ({
+        name: src.name,
+        bgColor: `${src.textColor}35`,
+        textColor: src.textColor,
+        key: src.key,
+        statusImage: '',
+        isDeleted: true,
+        type,
+    });
+
+    const out = [];
+    if (template.defaultActive && template.defaultActive.key !== undefined) {
+        out.push(entry(template.defaultActive, 'default_active'));
+    }
+    for (const s of template.ActiveStatusList || []) out.push(entry(s, 'active'));
+    for (const s of template.DoneStatusList || []) out.push(entry(s, 'done'));
+    if (template.defaultComplete && template.defaultComplete.key !== undefined) {
+        out.push(entry(template.defaultComplete, 'close'));
+    }
+    return out;
+}
+
+const pickDefault = (list) => (Array.isArray(list)
+    ? (list.find((x) => x && x.default === true) || list[0] || null)
+    : null);
+
 async function createDemoProject(companyId, userId, teamFocus) {
     try {
         if (!companyId || !userId) return false;
@@ -22,14 +55,38 @@ async function createDemoProject(companyId, userId, teamFocus) {
         const cid = String(companyId);
         const uid = String(userId);
 
-        const [apps, tabs, projectStatus] = await Promise.all([
+        const [apps, tabs, taskStatusTemplates, taskTypeTemplates, projectStatusTemplates] = await Promise.all([
             MongoDbCrudOpration(cid, { type: dbCollections.APPS, data: [{}] }, 'find'),
             MongoDbCrudOpration(cid, { type: dbCollections.PROJECT_TAB_COMPONENTS, data: [{}] }, 'find'),
-            MongoDbCrudOpration(cid, {
-                type: dbCollections.SETTINGS,
-                data: [{ name: settingsCollectionDocs.PROJECT_STATUS }],
-            }, 'find'),
+            MongoDbCrudOpration(cid, { type: dbCollections.TASK_STATUS_TEMPLATES, data: [{}] }, 'find'),
+            MongoDbCrudOpration(cid, { type: dbCollections.TASK_TYPE_TEMPLATES, data: [{}] }, 'find'),
+            MongoDbCrudOpration(cid, { type: dbCollections.PROJECT_STATUS_TEMPLATES, data: [{}] }, 'find'),
         ]);
+
+        const statusTemplate = pickDefault(taskStatusTemplates);
+        const typeTemplate = pickDefault(taskTypeTemplates);
+        const projectStatusTemplate = pickDefault(projectStatusTemplates);
+        if (!statusTemplate || !typeTemplate || !projectStatusTemplate) {
+            logger.error(`createDemoProject skipped: ${cid} has no seeded templates yet`);
+            return false;
+        }
+
+        const taskStatusData = buildTaskStatusData(JSON.parse(JSON.stringify(statusTemplate)));
+        if (!taskStatusData.some((s) => s.type === 'default_active')) {
+            logger.error(`createDemoProject skipped: ${cid} status template has no default active status`);
+            return false;
+        }
+
+        const projectStatusData = [
+            ...(projectStatusTemplate.projectActiveStatus || []),
+            ...(projectStatusTemplate.projectDoneStatus || []),
+            ...(projectStatusTemplate.projectCompletedStatus ? [projectStatusTemplate.projectCompletedStatus] : []),
+        ];
+        const openStatus = pickDefault(projectStatusTemplate.projectActiveStatus);
+        if (!openStatus) {
+            logger.error(`createDemoProject skipped: ${cid} has no project statuses seeded yet`);
+            return false;
+        }
 
         const tabList = Array.isArray(tabs) ? tabs : [];
         // Picked by keyName, not by the catalogue's viewStatus/setAsDefault flags: the seed writes
@@ -44,7 +101,6 @@ async function createDemoProject(companyId, userId, teamFocus) {
             return false;
         }
 
-        // Same shape the create-project screen sends: the flags travel on the selection.
         // _id as a STRING: createProject matches these against the catalogue with === on a
         // JSON-stringified id, so an ObjectId here never matches and the view keeps no name —
         // which renders as "ViewList.undefined" in the tabs.
@@ -54,12 +110,6 @@ async function createDemoProject(companyId, userId, teamFocus) {
             setAsDefault: v.keyName === DEFAULT_VIEW,
         }));
         const defaultViewKey = (chosen.find((v) => v.keyName === DEFAULT_VIEW) || chosen[0]).keyName;
-        const statuses = (projectStatus && projectStatus[0] && projectStatus[0].settings) || [];
-        const firstStatus = statuses.find((s) => s && s.isDeleted !== true);
-        if (!firstStatus) {
-            logger.error(`createDemoProject skipped: ${cid} has no project statuses seeded yet`);
-            return false;
-        }
 
         // Required late so a circular require through the createProject controller cannot affect
         // module load order during install.
@@ -84,7 +134,7 @@ async function createDemoProject(companyId, userId, teamFocus) {
                 // Object.keys() on it before checking whether it exists.
                 projectIcon: { type: 'color', data: '#6473e8' },
                 ProjectType: 'Fix',
-                status: firstStatus.value,
+                status: openStatus.value,
                 statusType: 'active',
                 markAsStar: false,
                 isPrivateSpace: false,
@@ -97,19 +147,20 @@ async function createDemoProject(companyId, userId, teamFocus) {
                 skills: [],
                 customFiedlsValue: [],
                 ProjectCurrency: {},
-                TaskTypeTemplateId: '',
-                projectStatusTemplateId: '',
-                TemplateTaskStatusId: '',
-                // Key-only arrays, the same shape the create-project screen sends. The controller
-                // fills in names and colours from the company's own settings, so this stays correct
-                // even if a company edits them later.
-                // 1 To Do, 3 In Progress, 6 Done, 2 Complete — seeded by importTaskDefaultStatus.
-                taskStatusData: [{ key: 1 }, { key: 3 }, { key: 6 }, { key: 2 }],
-                projectStatusData: statuses.filter((s) => s && s.isDeleted !== true),
-                taskTypeCounts: [{ key: 1 }],
+
+                // Straight off the company's own templates, exactly as the create-project screen
+                // does it. The template ids matter too: the project settings screen uses them to
+                // tell whether a project still matches its template or has been customised.
+                taskStatusData,
+                TemplateTaskStatusId: String(statusTemplate._id),
+                taskTypeCounts: typeTemplate.taskTypes || [],
+                TaskTypeTemplateId: String(typeTemplate._id),
+                projectStatusData,
+                projectStatusTemplateId: String(projectStatusTemplate._id),
+
                 // Apps travel as keys. ALL of them, not just the ones the seed marks active — the
-                // sample tasks teach time tracking, tags and custom fields, so the demo project has
-                // those switched on even though a normal new project starts with them off.
+                // sample tasks teach time tracking and tagging, so the demo project has the
+                // features its own content points at.
                 apps: (Array.isArray(apps) ? apps : []).map((a) => a && a.key).filter(Boolean),
                 ProjectRequiredComponent: views,
                 ProjectRequiredDefaultComponent: defaultViewKey,
@@ -125,4 +176,4 @@ async function createDemoProject(companyId, userId, teamFocus) {
     }
 }
 
-module.exports = { createDemoProject };
+module.exports = { createDemoProject, buildTaskStatusData };
