@@ -228,8 +228,7 @@ function Header() {
                                         </li>
                                     </ul>
                                     <div className="flex items-center leading-none text-white overflow-hidden text-ellipsis whitespace-nowrap">
-                                        {/* <img src={project?.selectedTaskType} className="h-4 w-4" alt="task type" /> */}
-                                        {(timeLog?.taskTypeData || timeLog?.taskTypeImage) && <TaskTypeIcon taskType={timeLog?.taskTypeData || { taskImage: timeLog?.taskTypeImage }} className="!w-[15px] !h-[15px]" />}
+                                        {(timeLog?.taskTypeData || timeLog?.taskTypeImage) && <TaskTypeIcon taskType={timeLog?.taskTypeData || { taskImage: timeLog?.taskTypeImage }} color="#fff" className="!w-[15px] !h-[15px]" />}
                                         <span className="ml-2 font-medium text-sm overflow-hidden text-ellipsis whitespace-nowrap">
                                             {timeLog?.taskName}
                                         </span>
