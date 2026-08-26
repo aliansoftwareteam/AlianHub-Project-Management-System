@@ -174,8 +174,11 @@ describe('demo project sample content', () => {
     });
 
     test('an unrecognised answer falls back to the product walkthrough', () => {
+        // Compared by title, not by reference: the rows come back wrapped with the demo project's
+        // positional plan (status, owner, dates, subtasks), so it is a new array every time.
+        const titles = (rows) => rows.map((r) => r[0]);
         for (const input of ['', null, undefined, 'nonsense', 0]) {
-            expect(st.demoTasksForFocus(input)).toBe(st.WELCOME_TASKS);
+            expect(titles(st.demoTasksForFocus(input))).toEqual(titles(st.WELCOME_TASKS));
         }
     });
 
