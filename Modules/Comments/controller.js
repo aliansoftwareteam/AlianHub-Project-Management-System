@@ -7,6 +7,7 @@ const { replaceObjectKey } = require("../Auth/helper");
 const socketEmitter = require('../../event/socketEventEmitter');
 const { escapeRegex } = require("../../utils/escapeRegex");
 const { parseMentionIds } = require("./helpers/parseMentions");
+const { maybeReplyAsAlianSafe } = require("./helpers/alianReply");
 const { handleNotificationtFun } = require("../notification/prepare-notification-data/controllerV2");
 const { getRoleType, isPrivileged } = require("../../Config/permissionGuard");
 
@@ -97,6 +98,10 @@ exports.save = async (req, res) => {
         if (mentionIds.length && response && response._id) {
             notifyMentions(req.headers['companyid'], response, mentionIds)
                 .catch((err) => logger.error(`[mentions] notify failed: ${err.message}`));
+        }
+        if (response && response._id) {
+            maybeReplyAsAlianSafe(req.headers['companyid'], response, req.uid)
+                .catch((err) => logger.error(`[alian] notify failed: ${err.message}`));
         }
         if (response) {
             return res.status(200).json({ status: true, data: response || {}  });

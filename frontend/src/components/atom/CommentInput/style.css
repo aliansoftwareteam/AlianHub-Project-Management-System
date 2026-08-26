@@ -42,3 +42,41 @@
 .emp__profile-wrapper{
     width: calc(100% - 25px) !important;
 }
+.mention-alian {
+    background: var(--kiln-paper);
+    color: var(--kiln-ink);
+}
+.mention-alian-on {
+    background: var(--kiln-ember) !important;
+    color: #fffaf3;
+}
+.alian-mark {
+    width: 30px;
+    height: 30px;
+    margin-right: 10px;
+    border-radius: 50%;
+    background: var(--kiln-ember);
+    color: #fffaf3;
+    font-family: var(--kiln-font-display), Georgia, serif;
+    font-weight: 700;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+.mention-alian-on .alian-mark {
+    background: #fffaf3;
+    color: var(--kiln-ember-deep);
+}
+.alian-kicker {
+    margin-left: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--kiln-ember);
+}
+.mention-alian-on .alian-kicker {
+    color: #fffaf3;
+}

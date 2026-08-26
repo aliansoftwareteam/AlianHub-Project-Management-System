@@ -112,6 +112,7 @@
                                 :reply="message.reply"
                                 @cancel-reply="message.reply = {}"
                                 :showAll="mainChat && !projectData?.default"
+                                :includeAlian="!mainChat"
                                 :userIds="users.map((x) => x.id)"
                                 @enter="mediaFiles.length ? sendMedia() : sendMessageFun(message)"
                                 :sendMessageAllowed="messageAllowed"
@@ -1696,7 +1697,13 @@ function checkMentions(message){
         tmpMentions.forEach((data) => {
             let id = data.split("(")[1].replace(")", "");
             let msgName = data.split("(")[0].replace("[", "").replace("]", "");
+            if(id === 'alian') {
+                return;
+            }
             const user = id === "everyone" ? {id, name: "All"} : users.value.filter((x) => x.id === id)[0];
+            if(!user) {
+                return;
+            }
             if(`@${user.name}` === msgName) {
                 mentions.push(user.id)
                 msg = msg.replace(data, `@[${user.name}](${user.id})`);

@@ -586,6 +586,26 @@ export function useGetterFunctions() {
      * @returns user object
      */
     function getUser(id,type = null) {
+        if (String(id) === 'alian') {
+            return {
+                id: 'alian',
+                _id: 'alian',
+                cuid: '',
+                Employee_Name: 'Alian',
+                Employee_profileImage: defaultUserAvatar,
+                Employee_profileImageURL: defaultUserAvatar,
+                isOnline: false,
+                timeFormat: '',
+                companyOwnerId: '',
+                Time_Zone: '',
+                timeZone: 'UTC',
+                assigneeCompany: [],
+                Employee_Email: '',
+                ghostUser: false,
+                isAlian: true,
+                isVesionUpdate: false
+            };
+        }
         const obj = ref({
             id: id,
             _id: id,

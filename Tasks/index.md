@@ -11,3 +11,4 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 005 | First-run experience — close the 13 gaps | active | high | — | active/005-first-run-experience |
 | 006 | Workspace Ask with real citations | active | high | — | active/006-workspace-ask-citations |
 | 006 | AI-native Pages space and distinctive shell | active | high | — | active/006-ai-native-pages-shell |
+| 007 | @Alian mentions in task comments | active | high | 006 | active/007-alian-mentions |

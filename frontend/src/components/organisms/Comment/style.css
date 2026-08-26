@@ -46,6 +46,30 @@
 .message_id-sent{
     max-width: 50vw;
  }
+.message_id-sent.is-alian {
+    background: var(--kiln-paper);
+    border: 1px solid var(--kiln-line);
+    border-top: 3px solid var(--kiln-ember);
+}
+.show__user.is-alian {
+    color: var(--kiln-ember-deep);
+    font-family: var(--kiln-font-display), Georgia, serif;
+}
+.alian-mark {
+    width: 30px;
+    height: 30px;
+    margin-right: 10px;
+    border-radius: 50%;
+    background: var(--kiln-ember);
+    color: #fffaf3;
+    font-family: var(--kiln-font-display), Georgia, serif;
+    font-weight: 700;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
 .comment__image{
    object-fit: contain;
    border: 1px solid #cecece; 
