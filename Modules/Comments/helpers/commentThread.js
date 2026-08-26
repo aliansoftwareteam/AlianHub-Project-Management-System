@@ -1,22 +1,55 @@
 'use strict';
 
 const HEX_ID = /^[0-9a-fA-F]{24}$/;
+const OBJECT_OBJECT = '[object Object]';
+
+function hexFromBytes(value) {
+    if (!value) return '';
+    if (Buffer.isBuffer(value)) {
+        const hex = value.toString('hex');
+        return HEX_ID.test(hex) ? hex : '';
+    }
+    if (value.type === 'Buffer' && Array.isArray(value.data)) {
+        return hexFromBytes(Buffer.from(value.data));
+    }
+    if (ArrayBuffer.isView(value)) {
+        return hexFromBytes(Buffer.from(value.buffer, value.byteOffset, value.byteLength));
+    }
+    if (Array.isArray(value) && value.length === 12 && value.every((n) => Number.isInteger(n))) {
+        return hexFromBytes(Buffer.from(value));
+    }
+    return '';
+}
 
 function idString(value) {
     if (value == null || value === '') return '';
-    if (typeof value === 'string') return value;
-    if (typeof value.toHexString === 'function') return value.toHexString();
-    if (Buffer.isBuffer(value)) return value.toString('hex');
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed || trimmed === OBJECT_OBJECT) return '';
+        return trimmed;
+    }
+    if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'symbol') {
+        return '';
+    }
+    if (typeof value.toHexString === 'function') {
+        return idString(value.toHexString());
+    }
+    const fromSelf = hexFromBytes(value);
+    if (fromSelf) return fromSelf;
     if (typeof value === 'object') {
-        if (value.$oid) return String(value.$oid);
-        if (typeof value.id === 'string' && HEX_ID.test(value.id)) return value.id;
-        if (Buffer.isBuffer(value.id)) return value.id.toString('hex');
-        if (value.buffer && Buffer.isBuffer(value.buffer)) return Buffer.from(value.buffer).toString('hex');
+        if (value.$oid) return idString(value.$oid);
+        const nested = hexFromBytes(value.id) || hexFromBytes(value.buffer);
+        if (nested) return nested;
+        if (typeof value.id === 'string') return idString(value.id);
         if (value._id && value._id !== value) return idString(value._id);
     }
-    const s = String(value);
-    if (s === '[object Object]') return '';
-    return s;
+    try {
+        const s = String(value);
+        if (!s || s === OBJECT_OBJECT) return '';
+        return s;
+    } catch (_e) {
+        return '';
+    }
 }
 
 function commentRoomPrefix(data) {
@@ -24,18 +57,22 @@ function commentRoomPrefix(data) {
     const sprintId = idString(data && data.sprintId);
     const taskId = idString(data && data.taskId);
     if (projectId && sprintId && taskId) {
+        const prefix = `comments_${projectId}_${sprintId}_${taskId}`;
+        if (prefix.includes(OBJECT_OBJECT)) return null;
         return {
             module: 'comments',
-            prefix: `comments_${projectId}_${sprintId}_${taskId}`,
+            prefix,
             projectId,
             sprintId,
             taskId,
         };
     }
     if (projectId) {
+        const prefix = `comments_project_${projectId}`;
+        if (prefix.includes(OBJECT_OBJECT)) return null;
         return {
             module: 'comments_project',
-            prefix: `comments_project_${projectId}`,
+            prefix,
             projectId,
             sprintId: sprintId || '',
             taskId: taskId || '',
@@ -63,6 +100,14 @@ function asPlain(doc) {
     return doc;
 }
 
+function firstId(...values) {
+    for (const value of values) {
+        const hex = idString(value);
+        if (hex) return hex;
+    }
+    return '';
+}
+
 function serializeCommentForSocket(doc, source) {
     const raw = asPlain(doc);
     let plain;
@@ -72,17 +117,20 @@ function serializeCommentForSocket(doc, source) {
         plain = { ...raw };
     }
     const fromSource = source ? serializeCommentForSocket(source) : {};
-    const projectId = idString(plain.projectId || raw.projectId || fromSource.projectId);
-    const sprintId = idString(plain.sprintId || raw.sprintId || fromSource.sprintId);
-    const taskId = idString(plain.taskId || raw.taskId || fromSource.taskId);
-    const _id = idString(plain._id || raw._id || plain.id || raw.id);
+    const projectId = firstId(plain.projectId, raw.projectId, fromSource.projectId);
+    const sprintId = firstId(plain.sprintId, raw.sprintId, fromSource.sprintId);
+    const taskId = firstId(plain.taskId, raw.taskId, fromSource.taskId);
+    const _id = firstId(plain._id, raw._id, plain.id, raw.id);
     if (_id) {
         plain._id = _id;
         plain.id = _id;
     }
     if (projectId) plain.projectId = projectId;
+    else delete plain.projectId;
     if (sprintId) plain.sprintId = sprintId;
+    else delete plain.sprintId;
     if (taskId) plain.taskId = taskId;
+    else delete plain.taskId;
     if (plain.userId != null) plain.userId = String(plain.userId);
     return plain;
 }

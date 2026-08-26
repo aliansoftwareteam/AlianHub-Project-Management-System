@@ -6,7 +6,7 @@ const {
     findRoomsByPrefix,
 } = require('../helper');
 const socketEmitter = require('../../event/socketEventEmitter');
-const { commentRoomPrefix } = require('../../Modules/Comments/helpers/commentThread');
+const { commentRoomPrefix, serializeCommentForSocket } = require('../../Modules/Comments/helpers/commentThread');
 
 exports.commentSocketHandler = ({ socket, namespace }) => {
     socket.on('joinCommentRoom', (data) => {
@@ -64,20 +64,16 @@ function setEventName(type) {
 
 const handleCommentChange = (changeData, includeUpdatedFields = false) => {
     if (!changeData || !changeData.data) return;
-    const thread = commentRoomPrefix(changeData.data);
-    const prefix = thread
-        ? thread.prefix
-        : (changeData.module === 'comments_project'
-            ? `comments_project_${changeData.data.projectId}`
-            : '');
-    if (!prefix) return;
+    const data = serializeCommentForSocket(changeData.data);
+    const thread = commentRoomPrefix(data);
+    if (!thread || !thread.prefix || String(thread.prefix).includes('[object Object]')) return;
 
-    const relatedRooms = findRoomsByPrefix(prefix);
+    const relatedRooms = findRoomsByPrefix(thread.prefix);
     if (!relatedRooms.length) return;
 
     const eventName = setEventName(changeData.type);
     const emitData = {
-        fullDocument: changeData.data,
+        fullDocument: data,
         ...(includeUpdatedFields && { updatedFields: changeData.updatedFields }),
     };
 

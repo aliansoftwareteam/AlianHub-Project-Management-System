@@ -11,7 +11,7 @@ const {
     citationsForComment,
     buildAlianComment,
 } = require('./alianMention');
-const { serializeCommentForSocket, commentRoomPrefix } = require('./commentThread');
+const { serializeCommentForSocket, commentRoomPrefix, idString } = require('./commentThread');
 
 const NO_QUESTION_TEXT = 'Ask a question after @Alian — I will look across pages and tasks you can open.';
 const AI_MISSING_TEXT = 'Connect an LLM in your environment to ask Alian from comments.';
@@ -22,10 +22,24 @@ function asPlain(doc) {
     return doc;
 }
 
+function copyThreadId(data, saved, source, key) {
+    const hex = idString(data[key]) || idString(saved && saved[key]) || idString(source && source[key]);
+    if (hex) data[key] = hex;
+    else delete data[key];
+}
+
 function emitCommentInsert(saved, source) {
     const data = serializeCommentForSocket(saved, source);
+    copyThreadId(data, saved, source, 'projectId');
+    copyThreadId(data, saved, source, 'sprintId');
+    copyThreadId(data, saved, source, 'taskId');
+    const _id = idString(data._id) || idString(data.id) || idString(saved && (saved._id || saved.id));
+    if (_id) {
+        data._id = _id;
+        data.id = _id;
+    }
     const thread = commentRoomPrefix(data);
-    if (!thread) return;
+    if (!thread || String(thread.prefix).includes('[object Object]')) return;
     socketEmitter.emit('insert', {
         type: 'insert',
         data,

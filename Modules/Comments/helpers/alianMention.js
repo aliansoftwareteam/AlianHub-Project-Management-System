@@ -1,5 +1,7 @@
 'use strict';
 
+const { idString } = require('./commentThread');
+
 const ALIAN_MENTION_KEY = 'alian';
 const ALIAN_DISPLAY_NAME = 'Alian';
 
@@ -113,7 +115,7 @@ function buildAlianComment(source, message, citations) {
         isDeleted: false,
         hasReply: true,
         project: src.project === true,
-        projectId: src.projectId,
+        projectId: idString(src.projectId) || src.projectId,
         mentionIds: [],
         pinnedMessage: false,
         reactions: [],
@@ -121,7 +123,7 @@ function buildAlianComment(source, message, citations) {
         mediaName: '',
         mediaOriginalName: '',
         mediaSize: 0,
-        reply_id: String(src._id || src.id || ''),
+        reply_id: idString(src._id || src.id) || String(src._id || src.id || ''),
         reply_userId: String(src.userId || ''),
         reply_type: String(src.type || 'text'),
         reply_message: String(src.message || ''),
@@ -131,8 +133,12 @@ function buildAlianComment(source, message, citations) {
         reply_mediaSize: 0,
         reply_createdAt: src.createdAt || new Date(),
     };
-    if (src.sprintId) payload.sprintId = src.sprintId;
-    if (src.taskId) payload.taskId = src.taskId;
+    const sprintId = idString(src.sprintId);
+    const taskId = idString(src.taskId);
+    if (sprintId) payload.sprintId = sprintId;
+    else if (src.sprintId) payload.sprintId = src.sprintId;
+    if (taskId) payload.taskId = taskId;
+    else if (src.taskId) payload.taskId = src.taskId;
     if (src.folderId) payload.folderId = src.folderId;
     return payload;
 }
