@@ -720,7 +720,7 @@ const schema = {
         connectedAt: { type: Date, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
-    // Wiki pages (Editor.js blocks; versioned) — managed by Modules/Pages
+    // Wiki pages (Editor.js blocks + HTML for search/share) — Modules/Pages
     pages: {
         title: { type: String, required: true },
         content: { type: Object, required: false },

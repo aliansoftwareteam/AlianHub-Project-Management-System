@@ -30,6 +30,7 @@ const openDocId = computed(() => String(route.query?.doc || ''));
 .docs-view {
     height: 100%;
     min-height: 520px;
-    padding: 12px 14px 16px;
+    padding: 0;
+    background: var(--kiln-paper);
 }
 </style>

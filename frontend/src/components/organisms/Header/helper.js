@@ -17,10 +17,15 @@ export function useHelper() {
             show:true,
             showerr: () => {
                 return true;
-                // return this.rules && this.checkPermission(this.rules.project, this.companyUserDetail.roleType) !== null && this.checkPermission(this.rules.project.project_list, this.companyUserDetail.roleType) !== null;
             },
             submenu: [],
             isActive: true
+        },
+        {
+            name: "Pages",
+            to: {path: `/${companyId.value}/pages`},
+            show: true,
+            submenu: [],
         },
         {
             // Workspace — oversight + planning + apps grouped under one menu.

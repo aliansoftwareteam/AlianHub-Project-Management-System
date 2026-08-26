@@ -1,10 +1,10 @@
 <template>
-    <div class="d-flex align-items-center justify-content-between px-1 bg-blue white header__wrapper border-bottom-lightgray">
+    <div class="d-flex align-items-center justify-content-between px-1 kiln-shell header__wrapper">
         <div class="d-flex align-items-center h-100">
-            <img :src="toggle" alt="options" class="pr-1 cursor-pointer" v-if="clientWidth <= 1200" @click="visible = !visible">
-            <router-link :to="{name: 'Home', params: {cid: companyId}}" class="d-flex align-items-center h-100">
-                <img :src="headerLogo" class="cursor-pointer" />
-                <img class="cursor-pointer m0px-20px logo-app-icon" v-if="clientWidth > 990" src="@/assets/images/svg/header_dashboard.svg" alt="">
+            <img :src="toggle" alt="options" class="pr-1 cursor-pointer kiln-toggle" v-if="clientWidth <= 1200" @click="visible = !visible">
+            <router-link :to="{name: 'Home', params: {cid: companyId}}" class="kiln-mark">
+                <img :src="headerLogo" class="kiln-mark__logo cursor-pointer" />
+                <span class="kiln-mark__word">Alian<span>Hub</span></span>
             </router-link>
 
             <NavLinks v-if="clientWidth > 1200 && rules && Object.keys(rules).length" :menu="menu" />
@@ -50,6 +50,7 @@
                 </div>
             </template>
             </div>
+            <WorkspaceAskPopover v-if="rules && Object.keys(rules).length" />
             <router-link class="position-re" :to="{name: 'chats', params: {cid: companyId}}" v-if="canOpenChat">
                 <img src="@/assets/images/svg/chat_icon.svg" class="cursor-pointer" id="chat_driver"/>
                 <span v-if="totalMainCounts" class="notification-tick blinking"></span>
@@ -307,6 +308,7 @@ import ClipsPanel from "@/components/molecules/Clips/ClipsPanel.vue";
 import ReminderPanel from "@/components/molecules/GeneralReminder/ReminderPanel.vue";
 import ClipRecorder from "@/components/molecules/ClipRecorder/ClipRecorder.vue";
 import TalkToTextPopover from "@/components/molecules/TalkToText/TalkToTextPopover.vue";
+import WorkspaceAskPopover from "@/components/molecules/Pages/WorkspaceAskPopover.vue";
 import DropDown from "@/components/molecules/DropDown/DropDown.vue";
 import DropDownOption from "@/components/molecules/DropDownOption/DropDownOption.vue";
 import DropDownRouterOption from "@/components/molecules/DropDownRouterOption/DropDownRouterOption.vue";

@@ -193,6 +193,7 @@ const props = defineProps({
     // default the picker to. Both optional — empty disables tasks-only mode.
     sprints: { type: Array, default: () => [] },
     activeSprintId: { type: String, default: '' },
+    initialRequirements: { type: String, default: '' },
 });
 const emit = defineEmits(['update:modelValue', 'done']);
 
@@ -289,7 +290,7 @@ function reset() {
     step.value = 'input';
     mode.value = 'full';
     targetSprintId.value = props.activeSprintId || (props.sprints[0] && props.sprints[0].id) || '';
-    requirements.value = '';
+    requirements.value = String(props.initialRequirements || '');
     plan.value = { sprints: [] };
     planUsage.value = null;
     progressMsg.value = '';

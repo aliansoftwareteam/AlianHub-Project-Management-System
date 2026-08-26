@@ -8,7 +8,7 @@
                      not only when the conversation that called them is on screen. -->
                 <CallOverlay />
                 <HeaderComponent v-if="!$route.meta.hideHeader" @change="changeCompany($event)" @filter="handleFilter"/>
-                <div :style="`height: calc(100dvh - ${$route.meta.hideHeader ? '0' : '46'}px);`" class="billing__history-wrapper style-scroll overflow-auto">
+                <div :style="`height: calc(100dvh - ${$route.meta.hideHeader ? '0' : '58'}px);`" class="billing__history-wrapper style-scroll overflow-auto">
                     <AdvanceSearchModal
                         v-if="!$route.meta.preventAdvanceSearch"
                         headerClasses="border-0"
@@ -77,7 +77,6 @@
 import { computed, defineComponent, onMounted, provide, ref, watch, inject} from 'vue'
 // COMPONENTS
 import TourCom from "@/components/organisms/Tour/TourComponet.vue"
-import FirstRunChecklist from "@/components/molecules/FirstRunChecklist/FirstRunChecklist.vue"
 import HeaderComponent from '@/components/organisms/Header/Header.vue'
 import CallOverlay from '@/components/organisms/CallOverlay/CallOverlay.vue'
 import AdvanceSearchModal from '@/components/atom/Modal/Modal.vue'
@@ -108,6 +107,19 @@ import { initOffline } from '@/offline';
 import * as env from '@/config/env';
 import {tabSyncHelper} from '@/utils/tabSyncs.js';
 import Cookies from 'js-cookie'
+// FirstRunChecklist lives on newer trees. Kiln/Pages must still boot when this file is missing.
+function loadFirstRunChecklist() {
+    try {
+        const ctx = require.context('@/components/molecules', true, /FirstRunChecklist\/FirstRunChecklist\.vue$/);
+        const key = ctx.keys()[0];
+        if (!key) return { name: 'FirstRunChecklist', render: () => null };
+        const mod = ctx(key);
+        return mod.default || mod;
+    } catch (_e) {
+        return { name: 'FirstRunChecklist', render: () => null };
+    }
+}
+const FirstRunChecklist = loadFirstRunChecklist();
 const {tabSync} = tabSyncHelper();
 const mainTour = ref();
 

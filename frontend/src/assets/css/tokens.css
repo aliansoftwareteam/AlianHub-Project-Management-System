@@ -1,0 +1,136 @@
+:root {
+    --kiln-ink: #1b2f28;
+    --kiln-ink-soft: #2c463d;
+    --kiln-paper: #f4ead8;
+    --kiln-paper-2: #ebe0c9;
+    --kiln-canvas: #fbf6ec;
+    --kiln-ember: #c45c26;
+    --kiln-ember-deep: #9b3f16;
+    --kiln-brass: #c9a227;
+    --kiln-moss: #3f6d52;
+    --kiln-line: #d8cbb3;
+    --kiln-text: #1b2f28;
+    --kiln-muted: #5d6e66;
+    --kiln-danger: #b42318;
+    --kiln-font-display: "Fraunces", "Iowan Old Style", Georgia, serif;
+    --kiln-font-body: "Figtree", "Segoe UI", sans-serif;
+    --kiln-radius: 18px;
+    --kiln-radius-sm: 9px;
+    --kiln-shadow: 0 18px 40px rgba(27, 47, 40, 0.12);
+    --kiln-header-h: 58px;
+}
+
+html,
+body,
+#app {
+    font-family: var(--kiln-font-body);
+    color: var(--kiln-text);
+}
+
+.kiln-shell {
+    background: var(--kiln-paper);
+    color: var(--kiln-ink);
+    border-bottom: 1px solid var(--kiln-line) !important;
+    height: var(--kiln-header-h);
+    font-family: var(--kiln-font-body);
+}
+
+.kiln-shell .header_main_navigation_menu_main {
+    height: 100%;
+}
+
+.kiln-mark {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: var(--kiln-ink);
+    height: 100%;
+    padding-right: 8px;
+}
+
+.kiln-mark__logo {
+    height: 28px;
+    max-width: 120px;
+    object-fit: contain;
+}
+
+.kiln-mark__word {
+    font-family: var(--kiln-font-display);
+    font-size: 20px;
+    font-weight: 650;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    color: var(--kiln-ink);
+}
+
+.kiln-mark__word span {
+    color: var(--kiln-ember);
+}
+
+.kiln-shell .project-list-title-small {
+    background: var(--kiln-canvas);
+    color: var(--kiln-muted);
+    border: 1px solid var(--kiln-line);
+    border-radius: 999px;
+    font-family: var(--kiln-font-body);
+}
+
+.kiln-shell .company-text {
+    color: var(--kiln-muted) !important;
+}
+
+.kiln-shell .app-version {
+    color: var(--kiln-muted);
+}
+
+.kiln-shell .header__actions > .position-re > img,
+.kiln-shell .header__actions .question__icon,
+.kiln-shell .logo-app-icon,
+.kiln-shell > div > img {
+    filter: invert(18%) sepia(22%) saturate(720%) hue-rotate(118deg) brightness(90%) contrast(92%);
+}
+
+.kiln-link {
+    font-family: var(--kiln-font-body);
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--kiln-ink-soft);
+    padding: 0 14px;
+    height: 100%;
+    display: inline-flex;
+    align-items: center;
+    position: relative;
+    margin-right: 2px;
+}
+
+.kiln-link:hover {
+    color: var(--kiln-ember);
+    text-decoration: none;
+}
+
+.kiln-link.is-active {
+    color: var(--kiln-ink);
+    background: transparent;
+}
+
+.kiln-link.is-active::after {
+    content: "";
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    bottom: 8px;
+    height: 3px;
+    border-radius: 99px;
+    background: var(--kiln-ember);
+}
+
+.kiln-link .dropdown_wrapper,
+.kiln-link .list-dropdown-item {
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+}
