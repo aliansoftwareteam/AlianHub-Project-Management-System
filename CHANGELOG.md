@@ -32,6 +32,7 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 * leave MONGODB_URL empty in .env.example so the wizard's answer wins ([4bcdc6e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4bcdc6e7ffb6ffb61826b70441fd8daac15c3fa4))
 * new tasks could not be created in the demo project ([a6843a7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a6843a7822960d94ea9401ce14572d8a71f76c22))
 * read the real project and task requirements instead of copying payload shapes ([c9eac49](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c9eac495b99ed5610755e742a1f23eafbdde9204))
+* the demo project was never created, and the wizard skip bypassed the backend ([2c352ba](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2c352ba9b28a68aeaefce00535beb66293684481))
 * the demo project was only populated when no setup answer was given ([a4b9365](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a4b9365abf160e1cf6b0b75151a9b766ec3dcf13))
 * the installer's database answer was recorded and then ignored ([b710f7c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b710f7c61b747b259248e930c6a4d1e2c35526ba))
 * the permission catalogue repair no longer runs on a live company by default ([c8ede23](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c8ede2324f5af7ed272b292c0a7c3f56a0c372a4))
