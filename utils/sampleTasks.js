@@ -145,7 +145,10 @@ const dayMs = 24 * 60 * 60 * 1000;
 // and so come out looking exactly as they did before; only the welcome set uses them, to make the
 // demo project look like a project someone has actually been working in — statuses spread across
 // the board, real owners, dates on the calendar, mixed priorities and one task with subtasks.
-function buildTaskDocs(project, sprint, rows, startingNumber, ownerId) {
+// `sprints` is either one sprint document or an array of them; a row's plan picks by index.
+function buildTaskDocs(project, sprints, rows, startingNumber, ownerId) {
+    const sprintList = Array.isArray(sprints) ? sprints : [sprints];
+    const sprintAt = (i) => sprintList[Math.min(Number(i) || 0, sprintList.length - 1)] || sprintList[0];
     const projectId = String(project._id);
     const companyId = String(project.CompanyId);
     const code = project.ProjectCode || 'TASK';
@@ -164,7 +167,7 @@ function buildTaskDocs(project, sprint, rows, startingNumber, ownerId) {
         },
     });
 
-    const base = (TaskName, text, n) => ({
+    const base = (TaskName, text, n, sprint) => ({
         ...TASK_DEFAULTS,
         TaskName,
         ...describe(text),
@@ -196,7 +199,8 @@ function buildTaskDocs(project, sprint, rows, startingNumber, ownerId) {
 
         // Ids are generated up front so a subtask can name its parent in the same insert.
         const _id = new mongoose.Types.ObjectId();
-        const doc = { ...base(TaskName, text, n), _id, groupByStatusIndex: i };
+        const sprint = sprintAt(opts.sprint);
+        const doc = { ...base(TaskName, text, n, sprint), _id, groupByStatusIndex: i };
 
         const status = opts.status ? resolveStatus(statuses, opts.status) : null;
         if (status) {
@@ -215,7 +219,8 @@ function buildTaskDocs(project, sprint, rows, startingNumber, ownerId) {
         kids.forEach((kidName, k) => {
             n += 1;
             docs.push({
-                ...base(kidName, `An example subtask of "${TaskName}".`, n),
+                // A subtask always lives in the same sprint as its parent.
+                ...base(kidName, `An example subtask of "${TaskName}".`, n, sprint),
                 _id: new mongoose.Types.ObjectId(),
                 isParentTask: false,
                 ParentTaskId: String(_id),
@@ -249,6 +254,43 @@ function buildTaskDocs(project, sprint, rows, startingNumber, ownerId) {
     return { docs, comments };
 }
 
+// The demo project arrives with the single sprint every project gets, called "List". A real
+// project is not one flat list, so that one is renamed and the rest are created beside it.
+// Nothing anywhere looks a sprint up by the name "List", so renaming it is safe.
+//
+// Never throws: if a sprint cannot be made, the tasks all fall back to the one that exists.
+async function ensureDemoSprints(project, firstSprint) {
+    const companyId = String(project.CompanyId);
+    const sprints = [firstSprint];
+    try {
+        await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.SPRINTS,
+            data: [{ _id: firstSprint._id }, { name: DEMO_SPRINTS[0] }],
+        }, 'findOneAndUpdate');
+        sprints[0] = { ...JSON.parse(JSON.stringify(firstSprint)), name: DEMO_SPRINTS[0] };
+
+        // Required late: Modules/Sprints pulls in a large part of the app.
+        // eslint-disable-next-line global-require
+        const { addSprintFun } = require('../Modules/Sprints/controller');
+        for (const name of DEMO_SPRINTS.slice(1)) {
+            // eslint-disable-next-line no-await-in-loop
+            const res = await addSprintFun({
+                body: {
+                    companyId,
+                    projectId: project._id,
+                    sprintName: name,
+                    userData: {},
+                    projectName: project.ProjectName,
+                },
+            });
+            if (res && res.data && res.data._id) sprints.push(JSON.parse(JSON.stringify(res.data)));
+        }
+    } catch (error) {
+        logger.error(`ensureDemoSprints: ${error && (error.statusText || error.message)}`);
+    }
+    return sprints;
+}
+
 // Never rejects. Sample content failing must not take a project creation down with it.
 async function seedSampleTasks(project, sprint, rows, ownerId) {
     try {
@@ -263,7 +305,13 @@ async function seedSampleTasks(project, sprint, rows, ownerId) {
 
         const companyId = String(project.CompanyId);
         const startingNumber = Number(project.lastTaskId) || 0;
-        const { docs, comments } = buildTaskDocs(project, sprint, rows, startingNumber, leader);
+
+        // Only the demo project is split across sprints. A template project keeps the single
+        // sprint it was created with, which is what every hand-made project gets.
+        const wantsSprints = rows.some((r) => r[2] && r[2].sprint !== undefined);
+        const sprints = wantsSprints ? await ensureDemoSprints(project, sprint) : [sprint];
+
+        const { docs, comments } = buildTaskDocs(project, sprints, rows, startingNumber, leader);
 
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
@@ -290,15 +338,20 @@ async function seedSampleTasks(project, sprint, rows, ownerId) {
             ],
         }, 'findOneAndUpdate');
 
-        // Only parents count towards the sprint total, the same as anywhere else in the app.
-        const parents = docs.filter((d) => d.isParentTask !== false).length;
-        await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.SPRINTS,
-            data: [
-                { _id: sprint._id },
-                { $inc: { tasks: parents } },
-            ],
-        }, 'findOneAndUpdate');
+        // Only parents count towards a sprint total, the same as anywhere else in the app,
+        // and each sprint counts its own.
+        const perSprint = {};
+        for (const d of docs) {
+            if (d.isParentTask === false) continue;
+            perSprint[d.sprintId] = (perSprint[d.sprintId] || 0) + 1;
+        }
+        for (const [sprintId, count] of Object.entries(perSprint)) {
+            // eslint-disable-next-line no-await-in-loop
+            await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.SPRINTS,
+                data: [{ _id: sprintId }, { $inc: { tasks: count } }],
+            }, 'findOneAndUpdate');
+        }
 
         removeCache(`project:${String(project._id)}`);
         removeCache(`projectList:${companyId}`);
@@ -325,23 +378,42 @@ function sampleTasksForTemplate(templateName) {
 //
 // Statuses are names of intent, resolved against the project's own status list, so a company
 // that renames or reorders its statuses still gets a sensible spread.
+// The demo project is split like a real one: work that is finished, work in flight, and work
+// not started. The project arrives with a single sprint called "List" — that one is renamed to
+// the first of these and the other two are created alongside it.
+const DEMO_SPRINTS = ['Getting started', 'This week', 'Up next'];
+
+// How the demo project is populated. Applied BY POSITION over whatever list the demo ends up
+// with, not attached to particular rows — picking "Marketing" during setup swaps most of the
+// rows out, and attaching the variety to specific rows meant that choice produced a flat,
+// all-To-Do project with no subtasks and no comment.
+//
+// Statuses are names of intent, resolved against the project's own status list, so a company
+// that renames or reorders its statuses still gets a sensible spread. `sprint` indexes
+// DEMO_SPRINTS, and each sprint holds work at a stage that suits its name.
 const DEMO_LIFE = [
-    { status: 'in_progress', assign: true, dueInDays: 0, priority: 'HIGH' },
-    { status: 'complete', assign: true, dueInDays: -1 },
-    { assign: true, dueInDays: 1 },
-    { dueInDays: 2, priority: 'URGENT' },
-    { status: 'in_progress', assign: true, dueInDays: 3, comment: 'This is what a comment looks like. The conversation stays on the task, so the reasoning is still here months from now.' },
-    { dueInDays: 4, priority: 'LOW' },
-    { status: 'in_review', assign: true, dueInDays: 5 },
-    { status: 'in_progress', assign: true, dueInDays: 7, priority: 'HIGH', subtasks: ['Write the first draft', 'Review it with someone', 'Publish the final version'] },
-    { status: 'done', assign: true, dueInDays: 6 },
-    { status: 'backlog', dueInDays: 12, priority: 'LOW' },
-    { dueInDays: 14 },
+    // Getting started — the intro, mostly behind us
+    { sprint: 0, status: 'in_progress', assign: true, dueInDays: 0, priority: 'HIGH' },
+    { sprint: 0, status: 'complete', assign: true, dueInDays: -2 },
+    { sprint: 0, status: 'done', assign: true, dueInDays: -1 },
+    // This week — work actually in flight
+    { sprint: 1, dueInDays: 1, priority: 'URGENT' },
+    { sprint: 1, status: 'in_progress', assign: true, dueInDays: 2, comment: 'This is what a comment looks like. The conversation stays on the task, so the reasoning is still here months from now.' },
+    { sprint: 1, dueInDays: 3, priority: 'LOW' },
+    { sprint: 1, status: 'in_review', assign: true, dueInDays: 4 },
+    // Position 7 on purpose: in the welcome set that row is "Break a big task into subtasks", so
+    // the task that teaches subtasks is the one that has them. Same reason the comment sits at 4.
+    { sprint: 1, status: 'in_progress', assign: true, dueInDays: 5, priority: 'HIGH', subtasks: ['Write the first draft', 'Review it with someone', 'Publish the final version'] },
+    // Up next — nothing started yet
+    { sprint: 2, status: 'backlog', dueInDays: 9, priority: 'LOW' },
+    { sprint: 2, dueInDays: 12 },
+    { sprint: 2, dueInDays: 14, priority: 'LOW' },
 ];
 
 // Anything past the plan still gets a date, so the calendar never has gaps.
 function withDemoLife(rows) {
-    return rows.map((row, i) => [row[0], row[1], DEMO_LIFE[i] || { dueInDays: 15 + i }]);
+    return rows.map((row, i) => [row[0], row[1],
+        DEMO_LIFE[i] || { sprint: DEMO_SPRINTS.length - 1, dueInDays: 15 + i }]);
 }
 
 // What the owner said their team does, answered once during setup, mapped onto the sample content
@@ -374,6 +446,7 @@ module.exports = {
     buildTaskDocs,
     TEAM_FOCUS_OPTIONS,
     demoTasksForFocus,
+    DEMO_SPRINTS,
     withDemoLife,
     WELCOME_TASKS,
     WELCOME_PROJECT_NAME,

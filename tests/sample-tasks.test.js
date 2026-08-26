@@ -208,3 +208,54 @@ describe('the demo task text reads as documentation', () => {
         }
     });
 });
+
+/* The demo project is split across sprints like a real one, rather than being a single flat list.
+   The project arrives with one sprint called "List"; that is renamed and two more are created. */
+describe('the demo project is split across sprints', () => {
+    const { DEMO_SPRINTS } = require('../utils/sampleTasks.js');
+
+    test('three named sprints, and none of them is called List', () => {
+        expect(DEMO_SPRINTS).toHaveLength(3);
+        for (const name of DEMO_SPRINTS) {
+            expect(typeof name).toBe('string');
+            expect(name).not.toBe('List');
+            expect(name.length).toBeGreaterThan(3);
+        }
+    });
+
+    test.each(ALL_ANSWERS.map((f) => [JSON.stringify(f), f]))('answer %s spreads work over all three', (_label, focus) => {
+        const rows = demoTasksForFocus(focus);
+        const used = new Set(rows.map((r) => (r[2] || {}).sprint));
+        expect([...used].sort()).toEqual([0, 1, 2]);
+        // and every row names one, so nothing silently falls into the first
+        for (const row of rows) expect((row[2] || {}).sprint).toBeDefined();
+    });
+
+    test('a subtask always sits in the same sprint as its parent', () => {
+        // Three distinct sprint documents, so a mismatch would show up as a different id.
+        const sprints = DEMO_SPRINTS.map((name, i) => ({
+            _id: `67beeeea2930c35b90cd87${40 + i}`, name, projectId: project._id, tasks: 0,
+        }));
+        const { docs } = buildTaskDocs(project, sprints, demoTasksForFocus(''), 0, OWNER);
+        const parent = docs.find((d) => d.subTasks > 0);
+        const kids = docs.filter((d) => d.isParentTask === false);
+        expect(kids).toHaveLength(3);
+        for (const kid of kids) expect(kid.sprintId).toBe(parent.sprintId);
+    });
+
+    test('the tasks that teach subtasks and comments are the ones that have them', () => {
+        const sprints = DEMO_SPRINTS.map((name, i) => ({
+            _id: `67beeeea2930c35b90cd87${40 + i}`, name, projectId: project._id, tasks: 0,
+        }));
+        const { docs, comments } = buildTaskDocs(project, sprints, demoTasksForFocus(''), 0, OWNER);
+        expect(docs.find((d) => d.subTasks > 0).TaskName).toBe('Break a big task into subtasks');
+        expect(docs.find((d) => String(d._id) === String(comments[0].taskId)).TaskName)
+            .toBe('Leave a comment');
+    });
+
+    test('template projects still get a single sprint', () => {
+        for (const rows of templateSets()) {
+            expect(rows.every((r) => r[2] === undefined)).toBe(true);
+        }
+    });
+});
