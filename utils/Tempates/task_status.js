@@ -75,7 +75,7 @@ exports.TemplateData = () => {
             taskcloseStatus: 2
         },
         {
-            default:true,
+            default:false,
             ActiveStatusList: [
                 {
                     bgColor: "#6473e835",
@@ -98,24 +98,14 @@ exports.TemplateData = () => {
                     value: "in_review"
                 },
                 {
-                    bgColor: "#ec414135",
+                    bgColor: "#cedb1f35",
                     isAddNewStatus: false,
                     isEditable: false,
-                    key: 5,
+                    key: 7,
                     type: "active",
-                    name: "Backlog",
-                    textColor: "#ec4141",
-                    value: "backlog"
-                },
-                {
-                    bgColor: "#24c11035",
-                    isAddNewStatus: false,
-                    isEditable: false,
-                    key: 6,
-                    type: "active",
-                    name: "Done",
-                    textColor: "#24c110",
-                    value: "done"
+                    name: "On Hold",
+                    textColor: "#cedb1f",
+                    value: "on_hold"
                 }
             ],
             Created_At: new Date(),
@@ -139,12 +129,12 @@ exports.TemplateData = () => {
                 value: "complete",
                 type: "close",
             },
-            taskActiveStatus: [1,3,4,5,6],
+            taskActiveStatus: [1,3,4,7],
             taskDoneStatus: [],
             taskcloseStatus: 2
         },
         {
-            default:true,
+            default:false,
             ActiveStatusList: [
                 {
                     bgColor: "#6473e835",
@@ -188,7 +178,7 @@ exports.TemplateData = () => {
                 value: "complete",
                 type: "close",
             },
-            taskActiveStatus: [1,3,4,5,6,7,8,9],
+            taskActiveStatus: [1,3,4],
             taskDoneStatus: [],
             taskcloseStatus: 2
         }

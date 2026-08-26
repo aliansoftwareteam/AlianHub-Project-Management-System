@@ -47,7 +47,12 @@
                 </div>
             </div>
             <div class="d-flex align-items-center justify-content-center flex-column" v-if="totalTaskInFirstSprint.length === 0">
-                <h3 class="mt-1" v-if="project?.deletedStatusKey !== 2">{{$t('Header.no_data_found')}}</h3>
+                <EmptyState
+                    v-if="project?.deletedStatusKey !== 2"
+                    :title="!project?.lastTaskId ? $t('EmptyState.no_tasks_title') : $t('EmptyState.no_match_title')"
+                    :message="!project?.lastTaskId ? $t('EmptyState.no_tasks_msg') : $t('EmptyState.no_match_msg')"
+                    helpPath="tasks"
+                />
             </div>
         </table>
     </div>
@@ -66,6 +71,7 @@ import { taskListHelper } from '@/views/Projects/helper.js';
 
 // PACKAGES
 import {useStore} from 'vuex'
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import { ref,
     inject,
     onMounted,computed,watch
