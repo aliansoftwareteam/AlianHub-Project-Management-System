@@ -19,6 +19,8 @@ try {
 const {
     formatContextPack,
     buildWorkspaceAskPrompt,
+    extractUsedHints,
+    selectCitations,
     WORKSPACE_ASK_SYSTEM,
 } = require('./pageWorkspaceAsk');
 
@@ -121,11 +123,12 @@ async function chatMarkdown({ systemPrompt, userPrompt, temperature }) {
         return { status: false, reason: (error && error.message) || 'Could not complete the AI request.' };
     }
 
-    const markdown = parseMarkdownPayload(result && result.content);
+    const raw = result && result.content;
+    const markdown = parseMarkdownPayload(raw);
     if (!markdown.trim()) {
         return { status: false, reason: 'The model returned an empty answer.' };
     }
-    return { status: true, markdown };
+    return { status: true, markdown, raw };
 }
 
 async function composePage({ action, title, instruction, currentText }) {
@@ -196,12 +199,14 @@ async function answerWorkspaceQuestion({ question, pages, tasks }) {
         temperature: 0.3,
     });
     if (!chat.status) return chat;
+    const citations = selectCitations(pack.citations, extractUsedHints(chat.raw));
     return {
         status: true,
         data: {
             markdown: chat.markdown,
             previewText: chat.markdown.slice(0, 400),
             sources: { pages: pack.pageCount, tasks: pack.taskCount },
+            citations,
         },
     };
 }

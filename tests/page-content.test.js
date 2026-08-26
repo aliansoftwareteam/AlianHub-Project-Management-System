@@ -14,6 +14,12 @@ const {
     pageInVisibleProjects,
     formatContextPack,
     buildWorkspaceAskPrompt,
+    citationsFromPack,
+    extractUsedHints,
+    selectCitations,
+    FALLBACK_PAGE_CITATIONS,
+    FALLBACK_TASK_CITATIONS,
+    WORKSPACE_ASK_SYSTEM,
 } = require('../Modules/Pages/helpers/pageWorkspaceAsk');
 const fs = require('fs');
 const path = require('path');
@@ -139,6 +145,73 @@ describe('PAGES - workspace ask', () => {
         expect(pack.pageText).toContain('Handbook');
         expect(pack.taskText).toContain('AH-1');
         expect(pack.taskText).toContain('Write the brief');
+        expect(pack.citations).toEqual([]);
+    });
+
+    test('context pack citations use pack ids, titles and project ids', () => {
+        const pack = formatContextPack({
+            pages: [{ _id: 'page1', title: 'Handbook', rawText: 'Onboarding lives here.', ProjectID: 'projA' }],
+            tasks: [{ id: 'task1', TaskKey: 'AH-1', TaskName: 'Write the brief', ProjectID: 'projA' }],
+        });
+        expect(pack.pageText).toContain('[page:page1]');
+        expect(pack.taskText).toContain('[task:task1]');
+        expect(pack.citations).toEqual([
+            { type: 'page', id: 'page1', title: 'Handbook', projectId: 'projA' },
+            { type: 'task', id: 'task1', title: 'AH-1 Write the brief', projectId: 'projA' },
+        ]);
+        expect(citationsFromPack({
+            pages: [{ _id: 'page1', title: 'Handbook', ProjectID: 'projA' }],
+            tasks: [{ id: 'task1', TaskKey: 'AH-1', TaskName: 'Write the brief', ProjectID: 'projA' }],
+        })).toEqual(pack.citations);
+    });
+
+    test('citation shaping drops invented ids and falls back to top N from the pack', () => {
+        const pages = [
+            { _id: 'p1', title: 'Alpha' },
+            { _id: 'p2', title: 'Beta' },
+            { _id: 'p3', title: 'Gamma' },
+        ];
+        const tasks = [
+            { _id: 't1', TaskName: 'Ship it', ProjectID: 'projA' },
+            { _id: 't2', TaskName: 'Polish' },
+        ];
+        const pack = formatContextPack({ pages, tasks });
+
+        expect(selectCitations(pack.citations, [
+            { type: 'page', id: 'p2' },
+            { type: 'task', id: 'invented' },
+            { type: 'page', id: 'p2' },
+        ])).toEqual([{ type: 'page', id: 'p2', title: 'Beta' }]);
+
+        expect(selectCitations(pack.citations, [
+            { type: 'task', title: 'Ship it' },
+        ])).toEqual([{ type: 'task', id: 't1', title: 'Ship it', projectId: 'projA' }]);
+
+        expect(selectCitations(pack.citations, [{ type: 'page', id: 'nope' }])).toEqual(pack.citations);
+        expect(selectCitations(pack.citations, [])).toEqual(pack.citations);
+        expect(selectCitations([], [{ type: 'page', id: 'p1' }])).toEqual([]);
+
+        const manyPages = Array.from({ length: 10 }, (_, i) => ({ _id: `p${i}`, title: `Page ${i}` }));
+        const manyTasks = Array.from({ length: 10 }, (_, i) => ({ _id: `t${i}`, TaskName: `Task ${i}` }));
+        const wide = formatContextPack({ pages: manyPages, tasks: manyTasks });
+        const fallback = selectCitations(wide.citations, []);
+        expect(fallback.filter((c) => c.type === 'page')).toHaveLength(FALLBACK_PAGE_CITATIONS);
+        expect(fallback.filter((c) => c.type === 'task')).toHaveLength(FALLBACK_TASK_CITATIONS);
+        expect(fallback[0]).toEqual({ type: 'page', id: 'p0', title: 'Page 0' });
+    });
+
+    test('extractUsedHints reads used ids from JSON and ignores count-style sources', () => {
+        expect(extractUsedHints('{"markdown":"Hi","used":[{"type":"page","id":"p1"},{"type":"task","id":"t1"}]}')).toEqual([
+            { type: 'page', id: 'p1' },
+            { type: 'task', id: 't1' },
+        ]);
+        expect(extractUsedHints('```json\n{"markdown":"Hi","citations":[{"type":"pages","_id":"p1","title":"Handbook"}]}\n```')).toEqual([
+            { type: 'page', id: 'p1', title: 'Handbook' },
+        ]);
+        expect(extractUsedHints('{"markdown":"Hi","sources":{"pages":2,"tasks":1}}')).toEqual([]);
+        expect(extractUsedHints('not json')).toEqual([]);
+        expect(WORKSPACE_ASK_SYSTEM).toMatch(/"used"/);
+        expect(WORKSPACE_ASK_SYSTEM).toMatch(/\[page:<id>\]/);
     });
 
     test('workspace ask prompt carries the question and both lists', () => {
@@ -176,5 +249,25 @@ describe('PAGES - kiln follow-up guards', () => {
         expect(src).toMatch(/action\.value === 'ask'/);
         expect(src).toContain("emit('apply'");
         expect(src).toMatch(/payload\.apply === false/);
+        expect(src).toContain('WorkspaceAskCitations');
+        expect(src).toContain('payload.citations');
+    });
+
+    test('workspace ask popover renders citation chips from the payload', () => {
+        const popover = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'molecules', 'Pages', 'WorkspaceAskPopover.vue'), 'utf8');
+        const chips = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'molecules', 'Pages', 'WorkspaceAskCitations.vue'), 'utf8');
+        const panel = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'molecules', 'Pages', 'PagesPanel.vue'), 'utf8');
+        const locale = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'locales', 'en.js'), 'utf8');
+        expect(popover).toContain('WorkspaceAskCitations');
+        expect(popover).toContain('payload.citations');
+        expect(chips).toContain('data-citation-type');
+        expect(chips).toContain('data-citation-id');
+        expect(chips).toContain("name: 'Pages'");
+        expect(chips).toContain('query: { page:');
+        expect(panel).toContain('route.query');
+        expect(panel).toContain('routePageId');
+        expect(locale).toContain('workspace_ask_sources');
+        expect(locale).toContain('pages_citation_page');
+        expect(locale).toContain('pages_citation_task');
     });
 });

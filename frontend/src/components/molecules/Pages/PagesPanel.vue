@@ -242,6 +242,7 @@ import { computed, defineProps, onBeforeUnmount, onMounted, ref, watch } from "v
 import { useToast } from "vue-toast-notification";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import { useRoute, useRouter } from "vue-router";
 
 import TaskChipPicker from "@/components/molecules/Pages/TaskChipPicker.vue";
 import PageBlockEditor from "@/components/molecules/Pages/PageBlockEditor.vue";
@@ -257,6 +258,8 @@ const { contentToEditorData, blocksToRawText } = pageContent.default || pageCont
 const { t } = useI18n();
 const $toast = useToast();
 const { getters, dispatch } = useStore();
+const route = useRoute();
+const router = useRouter();
 // getUser only resolves a name for display now — the author is taken from the JWT on the
 // server, so nothing here needs the current user's id.
 const { getUser, getTaskStatus } = useGetterFunctions();
@@ -327,6 +330,7 @@ const taskProjectId = computed(() => String(
 const rawDraft = computed(() => blocksToRawText(contentBlocks.value) || contentHtml.value || '');
 
 const query = ref('');
+const routePageId = computed(() => String((route.query && route.query.page) || ''));
 const expanded = ref(new Set());
 const showLinker = ref(false);
 // [{ id, key }] — the key is only what the picker handed over, for a readable chip. The
@@ -428,6 +432,11 @@ watch(() => props.openDocId, (id) => {
     if (id && isOpen.value) openPage(id);
 });
 
+watch(routePageId, (id, previous) => {
+    if (!props.workspace || !id || id === previous) return;
+    if (isOpen.value) openPage(id);
+});
+
 // Switching projects does not remount this component — only the injected project
 // changes — so nothing above re-ran and the previous project's tree and open doc
 // stayed on screen until a tab change or reload forced a rebuild.
@@ -483,7 +492,9 @@ function fetchPages() {
         // it has docs, so start on the first one. Only when nothing is open and
         // no doc was asked for — and with no docs at all the empty state is still
         // the right answer. The panel keeps its picker: it is opened FROM a doc.
-        if (props.embedded && !current.value && !props.openDocId && rows.value.length) {
+        if (props.workspace && routePageId.value) {
+            openPage(routePageId.value);
+        } else if (props.embedded && !current.value && !props.openDocId && rows.value.length) {
             openPage(rows.value[0]._id);
         }
     })
@@ -511,15 +522,15 @@ function openPage(id) {
             editorKey.value = String(id);
             baselinePending.value = true;
             isPrivate.value = String(current.value.visibility || '') === 'private';
-            // The doc stores ids only; the key is filled in when a task is linked in this
-            // session, and falls back to a short id otherwise.
             linkedTasks.value = (current.value.linkedTasks || []).map((x) => ({ id: String(x), key: '' }));
             mode.value = 'edit';
             showLinker.value = false;
-            // Both belong to the doc that was open, not to this one.
             showShare.value = false;
             share.value = null;
             previewHtml.value = '';
+            if (props.workspace && String(routePageId.value || '') !== String(id)) {
+                router.replace({ query: { ...route.query, page: String(id) } });
+            }
         }
     })
     .catch((error) => console.error('ERROR in open page: ', error));
