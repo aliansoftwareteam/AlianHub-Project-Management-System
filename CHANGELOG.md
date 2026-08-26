@@ -16,6 +16,20 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.35.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.34.0...v14.35.0) (2026-08-26)
+
+
+### 🚀 Features
+
+* carry subtasks through bulk move, and add both convert actions in bulk ([92b0098](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/92b0098cf9cb0316be0c3b255abcacdf4f86ef29))
+* **tracker:** tell people the estimate was passed, even when tracking is not capped ([8abb21c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8abb21c0ee799bc8b33dad2cf075834bb6039bd0))
+
+
+### 🐛 Bug Fixes
+
+* show a dragged-in subtask straight away instead of after a reload ([1fe8323](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1fe8323c540be6b2c81b01bee34aca57e262ff22))
+* **tracker:** the task type icon was invisible on the running-tracker header ([e43b962](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e43b9624318bef999405d17b59495caccd94a6dc))
+
 ## [14.34.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.33.0...v14.34.0) (2026-08-26)
 
 
