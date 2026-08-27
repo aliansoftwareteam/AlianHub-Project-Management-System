@@ -153,7 +153,7 @@ function fallbackCitations(packCitations) {
     return pages.concat(tasks);
 }
 
-function selectCitations(packCitations, usedHints) {
+function selectCitations(packCitations, usedHints, options) {
     const pack = Array.isArray(packCitations) ? packCitations.filter((c) => c && c.id && (c.type === 'page' || c.type === 'task')) : [];
     if (!pack.length) return [];
 
@@ -188,6 +188,7 @@ function selectCitations(packCitations, usedHints) {
     }
 
     if (picked.length) return picked;
+    if (options && options.fallback === false) return [];
     return fallbackCitations(pack);
 }
 

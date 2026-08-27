@@ -267,7 +267,7 @@ function contentToEditorData(content) {
     };
 }
 
-const AI_ACTIONS = ['draft', 'expand', 'summarize', 'outline', 'rewrite', 'ask'];
+const AI_ACTIONS = ['draft', 'expand', 'summarize', 'outline', 'rewrite', 'ask', 'transcript'];
 
 function isAiAction(action) {
     return AI_ACTIONS.includes(String(action || '').toLowerCase());
