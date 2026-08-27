@@ -50,7 +50,7 @@ import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPla
 import isEqual from 'lodash/isEqual';
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { useTaskSelection } from '@/composable/useTaskSelection.js';
-import { boardEmptyKind, countSprintBoardTasks, firstId } from '@/utils/taskOpenProjectId';
+import { boardEmptyKind, countSprintBoardTasks, firstId, sprintExpectedCount } from '@/utils/taskOpenProjectId';
 
 // UTILS
 const {getters} = useStore();
@@ -99,26 +99,9 @@ const props = defineProps({
 const groupedTasks = ref([]);
 const expandedSprint = ref("");
 const initialDate = ref(0);
-const isLoading = ref(false);
+const isLoading = ref(true);
 const searchedTasksData = computed(() => getters['projectData/searchedTasks'] || []);
 const allProjectTasks = computed(() => getters['projectData/tasks'] || {});
-const emptyKind = computed(() => {
-    const sprint = props.sprints && props.sprints[0];
-    const expected = Number((sprint && (sprint.tasks || sprint.taskCount || sprint.archiveTaskCount)) || 0);
-    const pid = firstId(project.value && project.value._id);
-    const sid = firstId(sprint && (sprint.id || sprint._id));
-    return boardEmptyKind({
-        loading: isLoading.value || props.sprintLoading,
-        sprintsBound: Boolean(props.sprints && props.sprints.length),
-        boardCount: countSprintBoardTasks(allProjectTasks.value, pid, sid),
-        expectedCount: expected,
-        searchHits: Boolean(searchedTask && searchedTask.value && searchedTasksData.value.length),
-    });
-});
-const boardExpectedCount = computed(() => {
-    const sprint = props.sprints && props.sprints[0];
-    return Number((sprint && (sprint.tasks || sprint.taskCount || sprint.archiveTaskCount)) || 0);
-});
 const headerSprints = computed(() => {
     if (groupedTasks.value && groupedTasks.value.length) return groupedTasks.value;
     return (props.sprints || []).map((sprint) => ({
@@ -126,6 +109,25 @@ const headerSprints = computed(() => {
         isExpanded: true,
         items: Array.isArray(sprint.items) ? sprint.items : [],
     }));
+});
+const emptyKind = computed(() => {
+    const sprint = (headerSprints.value && headerSprints.value[0]) || (props.sprints && props.sprints[0]);
+    const expected = sprintExpectedCount(sprint);
+    const pid = firstId(project.value && project.value._id);
+    const sid = firstId(sprint && (sprint.id || sprint._id));
+    const groups = sprint && Array.isArray(sprint.items) ? sprint.items : [];
+    return boardEmptyKind({
+        loading: isLoading.value || props.sprintLoading,
+        sprintsBound: Boolean(props.sprints && props.sprints.length),
+        boardCount: countSprintBoardTasks(allProjectTasks.value, pid, sid),
+        expectedCount: expected,
+        searchHits: Boolean(searchedTask && searchedTask.value && searchedTasksData.value.length),
+        hasGroups: groups.length > 0,
+    });
+});
+const boardExpectedCount = computed(() => {
+    const sprint = (headerSprints.value && headerSprints.value[0]) || (props.sprints && props.sprints[0]);
+    return sprintExpectedCount(sprint);
 });
 provide('boardSurfaceKind', emptyKind);
 provide('boardExpectedCount', boardExpectedCount);

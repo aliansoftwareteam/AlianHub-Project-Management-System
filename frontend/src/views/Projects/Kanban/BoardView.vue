@@ -53,7 +53,7 @@ import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPla
 
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { useRoute } from 'vue-router';
-import { boardEmptyKind, countSprintBoardTasks, firstId, sprintTasksBucket } from '@/utils/taskOpenProjectId';
+import { boardEmptyKind, countSprintBoardTasks, firstId, sprintExpectedCount, sprintTasksBucket } from '@/utils/taskOpenProjectId';
 const route = useRoute();
 
 // --- Props & Emits ---
@@ -169,18 +169,20 @@ const processedBoardData = computed(() => {
 const shownBoardCount = computed(() => processedBoardData.value.reduce((n, group) => n + ((group && group.tasksArray) || []).length, 0));
 const boardExpectedCount = computed(() => {
     const sprint = props.sprints && props.sprints[0];
-    return Number((sprint && (sprint.tasks || sprint.taskCount || sprint.archiveTaskCount)) || 0);
+    return sprintExpectedCount(sprint);
 });
 const emptyKind = computed(() => {
     const sprint = props.sprints && props.sprints[0];
     const pid = firstId(project.value && project.value._id);
     const sid = firstId(sprint && (sprint.id || sprint._id));
+    const groups = (internalGroupedTasks.value[0] && internalGroupedTasks.value[0].items) || [];
     return boardEmptyKind({
         loading: isLoading.value || props.sprintLoading,
         sprintsBound: Boolean(props.sprints && props.sprints.length),
         boardCount: Math.max(shownBoardCount.value, countSprintBoardTasks(allProjectTasks.value, pid, sid)),
         expectedCount: boardExpectedCount.value,
         searchHits: Boolean(searchedTask && searchedTask.value && searchedTasksData.value.length),
+        hasGroups: groups.length > 0,
     });
 });
 

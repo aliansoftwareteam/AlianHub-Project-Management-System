@@ -24,6 +24,7 @@ const {
     countSprintBoardTasks,
     sprintTasksBucket,
     boardEmptyKind,
+    sprintExpectedCount,
 } = require('../Modules/Project/helpers/taskOpenProjectId');
 
 describe('TASK OPEN - pass ProjectID so taskData is not empty', () => {
@@ -392,6 +393,11 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 0, expectedCount: 3 })).toBe('failed');
         expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 0, expectedCount: 0, searchHits: true })).toBe('failed');
         expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 2, expectedCount: 2 })).toBe('ready');
+        expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 0, expectedCount: 7, hasGroups: false })).toBe('failed');
+        expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 0, expectedCount: 0, hasGroups: false })).toBe('failed');
+        expect(sprintExpectedCount({ tasks: 7 })).toBe(7);
+        expect(sprintExpectedCount({ taskCount: 7 })).toBe(7);
+        expect(sprintExpectedCount({ tasks: [] })).toBe(0);
         const store = {
             [PROJECT]: {
                 sprints: [SPRINT],
@@ -401,6 +407,12 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(countSprintBoardTasks(store, { $oid: PROJECT }, { toHexString: () => SPRINT })).toBe(2);
         expect(countSprintBoardTasks({}, PROJECT, SPRINT)).toBe(0);
         expect(sprintTasksBucket(store, PROJECT, SPRINT).tasks).toHaveLength(2);
+        const list = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'views', 'Projects', 'ListView', 'ListView.vue'), 'utf8');
+        const board = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'views', 'Projects', 'Kanban', 'BoardView.vue'), 'utf8');
+        expect(list).toContain('hasGroups');
+        expect(list).toContain('sprintExpectedCount');
+        expect(board).toContain('hasGroups');
+        expect(board).toContain('sprintExpectedCount');
         const empty = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'atom', 'EmptyState', 'EmptyState.vue'), 'utf8');
         const locale = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'locales', 'en.js'), 'utf8');
         expect(empty).toContain('empty-state--pine');
@@ -464,9 +476,15 @@ describe('PAGES DEEP LINK - project-scoped hash before first paint', () => {
         const getPage = fs.readFileSync(path.join(__dirname, '..', 'Modules', 'Pages', 'controller.js'), 'utf8');
         expect(routerSrc).toContain('resolvePageDeepLink');
         expect(resolveSrc).toContain('pageOpenRoute');
+        expect(resolveSrc).toContain('pageFromGetResponse');
+        expect(resolveSrc).toContain('pageProjectId');
+        expect(resolveSrc).toContain('/api/v2/pages/');
+        expect(resolveSrc).toContain('companyId');
         expect(resolveSrc).not.toContain('unresolved');
+        expect(resolveSrc).toContain('fetchPageRow');
         expect(space).toContain('route.params.projectId');
-        expect(space).toContain('kind === \'opening\'');
+        expect(space).toContain("kind === 'opening'");
+        expect(space).toContain("kind === 'ready' && (projectId || !pageId)");
         expect(space).toContain('pageOpeningLine');
         expect(space).toContain('page_no_access');
         expect(space).toContain('page_not_in_named_project');

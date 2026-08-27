@@ -1076,9 +1076,9 @@ watch([projectData, route, () => getters['projectData/searchedTasks']], () => {
     const projectId = route.params?.id ? route.params.id : projectData.value._id;
     let project;
     if (projectSearchText.value === '') {
-        project = getters['projectData/projects']?.data?.find((x) => x._id === projectId) || null;
+        project = getters['projectData/projects']?.data?.find((x) => sameId(x._id, projectId)) || null;
     } else {
-        project = getters['projectData/searchedProjects']?.find((x) => x._id === projectId) || null;
+        project = getters['projectData/searchedProjects']?.find((x) => sameId(x._id, projectId)) || null;
     }
 
     if (!project) return;

@@ -285,6 +285,8 @@ describe('PAGES - kiln follow-up guards', () => {
         expect(pagesRouter).toContain('/:cid/projects/:projectId/pages');
         expect(resolveSrc).toContain('resolvePageDeepLink');
         expect(resolveSrc).toContain('pageOpenRoute');
+        expect(resolveSrc).toContain('pageFromGetResponse');
+        expect(resolveSrc).toContain('/api/v2/pages/');
         expect(appRouter).toContain('resolvePageDeepLink');
         expect(locale).toContain('workspace_ask_sources');
         expect(locale).toContain('pages_citation_page');

@@ -9,7 +9,7 @@
                 <button type="button" class="pages-space__back" @click="backToPages">{{ $t('Projects.page_back_to_pages') }}</button>
             </div>
         </div>
-        <PagesPanel v-else-if="kind === 'ready'" workspace embedded />
+        <PagesPanel v-else-if="kind === 'ready' && (projectId || !pageId)" workspace embedded />
     </div>
 </template>
 
@@ -27,7 +27,11 @@ const route = useRoute();
 const router = useRouter();
 const { getters } = useStore();
 
-const kind = ref('ready');
+const kind = ref(
+    firstId(route.query && route.query.page) && !firstId(route.params && route.params.projectId)
+        ? 'opening'
+        : 'ready',
+);
 const openingTitle = ref('');
 const missingProjectName = ref('');
 let hydrateGen = 0;
@@ -96,6 +100,9 @@ async function hydrate() {
         kind.value = 'ready';
         return;
     }
+    if (!pid) {
+        kind.value = 'opening';
+    }
     if (pid) {
         kind.value = 'ready';
         const found = await fetchPageRow(id, cid);
@@ -127,7 +134,8 @@ async function hydrate() {
                 return;
             }
         }
-        kind.value = 'ready';
+        missingProjectName.value = projectNameOf(pid) || t('Projects.pages_project_none');
+        kind.value = 'missing';
         return;
     }
     if (found.network) {

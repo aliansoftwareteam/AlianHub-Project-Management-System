@@ -353,7 +353,7 @@ const { t } = useI18n();
 const project = inject("selectedProject");
 const searchedTask = inject("searchedTask");
 const clientWidth = inject("$clientWidth");
-const boardSurfaceKind = inject('boardSurfaceKind', computed(() => 'ready'));
+const boardSurfaceKind = inject('boardSurfaceKind', computed(() => 'loading'));
 const boardExpectedCount = inject('boardExpectedCount', computed(() => 0));
 const onBoardSurfaceAction = inject('onBoardSurfaceAction', () => {});
 const { checkPermission, debouncerWithPromise, checkApps} = useCustomComposable();

@@ -239,8 +239,17 @@ export function pageOpeningLine(title) {
     return name ? `Opening ${name}…` : 'Opening…';
 }
 
-export function boardEmptyKind({ loading, sprintsBound, boardCount, expectedCount, searchHits } = {}) {
+export function sprintExpectedCount(sprint) {
+    if (!sprint || typeof sprint !== 'object') return 0;
+    const raw = sprint.tasks != null ? sprint.tasks : (sprint.taskCount != null ? sprint.taskCount : sprint.archiveTaskCount);
+    if (Array.isArray(raw)) return raw.filter((row) => row && !row.deletedStatusKey).length;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+export function boardEmptyKind({ loading, sprintsBound, boardCount, expectedCount, searchHits, hasGroups } = {}) {
     if (loading) return 'loading';
+    if (hasGroups === false) return 'failed';
     const shown = Number(boardCount) || 0;
     if (shown > 0) return 'ready';
     const expected = Number(expectedCount) || 0;
