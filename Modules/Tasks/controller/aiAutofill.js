@@ -1,6 +1,6 @@
 'use strict';
 
-const logger = require('../../Config/loggerConfig');
+const logger = require('../../../Config/loggerConfig');
 const {
     isAiAction,
     gatherAutofillContext,
