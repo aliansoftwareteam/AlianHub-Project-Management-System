@@ -276,7 +276,7 @@ describe('SEARCH OPEN - same-tab hash with ProjectID, TaskKey, and auto-select',
         const app = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'App.vue'), 'utf8');
         const dropdown = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'molecules', 'DropDown', 'DropDown.vue'), 'utf8');
         const autofill = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'molecules', 'TaskAiAutofill', 'TaskAiAutofill.vue'), 'utf8');
-        const detailTab = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'molecules', 'TaskDetailTab', 'TaskDetailTab.vue'), 'utf8');
+        const cfRender = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'plugins', 'customFieldView', 'component', 'molecules', 'customFieldTaskView', 'customFieldRender.vue'), 'utf8');
 
         expect(advance).toContain('openInApp');
         expect(advance).toContain('openFromTitle');
@@ -341,9 +341,11 @@ describe('SEARCH OPEN - same-tab hash with ProjectID, TaskKey, and auto-select',
         expect(autofill).toContain('autofill_native');
         expect(autofill).toContain('autofill_custom_people');
         expect(autofill).toContain('kiln-dismiss-autofill');
+        expect(autofill).toContain('canShow');
         expect(autofill).not.toContain('taf__kind');
         expect(autofill).not.toContain("checkApps('CustomFields')");
-        expect(detailTab).toContain('TaskAiAutofill');
+        expect(autofill).not.toContain('getAppState');
+        expect(cfRender).toContain('TaskAiAutofill');
         expect(app).toContain('closeGlobalSearch');
         expect(app).toContain('key="advance-search-modal"');
         expect(comments).toContain('buildPaginatedCommentMatch');

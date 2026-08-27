@@ -1835,6 +1835,7 @@ export default {
         autofill_none: "No grounded suggestions for the empty fields.",
         autofill_native: "native",
         autofill_custom_people: "custom people",
+        autofill_filled: "Filled",
     },
     Category: {
         cateory_name: "Category Name",

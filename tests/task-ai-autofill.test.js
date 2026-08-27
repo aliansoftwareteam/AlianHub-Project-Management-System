@@ -328,18 +328,19 @@ describe('TASKS - AI autofill custom fields', () => {
         expect(planAutofillWrites(tagOnly).every((row) => row.fieldId === 'f-tag')).toBe(true);
     });
 
-    test('task panel Autofill is two labeled rows with per-row apply, not gated on CustomFields', () => {
+    test('task panel Autofill is two labeled rows with per-row apply, not gated on AI plan', () => {
         const fs = require('fs');
         const path = require('path');
         const card = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'molecules', 'TaskAiAutofill', 'TaskAiAutofill.vue'), 'utf8');
-        const tab = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'molecules', 'TaskDetailTab', 'TaskDetailTab.vue'), 'utf8');
+        const render = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'plugins', 'customFieldView', 'component', 'molecules', 'customFieldTaskView', 'customFieldRender.vue'), 'utf8');
         expect(card).toContain('applyOne');
-        expect(card).toContain('rowTitle');
         expect(card).toContain('autofill_native');
         expect(card).toContain('autofill_custom_people');
         expect(card).toContain("item.fieldId === 'assignee'");
+        expect(card).toContain('\\bowner\\b');
+        expect(card).toContain('canApply');
         expect(card).not.toContain("checkApps('CustomFields')");
-        expect(tab).toContain('TaskAiAutofill');
-        expect(tab).toContain('checkPermission(\'task.task_assignee\'');
+        expect(card).not.toContain('getAppState');
+        expect(render).toContain('TaskAiAutofill');
     });
 });
