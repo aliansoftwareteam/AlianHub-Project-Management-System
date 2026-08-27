@@ -90,7 +90,7 @@ const { groupBy, checkCase } = taskListHelper();
 const showArchiveVar = inject("showArchived");
 const searchedTask = inject('searchedTask');
 const project = inject('selectedProject');
-const emptyIsFilter = computed(() => Boolean(project.value?.lastTaskId) || Boolean(searchedTask && searchedTask.value));
+const emptyIsFilter = computed(() => Boolean(project.value?.lastTaskId) || Boolean(searchedTask && searchedTask.value) || !(props.sprints && props.sprints.length));
 
 // --- Reactive State ---
 const isLoading = ref(true);

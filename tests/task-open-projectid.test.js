@@ -8,12 +8,15 @@ const {
     shapeOpenTaskHit,
     shouldShowTaskSkeleton,
     shouldShowTaskChrome,
+    bindSprintsToProject,
+    sameId,
 } = require('../Modules/Project/helpers/taskOpenProjectId');
 
 describe('TASK OPEN - pass ProjectID so taskData is not empty', () => {
     test('prefers the task ProjectID over an empty query', () => {
         expect(firstId('', 'undefined', null, '  abc  ')).toBe('abc');
         expect(firstId({ toHexString: () => '64b7f0c2a1b2c3d4e5f60711' })).toBe('64b7f0c2a1b2c3d4e5f60711');
+        expect(firstId({ $oid: '64b7f0c2a1b2c3d4e5f60711' })).toBe('64b7f0c2a1b2c3d4e5f60711');
         expect(firstId({ _id: '64b7f0c2a1b2c3d4e5f60711' })).toBe('64b7f0c2a1b2c3d4e5f60711');
         expect(resolveOpenProjectId({
             queryProjectId: '',
@@ -71,5 +74,72 @@ describe('TASK OPEN - pass ProjectID so taskData is not empty', () => {
         expect(shouldShowTaskChrome({ projectId: '', loaded: false, blocked: true })).toBe(false);
         expect(shouldShowTaskChrome({ projectId: 'p1', loaded: false, blocked: false })).toBe(true);
         expect(shouldShowTaskChrome({ projectId: '', loaded: true, blocked: false })).toBe(true);
+    });
+});
+
+describe('LIST/BOARD - bind sprint rows so SMOKE tasks can load', () => {
+    const PROJECT = '6a8f09301f05e701eaf45c9a';
+    const SPRINT = '6a8f0b22e2ad4d0997553eb4';
+    const FOLDER = '6a8f0aaa0000000000000001';
+
+    test('dangling folderId still lands in sprintsObj so list/board can fetch tasks', () => {
+        const bound = bindSprintsToProject(
+            [{ _id: SPRINT, name: 'Ask Smoke', projectId: PROJECT, folderId: FOLDER, deletedStatusKey: 0 }],
+            [],
+            PROJECT,
+        );
+        expect(bound.sprintsArray).toHaveLength(1);
+        expect(bound.sprintsObj[SPRINT]._id).toBe(SPRINT);
+        expect(bound.sprintsObj[SPRINT].id).toBe(SPRINT);
+        expect(bound.sprintsfolders).toEqual({});
+    });
+
+    test('ObjectId-like and $oid projectId still match the string project id', () => {
+        expect(sameId({ toHexString: () => PROJECT }, PROJECT)).toBe(true);
+        expect(sameId({ $oid: PROJECT }, PROJECT)).toBe(true);
+        const bound = bindSprintsToProject(
+            [{
+                _id: SPRINT,
+                name: 'Ask Smoke',
+                projectId: { toHexString: () => PROJECT },
+                deletedStatusKey: 0,
+            }],
+            [],
+            PROJECT,
+        );
+        expect(Object.keys(bound.sprintsObj)).toEqual([SPRINT]);
+        expect(bindSprintsToProject(
+            [{ _id: SPRINT, projectId: 'not-this-project', deletedStatusKey: 0 }],
+            [],
+            PROJECT,
+        ).sprintsArray).toHaveLength(0);
+    });
+
+    test('foldered sprints stay in the folder map, not dropped', () => {
+        const bound = bindSprintsToProject(
+            [{ _id: SPRINT, name: 'Ask Smoke', projectId: PROJECT, folderId: FOLDER, deletedStatusKey: 0 }],
+            [{ _id: FOLDER, name: 'Mobile', projectId: PROJECT, deletedStatusKey: 0 }],
+            PROJECT,
+        );
+        expect(bound.sprintsArray).toHaveLength(0);
+        expect(bound.sprintsfolders[FOLDER].sprintsObj[SPRINT].id).toBe(SPRINT);
+        expect(bound.sprintsfolders[FOLDER].sprintsObj[SPRINT].folderName).toBe('Mobile');
+    });
+
+    test('list/board load bound sprints and fail-fast search-open still pass ProjectID', () => {
+        const listing = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'views', 'Projects', 'ProjectsListing', 'ProjectListing.vue'), 'utf8');
+        const sprintFolder = fs.readFileSync(path.join(__dirname, '..', 'Modules', 'Project', 'controller', 'getSprintFolder.js'), 'utf8');
+        const list = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'views', 'Projects', 'ListView', 'ListView.vue'), 'utf8');
+        const board = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'views', 'Projects', 'Kanban', 'BoardView.vue'), 'utf8');
+        expect(listing).toContain('bindSprintsToProject');
+        expect(listing).toContain('sameId(item._id, id)');
+        expect(listing).toContain('resolve([])');
+        expect(sprintFolder).toContain('function projectIdMatch');
+        expect(sprintFolder).toContain('exports.projectIdMatch = projectIdMatch');
+        expect(sprintFolder).toContain('$in');
+        expect(list).toContain('EmptyState.no_match_title');
+        expect(board).toContain('EmptyState.no_match_title');
+        expect(list).toContain('props.sprints && props.sprints.length');
+        expect(board).toContain('props.sprints && props.sprints.length');
     });
 });

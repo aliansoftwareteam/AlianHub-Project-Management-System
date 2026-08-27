@@ -95,7 +95,7 @@ const project = inject("selectedProject");
 const clientWidth = inject("$clientWidth");
 const showArchived = inject("showArchived");
 const searchedTask = inject('searchedTask', ref(false));
-const emptyIsFilter = computed(() => Boolean(project.value?.lastTaskId) || Boolean(searchedTask && searchedTask.value));
+const emptyIsFilter = computed(() => Boolean(project.value?.lastTaskId) || Boolean(searchedTask && searchedTask.value) || !(props.sprints && props.sprints.length));
 const {
     groupBy,
     getSprintTasks,

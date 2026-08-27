@@ -1,15 +1,23 @@
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration,validateObjectId } = require("../../../utils/mongo-handler/mongoQueries");
-const { mongoose } = require("mongoose");
+const mongoose = require("mongoose");
 const logger = require("../../../Config/loggerConfig");
 
+function projectIdMatch(projectId) {
+    const raw = String(projectId || '').trim();
+    const ids = [raw];
+    try {
+        if (/^[a-f0-9]{24}$/i.test(raw)) ids.push(new mongoose.Types.ObjectId(raw));
+    } catch (_e) { /* keep the string form */ }
+    return { $in: ids };
+}
 
 exports.getDefaultSprintData = (uid, query, companyId, projectId, roleType) => {
     return new Promise((resolve, reject) => {
         try {
             const defaultPrivate = {
                 private: true,
-                projectId : new mongoose.Types.ObjectId(projectId),
+                projectId: projectIdMatch(projectId),
                 deletedStatusKey: { $nin: [1] },
             };
             if(roleType !== 1 && roleType !== 2) {
@@ -18,7 +26,7 @@ exports.getDefaultSprintData = (uid, query, companyId, projectId, roleType) => {
                 }
             }
             const defaultPublic = {
-                projectId : new mongoose.Types.ObjectId(projectId),
+                projectId: projectIdMatch(projectId),
                 deletedStatusKey: { $nin: [1] },
                 private: false
             };
@@ -66,11 +74,11 @@ exports.getDefaultFolderData = (uid,query,companyId,projectId) => {
     return new Promise((resolve, reject) => {
         try {
             const defaultPrivate = {
-                projectId : new mongoose.Types.ObjectId(projectId),
+                projectId: projectIdMatch(projectId),
                 deletedStatusKey: { $nin: [1] },
             };
             const defaultPublic = {
-                projectId : new mongoose.Types.ObjectId(projectId),
+                projectId: projectIdMatch(projectId),
                 deletedStatusKey: { $nin: [1] },
             };
             const queryArray = [
@@ -140,7 +148,7 @@ exports.getSprintFolder = async (req,res) => {
                     let data = [
                         {
                             $match: {
-                                projectId: new mongoose.Types.ObjectId(projectId),
+                                projectId: projectIdMatch(projectId),
                                 // BUG-032 / #86 fix: count was including
                                 // soft-deleted sprints/folders, which made the
                                 // sidebar counters disagree with the actual
@@ -199,3 +207,5 @@ exports.getSprintFolder = async (req,res) => {
         return res.status(500).json({ message: "An error occurred while fetching the projects", error: error.message });
     }
 }
+
+exports.projectIdMatch = projectIdMatch;

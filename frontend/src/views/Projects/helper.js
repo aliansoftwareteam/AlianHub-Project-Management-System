@@ -109,11 +109,11 @@ export function useProjectsHelper() {
                 if(sprint.deletedStatusKey !== 1 && (companyUserDetail.value.roleType === 1 || companyUserDetail.value.roleType === 2) || (!sprint?.private || sprint?.AssigneeUserId?.includes(userId.value))) {
                     if(!showArchived) {
                         if(!sprint.deletedStatusKey && sprint._id) {
-                            sprints[sprint.id] = sprint;
+                            sprints[sprint.id || sprint._id] = sprint;
                         }
                     } else {
                         if(sprint.deletedStatusKey !== 1 && (sprint.deletedStatusKey === 2 || sprint.archiveTaskCount) && sprint._id) {
-                            sprints[sprint.id] = sprint;
+                            sprints[sprint.id || sprint._id] = sprint;
                         }
                     }
                 }
@@ -125,7 +125,7 @@ export function useProjectsHelper() {
                 const others = Object.values(sprints).filter(x => !x.favouriteTasks?.length || !x.favouriteTasks.filter((y) => y.userId === userId.value).length).sort((a,b) => new Date(a?.createdAt) > new Date(b?.createdAt) ? -1 : 1)
                 let arr = [...favourites, ...others]
                 arr.forEach((sprint) => {
-                    tmp[sprint.id] = sprint;
+                    tmp[sprint.id || sprint._id] = sprint;
                 })
             } else {
                 tmp = sprints;
@@ -147,7 +147,7 @@ export function useProjectsHelper() {
                     const others = Object.values(folder.sprintsObj).filter(x => !x.favouriteTasks?.length || !x.favouriteTasks.filter((y) => y.userId === userId.value).length).sort((a,b) => a?.createdAt?.seconds > b?.createdAt?.seconds ? -1 : 1)
                     let arr = [...favourites, ...others]
                     arr.forEach((sprint) => {
-                        tmp[sprint.id] = sprint;
+                        tmp[sprint.id || sprint._id] = sprint;
                     })
                 } else {
                     tmp = folder.sprintsObj;
@@ -847,7 +847,10 @@ export function taskListHelper() {
             let sprints = JSON.parse(JSON.stringify(sprintData)).filter((x) => x);
 
             if(type === 0) {
-                arr = project.taskStatusData;
+                arr = Array.isArray(project.taskStatusData) ? project.taskStatusData : [];
+                if (!arr.length) {
+                    arr = [{ name: 'Tasks', key: '', textColor: '', bgColor: '' }];
+                }
 
                 indexKey.value = "kanbanIndex";
 
@@ -863,11 +866,11 @@ export function taskListHelper() {
                             bgColor: x.bgColor,
                             tasksArray: [],
 
-                            conditions: [
+                            conditions: x.key ? [
                                 {
                                     statusKey: {$eq: x.key}
                                 }
-                            ],
+                            ] : [],
 
                             searchKey: "statusKey",
                             indexName: "groupByStatusIndex",

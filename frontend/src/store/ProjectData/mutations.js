@@ -1,5 +1,6 @@
 import Cookies from 'js-cookie';
 import { useCustomComposable } from '@/composable/index.js';
+import { firstId } from '@/utils/taskOpenProjectId';
 const { checkPermission } = useCustomComposable();
 
 export const mutateMongoUpdatedTask = (state, payload) => {
@@ -12,7 +13,7 @@ export const mutateProjects = (state, payload) => {
     const sortObject = (object = {}) => {
         let obj = {};
         Object.values(object).sort((a, b) => a?.createdAt?.seconds > b?.createdAt?.seconds ? -1 : 1).forEach((x) => {
-            obj[x.id] = x;
+            obj[x.id || x._id] = x;
         });
 
         return obj;
@@ -800,7 +801,7 @@ export const mutatedefaultTemplate = (state,payload) =>{
 
 export const mutateSprints = (state,payload) => {
     const {op, data} = payload;
-    let pId = data?.projectId;
+    let pId = firstId(data?.projectId);
     if(op === "added"){
         let projecIdFound = Object.keys(state.sprints).includes(pId);
         if(projecIdFound){
@@ -930,7 +931,7 @@ export const relocateSprint = (state, payload) => {
 
 export const mutateFolders = (state,payload) => {
     const {op, data} = payload;
-    let pId = data?.projectId;
+    let pId = firstId(data?.projectId);
     if(op === "added"){
         let projecIdFound = Object.keys(state.folders).includes(pId)
         if(projecIdFound){

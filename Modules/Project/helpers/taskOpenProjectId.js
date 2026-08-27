@@ -4,6 +4,7 @@ function coerceId(value) {
     if (value == null) return '';
     if (typeof value === 'object') {
         if (typeof value.toHexString === 'function') return value.toHexString();
+        if (value.$oid) return coerceId(value.$oid);
         return coerceId(value._id || value.id || '');
     }
     const raw = String(value).trim();
@@ -53,10 +54,57 @@ function shouldShowTaskChrome({ projectId, loaded, blocked } = {}) {
     return Boolean(projectId) || Boolean(loaded);
 }
 
+function sameId(a, b) {
+    const left = firstId(a);
+    const right = firstId(b);
+    return Boolean(left) && left === right;
+}
+
+function bindSprintsToProject(sprints, folders, projectId) {
+    const sprintRows = Array.isArray(sprints) ? sprints : [];
+    const folderRows = Array.isArray(folders) ? folders : [];
+    const foldersObject = {};
+    for (const folder of folderRows) {
+        if (!sameId(folder.projectId, projectId)) continue;
+        const folId = firstId(folder._id, folder.id, folder.folderId);
+        if (!folId) continue;
+        foldersObject[folId] = {
+            folderId: folId,
+            name: folder.name,
+            sprintsObj: {},
+            deletedStatusKey: folder.deletedStatusKey,
+            legacyId: folder.legacyId || '',
+            id: folId,
+            _id: folId,
+        };
+    }
+    const root = [];
+    for (const sprint of sprintRows) {
+        if (!sameId(sprint.projectId, projectId)) continue;
+        const sid = firstId(sprint._id, sprint.id);
+        if (!sid) continue;
+        const row = { ...sprint, id: sid, _id: firstId(sprint._id) || sid };
+        const folderId = firstId(sprint.folderId);
+        if (folderId && foldersObject[folderId]) {
+            row.folderName = foldersObject[folderId].name;
+            foldersObject[folderId].sprintsObj[sid] = row;
+        } else {
+            root.push(row);
+        }
+    }
+    const sprintsObj = {};
+    root.forEach((row) => {
+        sprintsObj[row.id] = row;
+    });
+    return { sprintsObj, sprintsfolders: foldersObject, sprintsArray: root };
+}
+
 module.exports = {
     firstId,
     resolveOpenProjectId,
     shapeOpenTaskHit,
     shouldShowTaskSkeleton,
     shouldShowTaskChrome,
+    sameId,
+    bindSprintsToProject,
 };

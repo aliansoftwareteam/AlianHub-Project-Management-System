@@ -72,6 +72,7 @@ import { useRoute, useRouter } from 'vue-router';
 import ProjectListComponent from '@/components/molecules/ProjectListComponent/ProjectListComponent.vue'
 import Sidebar from "@/components/molecules/Sidebar/Sidebar.vue"
 import { useProjectsHelper } from '../helper';
+import { bindSprintsToProject, sameId } from '@/utils/taskOpenProjectId';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useToast } from 'vue-toast-notification';
@@ -377,13 +378,12 @@ const loadMoreProjects = () => {
 
 
 function getSprintData(id, forceRefresh = false) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
         try {
-            if(!forceRefresh && Object.keys(getters["projectData/sprints"]).includes(id)){
-                if(!sprintData.value || !Object.keys(sprintData.value || {}).length){
-                    sprintData.value = getters["projectData/sprints"][id];
-                }
-                resolve(sprintData.value,true);
+            const cached = getters["projectData/sprints"][id];
+            if (!forceRefresh && Array.isArray(cached)) {
+                sprintData.value = cached;
+                resolve(cached);
                 return;
             }
             let projectId = id;
@@ -413,24 +413,25 @@ function getSprintData(id, forceRefresh = false) {
             //     snapPrivateQuery['fullDocument.AssigneeUserId'] = {$in:[uid]}
             // }
             dispatch("projectData/setSprints",{projectId}).then((sprintss) => {
-                sprintData.value = sprintss;
-                resolve(sprintss);
+                const rows = Array.isArray(sprintss) ? sprintss : [];
+                sprintData.value = rows;
+                resolve(rows);
             }).catch(() => {
+                resolve([]);
             })
         } catch (error) {
-            reject(error);
+            resolve([]);
         }
     })
 }
 
 function getFolderData(id) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
         try {
-            if(Object.keys(getters["projectData/folders"]).includes(id)){
-                if(!folderData.value || Object.keys(folderData.value || {}).length === 0){
-                    folderData.value = getters["projectData/folders"][id];
-                }
-                resolve(folderData.value,true);
+            const cached = getters["projectData/folders"][id];
+            if (Array.isArray(cached)) {
+                folderData.value = cached;
+                resolve(cached);
                 return;
             }
             let projectId = id;
@@ -451,11 +452,14 @@ function getFolderData(id) {
             //     "fullDocument.projectId" : BSON.ObjectId(projectId)
             // }
             dispatch("projectData/setFolders",{projectId}).then((folders) => {
-                folderData.value = folders;
-                resolve(folders);
+                const rows = Array.isArray(folders) ? folders : [];
+                folderData.value = rows;
+                resolve(rows);
+            }).catch(() => {
+                resolve([]);
             })
         } catch (error) {
-            reject(error);
+            resolve([]);
         }
     })
 }
@@ -472,31 +476,10 @@ const getSprintFolderData = async (id,isUpdate = false, forceRefresh = false) =>
                 const resolvedPromises = results.filter((result) => result.status === 'fulfilled');
                 if (resolvedPromises.length === 2) {
                     const [sprintsResult, foldersResult] = resolvedPromises.map((result) => result.value);
-                    const sprintsArray = sprintsResult?.filter(sprint => sprint.projectId === id && !sprint.folderId).map((x) => ({ ...x, id:x._id }));
+                    const bound = bindSprintsToProject(sprintsResult || [], foldersResult || [], id);
+                    const sprintsArray = bound.sprintsArray;
+                    const foldersObject = bound.sprintsfolders;
 
-                    const foldersObject = foldersResult?.reduce((acc, folder) => {
-                        if (folder.projectId === id) {
-                            let folId = folder._id
-                            acc[folId] = {
-                                folderId: folId,
-                                name: folder.name,
-                                sprintsObj: {},
-                                deletedStatusKey: folder.deletedStatusKey,
-                                legacyId : folder?.legacyId ? folder?.legacyId : '',
-                                id: folder._id,
-                                _id: folder._id,
-                            };
-                        }
-                        return acc;
-                    }, {});
-
-                    sprintsResult?.forEach(sprint => {
-                        if (sprint.projectId === id && sprint.folderId && foldersObject[sprint.folderId]) {
-                            sprint.folderName = foldersObject[sprint.folderId].name;
-                            sprint.id = sprint._id;
-                            foldersObject[sprint.folderId].sprintsObj[sprint.id] = sprint;
-                        }
-                    });
                     sprintFolders.value[id] = {}
                     sprintFolders.value = {
                         [id]: {
@@ -505,17 +488,17 @@ const getSprintFolderData = async (id,isUpdate = false, forceRefresh = false) =>
                         }
                     };
 
-                    let project = projects.value.find((item) => item._id === id);
-                    let allSprints = sprintFolders.value !== undefined && sprintFolders.value && sprintFolders.value[id] ? sprintFolders.value[id]?.sprints : []
-                    allSprints = [...allSprints];
+                    let project = (projects.value || []).find((item) => sameId(item._id, id));
+                    if (!project) {
+                        loadingData.value[id] = false;
+                        emit('update:sprintLoading', false);
+                        return;
+                    }
 
                     let allFolders = sprintFolders.value && sprintFolders.value[id] ? sprintFolders.value[id]?.folders : {}
                     allFolders = {...(project?.sprintsfolders && Object.keys(project?.sprintsfolders).length ? project?.sprintsfolders || {} : {}), ...allFolders}
 
-                    const sprintIdToObject = {};
-                    allSprints.forEach(item => {sprintIdToObject[item.id] = item;});
-
-                    project.sprintsObj = sprintIdToObject;
+                    project.sprintsObj = bound.sprintsObj;
                     project.sprintsfolders = allFolders;
                     var newObj = {snap: null, privateSnap: false, userId: userId.value,roleType: companyUserDetail.value.roleType, op: "modified", data: {...project}};
                     commit("projectData/mutateProjects",[newObj]);
