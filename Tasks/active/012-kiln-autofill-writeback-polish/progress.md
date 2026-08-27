@@ -15,10 +15,10 @@
 - [x] Comments pane lists existing Alian comments for the open taskId (no empty pane with badge 1)
 
 ## Last step
-Bot 3 522-hydrate: GET/list stamp PascalCase ProjectID; workspace deep-link no longer dead-ends as "isn't in Workspace pages"; pine Opening while the body stays; Retry rebinds store tasks; Autofill sits under Task Details tabs above Checklist.
+Bot 3 overlay: Retry resets the sprint bucket then refetches; statusKey coerce + unmatched-to-first-column so shownBoardCount follows store; Autofill stays under Task Details tabs; handshake Ask smoke ObjectId ProjectID stamps hex.
 
 ## Blockers
-None. Live Local Smoke is not in this VM (no Mongo), so pages / Retry / Autofill were not browser-verified here.
+None. Live Local Smoke is not in this VM (no Mongo), so Retry / Autofill / pages were not browser-verified here.
 
 ## Log
 
@@ -47,4 +47,4 @@ None. Live Local Smoke is not in this VM (no Mongo), so pages / Retry / Autofill
 - Overlay evidence (Dismiss-only card): Assignee FILLED while the rail had no chip; Owner Local PM FILLED blocked the card; Due was inert (`—`) with “No grounded suggestions…”. Skip-filled now follows the rail (`indexOf`-safe string chips only), Owner filled is omitted, Due seeds sprint end 2026-08-28, Assignee seeds from Task_Leader when empty, and Apply / Fill empty return. No FILLED badge. Gantt not started. Write-back not re-implemented.
 - Bot 2 Autofill card lock: the card lists empty fields only. Assignee stays empty until the Details chip has a name. Empty Due always gets a row (pine Apply when a date is grounded, otherwise “No suggestion”). Dismiss-only only when nothing can apply. FILLED never sits on a dash. SMOKE-7: Assignee suggest/apply, Owner omitted, Due 2026-08-28 + Apply, Fill empty after apply/dismiss. Hydrate P0s stay. Gantt not started.
 - Bot 2 glitch pass on live v14.33.0: `#/<cid>/pages?page=` GET-resolves ProjectID (no null when knownPid missing) and PagesPanel loads the Local Smoke tree instead of Workspace/No pages yet; Ask smoke body + write-back strip stay. Board bind uses rendered item count so store=7/shown=0 is copper Retry without Planned/Logged 00h. Ctrl+K SMOKE-7 title + Open require taskId, push first, then close overlay. Comments mousedown emits changeTab so a swallowed click still switches. Gantt not started. Write-back not re-implemented.
-- Bot 3 QA 522-hydrate on 637db2a: GET `/pages/:id` and `pages?scope=all` stamp hex `ProjectID`. Workspace `?page=` with a reachable project page no longer paints "This page isn't in Workspace pages." — pine Opening keeps PagesPanel (body + strip), then rewrite to Local Smoke. True missing-in-project and ACL copy stay. List/board `boardCount` includes Vuex rows so store=7 is ready; Retry rebinds those rows (`refetch` only when store is empty). Autofill moved under Task Details tabs, above Checklist, out of customFieldRender (SMOKE-7 has no Summary). Gantt not started. Write-back not re-implemented.
+- Bot 3 overlay Retry: BoardView now resets `state.tasks[pid][sid].index/tasks` then refetches (`$skip` 0). `processedBoardData` coerces statusKey and dumps unmatched rows into the first column so store=7 becomes shownBoardCount=7. Failed card only when the fetch itself fails. Autofill stays under Task Details tabs, above Description/Checklist, not in customFieldRender. Handshake Ask smoke ObjectId ProjectID stamps hex; workspace never paints “isn't in Workspace pages” for an existing project-scoped page. Gantt not started.

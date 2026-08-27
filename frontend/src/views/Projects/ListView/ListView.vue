@@ -53,7 +53,7 @@ import { useTaskSelection } from '@/composable/useTaskSelection.js';
 import { boardEmptyKind, countRenderedSprintItems, countSprintBoardTasks, firstId, sprintExpectedCount } from '@/utils/taskOpenProjectId';
 
 // UTILS
-const {getters} = useStore();
+const {getters, commit} = useStore();
 const route = useRoute()
 const project = inject("selectedProject");
 const clientWidth = inject("$clientWidth");
@@ -139,17 +139,10 @@ function onEmptyAction() {
         const sprint = (headerSprints.value && headerSprints.value[0]) || (props.sprints && props.sprints[0]);
         const pid = firstId(project.value && project.value._id);
         const sid = firstId(sprint && (sprint.id || sprint._id));
-        const stored = countSprintBoardTasks(allProjectTasks.value, pid, sid);
-        const rebind = (refetch) => {
-            init(props.grouped, refetch, project.value, props.sprints, groupedTasks, false, true);
-        };
-        if (stored > 0) {
-            rebind(false);
-            return;
-        }
+        commit('projectData/resetSprintTaskBucket', { pid, sprintId: sid });
         Promise.resolve(reloadSprintTasks())
             .then(() => {
-                rebind(true);
+                init(props.grouped, true, project.value, props.sprints, groupedTasks, false, true);
             })
             .catch((error) => {
                 console.error('ERROR retrying sprint tasks: ', error);

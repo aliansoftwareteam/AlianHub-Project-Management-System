@@ -1,6 +1,6 @@
 import Cookies from 'js-cookie';
 import { useCustomComposable } from '@/composable/index.js';
-import { firstId } from '@/utils/taskOpenProjectId';
+import { firstId, lookupById } from '@/utils/taskOpenProjectId';
 const { checkPermission } = useCustomComposable();
 
 export const mutateMongoUpdatedTask = (state, payload) => {
@@ -447,6 +447,19 @@ export const mutateUpdateFirebaseTableTasks = (state, payload) => {
 export const removeProjectTaskSnap = (state, payload) => {
     delete state.tasks[payload];
 }
+
+export const resetSprintTaskBucket = (state, payload) => {
+    const pid = firstId(payload && (payload.pid || payload.projectId));
+    const sprintId = firstId(payload && payload.sprintId);
+    if (!pid || !sprintId) return;
+    const project = lookupById(state.tasks, pid);
+    if (!project || typeof project !== 'object') return;
+    const bucket = lookupById(project, sprintId);
+    if (!bucket || typeof bucket !== 'object') return;
+    bucket.index = {};
+    bucket.found = {};
+    bucket.tasks = [];
+};
 
 export const mutateTypesenseTasks = (state, payload) => {
     const pid = firstId(payload && payload.pid);

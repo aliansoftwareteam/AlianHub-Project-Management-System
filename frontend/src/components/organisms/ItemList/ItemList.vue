@@ -332,7 +332,7 @@ const {isCustomFields} = customField();
 import * as env from '@/config/env';
 import { useI18n } from "vue-i18n";
 import { apiRequest } from "../../../services";
-import { sprintTasksBucket } from '@/utils/taskOpenProjectId';
+import { sameGroupValue, sprintTasksBucket } from '@/utils/taskOpenProjectId';
 import Skelaton from "@/components/atom/Skelaton/AiSkelaton.vue"
 const { t } = useI18n();
 // UTILS
@@ -541,7 +541,7 @@ watch(() => sprintBucket.value && sprintBucket.value.tasks, () => {
             })?.sort((a,b)=> a.groupByAssigneeIndex - b.groupByAssigneeIndex);
         } else {
             if (props.item.searchKey === "statusKey") {
-                tmp = store.tasks.filter((x) => x[props.item.searchKey] === props.item.searchValue && !x?.deletedStatusKey)?.sort((a,b)=> a?.groupByStatusIndex - b?.groupByStatusIndex);
+                tmp = store.tasks.filter((x) => sameGroupValue(x.statusKey, props.item.searchValue) && !x?.deletedStatusKey)?.sort((a,b)=> a?.groupByStatusIndex - b?.groupByStatusIndex);
             } else if (props.item.searchKey === "Task_Priority") {
                 tmp = store.tasks.filter((x) => x[props.item.searchKey] === props.item.searchValue && !x?.deletedStatusKey)?.sort((a,b)=> a.groupByPriorityIndex - b.groupByPriorityIndex);
             } else {

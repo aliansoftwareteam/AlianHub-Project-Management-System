@@ -20,9 +20,13 @@ export function coerceId(value) {
             const hex = String(value.toHexString()).trim();
             if (HEX_ID.test(hex)) return hex;
         }
-        const fromBytes = hexFromBytes(value) || hexFromBytes(value.id) || hexFromBytes(value.buffer);
+        const fromBytes = hexFromBytes(value)
+            || hexFromBytes(value.id)
+            || hexFromBytes(value.buffer)
+            || hexFromBytes(value.oid);
         if (fromBytes) return fromBytes;
         if (value.$oid) return coerceId(value.$oid);
+        if (value.oid) return coerceId(value.oid);
         if (typeof value.toString === 'function') {
             const asString = value.toString();
             if (HEX_ID.test(asString)) return asString;
@@ -262,6 +266,40 @@ export function countRenderedSprintItems(groups) {
         if (!Array.isArray(rows)) return n;
         return n + rows.filter((row) => row && !row.deletedStatusKey).length;
     }, 0);
+}
+
+export function sameGroupValue(a, b) {
+    if (a === b) return true;
+    if (a == null || b == null) return false;
+    const left = firstId(a) || String(a).trim();
+    const right = firstId(b) || String(b).trim();
+    return left === right;
+}
+
+export function unmatchedBoardTasks(groups, tasks) {
+    const have = new Set();
+    for (const group of groups || []) {
+        for (const row of (group && group.tasksArray) || []) {
+            const id = firstId(row && (row._id || row.id));
+            if (id) have.add(id);
+        }
+    }
+    return (tasks || []).filter((row) => {
+        if (!row || row.deletedStatusKey) return false;
+        const id = firstId(row._id, row.id);
+        return id && !have.has(id);
+    });
+}
+
+export function appendUnmatchedToFirstGroup(groups, unmatched) {
+    if (!Array.isArray(groups) || !groups.length || !Array.isArray(unmatched) || !unmatched.length) return groups;
+    const have = new Set((groups[0].tasksArray || []).map((row) => firstId(row && (row._id || row.id))).filter(Boolean));
+    const extra = unmatched.filter((row) => {
+        const id = firstId(row && (row._id || row.id));
+        return id && !have.has(id);
+    });
+    if (!extra.length) return groups;
+    return groups.map((group, i) => (i === 0 ? { ...group, tasksArray: [...(group.tasksArray || []), ...extra] } : group));
 }
 
 export function boardEmptyKind({ loading, sprintsBound, boardCount, expectedCount, searchHits, hasGroups } = {}) {

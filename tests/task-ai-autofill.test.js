@@ -480,5 +480,6 @@ describe('TASKS - AI autofill custom fields', () => {
         expect(tab).toContain('TaskAiAutofill');
         expect(tab.indexOf('TaskAiAutofill')).toBeLessThan(tab.indexOf('CheckListComponent'));
         expect(tab.indexOf('TaskAiAutofill')).toBeLessThan(tab.indexOf('CustomFieldRenderViewComponent'));
+        expect(tab.indexOf('TaskAiAutofill')).toBeLessThan(tab.indexOf('Description'));
     });
 });

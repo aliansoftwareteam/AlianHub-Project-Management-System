@@ -53,7 +53,7 @@ import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPla
 
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { useRoute } from 'vue-router';
-import { boardEmptyKind, countSprintBoardTasks, firstId, sprintExpectedCount, sprintTasksBucket } from '@/utils/taskOpenProjectId';
+import { appendUnmatchedToFirstGroup, boardEmptyKind, countSprintBoardTasks, firstId, sameGroupValue, sprintExpectedCount, sprintTasksBucket, unmatchedBoardTasks } from '@/utils/taskOpenProjectId';
 const route = useRoute();
 
 // --- Props & Emits ---
@@ -68,7 +68,7 @@ const props = defineProps({
 defineEmits(['change']);
 
 // --- Store & Injected State ---
-const { getters } = useStore();
+const { getters, commit } = useStore();
 const { groupBy, checkCase } = taskListHelper();
 const showArchiveVar = inject("showArchived");
 const searchedTask = inject('searchedTask');
@@ -112,7 +112,7 @@ const processedBoardData = computed(() => {
     const currentSprintId = internalGroupedTasks.value[0].id;
     const filteredSourceTasks = sourceTasks.filter(task => (showArchiveVar.value ? task?.deletedStatusKey : !task?.deletedStatusKey));
 
-    return groupDefinitions.map(group => {
+    const mapped = groupDefinitions.map(group => {
         let tasksForGroup = [];
 
         switch (group.searchKey) {
@@ -129,19 +129,18 @@ const processedBoardData = computed(() => {
                 tasksForGroup.sort((a, b) => a.groupByAssigneeIndex - b.groupByAssigneeIndex);
                 break;
             case "statusKey":
-                tasksForGroup = filteredSourceTasks.filter(task => task.statusKey === group.searchValue);
+                tasksForGroup = filteredSourceTasks.filter(task => sameGroupValue(task.statusKey, group.searchValue));
                 tasksForGroup.sort((a, b) => a.groupByStatusIndex - b.groupByStatusIndex);
                 break;
             case "Task_Priority":
-                tasksForGroup = filteredSourceTasks.filter(task => task.Task_Priority === group.searchValue);
+                tasksForGroup = filteredSourceTasks.filter(task => sameGroupValue(task.Task_Priority, group.searchValue));
                 tasksForGroup.sort((a, b) => a.groupByPriorityIndex - b.groupByPriorityIndex);
                 break;
             default:
-                tasksForGroup = filteredSourceTasks.filter(task => task[group.searchKey] === group.searchValue);
+                tasksForGroup = filteredSourceTasks.filter(task => sameGroupValue(task[group.searchKey], group.searchValue));
                 break;
         }
 
-        // If subtasks don't need filtering here, remove this map.
         const processedTasks = tasksForGroup.map(task => {
             if (task?.subtaskArray) {
                 return {
@@ -164,6 +163,8 @@ const processedBoardData = computed(() => {
             totalTaskCounts: dataKeys || {},
         };
     });
+
+    return appendUnmatchedToFirstGroup(mapped, unmatchedBoardTasks(mapped, filteredSourceTasks));
 });
 
 const shownBoardCount = computed(() => processedBoardData.value.reduce((n, group) => n + ((group && group.tasksArray) || []).length, 0));
@@ -181,7 +182,7 @@ const emptyKind = computed(() => {
     return boardEmptyKind({
         loading: isLoading.value || props.sprintLoading,
         sprintsBound: Boolean(props.sprints && props.sprints.length),
-        boardCount: Math.max(shownBoardCount.value, stored),
+        boardCount: shownBoardCount.value,
         expectedCount: Math.max(boardExpectedCount.value, stored),
         searchHits: Boolean(searchedTask && searchedTask.value && searchedTasksData.value.length),
         hasGroups: groups.length > 0,
@@ -193,22 +194,18 @@ function onEmptyAction() {
         const sprint = props.sprints && props.sprints[0];
         const pid = firstId(project.value && project.value._id);
         const sid = firstId(sprint && (sprint.id || sprint._id));
-        const stored = countSprintBoardTasks(allProjectTasks.value, pid, sid);
-        const runGroup = (refetch) => {
+        commit('projectData/resetSprintTaskBucket', { pid, sprintId: sid });
+        const runGroup = () => {
             if (project.value?._id && props.sprints?.length) {
                 isLoading.value = true;
-                groupBy(props.grouped, refetch, project.value, props.sprints, internalGroupedTasks, true, 'board', false, true, (resp) => {
+                groupBy(props.grouped, true, project.value, props.sprints, internalGroupedTasks, true, 'board', false, true, (resp) => {
                     internalGroupedTasks.value = resp;
                     isLoading.value = false;
                 });
             }
         };
-        if (stored > 0) {
-            runGroup(false);
-            return;
-        }
         Promise.resolve(reloadSprintTasks()).then(() => {
-            runGroup(true);
+            runGroup();
         }).catch((error) => {
             console.error('ERROR retrying sprint tasks: ', error);
         });

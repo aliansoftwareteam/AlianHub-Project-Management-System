@@ -24,6 +24,9 @@ const {
     pageFromGetResponse,
     countSprintBoardTasks,
     countRenderedSprintItems,
+    sameGroupValue,
+    unmatchedBoardTasks,
+    appendUnmatchedToFirstGroup,
     sprintTasksBucket,
     boardEmptyKind,
     sprintExpectedCount,
@@ -402,6 +405,7 @@ describe('SEARCH OPEN - same-tab hash with ProjectID, TaskKey, and auto-select',
         expect(tab).toContain('TaskAiAutofill');
         expect(tab.indexOf('TaskAiAutofill')).toBeLessThan(tab.indexOf('CheckListComponent'));
         expect(tab.indexOf('TaskAiAutofill')).toBeLessThan(tab.indexOf('CustomFieldRenderViewComponent'));
+        expect(tab.indexOf('TaskAiAutofill')).toBeLessThan(tab.indexOf('Description'));
         expect(app).toContain('closeGlobalSearch');
         expect(app).toContain('key="advance-search-modal"');
         expect(comments).toContain('buildPaginatedCommentMatch');
@@ -442,6 +446,14 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(countRenderedSprintItems([{ tasksArray: [] }, { tasksArray: [] }])).toBe(0);
         expect(countRenderedSprintItems([{ tasksArray: [{ _id: 't1' }, { _id: 't2', deletedStatusKey: 1 }] }])).toBe(1);
         expect(countRenderedSprintItems([{ items: [{ _id: 't1' }] }, { tasks: [{ _id: 't2' }] }])).toBe(2);
+        expect(sameGroupValue(1, '1')).toBe(true);
+        expect(sameGroupValue('todo', 'todo')).toBe(true);
+        expect(sameGroupValue('todo', 'done')).toBe(false);
+        expect(appendUnmatchedToFirstGroup(
+            [{ tasksArray: [{ _id: 'a' }] }, { tasksArray: [] }],
+            [{ _id: 'b' }, { _id: 'a' }],
+        )[0].tasksArray.map((row) => row._id)).toEqual(['a', 'b']);
+        expect(unmatchedBoardTasks([{ tasksArray: [{ _id: 'a' }] }], [{ _id: 'a' }, { _id: 'b' }]).map((row) => row._id)).toEqual(['b']);
         expect(boardHoursVisible('failed')).toBe(false);
         expect(boardHoursVisible('loading')).toBe(false);
         expect(boardHoursVisible('ready')).toBe(true);
@@ -463,13 +475,18 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(list).toContain('Math.max(sprintExpectedCount(header), sprintExpectedCount(listed))');
         expect(list).toContain('Math.max(countRenderedSprintItems(groups), stored)');
         expect(list).toContain('boardCount: shown');
-        expect(list).toContain('rebind(false)');
-        expect(list).toContain('rebind(true)');
+        expect(list).toContain('resetSprintTaskBucket');
+        expect(list).toContain('init(props.grouped, true');
+        const itemList = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'organisms', 'ItemList', 'ItemList.vue'), 'utf8');
+        expect(itemList).toContain('sameGroupValue');
         expect(board).toContain('hasGroups');
         expect(board).toContain('sprintExpectedCount');
-        expect(board).toContain('Math.max(shownBoardCount.value, stored)');
-        expect(board).toContain('runGroup(false)');
-        expect(board).not.toContain('boardCount: shownBoardCount.value,');
+        expect(board).toContain('sameGroupValue');
+        expect(board).toContain('appendUnmatchedToFirstGroup');
+        expect(board).toContain('resetSprintTaskBucket');
+        expect(board).toContain('boardCount: shownBoardCount.value');
+        expect(board).not.toContain('Math.max(shownBoardCount.value, stored)');
+        expect(board).not.toContain('runGroup(false)');
         const sprintsList = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'organisms', 'SprinstList', 'SprintsList.vue'), 'utf8');
         expect(sprintsList).toContain('boardHoursVisible');
         expect(sprintsList).toContain('v-if="showSprintHours"');
@@ -580,6 +597,10 @@ describe('PAGES DEEP LINK - project-scoped hash before first paint', () => {
             title: 'Ask smoke',
             ProjectID: { $oid: PROJECT },
             toObject() { return { title: 'Ask smoke', ProjectID: { $oid: PROJECT } }; },
+        }).ProjectID).toBe(PROJECT);
+        expect(pageProject.asPlainPage({
+            title: 'Ask smoke',
+            ProjectID: { toHexString: () => PROJECT },
         }).ProjectID).toBe(PROJECT);
     });
 });
