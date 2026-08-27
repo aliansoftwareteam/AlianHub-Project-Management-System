@@ -21,7 +21,7 @@
                         />
                         <span class="taf__title">{{ row.title }}</span>
                     </label>
-                    <span class="taf__value">{{ row.display || '—' }}</span>
+                    <span class="taf__value" :class="{ 'taf__value--none': !row.item }">{{ row.display }}</span>
                     <button
                         v-if="row.canApply"
                         type="button"
@@ -283,6 +283,12 @@ function toggleRow(fieldId) {
     }
 }
 
+function suggestionLabel(item) {
+    if (!item) return t('CustomField.autofill_no_suggestion');
+    const label = item.display || (Array.isArray(item.value) ? '' : item.value);
+    return label || t('CustomField.autofill_no_suggestion');
+}
+
 const rows = computed(() => {
     const field = ownerField.value;
     const ownerSug = field
@@ -314,36 +320,35 @@ const rows = computed(() => {
         }
         : null);
     const out = [];
-    if (assigneeItem) {
-        const display = assigneeItem.display || (Array.isArray(assigneeItem.value) ? '' : assigneeItem.value) || '';
+    if (assigneeEmpty()) {
         out.push({
             fieldId: 'assignee',
             title: t('ProjectDetails.assignee'),
-            display,
+            display: suggestionLabel(assigneeItem),
             item: assigneeItem,
-            checked: isSelected('assignee'),
+            checked: Boolean(assigneeItem) && isSelected('assignee'),
             canApply: canWrite() && Boolean(assigneeItem),
             write: 'assignee',
         });
     }
-    if (!ownerFilled && ownerSug) {
+    if (field && !ownerFilled) {
         out.push({
-            fieldId: (field && field._id) || 'owner',
-            title: (field && field.fieldTitle) || 'Owner',
-            display: ownerSug.display || ownerSug.value || '',
+            fieldId: field._id || 'owner',
+            title: field.fieldTitle || 'Owner',
+            display: suggestionLabel(ownerSug),
             item: ownerSug,
-            checked: Boolean(field) && isSelected(field._id),
+            checked: Boolean(ownerSug) && isSelected(field._id),
             canApply: canWrite() && Boolean(ownerSug),
             write: 'owner',
         });
     }
-    if (dueIsEmpty && dueItem) {
+    if (dueIsEmpty) {
         out.push({
             fieldId: dueId,
             title: (dueField.value && dueField.value.fieldTitle) || (dueSug && dueSug.title) || t('Projects.due_date'),
-            display: dueItem.display || dueItem.value || dueSeed || '',
+            display: suggestionLabel(dueItem),
             item: dueItem,
-            checked: isSelected(dueId),
+            checked: Boolean(dueItem) && isSelected(dueId),
             canApply: canWrite() && Boolean(dueItem),
             write: 'date',
         });
@@ -422,7 +427,7 @@ async function preview() {
         selectedIds.value = ids;
         showCard.value = true;
         filledOnce.value = true;
-        if (!next.length && !dueIso && !seed) notice.value = t('CustomField.autofill_none');
+        notice.value = '';
     } catch (_error) {
         notice.value = t('CustomField.autofill_failed');
         suggestions.value = [];
@@ -615,6 +620,9 @@ async function applyOne(row) {
 .taf__value {
     color: var(--kiln-text, #1b2f28);
     word-break: break-word;
+}
+.taf__value--none {
+    color: var(--kiln-muted, #6b7280);
 }
 .taf__actions {
     display: flex;

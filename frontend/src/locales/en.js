@@ -1833,6 +1833,7 @@ export default {
         autofill_failed: "Could not suggest values. Try again.",
         autofill_applied: "Empty fields filled.",
         autofill_none: "No grounded suggestions for the empty fields.",
+        autofill_no_suggestion: "No suggestion",
         autofill_native: "native",
         autofill_custom_people: "custom people",
         autofill_filled: "Filled",

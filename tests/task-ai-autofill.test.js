@@ -458,6 +458,10 @@ describe('TASKS - AI autofill custom fields', () => {
         expect(card).toContain('showCard');
         expect(card).toContain('taf__go');
         expect(card).toContain('autofill_fill_empty');
+        expect(card).toContain('autofill_no_suggestion');
+        expect(card).toContain('suggestionLabel');
+        expect(card).toContain('assigneeEmpty()');
+        expect(card).toContain('dueIsEmpty');
         expect(card).toContain("item.fieldId === 'assignee'");
         expect(card).toContain('\\bowner\\b');
         expect(card).toContain('canApply');
@@ -468,6 +472,7 @@ describe('TASKS - AI autofill custom fields', () => {
         expect(card).not.toContain('taf__kind');
         expect(card).not.toContain('taf__filled');
         expect(card).not.toContain('autofill_filled');
+        expect(card).not.toContain("'—'");
         expect(card).not.toContain("checkApps('CustomFields')");
         expect(card).not.toContain('getAppState');
         expect(render).toContain('TaskAiAutofill');
