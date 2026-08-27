@@ -62,7 +62,8 @@ const reloadSprintTasks = inject('reloadSprintTasks', () => Promise.resolve());
 const {
     groupBy,
     getSprintTasks,
-    getMongoDBUpdate
+    getMongoDBUpdate,
+    refetchSprintBoardTasks,
 } = taskListHelper();
 
 // EMITS
@@ -140,12 +141,15 @@ function onEmptyAction() {
         const pid = firstId(project.value && project.value._id);
         const sid = firstId(sprint && (sprint.id || sprint._id));
         commit('projectData/resetSprintTaskBucket', { pid, sprintId: sid });
+        isLoading.value = true;
         Promise.resolve(reloadSprintTasks())
+            .then(() => refetchSprintBoardTasks({ projectId: pid, sprintId: sid, projectData: project.value }))
             .then(() => {
-                init(props.grouped, true, project.value, props.sprints, groupedTasks, false, true);
+                init(props.grouped, false, project.value, props.sprints, groupedTasks, false, true);
             })
             .catch((error) => {
                 console.error('ERROR retrying sprint tasks: ', error);
+                isLoading.value = false;
             });
         return;
     }

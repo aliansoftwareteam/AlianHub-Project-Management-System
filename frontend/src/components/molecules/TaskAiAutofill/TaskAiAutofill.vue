@@ -55,6 +55,7 @@ import { useToast } from 'vue-toast-notification';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useGetterFunctions } from '@/composable';
+import { firstId } from '@/utils/taskOpenProjectId';
 
 const OWNER_TITLE = /\bowner\b/i;
 const DUE_TITLE = /\b(due|deadline)\b/i;
@@ -138,21 +139,23 @@ function assigneeChipId(value) {
     return id;
 }
 
+function namedAssigneeChip(value) {
+    const id = assigneeChipId(value);
+    if (!id) return false;
+    try {
+        const user = getUser(id);
+        if (!user || user.ghostUser) return false;
+        const name = String(user.Employee_Name || user.name || '').trim();
+        return Boolean(name) && name.toLowerCase() !== 'ghost user';
+    } catch (_error) {
+        return false;
+    }
+}
+
 function assigneeEmpty() {
     const raw = props.task && props.task.AssigneeUserId;
-    const list = Array.isArray(raw) ? raw : (raw != null && raw !== '' ? [raw] : []);
-    return list.filter((value) => {
-        const id = assigneeChipId(value);
-        if (!id) return false;
-        try {
-            const user = getUser(id);
-            if (!user || user.ghostUser) return false;
-            const name = String(user.Employee_Name || user.name || '').trim();
-            return Boolean(name) && name.toLowerCase() !== 'ghost user';
-        } catch (_error) {
-            return false;
-        }
-    }).length === 0;
+    if (!Array.isArray(raw)) return true;
+    return raw.filter(namedAssigneeChip).length === 0;
 }
 
 function projectBag() {
@@ -208,12 +211,8 @@ function sprintDueDisplay(task) {
     return `${range[4]}-${String(month).padStart(2, '0')}-${String(Number(range[2])).padStart(2, '0')}`;
 }
 
-function assigneeSeed() {
-    if (!assigneeEmpty()) return null;
-    const leader = props.task && (props.task.Task_Leader || props.task.createdBy || props.task.createdById);
-    const id = typeof leader === 'string'
-        ? leader
-        : String((leader && (leader._id || leader.id)) || (leader && typeof leader.toHexString === 'function' ? leader.toHexString() : '') || '');
+function seedPerson(value) {
+    const id = firstId(value) || (typeof value === 'string' ? value.trim() : '');
     if (!id || id === '[object Object]') return null;
     try {
         const user = getUser(id);
@@ -230,6 +229,31 @@ function assigneeSeed() {
     } catch (_error) {
         return null;
     }
+}
+
+function assigneeSeed() {
+    if (!assigneeEmpty()) return null;
+    const task = props.task || {};
+    const project = projectBag();
+    const owner = getters['settings/companyOwnerDetail'] || {};
+    const lead = project.LeadUserId;
+    const projectAssignees = Array.isArray(project.AssigneeUserId) ? project.AssigneeUserId : [];
+    const currentId = (typeof localStorage !== 'undefined' && localStorage.getItem('userId')) || '';
+    const candidates = [
+        task.Task_Leader,
+        task.createdBy,
+        task.createdById,
+        Array.isArray(lead) ? lead[0] : lead,
+        projectAssignees[0],
+        owner.userId,
+        owner._id,
+        currentId,
+    ];
+    for (const candidate of candidates) {
+        const seed = seedPerson(candidate);
+        if (seed) return seed;
+    }
+    return null;
 }
 
 function nativeDueEmpty() {

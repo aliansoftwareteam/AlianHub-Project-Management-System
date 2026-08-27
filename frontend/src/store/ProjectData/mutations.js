@@ -467,53 +467,67 @@ export const mutateTypesenseTasks = (state, payload) => {
     const {data, nextPage, found = 0} = payload || {};
     if (!pid || !sprintId) return;
 
-    const keys = Object.keys(state.tasks);
-    const projectFound = keys.includes(pid);
+    const projectHit = lookupById(state.tasks, pid);
+    const projectKey = projectHit
+        ? (Object.keys(state.tasks).find((key) => state.tasks[key] === projectHit) || pid)
+        : pid;
+    const projectFound = Boolean(projectHit);
 
     if(projectFound) {
-        const sprintFound = state.tasks[pid].sprints.includes(sprintId);
+        const project = state.tasks[projectKey];
+        const bucketHit = lookupById(project, sprintId);
+        const sprintKey = bucketHit
+            ? (Object.keys(project).find((key) => project[key] === bucketHit) || sprintId)
+            : sprintId;
+        const sprintFound = Boolean(bucketHit)
+            || (Array.isArray(project.sprints) && project.sprints.some((sid) => firstId(sid) === sprintId));
 
-        if(sprintFound) {
-            state.tasks[pid][sprintId].index = {
-                ...state.tasks[pid][sprintId].index,
+        if(sprintFound && project[sprintKey] && typeof project[sprintKey] === 'object') {
+            const bucket = project[sprintKey];
+            bucket.index = {
+                ...bucket.index,
                 ...nextPage
             };
-            state.tasks[pid][sprintId].found = {
-                ...state.tasks[pid][sprintId].found,
+            bucket.found = {
+                ...bucket.found,
                 ...found
             };
             if(!data) return;
 
             if(data.isParentTask === false) {
 
-                const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data.ParentTaskId);
+                const taskIndex = (bucket.tasks || []).findIndex((x) => x._id === data.ParentTaskId);
 
                 if(taskIndex !== -1) {
-                    if(state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray) {
-                        const subTaskIndex = state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray.findIndex((x) => x._id === data._id);
+                    if(bucket.tasks[taskIndex].subtaskArray) {
+                        const subTaskIndex = bucket.tasks[taskIndex].subtaskArray.findIndex((x) => x._id === data._id);
 
                         if(subTaskIndex !== -1) {
-                            state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray[subTaskIndex] = {...data};
+                            bucket.tasks[taskIndex].subtaskArray[subTaskIndex] = {...data};
                         } else {
-                            state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray.push(data);
+                            bucket.tasks[taskIndex].subtaskArray.push(data);
                         }
                     } else {
-                        state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray = [data];
+                        bucket.tasks[taskIndex].subtaskArray = [data];
                     }
                 }
             } else {
-                const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data._id);
+                if (!Array.isArray(bucket.tasks)) bucket.tasks = [];
+                const taskIndex = bucket.tasks.findIndex((x) => x._id === data._id);
 
                 if(taskIndex !== -1) {
-                    state.tasks[pid][sprintId].tasks[taskIndex] = {...state.tasks[pid][sprintId].tasks[taskIndex], ...data};
+                    bucket.tasks[taskIndex] = {...bucket.tasks[taskIndex], ...data};
                 } else {
-                    state.tasks[pid][sprintId].tasks.push(data);
+                    bucket.tasks.push(data);
                 }
             }
         } else {
 
-            state.tasks[pid].sprints.push(sprintId);
-            state.tasks[pid][sprintId]={
+            if (!Array.isArray(project.sprints)) project.sprints = [];
+            if (!project.sprints.some((sid) => firstId(sid) === sprintId)) {
+                project.sprints.push(sprintId);
+            }
+            project[sprintId]={
                 index: {
                     ...nextPage
                 },
@@ -524,7 +538,7 @@ export const mutateTypesenseTasks = (state, payload) => {
                 snapshot: null
             };
             if(data) {
-                state.tasks[pid][sprintId].tasks = [data];
+                project[sprintId].tasks = [data];
             }
         }
     } else {

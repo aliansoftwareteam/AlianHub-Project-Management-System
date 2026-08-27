@@ -138,8 +138,8 @@ function isCustomFieldEmpty(task, field) {
 
 function isAssigneeEmpty(task, people) {
     const raw = task && task.AssigneeUserId;
-    const list = Array.isArray(raw) ? raw : (raw != null && raw !== '' ? [raw] : []);
-    const ids = list
+    if (!Array.isArray(raw)) return true;
+    const ids = raw
         .filter((item) => typeof item === 'string' || typeof item === 'number')
         .map(recordId)
         .filter((id) => id && id !== '0' && id.toLowerCase() !== 'unassigned');

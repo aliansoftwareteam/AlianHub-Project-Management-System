@@ -124,6 +124,14 @@ describe('TASKS - AI autofill custom fields', () => {
         expect(ghosted.map((row) => row.fieldId)).toContain(NATIVE_ASSIGNEE_ID);
         expect(ids).not.toContain('f-money');
 
+        const leftoverString = listEmptyTargets({
+            task: emptyTask({ AssigneeUserId: ADA.id }),
+            fields: FIELDS,
+            people: [ADA, GRACE],
+            permissions: { customField: true, assignee: true },
+        });
+        expect(leftoverString.map((row) => row.fieldId)).toContain(NATIVE_ASSIGNEE_ID);
+
         const { suggestions, skipped } = sanitizeSuggestions([
             { fieldId: 'f-summary', value: 'Overwrite me' },
             { fieldId: 'f-tag', optionId: 'opt-blocked' },
@@ -461,6 +469,10 @@ describe('TASKS - AI autofill custom fields', () => {
         expect(card).toContain('autofill_no_suggestion');
         expect(card).toContain('suggestionLabel');
         expect(card).toContain('assigneeEmpty()');
+        expect(card).toContain('namedAssigneeChip');
+        expect(card).toContain('seedPerson');
+        expect(card).toContain('!Array.isArray(raw)');
+        expect(card).toContain("t('ProjectDetails.assignee')");
         expect(card).toContain('dueIsEmpty');
         expect(card).toContain("item.fieldId === 'assignee'");
         expect(card).toContain('\\bowner\\b');

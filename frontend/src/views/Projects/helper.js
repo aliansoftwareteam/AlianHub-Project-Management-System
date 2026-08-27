@@ -811,6 +811,36 @@ export function taskListHelper() {
             }
         })
     }
+    function refetchSprintBoardTasks({ projectId, sprintId, projectData }) {
+        return new Promise((resolve, reject) => {
+            try {
+                if(permit === null && projectData && projectData.isGlobalPermission === false) {
+                    resolve();
+                    return;
+                }
+                dispatch("projectData/getPaginatedTasks", {
+                    cid: companyId.value,
+                    pid: firstId(projectId),
+                    sprintId: firstId(sprintId),
+                    item: { searchKey: 'all', searchValue: 'all', indexName: 'kanbanIndex', conditions: [] },
+                    fetchNew: true,
+                    unfiltered: true,
+                    resetCursor: true,
+                    userId: userId.value,
+                    showAllTasks: projectData && projectData.isGlobalPermission === false ? permit : true,
+                    indexName: 'kanbanIndex',
+                    parentId: '',
+                })
+                .then(resolve)
+                .catch((error) => {
+                    console.error(`ERROR in get tasks > ${projectId} > ${sprintId}: `, error);
+                    reject(error);
+                });
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
     // FIREBASE
     function getMongoDBUpdate({projectId, sprintId,projectData, groupBy: groupByValue, currentView})
     {
@@ -1276,7 +1306,8 @@ export function taskListHelper() {
         checkCase,
         getSprintTasks,
         getMongoDBUpdate,
-        searchMongoDBTasks
+        searchMongoDBTasks,
+        refetchSprintBoardTasks,
     }
 }
 

@@ -1,6 +1,6 @@
 import * as env from '@/config/env';
 import { apiRequest } from '../../services/index'
-import { firstId } from '@/utils/taskOpenProjectId';
+import { firstId, sprintTasksBucket } from '@/utils/taskOpenProjectId';
 /**
  * This function is used to get all the projects from MongoDB and add into the Vuex project store.
  * @param {*} state 
@@ -117,7 +117,10 @@ export const getPaginatedTasks = ({state, commit}, payload) => {
         try {
             const pid = firstId(payload && payload.pid);
             const sprintId = firstId(payload && payload.sprintId);
-            const {item, fetchNew, parentId = "", indexName = "", showAllTasks} = payload || {};
+            const {fetchNew, parentId = "", indexName = "", showAllTasks, unfiltered, resetCursor} = payload || {};
+            const item = (payload && payload.item) || (unfiltered
+                ? { searchKey: 'all', searchValue: 'all', indexName: 'kanbanIndex', conditions: [] }
+                : null);
             if (!pid || !sprintId || !item) {
                 resolve();
                 return;
@@ -125,25 +128,20 @@ export const getPaginatedTasks = ({state, commit}, payload) => {
             commit("setGetPaginatedTasksPayload",{data:{...payload, pid, sprintId},op: 'add'});
             const indName = indexName || item.indexName
 
-            const projectFound = Object.keys(state.tasks).includes(pid);
-            let sprintFound = false;
-            if(projectFound) {
-                sprintFound = state.tasks[pid].sprints.includes(sprintId);
-            }
+            const bucket = sprintTasksBucket(state.tasks, pid, sprintId);
+            const sprintFound = Boolean(bucket);
 
-            if(sprintFound && !fetchNew) {
+            if(sprintFound && !fetchNew && !unfiltered && !resetCursor) {
                 resolve();
                 return;
             }
 
-            let cursor = null;
-            let foundKey = `${item.searchKey}_${item.searchValue}`;
-
-            const indexKey = `${parentId && parentId.length ? `${parentId}_` : ''}${item.searchKey}_${item.searchValue}`;
-
-            if(sprintFound) {
-                cursor = state.tasks[pid][sprintId].index[indexKey] || null;
-            }
+            const foundKey = unfiltered ? 'all' : `${item.searchKey}_${item.searchValue}`;
+            const indexKey = unfiltered
+                ? `${parentId && parentId.length ? `${parentId}_` : ''}all`
+                : `${parentId && parentId.length ? `${parentId}_` : ''}${item.searchKey}_${item.searchValue}`;
+            const cursor = resetCursor ? 0 : ((bucket && bucket.index && bucket.index[indexKey]) || 0);
+            const pageSize = unfiltered ? (payload.limit || 250) : 35;
 
             const matchAnd = [
                 { $or: [{ objId: { ProjectID: pid } }, { ProjectID: pid }] },
@@ -157,10 +155,12 @@ export const getPaginatedTasks = ({state, commit}, payload) => {
                 matchAnd.push({ ParentTaskId: parentId });
             } else {
                 matchAnd.push({ isParentTask: true });
-                if (item.mongoConditions && item.mongoConditions.length) {
-                    matchAnd.push(item.mongoConditions[0]);
-                } else if (item.conditions && item.conditions.length) {
-                    matchAnd.push(item.conditions[0]);
+                if (!unfiltered) {
+                    if (item.mongoConditions && item.mongoConditions.length) {
+                        matchAnd.push(item.mongoConditions[0]);
+                    } else if (item.conditions && item.conditions.length) {
+                        matchAnd.push(item.conditions[0]);
+                    }
                 }
             }
 
@@ -177,7 +177,7 @@ export const getPaginatedTasks = ({state, commit}, payload) => {
                     $facet: {
                         result:[
                             { $skip: cursor || 0},
-                            { $limit: 35}
+                            { $limit: pageSize}
                         ],
                         count:[
                             {$count: "count" }
@@ -195,12 +195,12 @@ export const getPaginatedTasks = ({state, commit}, payload) => {
                     let resCount = {};
     
                     if (parentId && parentId.length) {
-                        resCount = { [foundKey]: state.tasks[pid]?.[sprintId]?.found?.[foundKey] || 0 };
-                    } else if (sprintFound && state.tasks[pid]?.[sprintId]?.found?.[foundKey]) {
+                        resCount = { [foundKey]: (bucket && bucket.found && bucket.found[foundKey]) || 0 };
+                    } else if (sprintFound && bucket && bucket.found && bucket.found[foundKey]) {
                         if (response.count?.[0]?.count) {
                             resCount = { [foundKey]: response?.count[0]?.count || 0 };
                         } else {
-                            resCount = { [foundKey]: (state.tasks[pid][sprintId].found[foundKey] === 1 ? 0 : state.tasks[pid][sprintId].found[foundKey]) || 0 };
+                            resCount = { [foundKey]: (bucket.found[foundKey] === 1 ? 0 : bucket.found[foundKey]) || 0 };
                         }
                     } else {
                         resCount = { [foundKey]: response.count?.[0]?.count || 0 };

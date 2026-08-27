@@ -69,7 +69,7 @@ defineEmits(['change']);
 
 // --- Store & Injected State ---
 const { getters, commit } = useStore();
-const { groupBy, checkCase } = taskListHelper();
+const { groupBy, checkCase, refetchSprintBoardTasks } = taskListHelper();
 const showArchiveVar = inject("showArchived");
 const searchedTask = inject('searchedTask');
 const project = inject('selectedProject');
@@ -195,19 +195,19 @@ function onEmptyAction() {
         const pid = firstId(project.value && project.value._id);
         const sid = firstId(sprint && (sprint.id || sprint._id));
         commit('projectData/resetSprintTaskBucket', { pid, sprintId: sid });
-        const runGroup = () => {
-            if (project.value?._id && props.sprints?.length) {
-                isLoading.value = true;
-                groupBy(props.grouped, true, project.value, props.sprints, internalGroupedTasks, true, 'board', false, true, (resp) => {
-                    internalGroupedTasks.value = resp;
-                    isLoading.value = false;
-                });
-            }
-        };
+        const bindGroups = () => new Promise((resolve) => {
+            groupBy(props.grouped, false, project.value, props.sprints, internalGroupedTasks, true, 'board', false, true, (resp) => {
+                internalGroupedTasks.value = resp;
+                resolve();
+            });
+        });
+        isLoading.value = true;
         Promise.resolve(reloadSprintTasks()).then(() => {
-            runGroup();
-        }).catch((error) => {
+            return refetchSprintBoardTasks({ projectId: pid, sprintId: sid, projectData: project.value });
+        }).then(() => bindGroups()).catch((error) => {
             console.error('ERROR retrying sprint tasks: ', error);
+        }).finally(() => {
+            isLoading.value = false;
         });
         return;
     }
