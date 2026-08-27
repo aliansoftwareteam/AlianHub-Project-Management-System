@@ -1,0 +1,18 @@
+{
+  "url": "http://localhost:4000",
+  "pat": "ahp_your_personal_api_token_here",
+  "companyId": "your_company_id_24hex",
+  "userId": "",
+  "claudeBin": "",
+  "workspace": "./workspace",
+  "repos": {
+    "UMM": {
+      "gitUrl": "https://github.com/your-org/user-management.git",
+      "base": "main"
+    },
+    "68c2540995e718dea76ad34f": {
+      "localPath": "E:/repos/alianhub",
+      "base": "staging"
+    }
+  }
+}

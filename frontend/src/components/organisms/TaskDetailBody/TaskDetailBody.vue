@@ -44,6 +44,13 @@
                     :isMainSpinner="isSpinner"
                 />
                 <TimeLog v-else-if="activeTab === 'time-log'" :task="task" :isMainSpinner="isSpinner" />
+                <DevelopmentChat
+                    v-else-if="activeTab === 'development' && Object.keys(projectData).length && Object.keys(task).length"
+                    :taskId="task?._id"
+                    :projectId="projectData._id"
+                    :sprintId="task?.sprintId"
+                    :folderId="task?.folderObjId || null"
+                />
                 <TaskDetailRightSide
                     v-if="clientWidth <= 767 ? activeTab === 'task-detail-tab' : false"
                     :task="task"
@@ -93,6 +100,7 @@
     import Comments from '@/views/Projects/Comments/Comments.vue'
     import ActivityLog from '@/components/templates/ActivityLog/ActivityLog.vue'
     import TimeLog from '@/views/TimeLog/TimeLog.vue'
+    import DevelopmentChat from '@/components/organisms/Development/DevelopmentChat.vue'
     import { useCustomComposable } from '@/composable';
 
     const {getters} = useStore();
@@ -182,7 +190,7 @@
 
     const myCounts = computed(() => getters["users/myCounts"]?.data?.[`task_${projectData.value._id}_${props.task.sprintId}_${props.task._id}_comments`] || 0)
 
-    const tabs = ref({
+    const tabs = computed(() => ({
         ...(checkPermission('task.task_details',projectData.value?.isGlobalPermission) === true && {'task-detail-tab': {
             name: 'task_details',
             activeIcon: require('@/assets/images/svg/tab1Icon.svg'),
@@ -202,8 +210,13 @@
             name: 'time_log',
             activeIcon:require('@/assets/images/svg/tab4Icon.svg'),
             inactiveIcon:require('@/assets/images/svg/tab4Icon.svg'),
+        },
+        'development':{
+            name: 'development',
+            activeIcon:require('@/assets/images/svg/integrationPuzzle.svg'),
+            inactiveIcon:require('@/assets/images/svg/integrationPuzzle.svg'),
         }
-    });
+    }));
 
     const changeTab = (tab) => {
         activeTab.value = tab;

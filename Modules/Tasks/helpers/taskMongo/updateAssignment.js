@@ -144,6 +144,11 @@ module.exports = {
                             MongoDbCrudOpration(projectData.CompanyId,object, "findOneAndUpdate").then((result) => {
                                 socketEmitter.emit('update', { type: "update", data: result , updatedFields: mongoUpdateObj, module: 'task' });
                                 resolve({status: true, statusText: "Assignee updated successfully"});
+                                // AI dev-agent: assigning the "AI Bot" user auto-enqueues a Development job.
+                                if (type === "assigneeAdd") {
+                                    try { require('../../../DevAgent/bot').onAssigneeAdded(projectData.CompanyId, firebaseObj.AssigneeUserId, taskData, projectData); }
+                                    catch (hookErr) { logger.error(`ERROR in dev-agent assignee hook: ${hookErr.message}`); }
+                                }
                                 try {
                                     this.updateWatcher({companyId : projectData.CompanyId, projectId: projectData._id, sprintId: taskData.sprintId, taskId: taskData._id, userId: uid, add: type === "assigneeAdd", type: type,userData:userData,employeeName:employeeName})
                                     .catch((error) => {

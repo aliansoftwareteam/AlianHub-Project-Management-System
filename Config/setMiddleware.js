@@ -193,6 +193,10 @@ const verifyJWTTokenWithCRoute = [
     // unauthenticated (trusted body userData) — now JWT-protected; the
     // PAT branch in jwt.js blocks PATs from token management except /me.
     '/api/v2/api-tokens',
+    // AI dev-agent "Development" chat (Modules/DevAgent). JWT+company for the
+    // in-app user (message/messages); the runner uses a PAT (allowed — this
+    // prefix isn't in the PAT-blocked list) for pending/reply.
+    '/api/v2/dev-agent',
     // Two-factor auth management (Phase 1). JWT + companyId required so req.uid
     // is populated for the handlers. /api/v2/auth/2fa/validate is intentionally
     // NOT here — it is public (the user is mid-login, holding only a tempToken).

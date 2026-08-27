@@ -1,10 +1,16 @@
 <template>
     <div class="list-head-right">
         <ul class="d-flex align-items-center m-0">
+            <li v-if="clientWidth > 767 && checkApps('AI',projectData) && checkPermission('artificial_intelligence',projectData?.isGlobalPermission) === true" class="mr-10px">
+                <img @click="$emit('openDevChat')" id="projectviewdevchat_driver" :src="devChatIcon" :title="$t('DevAgent.open_ai_developer')" alt="AI Developer" class="cursor-pointer"/>
+            </li>
             <li v-if="clientWidth > 767">
                 <img @click="$emit('openSidebar', 'filesLinks')" id="projectviewfiles_driver" :src="fileLinks" class="cursor-pointer"/>
             </li>
-            <li class="ml-10px" v-if="clientWidth > 767" :class="clientWidth>767 ? 'mr-10px' : 'm-0'">
+            <!-- 2px, not 10px: the mic artboard is 30x30 around an 11.5px glyph, so it
+                 carries ~9px of its own padding on each side. With a 10px margin its
+                 optical gaps measured 19.4px and 19.8px against 11.3px elsewhere. -->
+            <li class="ml-2px" v-if="clientWidth > 767" :class="clientWidth>767 ? 'mr-2px' : 'm-0'">
                 <img @click="$emit('openSidebar', 'audio')" id="projectviewaudio_driver" :src="audio" alt="audio" class="cursor-pointer"/>
             </li>
             <li v-if="clientWidth > 767">
@@ -54,6 +60,14 @@
                                 />
                             </DropDownOption>
                             <template v-if="clientWidth <= 767">
+                                <DropDownOption v-if="checkApps('AI',projectData) && checkPermission('artificial_intelligence',projectData?.isGlobalPermission) === true" @click="$refs[`projectdd_${projectData._id || ''}`].click(); $emit('openDevChat')">
+                                    <div class="d-flex align-items-center project-mobile-desc avtar-options" :class="`${clientWidth <= 767 ? 'project_detail_dropdown_wrapper' : ''}`">
+                                        <div class="d-flex align-items-center">
+                                            <img :src="devChatIcon" class="mr-20px" alt="AI Developer"/>
+                                        </div>
+                                        <span :class="{'font-size-16': clientWidth <= 767 }" class="font-weight-400 gray4b">{{ $t('DevAgent.ai_developer') }}</span>
+                                    </div>
+                                </DropDownOption>
                                 <DropDownOption @click="$refs[`projectdd_${projectData._id || ''}`].click(); $emit('openWatcher')">
                                     <div :style="[{padding : clientWidth <= 767 ? '10px 0px !important' : '3.5px 10px !important'}]" class="d-flex align-items-center">
                                         <div class="position-re mr-15px">
@@ -138,7 +152,7 @@ import Assignee from '@/components/molecules/Assignee/Assignee.vue';
 import WasabiImage from '@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue';
 import { useCustomComposable } from '@/composable';
 
-const { checkPermission } = useCustomComposable();
+const { checkPermission, checkApps } = useCustomComposable();
 
 defineProps({
     projectData: { type: Object, required: true },
@@ -147,9 +161,10 @@ defineProps({
     teams: { type: Array, default: () => [] },
 });
 
-defineEmits(['openSidebar', 'openWatcher', 'changeAssignee', 'openPermissionSidebar', 'startEditName', 'openColorAvatar', 'archiveProject']);
+defineEmits(['openSidebar', 'openWatcher', 'openDevChat', 'changeAssignee', 'openPermissionSidebar', 'startEditName', 'openColorAvatar', 'archiveProject']);
 
 const fileLinks = require('@/assets/images/svg/Fileslinks.svg');
+const devChatIcon = require('@/assets/images/svg/AiDeveloper.svg');
 const audio = require('@/assets/images/svg/Voice_Record.svg');
 const audioLinkMobile = require('@/assets/images/svg/AudioLink.svg');
 const fileLink = require('@/assets/images/svg/Files_links.svg');

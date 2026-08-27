@@ -1,0 +1,5 @@
+# Local config — contains a Personal API Token (secret). Never commit.
+config.json
+
+# On-demand clones the agent makes from a git URL.
+workspace/

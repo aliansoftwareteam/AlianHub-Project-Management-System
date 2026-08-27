@@ -74,6 +74,15 @@
             </template>
         </ConfirmModal>
         <AISidebar v-if="openAiSidebar" @closeAi="$emit('closeAiSidebar')"></AISidebar>
+        <!-- Keyed on the project: this bar outlives every project/sprint/task route
+             change, so without the key a project switch would show the previous
+             project's threads. -->
+        <ProjectDevChat
+            :key="`${projectData?._id || ''}-devchat`"
+            :modelValue="openDevChat"
+            :projectData="projectData"
+            @update:modelValue="(v) => $emit('update:openDevChat', v)"
+        />
     </div>
 </template>
 
@@ -88,6 +97,7 @@ import AiProjectCreator from '@/components/organisms/AiProjectCreator/AiProjectC
 import ProjectPermission from '@/components/atom/ProjectPermission/ProjectPermission.vue';
 import ConfirmModal from '@/components/atom/Modal/Modal.vue';
 import AISidebar from '@/components/molecules/AISidebar/AISidebar.vue';
+import ProjectDevChat from '@/components/organisms/ProjectDevChat/ProjectDevChat.vue';
 
 defineProps({
     clientWidth: { type: Number, required: true },
@@ -104,6 +114,7 @@ defineProps({
     permissionSidebar: { type: Boolean, default: false },
     showDriverSidebar: { type: Boolean, default: false },
     openAiSidebar: { type: Boolean, default: false },
+    openDevChat: { type: Boolean, default: false },
 });
 
 defineEmits([
@@ -117,6 +128,7 @@ defineEmits([
     'tourModalAccept',
     'tourModalClose',
     'closeAiSidebar',
+    'update:openDevChat',
 ]);
 
 const cancelIconForTour = require('@/assets/images/cancel_icon.png');

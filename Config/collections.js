@@ -89,6 +89,9 @@ const dbCollections = {
     AUTOMATION_RULES: "automation_rules",
     INTEGRATION_CONNECTIONS: "integration_connections",
     CLOUD_STORAGE_CONNECTIONS: "cloud_storage_connections",
+    DEV_MESSAGES: "dev_messages",
+    DEV_PAIRINGS: "dev_pairings",
+    DEV_PROJECT_REPOS: "dev_project_repos",
     FORMS: "forms",
     FORM_SUBMISSIONS: "form_submissions",
 }

@@ -72,6 +72,10 @@ async function resolveCallerRoleType(companyId, uid) {
 // caller holds the `public_projects` permission. Returns a Mongo sub-filter to
 // merge into a PROJECTS query, or null for no restriction. Fails closed (member
 // scope) on any lookup error.
+// Exported so other modules can ask the same question this file already answers,
+// instead of each re-deriving the roleType / team / public_projects rule.
+exports.resolveVisibleProjectFilter = (companyId, uid) => resolveVisibleProjectFilter(companyId, uid);
+
 async function resolveVisibleProjectFilter(companyId, uid) {
     if (!uid) return { _id: { $in: [] } }; // no identity → see nothing
     try {

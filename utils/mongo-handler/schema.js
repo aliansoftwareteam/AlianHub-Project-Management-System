@@ -689,6 +689,56 @@ const schema = {
         connectedAt: { type: Date, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // AI dev-agent conversation: user instructions + agent replies. The repo
+    // location travels on the message (temporary), nothing persisted as a binding.
+    // Managed by Modules/DevAgent.
+    //
+    // A message carries EXACTLY ONE scope, enforced in the controller:
+    //   taskId         — the task detail's "Development" tab
+    //   conversationId — a project-level chat, which has no task at all
+    // taskId is therefore not required at the schema level. Both fields are
+    // declared because the schema is strict: an undeclared field is dropped
+    // silently, which works in-session and vanishes after a reload.
+    devMessages: {
+        taskId: { type: String, default: '', required: false },
+        conversationId: { type: String, default: '', required: false },
+        projectId: { type: String, default: '', required: false },
+        sprintId: { type: String, default: '', required: false },
+        role: { type: String, default: 'user', required: false },   // user | agent | system
+        text: { type: String, default: '', required: false },
+        repo: { type: String, default: '', required: false },        // git URL or local path
+        base: { type: String, default: 'main', required: false },
+        status: { type: String, default: '', required: false },      // pending | working | done | error
+        prUrl: { type: String, default: '', required: false },
+        parentId: { type: String, default: '', required: false },    // agent reply → the user message it answers
+        userId: { type: String, default: '', required: false },
+        // A chat's own name, once someone renames it. Carried by the conversation's
+        // oldest message only — a chat has no record of its own by design, and the
+        // summary reads this with $max so which message holds it does not matter.
+        // Empty means the name falls back to the first instruction's text.
+        convTitle: { type: String, default: '', required: false },
+        // Files attached to the instruction: [{id, filename, extension, size, type, url}].
+        // Untyped on purpose — the module re-types every field on the way in.
+        attachments: { type: Array, default: [], required: false },
+    },
+    // AI dev-agent → device pairing (short-lived, single-use). Stored in the
+    // GLOBAL db so the public exchange endpoint can resolve a code without a
+    // company context. Managed by Modules/DevAgent.
+    devPairings: {
+        code: { type: String, required: true },
+        companyId: { type: String, default: '', required: false },
+        userId: { type: String, default: '', required: false },
+        used: { type: Boolean, default: false, required: false },
+    },
+    // AI dev-agent → per-PROJECT repo binding (company-scoped, one row per project).
+    // Set once from any task's Development tab; every task in that project + the AI
+    // Bot then resolve this repo automatically. Managed by Modules/DevAgent.
+    devProjectRepos: {
+        projectId: { type: String, required: true },
+        repo: { type: String, default: '', required: false },
+        base: { type: String, default: 'main', required: false },
+        updatedBy: { type: String, default: '', required: false },
+    },
     // AHE-3838 — one row per (user, cloud storage provider). Distinct from
     // integrationConnections above, which holds the COMPANY's app registration:
     // every person has their own Drive, so the OAuth grant has to be per-user.
