@@ -33,7 +33,7 @@ From a selected project, a user can generate a kiln standup / project-update bri
 - [ ] Standup control is hidden until a project is selected
 - [ ] Invented task ids are dropped from citations
 - [ ] Tests cover window filter, permission pack, invented ids, and the project-required gate
-- [ ] Stacked draft PR on a new `feat/` branch from `feat/meeting-transcript-ee23`
+- [x] Stacked draft PR on a new `feat/` branch from `feat/meeting-transcript-ee23`
 
 ## Constraints & notes
 - Stack on `feat/meeting-transcript-ee23` (PR 518). Branch: `feat/standup-project-update-1955`.
