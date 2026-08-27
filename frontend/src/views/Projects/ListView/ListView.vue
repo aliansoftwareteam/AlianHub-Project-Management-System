@@ -50,7 +50,7 @@ import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPla
 import isEqual from 'lodash/isEqual';
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { useTaskSelection } from '@/composable/useTaskSelection.js';
-import { boardEmptyKind, countRenderedSprintItems, countSprintBoardTasks, firstId, sprintExpectedCount } from '@/utils/taskOpenProjectId';
+import { boardEmptyKind, countPaintedSprintTasks, countSprintBoardTasks, firstId, paintSprintGroups, sprintExpectedCount, sprintTasksBucket } from '@/utils/taskOpenProjectId';
 
 // UTILS
 const {getters, commit} = useStore();
@@ -122,7 +122,8 @@ const emptyKind = computed(() => {
     const sid = firstId(sprint && (sprint.id || sprint._id));
     const groups = sprint && Array.isArray(sprint.items) ? sprint.items : [];
     const stored = countSprintBoardTasks(allProjectTasks.value, pid, sid);
-    const shown = Math.max(countRenderedSprintItems(groups), stored);
+    const bucket = sprintTasksBucket(allProjectTasks.value, pid, sid);
+    const shown = countPaintedSprintTasks(groups, bucket && bucket.tasks);
     return boardEmptyKind({
         loading: retrying.value || isLoading.value || props.sprintLoading,
         sprintsBound: Boolean(props.sprints && props.sprints.length),
@@ -148,7 +149,14 @@ function onEmptyAction() {
     commit('projectData/resetSprintTaskBucket', { pid, sprintId: sid });
     const bindGroups = () => new Promise((resolve) => {
         groupBy(props.grouped, false, project.value, props.sprints, groupedTasks, false, 'list', false, true, (resp) => {
-            groupedTasks.value = resp;
+            const next = Array.isArray(resp) ? resp : [];
+            groupedTasks.value = next.map((sprint) => {
+                const bucket = sprintTasksBucket(allProjectTasks.value, pid, firstId(sprint && (sprint.id || sprint._id)));
+                return {
+                    ...sprint,
+                    items: paintSprintGroups(sprint && sprint.items, bucket && bucket.tasks),
+                };
+            });
             resolve();
         });
     });

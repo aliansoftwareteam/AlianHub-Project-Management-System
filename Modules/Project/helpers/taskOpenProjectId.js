@@ -317,6 +317,38 @@ function appendUnmatchedToFirstGroup(groups, unmatched) {
     return groups.map((group, i) => (i === 0 ? { ...group, tasksArray: [...(group.tasksArray || []), ...extra] } : group));
 }
 
+function taskMatchesGroup(task, group) {
+    if (!task || !group) return false;
+    const key = group.searchKey;
+    if (key === 'statusKey') return sameGroupValue(task.statusKey, group.searchValue);
+    if (key === 'Task_Priority') return sameGroupValue(task.Task_Priority, group.searchValue);
+    if (key === 'AssigneeUserId') {
+        const raw = Array.isArray(task.AssigneeUserId)
+            ? task.AssigneeUserId.slice().sort().join('_')
+            : (task.AssigneeUserId || '');
+        return raw === (group.value || '');
+    }
+    if (key === 'DueDate') return false;
+    return sameGroupValue(task[key], group.searchValue);
+}
+
+function paintSprintGroups(groups, tasks) {
+    const source = (tasks || []).filter((row) => row && !row.deletedStatusKey);
+    const cols = Array.isArray(groups) ? groups : [];
+    const mapped = cols.map((group) => ({
+        ...group,
+        tasksArray: source.filter((task) => taskMatchesGroup(task, group)),
+    }));
+    if (!mapped.length) return mapped;
+    const statusMode = cols.some((group) => group && group.searchKey === 'statusKey');
+    if (!statusMode) return mapped;
+    return appendUnmatchedToFirstGroup(mapped, unmatchedBoardTasks(mapped, source));
+}
+
+function countPaintedSprintTasks(groups, tasks) {
+    return paintSprintGroups(groups, tasks).reduce((n, group) => n + (((group && group.tasksArray) || []).length), 0);
+}
+
 function boardEmptyKind({ loading, sprintsBound, boardCount, expectedCount, searchHits, hasGroups } = {}) {
     if (loading) return 'loading';
     if (hasGroups === false) return 'failed';
@@ -354,6 +386,9 @@ module.exports = {
     sameGroupValue,
     unmatchedBoardTasks,
     appendUnmatchedToFirstGroup,
+    taskMatchesGroup,
+    paintSprintGroups,
+    countPaintedSprintTasks,
     sprintExpectedCount,
     boardHoursVisible,
     boardEmptyKind,

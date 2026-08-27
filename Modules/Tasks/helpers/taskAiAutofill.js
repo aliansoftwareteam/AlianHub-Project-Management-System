@@ -145,7 +145,7 @@ function isAssigneeEmpty(task, people) {
         .filter((id) => id && id !== '0' && id.toLowerCase() !== 'unassigned');
     if (!ids.length) return true;
     const allowed = normalizePeople(people);
-    if (!allowed.length) return false;
+    if (!allowed.length) return true;
     return !ids.some((id) => allowed.some((person) => person.id === id));
 }
 

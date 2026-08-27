@@ -472,7 +472,9 @@ describe('TASKS - AI autofill custom fields', () => {
         expect(card).toContain('assigneeRow');
         expect(card).toContain('assigneeTitle');
         expect(card).toContain("'Assignee'");
-        expect(card).toContain('data-taf-row');
+        expect(card).toContain('data-taf-row="assignee"');
+        expect(card).toContain('paintedAssigneeChips');
+        expect(card).toContain('otherRows');
         expect(card).toContain('namedAssigneeChip');
         expect(card).toContain('seedPerson');
         expect(card).toContain('!Array.isArray(raw)');

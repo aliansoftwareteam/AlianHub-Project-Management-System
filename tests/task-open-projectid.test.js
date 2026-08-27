@@ -27,6 +27,7 @@ const {
     sameGroupValue,
     unmatchedBoardTasks,
     appendUnmatchedToFirstGroup,
+    countPaintedSprintTasks,
     sprintTasksBucket,
     boardEmptyKind,
     sprintExpectedCount,
@@ -460,6 +461,16 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(boardHoursVisible('loading')).toBe(false);
         expect(boardHoursVisible('ready')).toBe(true);
         expect(boardHoursVisible('empty')).toBe(false);
+        expect(countPaintedSprintTasks(
+            [{ searchKey: 'statusKey', searchValue: 'todo', tasksArray: [] }],
+            [{ _id: 'a', statusKey: 'in-progress' }, { _id: 'b', statusKey: 'todo' }],
+        )).toBe(2);
+        expect(countPaintedSprintTasks(
+            [{ searchKey: 'statusKey', searchValue: 'todo', tasksArray: [] }],
+            [],
+        )).toBe(0);
+        expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 0, expectedCount: 7, hasGroups: true })).toBe('failed');
+        expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 7, expectedCount: 7, hasGroups: true })).toBe('ready');
         const store = {
             [PROJECT]: {
                 sprints: [SPRINT],
@@ -473,9 +484,10 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         const board = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'views', 'Projects', 'Kanban', 'BoardView.vue'), 'utf8');
         expect(list).toContain('hasGroups');
         expect(list).toContain('sprintExpectedCount');
-        expect(list).toContain('countRenderedSprintItems');
         expect(list).toContain('Math.max(sprintExpectedCount(header), sprintExpectedCount(listed))');
-        expect(list).toContain('Math.max(countRenderedSprintItems(groups), stored)');
+        expect(list).toContain('countPaintedSprintTasks');
+        expect(list).toContain('paintSprintGroups');
+        expect(list).not.toContain('Math.max(countRenderedSprintItems(groups), stored)');
         expect(list).toContain('boardCount: shown');
         expect(list).toContain('resetSprintTaskBucket');
         expect(list).toContain('refetchSprintBoardTasks');
@@ -485,6 +497,8 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(list).not.toContain('reloadSprintTasks');
         const itemList = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'organisms', 'ItemList', 'ItemList.vue'), 'utf8');
         expect(itemList).toContain('sameGroupValue');
+        expect(itemList).toContain('unmatchedBoardTasks');
+        expect(itemList).toContain('Number(props.statusIndex) === 0');
         expect(board).toContain('hasGroups');
         expect(board).toContain('sprintExpectedCount');
         expect(board).toContain('sameGroupValue');

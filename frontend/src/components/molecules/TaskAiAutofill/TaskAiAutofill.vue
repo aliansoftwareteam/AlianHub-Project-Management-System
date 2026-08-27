@@ -11,7 +11,26 @@
             <h5 class="taf__heading">{{ $t('CustomField.autofill_preview') }}</h5>
             <p v-if="notice" class="taf__notice">{{ notice }}</p>
             <ul class="taf__list">
-                <li v-for="row in rows" :key="row.fieldId" class="taf__item" :data-taf-row="row.fieldId">
+                <li v-if="assigneeRow" class="taf__item" data-taf-row="assignee">
+                    <label class="taf__pick">
+                        <input
+                            type="checkbox"
+                            :checked="assigneeRow.checked"
+                            :disabled="!assigneeRow.item"
+                            @change="toggleRow('assignee')"
+                        />
+                        <span class="taf__title">{{ assigneeRow.title }}</span>
+                    </label>
+                    <span class="taf__value" :class="{ 'taf__value--none': !assigneeRow.item }">{{ assigneeRow.display }}</span>
+                    <button
+                        v-if="assigneeRow.canApply"
+                        type="button"
+                        class="taf__apply"
+                        :disabled="busy || !assigneeRow.checked"
+                        @click="applyOne(assigneeRow)"
+                    >{{ busy ? $t('CustomField.autofill_working') : $t('CustomField.autofill_apply') }}</button>
+                </li>
+                <li v-for="row in otherRows" :key="row.fieldId" class="taf__item" :data-taf-row="row.fieldId">
                     <label class="taf__pick">
                         <input
                             type="checkbox"
@@ -139,17 +158,27 @@ function assigneeChipId(value) {
     return id;
 }
 
-function namedAssigneeChip(value) {
-    const id = assigneeChipId(value);
-    if (!id) return false;
+function paintedAssigneeChips(raw) {
+    if (!Array.isArray(raw) || !raw.length) return [];
     try {
-        const user = getUser(id);
-        if (!user || user.ghostUser) return false;
-        const name = String(user.Employee_Name || user.name || '').trim();
-        return Boolean(name) && name.toLowerCase() !== 'ghost user';
+        return raw.map((value) => {
+            if (typeof value !== 'string') return null;
+            if (value.indexOf('tId_') === 0) return { id: value, title: 'team' };
+            const id = assigneeChipId(value);
+            if (!id) return null;
+            const user = getUser(id);
+            if (!user || user.ghostUser) return null;
+            const title = String(user.Employee_Name || user.name || '').trim();
+            if (!title || title.toLowerCase() === 'ghost user') return null;
+            return { id, title };
+        }).filter(Boolean);
     } catch (_error) {
-        return false;
+        return [];
     }
+}
+
+function namedAssigneeChip(value) {
+    return paintedAssigneeChips([value]).length > 0;
 }
 
 function assigneeEmpty() {
@@ -400,6 +429,8 @@ const rows = computed(() => {
     }
     return out;
 });
+
+const otherRows = computed(() => rows.value.filter((row) => row.fieldId !== 'assignee'));
 
 const canFillEmpty = computed(() => rows.value.some((row) => row.canApply && row.item));
 

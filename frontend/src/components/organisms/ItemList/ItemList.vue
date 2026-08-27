@@ -332,7 +332,7 @@ const {isCustomFields} = customField();
 import * as env from '@/config/env';
 import { useI18n } from "vue-i18n";
 import { apiRequest } from "../../../services";
-import { sameGroupValue, sprintTasksBucket } from '@/utils/taskOpenProjectId';
+import { firstId, sameGroupValue, sprintTasksBucket, unmatchedBoardTasks } from '@/utils/taskOpenProjectId';
 import Skelaton from "@/components/atom/Skelaton/AiSkelaton.vue"
 const { t } = useI18n();
 // UTILS
@@ -542,6 +542,19 @@ watch(() => sprintBucket.value && sprintBucket.value.tasks, () => {
         } else {
             if (props.item.searchKey === "statusKey") {
                 tmp = store.tasks.filter((x) => sameGroupValue(x.statusKey, props.item.searchValue) && !x?.deletedStatusKey)?.sort((a,b)=> a?.groupByStatusIndex - b?.groupByStatusIndex);
+                if (Number(props.statusIndex) === 0) {
+                    const siblings = (props.sprintObject && Array.isArray(props.sprintObject.items))
+                        ? props.sprintObject.items
+                        : [props.item];
+                    const mapped = siblings.map((group) => ({
+                        tasksArray: store.tasks.filter((x) => sameGroupValue(x.statusKey, group.searchValue) && !x?.deletedStatusKey),
+                    }));
+                    const extra = unmatchedBoardTasks(mapped, store.tasks);
+                    extra.forEach((row) => {
+                        const id = firstId(row && (row._id || row.id));
+                        if (id && !tmp.some((have) => firstId(have && (have._id || have.id)) === id)) tmp.push(row);
+                    });
+                }
             } else if (props.item.searchKey === "Task_Priority") {
                 tmp = store.tasks.filter((x) => x[props.item.searchKey] === props.item.searchValue && !x?.deletedStatusKey)?.sort((a,b)=> a.groupByPriorityIndex - b.groupByPriorityIndex);
             } else {
