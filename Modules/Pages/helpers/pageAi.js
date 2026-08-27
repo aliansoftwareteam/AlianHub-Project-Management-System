@@ -24,6 +24,7 @@ const {
     WORKSPACE_ASK_SYSTEM,
 } = require('./pageWorkspaceAsk');
 const { summarizeTranscript } = require('./pageTranscript');
+const { summarizeStandup } = require('./pageStandup');
 
 const TITLE_CAP = 200;
 const INTENT_CAP = 2000;
@@ -49,7 +50,8 @@ Action meanings:
 - outline: produce a heading + bullet outline the author can fill in.
 - rewrite: rewrite the existing body for clarity, same meaning.
 - ask: answer the author's question about the current page. Do not rewrite or replace the page. Put the answer in markdown.
-- transcript: turn a meeting transcript into a summary and action items. Do not rewrite or replace the page.`;
+- transcript: turn a meeting transcript into a summary and action items. Do not rewrite or replace the page.
+- standup: brief recent project task activity. Do not rewrite or replace the page.`;
 
 function clamp(value, cap) {
     if (typeof value !== 'string') return '';
@@ -146,7 +148,7 @@ async function chatMarkdown({ systemPrompt, userPrompt, temperature, maxTokens }
     return { status: true, markdown, raw, payload };
 }
 
-async function composePage({ action, title, instruction, currentText, pages, tasks }) {
+async function composePage({ action, title, instruction, currentText, pages, tasks, comments, projectId, window, now }) {
     const resolvedAction = String(action || 'draft').toLowerCase();
     if (!isAiAction(resolvedAction)) {
         return { status: false, reason: `action must be one of: ${AI_ACTIONS.join(', ')}.` };
@@ -163,6 +165,18 @@ async function composePage({ action, title, instruction, currentText, pages, tas
             tasks,
             chatMarkdown,
             isAiConfigured,
+        });
+    }
+    if (resolvedAction === 'standup') {
+        return summarizeStandup({
+            title,
+            window,
+            projectId,
+            tasks,
+            comments,
+            chatMarkdown,
+            isAiConfigured,
+            now,
         });
     }
     if (!isAiConfigured()) {

@@ -11,7 +11,7 @@ const {
     blocksToRawText,
 } = require('./helpers/pageContent');
 const { composePage, isAiConfigured } = require('./helpers/pageAi');
-const { runWorkspaceAsk, gatherWorkspaceAskContext } = require('./helpers/runWorkspaceAsk');
+const { runWorkspaceAsk, gatherWorkspaceAskContext, gatherStandupContext } = require('./helpers/runWorkspaceAsk');
 
 const emitPageChange = (type, data) => {
     try {
@@ -293,20 +293,23 @@ exports.aiStatus = (req, res) => {
     });
 };
 
-/* POST /api/v2/pages/ai  body: { action, title?, instruction?, currentText?, pageId? } */
+/* POST /api/v2/pages/ai  body: { action, title?, instruction?, currentText?, pageId?, projectId?, window? } */
 exports.composeWithAi = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
         if (!companyId) {
             return res.send({ status: false, statusText: 'companyId is required.' });
         }
-        const { action, title, instruction, currentText, pageId } = req.body || {};
+        const { action, title, instruction, currentText, pageId, projectId: bodyProjectId, window: bodyWindow } = req.body || {};
         let bodyText = String(currentText || '');
         let pageTitle = String(title || '');
         let pages = [];
         let tasks = [];
+        let comments = [];
+        let projectId = String(bodyProjectId || '');
+        const resolvedAction = String(action || '').toLowerCase();
 
-        if (pageId && isObjectIdString(pageId) && (!bodyText || !pageTitle)) {
+        if (pageId && isObjectIdString(pageId) && (!bodyText || !pageTitle || (resolvedAction === 'standup' && !projectId))) {
             const page = await MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.PAGES,
                 data: [{ _id: new mongoose.Types.ObjectId(pageId), deletedStatusKey: 0 }],
@@ -320,10 +323,11 @@ exports.composeWithAi = async (req, res) => {
                     bodyText = page.rawText || htmlToRawText((page.content && page.content.html) || '')
                         || blocksToRawText(contentToEditorData(page.content));
                 }
+                if (!projectId && page.ProjectID) projectId = String(page.ProjectID);
             }
         }
 
-        if (String(action || '').toLowerCase() === 'transcript') {
+        if (resolvedAction === 'transcript') {
             try {
                 const context = await gatherWorkspaceAskContext({ companyId, uid: callerId(req) });
                 pages = context.pages || [];
@@ -334,6 +338,28 @@ exports.composeWithAi = async (req, res) => {
             }
         }
 
+        if (resolvedAction === 'standup') {
+            if (!projectId || !isObjectIdString(projectId)) {
+                return res.send({ status: false, statusText: 'A project is required.' });
+            }
+            try {
+                const context = await gatherStandupContext({
+                    companyId,
+                    uid: callerId(req),
+                    projectId,
+                    window: bodyWindow,
+                });
+                if (!context.allowed) {
+                    return res.send({ status: false, statusText: context.reason || 'A project is required.' });
+                }
+                tasks = context.tasks || [];
+                comments = context.comments || [];
+            } catch (_e) {
+                tasks = [];
+                comments = [];
+            }
+        }
+
         const result = await composePage({
             action,
             title: pageTitle,
@@ -341,6 +367,9 @@ exports.composeWithAi = async (req, res) => {
             currentText: bodyText,
             pages,
             tasks,
+            comments,
+            projectId,
+            window: bodyWindow,
         });
         if (!result.status) {
             return res.send({

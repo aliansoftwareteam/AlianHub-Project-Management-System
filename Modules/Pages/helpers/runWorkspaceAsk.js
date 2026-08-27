@@ -1,5 +1,6 @@
 'use strict';
 
+const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { answerWorkspaceQuestion } = require('./pageAi');
@@ -9,6 +10,12 @@ const {
     PAGE_CAP,
     TASK_CAP,
 } = require('./pageWorkspaceAsk');
+const { standupWindow, permissionScope } = require('./pageStandup');
+
+const STANDUP_TASK_CAP = 80;
+const STANDUP_COMMENT_CAP = 80;
+const TASK_FIELDS = 'TaskName TaskKey ProjectID status statusType relations createdAt updatedAt lastMessage deletedStatusKey';
+const COMMENT_FIELDS = 'taskId TaskId message createdAt projectId isDeleted';
 
 async function callerRoleType(companyId, uid) {
     if (!uid) return 3;
@@ -80,9 +87,90 @@ async function runWorkspaceAsk({ companyId, uid, question }) {
     });
 }
 
+function projectIdVariants(projectId) {
+    const pid = String(projectId || '');
+    const variants = [pid];
+    if (mongoose.Types.ObjectId.isValid(pid)) variants.push(new mongoose.Types.ObjectId(pid));
+    return variants;
+}
+
+async function gatherStandupContext({ companyId, uid, projectId, window: windowName, now }) {
+    const window = standupWindow(windowName, now);
+    const missing = permissionScope({ projectId, restrictProjects: false });
+    if (!missing.allowed) {
+        return { ...missing, window, pages: [], tasks: [], comments: [] };
+    }
+
+    const visible = await visibleProjectsForAsk(companyId, uid);
+    const scoped = permissionScope({
+        projectId,
+        visibleProjectIds: visible.ids,
+        restrictProjects: visible.restrictProjects,
+    });
+    if (!scoped.allowed) {
+        return { ...scoped, window, pages: [], tasks: [], comments: [] };
+    }
+
+    const projectIds = projectIdVariants(scoped.projectId);
+    const since = window.since;
+    const tasks = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TASKS,
+        data: [{
+            ProjectID: { $in: projectIds },
+            deletedStatusKey: 0,
+            $or: [
+                { createdAt: { $gte: since } },
+                { updatedAt: { $gte: since } },
+                { lastMessage: { $gte: since } },
+                { 'relations.type': 'blocked_by' },
+            ],
+        }, TASK_FIELDS, { sort: { updatedAt: -1 }, limit: STANDUP_TASK_CAP }],
+    }, 'find').catch(() => []);
+
+    const comments = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.COMMENTS,
+        data: [{
+            projectId: { $in: projectIds },
+            isDeleted: { $ne: true },
+            createdAt: { $gte: since },
+        }, COMMENT_FIELDS, { sort: { createdAt: -1 }, limit: STANDUP_COMMENT_CAP }],
+    }, 'find').catch(() => []);
+
+    const known = new Set((tasks || []).map((row) => String(row._id || row.id || '')));
+    const missingIds = [];
+    for (const comment of comments || []) {
+        const id = String(comment.taskId || comment.TaskId || '').trim();
+        if (!id || id === 'default' || known.has(id)) continue;
+        if (mongoose.Types.ObjectId.isValid(id)) missingIds.push(new mongoose.Types.ObjectId(id));
+        known.add(id);
+    }
+
+    let extra = [];
+    if (missingIds.length) {
+        extra = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS,
+            data: [{
+                _id: { $in: missingIds },
+                ProjectID: { $in: projectIds },
+                deletedStatusKey: 0,
+            }, TASK_FIELDS],
+        }, 'find').catch(() => []);
+    }
+
+    return {
+        allowed: true,
+        projectId: scoped.projectId,
+        window,
+        pages: [],
+        tasks: (tasks || []).concat(extra || []),
+        comments: comments || [],
+    };
+}
+
 module.exports = {
     callerRoleType,
     visibleProjectsForAsk,
     gatherWorkspaceAskContext,
+    gatherStandupContext,
     runWorkspaceAsk,
 };
