@@ -479,7 +479,10 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(list).toContain('boardCount: shown');
         expect(list).toContain('resetSprintTaskBucket');
         expect(list).toContain('refetchSprintBoardTasks');
-        expect(list).toContain('init(props.grouped, false');
+        expect(list).toContain('const retrying = ref(false)');
+        expect(list).toContain('if (retrying.value) return');
+        expect(list).toContain('groupBy(props.grouped, false');
+        expect(list).not.toContain('reloadSprintTasks');
         const itemList = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'organisms', 'ItemList', 'ItemList.vue'), 'utf8');
         expect(itemList).toContain('sameGroupValue');
         expect(board).toContain('hasGroups');
@@ -489,6 +492,10 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(board).toContain('resetSprintTaskBucket');
         expect(board).toContain('refetchSprintBoardTasks');
         expect(board).toContain('boardCount: shownBoardCount.value');
+        expect(board).toContain('const retrying = ref(false)');
+        expect(board).toContain('if (retrying.value) return');
+        expect(board).toContain('groupBy(props.grouped, false');
+        expect(board).not.toContain('reloadSprintTasks');
         expect(board).not.toContain('Math.max(shownBoardCount.value, stored)');
         expect(board).not.toContain('runGroup(false)');
         const helper = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'views', 'Projects', 'helper.js'), 'utf8');
@@ -515,7 +522,10 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(sprintsList).toContain('EmptyState.load_failed_title');
         expect(sprintsList).toContain('retrySurface');
         const empty = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'atom', 'EmptyState', 'EmptyState.vue'), 'utf8');
-        expect(empty).toContain('@click.stop.prevent="$emit(\'action\')"');
+        expect(empty).toContain('@mousedown.stop.prevent="onActionPointer"');
+        expect(empty).toContain('@click.stop.prevent="onActionClick"');
+        expect(empty).toContain('skipClick');
+        expect(empty).toContain("emit('action')");
         const locale = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'locales', 'en.js'), 'utf8');
         expect(empty).toContain('empty-state--pine');
         expect(empty).toContain('empty-state--copper');

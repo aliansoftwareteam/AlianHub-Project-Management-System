@@ -11,7 +11,7 @@
             <h5 class="taf__heading">{{ $t('CustomField.autofill_preview') }}</h5>
             <p v-if="notice" class="taf__notice">{{ notice }}</p>
             <ul class="taf__list">
-                <li v-for="row in rows" :key="row.fieldId" class="taf__item">
+                <li v-for="row in rows" :key="row.fieldId" class="taf__item" :data-taf-row="row.fieldId">
                     <label class="taf__pick">
                         <input
                             type="checkbox"
@@ -322,11 +322,30 @@ function toggleRow(fieldId) {
     }
 }
 
+function assigneeTitle() {
+    const label = t('ProjectDetails.assignee');
+    return (!label || label === 'ProjectDetails.assignee') ? 'Assignee' : label;
+}
+
 function suggestionLabel(item) {
     if (!item) return t('CustomField.autofill_no_suggestion');
     const label = item.display || (Array.isArray(item.value) ? '' : item.value);
     return label || t('CustomField.autofill_no_suggestion');
 }
+
+const assigneeRow = computed(() => {
+    if (!assigneeEmpty()) return null;
+    const assigneeItem = findSuggestion((item) => item.fieldId === 'assignee' || (item.source === 'native' && item.kind === 'owner')) || assigneeSeed();
+    return {
+        fieldId: 'assignee',
+        title: assigneeTitle(),
+        display: suggestionLabel(assigneeItem),
+        item: assigneeItem,
+        checked: Boolean(assigneeItem) && isSelected('assignee'),
+        canApply: canWrite() && Boolean(assigneeItem),
+        write: 'assignee',
+    };
+});
 
 const rows = computed(() => {
     const field = ownerField.value;
@@ -338,9 +357,6 @@ const rows = computed(() => {
         || item.fieldId === 'due'
         || (dueField.value && String(item.fieldId) === String(dueField.value._id))
     ));
-    const assigneeItem = assigneeEmpty()
-        ? (findSuggestion((item) => item.fieldId === 'assignee' || (item.source === 'native' && item.kind === 'owner')) || assigneeSeed())
-        : null;
     const ownerFilled = Boolean(ownerValueLabel(field));
     const nativeEmpty = nativeDueEmpty();
     const customEmpty = dueField.value ? customDueEmpty() : false;
@@ -359,17 +375,7 @@ const rows = computed(() => {
         }
         : null);
     const out = [];
-    if (assigneeEmpty()) {
-        out.push({
-            fieldId: 'assignee',
-            title: t('ProjectDetails.assignee') || 'Assignee',
-            display: suggestionLabel(assigneeItem),
-            item: assigneeItem,
-            checked: Boolean(assigneeItem) && isSelected('assignee'),
-            canApply: canWrite() && Boolean(assigneeItem),
-            write: 'assignee',
-        });
-    }
+    if (assigneeRow.value) out.push(assigneeRow.value);
     if (field && !ownerFilled) {
         out.push({
             fieldId: field._id || 'owner',

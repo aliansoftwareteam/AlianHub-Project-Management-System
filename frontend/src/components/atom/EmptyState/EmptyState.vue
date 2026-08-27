@@ -8,7 +8,8 @@
             type="button"
             class="cursor-pointer font-roboto-sans empty-state__btn"
             :class="tone ? 'empty-state__btn--tone' : 'blue_btn'"
-            @click.stop.prevent="$emit('action')"
+            @mousedown.stop.prevent="onActionPointer"
+            @click.stop.prevent="onActionClick"
         >{{ actionLabel }}</button>
         <a
             v-if="resolvedHelpHref"
@@ -21,10 +22,22 @@
 </template>
 
 <script setup>
-import { computed, defineProps, defineEmits } from 'vue';
+import { computed, defineProps, defineEmits, ref } from 'vue';
 import { useStore } from 'vuex';
 
-defineEmits(['action']);
+const emit = defineEmits(['action']);
+const skipClick = ref(false);
+function onActionPointer() {
+    skipClick.value = true;
+    emit('action');
+}
+function onActionClick() {
+    if (skipClick.value) {
+        skipClick.value = false;
+        return;
+    }
+    emit('action');
+}
 
 const props = defineProps({
     title: { type: String, default: '' },

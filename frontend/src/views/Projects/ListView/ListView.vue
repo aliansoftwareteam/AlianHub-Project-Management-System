@@ -58,7 +58,6 @@ const route = useRoute()
 const project = inject("selectedProject");
 const clientWidth = inject("$clientWidth");
 const searchedTask = inject('searchedTask', ref(false));
-const reloadSprintTasks = inject('reloadSprintTasks', () => Promise.resolve());
 const {
     groupBy,
     getSprintTasks,
@@ -101,6 +100,7 @@ const groupedTasks = ref([]);
 const expandedSprint = ref("");
 const initialDate = ref(0);
 const isLoading = ref(true);
+const retrying = ref(false);
 const searchedTasksData = computed(() => getters['projectData/searchedTasks'] || []);
 const allProjectTasks = computed(() => getters['projectData/tasks'] || {});
 const headerSprints = computed(() => {
@@ -124,7 +124,7 @@ const emptyKind = computed(() => {
     const stored = countSprintBoardTasks(allProjectTasks.value, pid, sid);
     const shown = Math.max(countRenderedSprintItems(groups), stored);
     return boardEmptyKind({
-        loading: isLoading.value || props.sprintLoading,
+        loading: retrying.value || isLoading.value || props.sprintLoading,
         sprintsBound: Boolean(props.sprints && props.sprints.length),
         boardCount: shown,
         expectedCount: Math.max(boardExpectedCount.value, stored),
@@ -135,6 +135,7 @@ const emptyKind = computed(() => {
 provide('boardSurfaceKind', emptyKind);
 provide('boardExpectedCount', boardExpectedCount);
 function onEmptyAction() {
+    if (retrying.value) return;
     if (emptyKind.value !== 'failed') {
         emit('create');
         return;
@@ -142,18 +143,23 @@ function onEmptyAction() {
     const sprint = (headerSprints.value && headerSprints.value[0]) || (props.sprints && props.sprints[0]);
     const pid = firstId(project.value && project.value._id);
     const sid = firstId(sprint && (sprint.id || sprint._id));
+    retrying.value = true;
     isLoading.value = true;
     commit('projectData/resetSprintTaskBucket', { pid, sprintId: sid });
+    const bindGroups = () => new Promise((resolve) => {
+        groupBy(props.grouped, false, project.value, props.sprints, groupedTasks, false, 'list', false, true, (resp) => {
+            groupedTasks.value = resp;
+            resolve();
+        });
+    });
     Promise.resolve(refetchSprintBoardTasks({ projectId: pid, sprintId: sid, projectData: project.value }))
-        .then(() => {
-            init(props.grouped, false, project.value, props.sprints, groupedTasks, false, true);
-        })
+        .then(() => bindGroups())
         .catch((error) => {
             console.error('ERROR retrying sprint tasks: ', error);
-            isLoading.value = false;
         })
         .finally(() => {
-            Promise.resolve(reloadSprintTasks()).catch(() => {});
+            retrying.value = false;
+            isLoading.value = false;
         });
 }
 provide('onBoardSurfaceAction', onEmptyAction);
@@ -221,14 +227,17 @@ watch(route , (to, from) => {
 })
 const taskGetter = computed(() => JSON.parse(JSON.stringify(getters["projectData/tasks"])))
 watch(taskGetter , () => {
+    if (retrying.value) return;
     if(props.grouped === 1) {
         setTimeout(() => {
+            if (retrying.value) return;
             init(props.grouped, false, project.value, props.sprints, groupedTasks, false,false);
         }, 500)
     }
 })
 
 watch([() => props.grouped, () => props.sprints, () => props.sprintLoading], ([newGroup, newSprints, newSprintLoading], [oldGroup, oldSprints, oldSprintLoading]) => {
+    if (retrying.value) return;
     if (project.value && Object.keys(project.value).length) {
         let groupValue = groupedTasks.value && groupedTasks.value.length === 0;
         let isInitialValue = groupValue ? true : checkProjectIds(newSprints, oldSprints) === true ? false : true
