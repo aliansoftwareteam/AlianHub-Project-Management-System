@@ -267,6 +267,16 @@ module.exports = {
                     .then((result) => {
                         socketEmitter.emit('update', { type: "update", data: result , updatedFields: newStatus, module: 'task' });
                         resolve({status: true, statusText: "Status updated successfully"});
+                        this.maybeSpawnNextOnComplete({
+                            companyId: projectData.CompanyId,
+                            task: result || task,
+                            prevStatusType: task.statusType || (task.status && task.status.type),
+                            nextStatusType: newStatus.statusType || (newStatus.status && newStatus.status.type),
+                            projectData,
+                            userData,
+                        }).catch((error) => {
+                            logger.error(`ERROR in recurring spawn: ${error.message}`);
+                        });
                         try {
                             const { maybeRunAgentWritebackSafe } = require('../../../Automations/helpers/agentWritebackRun');
                             maybeRunAgentWritebackSafe({

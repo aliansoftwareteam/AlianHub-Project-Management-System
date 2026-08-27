@@ -17,3 +17,4 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 010 | AI Autofill on custom fields | active | high | 009 | active/010-ai-autofill-custom-fields |
 | 011 | Triggered agent write-back from status / page / comment | active | high | 010 | active/011-agent-writeback-triggers |
 | 012 | Kiln polish after Autofill + write-back | active | high | 011 | active/012-kiln-autofill-writeback-polish |
+| 013 | Gantt v1, dependencies, and due-date recurring | active | high | 012 | active/013-gantt-deps-recurring |

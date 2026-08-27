@@ -97,6 +97,43 @@ class Task {
         })
     }
 
+    updateRecurrence({ firebaseObj, project, task, userData }) {
+        return new Promise((resolve, reject) => {
+            try {
+                const { sprintId, ProjectID } = task;
+                Store.commit('projectData/mutateUpdateFirebaseTasks', {
+                    snap: null,
+                    op: 'modified',
+                    pid: ProjectID,
+                    sprintId,
+                    data: { ...task, ...firebaseObj },
+                    updatedFields: { ...firebaseObj },
+                });
+                apiRequest('patch', env.V2_TASKS, {
+                    action: 'updateRecurrence',
+                    firebaseObj,
+                    project,
+                    task,
+                    userData: {
+                        Employee_Name: userData.Employee_Name,
+                        id: userData.id,
+                        companyOwnerId: userData.companyOwnerId,
+                    },
+                }).then((response) => {
+                    if (response.data.status) {
+                        resolve({ status: true, statusText: 'Recurrence updated successfully' });
+                    } else {
+                        reject({ status: false, error: response.data.error || response.data.statusText });
+                    }
+                }).catch((error) => {
+                    reject({ status: false, error: error });
+                });
+            } catch (error) {
+                reject({ status: false, error: error });
+            }
+        });
+    }
+
     /* -------------- UPDATE START DATE FUNCTION FOR TASK -----------------*/
 
     updateStartDate({firebaseObj, project, task, obj,userData, commonDateFormatString,isUpdateTask = true}) {

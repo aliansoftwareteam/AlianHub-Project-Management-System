@@ -1,47 +1,101 @@
 <template>
     <div class="overflow-auto style-scroll mobile__bg--withPadding mt-10px">
         <div class="w-100 d-flex align-items-center justify-content-between">
-            <span :class="{'font-size-16 font-weight-600' : clientWidth <= 767 , 'font-size-14 font-weight-700' : clientWidth > 767 }" class="font-weight-700 font-size-14">{{$t('Projects.linked_tasks')}}</span>
-            <span v-if="!isAdding" @click="startAdding" class="blue font-size-14 font-weight-500 cursor-pointer pl-20px text-decoration-underline">+ {{$t('Projects.add_link')}}</span>
+            <span :class="{'font-size-16 font-weight-600' : clientWidth <= 767 , 'font-size-14 font-weight-700' : clientWidth > 767 }" class="font-weight-700 font-size-14">{{$t('Projects.blocking_blocked_by')}}</span>
+            <span v-if="!isAdding" @click="startAdding" class="linked-tasks__add-link font-size-14 font-weight-500 cursor-pointer pl-20px text-decoration-underline">+ {{$t('Projects.add_link')}}</span>
         </div>
 
-        <!-- Blocked-by warning: this task can't proceed while open blockers remain -->
         <div v-if="openBlockers.length > 0" class="linked-tasks__blocked-banner font-size-12 mt-5px">
             <span class="linked-tasks__blocked-icon">&#9888;</span>
             {{ $t('Projects.blocked_warning', { count: openBlockers.length }) }}
             <span class="font-weight-700">{{ openBlockerKeys }}</span>
         </div>
 
-        <!-- Existing links -->
-        <div v-if="linkedItems.length > 0" class="border-bottom linked-tasks__list">
-            <div
-                v-for="item in linkedItems"
-                :key="'linked-'+item.taskId"
-                class="d-flex align-items-center justify-content-between px-1 border-bottom linked-tasks__row"
-            >
-                <div class="d-flex align-items-center linked-tasks__row-main">
-                    <span class="font-size-11 font-weight-500 gray81 linked-tasks__type-label">{{ relationLabel(item.type) }}</span>
-                    <template v-if="item.task">
-                        <span class="font-size-12 font-weight-600 blue mr-5px">{{ item.task.TaskKey }}</span>
-                        <span class="font-size-13 font-weight-400 linked-tasks__name" :class="{'linked-tasks__name--muted': item.task.deletedStatusKey === 1}">
-                            {{ item.task.TaskName }}<template v-if="item.task.deletedStatusKey === 1"> ({{$t('Projects.link_task_deleted')}})</template>
-                        </span>
-                    </template>
-                    <span v-else class="font-size-13 font-weight-400 linked-tasks__name--muted">{{$t('Projects.link_task_unavailable')}}</span>
+        <div v-if="blockingItems.length || blockedByItems.length || otherItems.length" class="linked-tasks__list">
+            <div v-if="blockingItems.length" class="linked-tasks__group">
+                <h5 class="linked-tasks__group-title">{{ $t('Projects.relation_blocks') }}</h5>
+                <div
+                    v-for="item in blockingItems"
+                    :key="'linked-'+item.taskId"
+                    class="d-flex align-items-center justify-content-between px-1 linked-tasks__row"
+                >
+                    <div class="d-flex align-items-center linked-tasks__row-main">
+                        <template v-if="item.task">
+                            <span class="font-size-12 font-weight-600 linked-tasks__key mr-5px">{{ item.task.TaskKey }}</span>
+                            <span class="font-size-13 font-weight-400 linked-tasks__name" :class="{'linked-tasks__name--muted': item.task.deletedStatusKey === 1}">
+                                {{ item.task.TaskName }}<template v-if="item.task.deletedStatusKey === 1"> ({{$t('Projects.link_task_deleted')}})</template>
+                            </span>
+                        </template>
+                        <span v-else class="font-size-13 font-weight-400 linked-tasks__name--muted">{{$t('Projects.link_task_unavailable')}}</span>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <span v-if="item.task && item.task.status && item.task.status.text" class="font-size-11 font-weight-500 linked-tasks__status-chip">{{ item.task.status.text }}</span>
+                        <span
+                            class="font-size-14 cursor-pointer linked-tasks__remove"
+                            :class="{'pointer-event-none': isSaving}"
+                            :title="$t('Projects.remove_link')"
+                            @click="removeRelation(item)"
+                        >&#10005;</span>
+                    </div>
                 </div>
-                <div class="d-flex align-items-center">
-                    <span v-if="item.task && item.task.status && item.task.status.text" class="font-size-11 font-weight-500 linked-tasks__status-chip">{{ item.task.status.text }}</span>
-                    <span
-                        class="font-size-14 cursor-pointer linked-tasks__remove"
-                        :class="{'pointer-event-none': isSaving}"
-                        :title="$t('Projects.remove_link')"
-                        @click="removeRelation(item)"
-                    >&#10005;</span>
+            </div>
+            <div v-if="blockedByItems.length" class="linked-tasks__group">
+                <h5 class="linked-tasks__group-title">{{ $t('Projects.relation_blocked_by') }}</h5>
+                <div
+                    v-for="item in blockedByItems"
+                    :key="'linked-'+item.taskId"
+                    class="d-flex align-items-center justify-content-between px-1 linked-tasks__row"
+                >
+                    <div class="d-flex align-items-center linked-tasks__row-main">
+                        <template v-if="item.task">
+                            <span class="font-size-12 font-weight-600 linked-tasks__key mr-5px">{{ item.task.TaskKey }}</span>
+                            <span class="font-size-13 font-weight-400 linked-tasks__name" :class="{'linked-tasks__name--muted': item.task.deletedStatusKey === 1}">
+                                {{ item.task.TaskName }}<template v-if="item.task.deletedStatusKey === 1"> ({{$t('Projects.link_task_deleted')}})</template>
+                            </span>
+                        </template>
+                        <span v-else class="font-size-13 font-weight-400 linked-tasks__name--muted">{{$t('Projects.link_task_unavailable')}}</span>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <span v-if="item.task && item.task.status && item.task.status.text" class="font-size-11 font-weight-500 linked-tasks__status-chip">{{ item.task.status.text }}</span>
+                        <span
+                            class="font-size-14 cursor-pointer linked-tasks__remove"
+                            :class="{'pointer-event-none': isSaving}"
+                            :title="$t('Projects.remove_link')"
+                            @click="removeRelation(item)"
+                        >&#10005;</span>
+                    </div>
+                </div>
+            </div>
+            <div v-if="otherItems.length" class="linked-tasks__group">
+                <h5 class="linked-tasks__group-title">{{ $t('Projects.also_linked') }}</h5>
+                <div
+                    v-for="item in otherItems"
+                    :key="'linked-'+item.taskId"
+                    class="d-flex align-items-center justify-content-between px-1 linked-tasks__row"
+                >
+                    <div class="d-flex align-items-center linked-tasks__row-main">
+                        <span class="font-size-11 font-weight-500 linked-tasks__type-label">{{ relationLabel(item.type) }}</span>
+                        <template v-if="item.task">
+                            <span class="font-size-12 font-weight-600 linked-tasks__key mr-5px">{{ item.task.TaskKey }}</span>
+                            <span class="font-size-13 font-weight-400 linked-tasks__name" :class="{'linked-tasks__name--muted': item.task.deletedStatusKey === 1}">
+                                {{ item.task.TaskName }}<template v-if="item.task.deletedStatusKey === 1"> ({{$t('Projects.link_task_deleted')}})</template>
+                            </span>
+                        </template>
+                        <span v-else class="font-size-13 font-weight-400 linked-tasks__name--muted">{{$t('Projects.link_task_unavailable')}}</span>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <span
+                            class="font-size-14 cursor-pointer linked-tasks__remove"
+                            :class="{'pointer-event-none': isSaving}"
+                            :title="$t('Projects.remove_link')"
+                            @click="removeRelation(item)"
+                        >&#10005;</span>
+                    </div>
                 </div>
             </div>
         </div>
-        <div v-else-if="!isAdding && !isLoading" class="gray81 font-size-12 py-10px">
-            {{$t('Projects.no_linked_tasks')}}
+        <div v-else-if="!isAdding && !isLoading" class="linked-tasks__empty font-size-12 py-10px">
+            {{$t('Projects.no_blocking_links')}}
         </div>
 
         <!-- Add-link row -->
@@ -138,6 +192,9 @@ const openBlockers = computed(() =>
 const openBlockerKeys = computed(() =>
     openBlockers.value.map((item) => item.task && item.task.TaskKey).filter(Boolean).join(', ')
 );
+const blockingItems = computed(() => linkedItems.value.filter((item) => item.type === 'blocks'));
+const blockedByItems = computed(() => linkedItems.value.filter((item) => item.type === 'blocked_by'));
+const otherItems = computed(() => linkedItems.value.filter((item) => item.type !== 'blocks' && item.type !== 'blocked_by'));
 
 const companyOwner = computed(() => {
     return getters["settings/companyOwnerDetail"];
@@ -354,14 +411,32 @@ function removeRelation(item) {
     background: #f7f9fc;
 }
 .linked-tasks__blocked-banner {
-    background: #fff5e6;
-    border: 1px solid #f0d8a8;
+    background: #f4ead8;
+    border: 1px solid #c45c26;
     border-radius: 6px;
-    color: #b06a00;
+    color: #c45c26;
     padding: 6px 10px;
     margin-bottom: 6px;
 }
 .linked-tasks__blocked-icon {
     margin-right: 4px;
+}
+.linked-tasks__add-link { color: #c45c26; }
+.linked-tasks__group { margin-top: 8px; }
+.linked-tasks__group-title {
+    margin: 0 0 4px;
+    font-size: 11px;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: #1b2f28;
+    font-weight: 700;
+}
+.linked-tasks__key { color: #1b2f28; }
+.linked-tasks__empty { color: #1b2f28; opacity: 0.7; }
+.linked-tasks__list {
+    background: #f4ead8;
+    border: 1px solid #d8cbb3;
+    border-radius: 8px;
+    padding: 6px 8px;
 }
 </style>

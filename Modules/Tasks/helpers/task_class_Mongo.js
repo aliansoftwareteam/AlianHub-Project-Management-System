@@ -12,6 +12,7 @@ const mergeDuplicateMixin = require('./taskMongo/mergeDuplicate');
 const internalsMixin = require('./taskMongo/internals');
 const bulkMixin = require('./taskMongo/bulk');
 const relationsMixin = require('./taskMongo/relations');
+const recurrenceMixin = require('./taskMongo/recurrence');
 
 class Task {}
 
@@ -26,6 +27,7 @@ Object.assign(
     internalsMixin,
     bulkMixin,
     relationsMixin,
+    recurrenceMixin,
 );
 
 exports.taskMongo = new Task();

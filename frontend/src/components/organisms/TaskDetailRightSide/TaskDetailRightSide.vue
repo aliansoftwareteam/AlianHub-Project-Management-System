@@ -198,6 +198,19 @@
                     </template>
                 </template>
             </div>
+            <div class="d-flex task-detail-right-side-label" v-if="checkPermission('task.task_due_date',project?.isGlobalPermission) !== null">
+                <h4>{{$t('Projects.recurrence')}}</h4>
+                <select
+                    class="task-recurrence-select"
+                    :value="recurrenceFreq"
+                    :disabled="checkPermission('task.task_due_date',project?.isGlobalPermission) !== true || checkPermission('task.task_list',project?.isGlobalPermission) !== true"
+                    @change="updateRecurrence($event.target.value)"
+                >
+                    <option value="">{{ $t('Projects.recurrence_none') }}</option>
+                    <option value="week">{{ $t('Projects.recurrence_week') }}</option>
+                    <option value="month">{{ $t('Projects.recurrence_month') }}</option>
+                </select>
+            </div>
              <div class="d-flex task-detail-right-side-label" v-if="checkApps('TimeEstimates') && checkPermission('task.task_estimated_hours',project?.isGlobalPermission) !== null">
                 <h4>{{$t('UserTimesheet.estimated')}}</h4>
                 <Skelaton v-if="isMainSpinner" style="height: 24px;" class="w-100px border-radius-7-px"/>
@@ -517,6 +530,15 @@ function getUserData() {
     };
 }
 
+const recurrenceFreq = computed(() => {
+    const raw = props.task && props.task.recurrence;
+    if (!raw) return '';
+    const freq = String(raw.freq || raw || '').toLowerCase();
+    if (freq === 'weekly') return 'week';
+    if (freq === 'monthly') return 'month';
+    return (freq === 'week' || freq === 'month') ? freq : '';
+});
+
 const updateAssignee = (event, type) =>{
     try {
         if(assigneeInProgress.value[event?.id] && assigneeInProgress.value[event?.id] === type) return;
@@ -784,6 +806,33 @@ const updateDueDate = (event) => {
     }
 }
 
+const updateRecurrence = (freq) => {
+    try {
+        const userData = getUserData();
+        const projectData = {
+            _id: project.value._id,
+            CompanyId: project.value.CompanyId,
+            lastTaskId: project.value.lastTaskId,
+            ProjectName: project.value.ProjectName,
+            ProjectCode: project.value.ProjectCode
+        };
+        taskClass.updateRecurrence({
+            firebaseObj: { recurrence: { freq } },
+            project: projectData,
+            task: props.task,
+            userData,
+        }).then(() => {
+            $toast.success(t('Toast.Recurrence_updated'), { position: 'top-right' });
+        }).catch((error) => {
+            console.error('ERROR in updateRecurrence: ', error);
+            $toast.error(t('Toast.Recurrence_not_updated'), { position: 'top-right' });
+        });
+    } catch (error) {
+        console.error('ERROR in updateRecurrence: ', error);
+        $toast.error(t('Toast.Recurrence_not_updated'), { position: 'top-right' });
+    }
+}
+
 const updateStartDate = (event) => {
     try {
         const userData = getUserData();
@@ -961,4 +1010,15 @@ const generateAiEstimate = async () => {
 }
 </script>
 <style scoped src='./style.css'>
+</style>
+<style scoped>
+.task-recurrence-select {
+    border: 1px solid #1b2f28;
+    background: #f4ead8;
+    color: #1b2f28;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 13px;
+    min-width: 140px;
+}
 </style>

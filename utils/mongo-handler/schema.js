@@ -112,6 +112,10 @@ const schema = {
             default: [],
             required: false,
         },
+        recurrence: {
+            type: Object,
+            required: false,
+        },
         // Emoji reactions: [{ emoji, userId, createdAt }], one entry per
         // user+emoji — written only by Modules/Reactions/controller.js
         'reactions': {
