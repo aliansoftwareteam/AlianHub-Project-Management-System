@@ -3,6 +3,7 @@ const {taskMongo} = require('./helpers/task_class_Mongo');
 const tabSyncTaskCtrl = require('./controller/getTabSyncTasks');
 const advanceFilter = require('./helpers/manageGlobalFilter');
 const getTaskCtrl = require('./helpers/getTasksData');
+const aiAutofillCtrl = require('./controller/aiAutofill');
 const { handleEvents } = require('../Company/eventController');
 const logger = require('../../Config/loggerConfig');
 const { requireTaskActionPermission, requirePermission } = require('../../Config/permissionGuard');
@@ -75,6 +76,8 @@ exports.init = (app) => {
     // for PAT/MCP requests, and only for actions named in TASK_ACTION_PERMISSION.
     // No bulk action is named there yet, so nothing changes today — the point is
     // that the map now governs both endpoints instead of only the single one.
+    app.post('/api/v2/tasks/ai-autofill', aiAutofillCtrl.aiAutofill);
+
     app.post('/api/v2/tasks/bulk', requireTaskActionPermission(), (req, res) => {
         try {
             const action = req.body && req.body.action;

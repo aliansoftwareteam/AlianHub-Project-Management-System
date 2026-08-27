@@ -6,14 +6,15 @@
             </h4>
             <h4 v-if="props.editPermission" class="font-roboto-sans font-size-14 font-weight-500 font-normal text-decoration-underline blue cursor-pointer" @click="emit('isCustomField', true)">+ {{ $t('CustomField.custom_field') }}</h4>
         </div>
-        
-        <!-- Loading skeleton -->
+        <TaskAiAutofill :task="props.task" :enabled="props.editPermission" />
+
         <template v-if="isInitialLoading">
             <template v-for="index in 5" :key="`skeleton-${index}`">
                 <Skelaton style="height: 30px;" class="border-radius-6-px mb-5px"/>
             </template>
         </template>
         
+        <!-- Content -->
         <!-- Content -->
         <template v-else>
             <template v-if="filteredCustomFields.length">
@@ -49,6 +50,7 @@
     import ComputedComponentListing from '../../atom/customFieldTaskView/computedComponentListing.vue';
     import { computeCustomFieldValue } from '@/plugins/customFieldView/formulaEngine.js';
     import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
+    import TaskAiAutofill from '@/components/molecules/TaskAiAutofill/TaskAiAutofill.vue';
 
 
     const { getters } = useStore();
