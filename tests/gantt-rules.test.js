@@ -1,4 +1,5 @@
 const {
+    COLLISION_LINE,
     planBarMove,
     fsCollision,
     collisionHints,
@@ -48,15 +49,24 @@ describe('Gantt collision copper hint', () => {
         expect(fsCollision({ predecessorDue: '2026-08-10', successorStart: '2026-08-11' })).toBe(false);
     });
 
-    test('blocks arrows that overlap get a copper hint class, never a date rewrite', () => {
+    test('blocks arrows that overlap get a copper in-place line, never a banner or a date rewrite', () => {
         const tasks = [
             { _id: A, DueDate: '2026-08-10', startDate: '2026-08-01', relations: [{ type: 'blocks', taskId: B }] },
             { _id: B, DueDate: '2026-08-20', startDate: '2026-08-08', relations: [{ type: 'blocked_by', taskId: A }] },
         ];
         const hints = collisionHints(tasks);
         expect(hints).toEqual([
-            { sourceId: A, targetId: B, hint: 'collision', css: 'gantt-link--collision' },
+            {
+                sourceId: A,
+                targetId: B,
+                hint: 'collision',
+                css: 'gantt-link--collision',
+                line: COLLISION_LINE,
+                banner: false,
+            },
         ]);
+        expect(COLLISION_LINE).toBe('Dates overlap. Blocked task stayed put.');
+        expect(hints[0].banner).toBe(false);
         expect(tasks[1].startDate).toBe('2026-08-08');
     });
 

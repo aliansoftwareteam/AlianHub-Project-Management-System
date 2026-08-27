@@ -1,5 +1,7 @@
 const { RELATION_TYPES } = require('./relationRules');
 
+const COLLISION_LINE = 'Dates overlap. Blocked task stayed put.';
+
 const toTime = (value) => {
     if (!value) return NaN;
     const ms = new Date(value).getTime();
@@ -43,6 +45,8 @@ const collisionHints = (tasks = [], relationsByTaskId = {}) => {
                     targetId,
                     hint: 'collision',
                     css: 'gantt-link--collision',
+                    line: COLLISION_LINE,
+                    banner: false,
                 });
             }
         });
@@ -51,6 +55,7 @@ const collisionHints = (tasks = [], relationsByTaskId = {}) => {
 };
 
 module.exports = {
+    COLLISION_LINE,
     planBarMove,
     fsCollision,
     collisionHints,

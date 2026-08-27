@@ -10,7 +10,7 @@
 - [x] Jest + i18n; existing tests green
 
 ## Last step
-GitHub CI green on PR 523 (`feat/gantt-deps-recurring-52b7`, stacked on PR 522).
+Kiln pass: collision is a copper line on the arrow only — no overlap banner. dhtmlx lightbox/blue bars/cyan-red links overridden.
 
 ## Blockers
 None.
@@ -23,3 +23,4 @@ None.
 - Extended `relations` with planFinishToStartAdd (Gantt arrows = Blocking/Blocked by).
 - Gantt: cream rail, pine bars, copper today-line and collision hint. No dates stack. Drag does not cascade. RecurringTasks cron left in place. Due-date week/month spawns the next task on complete only.
 - GitHub CI green on PR 523 (title, branch name, commitlint, CodeRabbit). Stacked on PR 522.
+- Kiln pass: dropped the overlap banner. Collision copy lives on the copper FS arrow (“Dates overlap. Blocked task stayed put.”). Quiet pine arrows otherwise. Lightbox disabled. Empty stays “No scheduled tasks yet…”.

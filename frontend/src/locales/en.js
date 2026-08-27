@@ -823,7 +823,7 @@ export default {
         gantt_scheduled_count: "{n} scheduled",
         gantt_no_dates: "No dates",
         gantt_schedule: "Schedule",
-        gantt_collision: "Dates overlap — blocked task was not moved",
+        gantt_collision: "Dates overlap. Blocked task stayed put.",
         gantt_empty: "No scheduled tasks yet — give a task dates, or drag one from No dates onto the timeline.",
         recurrence: "Repeats",
         recurrence_none: "Doesn't repeat",

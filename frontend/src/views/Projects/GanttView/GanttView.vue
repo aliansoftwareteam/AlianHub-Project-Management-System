@@ -1,5 +1,5 @@
 <template>
-  <div class="gantt-view">
+  <div class="gantt-view" :style="{ '--gantt-collision-line': collisionLineCss }">
     <div v-if="!hasProject" class="gantt-view__pick">{{ $t('Projects.gantt_select_project') }}</div>
     <template v-else>
       <div class="gantt-view__bar">
@@ -43,12 +43,6 @@
         </ul>
       </div>
 
-      <div
-        v-if="collisionCount"
-        class="gantt-view__hint"
-        role="status"
-      >{{ $t('Projects.gantt_collision') }}</div>
-
       <div class="gantt-view__main">
         <div v-if="loadError" class="gantt-view__msg">
           Couldn't load the Gantt module. Install the dependency and reload:
@@ -82,6 +76,7 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import taskClass from '@/utils/TaskOperations';
 import { taskListHelper } from '@/views/Projects/helper.js';
+import { useI18n } from 'vue-i18n';
 
 const props = defineProps({
     projectData: { type: Object, default: () => ({}) },
@@ -89,6 +84,7 @@ const props = defineProps({
 });
 
 const { getters } = useStore();
+const { t } = useI18n();
 const { checkPermission } = useCustomComposable();
 const { groupBy } = taskListHelper();
 const selectedProject = inject('selectedProject', ref({}));
@@ -99,7 +95,7 @@ const loading = ref(true);
 const milestones = ref([]);
 const zoomLevels = ['Day', 'Week', 'Month'];
 const zoom = ref('Week');
-const collisionCount = ref(0);
+const collisionLineCss = computed(() => JSON.stringify(t('Projects.gantt_collision')));
 
 let gantt = null;
 let ready = false;
@@ -152,20 +148,6 @@ function buildUserData() {
     const uid = localStorage.getItem('userId');
     const me = (getters['users/users'] || []).find((u) => String(u._id) === String(uid)) || {};
     return { Employee_Name: me.Employee_Name || '', id: uid, companyOwnerId: getters['settings/companyOwnerDetail']?.userId || '' };
-}
-
-function collisionsFrom(list) {
-    const byId = new Map(list.map((t) => [String(t._id), t]));
-    let n = 0;
-    list.forEach((t) => {
-        (t.relations || []).forEach((rel) => {
-            if (rel.type !== 'blocks') return;
-            const target = byId.get(String(rel.taskId));
-            if (!target || !target.startDate || !t.DueDate) return;
-            if (new Date(target.startDate).getTime() < new Date(t.DueDate).getTime()) n += 1;
-        });
-    });
-    return n;
 }
 
 function collidingLinkIds() {
@@ -226,7 +208,6 @@ function renderData() {
     try {
         gantt.clearAll();
         gantt.parse(toGanttData());
-        collisionCount.value = collisionsFrom(scheduled.value);
     } finally {
         suppress = false;
     }
@@ -242,12 +223,6 @@ function persistDates(id) {
         projectData: buildProjectData(),
         taskData: task,
         userData: buildUserData(),
-    }).then(() => {
-        collisionCount.value = collisionsFrom(scheduled.value.map((row) => (
-            String(row._id) === String(id)
-                ? { ...row, startDate: g.start_date, DueDate: g.end_date }
-                : row
-        )));
     }).catch((e) => console.error('Gantt: updateDates failed', e));
 }
 function persistLinkAdd(id, link) {
@@ -362,6 +337,8 @@ function applyKilnSkin() {
     gantt.config.drag_progress = false;
     gantt.config.fit_tasks = true;
     gantt.config.details_on_dblclick = false;
+    gantt.config.details_on_create = false;
+    gantt.config.show_quick_info = false;
     gantt.config.drag_move = !readOnly.value;
     gantt.config.drag_resize = !readOnly.value;
     gantt.config.drag_links = !readOnly.value;
@@ -370,7 +347,9 @@ function applyKilnSkin() {
     gantt.config.columns = [
         { name: 'text', label: 'Task', tree: true, width: 220, resize: true },
     ];
-    gantt.templates.link_class = (link) => (collidingLinkIds().has(String(link.id)) ? 'gantt-link--collision' : '');
+    gantt.templates.task_class = () => 'gantt-bar--kiln';
+    gantt.templates.link_class = (link) => (collidingLinkIds().has(String(link.id)) ? 'gantt-link--collision' : 'gantt-link--fs');
+    gantt.showLightbox = function () {};
 }
 
 onMounted(async () => {
@@ -403,6 +382,7 @@ onMounted(async () => {
         applyScales(zoom.value);
         gantt.init(ganttEl.value);
 
+        eventIds.push(gantt.attachEvent('onBeforeLightbox', () => false));
         eventIds.push(gantt.attachEvent('onBeforeLinkAdd', (id, link) => String(link.type) === '0'));
         eventIds.push(gantt.attachEvent('onAfterTaskDrag', (id) => persistDates(id)));
         eventIds.push(gantt.attachEvent('onAfterLinkAdd', (id, link) => persistLinkAdd(id, link)));
@@ -567,13 +547,6 @@ onBeforeUnmount(() => {
     cursor: pointer;
     white-space: nowrap;
 }
-.gantt-view__hint {
-    background: #f4ead8;
-    color: #c45c26;
-    border-bottom: 1px solid #c45c26;
-    font-size: 12px;
-    padding: 6px 12px;
-}
 .gantt-view__main { position: relative; flex: 1 1 auto; display: flex; min-height: 360px; }
 .gantt-view__chart { flex: 1 1 auto; height: 100%; min-height: 360px; background: #fbf6ec; }
 .gantt-view__msg code { background: #f4ead8; padding: 2px 6px; border-radius: 4px; pointer-events: auto; }
@@ -583,15 +556,24 @@ onBeforeUnmount(() => {
 .gantt-view .gantt_grid,
 .gantt-view .gantt_grid_scale,
 .gantt-view .gantt_grid_data .gantt_row,
-.gantt-view .gantt_grid_data .gantt_row.odd {
+.gantt-view .gantt_grid_data .gantt_row.odd,
+.gantt-view .gantt_grid_data .gantt_row.gantt_selected,
+.gantt-view .gantt_task_row.gantt_selected {
     background-color: #f4ead8 !important;
     color: #1b2f28;
     border-color: #d8cbb3 !important;
 }
-.gantt-view .gantt_task_line {
+.gantt-view .gantt_task_line,
+.gantt-view .gantt_task_line.gantt_bar_task,
+.gantt-view .gantt_task_line.gantt_project,
+.gantt-view .gantt_task_line.gantt_milestone,
+.gantt-view .gantt_task_line.gantt-bar--kiln,
+.gantt-view .gantt_task_drag,
+.gantt-view .gantt_selected .gantt_task_line {
     background-color: #1b2f28 !important;
     border-color: #1b2f28 !important;
     border-radius: 4px;
+    box-shadow: none;
 }
 .gantt-view .gantt_task_progress {
     background-color: rgba(244, 234, 216, 0.28) !important;
@@ -599,11 +581,37 @@ onBeforeUnmount(() => {
 .gantt-view .gantt_task_content {
     color: #f4ead8 !important;
 }
-.gantt-view .gantt_task_link .gantt_line_wrapper div {
-    background-color: #1b2f28;
+.gantt-view .gantt_link_control,
+.gantt-view .gantt_link_point,
+.gantt-view .gantt_link_tooltip {
+    background: #1b2f28 !important;
+    border-color: #1b2f28 !important;
 }
-.gantt-view .gantt_task_link .gantt_link_arrow {
-    border-color: #1b2f28;
+.gantt-view .gantt_task_link .gantt_line_wrapper div,
+.gantt-view .gantt_task_link.gantt-link--fs .gantt_line_wrapper div,
+.gantt-view .gantt_link_line_right,
+.gantt-view .gantt_link_line_left,
+.gantt-view .gantt_link_corner {
+    background-color: #1b2f28 !important;
+}
+.gantt-view .gantt_task_link .gantt_link_arrow,
+.gantt-view .gantt_task_link.gantt-link--fs .gantt_link_arrow,
+.gantt-view .gantt_link_arrow_right,
+.gantt-view .gantt_link_arrow_left {
+    border-color: #1b2f28 !important;
+    border-left-color: #1b2f28 !important;
+    border-right-color: #1b2f28 !important;
+    border-top-color: #1b2f28 !important;
+    border-bottom-color: #1b2f28 !important;
+}
+.gantt-view .gantt_critical_task,
+.gantt-view .gantt_critical_link .gantt_line_wrapper div,
+.gantt-view .gantt_task_link.gantt_critical_link .gantt_line_wrapper div {
+    background-color: #1b2f28 !important;
+    border-color: #1b2f28 !important;
+}
+.gantt-view .gantt_task_link.gantt-link--collision .gantt_line_wrapper {
+    overflow: visible;
 }
 .gantt-view .gantt_task_link.gantt-link--collision .gantt_line_wrapper div {
     background-color: #c45c26 !important;
@@ -614,6 +622,21 @@ onBeforeUnmount(() => {
     border-top-color: #c45c26 !important;
     border-bottom-color: #c45c26 !important;
 }
+.gantt-view .gantt_task_link.gantt-link--collision .gantt_line_wrapper::after {
+    content: var(--gantt-collision-line, "Dates overlap. Blocked task stayed put.");
+    position: absolute;
+    left: 50%;
+    top: -16px;
+    transform: translateX(-50%);
+    color: #c45c26;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    pointer-events: none;
+    background: #f4ead8;
+    padding: 0 4px;
+    line-height: 1.2;
+}
 .gantt-view .gantt_now,
 .gantt-view .gantt_current,
 .gantt-view .gantt-today-line {
@@ -623,5 +646,12 @@ onBeforeUnmount(() => {
 .gantt-view .gantt_task_cell.gantt_today,
 .gantt-view .gantt_scale_cell.gantt_today {
     box-shadow: inset 2px 0 0 #c45c26;
+}
+.gantt-view .gantt_cal_light,
+.gantt-view .gantt_cal_cover,
+.gantt-view + .gantt_cal_light,
+.gantt_cal_light,
+.gantt_cal_cover {
+    display: none !important;
 }
 </style>
