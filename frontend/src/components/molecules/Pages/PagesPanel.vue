@@ -135,6 +135,25 @@
                         </span>
                     </div>
 
+                    <div v-if="taskProjectId" class="pg__writeback">
+                        <div class="pg__writeback-bar">
+                            <span class="pg__writeback-kicker">{{ $t('Projects.pages_writeback') }}</span>
+                            <span class="pg__writeback-hint">{{ writebackOn ? $t('Projects.pages_writeback_on') : $t('Projects.pages_writeback_off') }}</span>
+                            <button
+                                type="button"
+                                class="pg__switch"
+                                :class="{ 'is-on': writebackOn }"
+                                :disabled="writebackBusy"
+                                :title="writebackOn ? $t('Projects.pages_writeback_on') : $t('Projects.pages_writeback_off')"
+                                @click="toggleWriteback"
+                            ><i></i></button>
+                        </div>
+                        <div v-if="pageBriefing" class="pg__briefing">
+                            <span class="pg__briefing-kicker">{{ $t('Projects.pages_writeback_fired') }}</span>
+                            <pre class="pg__briefing-body">{{ pageBriefing }}</pre>
+                        </div>
+                    </div>
+
                     <!-- The editor is seeded, not two-way bound. vue3-editor watches its
                          modelValue and writes it straight into Quill's DOM whenever it
                          differs from what Quill currently holds — and it always differs,
@@ -330,6 +349,9 @@ const taskProjectId = computed(() => String(
     || ''
 ));
 const rawDraft = computed(() => blocksToRawText(contentBlocks.value) || contentHtml.value || '');
+const pageBriefing = computed(() => String((current.value && current.value.briefing && current.value.briefing.markdown) || '').trim());
+const writebackOn = ref(true);
+const writebackBusy = ref(false);
 
 const query = ref('');
 const routePageId = computed(() => String((route.query && route.query.page) || ''));
@@ -479,6 +501,40 @@ watch(workspaceProjectId, (id, previous) => {
     expanded.value = new Set();
     if (isOpen.value) fetchPages();
 });
+
+function loadWriteback() {
+    const id = taskProjectId.value;
+    if (!id) {
+        writebackOn.value = true;
+        return;
+    }
+    apiRequest('get', `${env.AUTOMATIONS}/writeback`)
+        .then((response) => {
+            const rows = (response.data && response.data.data) || [];
+            const row = rows.find((item) => String(item._id) === String(id));
+            writebackOn.value = !row || row.enabled !== false;
+        })
+        .catch(() => { writebackOn.value = true; });
+}
+
+function toggleWriteback() {
+    const id = taskProjectId.value;
+    if (!id || writebackBusy.value) return;
+    writebackBusy.value = true;
+    const next = !writebackOn.value;
+    apiRequest('put', `${env.AUTOMATIONS}/writeback/${id}`, { enabled: next })
+        .then((response) => {
+            if (response.data && response.data.status) {
+                writebackOn.value = response.data.data ? response.data.data.enabled !== false : next;
+            }
+        })
+        .catch(() => {})
+        .finally(() => { writebackBusy.value = false; });
+}
+
+watch(taskProjectId, (id) => {
+    if (id) loadWriteback();
+}, { immediate: true });
 
 function fetchPages() {
     const queryString = projectId.value ? `?projectId=${projectId.value}` : '';
@@ -1114,6 +1170,45 @@ onBeforeUnmount(() => {
 }
 .pg__link-x { border: 0; background: none; padding: 0 3px; color: #7a80ad; cursor: pointer; font-size: 10px; }
 .pg__link-x:hover { color: #b91c1c; }
+
+.pg__writeback {
+    margin: 0 20px 12px;
+    background: var(--kiln-paper);
+    border: 1px solid var(--kiln-line);
+    border-left: 3px solid var(--kiln-ember);
+    border-radius: var(--kiln-radius-sm);
+    padding: 10px 12px;
+    color: var(--kiln-ink);
+}
+.pg__writeback-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.pg__writeback-kicker,
+.pg__briefing-kicker {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--kiln-ember);
+}
+.pg__writeback-hint {
+    flex: 1 1 auto;
+    font-size: 12px;
+    color: var(--kiln-muted);
+}
+.pg__briefing {
+    margin-top: 8px;
+}
+.pg__briefing-body {
+    margin: 6px 0 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: var(--kiln-font-body);
+    font-size: 13px;
+    color: var(--kiln-ink);
+}
 
 .pg__meta {
     display: flex; align-items: center; gap: 6px;

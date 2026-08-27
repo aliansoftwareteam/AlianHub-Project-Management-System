@@ -154,7 +154,7 @@ async function gatherAutofillContext({ companyId, uid, taskId }) {
         roleType: visible.roleType,
     };
     const gate = permissionGate(permissions);
-    if (!gate.allowed) return { allowed: false, reason: gate.reason, permissions };
+    if (!gate.allowed) return { allowed: false, reason: gate.reason, permissions, task, companyId };
 
     const fields = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.CUSTOM_FIELDS,

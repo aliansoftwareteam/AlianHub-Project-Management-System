@@ -734,6 +734,7 @@ const schema = {
         // read and write, and a doc knows what it belongs to without a second lookup.
         // A project link needs no field of its own — ProjectID above already is one.
         linkedTasks: { type: [mongoose.Schema.Types.ObjectId], required: false, default: [] },
+        briefing: { type: Object, required: false },
         // 'project' (anyone who can see the project) or 'private' (only its author).
         visibility: { type: String, required: false, default: 'project' },
         deletedStatusKey: { type: Number, default: 0, required: false },
@@ -1730,6 +1731,11 @@ const schema = {
         "autoArchive": {
             type: Object,
             required: false
+        },
+        aiWritebackEnabled: {
+            type: Boolean,
+            required: false,
+            default: true
         },
         AssigneeUserId: {
             type: Array,

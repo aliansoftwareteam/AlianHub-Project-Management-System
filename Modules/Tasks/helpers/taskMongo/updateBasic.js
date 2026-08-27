@@ -267,6 +267,18 @@ module.exports = {
                     .then((result) => {
                         socketEmitter.emit('update', { type: "update", data: result , updatedFields: newStatus, module: 'task' });
                         resolve({status: true, statusText: "Status updated successfully"});
+                        try {
+                            const { maybeRunAgentWritebackSafe } = require('../../../Automations/helpers/agentWritebackRun');
+                            maybeRunAgentWritebackSafe({
+                                type: 'task_status_changed',
+                                companyId: projectData.CompanyId,
+                                uid: userData && (userData.id || userData._id || userData.userId),
+                                taskId: prevStatus.taskId,
+                                statusText: newStatus.status && newStatus.status.text,
+                            });
+                        } catch (error) {
+                            logger.error(`ERROR in status write-back: ${error.message}`);
+                        }
 
                         let obj = {
                             'ProjectName': projectData.ProjectName,

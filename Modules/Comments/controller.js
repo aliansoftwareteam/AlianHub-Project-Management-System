@@ -95,6 +95,14 @@ exports.save = async (req, res) => {
         if (response && response._id) {
             maybeReplyAsAlianSafe(req.headers['companyid'], response, req.uid)
                 .catch((err) => logger.error(`[alian] notify failed: ${err.message}`));
+            const { maybeRunAgentWritebackSafe } = require('../Automations/helpers/agentWritebackRun');
+            maybeRunAgentWritebackSafe({
+                type: 'comment_created',
+                companyId: req.headers['companyid'],
+                uid: req.uid,
+                taskId: response.taskId,
+                comment: response,
+            }).catch((err) => logger.error(`[writeback] comment failed: ${err.message}`));
         }
         if (response) {
             return res.status(200).json({ status: true, data: response || {}  });

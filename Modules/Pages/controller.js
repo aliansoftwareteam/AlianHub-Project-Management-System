@@ -12,6 +12,7 @@ const {
 } = require('./helpers/pageContent');
 const { composePage, isAiConfigured } = require('./helpers/pageAi');
 const { runWorkspaceAsk, gatherWorkspaceAskContext, gatherStandupContext } = require('./helpers/runWorkspaceAsk');
+const { applyPageWriteback } = require('../Automations/helpers/agentWritebackRun');
 
 const emitPageChange = (type, data) => {
     try {
@@ -228,7 +229,16 @@ exports.updatePage = async (req, res) => {
         }, 'findOneAndUpdate');
 
         emitPageChange('update', updated);
-        return res.send({ status: true, statusText: 'Page saved.', data: updated });
+        let data = updated;
+        const contentChanged = title !== undefined || contentHtml !== undefined || contentBlocks !== undefined;
+        if (contentChanged) {
+            try {
+                data = await applyPageWriteback({ companyId, uid: userId, page: updated, briefingOnly: false }) || updated;
+            } catch (error) {
+                logger.error(`ERROR in page write-back: ${error.message}`);
+            }
+        }
+        return res.send({ status: true, statusText: 'Page saved.', data });
     } catch (error) {
         logger.error(`ERROR in update page: ${error.message}`);
         return res.send({ status: false, statusText: error.message });

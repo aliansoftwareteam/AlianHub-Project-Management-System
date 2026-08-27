@@ -113,3 +113,54 @@ exports.applyRule = async (req, res) => {
         return res.send({ status: true, statusText: `Applied to ${modified} task(s).`, data: { modified } });
     } catch (e) { logger.error(`applyRule: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
+
+// GET /api/v1/automations/writeback — per-project agent write-back switches (default on).
+exports.listWriteback = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        const rows = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.PROJECTS,
+            data: [{ deletedStatusKey: { $ne: 1 }, status: { $ne: 'close' } }, 'ProjectName aiWritebackEnabled', { sort: { ProjectName: 1 } }],
+        }, 'find');
+        const data = (rows || []).map((row) => {
+            const plain = row && row.toObject ? row.toObject() : row;
+            return {
+                _id: plain._id,
+                ProjectName: plain.ProjectName || '',
+                enabled: plain.aiWritebackEnabled !== false,
+            };
+        });
+        return res.send({ status: true, data });
+    } catch (e) { logger.error(`listWriteback: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
+};
+
+// PUT /api/v1/automations/writeback/:projectId  { enabled }
+exports.setWriteback = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        const projectId = oid(req.params.projectId);
+        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        if (!projectId) return res.send({ status: false, statusText: 'A valid project id is required.' });
+        const enabled = req.body && req.body.enabled !== false && req.body.enabled !== 'false';
+        const updated = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.PROJECTS,
+            data: [
+                { _id: projectId, deletedStatusKey: { $ne: 1 } },
+                { $set: { aiWritebackEnabled: enabled } },
+                { returnDocument: 'after' },
+            ],
+        }, 'findOneAndUpdate');
+        if (!updated) return res.send({ status: false, statusText: 'Not found.' });
+        removeCache('UserProjectData:', true);
+        return res.send({
+            status: true,
+            statusText: enabled ? 'Write-back on for this project.' : 'Write-back off for this project.',
+            data: {
+                _id: updated._id,
+                ProjectName: updated.ProjectName || '',
+                enabled: updated.aiWritebackEnabled !== false,
+            },
+        });
+    } catch (e) { logger.error(`setWriteback: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
+};
