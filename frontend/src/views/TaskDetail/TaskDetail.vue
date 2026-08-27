@@ -573,6 +573,11 @@
     provide("subtaskCompletion", subtaskCompletion);
 
     function keepTaskOpenHash() {
+        const openTid = firstId(
+            task.value && (task.value._id || task.value.id),
+            props.taskId,
+            route.params && route.params.taskId,
+        );
         const dest = taskOpenRoute({
             companyId: firstId(props.companyId, route.params && route.params.cid),
             projectId: firstId(
@@ -582,10 +587,11 @@
                 route.params && route.params.id,
             ),
             sprintId: firstId(task.value && task.value.sprintId, props.sprintId, route.params && route.params.sprintId),
-            taskId: firstId(task.value && (task.value._id || task.value.id), props.taskId),
+            taskId: openTid,
             folderId: firstId(task.value && task.value.folderObjId, route.params && route.params.folderId),
         });
         if (!dest) return;
+        if (openTid && !dest.params.taskId) return;
         const sameName = route.name === dest.name;
         const sameParams = firstId(route.params.id) === dest.params.id
             && firstId(route.params.sprintId) === dest.params.sprintId

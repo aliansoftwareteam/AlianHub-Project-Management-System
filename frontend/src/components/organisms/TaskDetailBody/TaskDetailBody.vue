@@ -177,27 +177,34 @@
         projectData.value && projectData.value._id,
         route.params && route.params.id,
     ));
-    const threadTaskId = computed(() => firstId(props.task && (props.task._id || props.task.id)));
-    const threadSprintId = computed(() => firstId(props.task && props.task.sprintId, route.params && route.params.sprintId));
+    const threadTaskId = computed(() => firstId(
+        props.task && (props.task._id || props.task.id),
+        route.params && route.params.taskId,
+    ));
+    const threadSprintId = computed(() => firstId(
+        props.task && props.task.sprintId,
+        route.params && route.params.sprintId,
+    ));
 
     const customerId = ref(props.task?.customField?.[process.env.VUE_APP_CUSTOMFIELDID]?.fieldValue);
     const productName = ref(props.task?.customField?.[process.env.VUE_APP_CUSTOMFIELDPRODUCTID]?.fieldValue);
 
     function syncDetailTab(tab) {
         activeTab.value = tab;
+        const query = { ...route.query, detailTab: tab };
+        const openTid = firstId(threadTaskId.value, route.params && route.params.taskId);
         const dest = taskOpenRoute({
             companyId: route.params && route.params.cid,
             projectId: openProjectId.value,
-            sprintId: threadSprintId.value,
-            taskId: threadTaskId.value,
+            sprintId: firstId(threadSprintId.value, route.params && route.params.sprintId),
+            taskId: openTid,
             folderId: props.task && props.task.folderObjId,
         });
-        const query = { ...route.query, detailTab: tab };
-        if (dest) {
-            router.replace({ ...dest, query });
+        if (dest && dest.params.taskId) {
+            router.replace({ ...dest, query }).catch(() => {});
             return;
         }
-        router.replace({ name: route.name, params: { ...route.params }, query });
+        router.replace({ name: route.name, params: { ...route.params }, query }).catch(() => {});
     }
 
     onMounted(() => {

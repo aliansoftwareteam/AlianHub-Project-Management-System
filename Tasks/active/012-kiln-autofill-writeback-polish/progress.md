@@ -15,7 +15,7 @@
 - [x] Comments pane lists existing Alian comments for the open taskId (no empty pane with badge 1)
 
 ## Last step
-Bot 3 leftover 2: Ctrl+K OPEN must stay same-tab in-app, and a correct `#/<cid>/project/<pid>/s/<sid>/<tid>` deep link must hydrate title/status/dates (indexed task `findOne`). Fail-fast after 8s instead of an infinite skeleton.
+Bot 3 leftover 2 split: enter-to-open PASS. Middle external-link OPEN must share that same in-app `taskHref` (always preventDefault, even with Ctrl still down). Comments tab must switch tabs, not edit the title. Keep task id in the hash while the modal is open.
 
 ## Blockers
 None. Live Local Smoke is not in this VM (no Mongo), so Ctrl+K OPEN was not browser-verified here.
@@ -33,3 +33,4 @@ None. Live Local Smoke is not in this VM (no Mongo), so Ctrl+K OPEN was not brow
 - QA P0 leftover 3 (SMOKE-7 comments): badge 1 with empty Comments pane. Thread fetch now uses `taskId` even when `selectedProject` is `{}`, does not AND sprintId on a task thread, and keeps pid/sid/tid in the hash while the modal is open. Empty projectId is still 400 only when there is no valid taskId either.
 - Bot 3 GET `/get-paginated-messages` with Local Smoke ids returned `{data:[]}` while 5 Alian comments exist with string `taskId`. The list query no longer ANDs `projectId`/`sprintId` (mongoose ObjectId-cast dropped string-stored thread ids) and matches `$toString(taskId)`. Empty/`undefined` projectId is 400, not a 500 ObjectId cast.
 - Bot 3 leftover 2: Ctrl+K OPEN was a real `<a href>` (new tab after Ctrl+K) and `GET taskData` `$lookup $expr` on `_id` never hydrated (skeleton). OPEN/title are in-app buttons; taskData is an indexed `findOne` on the task; 8s fail-fast instead of an infinite shimmer.
+- Bot 3 leftover 2 split: enter-to-open already hydrates same-tab. The middle external-link icon failed because `openInApp` returned on `ctrlKey` and let the native `<a>` open a new tab. Title + enter-to-open + middle icon now share one `taskHref`; click always `preventDefault` + `router.push`. Comments tab label no longer swallows the click (and the overflowing title no longer sits on the tab). Hash replace refuses to drop `taskId` while the modal is open.

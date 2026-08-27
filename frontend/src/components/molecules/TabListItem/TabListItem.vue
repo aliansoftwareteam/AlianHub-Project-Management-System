@@ -4,7 +4,7 @@
         role="presentation"
         :class="{ active: isActive }"
         class="cursor-pointer"
-        @click.stop="!isActive ? $emit('changeTab' ,tabKey) : ''"
+        @click.prevent.stop="selectTab"
     >
         <img
             v-if="isActive"
@@ -21,7 +21,6 @@
         <span
             :aria-controls="tabKey"
             role="tab"
-            @click.stop
         >
             {{ $t(`Header.${tab.name}`) }}
         </span>
@@ -38,13 +37,17 @@ import { defineProps, defineEmits } from 'vue';
 import { useCustomComposable } from '@/composable';
 const { checkApps, getAppState } = useCustomComposable();
 
-defineEmits(["changeTab"]);
-defineProps({
+const emit = defineEmits(["changeTab"]);
+const props = defineProps({
     isActive: Boolean,
     tab: Object,
     tabKey: String,
     commentCounts: Number
 })
+
+function selectTab() {
+    if (!props.isActive) emit('changeTab', props.tabKey);
+}
 </script>
 <style scoped src="./style.css">
 </style>

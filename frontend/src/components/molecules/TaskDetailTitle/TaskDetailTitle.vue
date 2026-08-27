@@ -16,7 +16,8 @@
                     v-if="checkPermission('task.task_name_edit',selectedProject?.isGlobalPermission) === true"
                     class="title-name"
                     :title="taskName"
-                    @click.stop="isEditName = true, editTaskName = taskName"
+                    @mousedown.stop
+                    @click.stop="startEditName"
                 >
                     {{ taskName }}
                 </h4>
@@ -36,6 +37,7 @@
                         :max-length="250"
                         @blur="editFocusOut()"
                         :place-holder="$t('Projects.task_name')"
+                        @keydown="onTitleKey"
                         @enter="$emit('update:taskName', editTaskName), isEditName = false"
                         height="25px"
                         :isOutline="false"
@@ -84,7 +86,12 @@
         return selectedProject.value?.taskTypeCounts?.find((x) => x?.key === props?.taskType)
     })
 
-    const isEditName = ref(false); 
+    const isEditName = ref(false);
+
+    const startEditName = () => {
+        isEditName.value = true;
+        editTaskName.value = props.taskName;
+    };
 
     const editFocusOut = () => {
         if(isEditName.value) {
@@ -92,6 +99,15 @@
         }
         editTaskName.value = '';
     }
+
+    const onTitleKey = (payload) => {
+        const event = payload && payload.event;
+        if (!event || event.key !== 'Escape') return;
+        event.preventDefault();
+        event.stopPropagation();
+        isEditName.value = false;
+        editTaskName.value = '';
+    };
 
     const copyText = (text) => {
         $toast.success(t(`Toast.Task_name_copied`), {position: "top-right"})

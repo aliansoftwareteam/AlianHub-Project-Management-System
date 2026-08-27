@@ -15,7 +15,7 @@
                         <div class="d-flex align-items-center advancefilter__body--taskblock">
                             <span class="d-block" :style="[{'background-color':(props?.allTaskStatusArray && props.allTaskStatusArray?.settings?.length) ? props?.allTaskStatusArray?.settings.find((ut)=> ut.key === props?.taskObj?.statusKey)?.bgColor : '','width':'10px','height':'10px','margin-right': '5px'}]"></span>
                             <span class="advancefilter__body--taskstatus gray81 status_text_overflow">
-                                {{(props?.allTaskStatusArray && props?.allTaskStatusArray?.settings?.length) ? props.allTaskStatusArray?.settings.find((ut)=> ut.key === props?.taskObj?.statusKey)?.name : ''}}
+                                {{(props?.allTaskStatusArray && props.allTaskStatusArray?.settings?.length) ? props.allTaskStatusArray?.settings.find((ut)=> ut.key === props?.taskObj?.statusKey)?.name : ''}}
                             </span>
                         </div>
                         <div v-if="findParticularProject(props?.taskObj?.ProjectID)" class="text-ellipse">
@@ -34,21 +34,21 @@
                     <div class="d-flex align-items-center">
                         <span class="advancefilter__body--marginright" v-if="props.taskObj?.isParentTask === false"><img :src="subTaskImage" /> </span>
                         <span class="advancefilter__body--marginright"><img :src="favourite(props.taskObj?.favouriteTasks) && favourite(props.taskObj?.favouriteTasks)?.length ? filledStar : blankStar" /></span>
-                        <button type="button" class="advancefilter__body--taskname black text-ellipse d-block advancefilter__body--width cursor-pointer" @click="openInApp($event, props.taskObj)" v-html="highlightSearchTerm(props.taskObj?.TaskName)"></button>
+                        <a class="advancefilter__body--taskname black text-ellipse d-block advancefilter__body--width cursor-pointer" :href="taskHref" @click="openInApp($event, props.taskObj)" v-html="highlightSearchTerm(props.taskObj?.TaskName)"></a>
                     </div>
                 </div>
             </div>
             <div class="advancefilter__body--list--right">
                 <ul class="advancefilter__body--ul align-items-center">
                     <li class="cursor-pointer advancefilter__body--newtab">
-                        <button type="button" @click="openInApp($event, props.taskObj)">
+                        <a :href="taskHref" @click="openInApp($event, props.taskObj)">
                             <img :src="imgOpenSameTab" alt="Open"/>
-                        </button>
+                        </a>
                     </li>
                     <li class="cursor-pointer advancefilter__body--newtab">
-                        <button type="button" @click="openInApp($event, props.taskObj)">
+                        <a :href="taskHref" @click="openInApp($event, props.taskObj)">
                             <img :src="imgOpenNewTab" alt="Open"/>
-                        </button>
+                        </a>
                     </li>
                     <li class="cursor-pointer" @click="copyLink(props.taskObj)">
                         <img :src="imgCopyLink" alt="Copy Link"/>
@@ -60,7 +60,7 @@
 </template>
 
 <script setup>
-    import { inject,defineProps } from 'vue';
+    import { inject,defineProps,computed } from 'vue';
     import { useToast } from 'vue-toast-notification';
     import {filterFun} from '@/components/molecules/AdvanceSearch/helper';
     import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
@@ -79,14 +79,12 @@
     const router = useRouter();
     const route = useRoute();
 
-    // image
     const filledStar = require("@/assets/images/svg/start10.svg");
     const blankStar = require("@/assets/images/svg/blankStar.svg");
     const subTaskImage = require("@/assets/images/svg/sub_task_image.svg");
     const imgCopyLink = require('@/assets/images/png/task_copy_link.png');
     const imgOpenNewTab = require('@/assets/images/png/task_open_new_tab.png');
     const imgOpenSameTab = require('@/assets/images/svg/entertoopen.svg');
-    // props
     const props = defineProps({
         taskObj : {type:Object,required:true},
         activeTab:{type:String,default:'all'},
@@ -94,7 +92,6 @@
         allTaskStatusArray:{type:Object,required:true},
         searchText:{type:String,default:""}
     });
-    // favourite function
     const favourite = (value) => {
         if(value && value.length){
             let filteredArray = value
@@ -123,7 +120,6 @@
         }
     };
 
-    // This function is use to copy link of selected task
     const companyIdNow = () => firstId(
         injectedId(companyId),
         route.params && route.params.cid,
@@ -140,6 +136,12 @@
             folderId: task && task.folderObjId,
         });
     };
+
+    const taskHref = computed(() => {
+        const dest = taskDest(props.taskObj);
+        if (!dest) return '';
+        return router.resolve({ ...dest, query: { detailTab: 'task-detail-tab' } }).href;
+    });
 
     const copyLink = (task) => {
         generateTaskURL(task, companyIdNow()).then((url)=>{
@@ -165,18 +167,5 @@
 .onlyComment{
     width: 18px !important;
     height: 18px !important;
-}
-button.advancefilter__body--taskname {
-    background: none;
-    border: none;
-    padding: 0;
-    text-align: left;
-    font: inherit;
-}
-.advancefilter__body--newtab button {
-    background: none;
-    border: none;
-    padding: 0;
-    cursor: pointer;
 }
 </style>
