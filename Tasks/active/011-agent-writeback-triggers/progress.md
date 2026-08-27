@@ -9,7 +9,7 @@
 - [x] Draft stacked PR
 
 ## Last step
-Draft PR 521 stacked on 520. Unit tests 109 passing; frontend build complete.
+Draft PR 521 stacked on 520. Unit tests 109 passing; frontend build complete; GitHub CI green on `85087dd`.
 
 ## Blockers
 None.
@@ -23,3 +23,4 @@ None.
 - Skip Alian-authored comments and `@Alian` mentions (007 handles those).
 - Tests: 109 passing with stacked page/comment/autofill tests. Frontend `npm run build` succeeded.
 - Draft PR 521: https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/521
+- GitHub CI on `85087dd`: 5 checks, no failures.

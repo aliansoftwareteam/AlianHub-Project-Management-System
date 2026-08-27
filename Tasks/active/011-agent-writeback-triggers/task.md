@@ -29,9 +29,9 @@ When a user changes a task status, saves a page, or posts a comment, an agent ca
 
 ## Acceptance criteria
 - [ ] Changing a Local Smoke task status, saving a page, or posting a comment can trigger a grounded write-back (empty fields or a follow-up comment)
-- [ ] Filled fields are not clobbered; invented people/tags/task ids are dropped
-- [ ] Permission-aware and companyId multi-tenant
-- [ ] Tests cover event gate, skip-filled, invented ids dropped, and permission
+- [x] Filled fields are not clobbered; invented people/tags/task ids are dropped
+- [x] Permission-aware and companyId multi-tenant
+- [x] Tests cover event gate, skip-filled, invented ids dropped, and permission
 - [x] Draft stacked PR on a new `feat/` branch from `feat/ai-autofill-custom-fields-32f3`; tests green
 
 ## Constraints & notes
