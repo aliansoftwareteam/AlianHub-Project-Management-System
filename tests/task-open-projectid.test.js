@@ -19,6 +19,9 @@ const {
     pageOpenPath,
     pageDeepLinkNeedsResolve,
     pageProjectId,
+    pageFromGetResponse,
+    countSprintBoardTasks,
+    sprintTasksBucket,
     boardEmptyKind,
 } = require('../Modules/Project/helpers/taskOpenProjectId');
 
@@ -28,6 +31,7 @@ describe('TASK OPEN - pass ProjectID so taskData is not empty', () => {
         expect(firstId({ toHexString: () => '64b7f0c2a1b2c3d4e5f60711' })).toBe('64b7f0c2a1b2c3d4e5f60711');
         expect(firstId({ $oid: '64b7f0c2a1b2c3d4e5f60711' })).toBe('64b7f0c2a1b2c3d4e5f60711');
         expect(firstId({ _id: '64b7f0c2a1b2c3d4e5f60711' })).toBe('64b7f0c2a1b2c3d4e5f60711');
+        expect(firstId({ type: 'Buffer', data: [0x64, 0xb7, 0xf0, 0xc2, 0xa1, 0xb2, 0xc3, 0xd4, 0xe5, 0xf6, 0x07, 0x11] })).toBe('64b7f0c2a1b2c3d4e5f60711');
         expect(resolveOpenProjectId({
             queryProjectId: '',
             task: { ProjectID: '64b7f0c2a1b2c3d4e5f60711' },
@@ -159,6 +163,7 @@ describe('LIST/BOARD - bind sprint rows so SMOKE tasks can load', () => {
         const sprintFolder = fs.readFileSync(path.join(__dirname, '..', 'Modules', 'Project', 'controller', 'getSprintFolder.js'), 'utf8');
         const list = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'views', 'Projects', 'ListView', 'ListView.vue'), 'utf8');
         const board = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'views', 'Projects', 'Kanban', 'BoardView.vue'), 'utf8');
+        const actions = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'store', 'ProjectData', 'actions.js'), 'utf8');
         expect(listing).toContain('bindSprintsToProject');
         expect(listing).toContain('sameId(item._id, id)');
         expect(listing).toContain('resolve([])');
@@ -173,14 +178,17 @@ describe('LIST/BOARD - bind sprint rows so SMOKE tasks can load', () => {
         expect(board).toContain('EmptyState.no_sprint_tasks_title');
         expect(list).toContain('EmptyState.load_failed_title');
         expect(board).toContain('EmptyState.load_failed_title');
-        expect(list).toContain('boardEmptyKind');
-        expect(board).toContain('boardEmptyKind');
+        expect(list).toContain('countSprintBoardTasks');
+        expect(list).not.toContain('boardCount: groupedTasks.value.length');
+        expect(board).toContain('sprintTasksBucket');
         expect(list).not.toContain('EmptyState.no_match_title');
         expect(board).not.toContain('EmptyState.no_match_title');
         expect(list).not.toContain('no_data_found');
         expect(board).not.toContain('no_data_found');
         expect(list).toContain('props.sprints && props.sprints.length');
         expect(board).toContain('props.sprints && props.sprints.length');
+        expect(actions).toContain('{ $or: [{ objId: { ProjectID: pid } }, { ProjectID: pid }] }');
+        expect(actions).toContain('{ $or: [{ objId: { sprintId } }, { sprintId }] }');
     });
 });
 
@@ -320,6 +328,9 @@ describe('SEARCH OPEN - same-tab hash with ProjectID, TaskKey, and auto-select',
 });
 
 describe('BOARD EMPTY - three states, never No Data Found', () => {
+    const PROJECT = '6a8f09301f05e701eaf45c9a';
+    const SPRINT = '6a8f0b22e2ad4d0997553eb4';
+
     test('loading, honest empty, and failed bind are distinct', () => {
         expect(boardEmptyKind({ loading: true, sprintsBound: true, boardCount: 0, expectedCount: 4 })).toBe('loading');
         expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 0, expectedCount: 0, searchHits: false })).toBe('empty');
@@ -327,6 +338,15 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 0, expectedCount: 3 })).toBe('failed');
         expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 0, expectedCount: 0, searchHits: true })).toBe('failed');
         expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 2, expectedCount: 2 })).toBe('ready');
+        const store = {
+            [PROJECT]: {
+                sprints: [SPRINT],
+                [SPRINT]: { tasks: [{ _id: 't1' }, { _id: 't2', deletedStatusKey: 0 }] },
+            },
+        };
+        expect(countSprintBoardTasks(store, { $oid: PROJECT }, { toHexString: () => SPRINT })).toBe(2);
+        expect(countSprintBoardTasks({}, PROJECT, SPRINT)).toBe(0);
+        expect(sprintTasksBucket(store, PROJECT, SPRINT).tasks).toHaveLength(2);
         const empty = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'atom', 'EmptyState', 'EmptyState.vue'), 'utf8');
         const locale = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'locales', 'en.js'), 'utf8');
         expect(empty).toContain('empty-state--pine');
@@ -365,7 +385,15 @@ describe('PAGES DEEP LINK - project-scoped hash before first paint', () => {
         expect(pageDeepLinkNeedsResolve({ pageId: PAGE, projectId: '', routeName: 'ProjectPages' })).toBe(false);
         expect(pageProjectId({ ProjectID: { $oid: PROJECT } })).toBe(PROJECT);
         expect(pageProjectId({ projectId: PROJECT })).toBe(PROJECT);
+        expect(pageProjectId({ ProjectID: { $oid: PROJECT }, projectId: '[object Object]' })).toBe(PROJECT);
         expect(pageProjectId({ title: 'Ask smoke' })).toBe('');
+        expect(pageFromGetResponse({
+            data: { status: true, data: { _id: PAGE, ProjectID: { $oid: PROJECT }, projectId: '[object Object]' } },
+        })).toEqual({ _id: PAGE, ProjectID: { $oid: PROJECT }, projectId: '[object Object]' });
+        expect(pageProjectId(pageFromGetResponse({
+            data: { status: true, data: { _id: PAGE, ProjectID: { type: 'Buffer', data: PROJECT.match(/.{2}/g).map((h) => parseInt(h, 16)) } } },
+        }))).toBe(PROJECT);
+        expect(pageFromGetResponse({ data: { status: false, statusText: 'Page not found.' } })).toBe(null);
         const routerSrc = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'router', 'index.js'), 'utf8');
         const resolveSrc = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'router', 'pages', 'resolvePageDeepLink.js'), 'utf8');
         const space = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'views', 'Pages', 'PagesSpace.vue'), 'utf8');
@@ -373,10 +401,12 @@ describe('PAGES DEEP LINK - project-scoped hash before first paint', () => {
         expect(routerSrc).toContain('resolvePageDeepLink');
         expect(resolveSrc).toContain('pageOpenRoute');
         expect(resolveSrc).toContain('pageProjectId');
-        expect(resolveSrc).toContain('unresolved');
+        expect(resolveSrc).toContain('pageFromGetResponse');
+        expect(resolveSrc).toContain('headers: { companyId: cid }');
         expect(space).toContain('route.params.projectId');
         expect(space).toContain('v-else-if="ready"');
         expect(space).not.toContain('PagesPanel v-if="true"');
-        expect(getPage).toContain('row.projectId');
+        expect(getPage).toContain('firstId(row.ProjectID');
+        expect(getPage).toContain('row.projectId = pid');
     });
 });

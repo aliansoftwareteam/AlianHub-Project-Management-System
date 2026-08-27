@@ -332,6 +332,7 @@ const {isCustomFields} = customField();
 import * as env from '@/config/env';
 import { useI18n } from "vue-i18n";
 import { apiRequest } from "../../../services";
+import { sprintTasksBucket } from '@/utils/taskOpenProjectId';
 import Skelaton from "@/components/atom/Skelaton/AiSkelaton.vue"
 const { t } = useI18n();
 // UTILS
@@ -348,6 +349,11 @@ const showArchived = inject("showArchived");
 const companyId = inject("$companyId");
 const {updateTaskByGroup} = useUpdateTasks();
 const isLoading = ref(false);
+const sprintBucket = computed(() => sprintTasksBucket(
+    getters['projectData/tasks'],
+    props.projectId,
+    props.sprintId,
+));
 
 
 // IMAGES
@@ -394,7 +400,7 @@ onMounted(() => {
         };
         let obs = new IntersectionObserver((e) => {
             if(e[0] && e[0]?.isIntersecting) {
-                if(getters['projectData/tasks']?.[props.projectId]?.[props.sprintId]?.tasks.length) {
+                if(sprintBucket.value?.tasks?.length) {
                     getSprintTasks({
                         projectId: props.projectId,
                         sprintId: props.sprintId,
@@ -506,8 +512,8 @@ function changeExpanded(e, field) {
     }
 }
 const tasksFound = computed(() => {
-    if(getters['projectData/tasks'][props.projectId] && getters['projectData/tasks'][props.projectId][props.sprintId]) {
-        const found = JSON.parse(JSON.stringify(getters['projectData/tasks'][props.projectId][props.sprintId]?.found))
+    if(sprintBucket.value) {
+        const found = JSON.parse(JSON.stringify(sprintBucket.value.found || {}))
         return found?.[`${props.item.searchKey}_${props.item.searchValue}`] || 0
     } else {
         return 0;
@@ -521,9 +527,9 @@ const pointsTotal = computed(() => {
 });
 
 const tasksGetter = ref([])
-watch(() => getters['projectData/tasks']?.[props.projectId]?.[props.sprintId]?.tasks, () => {
-    if(getters['projectData/tasks'][props.projectId] && getters['projectData/tasks'][props.projectId][props.sprintId]) {
-        const store = JSON.parse(JSON.stringify(getters['projectData/tasks'][props.projectId][props.sprintId]))
+watch(() => sprintBucket.value && sprintBucket.value.tasks, () => {
+    if(sprintBucket.value) {
+        const store = JSON.parse(JSON.stringify(sprintBucket.value))
         let tmp = [];
         if(props.item.searchKey === "DueDate") {
             tmp = store.tasks.filter((x) => {
@@ -555,7 +561,6 @@ watch(() => getters['projectData/tasks']?.[props.projectId]?.[props.sprintId]?.t
         tasksGetter.value = [];
     }
 }, {immediate: true, deep: true})
-const currentProjectTasks = computed(() => getters['projectData/tasks']);
 const filteredTasksGetter = computed(() => {
     if(getters['projectData/searchedTasks']?.length && props.sprintId) {
         if(props.item.searchKey === "DueDate") {
@@ -674,7 +679,7 @@ function toggleTask(task,e) {
             };
             let obs = new IntersectionObserver((e) => {
                 if(e[0] && e[0]?.isIntersecting) {
-                    let storeSprintTasks = getters['projectData/tasks']?.[props.projectId]?.[props.sprintId]?.tasks || [];
+                    let storeSprintTasks = (sprintBucket.value && sprintBucket.value.tasks) || [];
                     if(storeSprintTasks.length && storeSprintTasks.find((x) => x._id === task._id)) {
                         fetchSubTask(task, true);
                     }
@@ -694,7 +699,7 @@ function toggleTask(task,e) {
     }
 
     if(task.isExpanded === true && (!task.subtaskArray || task.subtaskArray.length < 25)) {
-        let fetchNew = currentProjectTasks.value?.[props.projectId]?.[props.sprintId].index[`${task._id}_${props.item.searchKey}_${props.item.searchValue}`] === undefined;
+        let fetchNew = sprintBucket.value?.index?.[`${task._id}_${props.item.searchKey}_${props.item.searchValue}`] === undefined;
         fetchSubTask(task, fetchNew);
     }
 }
@@ -737,7 +742,7 @@ function updateItem(type,e, item) {
         (e.removed && (!e.removed.element || !Object.keys(e.removed.element).length))) || (props.item.value === "NO_DUE_DATE") || (props.item.value === "NEXT")
     ){
         if((props.item.value === "NO_DUE_DATE") || (props.item.value === "NEXT")) {
-            const store = JSON.parse(JSON.stringify(getters['projectData/tasks'][props.projectId][props.sprintId]))
+            const store = JSON.parse(JSON.stringify(sprintBucket.value || { tasks: [] }))
             let tmp = [];
             if(store?.tasks?.length){
                 tmp = store.tasks.filter((x) => {
@@ -888,7 +893,7 @@ function updateItem(type,e, item) {
                 });
             }
 
-            let countTask = getters['projectData/tasks'][props.projectId][props.sprintId];
+            let countTask = sprintBucket.value || { found: {} };
 
             const { indexName, searchKey } = props.item;
 

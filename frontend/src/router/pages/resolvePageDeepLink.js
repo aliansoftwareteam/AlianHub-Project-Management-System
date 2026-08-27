@@ -1,5 +1,5 @@
 import { apiRequest } from '@/services';
-import { firstId, pageDeepLinkNeedsResolve, pageOpenRoute, pageProjectId } from '@/utils/taskOpenProjectId';
+import { firstId, pageDeepLinkNeedsResolve, pageFromGetResponse, pageOpenRoute, pageProjectId } from '@/utils/taskOpenProjectId';
 
 const RESOLVE_MS = 5000;
 
@@ -44,8 +44,14 @@ export async function resolvePageDeepLink(to) {
     if (!pageDeepLinkNeedsResolve({ pageId, projectId: knownPid, routeName: to.name })) return null;
 
     try {
-        const response = await withTimeout(apiRequest('get', `/api/v2/pages/${pageId}`), RESOLVE_MS);
-        const page = response && response.data && response.data.status ? response.data.data : null;
+        if (typeof localStorage !== 'undefined' && !localStorage.getItem('selectedCompany')) {
+            localStorage.setItem('selectedCompany', cid);
+        }
+        const response = await withTimeout(
+            apiRequest('get', `/api/v2/pages/${pageId}`, null, null, { headers: { companyId: cid } }),
+            RESOLVE_MS,
+        );
+        const page = pageFromGetResponse(response);
         const dest = pageOpenRoute({ companyId: cid, projectId: pageProjectId(page), pageId });
         if (dest) return dest;
     } catch (error) {

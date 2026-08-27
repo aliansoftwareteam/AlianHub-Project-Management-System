@@ -331,6 +331,7 @@ import * as env from '@/config/env';
 import { useStore } from 'vuex';
 import { useRoute } from 'vue-router';
 import { apiRequest } from '../../../services'
+import { sprintTasksBucket } from '@/utils/taskOpenProjectId';
 import { useAiApiFunction } from "@/composable/aiHelper";
 import taskClass from "@/utils/TaskOperations"
 import { useI18n } from "vue-i18n";
@@ -436,7 +437,7 @@ const refreshSprintHours = () => {
     clearTimeout(hoursTimer);
     hoursTimer = setTimeout(loadSprintHours, 600);
 };
-watch(() => getters["projectData/tasks"]?.[project.value?._id]?.[props.sprint?.id]?.tasks,
+watch(() => sprintTasksBucket(getters["projectData/tasks"], project.value?._id, props.sprint?.id)?.tasks,
     refreshSprintHours, { deep: true });
 onMounted(loadSprintHours);
 onUnmounted(() => clearTimeout(hoursTimer));

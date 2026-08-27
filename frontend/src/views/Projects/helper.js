@@ -8,6 +8,7 @@ import { i18n } from "@/locales/main";
 const t = i18n.global.t;
 import * as env from '@/config/env';
 import { apiRequest } from '../../services';
+import { firstId } from '@/utils/taskOpenProjectId';
 
 const projectsList = ref([]);
 const filterdProjects = ref([]);
@@ -769,8 +770,8 @@ export function taskListHelper() {
                 if(groupType && groupType === 'table') {
                     dispatch("projectData/setTableTasksFromTypesense", {
                         cid: companyId.value,
-                        pid: projectId,
-                        sprintId: sprintId,
+                        pid: firstId(projectId),
+                        sprintId: firstId(sprintId),
                         item,
                         fetchNew,
                         userId: userId.value,
@@ -788,8 +789,8 @@ export function taskListHelper() {
                 } else {
                     dispatch("projectData/getPaginatedTasks", {
                         cid: companyId.value,
-                        pid: projectId,
-                        sprintId: sprintId,
+                        pid: firstId(projectId),
+                        sprintId: firstId(sprintId),
                         item,
                         fetchNew,
                         userId: userId.value,
@@ -818,8 +819,8 @@ export function taskListHelper() {
         }
         dispatch("projectData/getTasksFromMongoDB", {
             cid: companyId.value,
-            pid: projectId,
-            sprintId: sprintId,
+            pid: firstId(projectId),
+            sprintId: firstId(sprintId),
             userId: userId.value,
             showAllTasks: projectData.isGlobalPermission === false ? permit : true,
             groupBy:groupByValue,
@@ -1181,7 +1182,7 @@ export function taskListHelper() {
                     let promises = [];
                     sprints[0].items.forEach((item) => {
                         promises.push(
-                            getSprintTasks({projectId: project._id, sprintId:sprints[0]?.id ? sprints[0]?.id : sprints[0]?._id, item, fetchNew: lView == 'table' ? refetch : true,projectData: project, indexName: item.indexName, groupType: lView,resetTable:resetTable})
+                            getSprintTasks({projectId: firstId(project._id), sprintId: firstId(sprints[0]?.id, sprints[0]?._id), item, fetchNew: lView == 'table' ? refetch : true,projectData: project, indexName: item.indexName, groupType: lView,resetTable:resetTable})
                         )
                     })
                     Promise.allSettled(promises)

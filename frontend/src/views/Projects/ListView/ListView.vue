@@ -84,7 +84,7 @@ import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPla
 import isEqual from 'lodash/isEqual';
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { useTaskSelection } from '@/composable/useTaskSelection.js';
-import { boardEmptyKind } from '@/utils/taskOpenProjectId';
+import { boardEmptyKind, countSprintBoardTasks, firstId } from '@/utils/taskOpenProjectId';
 
 const triangleBlack = require('@/assets/images/svg/triangleBlack.svg');
 
@@ -138,22 +138,29 @@ const expandedSprint = ref("");
 const initialDate = ref(0);
 const isLoading = ref(false);
 const searchedTasksData = computed(() => getters['projectData/searchedTasks'] || []);
+const allProjectTasks = computed(() => getters['projectData/tasks'] || {});
 const emptyKind = computed(() => {
     const sprint = props.sprints && props.sprints[0];
     const expected = Number((sprint && (sprint.tasks || sprint.taskCount || sprint.archiveTaskCount)) || 0);
+    const pid = firstId(project.value && project.value._id);
+    const sid = firstId(sprint && (sprint.id || sprint._id));
     return boardEmptyKind({
         loading: isLoading.value || props.sprintLoading,
         sprintsBound: Boolean(props.sprints && props.sprints.length),
-        boardCount: groupedTasks.value.length,
+        boardCount: countSprintBoardTasks(allProjectTasks.value, pid, sid),
         expectedCount: expected,
         searchHits: Boolean(searchedTask && searchedTask.value && searchedTasksData.value.length),
     });
 });
 function onEmptyAction() {
     if (emptyKind.value === 'failed') {
-        Promise.resolve(reloadSprintTasks()).catch((error) => {
-            console.error('ERROR retrying sprint tasks: ', error);
-        });
+        Promise.resolve(reloadSprintTasks())
+            .then(() => {
+                init(props.grouped, true, project.value, props.sprints, groupedTasks, false, true);
+            })
+            .catch((error) => {
+                console.error('ERROR retrying sprint tasks: ', error);
+            });
         return;
     }
     emit('create');
@@ -266,7 +273,7 @@ function toggleSprints(sprintId) {
                 let promises = [];
                 sprint.items.forEach((item) => {
                     promises.push(
-                        getSprintTasks({ projectId: project.value._id, sprintId: SprintId, item, projectData: project.value, groupType: props.grouped })
+                        getSprintTasks({ projectId: firstId(project.value._id), sprintId: firstId(SprintId), item, projectData: project.value, groupType: props.grouped })
                     )
                 })
                 Promise.allSettled(promises)

@@ -449,7 +449,10 @@ export const removeProjectTaskSnap = (state, payload) => {
 }
 
 export const mutateTypesenseTasks = (state, payload) => {
-    const {pid, sprintId, data, nextPage, found = 0} = payload;
+    const pid = firstId(payload && payload.pid);
+    const sprintId = firstId(payload && payload.sprintId);
+    const {data, nextPage, found = 0} = payload || {};
+    if (!pid || !sprintId) return;
 
     const keys = Object.keys(state.tasks);
     const projectFound = keys.includes(pid);

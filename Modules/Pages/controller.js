@@ -13,6 +13,7 @@ const {
 const { composePage, isAiConfigured } = require('./helpers/pageAi');
 const { runWorkspaceAsk, gatherWorkspaceAskContext, gatherStandupContext } = require('./helpers/runWorkspaceAsk');
 const { applyPageWriteback } = require('../Automations/helpers/agentWritebackRun');
+const { firstId } = require('../Project/helpers/taskOpenProjectId');
 
 const emitPageChange = (type, data) => {
     try {
@@ -156,7 +157,19 @@ exports.getPage = async (req, res) => {
             return res.send({ status: false, statusText: 'Page not found.' });
         }
         const row = typeof page.toObject === 'function' ? page.toObject() : { ...page };
-        row.projectId = String(row.ProjectID || row.projectId || '');
+        let pid = firstId(row.ProjectID, row.projectId, row.ProjectId);
+        if (!pid && Array.isArray(row.linkedTasks) && row.linkedTasks.length) {
+            const tid = firstId(row.linkedTasks[0]);
+            if (tid && isObjectIdString(tid)) {
+                const task = await MongoDbCrudOpration(companyId, {
+                    type: SCHEMA_TYPE.TASKS,
+                    data: [{ _id: new mongoose.Types.ObjectId(tid) }],
+                }, 'findOne');
+                pid = firstId(task && (task.ProjectID || task.projectId || task.ProjectId));
+            }
+        }
+        row.projectId = pid;
+        if (pid) row.ProjectID = pid;
         return res.send({ status: true, statusText: 'Page fetched.', data: row });
     } catch (error) {
         logger.error(`ERROR in get page: ${error.message}`);

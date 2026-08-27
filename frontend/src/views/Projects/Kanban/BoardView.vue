@@ -79,7 +79,7 @@ import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { useRoute } from 'vue-router';
-import { boardEmptyKind } from '@/utils/taskOpenProjectId';
+import { boardEmptyKind, firstId, sprintTasksBucket } from '@/utils/taskOpenProjectId';
 const route = useRoute();
 
 // --- Props & Emits ---
@@ -114,12 +114,14 @@ const searchedTasksData = computed(() => getters['projectData/searchedTasks'] ||
 
 // Determine the source task array based on whether a search is active
 const taskSourceArray = computed(() => {
+    const sprint = props.sprints && props.sprints[0];
+    const sid = firstId(sprint && (sprint.id || sprint._id));
     if (searchedTask.value && searchedTasksData.value.length > 0) {
-        const currentSprintId = props.sprints[0]?.id;
-        if (!currentSprintId) return [];
-        return searchedTasksData.value.filter(task => task.sprintId === currentSprintId);
-    } else if (!searchedTask.value && project.value?._id && props.sprints[0]?.id) {
-        return allProjectTasks.value[project.value._id]?.[props.sprints[0].id]?.tasks || [];
+        if (!sid) return [];
+        return searchedTasksData.value.filter(task => firstId(task.sprintId, task.SprintId) === sid);
+    } else if (!searchedTask.value && project.value?._id && sid) {
+        const bucket = sprintTasksBucket(allProjectTasks.value, project.value._id, sid);
+        return (bucket && bucket.tasks) || [];
     }
     return [];
 });
@@ -178,7 +180,7 @@ const processedBoardData = computed(() => {
 
         sprintId.value = currentSprintId;
 
-        const dataKeys = allProjectTasks.value[project.value._id]?.[props.sprints[0].id]?.found;
+        const dataKeys = sprintTasksBucket(allProjectTasks.value, project.value._id, props.sprints[0] && (props.sprints[0].id || props.sprints[0]._id))?.found;
 
         return {
             ...group,
@@ -205,7 +207,15 @@ const emptyKind = computed(() => {
 
 function onEmptyAction() {
     if (emptyKind.value === 'failed') {
-        Promise.resolve(reloadSprintTasks()).catch((error) => {
+        Promise.resolve(reloadSprintTasks()).then(() => {
+            if (project.value?._id && props.sprints?.length) {
+                isLoading.value = true;
+                groupBy(props.grouped, true, project.value, props.sprints, internalGroupedTasks, true, 'board', false, true, (resp) => {
+                    internalGroupedTasks.value = resp;
+                    isLoading.value = false;
+                });
+            }
+        }).catch((error) => {
             console.error('ERROR retrying sprint tasks: ', error);
         });
         return;
@@ -232,7 +242,7 @@ onMounted(async () => {
         isLoading.value = true;
 
         try {
-            const needsInitialGrouping = !allProjectTasks.value[project.value._id]?.[props.sprints[0].id];
+            const needsInitialGrouping = !sprintTasksBucket(allProjectTasks.value, project.value._id, props.sprints[0] && (props.sprints[0].id || props.sprints[0]._id));
             await new Promise((resolve) => {
                 groupBy(props.grouped, needsInitialGrouping, project.value, props.sprints, internalGroupedTasks, true, 'board', false, true, (resp) => {
                     internalGroupedTasks.value = resp;

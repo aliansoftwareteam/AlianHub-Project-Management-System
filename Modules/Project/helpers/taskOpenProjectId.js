@@ -1,10 +1,34 @@
 'use strict';
 
+const HEX_ID = /^[a-f0-9]{24}$/i;
+
+function hexFromBytes(value) {
+    if (!value) return '';
+    if (typeof Buffer !== 'undefined' && Buffer.isBuffer && Buffer.isBuffer(value)) {
+        const hex = value.toString('hex');
+        return HEX_ID.test(hex) ? hex : '';
+    }
+    if (value.type === 'Buffer' && Array.isArray(value.data) && value.data.length === 12) {
+        const hex = value.data.map((n) => Number(n).toString(16).padStart(2, '0')).join('');
+        return HEX_ID.test(hex) ? hex : '';
+    }
+    return '';
+}
+
 function coerceId(value) {
     if (value == null) return '';
     if (typeof value === 'object') {
-        if (typeof value.toHexString === 'function') return value.toHexString();
+        if (typeof value.toHexString === 'function') {
+            const hex = String(value.toHexString()).trim();
+            if (HEX_ID.test(hex)) return hex;
+        }
+        const fromBytes = hexFromBytes(value) || hexFromBytes(value.id) || hexFromBytes(value.buffer);
+        if (fromBytes) return fromBytes;
         if (value.$oid) return coerceId(value.$oid);
+        if (typeof value.toString === 'function') {
+            const asString = value.toString();
+            if (HEX_ID.test(asString)) return asString;
+        }
         return coerceId(value._id || value.id || '');
     }
     const raw = String(value).trim();
@@ -163,6 +187,39 @@ function pageProjectId(page) {
     );
 }
 
+function pageFromGetResponse(response) {
+    const body = response && response.data;
+    if (!body || typeof body !== 'object' || body.status === false) return null;
+    const row = body.data !== undefined ? body.data : body;
+    if (!row || typeof row !== 'object' || Array.isArray(row)) return null;
+    if (!(row._id || row.id || row.ProjectID || row.projectId || row.ProjectId)) return null;
+    return row;
+}
+
+function lookupById(map, id) {
+    if (!map || typeof map !== 'object') return undefined;
+    const want = firstId(id);
+    if (!want) return undefined;
+    if (Object.prototype.hasOwnProperty.call(map, want) && map[want] !== undefined) return map[want];
+    for (const key of Object.keys(map)) {
+        if (firstId(key) === want) return map[key];
+    }
+    return undefined;
+}
+
+function sprintTasksBucket(tasksMap, projectId, sprintId) {
+    const project = lookupById(tasksMap, projectId);
+    if (!project || typeof project !== 'object') return null;
+    const bucket = lookupById(project, sprintId);
+    return bucket && typeof bucket === 'object' ? bucket : null;
+}
+
+function countSprintBoardTasks(tasksMap, projectId, sprintId) {
+    const bucket = sprintTasksBucket(tasksMap, projectId, sprintId);
+    const rows = bucket && Array.isArray(bucket.tasks) ? bucket.tasks : [];
+    return rows.filter((row) => row && !row.deletedStatusKey).length;
+}
+
 function pageOpenRoute({ companyId, projectId, pageId } = {}) {
     const cid = injectedId(companyId);
     const pid = firstId(projectId);
@@ -210,5 +267,9 @@ module.exports = {
     pageOpenPath,
     pageDeepLinkNeedsResolve,
     pageProjectId,
+    pageFromGetResponse,
+    lookupById,
+    sprintTasksBucket,
+    countSprintBoardTasks,
     boardEmptyKind,
 };
