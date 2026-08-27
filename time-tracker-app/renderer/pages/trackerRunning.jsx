@@ -4,7 +4,7 @@ import Router from 'next/router';
 import { setCaptures, setActivityTick, setTrackerStopTime, removeExtraClicks, setComment, setTrackerStartTime, removeAllTimeLog } from '../store/timelog';
 import { TrackerController } from '../controller/tracker/tracker';
 import { apiRequest } from '../utils/services';
-import { fetchEstimateStatus } from '../utils/estimateLimit';
+import { fetchEstimateStatus, isEstimateLimitEnabled } from '../utils/estimateLimit';
 import store from '../store/store';
 import moment from 'moment';
 import { DateTime } from 'luxon';
@@ -291,15 +291,24 @@ function TimeTrackerView() {
     // Set the guard synchronously so the next 1s tick can't double-stop.
     autoStoppedRef.current = true;
     const taskName = currentTimeLog.taskName;
-    try {
-      await TrackerController.TrackerStop();
-    } catch (e) {
-      console.error('Estimate auto-stop failed', e);
+
+    // The company switch decides whether the session is CUT SHORT here, not whether the
+    // person is told. With it off the tracker keeps running and the alert still appears.
+    const capEnabled = isEstimateLimitEnabled(store.getState()?.company?.currentCompany);
+
+    if (capEnabled) {
+      try {
+        await TrackerController.TrackerStop();
+      } catch (e) {
+        console.error('Estimate auto-stop failed', e);
+      }
+      dispatch(setTrackerStopTime());
+      dispatch(removeAllTimeLog());
     }
-    dispatch(setTrackerStopTime());
-    dispatch(removeAllTimeLog());
-    try { window.ipc.send('estimate:limit', { reason: 'autostopped', taskName }); } catch (e) { /* best-effort */ }
-    Router.push('/home');
+    // `stopped` tells the alert whether tracking actually ended. With the cap off it did
+    // not, and the card drops its Resume button — there is nothing to resume.
+    try { window.ipc.send('estimate:limit', { reason: 'autostopped', taskName, stopped: capEnabled }); } catch (e) { /* best-effort */ }
+    if (capEnabled) Router.push('/home');
   };
 
   const setActivityEvent = (e) => {

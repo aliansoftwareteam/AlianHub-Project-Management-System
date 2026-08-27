@@ -39,6 +39,20 @@
     import SecurityPermissionRowCompo from '@/components/atom/SecurityPermissionRowCompo/SecurityPermissionRowCompo.vue'
     import { computed } from "vue";
     import { useStore } from "vuex";
+    import { useI18n } from "vue-i18n";
+    const { t, te } = useI18n();
+
+    // The shortlist behind "show only the common ones". Ninety-nine switches is the reason owners
+    // give up on this screen. Every section heading is kept so the groups still read as groups,
+    // and each listed child's parent is kept too, because a row's enabled state is worked out by
+    // looking its dependency up in the same filtered list.
+    const COMMON_PERMISSIONS = [
+        'project', 'task', 'settings', 'sheet_settings', 'artificial_intelligence', 'chat',
+        'project_list', 'project_create', 'project_delete',
+        'task_list', 'task_create', 'task_delete', 'task_assignee', 'task_status', 'show_tasks',
+        'settings_invite_member', 'settings_member_list', 'settings_security_permissions',
+        'user_timesheet',
+    ];
 
     const props = defineProps({
         searchValue: {
@@ -60,6 +74,10 @@
         planCondition : {
             type:Boolean,
             default : false
+        },
+        showAll : {
+            type:Boolean,
+            default : true
         }
     })
     const { getters } = useStore();
@@ -69,7 +87,22 @@
     const aiPlanPermission = computed(() => getters["settings/selectedCompany"].planFeature?.aiPermission);
 
     const filterdRules = computed(() => {
-        let tmp = props.advancedPermissionBody.filter((x) => x.name.toLowerCase().includes(props.searchValue) || x.desc.toLowerCase().includes(props.searchValue));
+        // Search has to match what is on screen, and the row shows the translated name and the
+        // translated description rather than the seeded `name` / `desc` fields.
+        const needle = String(props.searchValue || '').toLowerCase();
+        const localised = (prefix, key) => (te(`${prefix}.${key}`) ? t(`${prefix}.${key}`) : '');
+        let tmp = props.advancedPermissionBody.filter((x) => [
+            x.name,
+            x.desc,
+            localised('SecurityAndPermission', x.key),
+            localised('PermissionDesc', x.key),
+        ].some((field) => String(field || '').toLowerCase().includes(needle)));
+
+        // Searching means the person is looking for something specific, so it always searches the
+        // full set rather than only the shortlist.
+        if (!props.showAll && !needle) {
+            tmp = tmp.filter((x) => COMMON_PERMISSIONS.includes(x.key));
+        }
 
         tmp.forEach((data) => {
             if(!data.isParent) {

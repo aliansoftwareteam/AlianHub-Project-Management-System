@@ -447,7 +447,12 @@ ipcMain.on('estimate:limit', (event, data) => {
   const d = data || {}
   if (d.reason === 'autostopped') {
     try {
-      showTrackerStoppedAlert({ reason: 'estimate', taskName: d.taskName || (lastTaskCtx && lastTaskCtx.taskName) || '' })
+      showTrackerStoppedAlert({
+        reason: 'estimate',
+        taskName: d.taskName || (lastTaskCtx && lastTaskCtx.taskName) || '',
+        // Absent means stopped, which is what every caller before this one meant.
+        stopped: d.stopped !== false,
+      })
     } catch (e) { /* best-effort */ }
     return
   }
@@ -672,7 +677,7 @@ function closeStoppedAlert() {
   stoppedAlertWindow = null
 }
 
-function showTrackerStoppedAlert({ reason, taskName = '', stoppedAt = Date.now() } = {}) {
+function showTrackerStoppedAlert({ reason, taskName = '', stoppedAt = Date.now(), stopped = true } = {}) {
   closeStoppedAlert() // never let alerts stack in the corner
 
   const { width, height } = screen.getPrimaryDisplay().workAreaSize
@@ -713,7 +718,7 @@ function showTrackerStoppedAlert({ reason, taskName = '', stoppedAt = Date.now()
 
   win.loadFile(notificationAlertHtmlPath)
   win.webContents.on('did-finish-load', () => {
-    win.webContents.send('alert:render', { reason, taskName, stoppedAt })
+    win.webContents.send('alert:render', { reason, taskName, stoppedAt, stopped })
     setTimeout(showOnce, 400) // fallback if no size report arrives
   })
 

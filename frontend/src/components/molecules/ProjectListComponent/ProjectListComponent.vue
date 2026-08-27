@@ -101,6 +101,9 @@
                     </VirtualScroller>
                 </template>
                 <template v-else>
+                    <!-- Left as it was: the main panel already shows a full empty state and the
+                         "+ New" button sits directly above this, so explaining it a third time in
+                         the sidebar is noise. -->
                     <div class="text-center mt-1">
                         <h3 class="m-0">
                             {{!search?.length ? (isSpinner === false && projects.length == 0 ? $t('ProjectSlider.no_project_found') : $t('ProjectSlider.no_result_found')) : $t('ProjectSlider.no_result_found')}}

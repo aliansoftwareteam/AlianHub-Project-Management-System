@@ -763,73 +763,49 @@ function updateItem(type,e, item) {
         const taskObject = JSON.parse(JSON.stringify(e?.added?.element))
         
         if(type === 'subTask' && checkPermission('task.task_convert_to_subtask', props.project?.isGlobalPermission) === true){
-            if(e?.added?.element?.subTasks <= 0 || e?.added?.element?.subTasks === undefined){
-                if(e?.added?.element?.ParentTaskId){
-                    setTimeout(() => {
-                        commit("projectData/mutateUpdateFirebaseTasks",{
-                            snap, 
-                            op: "removed",
-                            pid,
-                            sprintId,
-                            data: {...taskObject,isParentTask:false,ParentTaskId:e?.added?.element?.ParentTaskId},
-                            showAllTasks
-                        });
-                    },800)
-                }
+            // The dropped task always has to be attached locally. This used to be
+            // split three ways with only two of them doing anything: a task that
+            // HAS subtasks but was never expanded — so its subtaskArray was never
+            // loaded — matched neither, and the screen was left untouched while the
+            // server converted it anyway.
+            const attach = (row) => {
                 commit("projectData/mutateUpdateFirebaseTasks",{
-                    snap, 
+                    snap,
                     op: "modified",
                     pid,
                     sprintId,
-                    data: {...taskObject,isParentTask:false,ParentTaskId:item._id},
+                    data: {...row,isParentTask:false,ParentTaskId:item._id},
                     showAllTasks,
                     updatedFields:{
                         deletedStatusKey:1,
                         updatedAt:new Date(),
                         ParentTaskId: item._id,
                         isParentTask: false,
-                        subTasks:item?.subTasks >= 0 ? item?.subTasks + 1 : 1
                     },
                     dragDropcheck:true
                 });
-            }else{
-                if(e?.added?.element?.subtaskArray && e?.added?.element?.subtaskArray.length){
+            };
+
+            // Already a subtask elsewhere: drop it from the old parent's list too.
+            if(e?.added?.element?.ParentTaskId){
+                setTimeout(() => {
                     commit("projectData/mutateUpdateFirebaseTasks",{
                         snap, 
-                        op: "modified",
+                        op: "removed",
                         pid,
                         sprintId,
-                        data: {...e?.added?.element,isParentTask:false,ParentTaskId:item._id},
-                        showAllTasks,
-                        updatedFields:{
-                            deletedStatusKey:1,
-                            updatedAt:new Date(),
-                            ParentTaskId: item._id,
-                            isParentTask: false,
-                            subTasks:item?.subTasks >= 0 ? item?.subTasks + 1 : 0
-                        },
-                        dragDropcheck:true
+                        data: {...taskObject,isParentTask:false,ParentTaskId:e?.added?.element?.ParentTaskId},
+                        showAllTasks
                     });
-                    e?.added?.element?.subtaskArray.forEach((x)=>{
-                        commit("projectData/mutateUpdateFirebaseTasks",{
-                            snap, 
-                            op: "modified",
-                            pid,
-                            sprintId,
-                            data: {...x,isParentTask:false,ParentTaskId:item._id},
-                            showAllTasks,
-                            updatedFields:{
-                                deletedStatusKey:1,
-                                updatedAt:new Date(),
-                                ParentTaskId: item._id,
-                                isParentTask: false,
-                                subTasks:item?.subTasks >= 0 ? item?.subTasks + 1 : 0
-                            },
-                            dragDropcheck:true
-                        });
-                    })
-                }
+                },800)
             }
+
+            attach(taskObject);
+
+            // Its own children come across beside it — only one level of nesting
+            // exists — so each of the loaded ones is attached as well. Any that were
+            // never loaded are reconciled by the parent's own update from the server.
+            (e?.added?.element?.subtaskArray || []).forEach((x) => attach(x));
             taskClass.convertToSubTask({
                 companyId: companyId.value,
                 projectData: {

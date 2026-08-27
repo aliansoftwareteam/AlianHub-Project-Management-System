@@ -23,9 +23,16 @@
                                 <input v-if="props?.from ? currentCompany?.planFeature?.projectWisePermisson : currentCompany?.planFeature?.globalPermison" type="search" v-model="searchValue" :placeHolder="$t('PlaceHolder.search')" class="form-control search__input">
                                 <button v-if="checkPermission('settings.settings_security_permissions') === true" class="blue_btn bg-blue white border-0" :class="[{'opacity-5 pointer-event-none':props?.from ? !currentCompany?.planFeature?.projectWisePermisson :!currentCompany?.planFeature?.globalPermison,'cursor-pointer':props?.from ? !currentCompany?.planFeature?.projectWisePermisson :!currentCompany?.planFeature?.globalPermison,'justify-content-between':props?.from ? currentCompany?.planFeature?.projectWisePermisson : currentCompany?.planFeature?.globalPermison}]" @click="updateRules">{{$t('Projects.save')}}</button>
                             </div>
+                            <div class="permissionMode d-flex align-items-center justify-content-between">
+                                <span class="permissionMode__note">{{ showAllPermissions ? '' : $t('PermissionMode.common_note') }}</span>
+                                <a href="#" class="blue font-roboto-sans permissionMode__link" @click.prevent="showAllPermissions = !showAllPermissions">
+                                    {{ showAllPermissions ? $t('PermissionMode.show_common') : $t('PermissionMode.show_all') }}
+                                </a>
+                            </div>
                             <SecurityandPermissionTable :searchValue="searchValue" :withoutOwnerRoles="withoutOwnerRoles"
-                                :advancedPermissionBody="advancedPermissionBody" :changeRule="changeRule" :from="from" 
+                                :advancedPermissionBody="advancedPermissionBody" :changeRule="changeRule" :from="from"
                                 :planCondition="props?.from ? currentCompany?.planFeature?.projectWisePermisson : currentCompany?.planFeature?.globalPermison"
+                                :showAll="showAllPermissions"
                             />
                         </div>
                     </div>
@@ -54,6 +61,9 @@
     const oldRules = ref([]);
     const loading = ref(true);
     const searchValue = ref("");
+    // Opens on the full list, as it always has. The shortlist is one click away for anyone who
+    // wants it, but changing what an existing admin sees on load is not worth the surprise.
+    const showAllPermissions = ref(true);
     const isSpinner = ref(false);
     const showAllTasks = ref(true);
     const showAllProjects = ref(true);
@@ -377,3 +387,24 @@
 </script>
 
 <style src="./style.css"></style>
+<style scoped>
+.permissionMode {
+    padding: 8px 0 12px;
+    gap: 16px;
+}
+.permissionMode__note {
+    font-family: Roboto, sans-serif;
+    font-size: 12.5px;
+    color: #8c8c8c;
+    line-height: 1.4;
+}
+.permissionMode__link {
+    font-size: 13px;
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+}
+.permissionMode__link:hover {
+    text-decoration: underline;
+}
+</style>

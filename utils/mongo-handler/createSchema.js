@@ -221,8 +221,14 @@ timeSheetSchema.index({ userId: 1, ProjectId: 1 });
 userIdSchema.index({ userId: 1 });
 
 // sprints/folders/projects: secondary lookups.
-sprints.index({ ProjectID: 1, deletedStatusKey: 1 });
-folders.index({ ProjectID: 1 });
+//
+// These two indexed `ProjectID`, which neither collection has — both declare
+// `projectId` (schema.js). So the index covered nothing and the hot
+// sprint-and-folder list query has been running unindexed.
+sprints.index({ projectId: 1, deletedStatusKey: 1 });
+folders.index({ projectId: 1 });
+// Scrum: the cron's due-sprint scan and the sprint pickers.
+sprints.index({ projectId: 1, isScrum: 1, state: 1, endDate: 1 });
 projectsSchema.index({ deletedStatusKey: 1 });
 
 // --- Global DB collections (the "global" company DB) ------------------------

@@ -1208,6 +1208,13 @@ const schema = {
             type: String,
             required: true
         },
+        // What the team mainly does, answered once during setup. Decides which sample content the
+        // company starts with, and which templates are worth showing first. Blank for every company
+        // created before the question existed, which the code treats as "no preference".
+        teamFocus: {
+            type: String,
+            default: ''
+        },
         Cst_DialCode: {
             type: Map,
             required: true
@@ -1913,6 +1920,15 @@ const schema = {
         statusType: {
             type: String,
             required: true,
+        },
+        // Per-project sprint cadence. Shaped like the existing autoArchive and
+        // autoCloseProjects rules so the nightly cron that reads it follows a
+        // pattern already in the codebase.
+        // { enabled, lengthDays, startWeekday, autoClose, autoCreateNext, rolloverTarget }
+        sprintCadence: {
+            type: Object,
+            default: {},
+            required: false
         },
         taskStatusData: {
             type: Array,
@@ -3008,6 +3024,64 @@ const schema = {
         },
         url : {
             type: String,
+            required: false
+        },
+        // ── Scrum ────────────────────────────────────────────────────
+        // A sprint doc is a plain container until someone opts it in. Chat
+        // channels (mainChat) and Forms response lists live in this same
+        // collection and never get these set, so they are unaffected.
+        //
+        // Declared, not inferred: the schema is strict, so an undeclared path is
+        // dropped on write — it appears to work until the next reload. That is
+        // exactly why burndown.js has been reading a startDate that never existed.
+        isScrum: {
+            type: Boolean,
+            default: false,
+            required: false
+        },
+        // The one designated container per project for un-sprinted work.
+        // tasks.sprintId is required, so a backlog cannot be "no sprint".
+        isBacklog: {
+            type: Boolean,
+            default: false,
+            required: false
+        },
+        goal: {
+            type: String,
+            default: '',
+            required: false
+        },
+        startDate: {
+            type: Date,
+            required: false
+        },
+        endDate: {
+            type: Date,
+            required: false
+        },
+        // planned | active | closed
+        state: {
+            type: String,
+            default: '',
+            required: false
+        },
+        // Snapshot taken once, when the sprint starts: { points, tasks, minutes, at }.
+        // Without it "committed vs completed" is a tautology and scope added
+        // mid-sprint is invisible.
+        commitment: {
+            type: Object,
+            default: {},
+            required: false
+        },
+        // What the close actually did: { at, by, done, notDone, movedTo, counts }.
+        closeReport: {
+            type: Object,
+            default: {},
+            required: false
+        },
+        // Set on a sprint created by rolling over from another one.
+        rolledFrom: {
+            type: mongoose.Schema.Types.ObjectId,
             required: false
         }
     },
