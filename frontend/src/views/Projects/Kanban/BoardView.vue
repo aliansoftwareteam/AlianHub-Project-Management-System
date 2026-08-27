@@ -169,7 +169,8 @@ const processedBoardData = computed(() => {
 const shownBoardCount = computed(() => processedBoardData.value.reduce((n, group) => n + ((group && group.tasksArray) || []).length, 0));
 const boardExpectedCount = computed(() => {
     const sprint = props.sprints && props.sprints[0];
-    return sprintExpectedCount(sprint);
+    const grouped = internalGroupedTasks.value && internalGroupedTasks.value[0];
+    return Math.max(sprintExpectedCount(sprint), sprintExpectedCount(grouped));
 });
 const emptyKind = computed(() => {
     const sprint = props.sprints && props.sprints[0];

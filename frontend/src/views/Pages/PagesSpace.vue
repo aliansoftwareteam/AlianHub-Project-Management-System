@@ -1,15 +1,17 @@
 <template>
     <div class="pages-space">
-        <div v-if="kind === 'opening'" class="pages-space__opening">
-            <p class="pages-space__line pages-space__line--pine">{{ openingLine }}</p>
-        </div>
-        <div v-else-if="kind === 'forbidden' || kind === 'missing'" class="pages-space__missing">
+        <div v-if="kind === 'forbidden' || kind === 'missing'" class="pages-space__missing">
             <div class="pages-space__card">
                 <p class="pages-space__line pages-space__line--pine">{{ errorLine }}</p>
                 <button type="button" class="pages-space__back" @click="backToPages">{{ $t('Projects.page_back_to_pages') }}</button>
             </div>
         </div>
-        <PagesPanel v-else-if="kind === 'ready' && (projectId || !pageId)" workspace embedded />
+        <PagesPanel
+            v-else
+            workspace
+            embedded
+            :project-data="boundProject"
+        />
     </div>
 </template>
 
@@ -20,19 +22,14 @@ import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import PagesPanel from '@/components/molecules/Pages/PagesPanel.vue';
 import { apiRequest } from '@/services';
-import { firstId, pageFromGetResponse, pageOpenRoute, pageOpeningLine, pageProjectId } from '@/utils/taskOpenProjectId';
+import { firstId, pageFromGetResponse, pageOpenRoute, pageProjectId } from '@/utils/taskOpenProjectId';
 
 const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const { getters } = useStore();
 
-const kind = ref(
-    firstId(route.query && route.query.page) && !firstId(route.params && route.params.projectId)
-        ? 'opening'
-        : 'ready',
-);
-const openingTitle = ref('');
+const kind = ref('ready');
 const missingProjectName = ref('');
 let hydrateGen = 0;
 
@@ -40,7 +37,13 @@ const pageId = computed(() => firstId(route.query && route.query.page));
 const projectId = computed(() => firstId(route.params && route.params.projectId));
 const companyId = computed(() => firstId(route.params && route.params.cid));
 
-const openingLine = computed(() => pageOpeningLine(openingTitle.value));
+const boundProject = computed(() => {
+    const pid = projectId.value;
+    if (!pid) return {};
+    const hit = projectRow(pid);
+    return hit || { _id: pid };
+});
+
 const errorLine = computed(() => {
     if (kind.value === 'forbidden') return t('Projects.page_no_access');
     return t('Projects.page_not_in_named_project', {
@@ -48,11 +51,15 @@ const errorLine = computed(() => {
     });
 });
 
-function projectNameOf(id) {
+function projectRow(id) {
     const pid = firstId(id);
     const raw = getters['projectData/projects'];
     const list = raw && Array.isArray(raw.data) ? raw.data : [];
-    const hit = list.find((row) => firstId(row && row._id) === pid);
+    return list.find((row) => firstId(row && row._id) === pid) || null;
+}
+
+function projectNameOf(id) {
+    const hit = projectRow(id);
     return (hit && (hit.ProjectName || hit.ProjectCode)) || '';
 }
 
@@ -100,49 +107,35 @@ async function hydrate() {
         kind.value = 'ready';
         return;
     }
-    if (!pid) {
-        kind.value = 'opening';
-    }
-    if (pid) {
-        kind.value = 'ready';
-        const found = await fetchPageRow(id, cid);
-        if (gen !== hydrateGen) return;
-        if (found.forbidden) {
-            kind.value = 'forbidden';
-            return;
-        }
-        if (found.page) {
-            const bound = pageProjectId(found.page);
-            if (bound && bound !== pid) {
-                missingProjectName.value = projectNameOf(pid) || projectNameOf(bound);
-                kind.value = 'missing';
-            }
-        }
-        return;
-    }
-    kind.value = 'opening';
-    openingTitle.value = '';
+    kind.value = 'ready';
     const found = await fetchPageRow(id, cid);
     if (gen !== hydrateGen) return;
-    if (found.page) {
-        openingTitle.value = String(found.page.title || '').trim();
-        const bound = pageProjectId(found.page);
-        if (bound) {
-            const dest = pageOpenRoute({ companyId: cid, projectId: bound, pageId: id });
-            if (dest) {
-                router.replace(dest);
-                return;
-            }
+    if (found.forbidden) {
+        kind.value = 'forbidden';
+        return;
+    }
+    if (!found.page) {
+        if (found.network) return;
+        kind.value = 'forbidden';
+        return;
+    }
+    const bound = pageProjectId(found.page);
+    if (pid) {
+        if (bound && bound !== pid) {
+            missingProjectName.value = projectNameOf(pid) || projectNameOf(bound);
+            kind.value = 'missing';
         }
-        missingProjectName.value = projectNameOf(pid) || t('Projects.pages_project_none');
-        kind.value = 'missing';
         return;
     }
-    if (found.network) {
-        kind.value = 'opening';
-        return;
+    if (bound) {
+        const dest = pageOpenRoute({ companyId: cid, projectId: bound, pageId: id });
+        if (dest) {
+            router.replace(dest);
+            return;
+        }
     }
-    kind.value = 'forbidden';
+    missingProjectName.value = projectNameOf(bound) || t('Projects.pages_project_none');
+    kind.value = 'missing';
 }
 
 onMounted(hydrate);
@@ -155,7 +148,6 @@ watch([pageId, projectId, companyId], hydrate);
     min-height: calc(100dvh - var(--kiln-header-h, 58px));
     background: var(--kiln-paper, #f4ead8);
 }
-.pages-space__opening,
 .pages-space__missing {
     display: flex;
     align-items: flex-start;

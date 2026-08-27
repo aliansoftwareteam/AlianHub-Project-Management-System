@@ -110,9 +110,13 @@ const headerSprints = computed(() => {
         items: Array.isArray(sprint.items) ? sprint.items : [],
     }));
 });
+const boardExpectedCount = computed(() => {
+    const header = headerSprints.value && headerSprints.value[0];
+    const listed = props.sprints && props.sprints[0];
+    return Math.max(sprintExpectedCount(header), sprintExpectedCount(listed));
+});
 const emptyKind = computed(() => {
     const sprint = (headerSprints.value && headerSprints.value[0]) || (props.sprints && props.sprints[0]);
-    const expected = sprintExpectedCount(sprint);
     const pid = firstId(project.value && project.value._id);
     const sid = firstId(sprint && (sprint.id || sprint._id));
     const groups = sprint && Array.isArray(sprint.items) ? sprint.items : [];
@@ -120,14 +124,10 @@ const emptyKind = computed(() => {
         loading: isLoading.value || props.sprintLoading,
         sprintsBound: Boolean(props.sprints && props.sprints.length),
         boardCount: countSprintBoardTasks(allProjectTasks.value, pid, sid),
-        expectedCount: expected,
+        expectedCount: boardExpectedCount.value,
         searchHits: Boolean(searchedTask && searchedTask.value && searchedTasksData.value.length),
         hasGroups: groups.length > 0,
     });
-});
-const boardExpectedCount = computed(() => {
-    const sprint = (headerSprints.value && headerSprints.value[0]) || (props.sprints && props.sprints[0]);
-    return sprintExpectedCount(sprint);
 });
 provide('boardSurfaceKind', emptyKind);
 provide('boardExpectedCount', boardExpectedCount);

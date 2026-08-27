@@ -37,12 +37,7 @@
                         <img :src="aiIcon" class="mr-3px" />
                         <span @click.stop="suggestTask()" class="ai-color font-size-14 font-weight-500 ai-border-bottom" :class="[{'pointer-event-none' : isSpinner}]">{{$t("AI.suggest_tasks")}}</span>
                     </div>
-                    <!-- Planned / Logged / Overdue for the whole sprint, on the same
-                         definitions the Tasks Summary by Status card uses. Counted on the
-                         server: the list pages at 35 and subtasks are not loaded at all
-                         while collapsed, so a client-side sum would quietly under-report.
-                         No period here — this is the sprint entire. -->
-                    <span v-if="showSprintHours" class="sprint-hours ml-10px" @click.stop>
+                    <span v-if="showSprintHours" class="sprint-hours ml-10px" @click.stop data-board-hours>
                         <span class="sprint-hours__item" :title="$t('Projects.sprint_planned_hint')">
                             <span class="sprint-hours__label">{{ $t('Projects.sprint_planned') }}</span>
                             <span class="sprint-hours__value">{{ hoursLabel(sprintHours.plannedMinutes) }}</span>
@@ -51,8 +46,6 @@
                             <span class="sprint-hours__label">{{ $t('Projects.sprint_logged') }}</span>
                             <span class="sprint-hours__value">{{ hoursLabel(sprintHours.loggedMinutes) }}</span>
                         </span>
-                        <!-- Only an overrun is worth colouring; a sprint inside its plan
-                             has nothing to report. -->
                         <span class="sprint-hours__item" :title="$t('Projects.sprint_overdue_hint')">
                             <span class="sprint-hours__label">{{ $t('Projects.sprint_overdue') }}</span>
                             <span class="sprint-hours__value" :class="{ 'sprint-hours__value--over': sprintHours.overdueMinutes > 0 }">
@@ -317,7 +310,7 @@
 
 <script setup>
 // PACKAGES
-import { computed, defineComponent, defineEmits, defineProps, inject, onMounted, onUnmounted, ref, watch} from 'vue';
+import { computed, defineComponent, defineEmits, defineProps, inject, onMounted, onUnmounted, ref, unref, watch} from 'vue';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { useToast } from 'vue-toast-notification';
 
@@ -343,7 +336,7 @@ import * as env from '@/config/env';
 import { useStore } from 'vuex';
 import { useRoute } from 'vue-router';
 import { apiRequest } from '../../../services'
-import { sprintTasksBucket } from '@/utils/taskOpenProjectId';
+import { boardHoursVisible, sprintTasksBucket } from '@/utils/taskOpenProjectId';
 import { useAiApiFunction } from "@/composable/aiHelper";
 import taskClass from "@/utils/TaskOperations"
 import { useI18n } from "vue-i18n";
@@ -408,24 +401,12 @@ const props = defineProps({
     calendarDate: Number
 })
 
-// ─── Sprint hours: Planned, Logged, Overdue ─────────────────────────────────────
-//
-// The same three figures the Tasks Summary by Status card shows, on the same
-// definitions, for the whole sprint rather than a period. The projection that turns
-// them into "overdue" lives on the server (Modules/Sprints/hours.js) so the two places
-// cannot drift — the card and this header must always agree about what overdue means.
-//
-// Counted on the server for a second reason: the list pages at 35 and subtasks are not
-// fetched at all while the Subtask toggle is Collapsed, so summing what the client
-// happens to hold would under-report — silently, and by more the bigger the sprint.
 const sprintHours = ref({ plannedMinutes: 0, loggedMinutes: 0, overdueMinutes: 0 });
 const currentCompanyForHours = computed(() => getters["settings/selectedCompany"]);
-// Gated on the same plan feature that gates the estimate editor on a task: a company
-// without time estimates would otherwise stare at three permanent 00h 00m.
-const showSprintHours = computed(() => !!currentCompanyForHours.value?.planFeature?.timeEstimateProjectApp
+const showSprintHours = computed(() => boardHoursVisible(unref(boardSurfaceKind))
+    && !!currentCompanyForHours.value?.planFeature?.timeEstimateProjectApp
     && checkPermission('task.task_list', project.value?.isGlobalPermission) === true);
 
-// Same shape the task detail shows ("01h 00m"), so the numbers read as one family.
 const hoursLabel = (minutes) => {
     const total = Number(minutes) || 0;
     const h = Math.floor(total / 60);

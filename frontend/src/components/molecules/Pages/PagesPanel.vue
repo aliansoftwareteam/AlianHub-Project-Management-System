@@ -4,7 +4,7 @@
             <!-- ─── Sidebar: the page tree ─────────────────────────────── -->
             <aside class="pg__side">
                 <div class="pg__side-head">
-                    <span v-if="workspace" class="pg__side-kicker">{{ $t('Projects.pages_space_kicker') }}</span>
+                    <span v-if="workspace" class="pg__side-kicker">{{ workspaceSideKicker }}</span>
                     <span class="pg__side-title">{{ $t('Projects.pages') }}</span>
                     <button type="button" class="pg__icon-btn" :title="$t('Projects.add_page')" @click="createPage(null)">
                         <span v-html="ICONS.plus"></span>
@@ -30,7 +30,7 @@
                 </div>
 
                 <div class="pg__tree">
-                    <div v-if="!rows.length" class="pg__empty">
+                    <div v-if="!rows.length && !current" class="pg__empty">
                         {{ query ? $t('Projects.no_pages_match') : $t('Projects.no_pages') }}
                     </div>
                     <!-- Flattened rather than a recursive component: depth is just an
@@ -284,7 +284,7 @@ import AiTaskCreator from "@/components/organisms/AiTaskCreator/AiTaskCreator.vu
 
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
-import { firstId, pageOpenRoute, pageProjectId } from '@/utils/taskOpenProjectId';
+import { firstId, pageFromGetResponse, pageOpenRoute, pageProjectId } from '@/utils/taskOpenProjectId';
 import { useGetterFunctions } from "@/composable";
 import pageContent from '@pageContent';
 const { contentToEditorData, blocksToRawText } = pageContent.default || pageContent;
@@ -348,7 +348,19 @@ let pagesFetchGen = 0;
 const pickerProjects = computed(() => {
     const raw = getters['projectData/projects'];
     const list = raw && Array.isArray(raw.data) ? raw.data : [];
-    return list.filter((project) => project && project._id);
+    const rows = list.filter((project) => project && project._id);
+    const bound = props.projectData && firstId(props.projectData._id);
+    if (bound && !rows.some((project) => firstId(project._id) === bound)) {
+        return [props.projectData, ...rows];
+    }
+    return rows;
+});
+
+const workspaceSideKicker = computed(() => {
+    const pid = firstId(workspaceProjectId.value, routeProjectId.value, props.projectData && props.projectData._id);
+    if (!pid) return t('Projects.pages_space_kicker');
+    const hit = pickerProjects.value.find((project) => firstId(project && project._id) === pid);
+    return (hit && (hit.ProjectName || hit.ProjectCode)) || t('Projects.pages');
 });
 
 const routePageId = computed(() => firstId(Array.isArray(route.query && route.query.page)
@@ -602,6 +614,13 @@ watch(taskProjectId, (id) => {
     if (id) loadWriteback();
 }, { immediate: true });
 
+function ensurePageInList(page) {
+    const id = firstId(page && (page._id || page.id));
+    if (!id) return;
+    if (pages.value.some((row) => firstId(row && (row._id || row.id)) === id)) return;
+    pages.value = [page, ...pages.value];
+}
+
 function fetchPages() {
     if (props.workspace && routePageId.value && !projectId.value) {
         openPage(routePageId.value);
@@ -613,6 +632,7 @@ function fetchPages() {
     .then((response) => {
         if (gen !== pagesFetchGen) return;
         pages.value = response.data?.status ? (response.data.data || []) : [];
+        if (current.value) ensurePageInList(current.value);
         // Open every branch that has children the first time the panel loads, so the
         // tree shows what exists rather than hiding it behind twisties.
         if (!expanded.value.size) {
@@ -642,8 +662,9 @@ function openPage(id) {
     if (!confirmDiscard()) return;
     apiRequest('get', `/api/v2/pages/${id}`)
     .then((response) => {
-        if (response.data?.status) {
-            current.value = response.data.data;
+        const page = pageFromGetResponse(response) || (response.data && response.data.status ? response.data.data : null);
+        if (page) {
+            current.value = page;
             draftTitle.value = current.value.title || '';
             contentHtml.value = (current.value.content && current.value.content.html) || '';
             contentBlocks.value = contentToEditorData(current.value.content);
@@ -658,11 +679,13 @@ function openPage(id) {
             showShare.value = false;
             share.value = null;
             previewHtml.value = '';
+            ensurePageInList(page);
             if (props.workspace) {
                 const pid = firstId(
                     pageProjectId(current.value),
                     workspaceProjectId.value,
                     routeProjectId.value,
+                    props.projectData && props.projectData._id,
                 );
                 if (pid && firstId(workspaceProjectId.value) !== pid) {
                     workspaceProjectId.value = pid;

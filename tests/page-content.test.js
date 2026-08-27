@@ -278,9 +278,11 @@ describe('PAGES - kiln follow-up guards', () => {
         const resolveSrc = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'router', 'pages', 'resolvePageDeepLink.js'), 'utf8');
         const appRouter = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'router', 'index.js'), 'utf8');
         expect(space).toContain('route.params.projectId');
-        expect(space).toContain("kind === 'ready'");
+        expect(space).toContain('boundProject');
         expect(space).toContain('page_no_access');
+        expect(space).not.toContain("kind === 'opening'");
         expect(space).not.toContain('<PagesPanel workspace embedded />');
+        expect(space).toContain('PagesPanel');
         expect(pagesRouter).toContain("name: 'ProjectPages'");
         expect(pagesRouter).toContain('/:cid/projects/:projectId/pages');
         expect(resolveSrc).toContain('resolvePageDeepLink');

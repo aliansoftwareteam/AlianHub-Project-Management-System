@@ -25,6 +25,7 @@ const {
     sprintTasksBucket,
     boardEmptyKind,
     sprintExpectedCount,
+    boardHoursVisible,
 } = require('../Modules/Project/helpers/taskOpenProjectId');
 
 describe('TASK OPEN - pass ProjectID so taskData is not empty', () => {
@@ -398,6 +399,11 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(sprintExpectedCount({ tasks: 7 })).toBe(7);
         expect(sprintExpectedCount({ taskCount: 7 })).toBe(7);
         expect(sprintExpectedCount({ tasks: [] })).toBe(0);
+        expect(sprintExpectedCount({ tasks: [], taskCount: 7 })).toBe(7);
+        expect(boardHoursVisible('failed')).toBe(false);
+        expect(boardHoursVisible('loading')).toBe(false);
+        expect(boardHoursVisible('ready')).toBe(true);
+        expect(boardHoursVisible('empty')).toBe(true);
         const store = {
             [PROJECT]: {
                 sprints: [SPRINT],
@@ -411,8 +417,15 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         const board = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'views', 'Projects', 'Kanban', 'BoardView.vue'), 'utf8');
         expect(list).toContain('hasGroups');
         expect(list).toContain('sprintExpectedCount');
+        expect(list).toContain('Math.max(sprintExpectedCount(header), sprintExpectedCount(listed))');
         expect(board).toContain('hasGroups');
         expect(board).toContain('sprintExpectedCount');
+        const sprintsList = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'organisms', 'SprinstList', 'SprintsList.vue'), 'utf8');
+        expect(sprintsList).toContain('boardHoursVisible');
+        expect(sprintsList).toContain('v-if="showSprintHours"');
+        expect(sprintsList).toContain('data-board-hours');
+        expect(sprintsList).toContain("boardSurfaceKind === 'failed'");
+        expect(sprintsList).toContain('EmptyState.load_failed_title');
         const empty = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'atom', 'EmptyState', 'EmptyState.vue'), 'utf8');
         const locale = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'locales', 'en.js'), 'utf8');
         expect(empty).toContain('empty-state--pine');
@@ -483,14 +496,21 @@ describe('PAGES DEEP LINK - project-scoped hash before first paint', () => {
         expect(resolveSrc).not.toContain('unresolved');
         expect(resolveSrc).toContain('fetchPageRow');
         expect(space).toContain('route.params.projectId');
-        expect(space).toContain("kind === 'opening'");
-        expect(space).toContain("kind === 'ready' && (projectId || !pageId)");
-        expect(space).toContain('pageOpeningLine');
+        expect(space).toContain('boundProject');
+        expect(space).toContain('PagesPanel');
+        expect(space).not.toContain("kind === 'opening'");
+        expect(space).not.toContain('pages-space__opening');
+        expect(space).not.toContain('pageOpeningLine');
         expect(space).toContain('page_no_access');
         expect(space).toContain('page_not_in_named_project');
         expect(space).toContain('page_back_to_pages');
         expect(space).not.toContain('page_not_in_project');
         expect(space).not.toContain('PagesPanel v-if="true"');
+        const panel = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'molecules', 'Pages', 'PagesPanel.vue'), 'utf8');
+        expect(panel).toContain('workspaceSideKicker');
+        expect(panel).toContain('ensurePageInList');
+        expect(panel).toContain('pageFromGetResponse');
+        expect(panel).toContain('!rows.length && !current');
         expect(getPage).toContain('firstId(row.ProjectID');
         expect(getPage).toContain('row.projectId = pid');
     });

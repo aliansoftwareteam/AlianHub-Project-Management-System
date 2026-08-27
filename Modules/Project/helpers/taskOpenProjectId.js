@@ -248,10 +248,17 @@ function pageOpeningLine(title) {
 
 function sprintExpectedCount(sprint) {
     if (!sprint || typeof sprint !== 'object') return 0;
-    const raw = sprint.tasks != null ? sprint.tasks : (sprint.taskCount != null ? sprint.taskCount : sprint.archiveTaskCount);
-    if (Array.isArray(raw)) return raw.filter((row) => row && !row.deletedStatusKey).length;
-    const n = Number(raw);
-    return Number.isFinite(n) && n > 0 ? n : 0;
+    const counts = [sprint.tasks, sprint.taskCount, sprint.archiveTaskCount].map((raw) => {
+        if (raw == null) return 0;
+        if (Array.isArray(raw)) return raw.filter((row) => row && !row.deletedStatusKey).length;
+        const n = Number(raw);
+        return Number.isFinite(n) && n > 0 ? n : 0;
+    });
+    return Math.max(0, ...counts);
+}
+
+function boardHoursVisible(kind) {
+    return kind === 'ready' || kind === 'empty';
 }
 
 function boardEmptyKind({ loading, sprintsBound, boardCount, expectedCount, searchHits, hasGroups } = {}) {
@@ -287,5 +294,6 @@ module.exports = {
     sprintTasksBucket,
     countSprintBoardTasks,
     sprintExpectedCount,
+    boardHoursVisible,
     boardEmptyKind,
 };
