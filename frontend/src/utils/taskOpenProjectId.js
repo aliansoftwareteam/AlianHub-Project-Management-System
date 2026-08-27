@@ -146,6 +146,16 @@ export function taskOpenPath(ids = {}) {
     return `${base}/p`;
 }
 
+export function pageProjectId(page) {
+    if (!page || typeof page !== 'object') return '';
+    return firstId(
+        page.ProjectID,
+        page.projectId,
+        page.ProjectId,
+        page.project && (page.project._id || page.project.id || page.project),
+    );
+}
+
 export function pageOpenRoute({ companyId, projectId, pageId } = {}) {
     const cid = injectedId(companyId);
     const pid = firstId(projectId);

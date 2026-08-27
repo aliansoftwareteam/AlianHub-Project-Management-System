@@ -155,7 +155,9 @@ exports.getPage = async (req, res) => {
         if (String(page.visibility || '') === 'private' && String(page.createdBy || '') !== callerId(req)) {
             return res.send({ status: false, statusText: 'Page not found.' });
         }
-        return res.send({ status: true, statusText: 'Page fetched.', data: page });
+        const row = typeof page.toObject === 'function' ? page.toObject() : { ...page };
+        row.projectId = String(row.ProjectID || row.projectId || '');
+        return res.send({ status: true, statusText: 'Page fetched.', data: row });
     } catch (error) {
         logger.error(`ERROR in get page: ${error.message}`);
         return res.send({ status: false, statusText: error.message });

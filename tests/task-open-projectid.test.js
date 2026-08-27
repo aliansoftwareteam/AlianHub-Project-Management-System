@@ -18,6 +18,7 @@ const {
     pageOpenRoute,
     pageOpenPath,
     pageDeepLinkNeedsResolve,
+    pageProjectId,
     boardEmptyKind,
 } = require('../Modules/Project/helpers/taskOpenProjectId');
 
@@ -362,5 +363,20 @@ describe('PAGES DEEP LINK - project-scoped hash before first paint', () => {
         expect(pageDeepLinkNeedsResolve({ pageId: PAGE, projectId: '', routeName: 'Pages' })).toBe(true);
         expect(pageDeepLinkNeedsResolve({ pageId: PAGE, projectId: PROJECT, routeName: 'Pages' })).toBe(false);
         expect(pageDeepLinkNeedsResolve({ pageId: PAGE, projectId: '', routeName: 'ProjectPages' })).toBe(false);
+        expect(pageProjectId({ ProjectID: { $oid: PROJECT } })).toBe(PROJECT);
+        expect(pageProjectId({ projectId: PROJECT })).toBe(PROJECT);
+        expect(pageProjectId({ title: 'Ask smoke' })).toBe('');
+        const routerSrc = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'router', 'index.js'), 'utf8');
+        const resolveSrc = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'router', 'pages', 'resolvePageDeepLink.js'), 'utf8');
+        const space = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'views', 'Pages', 'PagesSpace.vue'), 'utf8');
+        const getPage = fs.readFileSync(path.join(__dirname, '..', 'Modules', 'Pages', 'controller.js'), 'utf8');
+        expect(routerSrc).toContain('resolvePageDeepLink');
+        expect(resolveSrc).toContain('pageOpenRoute');
+        expect(resolveSrc).toContain('pageProjectId');
+        expect(resolveSrc).toContain('unresolved');
+        expect(space).toContain('route.params.projectId');
+        expect(space).toContain('v-else-if="ready"');
+        expect(space).not.toContain('PagesPanel v-if="true"');
+        expect(getPage).toContain('row.projectId');
     });
 });

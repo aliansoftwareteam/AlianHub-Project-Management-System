@@ -153,6 +153,16 @@ function taskOpenPath(ids = {}) {
     return `${base}/p`;
 }
 
+function pageProjectId(page) {
+    if (!page || typeof page !== 'object') return '';
+    return firstId(
+        page.ProjectID,
+        page.projectId,
+        page.ProjectId,
+        page.project && (page.project._id || page.project.id || page.project),
+    );
+}
+
 function pageOpenRoute({ companyId, projectId, pageId } = {}) {
     const cid = injectedId(companyId);
     const pid = firstId(projectId);
@@ -199,5 +209,6 @@ module.exports = {
     pageOpenRoute,
     pageOpenPath,
     pageDeepLinkNeedsResolve,
+    pageProjectId,
     boardEmptyKind,
 };

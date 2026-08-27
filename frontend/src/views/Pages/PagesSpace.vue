@@ -10,59 +10,20 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { computed } from 'vue';
+import { useRoute } from 'vue-router';
 import PagesPanel from '@/components/molecules/Pages/PagesPanel.vue';
-import { apiRequest } from '@/services';
-import { firstId, pageOpenRoute } from '@/utils/taskOpenProjectId';
+import { firstId } from '@/utils/taskOpenProjectId';
 
 const route = useRoute();
-const router = useRouter();
-const ready = ref(false);
-const blocked = ref(false);
-let bindGen = 0;
-
-async function bindRoute() {
-    const gen = ++bindGen;
-    const cid = firstId(route.params && route.params.cid);
-    const paramPid = firstId(route.params && route.params.projectId);
+const blocked = computed(() => String((route.query && route.query.unresolved) || '') === '1');
+const ready = computed(() => {
+    if (blocked.value) return false;
     const pageId = firstId(route.query && route.query.page);
-    const queryPid = firstId(route.query && (route.query.project || route.query.projectId));
-    const knownPid = firstId(paramPid, queryPid);
-
-    blocked.value = false;
-
-    if (pageId && !paramPid) {
-        ready.value = false;
-        let resolved = knownPid;
-        if (!resolved) {
-            try {
-                const response = await apiRequest('get', `/api/v2/pages/${pageId}`);
-                if (gen !== bindGen) return;
-                const page = response && response.data && response.data.status ? response.data.data : null;
-                resolved = firstId(page && (page.ProjectID || page.projectId));
-            } catch (error) {
-                console.error('ERROR resolving page project: ', error);
-                if (gen !== bindGen) return;
-                blocked.value = true;
-                return;
-            }
-        }
-        const dest = pageOpenRoute({ companyId: cid, projectId: resolved, pageId });
-        if (!dest) {
-            blocked.value = true;
-            return;
-        }
-        await router.replace(dest).catch(() => {});
-        if (gen !== bindGen) return;
-        ready.value = true;
-        return;
-    }
-
-    ready.value = true;
-}
-
-watch(() => [route.name, route.params.projectId, route.query.page, route.query.project, route.query.projectId], bindRoute, { immediate: true });
+    const projectId = firstId(route.params && route.params.projectId);
+    if (pageId && !projectId) return false;
+    return true;
+});
 </script>
 
 <style scoped>

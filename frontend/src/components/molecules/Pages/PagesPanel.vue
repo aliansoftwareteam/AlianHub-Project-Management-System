@@ -14,6 +14,10 @@
                     <label class="pg__picker-label">{{ $t('Projects.pages_project_picker') }}</label>
                     <select v-model="workspaceProjectId" class="pg__picker">
                         <option value="">{{ $t('Projects.pages_project_none') }}</option>
+                        <option
+                            v-if="workspaceProjectId && !pickerProjects.some((project) => String(project._id) === String(workspaceProjectId))"
+                            :value="workspaceProjectId"
+                        >{{ workspaceProjectId }}</option>
                         <option v-for="project in pickerProjects" :key="project._id" :value="String(project._id)">
                             {{ project.ProjectName || project.ProjectCode || project._id }}
                         </option>
@@ -280,7 +284,7 @@ import AiTaskCreator from "@/components/organisms/AiTaskCreator/AiTaskCreator.vu
 
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
-import { firstId, pageOpenRoute } from '@/utils/taskOpenProjectId';
+import { firstId, pageOpenRoute, pageProjectId } from '@/utils/taskOpenProjectId';
 import { useGetterFunctions } from "@/composable";
 import pageContent from '@pageContent';
 const { contentToEditorData, blocksToRawText } = pageContent.default || pageContent;
@@ -365,8 +369,7 @@ const projectId = computed(() => firstId(
 
 const taskProjectId = computed(() => firstId(
     projectId.value,
-    current.value && current.value.ProjectID,
-    current.value && current.value.projectId,
+    pageProjectId(current.value),
 ));
 const rawDraft = computed(() => blocksToRawText(contentBlocks.value) || contentHtml.value || '');
 const pageBriefing = computed(() => String((current.value && current.value.briefing && current.value.briefing.markdown) || '').trim());
@@ -510,7 +513,7 @@ watch(() => props.openDocId, (id) => {
 watch(routePageId, (id, previous) => {
     if (!props.workspace || !id || id === previous) return;
     if (isOpen.value) openPage(id);
-});
+}, { immediate: true });
 
 watch(routeProjectId, (id) => {
     if (!props.workspace) return;
@@ -600,6 +603,10 @@ watch(taskProjectId, (id) => {
 }, { immediate: true });
 
 function fetchPages() {
+    if (props.workspace && routePageId.value && !projectId.value) {
+        openPage(routePageId.value);
+        return;
+    }
     const gen = ++pagesFetchGen;
     const queryString = projectId.value ? `?projectId=${projectId.value}` : '';
     apiRequest('get', `/api/v2/pages${queryString}`)
@@ -653,8 +660,7 @@ function openPage(id) {
             previewHtml.value = '';
             if (props.workspace) {
                 const pid = firstId(
-                    current.value && current.value.ProjectID,
-                    current.value && current.value.projectId,
+                    pageProjectId(current.value),
                     workspaceProjectId.value,
                     routeProjectId.value,
                 );
