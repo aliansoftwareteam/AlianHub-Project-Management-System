@@ -44,6 +44,18 @@ function firstId(...values) {
     return '';
 }
 
+function resolveTaskOpenIds(row) {
+    if (!row || typeof row !== 'object') {
+        return { projectId: '', sprintId: '', taskId: '' };
+    }
+    const sprint = row.sprintArray || row.sprint || {};
+    return {
+        projectId: firstId(row.ProjectID, row.projectId, row.ProjectId, sprint.projectId),
+        sprintId: firstId(row.sprintId, row.SprintId, sprint.id, sprint._id),
+        taskId: firstId(row.taskId, row._id, row.id),
+    };
+}
+
 function resolveOpenProjectId({ queryProjectId, task, selectedTask, routeProjectId } = {}) {
     return firstId(
         queryProjectId,
@@ -258,7 +270,16 @@ function sprintExpectedCount(sprint) {
 }
 
 function boardHoursVisible(kind) {
-    return kind === 'ready' || kind === 'empty';
+    return kind === 'ready';
+}
+
+function countRenderedSprintItems(groups) {
+    if (!Array.isArray(groups)) return 0;
+    return groups.reduce((n, group) => {
+        const rows = (group && (group.tasksArray || group.items || group.tasks)) || [];
+        if (!Array.isArray(rows)) return n;
+        return n + rows.filter((row) => row && !row.deletedStatusKey).length;
+    }, 0);
 }
 
 function boardEmptyKind({ loading, sprintsBound, boardCount, expectedCount, searchHits, hasGroups } = {}) {
@@ -274,6 +295,7 @@ function boardEmptyKind({ loading, sprintsBound, boardCount, expectedCount, sear
 module.exports = {
     firstId,
     injectedId,
+    resolveTaskOpenIds,
     resolveOpenProjectId,
     shapeOpenTaskHit,
     shouldShowTaskSkeleton,
@@ -293,6 +315,7 @@ module.exports = {
     lookupById,
     sprintTasksBucket,
     countSprintBoardTasks,
+    countRenderedSprintItems,
     sprintExpectedCount,
     boardHoursVisible,
     boardEmptyKind,

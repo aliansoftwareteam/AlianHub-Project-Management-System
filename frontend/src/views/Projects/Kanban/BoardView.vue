@@ -177,11 +177,12 @@ const emptyKind = computed(() => {
     const pid = firstId(project.value && project.value._id);
     const sid = firstId(sprint && (sprint.id || sprint._id));
     const groups = (internalGroupedTasks.value[0] && internalGroupedTasks.value[0].items) || [];
+    const stored = countSprintBoardTasks(allProjectTasks.value, pid, sid);
     return boardEmptyKind({
         loading: isLoading.value || props.sprintLoading,
         sprintsBound: Boolean(props.sprints && props.sprints.length),
-        boardCount: Math.max(shownBoardCount.value, countSprintBoardTasks(allProjectTasks.value, pid, sid)),
-        expectedCount: boardExpectedCount.value,
+        boardCount: shownBoardCount.value,
+        expectedCount: Math.max(boardExpectedCount.value, stored),
         searchHits: Boolean(searchedTask && searchedTask.value && searchedTasksData.value.length),
         hasGroups: groups.length > 0,
     });

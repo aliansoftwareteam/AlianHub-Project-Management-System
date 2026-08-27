@@ -121,12 +121,13 @@
 
     const taskDest = (task) => {
         const ids = resolveTaskOpenIds(task || {});
+        const listed = findParticularProject(task && task.ProjectID);
         return taskOpenRoute({
             companyId: companyIdNow(),
-            projectId: ids.projectId,
+            projectId: ids.projectId || firstId(listed && listed._id),
             sprintId: ids.sprintId,
             taskId: ids.taskId,
-            folderId: task && task.folderObjId,
+            folderId: firstId(task && (task.folderObjId || (task.sprintArray && task.sprintArray.folderId))),
         });
     };
 
@@ -147,15 +148,16 @@
         if (event && typeof event.preventDefault === 'function') event.preventDefault();
         if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
         const dest = taskDest(task);
-        if (!dest) return;
+        if (!dest || !dest.params || !dest.params.taskId) return;
+        const next = { ...dest, query: { detailTab: 'task-detail-tab' } };
+        router.push(next).catch((error) => {
+            console.error('ERROR opening search task: ', error);
+            const path = router.resolve(next).href || '';
+            if (path) window.location.hash = path.replace(/^[^#]*#/, '');
+        });
         if (typeof closeAdvanceSearch === 'function') closeAdvanceSearch();
         closeGlobalSearch();
         markSearchClosed();
-        router.push({ ...dest, query: { detailTab: 'task-detail-tab' } }).catch((error) => {
-            console.error('ERROR opening search task: ', error);
-            const path = router.resolve({ ...dest, query: { detailTab: 'task-detail-tab' } }).href || '';
-            if (path) window.location.hash = path.replace(/^[^#]*#/, '');
-        });
     };
     const openFromTitle = (event, task) => {
         if (event && (event.metaKey || event.ctrlKey)) return;

@@ -273,6 +273,8 @@ describe('PAGES - kiln follow-up guards', () => {
         expect(panel).toContain('pageOpenRoute');
         expect(panel).toContain('ProjectPages');
         expect(panel).toContain('stopImmediatePropagation');
+        expect(panel).toContain('loadTree');
+        expect(panel).toContain('workspace && routePageId.value && !projectId.value');
         const space = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'views', 'Pages', 'PagesSpace.vue'), 'utf8');
         const pagesRouter = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'router', 'pages', 'index.js'), 'utf8');
         const resolveSrc = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'router', 'pages', 'resolvePageDeepLink.js'), 'utf8');
@@ -289,6 +291,9 @@ describe('PAGES - kiln follow-up guards', () => {
         expect(resolveSrc).toContain('pageOpenRoute');
         expect(resolveSrc).toContain('pageFromGetResponse');
         expect(resolveSrc).toContain('/api/v2/pages/');
+        expect(resolveSrc).toContain('fetchPageRow');
+        expect(resolveSrc).not.toContain('pageDeepLinkNeedsResolve');
+        expect(resolveSrc).toContain('knownPid');
         expect(appRouter).toContain('resolvePageDeepLink');
         expect(locale).toContain('workspace_ask_sources');
         expect(locale).toContain('pages_citation_page');

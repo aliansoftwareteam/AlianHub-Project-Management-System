@@ -57,6 +57,7 @@ function emitTaskTab() {
 function onTabPointer() {
     emitTaskTab();
     markTabPointer();
+    if (!props.isActive) emit('changeTab', props.tabKey);
 }
 
 function selectTab() {

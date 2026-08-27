@@ -15,10 +15,7 @@
 - [x] Comments pane lists existing Alian comments for the open taskId (no empty pane with badge 1)
 
 ## Last step
-Bot 2 Autofill card lock: empty fields only; Assignee empty until a named rail chip; Due always listed (pine Apply with a date, otherwise “No suggestion”); Dismiss-only only when nothing can apply; FILLED never on a dash. SMOKE-7: Assignee suggest/apply, Owner omitted, Due 2026-08-28 + Apply, Fill empty after apply/dismiss.
-
-## Blockers
-None. Live Local Smoke is not in this VM (no Mongo), so Ctrl+K / board / pages were not browser-verified here.
+Bot 2 glitch pass: `resolvePageDeepLink` GETs the page when `knownPid` is missing; PagesPanel loads Local Smoke tree instead of Workspace/No pages yet; failed bind uses rendered count so copper Retry hides 00h; Ctrl+K title/Open push with taskId first; Comments mousedown emits changeTab.
 
 ## Blockers
 None. Live Local Smoke is not in this VM (no Mongo), so Ctrl+K / board / pages were not browser-verified here.
@@ -49,3 +46,4 @@ None. Live Local Smoke is not in this VM (no Mongo), so Ctrl+K / board / pages w
 - Bot 3 remainder on ca3cc74 overlay: header `…` Escape was closing the overflow menu and the panel in one press. TaskDetail now owns the stack in capture (menu, title, Autofill strip, panel). Autofill skip-filled matches Details: ghost/unresolved Assignee ids count as empty so Apply can land; filled Owner is omitted instead of a FILLED row; Due grounds to the sprint end even when the LLM returns `[]`. Fill empty stays in the card next to Dismiss. Gantt not started.
 - Overlay evidence (Dismiss-only card): Assignee FILLED while the rail had no chip; Owner Local PM FILLED blocked the card; Due was inert (`—`) with “No grounded suggestions…”. Skip-filled now follows the rail (`indexOf`-safe string chips only), Owner filled is omitted, Due seeds sprint end 2026-08-28, Assignee seeds from Task_Leader when empty, and Apply / Fill empty return. No FILLED badge. Gantt not started. Write-back not re-implemented.
 - Bot 2 Autofill card lock: the card lists empty fields only. Assignee stays empty until the Details chip has a name. Empty Due always gets a row (pine Apply when a date is grounded, otherwise “No suggestion”). Dismiss-only only when nothing can apply. FILLED never sits on a dash. SMOKE-7: Assignee suggest/apply, Owner omitted, Due 2026-08-28 + Apply, Fill empty after apply/dismiss. Hydrate P0s stay. Gantt not started.
+- Bot 2 glitch pass on live v14.33.0: `#/<cid>/pages?page=` GET-resolves ProjectID (no null when knownPid missing) and PagesPanel loads the Local Smoke tree instead of Workspace/No pages yet; Ask smoke body + write-back strip stay. Board bind uses rendered item count so store=7/shown=0 is copper Retry without Planned/Logged 00h. Ctrl+K SMOKE-7 title + Open require taskId, push first, then close overlay. Comments mousedown emits changeTab so a swallowed click still switches. Gantt not started. Write-back not re-implemented.

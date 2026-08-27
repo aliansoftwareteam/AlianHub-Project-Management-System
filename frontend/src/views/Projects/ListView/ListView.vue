@@ -50,7 +50,7 @@ import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPla
 import isEqual from 'lodash/isEqual';
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { useTaskSelection } from '@/composable/useTaskSelection.js';
-import { boardEmptyKind, countSprintBoardTasks, firstId, sprintExpectedCount } from '@/utils/taskOpenProjectId';
+import { boardEmptyKind, countRenderedSprintItems, countSprintBoardTasks, firstId, sprintExpectedCount } from '@/utils/taskOpenProjectId';
 
 // UTILS
 const {getters} = useStore();
@@ -120,11 +120,13 @@ const emptyKind = computed(() => {
     const pid = firstId(project.value && project.value._id);
     const sid = firstId(sprint && (sprint.id || sprint._id));
     const groups = sprint && Array.isArray(sprint.items) ? sprint.items : [];
+    const shown = countRenderedSprintItems(groups);
+    const stored = countSprintBoardTasks(allProjectTasks.value, pid, sid);
     return boardEmptyKind({
         loading: isLoading.value || props.sprintLoading,
         sprintsBound: Boolean(props.sprints && props.sprints.length),
-        boardCount: countSprintBoardTasks(allProjectTasks.value, pid, sid),
-        expectedCount: boardExpectedCount.value,
+        boardCount: shown,
+        expectedCount: Math.max(boardExpectedCount.value, stored),
         searchHits: Boolean(searchedTask && searchedTask.value && searchedTasksData.value.length),
         hasGroups: groups.length > 0,
     });

@@ -1,7 +1,6 @@
 import { apiRequest } from '@/services';
 import {
     firstId,
-    pageDeepLinkNeedsResolve,
     pageFromGetResponse,
     pageOpenRoute,
     pageProjectId,
@@ -49,15 +48,16 @@ export async function resolvePageDeepLink(to) {
     const cid = firstId(to && to.params && to.params.cid);
     const knownPid = queryProjectId(to);
     if (!cid || !pageId) return null;
-    if (to.name !== 'Pages' && to.name !== 'ProjectPages') return null;
+    const path = String((to && to.path) || '');
+    const onPages = to.name === 'Pages'
+        || to.name === 'ProjectPages'
+        || /\/pages\/?$/.test(path);
+    if (!onPages) return null;
 
     if (knownPid) {
-        if (to.name === 'ProjectPages') return null;
         const dest = pageOpenRoute({ companyId: cid, projectId: knownPid, pageId });
         return dest && !sameDest(to, dest) ? dest : null;
     }
-
-    if (!pageDeepLinkNeedsResolve({ pageId, projectId: knownPid, routeName: to.name })) return null;
 
     try {
         if (typeof localStorage !== 'undefined' && !localStorage.getItem('selectedCompany')) {

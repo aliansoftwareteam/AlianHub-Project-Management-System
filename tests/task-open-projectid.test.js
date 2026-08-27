@@ -5,6 +5,7 @@ const path = require('path');
 const {
     resolveOpenProjectId,
     firstId,
+    resolveTaskOpenIds,
     shapeOpenTaskHit,
     shouldShowTaskSkeleton,
     shouldShowTaskChrome,
@@ -22,6 +23,7 @@ const {
     pageProjectId,
     pageFromGetResponse,
     countSprintBoardTasks,
+    countRenderedSprintItems,
     sprintTasksBucket,
     boardEmptyKind,
     sprintExpectedCount,
@@ -67,6 +69,10 @@ describe('TASK OPEN - pass ProjectID so taskData is not empty', () => {
         expect(advance).not.toContain('imgOpenSameTab');
         expect(advance).not.toContain('imgOpenNewTab');
         expect(advance).toContain('taskOpenRoute');
+        expect(advance).toContain('resolveTaskOpenIds');
+        expect(advance).toContain('sprintArray');
+        expect(advance).toContain('dest.params.taskId');
+        expect(advance).toContain('router.push(next)');
         expect(advance).toContain('closeAdvanceSearch');
         expect(advance).toContain('closeGlobalSearch');
         expect(advance).not.toContain('window.open');
@@ -99,6 +105,20 @@ describe('TASK OPEN - pass ProjectID so taskData is not empty', () => {
         expect(shaped._id).toBe('64b7f0c2a1b2c3d4e5f60722');
         expect(shapeOpenTaskHit({ TaskName: 'no id' })).toBe(null);
         expect(shapeOpenTaskHit({ _id: 't1' }).ProjectID).toBe('');
+        expect(resolveTaskOpenIds({
+            _id: '6a8f8cc420e171dfa740fc43',
+            TaskKey: 'SMOKE-7',
+            sprintArray: {
+                id: '6a8f0b22e2ad4d0997553eb4',
+                projectId: '6a8f09301f05e701eaf45c9a',
+                folderId: '',
+            },
+        })).toEqual({
+            projectId: '6a8f09301f05e701eaf45c9a',
+            sprintId: '6a8f0b22e2ad4d0997553eb4',
+            taskId: '6a8f8cc420e171dfa740fc43',
+        });
+        expect(resolveTaskOpenIds(null)).toEqual({ projectId: '', sprintId: '', taskId: '' });
     });
 
     test('empty projectId never shows a task skeleton; fail-fast is the fallback', () => {
@@ -289,6 +309,10 @@ describe('SEARCH OPEN - same-tab hash with ProjectID, TaskKey, and auto-select',
         expect(advance).not.toContain('imgOpenNewTab');
         expect((advance.match(/:href="taskHref"/g) || []).length).toBe(2);
         expect(advance).toContain('taskOpenRoute');
+        expect(advance).toContain('resolveTaskOpenIds');
+        expect(advance).toContain('sprintArray');
+        expect(advance).toContain('dest.params.taskId');
+        expect(advance).toContain('router.push(next)');
         expect(advance).toContain('closeAdvanceSearch');
         expect(advance).toContain('closeGlobalSearch');
         expect(advance).toContain('markSearchClosed');
@@ -329,6 +353,8 @@ describe('SEARCH OPEN - same-tab hash with ProjectID, TaskKey, and auto-select',
         expect(body).not.toContain("activeTab === 'comment' && Object.keys(projectData).length");
         expect(tabs).toContain('selectTab');
         expect(tabs).toContain("emit('changeTab'");
+        expect(tabs).toContain('onTabPointer');
+        expect(tabs).toContain("if (!props.isActive) emit('changeTab', props.tabKey)");
         expect(tabs).toContain('@click.prevent.stop="selectTab"');
         expect(tabs).toContain('@mousedown.stop.prevent="onTabPointer"');
         expect(tabs).toContain('data-tab');
@@ -403,14 +429,18 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 2, expectedCount: 2 })).toBe('ready');
         expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 0, expectedCount: 7, hasGroups: false })).toBe('failed');
         expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 0, expectedCount: 0, hasGroups: false })).toBe('failed');
+        expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 0, expectedCount: 7, hasGroups: true })).toBe('failed');
         expect(sprintExpectedCount({ tasks: 7 })).toBe(7);
         expect(sprintExpectedCount({ taskCount: 7 })).toBe(7);
         expect(sprintExpectedCount({ tasks: [] })).toBe(0);
         expect(sprintExpectedCount({ tasks: [], taskCount: 7 })).toBe(7);
+        expect(countRenderedSprintItems([{ tasksArray: [] }, { tasksArray: [] }])).toBe(0);
+        expect(countRenderedSprintItems([{ tasksArray: [{ _id: 't1' }, { _id: 't2', deletedStatusKey: 1 }] }])).toBe(1);
+        expect(countRenderedSprintItems([{ items: [{ _id: 't1' }] }, { tasks: [{ _id: 't2' }] }])).toBe(2);
         expect(boardHoursVisible('failed')).toBe(false);
         expect(boardHoursVisible('loading')).toBe(false);
         expect(boardHoursVisible('ready')).toBe(true);
-        expect(boardHoursVisible('empty')).toBe(true);
+        expect(boardHoursVisible('empty')).toBe(false);
         const store = {
             [PROJECT]: {
                 sprints: [SPRINT],
@@ -424,9 +454,14 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         const board = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'views', 'Projects', 'Kanban', 'BoardView.vue'), 'utf8');
         expect(list).toContain('hasGroups');
         expect(list).toContain('sprintExpectedCount');
+        expect(list).toContain('countRenderedSprintItems');
         expect(list).toContain('Math.max(sprintExpectedCount(header), sprintExpectedCount(listed))');
+        expect(list).toContain('boardCount: shown');
+        expect(list).not.toContain('boardCount: countSprintBoardTasks');
         expect(board).toContain('hasGroups');
         expect(board).toContain('sprintExpectedCount');
+        expect(board).toContain('boardCount: shownBoardCount.value');
+        expect(board).not.toContain('Math.max(shownBoardCount');
         const sprintsList = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'organisms', 'SprinstList', 'SprintsList.vue'), 'utf8');
         expect(sprintsList).toContain('boardHoursVisible');
         expect(sprintsList).toContain('v-if="showSprintHours"');
@@ -502,6 +537,9 @@ describe('PAGES DEEP LINK - project-scoped hash before first paint', () => {
         expect(resolveSrc).toContain('companyId');
         expect(resolveSrc).not.toContain('unresolved');
         expect(resolveSrc).toContain('fetchPageRow');
+        expect(resolveSrc).not.toContain('pageDeepLinkNeedsResolve');
+        expect(resolveSrc).toContain('knownPid');
+        expect(resolveSrc).toContain('/\\/pages\\/?$/');
         expect(space).toContain('route.params.projectId');
         expect(space).toContain('boundProject');
         expect(space).toContain('PagesPanel');
@@ -518,6 +556,9 @@ describe('PAGES DEEP LINK - project-scoped hash before first paint', () => {
         expect(panel).toContain('ensurePageInList');
         expect(panel).toContain('pageFromGetResponse');
         expect(panel).toContain('!rows.length && !current');
+        expect(panel).toContain('loadTree');
+        expect(panel).toContain('workspace && routePageId.value && !projectId.value');
+        expect(panel).toContain('workspaceProjectId.value = pid');
         expect(getPage).toContain('firstId(row.ProjectID');
         expect(getPage).toContain('row.projectId = pid');
     });

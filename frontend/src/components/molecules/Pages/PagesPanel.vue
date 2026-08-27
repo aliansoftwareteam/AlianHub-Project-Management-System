@@ -622,33 +622,53 @@ function ensurePageInList(page) {
 }
 
 function fetchPages() {
+    const gen = ++pagesFetchGen;
+    const loadTree = (pid) => {
+        const queryString = pid ? `?projectId=${pid}` : '';
+        apiRequest('get', `/api/v2/pages${queryString}`)
+        .then((response) => {
+            if (gen !== pagesFetchGen) return;
+            pages.value = response.data?.status ? (response.data.data || []) : [];
+            if (current.value) ensurePageInList(current.value);
+            if (!expanded.value.size) {
+                expanded.value = new Set(pages.value.filter((p) => p.parentPageId).map((p) => String(p.parentPageId)));
+            }
+            if (props.workspace && routePageId.value) {
+                openPage(routePageId.value);
+            } else if (props.embedded && !current.value && !props.openDocId && rows.value.length) {
+                openPage(rows.value[0]._id);
+            }
+        })
+        .catch((error) => console.error('ERROR in fetch pages: ', error));
+    };
     if (props.workspace && routePageId.value && !projectId.value) {
-        openPage(routePageId.value);
+        const cid = firstId(route.params && route.params.cid);
+        apiRequest('get', `/api/v2/pages/${routePageId.value}`, null, null, { headers: { companyId: cid } })
+        .then((response) => {
+            if (gen !== pagesFetchGen) return;
+            const page = pageFromGetResponse(response) || (response.data && response.data.status ? response.data.data : null);
+            if (page) {
+                ensurePageInList(page);
+                const pid = pageProjectId(page);
+                if (pid && firstId(workspaceProjectId.value) !== pid) {
+                    workspaceProjectId.value = pid;
+                }
+                if (pid) {
+                    loadTree(pid);
+                    syncWorkspaceHash({ pageId: routePageId.value, projectId: pid });
+                    openPage(routePageId.value);
+                    return;
+                }
+            }
+            openPage(routePageId.value);
+        })
+        .catch((error) => {
+            console.error('ERROR in fetch page project: ', error);
+            openPage(routePageId.value);
+        });
         return;
     }
-    const gen = ++pagesFetchGen;
-    const queryString = projectId.value ? `?projectId=${projectId.value}` : '';
-    apiRequest('get', `/api/v2/pages${queryString}`)
-    .then((response) => {
-        if (gen !== pagesFetchGen) return;
-        pages.value = response.data?.status ? (response.data.data || []) : [];
-        if (current.value) ensurePageInList(current.value);
-        // Open every branch that has children the first time the panel loads, so the
-        // tree shows what exists rather than hiding it behind twisties.
-        if (!expanded.value.size) {
-            expanded.value = new Set(pages.value.filter((p) => p.parentPageId).map((p) => String(p.parentPageId)));
-        }
-        // As a view, landing on "pick a doc" reads as an empty project even when
-        // it has docs, so start on the first one. Only when nothing is open and
-        // no doc was asked for — and with no docs at all the empty state is still
-        // the right answer. The panel keeps its picker: it is opened FROM a doc.
-        if (props.workspace && routePageId.value) {
-            openPage(routePageId.value);
-        } else if (props.embedded && !current.value && !props.openDocId && rows.value.length) {
-            openPage(rows.value[0]._id);
-        }
-    })
-    .catch((error) => console.error('ERROR in fetch pages: ', error));
+    loadTree(projectId.value);
 }
 
 // Leaving a page with unsaved edits is the one way to lose work here, so it is the one
