@@ -23,6 +23,9 @@
     padding-left: 9px;
     margin: 0;
     text-transform: capitalize;
+    position: relative;
+    z-index: 0;
+    pointer-events: auto;
 }
 
 .input-border-color{

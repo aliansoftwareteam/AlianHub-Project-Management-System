@@ -65,6 +65,7 @@ import { useRouter, useRoute } from "vue-router";
 import { apiRequest } from '@/services';
 import { useCustomComposable } from "@/composable";
 import { resolveTaskOpenIds, firstId, injectedId, taskOpenRoute } from '@/utils/taskOpenProjectId';
+import { closeGlobalSearch } from '@/utils/openGlobalSearch';
 
 const { debounce } = useCustomComposable();
 const router = useRouter();
@@ -110,6 +111,7 @@ watch(() => props.modelValue, (open) => {
 });
 
 function close() {
+    closeGlobalSearch();
     emit('update:modelValue', false);
 }
 

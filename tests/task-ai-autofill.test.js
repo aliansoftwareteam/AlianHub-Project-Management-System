@@ -327,4 +327,19 @@ describe('TASKS - AI autofill custom fields', () => {
         expect(tagOnly).toEqual([expect.objectContaining({ fieldId: 'f-tag' })]);
         expect(planAutofillWrites(tagOnly).every((row) => row.fieldId === 'f-tag')).toBe(true);
     });
+
+    test('task panel Autofill is two labeled rows with per-row apply, not gated on CustomFields', () => {
+        const fs = require('fs');
+        const path = require('path');
+        const card = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'molecules', 'TaskAiAutofill', 'TaskAiAutofill.vue'), 'utf8');
+        const tab = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'molecules', 'TaskDetailTab', 'TaskDetailTab.vue'), 'utf8');
+        expect(card).toContain('applyOne');
+        expect(card).toContain('rowTitle');
+        expect(card).toContain('autofill_native');
+        expect(card).toContain('autofill_custom_people');
+        expect(card).toContain("item.fieldId === 'assignee'");
+        expect(card).not.toContain("checkApps('CustomFields')");
+        expect(tab).toContain('TaskAiAutofill');
+        expect(tab).toContain('checkPermission(\'task.task_assignee\'');
+    });
 });

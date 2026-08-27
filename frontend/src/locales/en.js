@@ -1833,6 +1833,8 @@ export default {
         autofill_failed: "Could not suggest values. Try again.",
         autofill_applied: "Empty fields filled.",
         autofill_none: "No grounded suggestions for the empty fields.",
+        autofill_native: "native",
+        autofill_custom_people: "custom people",
     },
     Category: {
         cateory_name: "Category Name",

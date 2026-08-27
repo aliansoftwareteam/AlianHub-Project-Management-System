@@ -322,6 +322,9 @@ describe('AUTOMATIONS - write-back reuses 005-007 without wiring set_priority in
         );
         expect(card).not.toContain('taf__kind');
         expect(card).toContain('taf__pick');
+        expect(card).toContain('applyOne');
+        expect(card).toContain('autofill_native');
+        expect(card).toContain('autofill_custom_people');
         expect(card).toContain('autofill_fill_empty');
         expect(activity).toContain('alian-mark');
         expect(activity).toContain('agent_writeback');

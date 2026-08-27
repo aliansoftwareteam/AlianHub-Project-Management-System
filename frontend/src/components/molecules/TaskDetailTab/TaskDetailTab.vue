@@ -55,6 +55,10 @@
                 :task="task"
                 class="mt-1"
             />
+            <TaskAiAutofill
+                :task="props.task"
+                :enabled="checkPermission('task.task_custom_field',projectData?.isGlobalPermission) || checkPermission('task.task_assignee',projectData?.isGlobalPermission)"
+            />
             <div class="position-re" v-if="checkPermission('task.task_custom_field',projectData?.isGlobalPermission) !== null">
                 <!-- App enabled for this project: existing behavior (feature, or blurred feature + upgrade overlay when the plan doesn't include it). -->
                 <div v-if="checkApps('CustomFields')">
@@ -151,6 +155,7 @@ import { useCustomComposable, useGetterFunctions } from '@/composable';
 import taskClass from '@/utils/TaskOperations';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import AppTeaserBlock from '@/components/molecules/AppTeaserBlock/AppTeaserBlock.vue';
+import TaskAiAutofill from '@/components/molecules/TaskAiAutofill/TaskAiAutofill.vue';
 import {storageQueryBuilder,generateFileName} from '@/utils/storageQueryBuild.js';
 import { buildCloudAttachment, isCloudAttachment, cloudTypeOf, CLOUD_PROVIDERS } from '@/utils/cloudAttachment';
 import { importCloudFile } from '@/composable/cloudPicker';

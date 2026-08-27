@@ -11,7 +11,7 @@
             width="1545px"
             :defaultLayout="false"
             :visible="isTaskDetailSideBar"
-            @update:visible="() => $emit('toggleTaskDetail' , task, true)"
+            @update:visible="onSidebarVisible"
             className="task-detail-sidebar"
             headClass="task-detail-head"
             :zIndex="props.zIndex"
@@ -123,6 +123,7 @@
     import * as env from '@/config/env';
     import { resolveOpenProjectId, shouldShowTaskChrome, bindSprintsToProject, asDocList, taskOpenRoute, firstId } from '@/utils/taskOpenProjectId';
     import { openGlobalSearch } from '@/utils/openGlobalSearch';
+    import { ignoreTaskBackdrop } from '@/utils/taskPanelGuard';
     import Sidebar from '@/components/molecules/Sidebar/Sidebar.vue'
     import TaskDetailNavBar from '@/components/molecules/TaskDetailNavBar/TaskDetailNavBar.vue'
     import TaskDetailTitle from '@/components/molecules/TaskDetailTitle/TaskDetailTitle.vue'
@@ -278,6 +279,27 @@
 
     const titleRef = ref(null);
 
+    function nestedLayerOpen() {
+        if (document.querySelector('.taf__preview')) return 'autofill';
+        if (document.querySelector('.drop-down-menu')) return 'dropdown';
+        if (document.querySelector('.reminder-modal, .reminder-modal__overlay')) return 'modal';
+        return '';
+    }
+
+    function dismissNestedLayer(kind) {
+        if (kind === 'autofill') {
+            document.dispatchEvent(new CustomEvent('kiln-dismiss-autofill'));
+            return;
+        }
+        if (kind === 'dropdown') {
+            document.dispatchEvent(new CustomEvent('kiln-dismiss-dropdown'));
+            return;
+        }
+        if (kind === 'modal') {
+            document.dispatchEvent(new CustomEvent('kiln-dismiss-modal'));
+        }
+    }
+
     function onPanelEscape(event) {
         if (!event || event.key !== 'Escape') return;
         if (titleRef.value && titleRef.value.isEditing) {
@@ -287,7 +309,20 @@
             if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
             return;
         }
+        const nested = nestedLayerOpen();
+        if (nested) {
+            dismissNestedLayer(nested);
+            event.preventDefault();
+            event.stopPropagation();
+            if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+            return;
+        }
         if (event.defaultPrevented) return;
+        emit('toggleTaskDetail', task.value, true);
+    }
+
+    function onSidebarVisible() {
+        if (ignoreTaskBackdrop()) return;
         emit('toggleTaskDetail', task.value, true);
     }
 

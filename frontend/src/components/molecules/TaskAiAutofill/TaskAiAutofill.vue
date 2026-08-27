@@ -1,5 +1,5 @@
 <template>
-    <div v-if="canShow" class="taf">
+    <div v-if="canShow" class="taf" data-taf>
         <button
             type="button"
             class="taf__go"
@@ -12,20 +12,19 @@
             <ul class="taf__list">
                 <li v-for="item in suggestions" :key="item.fieldId" class="taf__item">
                     <label class="taf__pick">
-                        <input
-                            type="checkbox"
-                            :checked="isSelected(item.fieldId)"
-                            @change="toggleRow(item.fieldId)"
-                        />
-                        <span class="taf__title">{{ item.title }}</span>
+                        <span class="taf__title">{{ rowTitle(item) }}</span>
+                        <span v-if="rowHint(item)" class="taf__hint">{{ rowHint(item) }}</span>
                     </label>
                     <span class="taf__value">{{ item.display || item.value }}</span>
+                    <button
+                        type="button"
+                        class="taf__apply"
+                        :disabled="busy"
+                        @click="applyOne(item)"
+                    >{{ busy ? $t('CustomField.autofill_working') : $t('CustomField.autofill_apply') }}</button>
                 </li>
             </ul>
             <div class="taf__actions">
-                <button type="button" class="taf__apply" :disabled="busy || !selectedIds.length" @click="apply">
-                    {{ busy ? $t('CustomField.autofill_working') : $t('CustomField.autofill_apply') }}
-                </button>
                 <button type="button" class="taf__dismiss" :disabled="busy" @click="dismiss">
                     {{ $t('CustomField.autofill_dismiss') }}
                 </button>
@@ -35,7 +34,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import { useToast } from 'vue-toast-notification';
@@ -53,32 +52,62 @@ const emit = defineEmits(['applied']);
 const { t } = useI18n();
 const $toast = useToast();
 const { commit } = useStore();
-const { checkApps } = useCustomComposable();
+const { getAppState } = useCustomComposable();
 
 const busy = ref(false);
 const notice = ref('');
 const suggestions = ref([]);
-const selectedIds = ref([]);
 const filledOnce = ref(false);
+const previewedFor = ref('');
 
-const canShow = computed(() => Boolean(props.enabled) && Boolean(checkApps('AI')) && Boolean(checkApps('CustomFields')));
+const canShow = computed(() => {
+    if (!props.enabled || !props.task || !props.task._id) return false;
+    return getAppState('AI') !== 'upgrade';
+});
 const goLabel = computed(() => {
     if (busy.value && !suggestions.value.length) return t('CustomField.autofill_working');
     return filledOnce.value ? t('CustomField.autofill_fill_empty') : t('CustomField.autofill');
 });
 
-function isSelected(fieldId) {
-    return selectedIds.value.includes(String(fieldId));
+function rowTitle(item) {
+    if (!item) return '';
+    if (item.source === 'native' || item.fieldId === 'assignee') return t('ProjectDetails.assignee');
+    if (item.kind === 'owner') return item.title || 'Owner';
+    if (item.kind === 'date') return item.title || t('Projects.due_date');
+    return item.title || '';
 }
 
-function toggleRow(fieldId) {
-    const id = String(fieldId);
-    if (selectedIds.value.includes(id)) {
-        selectedIds.value = selectedIds.value.filter((item) => item !== id);
-    } else {
-        selectedIds.value = [...selectedIds.value, id];
-    }
+function rowHint(item) {
+    if (!item) return '';
+    if (item.source === 'native' || item.fieldId === 'assignee') return t('CustomField.autofill_native');
+    if (item.kind === 'owner') return t('CustomField.autofill_custom_people');
+    return '';
 }
+
+function dismiss() {
+    suggestions.value = [];
+    notice.value = '';
+}
+
+function onEscape(event) {
+    if (!event || event.key !== 'Escape') return;
+    if (!suggestions.value.length) return;
+    const tag = document.activeElement && document.activeElement.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+    dismiss();
+}
+
+onMounted(() => {
+    document.addEventListener('keydown', onEscape, true);
+    document.addEventListener('kiln-dismiss-autofill', dismiss);
+});
+onBeforeUnmount(() => {
+    document.removeEventListener('keydown', onEscape, true);
+    document.removeEventListener('kiln-dismiss-autofill', dismiss);
+});
 
 function patchTask(next) {
     const task = props.task || {};
@@ -93,18 +122,11 @@ function patchTask(next) {
     });
 }
 
-function dismiss() {
-    suggestions.value = [];
-    selectedIds.value = [];
-    notice.value = '';
-}
-
 async function preview() {
     if (busy.value || !props.task?._id) return;
     busy.value = true;
     notice.value = '';
     suggestions.value = [];
-    selectedIds.value = [];
     try {
         const response = await apiRequest('post', env.V2_TASKS_AI_AUTOFILL, {
             action: 'preview',
@@ -121,7 +143,7 @@ async function preview() {
             return;
         }
         suggestions.value = next;
-        selectedIds.value = next.map((item) => String(item.fieldId));
+        previewedFor.value = String(props.task._id);
     } catch (_error) {
         notice.value = t('CustomField.autofill_failed');
     } finally {
@@ -129,41 +151,59 @@ async function preview() {
     }
 }
 
-async function apply() {
-    const chosen = suggestions.value.filter((item) => selectedIds.value.includes(String(item.fieldId)));
-    if (busy.value || !chosen.length || !props.task?._id) return;
+watch(() => [canShow.value, props.task && props.task._id], ([show, id]) => {
+    if (!show || !id) return;
+    if (previewedFor.value === String(id) || busy.value) return;
+    preview();
+}, { immediate: true });
+
+function applyPatch(applied) {
+    const customField = { ...(props.task.customField || {}) };
+    let assignees = Array.isArray(props.task.AssigneeUserId) ? [...props.task.AssigneeUserId] : [];
+    let dueDate = props.task.DueDate;
+    const appliedIds = [];
+    applied.forEach((item) => {
+        appliedIds.push(String(item.fieldId));
+        if (item.source === 'native' || item.fieldId === 'assignee') {
+            assignees = item.value || [];
+        } else if (item.kind === 'date') {
+            customField[item.fieldId] = { _id: item.fieldId, fieldValue: item.value };
+            if (!dueDate) {
+                dueDate = item.value;
+                appliedIds.push('due');
+            }
+        } else {
+            customField[item.fieldId] = { _id: item.fieldId, fieldValue: item.value };
+        }
+    });
+    const prior = Array.isArray(props.task._autofilledFields) ? props.task._autofilledFields : [];
+    const _autofilledFields = [...new Set([...prior, ...appliedIds])];
+    const next = { customField, AssigneeUserId: assignees, _autofilledFields };
+    if (dueDate) next.DueDate = dueDate;
+    patchTask(next);
+    filledOnce.value = true;
+    emit('applied', appliedIds);
+    const used = new Set(applied.map((item) => String(item.fieldId)));
+    suggestions.value = suggestions.value.filter((item) => !used.has(String(item.fieldId)));
+}
+
+async function applyOne(item) {
+    if (busy.value || !item || !props.task?._id) return;
     busy.value = true;
     notice.value = '';
     try {
         const response = await apiRequest('post', env.V2_TASKS_AI_AUTOFILL, {
             action: 'apply',
             taskId: props.task._id,
-            suggestions: chosen,
+            suggestions: [item],
         });
         const payload = response.data || {};
         if (!payload.status) {
             notice.value = payload.statusText || t('CustomField.autofill_failed');
             return;
         }
-        const applied = Array.isArray(payload.data?.suggestions) ? payload.data.suggestions : chosen;
-        const customField = { ...(props.task.customField || {}) };
-        let assignees = Array.isArray(props.task.AssigneeUserId) ? [...props.task.AssigneeUserId] : [];
-        const appliedIds = [];
-        applied.forEach((item) => {
-            appliedIds.push(String(item.fieldId));
-            if (item.source === 'native' || item.fieldId === 'assignee') {
-                assignees = item.value || [];
-            } else {
-                customField[item.fieldId] = { _id: item.fieldId, fieldValue: item.value };
-            }
-        });
-        const prior = Array.isArray(props.task._autofilledFields) ? props.task._autofilledFields : [];
-        const _autofilledFields = [...new Set([...prior, ...appliedIds])];
-        patchTask({ customField, AssigneeUserId: assignees, _autofilledFields });
-        filledOnce.value = true;
-        emit('applied', appliedIds);
-        suggestions.value = [];
-        selectedIds.value = [];
+        const applied = Array.isArray(payload.data?.suggestions) ? payload.data.suggestions : [item];
+        applyPatch(applied);
         $toast.success(t('CustomField.autofill_applied'), { position: 'top-right' });
     } catch (_error) {
         notice.value = t('CustomField.autofill_failed');
@@ -235,27 +275,28 @@ async function apply() {
 }
 .taf__item {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto;
     gap: 8px;
     align-items: start;
     font-size: 13px;
 }
 .taf__pick {
     display: flex;
+    flex-direction: column;
     align-items: flex-start;
-    gap: 8px;
+    gap: 2px;
     min-width: 0;
-    cursor: pointer;
-}
-.taf__pick input {
-    margin-top: 3px;
-    accent-color: var(--kiln-ember);
-    flex: 0 0 auto;
 }
 .taf__title {
     font-family: var(--kiln-font-display);
     font-weight: 600;
     color: var(--kiln-ink);
+}
+.taf__hint {
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--kiln-muted, #6b7280);
 }
 .taf__value {
     color: var(--kiln-text);
@@ -270,5 +311,6 @@ async function apply() {
     background: var(--kiln-ink);
     border-color: var(--kiln-ink);
     color: var(--kiln-paper);
+    justify-self: end;
 }
 </style>

@@ -2,9 +2,11 @@
     <li
         v-if="tabKey === 'time-log' ? (checkApps('TimeTracking') || getAppState('TimeTracking') === 'disabled') : true"
         role="presentation"
+        data-tab
+        :data-tab-key="tabKey"
         :class="{ active: isActive }"
         class="cursor-pointer"
-        @mousedown.stop
+        @mousedown.stop="onTabPointer"
         @click.prevent.stop="selectTab"
     >
         <img
@@ -36,6 +38,7 @@
 <script setup>
 import { defineProps, defineEmits } from 'vue';
 import { useCustomComposable } from '@/composable';
+import { markTabPointer } from '@/utils/taskPanelGuard';
 const { checkApps, getAppState } = useCustomComposable();
 
 const emit = defineEmits(["changeTab"]);
@@ -46,7 +49,12 @@ const props = defineProps({
     commentCounts: Number
 })
 
+function onTabPointer() {
+    markTabPointer();
+}
+
 function selectTab() {
+    markTabPointer();
     if (!props.isActive) emit('changeTab', props.tabKey);
 }
 </script>

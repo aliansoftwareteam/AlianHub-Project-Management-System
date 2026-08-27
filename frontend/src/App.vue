@@ -11,6 +11,7 @@
                 <div :style="`height: calc(100dvh - ${$route.meta.hideHeader ? '0' : '58'}px);`" class="billing__history-wrapper style-scroll overflow-auto">
                     <AdvanceSearchModal
                         v-if="!$route.meta.preventAdvanceSearch"
+                        key="advance-search-modal"
                         headerClasses="border-0"
                         :modelValue="isAdvanceSearch"
                         :header="false"
@@ -106,6 +107,8 @@ import OfflineBanner from '@/components/offline/OfflineBanner.vue';
 import { initOffline } from '@/offline';
 import * as env from '@/config/env';
 import {tabSyncHelper} from '@/utils/tabSyncs.js';
+import { closeGlobalSearch } from '@/utils/openGlobalSearch';
+import { markSearchClosed } from '@/utils/taskPanelGuard';
 import Cookies from 'js-cookie'
 // FirstRunChecklist lives on newer trees. Kiln/Pages must still boot when this file is missing.
 function loadFirstRunChecklist() {
@@ -180,6 +183,11 @@ watch(() => getters['settings/rules'], (val) => {
 })
 watch(route, (newVal) => {
 	const token = Cookies.get('accessToken') || '';
+    if (newVal.params && newVal.params.taskId) {
+        if (isAdvanceSearch.value) markSearchClosed();
+        isAdvanceSearch.value = false;
+        closeGlobalSearch();
+    }
     if(newVal?.name === 'Support'){
         if(token && !companyId.value){
             return router.push({name : 'Create_Company'});
@@ -813,7 +821,11 @@ provide("$dateFormat", dateFormat);
 provide("$companyId", companyId);
 provide("$axios", axios);
 provide("$userId", userId);
-provide('closeAdvanceSearch', () => { isAdvanceSearch.value = false; });
+provide('closeAdvanceSearch', () => {
+    if (isAdvanceSearch.value) markSearchClosed();
+    isAdvanceSearch.value = false;
+    closeGlobalSearch();
+});
 provide("$moneysymbol", '');
 provide("$isLogginedIn", logged.value);
 provide("$clientWidth", clientWidth);

@@ -1050,8 +1050,18 @@ watch([projects, route], () => {
 
 watch(route, () => {
     if (!projects.value || !projects.value.length) return;
+    if (route.params?.taskId) return;
     if (route.params?.id && !findListedProject(route.params.id) && projectData.value && projectData.value._id) {
-        router.replace({ name: 'Project', params: { cid: route.params?.cid, id: firstId(projectData.value._id) }, query: { ...route.query } });
+        const params = {
+            cid: route.params?.cid,
+            id: firstId(projectData.value._id),
+        };
+        if (route.params.sprintId) params.sprintId = route.params.sprintId;
+        if (route.params.folderId) params.folderId = route.params.folderId;
+        const name = route.params.sprintId
+            ? (route.params.folderId ? 'ProjectFolderSprint' : 'ProjectSprint')
+            : (route.params.folderId ? 'ProjectFolder' : 'Project');
+        router.replace({ name, params, query: { ...route.query } });
     }
 });
 

@@ -182,6 +182,7 @@
                 <h4>{{$t('Projects.due_date')}}</h4>
                 <Skelaton v-if="!task?.DueDate && isMainSpinner" style="height: 36px;" class="w-100px border-radius-7-px"/>
                 <template v-else>
+                    <span class="assignee-autofill-wrap">
                     <DueDateCompo
                         id="due-date-task"
                         class="taskdetail-label task-detail-right-wrapper"
@@ -196,6 +197,8 @@
                         <span v-if="task.DueDate">{{convertDateFormat(task.DueDate,'',{showDayName:false})}}</span>
                         <span v-else>{{$t('ProjectDetails.no_due_date')}}</span>
                     </template>
+                    <span v-if="isDueAutofilled" class="cf-autofill-mark" aria-hidden="true"></span>
+                    </span>
                 </template>
             </div>
              <div class="d-flex task-detail-right-side-label" v-if="checkApps('TimeEstimates') && checkPermission('task.task_estimated_hours',project?.isGlobalPermission) !== null">
@@ -362,6 +365,10 @@ const isAssignee = computed(() => (props.task?.AssigneeUserId || []).includes(us
 const isAssigneeAutofilled = computed(() => {
     const marks = Array.isArray(props.task && props.task._autofilledFields) ? props.task._autofilledFields : [];
     return marks.map(String).includes('assignee');
+});
+const isDueAutofilled = computed(() => {
+    const marks = Array.isArray(props.task && props.task._autofilledFields) ? props.task._autofilledFields : [];
+    return marks.map(String).includes('due');
 });
 
 // Only OPEN tasks can be tracked — hide "Start Tracker" on completed/closed

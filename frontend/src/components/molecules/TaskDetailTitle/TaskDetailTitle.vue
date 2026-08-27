@@ -56,6 +56,7 @@
 <script setup>
     import { useCustomComposable } from '@/composable';
     import { computed, defineProps, defineEmits, defineExpose, inject, ref } from 'vue';
+    import { clickFromTab, wasRecentTabPointer } from '@/utils/taskPanelGuard';
     import InputText from '@/components/atom/InputText/InputText.vue';
     import { useToast } from 'vue-toast-notification';
     import ProjectTaskType from "@/components/atom/TaskTypeSelection/TaskTypeSelection.vue"
@@ -89,7 +90,9 @@
     const isEditName = ref(false);
 
     const startEditName = (event) => {
-        if (event && event.target !== event.currentTarget) return;
+        if (!event || event.target !== event.currentTarget) return;
+        if (event.defaultPrevented) return;
+        if (clickFromTab(event) || wasRecentTabPointer()) return;
         isEditName.value = true;
         editTaskName.value = props.taskName;
     };

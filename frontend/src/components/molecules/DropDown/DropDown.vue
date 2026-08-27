@@ -39,7 +39,7 @@
 
 <script setup>
 // PACKAGES
-import {defineProps, nextTick, onMounted, ref, watch} from "vue";
+import {defineProps, nextTick, onMounted, onUnmounted, ref, watch} from "vue";
 import { useCustomComposable } from "@/composable";
 
 // COMPOSABLES
@@ -132,16 +132,45 @@ function stopMouseListener() {
 watch(dropdownVisible, (val) => {
     if(val) {
         startClickListener();
+        document.addEventListener('keydown', onEscape, true);
+        document.addEventListener('kiln-dismiss-dropdown', closeNow);
         if(props.hover) {
             startMouseListener();
         }
     } else {
         stopClickListener();
+        document.removeEventListener('keydown', onEscape, true);
+        document.removeEventListener('kiln-dismiss-dropdown', closeNow);
         if(props.hover) {
             stopMouseListener();
         }
     }
     emit('isVisible',dropdownVisible.value)
+});
+
+function closeNow(event) {
+    if (!dropdownVisible.value) return;
+    if (event && event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+    }
+    bind.value = false;
+    dropdownVisible.value = false;
+}
+
+function onEscape(event) {
+    if (!event || event.key !== 'Escape') return;
+    const tag = document.activeElement && document.activeElement.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    closeNow(event);
+}
+
+onUnmounted(() => {
+    stopClickListener();
+    stopMouseListener();
+    document.removeEventListener('keydown', onEscape, true);
+    document.removeEventListener('kiln-dismiss-dropdown', closeNow);
 });
 
 function buttonClick(flag = false) {

@@ -62,6 +62,8 @@
     const { t } = useI18n();
     import { useCustomComposable } from '../../../composable';
     import { firstId, injectedId, resolveTaskOpenIds, sameId, taskOpenRoute } from '@/utils/taskOpenProjectId';
+    import { closeGlobalSearch } from '@/utils/openGlobalSearch';
+    import { markSearchClosed } from '@/utils/taskPanelGuard';
     const { generateTaskURL } = filterFun();
     const $toast = useToast();
     const {sanitizeInput} = useCustomComposable();
@@ -147,6 +149,8 @@
         const dest = taskDest(task);
         if (!dest) return;
         if (typeof closeAdvanceSearch === 'function') closeAdvanceSearch();
+        closeGlobalSearch();
+        markSearchClosed();
         router.push({ ...dest, query: { detailTab: 'task-detail-tab' } }).catch((error) => {
             console.error('ERROR opening search task: ', error);
             const path = router.resolve({ ...dest, query: { detailTab: 'task-detail-tab' } }).href || '';

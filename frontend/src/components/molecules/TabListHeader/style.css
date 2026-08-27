@@ -1,6 +1,8 @@
 .tab-list-header {
     padding: 0px;
     position: relative;
+    z-index: 4;
+    isolation: isolate;
     width: 100%;
     max-width: 73.477%;
     -webkit-box-flex: 0;

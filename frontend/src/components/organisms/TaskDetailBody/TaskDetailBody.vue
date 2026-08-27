@@ -95,7 +95,7 @@
     import ActivityLog from '@/components/templates/ActivityLog/ActivityLog.vue'
     import TimeLog from '@/views/TimeLog/TimeLog.vue'
     import { useCustomComposable } from '@/composable';
-    import { firstId, taskOpenRoute } from '@/utils/taskOpenProjectId';
+    import { firstId } from '@/utils/taskOpenProjectId';
 
     const {getters} = useStore();
     const { checkPermission } = useCustomComposable();
@@ -162,8 +162,8 @@
 
     const router = useRouter();
     const route = useRoute();
-    watch(route, (newVal) => {
-        activeTab.value = newVal.query.detailTab
+    watch(() => route.query && route.query.detailTab, (tab) => {
+        if (tab) activeTab.value = tab;
     })
 
     const projectData = inject("selectedProject");
@@ -191,20 +191,15 @@
 
     function syncDetailTab(tab) {
         activeTab.value = tab;
-        const query = { ...route.query, detailTab: tab };
         const openTid = firstId(threadTaskId.value, route.params && route.params.taskId);
-        const dest = taskOpenRoute({
-            companyId: route.params && route.params.cid,
-            projectId: openProjectId.value,
-            sprintId: firstId(threadSprintId.value, route.params && route.params.sprintId),
-            taskId: openTid,
-            folderId: props.task && props.task.folderObjId,
-        });
-        if (dest && dest.params.taskId) {
-            router.replace({ ...dest, query }).catch(() => {});
-            return;
-        }
-        router.replace({ name: route.name, params: { ...route.params }, query }).catch(() => {});
+        if (!openTid) return;
+        const params = { ...route.params };
+        if (!params.taskId) params.taskId = openTid;
+        router.replace({
+            name: route.name,
+            params,
+            query: { ...route.query, detailTab: tab },
+        }).catch(() => {});
     }
 
     onMounted(() => {
@@ -248,6 +243,7 @@
     });
 
     const changeTab = (tab) => {
+        if (!tab || tab === activeTab.value) return;
         syncDetailTab(tab);
     }
 
