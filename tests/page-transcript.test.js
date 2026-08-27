@@ -131,7 +131,7 @@ describe('PAGES - meeting transcript', () => {
         expect(rail).toContain("action.value === 'transcript'");
         expect(rail).toContain("emit('apply'");
         expect(rail).toContain("emit('turn-into-tasks'");
-        expect(rail).toContain('v-if="projectId && brief.items.length"');
+        expect(rail).toContain('v-if="projectId && brief.items && brief.items.length"');
         expect(rail).toContain('pages_transcript_need_project');
         expect(panel).toContain(':project-id="taskProjectId"');
         expect(panel).toContain('v-if="taskProjectId"');
@@ -140,6 +140,6 @@ describe('PAGES - meeting transcript', () => {
         expect(locale).toContain('pages_compose_transcript');
         expect(provider).toContain('maxTokens');
         expect(controller).toContain('gatherWorkspaceAskContext');
-        expect(controller).toContain("action || '').toLowerCase() === 'transcript'");
+        expect(controller).toContain("resolvedAction === 'transcript'");
     });
 });

@@ -79,7 +79,7 @@ describe('PAGES - block content', () => {
 describe('PAGES - AI helpers', () => {
 
     test('compose actions include ask', () => {
-        expect(AI_ACTIONS).toEqual(expect.arrayContaining(['draft', 'expand', 'summarize', 'outline', 'rewrite', 'ask', 'transcript']));
+        expect(AI_ACTIONS).toEqual(expect.arrayContaining(['draft', 'expand', 'summarize', 'outline', 'rewrite', 'ask', 'transcript', 'standup']));
         AI_ACTIONS.forEach((action) => expect(isAiAction(action)).toBe(true));
         expect(isAiAction('chat')).toBe(false);
         expect(isAiAction('workspace')).toBe(false);

@@ -2,7 +2,7 @@
     <div class="pcr">
         <div class="pcr__actions">
             <button
-                v-for="item in actions"
+                v-for="item in visibleActions"
                 :key="item.key"
                 type="button"
                 class="pcr__chip"
@@ -19,6 +19,16 @@
                 :placeholder="placeholder"
                 :disabled="busy"
             ></textarea>
+            <div v-else-if="action === 'standup'" class="pcr__windows">
+                <button
+                    v-for="item in windows"
+                    :key="item.key"
+                    type="button"
+                    class="pcr__chip"
+                    :class="{ 'is-on': windowKey === item.key }"
+                    @click="windowKey = item.key"
+                >{{ $t(item.label) }}</button>
+            </div>
             <input
                 v-else
                 v-model="instruction"
@@ -34,7 +44,7 @@
         <p v-if="notice && !brief" class="pcr__notice" :class="{ 'is-answer': Boolean(answer) }">{{ notice }}</p>
         <div v-if="brief" class="pcr__brief">
             <p class="pcr__summary">{{ brief.markdown }}</p>
-            <ol v-if="brief.items.length" class="pcr__items">
+            <ol v-if="brief.items && brief.items.length" class="pcr__items">
                 <li v-for="(item, index) in brief.items" :key="'ai-' + index">
                     <span class="pcr__item-title">{{ item.title }}</span>
                     <span v-if="item.owner" class="pcr__item-meta">{{ item.owner }}</span>
@@ -42,20 +52,33 @@
                     <p v-if="item.notes" class="pcr__item-notes">{{ item.notes }}</p>
                 </li>
             </ol>
+            <section
+                v-for="group in (brief.groups || [])"
+                :key="'grp-' + group.key"
+                class="pcr__group"
+            >
+                <h4 class="pcr__group-title">{{ group.label }}</h4>
+                <ol class="pcr__items">
+                    <li v-for="(item, index) in group.items" :key="group.key + '-' + index">
+                        <span class="pcr__item-title">{{ item.title }}</span>
+                        <p v-if="item.notes" class="pcr__item-notes">{{ item.notes }}</p>
+                    </li>
+                </ol>
+            </section>
             <button
-                v-if="projectId && brief.items.length"
+                v-if="projectId && brief.items && brief.items.length"
                 type="button"
                 class="pcr__tasks"
                 @click="turnIntoTasks"
             >{{ $t('Projects.pages_turn_into_tasks') }}</button>
-            <p v-else-if="brief.items.length" class="pcr__need-project">{{ $t('Projects.pages_transcript_need_project') }}</p>
+            <p v-else-if="brief.items && brief.items.length" class="pcr__need-project">{{ $t('Projects.pages_transcript_need_project') }}</p>
         </div>
         <WorkspaceAskCitations v-if="answer && citations.length" :citations="citations" />
     </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useToast } from 'vue-toast-notification';
 import { apiRequest } from '@/services';
@@ -83,19 +106,27 @@ const actions = [
     { key: 'ask', label: 'Projects.pages_compose_ask' },
     { key: 'workspace', label: 'Projects.pages_compose_workspace' },
     { key: 'transcript', label: 'Projects.pages_compose_transcript' },
+    { key: 'standup', label: 'Projects.pages_compose_standup' },
 ];
 
 const action = ref('draft');
 const instruction = ref('');
+const windowKey = ref('24h');
 const busy = ref(false);
 const notice = ref('');
 const answer = ref('');
 const citations = ref([]);
 const brief = ref(null);
 const configured = ref(true);
+const windows = [
+    { key: '24h', label: 'Projects.pages_standup_24h' },
+    { key: '7d', label: 'Projects.pages_standup_7d' },
+];
 
+const visibleActions = computed(() => actions.filter((item) => item.key !== 'standup' || Boolean(props.projectId)));
 const needsQuestion = computed(() => action.value === 'ask' || action.value === 'workspace');
 const isTranscript = computed(() => action.value === 'transcript');
+const isStandup = computed(() => action.value === 'standup');
 const placeholder = computed(() => {
     if (action.value === 'ask') return t('Projects.pages_ask_placeholder');
     if (action.value === 'workspace') return t('Projects.pages_workspace_ask_placeholder');
@@ -103,8 +134,12 @@ const placeholder = computed(() => {
     return t('Projects.pages_compose_placeholder');
 });
 const goLabel = computed(() => {
-    if (isTranscript.value) return t('Projects.pages_transcript_go');
+    if (isTranscript.value || isStandup.value) return t('Projects.pages_transcript_go');
     return needsQuestion.value ? t('Projects.pages_ask') : t('Projects.pages_compose');
+});
+
+watch(() => props.projectId, (id) => {
+    if (!id && action.value === 'standup') action.value = 'draft';
 });
 
 onMounted(() => {
@@ -141,7 +176,14 @@ function isMissing(payload) {
 
 function compose() {
     if (busy.value) return;
-    const alian = isTranscript.value ? { mentioned: false, question: '' } : extractAlianQuestion(instruction.value);
+    const alian = isTranscript.value || isStandup.value ? { mentioned: false, question: '' } : extractAlianQuestion(instruction.value);
+    if (isStandup.value && !props.projectId) {
+        answer.value = '';
+        citations.value = [];
+        brief.value = null;
+        notice.value = t('Projects.pages_standup_need_project');
+        return;
+    }
     if (isTranscript.value && !instruction.value.trim()) {
         answer.value = '';
         citations.value = [];
@@ -169,16 +211,18 @@ function compose() {
     citations.value = [];
     brief.value = null;
 
-    const useWorkspace = action.value === 'workspace' || alian.mentioned;
+    const useWorkspace = !isStandup.value && (action.value === 'workspace' || alian.mentioned);
     const question = alian.mentioned ? alian.question : instruction.value;
     const request = useWorkspace
         ? apiRequest('post', '/api/v2/pages/ask-workspace', { question })
         : apiRequest('post', '/api/v2/pages/ai', {
             action: action.value,
             title: props.title,
-            instruction: instruction.value,
+            instruction: isStandup.value ? '' : instruction.value,
             currentText: props.currentText,
             pageId: props.pageId || undefined,
+            projectId: props.projectId || undefined,
+            window: isStandup.value ? windowKey.value : undefined,
         });
 
     request.then((response) => {
@@ -191,7 +235,7 @@ function compose() {
             return;
         }
         const payload = response.data.data || {};
-        if (useWorkspace || action.value === 'ask' || action.value === 'transcript' || payload.apply === false) {
+        if (useWorkspace || action.value === 'ask' || action.value === 'transcript' || action.value === 'standup' || payload.apply === false) {
             const markdown = payload.markdown || payload.previewText || '';
             answer.value = markdown;
             citations.value = Array.isArray(payload.citations) ? payload.citations : [];
@@ -202,7 +246,19 @@ function compose() {
                 brief.value = {
                     markdown,
                     items,
+                    groups: [],
                     requirementsText: String(payload.requirementsText || ''),
+                };
+                notice.value = '';
+            } else if (action.value === 'standup' || payload.action === 'standup') {
+                const groups = Array.isArray(payload.groups)
+                    ? payload.groups.filter((group) => group && Array.isArray(group.items) && group.items.length)
+                    : [];
+                brief.value = {
+                    markdown,
+                    items: [],
+                    groups,
+                    requirementsText: '',
                 };
                 notice.value = '';
             } else {
@@ -302,6 +358,25 @@ function compose() {
 }
 .pcr__form.is-stack .pcr__go {
     align-self: flex-end;
+}
+.pcr__windows {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+.pcr__group {
+    margin-top: 12px;
+}
+.pcr__group-title {
+    margin: 0 0 6px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--kiln-ember);
 }
 .pcr__go:disabled {
     opacity: 0.55;
