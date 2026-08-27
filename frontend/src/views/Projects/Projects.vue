@@ -355,7 +355,7 @@
                         <TaskDetail
                             v-if="isTaskDetail && selectedTask"
                             :companyId="companyId"
-                            :projectId="projectData._id"
+                            :projectId="openTaskProjectId"
                             :sprintId="selectedTask.sprintId"
                             :taskId="selectedTask.id"
                             :isTaskDetailSideBar="isTaskDetail"
@@ -1252,10 +1252,17 @@ function getView(val) {
 // Task Detail
 const isTaskDetail = ref(false);
 const selectedTask = ref({});
+const openTaskProjectId = computed(() => String(
+    selectedTask.value?.ProjectID
+    || selectedTask.value?.projectId
+    || projectData.value?._id
+    || route.params.id
+    || ''
+));
 
 watch(() => route.params.taskId, (taskId) => {
     if (taskId && !isTaskDetail.value) {
-        selectedTask.value = { id: taskId, sprintId: route.params.sprintId };
+        selectedTask.value = { id: taskId, sprintId: route.params.sprintId, ProjectID: route.params.id };
         isTaskDetail.value = true;
     } else if (!taskId) {
         isTaskDetail.value = false;

@@ -148,9 +148,17 @@
                                 @click="toggleWriteback"
                             ><i></i></button>
                         </div>
-                        <div v-if="pageBriefing" class="pg__briefing">
-                            <span class="pg__briefing-kicker">{{ $t('Projects.pages_writeback_fired') }}</span>
-                            <pre class="pg__briefing-body">{{ pageBriefing }}</pre>
+                        <div v-if="pageBriefing && !briefingDismissed" class="pg__briefing">
+                            <div class="pg__briefing-bar">
+                                <span class="pg__briefing-kicker">{{ $t('Projects.pages_writeback_fired') }}</span>
+                                <button type="button" class="pg__briefing-btn" @click="briefingCollapsed = !briefingCollapsed">
+                                    {{ briefingCollapsed ? $t('Projects.pages_briefing_expand') : $t('Projects.pages_briefing_collapse') }}
+                                </button>
+                                <button type="button" class="pg__briefing-btn" @click="briefingDismissed = true">
+                                    {{ $t('Projects.pages_briefing_dismiss') }}
+                                </button>
+                            </div>
+                            <pre v-if="!briefingCollapsed" class="pg__briefing-body">{{ pageBriefing }}</pre>
                         </div>
                     </div>
 
@@ -350,6 +358,12 @@ const taskProjectId = computed(() => String(
 ));
 const rawDraft = computed(() => blocksToRawText(contentBlocks.value) || contentHtml.value || '');
 const pageBriefing = computed(() => String((current.value && current.value.briefing && current.value.briefing.markdown) || '').trim());
+const briefingCollapsed = ref(false);
+const briefingDismissed = ref(false);
+watch(() => current.value && current.value._id, () => {
+    briefingCollapsed.value = false;
+    briefingDismissed.value = false;
+});
 const writebackOn = ref(true);
 const writebackBusy = ref(false);
 
@@ -1201,8 +1215,29 @@ onBeforeUnmount(() => {
 .pg__briefing {
     margin-top: 8px;
 }
+.pg__briefing-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.pg__briefing-btn {
+    border: 0;
+    background: transparent;
+    color: var(--kiln-ink);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    padding: 0;
+}
+.pg__briefing-btn:hover {
+    color: var(--kiln-ember);
+}
 .pg__briefing-body {
     margin: 6px 0 0;
+    max-height: 160px;
+    overflow: auto;
     white-space: pre-wrap;
     word-break: break-word;
     font-family: var(--kiln-font-body);

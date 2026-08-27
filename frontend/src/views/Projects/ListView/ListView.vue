@@ -59,8 +59,8 @@
                 <EmptyState
                     v-if="project?.deletedStatusKey !== 2"
                     :image="noSearchResult"
-                    :title="showArchived ? $t('ProjectSlider.no_archived') : (!project?.lastTaskId ? $t('EmptyState.no_tasks_title') : $t('EmptyState.no_match_title'))"
-                    :message="showArchived ? '' : (!project?.lastTaskId ? $t('EmptyState.no_tasks_msg') : $t('EmptyState.no_match_msg'))"
+                    :title="showArchived ? $t('ProjectSlider.no_archived') : (emptyIsFilter ? $t('EmptyState.no_match_title') : $t('EmptyState.no_tasks_title'))"
+                    :message="showArchived ? '' : (emptyIsFilter ? $t('EmptyState.no_match_msg') : $t('EmptyState.no_tasks_msg'))"
                     :helpPath="showArchived ? '' : 'tasks'"
                 />
             </div>
@@ -94,6 +94,8 @@ const route = useRoute()
 const project = inject("selectedProject");
 const clientWidth = inject("$clientWidth");
 const showArchived = inject("showArchived");
+const searchedTask = inject('searchedTask', ref(false));
+const emptyIsFilter = computed(() => Boolean(project.value?.lastTaskId) || Boolean(searchedTask && searchedTask.value));
 const {
     groupBy,
     getSprintTasks,

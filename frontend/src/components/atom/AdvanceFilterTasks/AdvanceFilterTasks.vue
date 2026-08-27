@@ -34,7 +34,7 @@
                     <div class="d-flex align-items-center">
                         <span class="advancefilter__body--marginright" v-if="props.taskObj?.isParentTask === false"><img :src="subTaskImage" /> </span>
                         <span class="advancefilter__body--marginright"><img :src="favourite(props.taskObj?.favouriteTasks) && favourite(props.taskObj?.favouriteTasks)?.length ? filledStar : blankStar" /></span>
-                        <span class="advancefilter__body--taskname black text-ellipse d-block advancefilter__body--width" v-html="highlightSearchTerm(props.taskObj?.TaskName)"></span>
+                        <span class="advancefilter__body--taskname black text-ellipse d-block advancefilter__body--width cursor-pointer" v-html="highlightSearchTerm(props.taskObj?.TaskName)" @click="openModel(props.taskObj)"></span>
                     </div>
                 </div>
             </div>
@@ -142,17 +142,12 @@
             $toast.success(t("Toast.Link_is_Copied_to_clipboard"),{position: 'top-right'});
         });
     };
-    // Open task in new tab
     const openModel = (task) => {
         isTaskDetail.value = true;
-        projectId.value = task.ProjectID
+        projectId.value = task.ProjectID || task.projectId || '';
         sprintId.value = task.sprintId
         taskId.value = task._id
-        // generateTaskURL(task,companyId.value).then((url)=>{
-        //     window.open(url, '_blank');
-        // });  
     };
-    // Open task in new tab
     const openInNewTab = (task) => {
         generateTaskURL(task,companyId.value).then((url)=>{
             window.open(url, '_blank');

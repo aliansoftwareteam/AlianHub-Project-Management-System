@@ -113,6 +113,7 @@
     import taskClass from "@/utils/TaskOperations";
     import { apiRequest } from '../../services';
     import * as env from '@/config/env';
+    import { resolveOpenProjectId } from '@/utils/taskOpenProjectId';
     import Sidebar from '@/components/molecules/Sidebar/Sidebar.vue'
     import TaskDetailNavBar from '@/components/molecules/TaskDetailNavBar/TaskDetailNavBar.vue'
     import TaskDetailTitle from '@/components/molecules/TaskDetailTitle/TaskDetailTitle.vue'
@@ -171,6 +172,12 @@
     const snap = ref(null);
     const projectDataObj = inject("selectedProject");
     const projectData = ref(projectDataObj?.value ? projectDataObj?.value : {});
+
+    const resolvedProjectId = computed(() => resolveOpenProjectId({
+        queryProjectId: props.projectId,
+        selectedTask: props.selectedTask,
+        routeProjectId: route.params && route.params.id,
+    }));
 
     const clientWidth = ref(document.documentElement.clientWidth);
     window.addEventListener('resize', (e) => {
@@ -589,9 +596,10 @@
     }
 
     function getQueryFun () {
+        if (!resolvedProjectId.value || !props.taskId) return;
         const queryParams = new URLSearchParams({
             taskId: props.taskId,
-            projectId: props.projectId,
+            projectId: resolvedProjectId.value,
             subTaskLimit: subTaskLimit.value
         }).toString();
         try{
@@ -613,7 +621,7 @@
                         fetchSubtaskCount();   // accurate %/count when subtasks exceed the loaded slice
 
                         if(!projectData.value?.isGlobalPermission && !(getters["settings/projectRules"] && Object.keys(getters["settings/projectRules"])?.length > 0)) {
-                            dispatch("settings/setProjectRules", {pid: props.projectId})
+                            dispatch("settings/setProjectRules", {pid: resolvedProjectId.value})
                             .catch((error) => {
                                 console.error("ERROR in get project rules", error);
                             });
@@ -627,6 +635,10 @@
             console.error(error)
         }
     }
+
+    watch(resolvedProjectId, (id, prev) => {
+        if (id && id !== prev) getQueryFun();
+    });
 
     function changeTaskType(status) {
         const statusIndex = projectData.value.taskTypeCounts.findIndex((x) => x.key === task.value.TaskTypeKey);

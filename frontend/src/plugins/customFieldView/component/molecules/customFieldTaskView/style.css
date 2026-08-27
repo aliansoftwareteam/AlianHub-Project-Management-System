@@ -27,6 +27,20 @@
 .custom-field__height{
     height: 200px;
 }
+.cf-row {
+    position: relative;
+}
+.cf-autofill-mark {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    width: 6px;
+    height: 6px;
+    margin-top: -3px;
+    background: var(--kiln-ember, #c45c26);
+    border-radius: 1px;
+    pointer-events: none;
+}
 .custom__field_project_detail_wrapper {
     margin: 0px 0px 20px 0px;
 }

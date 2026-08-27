@@ -6,7 +6,7 @@
             </h4>
             <h4 v-if="props.editPermission" class="font-roboto-sans font-size-14 font-weight-500 font-normal text-decoration-underline blue cursor-pointer" @click="emit('isCustomField', true)">+ {{ $t('CustomField.custom_field') }}</h4>
         </div>
-        <TaskAiAutofill :task="props.task" :enabled="props.editPermission" />
+        <TaskAiAutofill :task="props.task" :enabled="props.editPermission" @applied="markApplied" />
 
         <template v-if="isInitialLoading">
             <template v-for="index in 5" :key="`skeleton-${index}`">
@@ -17,7 +17,7 @@
         <template v-else>
             <template v-if="filteredCustomFields.length">
                 <template v-for="item in filteredCustomFields" :key="item._id">
-                    <div class="position-re" :class="itemClasses">
+                    <div class="position-re cf-row" :class="itemClasses">
                         <component
                             :is="getView(item?.fieldType)"
                             :detail="item"
@@ -26,6 +26,7 @@
                             @handleEdit="handleEdit(item)"
                             @handleUpdate="handleUpdate"
                         />
+                        <span v-if="isAutofilled(item._id)" class="cf-autofill-mark" aria-hidden="true"></span>
                     </div>
                 </template>
             </template>
@@ -54,6 +55,7 @@
     const { getters } = useStore();
     const isInitialLoading = ref(true);
     const processedCustomFieldList = ref([]);
+    const appliedIds = ref([]);
     // Props
     const props = defineProps({
         task:{
@@ -157,6 +159,16 @@
     const headerClasses = computed(() => ({'font-size-16 font-weight-600': clientWidth <= 767,'font-size-14 font-weight-700': clientWidth > 767}));
 
     const itemClasses = computed(() => ({'pointer-event-none': !props.editPermission}));
+
+    function markApplied(ids) {
+        appliedIds.value = [...new Set([...appliedIds.value, ...(ids || []).map(String)])];
+    }
+
+    function isAutofilled(id) {
+        const fromTask = Array.isArray(props.task && props.task._autofilledFields) ? props.task._autofilledFields : [];
+        const mark = String(id);
+        return appliedIds.value.includes(mark) || fromTask.map(String).includes(mark);
+    }
 
     // Helper function to remove custom field properties
     const removeCustomFieldProperties = (obj) => {

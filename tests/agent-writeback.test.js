@@ -9,6 +9,8 @@ const {
     chooseWrite,
     planTaskAutofill,
     followupCommentText,
+    followupActivityMessage,
+    shouldNotifyForWriteback,
     heuristicPageBriefing,
     shapePageBriefing,
     listEmptyTargets,
@@ -16,6 +18,7 @@ const {
 const {
     NATIVE_ASSIGNEE_ID,
     sanitizeSuggestions,
+    isAssigneeEmpty,
 } = require('../Modules/Tasks/helpers/taskAiAutofill');
 const R = require('../Modules/Automations/helpers/automationRules');
 
@@ -168,6 +171,38 @@ describe('AUTOMATIONS - agent write-back skip-filled and invented ids', () => {
         expect(planned.writes.every((row) => row.fieldId !== 'f-summary')).toBe(true);
     });
 
+    test('Owner write-back does not assign the native assignee', () => {
+        const ownerField = {
+            _id: 'f-owner',
+            fieldTitle: 'Owner',
+            fieldType: 'dropdown',
+            type: 'task',
+            global: true,
+            fieldOptions: [{ id: 'opt-ada', label: 'Ada Lovelace' }],
+        };
+        const task = emptyTask();
+        const targets = listEmptyTargets({
+            task,
+            fields: [...FIELDS, ownerField],
+            people: [ADA, GRACE],
+            permissions: { customField: true, assignee: true },
+        });
+        const planned = planTaskAutofill({
+            incoming: [
+                { fieldId: 'f-owner', kind: 'owner', optionId: 'opt-ada' },
+            ],
+            targets,
+            people: [ADA, GRACE],
+            task,
+        });
+        expect(planned.suggestions.map((row) => row.fieldId)).toEqual(['f-owner']);
+        expect(planned.writes.some((row) => row.type === 'assignee')).toBe(false);
+        expect(planned.writes).toEqual([
+            expect.objectContaining({ type: 'customField', fieldId: 'f-owner' }),
+        ]);
+        expect(isAssigneeEmpty(task)).toBe(true);
+    });
+
     test('invented people, tags, and task ids are dropped', () => {
         const task = emptyTask();
         const targets = listEmptyTargets({
@@ -211,7 +246,8 @@ describe('AUTOMATIONS - agent write-back skip-filled and invented ids', () => {
         });
         expect(chooseWrite({ event: STATUS_EVENT, emptyTargets: targets }).action).toBe('autofill');
         expect(chooseWrite({ event: COMMENT_EVENT, emptyTargets: targets }).action).toBe('autofill');
-        expect(chooseWrite({ event: STATUS_EVENT, emptyTargets: [] }).action).toBe('comment');
+        expect(chooseWrite({ event: STATUS_EVENT, emptyTargets: [] }).action).toBe('activity');
+        expect(chooseWrite({ event: COMMENT_EVENT, emptyTargets: [] }).action).toBe('activity');
         expect(chooseWrite({ event: PAGE_EVENT, pageText: 'Ship the invite.' }).action).toBe('briefing');
         expect(chooseWrite({ event: PAGE_EVENT, pageText: '' }).action).toBe('skip');
 
@@ -220,12 +256,19 @@ describe('AUTOMATIONS - agent write-back skip-filled and invented ids', () => {
             applied: [{ title: 'Summary' }, { title: 'Due' }],
         });
         expect(filledNote).toMatch(/Filled empty fields after this status change: Summary, Due/);
-        expect(followupCommentText({
+        expect(followupActivityMessage({
+            event: STATUS_EVENT,
+            applied: [{ title: 'Summary' }, { title: 'Due' }],
+        })).toMatch(/<b>Alian<\/b> filled empty fields after this status change: Summary, Due/);
+        expect(followupActivityMessage({
             event: STATUS_EVENT,
             applied: [],
             statusText: 'In Progress',
             taskTitle: 'Ship the invite',
-        })).toMatch(/In Progress/);
+        })).toMatch(/<b>Alian<\/b> noted the status change to In Progress/);
+        expect(shouldNotifyForWriteback({})).toBe(false);
+        expect(shouldNotifyForWriteback({ taggedUserIds: [] })).toBe(false);
+        expect(shouldNotifyForWriteback({ taggedUserIds: ['u-ada'] })).toBe(true);
 
         const brief = heuristicPageBriefing({
             title: 'Local Smoke',
@@ -253,9 +296,13 @@ describe('AUTOMATIONS - write-back reuses 005-007 without wiring set_priority in
         const pages = fs.readFileSync(path.join(__dirname, '..', 'Modules', 'Pages', 'controller.js'), 'utf8');
         const status = fs.readFileSync(path.join(__dirname, '..', 'Modules', 'Tasks', 'helpers', 'taskMongo', 'updateBasic.js'), 'utf8');
         const run = fs.readFileSync(path.join(__dirname, '..', 'Modules', 'Automations', 'helpers', 'agentWritebackRun.js'), 'utf8');
+        const card = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'molecules', 'TaskAiAutofill', 'TaskAiAutofill.vue'), 'utf8');
+        const activity = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'molecules', 'ActivityLogContent', 'ActivityContent.vue'), 'utf8');
 
         expect(panel).toContain('pg__writeback');
         expect(panel).toContain('pg__briefing');
+        expect(panel).toContain('briefingDismissed');
+        expect(panel).toContain('pages_briefing_dismiss');
         expect(panel).toContain('pages_writeback');
         expect(panel).toContain('${env.AUTOMATIONS}/writeback');
         expect(hub).toContain('ig-writeback');
@@ -266,6 +313,17 @@ describe('AUTOMATIONS - write-back reuses 005-007 without wiring set_priority in
         expect(pages).toContain('applyPageWriteback');
         expect(status).toContain("type: 'task_status_changed'");
         expect(run).toContain('applyAutofillWrites');
-        expect(run).toContain('saveAlianComment');
+        expect(run).toContain('postWritebackActivity');
+        expect(run).toContain('HandleHistory');
+        expect(run).not.toContain('saveAlianComment');
+        expect(run).toContain("action: applied.length ? 'autofill' : 'activity'");
+        expect(run.indexOf('if (!isWritebackEnabled(project))')).toBeLessThan(
+            run.indexOf("action: 'activity', reason: context.reason"),
+        );
+        expect(card).not.toContain('taf__kind');
+        expect(card).toContain('taf__pick');
+        expect(card).toContain('autofill_fill_empty');
+        expect(activity).toContain('alian-mark');
+        expect(activity).toContain('agent_writeback');
     });
 });

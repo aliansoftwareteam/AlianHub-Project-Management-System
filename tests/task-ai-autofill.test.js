@@ -10,6 +10,7 @@ const {
     sanitizeSuggestions,
     heuristicSuggestions,
     planAutofillWrites,
+    selectSuggestionsByFieldIds,
     previewFromParts,
     parseSuggestionsPayload,
 } = require('../Modules/Tasks/helpers/taskAiAutofill');
@@ -286,5 +287,44 @@ describe('TASKS - AI autofill custom fields', () => {
     test('parses model JSON even with fences', () => {
         const parsed = parseSuggestionsPayload('```json\n{"suggestions":[{"fieldId":"f-tag","optionId":"opt-launch"}]}\n```');
         expect(parsed).toEqual([{ fieldId: 'f-tag', optionId: 'opt-launch' }]);
+    });
+
+    test('Assignee and Owner stay two writes; Owner can fill without assigning', () => {
+        const result = preview(emptyTask());
+        const byId = Object.fromEntries(result.data.suggestions.map((row) => [row.fieldId, row]));
+        expect(byId.assignee.title).toBe('Assignee');
+        expect(byId['f-owner'].title).toBe('Owner');
+        expect(byId.assignee.fieldId).not.toBe(byId['f-owner'].fieldId);
+
+        const ownerOnly = selectSuggestionsByFieldIds(result.data.suggestions, ['f-owner']);
+        const writes = planAutofillWrites(ownerOnly);
+        expect(writes).toEqual([
+            expect.objectContaining({ type: 'customField', fieldId: 'f-owner' }),
+        ]);
+        expect(writes.some((row) => row.type === 'assignee')).toBe(false);
+
+        const none = selectSuggestionsByFieldIds(result.data.suggestions, []);
+        expect(none).toEqual([]);
+        expect(planAutofillWrites(none)).toEqual([]);
+    });
+
+    test('skip-filled is per field so Priority tag can land without re-applying Summary', () => {
+        const first = preview(emptyTask());
+        const summary = first.data.suggestions.find((row) => row.fieldId === 'f-summary');
+        const filled = emptyTask({
+            customField: {
+                'f-summary': { fieldValue: summary.value },
+            },
+        });
+        const second = preview(filled);
+        const ids = second.data.suggestions.map((row) => row.fieldId);
+        expect(ids).toContain('f-tag');
+        expect(ids).toContain('f-owner');
+        expect(ids).toContain(NATIVE_ASSIGNEE_ID);
+        expect(ids).not.toContain('f-summary');
+
+        const tagOnly = selectSuggestionsByFieldIds(second.data.suggestions, ['f-tag']);
+        expect(tagOnly).toEqual([expect.objectContaining({ fieldId: 'f-tag' })]);
+        expect(planAutofillWrites(tagOnly).every((row) => row.fieldId === 'f-tag')).toBe(true);
     });
 });

@@ -21,7 +21,7 @@
                         @click="openTask(task)"
                     >
                         <span class="font-size-12 font-weight-600 blue mr-5px">{{ task.TaskKey }}</span>
-                        <span class="font-size-13 gsearch__name">{{ task.TaskName }}</span>
+                        <span class="font-size-13 gsearch__name" @click.stop="openTask(task)">{{ task.TaskName }}</span>
                         <span v-if="task.status && task.status.text" class="font-size-11 gsearch__chip">{{ task.status.text }}</span>
                     </div>
                 </div>
@@ -60,6 +60,7 @@ import { useRouter } from "vue-router";
 // UTILS
 import { apiRequest } from '@/services';
 import { useCustomComposable } from "@/composable";
+import { resolveTaskOpenIds } from '@/utils/taskOpenProjectId';
 
 const { debounce } = useCustomComposable();
 const router = useRouter();
@@ -124,10 +125,13 @@ const onInput = debounce(() => {
 // /:cid/project/:id/s/:sprintId/:taskId (plain sprint).
 function openTask(task) {
     close();
-    const base = `/${companyId.value}/project/${task.ProjectID}`;
+    const ids = resolveTaskOpenIds(task);
+    const projectId = ids.projectId;
+    if (!projectId || !ids.taskId) return;
+    const base = `/${companyId.value}/project/${projectId}`;
     const path = task.folderObjId
-        ? `${base}/fs/${task.folderObjId}/${task.sprintId}/${task._id}`
-        : `${base}/s/${task.sprintId}/${task._id}`;
+        ? `${base}/fs/${task.folderObjId}/${ids.sprintId}/${ids.taskId}`
+        : `${base}/s/${ids.sprintId}/${ids.taskId}`;
     router.push(path).catch((error) => console.error('ERROR opening search task: ', error));
 }
 

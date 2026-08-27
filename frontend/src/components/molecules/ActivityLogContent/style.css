@@ -7,6 +7,22 @@
     min-width: 30px;
 }
 
+.alian-mark {
+    width: 30px;
+    height: 30px;
+    margin-right: 0;
+    border-radius: 50%;
+    background: var(--kiln-ember, #c45c26);
+    color: #fffaf3;
+    font-family: var(--kiln-font-display), Georgia, serif;
+    font-weight: 700;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+
 @media (max-width:991px){
     .wrapperNameImage span {
         font-size: 13px!important; 

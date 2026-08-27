@@ -10,15 +10,16 @@ const {
     previewAutofill,
     applyAutofillWrites,
 } = require('../../Tasks/helpers/taskAiAutofillRun');
-const { saveAlianComment } = require('../../Comments/helpers/alianReply');
+const { HandleHistory } = require('../../Tasks/helpers/mongo_helper');
+const { ALIAN_MENTION_KEY } = require('../../Comments/helpers/alianMention');
 const { idString } = require('../../Comments/helpers/commentThread');
-const { citationFromTask, citationsFromPack } = require('../../Pages/helpers/pageWorkspaceAsk');
+const { citationsFromPack } = require('../../Pages/helpers/pageWorkspaceAsk');
 const {
     isWritebackEnabled,
     eventGate,
     chooseWrite,
     planTaskAutofill,
-    followupCommentText,
+    followupActivityMessage,
     heuristicPageBriefing,
     shapePageBriefing,
     listEmptyTargets,
@@ -61,23 +62,16 @@ async function loadLinkedTasks(companyId, ids) {
     return rows || [];
 }
 
-function commentSourceFromTask(task, comment) {
-    const src = comment && typeof comment === 'object' ? { ...comment } : {};
-    src.projectId = idString(src.projectId) || idString(task && task.ProjectID);
-    src.sprintId = idString(src.sprintId) || idString(task && task.sprintId);
-    src.taskId = idString(src.taskId) || recordId(task);
-    src.folderId = src.folderId || (task && task.folderObjId);
-    src.project = src.project === true;
-    if (!src.userId) src.userId = 'writeback';
-    if (!src.type) src.type = 'text';
-    if (!src.message) src.message = '';
-    return src;
-}
-
-async function postWritebackComment({ companyId, task, comment, message, citations }) {
-    const source = commentSourceFromTask(task, comment);
-    if (!source.projectId || !source.taskId) return null;
-    return saveAlianComment(companyId, source, message, citations || []);
+async function postWritebackActivity({ companyId, task, message }) {
+    const projectId = idString(task && task.ProjectID) || String((task && task.ProjectID) || '').trim();
+    const taskId = recordId(task);
+    if (!companyId || !projectId || !taskId || !message) return null;
+    await HandleHistory('task', companyId, projectId, taskId, {
+        key: 'agent_writeback',
+        message,
+        sprintId: (task && task.sprintId) || '',
+    }, { id: ALIAN_MENTION_KEY, Employee_Name: 'Alian' });
+    return { activity: true };
 }
 
 async function runTaskWriteback(event) {
@@ -86,28 +80,28 @@ async function runTaskWriteback(event) {
         uid: event.uid,
         taskId: event.taskId,
     });
+    const task = context && context.task;
+    if (!task) {
+        return { skipped: true, reason: (context && context.reason) || 'permission' };
+    }
+    const project = (context && context.project) || await loadProject(event.companyId, task.ProjectID);
+    if (!isWritebackEnabled(project)) return { skipped: true, reason: 'disabled' };
+
     if (!context || context.allowed === false) {
-        if (!context || !context.task) {
-            return { skipped: true, reason: (context && context.reason) || 'permission' };
-        }
-        const message = followupCommentText({
+        const message = followupActivityMessage({
             event,
             applied: [],
             statusText: event.statusText,
             commentExcerpt: event.comment && event.comment.message,
-            taskTitle: context.task && (context.task.TaskName || context.task.TaskKey),
+            taskTitle: task.TaskName || task.TaskKey,
         });
-        const saved = await postWritebackComment({
+        await postWritebackActivity({
             companyId: event.companyId,
-            task: context.task,
-            comment: event.comment,
+            task,
             message,
-            citations: [citationFromTask(context.task)].filter(Boolean),
         });
-        return { skipped: false, applied: [], action: 'comment', reason: context.reason, commentId: saved && recordId(saved) };
+        return { skipped: false, applied: [], action: 'activity', reason: context.reason };
     }
-    const project = context.project || await loadProject(event.companyId, context.task && context.task.ProjectID);
-    if (!isWritebackEnabled(project)) return { skipped: true, reason: 'disabled' };
 
     const gated = eventGate({
         ...event,
@@ -152,22 +146,19 @@ async function runTaskWriteback(event) {
         }
     }
 
-    const message = followupCommentText({
+    const message = followupActivityMessage({
         event,
         applied,
         statusText: event.statusText,
         commentExcerpt: event.comment && event.comment.message,
         taskTitle: context.task && (context.task.TaskName || context.task.TaskKey),
     });
-    const citations = [citationFromTask(context.task)].filter(Boolean);
-    const saved = await postWritebackComment({
+    await postWritebackActivity({
         companyId: context.companyId,
         task: context.task,
-        comment: event.comment,
         message,
-        citations,
     });
-    return { skipped: false, applied, commentId: saved && recordId(saved), action: applied.length ? 'autofill' : 'comment' };
+    return { skipped: false, applied, skipped, action: applied.length ? 'autofill' : 'activity' };
 }
 
 async function writePageBriefing(companyId, pageId, briefing) {

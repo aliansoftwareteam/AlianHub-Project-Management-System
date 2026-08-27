@@ -14,9 +14,9 @@
                 <CalenderCompo
                     :format="props.detail?.fieldDateFormate"
                     :modelValue="props.detail?.fieldValue ? props.detail?.fieldValue : ''"
-                    :minDate="props.detail.fieldPastFuture.includes('Future') ? props.detail.fieldPastFuture.includes('Future') && props.detail.fieldPastFuture.includes('Past') ? '' : new Date(new Date().setHours(0,0,0,0)) : !props.detail.fieldPastFuture.includes('Future') && !props.detail.fieldPastFuture.includes('Past') ? new Date(new Date().setHours(0,0,0,0)) : ''"
-                    :maxDate="props.detail.fieldPastFuture.includes('Past') ? props.detail.fieldPastFuture.includes('Future') && props.detail.fieldPastFuture.includes('Past') ? '' : new Date(new Date().setHours(23,23,59)) : !props.detail.fieldPastFuture.includes('Past') && !props.detail.fieldPastFuture.includes('Future') ? new Date(new Date().setHours(23,23,59)) : ''"
-                    :daysWeekDisable="props.detail.fieldDaysDisable"
+                    :minDate="minDate"
+                    :maxDate="maxDate"
+                    :daysWeekDisable="props.detail.fieldDaysDisable || []"
                     @update:modelValue="($event) => emit('blurUpdate',$event,props.detail)"
                     :isShowDateAndicon="true"
                     :hideExtraLayouts="props.detail.fieldTimeFormate ? [] : ['time' ,'minutes' , 'hours' , 'seconds']"
@@ -38,7 +38,7 @@
 <script setup>
     import CalenderCompo from '@/components/atom/CalenderCompo/CalenderCompo.vue';
     import ToolTip from "@/components/molecules/ToolTip/ToolTip.vue";
-    import { ref } from 'vue';
+    import { computed, ref } from 'vue';
     import useCustomFieldImage from '@/composable/customFieldIcon.js';
     const { getImageData } = useCustomFieldImage();
     const props = defineProps({
@@ -52,6 +52,19 @@
         }
     });
     const emit = defineEmits(['blurUpdate','handleEdit']);
+    const pastFuture = computed(() => Array.isArray(props.detail && props.detail.fieldPastFuture) ? props.detail.fieldPastFuture : []);
+    const allowFuture = computed(() => pastFuture.value.includes('Future'));
+    const allowPast = computed(() => pastFuture.value.includes('Past'));
+    const minDate = computed(() => {
+        if (allowFuture.value && allowPast.value) return '';
+        if (allowFuture.value || (!allowFuture.value && !allowPast.value)) return new Date(new Date().setHours(0, 0, 0, 0));
+        return '';
+    });
+    const maxDate = computed(() => {
+        if (allowFuture.value && allowPast.value) return '';
+        if (allowPast.value || (!allowFuture.value && !allowPast.value)) return new Date(new Date().setHours(23, 23, 59));
+        return '';
+    });
     const editIconImage = require("@/assets/images/editing.png");
     const validationError = ref(false);
     const handleOutside = () => {

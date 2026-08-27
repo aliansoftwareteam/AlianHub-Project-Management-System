@@ -47,8 +47,8 @@
                 <div class="d-flex align-items-center justify-content-center flex-column mt-1">
                     <EmptyState
                         v-if="project?.deletedStatusKey !== 2"
-                        :title="!project?.lastTaskId ? $t('EmptyState.no_tasks_title') : $t('EmptyState.no_match_title')"
-                        :message="!project?.lastTaskId ? $t('EmptyState.no_tasks_msg') : $t('EmptyState.no_match_msg')"
+                        :title="emptyIsFilter ? $t('EmptyState.no_match_title') : $t('EmptyState.no_tasks_title')"
+                        :message="emptyIsFilter ? $t('EmptyState.no_match_msg') : $t('EmptyState.no_tasks_msg')"
                         helpPath="tasks"
                     />
                 </div>
@@ -90,6 +90,7 @@ const { groupBy, checkCase } = taskListHelper();
 const showArchiveVar = inject("showArchived");
 const searchedTask = inject('searchedTask');
 const project = inject('selectedProject');
+const emptyIsFilter = computed(() => Boolean(project.value?.lastTaskId) || Boolean(searchedTask && searchedTask.value));
 
 // --- Reactive State ---
 const isLoading = ref(true);

@@ -414,6 +414,13 @@ function sanitizeSuggestions(suggestions, { targets, people, task } = {}) {
     return { suggestions: out, skipped };
 }
 
+function selectSuggestionsByFieldIds(suggestions, fieldIds) {
+    if (!Array.isArray(fieldIds)) return suggestions || [];
+    const allowed = new Set(fieldIds.map((id) => String(id || '').trim()).filter(Boolean));
+    if (!allowed.size) return [];
+    return (suggestions || []).filter((row) => allowed.has(String(row && row.fieldId)));
+}
+
 function planAutofillWrites(suggestions) {
     return (suggestions || []).map((item) => {
         if (item.source === 'native' || item.fieldId === NATIVE_ASSIGNEE_ID) {
@@ -569,6 +576,7 @@ module.exports = {
     listEmptyTargets,
     sanitizeSuggestions,
     heuristicSuggestions,
+    selectSuggestionsByFieldIds,
     planAutofillWrites,
     parseSuggestionsPayload,
     buildAutofillPrompt,
