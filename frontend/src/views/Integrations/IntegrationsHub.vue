@@ -139,6 +139,24 @@
                         <h2>{{ $t('IntegrationsHub.automations') }}</h2>
                         <p>{{ $t('IntegrationsHub.auto_intro') }}</p>
                     </div>
+                    <div class="ig-writeback">
+                        <div class="ig-writeback-head">
+                            <h3>{{ $t('IntegrationsHub.writeback') }}</h3>
+                            <p>{{ $t('IntegrationsHub.writeback_intro') }}</p>
+                        </div>
+                        <div v-if="!writebackProjects.length" class="ig-empty">{{ $t('IntegrationsHub.writeback_none') }}</div>
+                        <div v-for="p in writebackProjects" :key="'wb-' + p._id" class="ig-writeback-row">
+                            <span class="ig-writeback-name">{{ p.ProjectName || '(untitled)' }}</span>
+                            <span class="ig-writeback-state">{{ p.enabled ? $t('IntegrationsHub.writeback_on') : $t('IntegrationsHub.writeback_off') }}</span>
+                            <button
+                                type="button"
+                                class="ig-writeback-switch"
+                                :class="{ 'is-on': p.enabled }"
+                                :disabled="busy"
+                                @click="toggleWriteback(p)"
+                            ><i></i></button>
+                        </div>
+                    </div>
                     <div class="ig-card">
                         <label class="ig-lbl">{{ $t('IntegrationsHub.auto_name') }}</label>
                         <input v-model="ruleForm.name" class="form-control" :placeholder="$t('IntegrationsHub.auto_name_ph')" />
@@ -308,6 +326,7 @@ const feeds = ref([]);
 const calScope = ref('my');
 const calProjectId = ref('');
 const rules = ref([]);
+const writebackProjects = ref([]);
 const ruleForm = reactive({ name: '', projectId: '', condPriority: '', actionPriority: 'HIGH' });
 const catalog = ref([]);
 const connections = ref([]);
@@ -391,6 +410,24 @@ const removeFeed = async (f) => {
 const loadRules = async () => {
     try { const b = (await apiRequest('get', env.AUTOMATIONS))?.data; rules.value = (b && b.data) || []; } catch (e) { rules.value = []; }
 };
+const loadWriteback = async () => {
+    try {
+        const b = (await apiRequest('get', `${env.AUTOMATIONS}/writeback`))?.data;
+        writebackProjects.value = (b && b.data) || [];
+    } catch (e) { writebackProjects.value = []; }
+};
+const toggleWriteback = async (row) => {
+    if (!row || busy.value) return;
+    busy.value = true;
+    try {
+        const b = (await apiRequest('put', `${env.AUTOMATIONS}/writeback/${row._id}`, { enabled: !row.enabled }))?.data;
+        if (b && b.status && b.data) {
+            writebackProjects.value = writebackProjects.value.map((item) => (
+                String(item._id) === String(b.data._id) ? { ...item, enabled: b.data.enabled !== false } : item
+            ));
+        }
+    } catch (e) { /* noop */ } finally { busy.value = false; }
+};
 const createRule = async () => {
     if (!ruleForm.name.trim() || busy.value) return;
     busy.value = true;
@@ -468,7 +505,7 @@ const connectSlack = async () => {
     } catch (e) { /* noop */ } finally { busy.value = false; }
 };
 
-onMounted(() => { loadProjects(); loadInboxes(); loadFeeds(); loadRules(); loadCatalog(); loadConnections(); });
+onMounted(() => { loadProjects(); loadInboxes(); loadFeeds(); loadRules(); loadWriteback(); loadCatalog(); loadConnections(); });
 </script>
 
 <style scoped>
@@ -543,4 +580,69 @@ onMounted(() => { loadProjects(); loadInboxes(); loadFeeds(); loadRules(); loadC
 .ig-app-x:hover { color: #c0392b; }
 .ig-app-frame { border: 1px solid #e6e7ee; border-radius: 10px; overflow: hidden; background: #fff; height: calc(100dvh - 230px); min-height: 360px; }
 .ig-app-frame iframe { width: 100%; height: 100%; border: 0; }
+.ig-writeback {
+    background: var(--kiln-paper);
+    border: 1px solid var(--kiln-line);
+    border-left: 3px solid var(--kiln-ember);
+    border-radius: var(--kiln-radius-sm);
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    max-width: 720px;
+    color: var(--kiln-ink);
+}
+.ig-writeback-head h3 {
+    margin: 0 0 4px;
+    font-family: var(--kiln-font-display);
+    font-size: 16px;
+    color: var(--kiln-ink);
+}
+.ig-writeback-head p {
+    margin: 0 0 12px;
+    font-size: 12.5px;
+    color: var(--kiln-muted);
+}
+.ig-writeback-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-top: 1px solid var(--kiln-line);
+}
+.ig-writeback-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 13.5px;
+    font-weight: 600;
+}
+.ig-writeback-state {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--kiln-ember);
+}
+.ig-writeback-switch {
+    flex: 0 0 auto;
+    width: 38px;
+    height: 21px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: var(--kiln-line);
+    cursor: pointer;
+    position: relative;
+}
+.ig-writeback-switch i {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    background: #fffaf3;
+    display: block;
+    transition: transform .12s ease;
+}
+.ig-writeback-switch.is-on { background: var(--kiln-ember); }
+.ig-writeback-switch.is-on i { transform: translateX(17px); }
+.ig-writeback-switch:disabled { opacity: .55; cursor: default; }
 </style>

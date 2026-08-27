@@ -99,4 +99,5 @@ module.exports = {
     maybeReplyAsAlian,
     maybeReplyAsAlianSafe,
     emitCommentInsert,
+    saveAlianComment,
 };
