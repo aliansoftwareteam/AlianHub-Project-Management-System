@@ -8,6 +8,7 @@ const {
     STANDUP_MAX_TOKENS,
     standupWindow,
     permissionScope,
+    isInProgressTask,
     filterTasksForStandup,
     groupStandupActivity,
     shapeStandupResult,
@@ -47,7 +48,15 @@ const TASKS = [
     },
     {
         _id: 't5', TaskKey: 'SMOKE-5', TaskName: 'Spike the kiln shell', ProjectID: PROJ,
-        statusType: 'active', status: { text: 'In Progress' }, createdAt: daysAgo(3), updatedAt: daysAgo(3),
+        statusType: 'active', status: { text: 'In Progress' }, createdAt: daysAgo(10), updatedAt: daysAgo(3),
+    },
+    {
+        _id: 't6', TaskKey: 'SMOKE-6', TaskName: 'Fix login timeout', ProjectID: PROJ,
+        statusType: 'default_active', status: { text: 'To Do' }, createdAt: daysAgo(3), updatedAt: daysAgo(3),
+    },
+    {
+        _id: 't7', TaskKey: 'SMOKE-7', TaskName: 'Empty status type', ProjectID: PROJ,
+        statusType: '', status: { text: 'To Do' }, createdAt: hoursAgo(3), updatedAt: hoursAgo(3),
     },
     {
         _id: 'ghost', TaskKey: 'OTHER-1', TaskName: 'Other company work', ProjectID: OTHER,
@@ -111,18 +120,43 @@ describe('PAGES - standup / project update', () => {
 
         const dayMap = groupMap(groupsOf('24h'));
         expect(dayMap.completed).toEqual(['t1']);
-        expect(dayMap.inProgress).toEqual(['t2', 't4']);
+        expect(dayMap.inProgress).toEqual(['t2']);
         expect(dayMap.blocked).toEqual(['t3']);
-        expect(dayMap.created).toEqual(['t4']);
+        expect(dayMap.created).toEqual(['t4', 't7']);
         expect(dayMap.comments).toEqual(['t1']);
+        expect(dayMap.inProgress).not.toContain('t4');
         expect(dayMap.inProgress).not.toContain('t5');
+        expect(dayMap.inProgress).not.toContain('t6');
+        expect(dayMap.inProgress).not.toContain('t7');
         expect(dayMap.comments).not.toContain('t5');
+        expect(dayMap.created).not.toContain('t6');
 
         const weekMap = groupMap(groupsOf('week'));
-        expect(weekMap.created).toEqual(['t4', 't5']);
-        expect(weekMap.inProgress).toEqual(['t2', 't4', 't5']);
+        expect(weekMap.created).toEqual(['t4', 't6', 't7']);
+        expect(weekMap.inProgress).toEqual(['t2', 't5']);
         expect(weekMap.comments).toEqual(['t1', 't5']);
         expect(weekMap.completed).toEqual(['t1']);
+        expect(weekMap.inProgress).not.toContain('t4');
+        expect(weekMap.inProgress).not.toContain('t6');
+    });
+
+    test('To Do / default_active / empty statusType are not in progress', () => {
+        expect(isInProgressTask({ statusType: 'active' })).toBe(true);
+        expect(isInProgressTask({ statusType: 'inprogress' })).toBe(true);
+        expect(isInProgressTask({ statusType: 'default_active', status: { text: 'To Do' } })).toBe(false);
+        expect(isInProgressTask({ statusType: '', status: { text: 'To Do' } })).toBe(false);
+        expect(isInProgressTask({ status: { text: 'To Do' } })).toBe(false);
+        expect(isInProgressTask({ statusType: 'close' })).toBe(false);
+
+        const dayMap = groupMap(groupsOf('24h'));
+        expect(dayMap.created).toEqual(['t4', 't7']);
+        expect(dayMap.inProgress).toEqual(['t2']);
+        expect(dayMap.created.some((id) => (dayMap.inProgress || []).includes(id))).toBe(false);
+    });
+
+    test('older in-progress work appears in 7d but not 24h', () => {
+        expect(groupMap(groupsOf('24h')).inProgress).toEqual(['t2']);
+        expect(groupMap(groupsOf('7d')).inProgress).toEqual(['t2', 't5']);
     });
 
     test('permission pack keeps only the selected project and drops other-project tasks', () => {
@@ -144,7 +178,7 @@ describe('PAGES - standup / project update', () => {
         }).allowed).toBe(true);
 
         const scoped = filterTasksForStandup(TASKS, PROJ);
-        expect(scoped.map((row) => row._id)).toEqual(['t1', 't2', 't3', 't4', 't5']);
+        expect(scoped.map((row) => row._id)).toEqual(['t1', 't2', 't3', 't4', 't5', 't6', 't7']);
         expect(scoped.some((row) => row._id === 'ghost')).toBe(false);
 
         const grouped = groupsOf('24h');
@@ -231,8 +265,10 @@ describe('PAGES - standup / project update', () => {
         expect(locale).toContain('pages_standup_24h');
         expect(locale).toContain('pages_standup_7d');
         expect(provider).toContain('summarizeStandup');
-        expect(controller).toContain('gatherStandupContext');
-        expect(controller).toContain("resolvedAction === 'standup'");
-        expect(controller).toContain('A project is required.');
+        expect(rail).toContain("watch(action, () => {");
+        expect(rail).toContain('clearOutput');
+        expect(rail).toContain('brief.value = null');
+        expect(rail).toContain("answer.value = ''");
+        expect(rail).toContain('citations.value = []');
     });
 });

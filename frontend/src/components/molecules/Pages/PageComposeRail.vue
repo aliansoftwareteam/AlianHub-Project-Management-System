@@ -138,6 +138,17 @@ const goLabel = computed(() => {
     return needsQuestion.value ? t('Projects.pages_ask') : t('Projects.pages_compose');
 });
 
+function clearOutput() {
+    brief.value = null;
+    answer.value = '';
+    citations.value = [];
+    notice.value = configured.value ? '' : t('Projects.pages_ai_missing');
+}
+
+watch(action, () => {
+    clearOutput();
+});
+
 watch(() => props.projectId, (id) => {
     if (!id && action.value === 'standup') action.value = 'draft';
 });

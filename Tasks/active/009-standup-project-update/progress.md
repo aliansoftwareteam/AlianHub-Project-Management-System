@@ -20,7 +20,8 @@ None.
 - Implemented `pageStandup.js` + `gatherStandupContext`, rail chip gated on `projectId`, 24h/7d windows, grouped kiln briefing with `apply: false`.
 - Jest: page-standup + page-standup-gather + page-transcript + page-content + page-rules + alian-mention = 65 passed. Frontend `npm run build` succeeded.
 - Draft PR: https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/519
-- Live pick-Local-Smoke flow was not exercised (no MongoDB in this environment).
+- Jest: grouping now treats only `active`/`inprogress` as In progress; To Do stays in Newly created. Compose rail clears brief/answer/citations when the action chip changes.
+- Tests: 24h vs 7d in-progress window, default_active/empty not in progress, chip switch clears output.
 
 ## Blockers
 None.

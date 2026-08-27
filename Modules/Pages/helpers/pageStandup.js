@@ -100,7 +100,7 @@ function isBlockedTask(task) {
 function isInProgressTask(task) {
     if (isCompletedTask(task) || isBlockedTask(task)) return false;
     const type = String((task && task.statusType) || '').toLowerCase();
-    return type === 'active' || type === 'default_active' || type === 'inprogress' || type === 'open' || !type;
+    return type === 'active' || type === 'inprogress';
 }
 
 function sameProject(task, projectId) {
