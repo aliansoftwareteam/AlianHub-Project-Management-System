@@ -6,6 +6,7 @@ const {
     incomingCommentDoc,
     acceptIncomingComment,
     mongoIdIn,
+    buildPaginatedCommentMatch,
 } = require('../Modules/Comments/helpers/commentThread');
 const helper = require('../socket/helper');
 const { handleCommentChange } = require('../socket/controller/commentSocket');
@@ -159,9 +160,27 @@ describe('comment thread id contract', () => {
         expect(mongoIdIn('')).toBe(null);
         expect(mongoIdIn(null)).toBe(null);
         const comments = fs.readFileSync(path.join(__dirname, '..', 'Modules', 'Comments', 'controller.js'), 'utf8');
-        expect(comments).toContain('mongoIdIn(projectId)');
-        expect(comments).toContain('A valid projectId is required.');
+        const thread = fs.readFileSync(path.join(__dirname, '..', 'Modules', 'Comments', 'helpers', 'commentThread.js'), 'utf8');
+        expect(comments).toContain('buildPaginatedCommentMatch');
         expect(comments).toContain('status(400)');
+        expect(thread).toContain('A valid projectId is required.');
+    });
+
+    test('task thread lists by taskId even without projectId and does not AND sprintId', () => {
+        const byTask = buildPaginatedCommentMatch({ taskId: TID, sprintId: SID });
+        expect(byTask.error).toBeUndefined();
+        expect(JSON.stringify(byTask.and)).toContain(TID);
+        expect(JSON.stringify(byTask.and)).not.toContain(SID);
+        expect(byTask.and.some((clause) => clause.taskId && clause.taskId.$in)).toBe(true);
+        expect(byTask.and.some((clause) => clause.projectId)).toBe(false);
+        expect(byTask.and.some((clause) => clause.sprintId)).toBe(false);
+
+        const withProject = buildPaginatedCommentMatch({ projectId: PID, taskId: TID, sprintId: SID });
+        expect(withProject.and.some((clause) => clause.projectId && clause.projectId.$in)).toBe(true);
+        expect(withProject.and.some((clause) => clause.sprintId)).toBe(false);
+
+        expect(buildPaginatedCommentMatch({}).error).toBe('A valid projectId is required.');
+        expect(buildPaginatedCommentMatch({ projectId: PID }).and.some((clause) => clause.project === true)).toBe(true);
     });
 });
 

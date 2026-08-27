@@ -295,6 +295,10 @@ const props = defineProps({
         type: String,
         default: ""
     },
+    projectId: {
+        type: String,
+        default: ""
+    },
     creator: {
         type: Object,
         default: () => {}
@@ -444,7 +448,10 @@ const users = ref([]);
 const unreadMessages = ref(0);
 let debounceTimeout;
 const countGetter = computed(() => {
-    return getters["users/myCounts"]?.data?.[`${props.taskId ? "task" : "project"}_${projectData.value._id}${props.taskId ? `_${props.sprintId}_${props.taskId}` : ``}_comments`] || 0
+    const { projectId, taskId, sprintId } = commentThreadQuery();
+    const pid = projectId || firstId(projectData.value && projectData.value._id);
+    if (!pid) return 0;
+    return getters["users/myCounts"]?.data?.[`${taskId ? "task" : "project"}_${pid}${taskId ? `_${sprintId}_${taskId}` : ``}_comments`] || 0
 })
 watch(countGetter, (val) => {
     unreadMessages.value = val;
@@ -540,8 +547,8 @@ watch(projectData, (newProj, oldProj) => {
     }
 })
 
-watch([() => props.sprintId, () => props.taskId], ([newSprint, newTask], [oldSprint, oldTask]) => {
-    if(newSprint !== oldSprint || newTask !== oldTask) {
+watch([() => props.sprintId, () => props.taskId, () => props.projectId], ([newSprint, newTask, newProject], [oldSprint, oldTask, oldProject]) => {
+    if(newSprint !== oldSprint || newTask !== oldTask || newProject !== oldProject) {
         initialize();
     }
 })
@@ -647,22 +654,44 @@ const visibilityHandler = async () => {
 };
 
 function commentThreadQuery() {
-    const projectId = firstId(projectData.value && projectData.value._id);
-    const taskId = firstId(props.taskId) || props.taskId || '';
+    const projectId = firstId(
+        props.projectId,
+        projectData.value && projectData.value._id,
+        route.params && route.params.id,
+    );
+    const taskId = firstId(props.taskId) || (props.taskId === 'default' ? 'default' : '');
     const sprintId = firstId(props.sprintId);
     return { projectId, taskId, sprintId };
+}
+
+function commentMessagesUrl({ skipValue = 0, batchLimit = messageLimit.value, tabLeaveTime = '', sort = '' } = {}) {
+    const { projectId, taskId, sprintId } = commentThreadQuery();
+    const params = new URLSearchParams();
+    if (projectId) params.set('projectId', projectId);
+    if (taskId) params.set('taskId', taskId);
+    if (sprintId) params.set('sprintId', sprintId);
+    params.set('isDefault', projectData.value?.default ? 'true' : 'false');
+    params.set('mainChat', props.mainChat ? 'true' : 'false');
+    params.set('skipValue', String(skipValue));
+    params.set('batchLimit', String(batchLimit));
+    if (tabLeaveTime) params.set('tabLeaveTime', String(tabLeaveTime));
+    if (sort) params.set('sort', sort);
+    return { url: `${env.API_COMMENTS}/get-paginated-messages?${params.toString()}`, projectId, taskId, sprintId };
 }
 
 function tabSyncDataGet () {
     return new Promise((resolve, reject) => {
         try {
             let tabLeaveTime = sessionStorage.getItem('tableaveTime');
-            const { projectId, taskId, sprintId } = commentThreadQuery();
-            if (!projectId) {
+            const { url, projectId, taskId } = commentMessagesUrl({
+                skipValue: 0,
+                batchLimit: messageLimit.value,
+                tabLeaveTime,
+            });
+            if (!projectId && !taskId) {
                 resolve();
                 return;
             }
-            const url = `${env.API_COMMENTS}/get-paginated-messages?projectId=${projectId}&taskId=${taskId}&sprintId=${sprintId}&isDefault=${projectData.value?.default}&mainChat=${props.mainChat}&skipValue=${0}&batchLimit=${messageLimit.value}&tabLeaveTime=${tabLeaveTime}`;
             apiRequest("get", url).then((response) => {
                 response.data.data.forEach((docData)=> {
                     let index = messages.value.findIndex((x) => x._id === docData._id);
@@ -765,7 +794,16 @@ watch(projectData, (val) => {
 function getLatestMessage(projectId, taskId, sprintId, messageData) {
     return new Promise((resolve, reject) => {
         try {
-            const url = `${env.API_COMMENTS}/get-paginated-messages?projectId=${firstId(projectId)}&taskId=${firstId(taskId) || taskId}&sprintId=${firstId(sprintId)}&sort=createdAt:desc&batchLimit=1`;
+            const params = new URLSearchParams();
+            const pid = firstId(projectId);
+            const tid = firstId(taskId) || (taskId === 'default' ? 'default' : '');
+            const sid = firstId(sprintId);
+            if (pid) params.set('projectId', pid);
+            if (tid) params.set('taskId', tid);
+            if (sid) params.set('sprintId', sid);
+            params.set('sort', 'createdAt:desc');
+            params.set('batchLimit', '1');
+            const url = `${env.API_COMMENTS}/get-paginated-messages?${params.toString()}`;
             apiRequest("get", url)
             .then((response) => {
                 const latestMessage = response.data.data[0];
@@ -1251,10 +1289,13 @@ function detachSnapshot() {
 }
 
 function getRoomName(obj) {
-    if (obj.sprintId && obj.taskId) {
-        return `comments_${obj.projectId}_${obj.sprintId}_${obj.taskId}**${socket.value.id}`;
+    const projectId = firstId(obj && obj.projectId);
+    const sprintId = firstId(obj && obj.sprintId);
+    const taskId = firstId(obj && obj.taskId) || (obj && obj.taskId === 'default' ? 'default' : '');
+    if (sprintId && taskId) {
+        return `comments_${projectId}_${sprintId}_${taskId}**${socket.value.id}`;
     } else {
-        return `comments_project_${obj.projectId}**${socket.value.id}`;
+        return `comments_project_${projectId}**${socket.value.id}`;
     }
 }
 
@@ -1263,13 +1304,14 @@ function getMessages() {
     messages.value = [];
     totalMessages.value = 0;
     currentTime.value = new Date().setHours(new Date().getHours() - 1)
+    const thread = commentThreadQuery();
     let obj = {
-        'projectId': projectData.value._id,
-        ...(props.sprintId ? {'sprintId': props.sprintId} : ''),
-        ...(!projectData.value?.default && props.mainChat ? {'taskId':"default"} : props.taskId ? {'taskId': props.mainChat ? newMainChat.value : props.taskId} : {"project": true})
+        'projectId': thread.projectId,
+        ...(thread.sprintId ? {'sprintId': thread.sprintId} : ''),
+        ...(!projectData.value?.default && props.mainChat ? {'taskId':"default"} : thread.taskId ? {'taskId': props.mainChat ? newMainChat.value : thread.taskId} : {"project": true})
     }
-    if(props.mainChat && props.taskId && props.taskId !== "default") {
-        obj.taskId = props.taskId;
+    if(props.mainChat && thread.taskId && thread.taskId !== "default") {
+        obj.taskId = thread.taskId;
     }
     
     if(props.mainChat && projectData.value?.default && props.newChat) {
@@ -1472,13 +1514,16 @@ function getPaginatedMessages(...args) {
 
     return new Promise((resolve, reject) => {
         try {
-            const { projectId, taskId, sprintId } = commentThreadQuery();
-            if (!projectId) {
+            const { projectId, taskId } = commentThreadQuery();
+            if (!projectId && !taskId) {
                 loadingChat.value = false;
                 resolve("No data");
                 return;
             }
-            const url = `${env.API_COMMENTS}/get-paginated-messages?projectId=${projectId}&taskId=${taskId}&sprintId=${sprintId}&isDefault=${projectData.value?.default}&mainChat=${props.mainChat}&skipValue=${totalMessages.value}&batchLimit=${messageLimit.value}`
+            const { url } = commentMessagesUrl({
+                skipValue: totalMessages.value,
+                batchLimit: messageLimit.value,
+            });
             apiRequest("get", url).then((response) => {
                 const results = response.data.data;
 

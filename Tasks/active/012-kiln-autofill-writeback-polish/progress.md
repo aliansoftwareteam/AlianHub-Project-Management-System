@@ -12,12 +12,13 @@
 - [x] Comments list matches string or ObjectId taskId; empty projectId is 400
 - [x] Tests: skip-filled per field, Owner-without-Assignee, activity vs comment
 - [x] Draft stacked PR; tests green
+- [x] Comments pane lists existing Alian comments for the open taskId (no empty pane with badge 1)
 
 ## Last step
-Ctrl+K from Home (Local Smoke not selected): title click and OPEN now share one in-app `taskOpenPath` href and `router.push` (no `window.open`, no `[object Object]` project segment). TaskKey queries hit the same AdvancedGlobalFilter `$or` as TaskName. PROJECTS tab without an id auto-binds the first listed project (Local Smoke in the smoke company) and loads sprints so Tags/AI and the board can bind SMOKE-1..7. Comments `$in` string+ObjectId; missing projectId is 400.
+SMOKE-7 Comments tab showed badge 1 with an empty pane because the thread fetch required `selectedProject._id` and ANDed `sprintId`. The list now queries by `taskId` (string or ObjectId), mounts without waiting on inject, and `changeTab` / hydrate rewrite the hash to `#/<cid>/project/<pid>/s/<sid>/<tid>?detailTab=comment`.
 
 ## Blockers
-None. Live Local Smoke is not in this VM (no Mongo), so the Home Ctrl+K and PROJECTS auto-select paths are covered by source/unit tests, not a browser pass.
+None. Live Local Smoke is not in this VM (no Mongo), so the Comments pane and hash restore are covered by source/unit tests, not a browser pass.
 
 ## Log
 
@@ -29,3 +30,4 @@ None. Live Local Smoke is not in this VM (no Mongo), so the Home Ctrl+K and PROJ
 - List/board bind: sprint GET matches string or ObjectId `projectId`; dangling `folderId` still lands in `sprintsObj`; cache no longer returns another project's sprints. Empty status columns no longer skip the task fetch.
 - Jest 116 passing; frontend production build succeeded. PR 522 updated.
 - QA P0 leftover 2 retry: sidebar Local Smoke / sprint click still left the URL on `#/<cid>/project` because sprint rows used JS-only `router.push({ path })` without a real href, and search rows `@click.prevent`ed an empty hash. Both now use named routes with `cid` (`taskOpenRoute`) and a real `<a :href>` from `router.resolve`. Title and OPEN share that href (no `target=_blank`). PROJECTS without an id `router.replace`s onto the first listed project + first sprint.
+- QA P0 leftover 3 (SMOKE-7 comments): badge 1 with empty Comments pane. Thread fetch now uses `taskId` even when `selectedProject` is `{}`, does not AND sprintId on a task thread, and keeps pid/sid/tid in the hash while the modal is open. Empty projectId is still 400 only when there is no valid taskId either.

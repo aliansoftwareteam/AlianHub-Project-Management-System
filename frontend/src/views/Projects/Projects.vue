@@ -1270,9 +1270,12 @@ const openTaskProjectId = computed(() => firstId(
 
 watch(() => route.params.taskId, (taskId) => {
     if (taskId && !isTaskDetail.value) {
-        selectedTask.value = { id: taskId, sprintId: route.params.sprintId, ProjectID: route.params.id };
+        selectedTask.value = { id: firstId(taskId), sprintId: firstId(route.params.sprintId), ProjectID: firstId(route.params.id) };
         isTaskDetail.value = true;
     } else if (!taskId) {
+        if (isTaskDetail.value && firstId(selectedTask.value?.id, selectedTask.value?._id)) {
+            return;
+        }
         isTaskDetail.value = false;
         selectedTask.value = {};
     }

@@ -10,7 +10,7 @@ const { parseMentionIds } = require("./helpers/parseMentions");
 const { maybeReplyAsAlianSafe, emitCommentInsert } = require("./helpers/alianReply");
 const { handleNotificationtFun } = require("../notification/prepare-notification-data/controllerV2");
 const { getRoleType, isPrivileged } = require("../../Config/permissionGuard");
-const { idString, mongoIdIn } = require("./helpers/commentThread");
+const { buildPaginatedCommentMatch } = require("./helpers/commentThread");
 
 /* @mention delivery: record the mention (feeds the in-app "mentions" tab, which
  * queries the mentions collection by mentionIds) and fire the notification
@@ -218,27 +218,12 @@ exports.getPaginatedMessages = async (req, res) => {
             tabLeaveTime = null
         } = req.query;
 
-        const projectMatch = mongoIdIn(projectId);
-        if (!projectMatch) {
-            return res.status(400).json({ status: false, message: 'A valid projectId is required.', data: [] });
+        const match = buildPaginatedCommentMatch({ projectId, taskId, sprintId, isDefault, mainChat });
+        if (match.error) {
+            return res.status(400).json({ status: false, message: match.error, data: [] });
         }
 
-        const taskMatch = !isDefault && mainChat
-            ? { taskId: 'default' }
-            : (taskId
-                ? { taskId: taskId !== 'default' ? mongoIdIn(taskId) : taskId }
-                : { project: true });
-        if (taskId && taskId !== 'default' && !mongoIdIn(taskId)) {
-            return res.status(400).json({ status: false, message: 'A valid taskId is required.', data: [] });
-        }
-
-        const and = [
-            { projectId: projectMatch },
-            { isDeleted: { $ne: true } },
-            taskMatch,
-        ];
-        const sprintMatch = sprintId ? mongoIdIn(sprintId) : null;
-        if (sprintMatch) and.push({ sprintId: sprintMatch });
+        const and = match.and;
         if (tabLeaveTime) and.push({ updatedAt: { $gte: new Date(Number(tabLeaveTime)) } });
 
         const searchResultMatch = {

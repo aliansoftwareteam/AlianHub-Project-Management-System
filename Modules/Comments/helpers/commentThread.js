@@ -154,6 +154,56 @@ function mongoIdIn(value) {
     return { $in: ids };
 }
 
+function isTrueFlag(value) {
+    return value === true || value === 'true';
+}
+
+function buildPaginatedCommentMatch(query = {}) {
+    const projectMatch = mongoIdIn(query.projectId);
+    const taskRaw = idString(query.taskId);
+
+    if (!isTrueFlag(query.isDefault) && isTrueFlag(query.mainChat)) {
+        if (!projectMatch) return { error: 'A valid projectId is required.' };
+        return {
+            and: [
+                { projectId: projectMatch },
+                { isDeleted: { $ne: true } },
+                { taskId: 'default' },
+            ],
+        };
+    }
+
+    if (taskRaw && taskRaw !== 'default') {
+        const taskMatch = mongoIdIn(taskRaw);
+        if (!taskMatch) return { error: 'A valid taskId is required.' };
+        const and = [
+            { isDeleted: { $ne: true } },
+            { taskId: taskMatch },
+        ];
+        if (projectMatch) and.push({ projectId: projectMatch });
+        return { and };
+    }
+
+    if (!projectMatch) return { error: 'A valid projectId is required.' };
+    if (taskRaw === 'default') {
+        return {
+            and: [
+                { projectId: projectMatch },
+                { isDeleted: { $ne: true } },
+                { taskId: 'default' },
+            ],
+        };
+    }
+    const and = [
+        { projectId: projectMatch },
+        { isDeleted: { $ne: true } },
+        { project: true },
+    ];
+    const sprintMatch = query.sprintId ? mongoIdIn(query.sprintId) : null;
+    if (sprintMatch) and.push({ sprintId: sprintMatch });
+    return { and };
+}
+
 function acceptIncomingComment(doc) {
     if (!doc || typeof doc !== 'object') return false;
     return Boolean(idString(doc._id || doc.id) || doc.userId || doc.message);
@@ -162,6 +212,7 @@ function acceptIncomingComment(doc) {
 module.exports = {
     idString,
     mongoIdIn,
+    buildPaginatedCommentMatch,
     commentRoomPrefix,
     serializeCommentForSocket,
     incomingCommentDoc,

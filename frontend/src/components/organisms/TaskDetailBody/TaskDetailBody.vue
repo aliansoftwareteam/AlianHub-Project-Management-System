@@ -22,10 +22,11 @@
                     @openDoc="openDoc"
                 />
                 <Comments
-                    v-else-if="activeTab === 'comment' && Object.keys(projectData).length && Object.keys(task).length"
-                    :taskId="task?._id"
+                    v-else-if="activeTab === 'comment' && threadTaskId"
+                    :projectId="openProjectId"
+                    :taskId="threadTaskId"
                     :parentTaskId="task?.ParentTaskId"
-                    :sprintId="task?.sprintId"
+                    :sprintId="threadSprintId"
                     :folderId="task?.folderObjId || null"
                     :userIds="commentUsers"
                     :watchers="[...(task?.watchers || [])]"
@@ -94,6 +95,7 @@
     import ActivityLog from '@/components/templates/ActivityLog/ActivityLog.vue'
     import TimeLog from '@/views/TimeLog/TimeLog.vue'
     import { useCustomComposable } from '@/composable';
+    import { firstId, taskOpenRoute } from '@/utils/taskOpenProjectId';
 
     const {getters} = useStore();
     const { checkPermission } = useCustomComposable();
@@ -170,17 +172,50 @@
     const activeTab = ref('');
     const isSupportProject = computed(() => process.env.VUE_APP_SUPPORT_PROJECTID === projectData.value._id)
 
+    const openProjectId = computed(() => firstId(
+        props.task && (props.task.ProjectID || props.task.projectId),
+        projectData.value && projectData.value._id,
+        route.params && route.params.id,
+    ));
+    const threadTaskId = computed(() => firstId(props.task && (props.task._id || props.task.id)));
+    const threadSprintId = computed(() => firstId(props.task && props.task.sprintId, route.params && route.params.sprintId));
+
     const customerId = ref(props.task?.customField?.[process.env.VUE_APP_CUSTOMFIELDID]?.fieldValue);
     const productName = ref(props.task?.customField?.[process.env.VUE_APP_CUSTOMFIELDPRODUCTID]?.fieldValue);
 
-    onMounted(() => {
-        if(!route.query?.detailTab) {
-            router.replace({ name: route.name, params: { ...route.params }, query: { ...route.query, detailTab: 'task-detail-tab' } })
+    function syncDetailTab(tab) {
+        activeTab.value = tab;
+        const dest = taskOpenRoute({
+            companyId: route.params && route.params.cid,
+            projectId: openProjectId.value,
+            sprintId: threadSprintId.value,
+            taskId: threadTaskId.value,
+            folderId: props.task && props.task.folderObjId,
+        });
+        const query = { ...route.query, detailTab: tab };
+        if (dest) {
+            router.replace({ ...dest, query });
+            return;
         }
-        activeTab.value = route.query.detailTab ? route.query.detailTab : 'task-detail-tab'
+        router.replace({ name: route.name, params: { ...route.params }, query });
+    }
+
+    onMounted(() => {
+        const tab = route.query.detailTab ? route.query.detailTab : 'task-detail-tab';
+        if (!route.query?.detailTab || !route.params.taskId) {
+            syncDetailTab(tab);
+        } else {
+            activeTab.value = tab;
+        }
     })
 
-    const myCounts = computed(() => getters["users/myCounts"]?.data?.[`task_${projectData.value._id}_${props.task.sprintId}_${props.task._id}_comments`] || 0)
+    const myCounts = computed(() => {
+        const pid = openProjectId.value;
+        const sid = threadSprintId.value;
+        const tid = threadTaskId.value;
+        if (!pid || !sid || !tid) return 0;
+        return getters["users/myCounts"]?.data?.[`task_${pid}_${sid}_${tid}_comments`] || 0;
+    })
 
     const tabs = ref({
         ...(checkPermission('task.task_details',projectData.value?.isGlobalPermission) === true && {'task-detail-tab': {
@@ -206,8 +241,7 @@
     });
 
     const changeTab = (tab) => {
-        activeTab.value = tab;
-        router.replace({ name: route.name, params: { ...route.params }, query: { ...route.query, detailTab: tab } })
+        syncDetailTab(tab);
     }
 
     const commentUsers = computed(() => {

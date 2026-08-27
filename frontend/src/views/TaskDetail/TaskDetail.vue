@@ -120,7 +120,7 @@
     import taskClass from "@/utils/TaskOperations";
     import { apiRequest } from '../../services';
     import * as env from '@/config/env';
-    import { resolveOpenProjectId, shouldShowTaskChrome, bindSprintsToProject, asDocList } from '@/utils/taskOpenProjectId';
+    import { resolveOpenProjectId, shouldShowTaskChrome, bindSprintsToProject, asDocList, taskOpenRoute, firstId } from '@/utils/taskOpenProjectId';
     import { openGlobalSearch } from '@/utils/openGlobalSearch';
     import Sidebar from '@/components/molecules/Sidebar/Sidebar.vue'
     import TaskDetailNavBar from '@/components/molecules/TaskDetailNavBar/TaskDetailNavBar.vue'
@@ -565,6 +565,29 @@
     // header (SubTasks) read one identical value and never disagree.
     provide("subtaskCompletion", subtaskCompletion);
 
+    function keepTaskOpenHash() {
+        const dest = taskOpenRoute({
+            companyId: firstId(props.companyId, route.params && route.params.cid),
+            projectId: firstId(
+                resolvedProjectId.value,
+                task.value && (task.value.ProjectID || task.value.projectId),
+                projectData.value && projectData.value._id,
+                route.params && route.params.id,
+            ),
+            sprintId: firstId(task.value && task.value.sprintId, props.sprintId, route.params && route.params.sprintId),
+            taskId: firstId(task.value && (task.value._id || task.value.id), props.taskId),
+            folderId: firstId(task.value && task.value.folderObjId, route.params && route.params.folderId),
+        });
+        if (!dest) return;
+        const sameName = route.name === dest.name;
+        const sameParams = firstId(route.params.id) === dest.params.id
+            && firstId(route.params.sprintId) === dest.params.sprintId
+            && firstId(route.params.taskId) === dest.params.taskId
+            && firstId(route.params.folderId) === firstId(dest.params.folderId);
+        if (sameName && sameParams) return;
+        router.replace({ ...dest, query: { ...route.query } }).catch(() => {});
+    }
+
     function getParentTask() {
         if(task?.value?.ParentTaskId) {
             apiRequest('get', `${env.TASK}/${task.value.ParentTaskId}`).then((response) => {
@@ -613,6 +636,7 @@
                     emit('handleSpinner');
                     task.value = row;
                     projectData.value = response[0];
+                    keepTaskOpenHash();
                     const sprint = response[0].sprintsObj;
                     const folder = response[0].sprintsfolders;
                     getSprintFolderData(response[0]._id,sprint,folder).then((resp) => {
