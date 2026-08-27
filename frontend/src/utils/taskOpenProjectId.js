@@ -145,3 +145,33 @@ export function taskOpenPath(ids = {}) {
     if (folderId) return `${base}/f/${folderId}`;
     return `${base}/p`;
 }
+
+export function pageOpenRoute({ companyId, projectId, pageId } = {}) {
+    const cid = injectedId(companyId);
+    const pid = firstId(projectId);
+    if (!cid || !pid) return null;
+    const page = firstId(pageId);
+    const dest = { name: 'ProjectPages', params: { cid, projectId: pid } };
+    if (page) dest.query = { page };
+    return dest;
+}
+
+export function pageOpenPath(ids = {}) {
+    const dest = pageOpenRoute(ids);
+    if (!dest) return '';
+    const page = dest.query && dest.query.page;
+    return `/${dest.params.cid}/projects/${dest.params.projectId}/pages${page ? `?page=${page}` : ''}`;
+}
+
+export function pageDeepLinkNeedsResolve({ pageId, projectId, routeName } = {}) {
+    return Boolean(firstId(pageId)) && !firstId(projectId) && routeName !== 'ProjectPages';
+}
+
+export function boardEmptyKind({ loading, sprintsBound, boardCount, expectedCount, searchHits } = {}) {
+    if (loading) return 'loading';
+    const shown = Number(boardCount) || 0;
+    if (shown > 0) return 'ready';
+    const expected = Number(expectedCount) || 0;
+    if (!sprintsBound || expected > 0 || searchHits) return 'failed';
+    return 'empty';
+}

@@ -9,18 +9,18 @@
         />
     </div>
     <div v-else>
-        <template v-if="isLoading">
+        <template v-if="emptyKind === 'loading'">
             <div class="kanban-board-skeleton">
-                <div class="kanban-column-skeleton" v-for="j in Math.round(Math.random() * (5 - 2) + 2)" :key="j">
+                <div class="kanban-column-skeleton" v-for="j in 3" :key="j">
                     <div class="d-flex justify-content-between w-100 mb-15px">
                         <Skelaton class="border-radius-5-px" style="height: 25px; width: 70px;" />
-                        <span class="cursor-pointer">
+                        <span>
                             <Skelaton class="border-radius-5-px" style="height: 25px; width: 24px;" />
                         </span>
                     </div>
                     <div class="">
-                        <div class="kanban-card-wrapper-skeleton" :style="{ backgroundColor: '#FFF' }">
-                            <div class="kanban-card-skeleton pt-10px pl-10px pr-10px pb-5px w-100 mb-10px" v-for="i in Math.round(Math.random() * (5 - 2) + 2)" :key="i">
+                        <div class="kanban-card-wrapper-skeleton">
+                            <div class="kanban-card-skeleton pt-10px pl-10px pr-10px pb-5px w-100 mb-10px" v-for="i in 3" :key="i">
                                 <Skelaton class="border-radius-5-px mt-5px" style="height: 22px; width: 278px;" />
                                 <div class="d-flex align-items-center mt-5px justify-content-between">
                                     <div class="d-flex align-items-center">
@@ -39,20 +39,28 @@
                 </div>
             </div>
         </template>
+        <template v-else-if="emptyKind === 'ready'">
+            <KanbanBoard :data="processedBoardData" :group="grouped" :sprintId="sprintId" />
+        </template>
         <template v-else>
-            <template v-if="processedBoardData.length && sprints?.length">
-                <KanbanBoard :data="processedBoardData" :group="grouped" :sprintId="sprintId" />
-            </template>
-            <template v-else>
-                <div class="d-flex align-items-center justify-content-center flex-column mt-1">
-                    <EmptyState
-                        v-if="project?.deletedStatusKey !== 2"
-                        :title="emptyIsFilter ? $t('EmptyState.no_match_title') : $t('EmptyState.no_tasks_title')"
-                        :message="emptyIsFilter ? $t('EmptyState.no_match_msg') : $t('EmptyState.no_tasks_msg')"
-                        helpPath="tasks"
-                    />
-                </div>
-            </template>
+            <div class="d-flex align-items-center justify-content-center flex-column mt-1">
+                <EmptyState
+                    v-if="project?.deletedStatusKey !== 2"
+                    :title="emptyKind === 'failed' ? $t('EmptyState.load_failed_title') : $t('EmptyState.no_sprint_tasks_title')"
+                    :message="emptyKind === 'failed' ? $t('EmptyState.load_failed_msg') : $t('EmptyState.no_sprint_tasks_msg')"
+                    :actionLabel="emptyKind === 'failed' ? $t('EmptyState.load_failed_action') : $t('EmptyState.no_sprint_tasks_action')"
+                    :tone="emptyKind === 'failed' ? 'copper' : 'pine'"
+                    @action="onEmptyAction"
+                />
+                <BoardViewTaskCreate
+                    v-if="wantCreate && sprints && sprints[0]"
+                    :data="{}"
+                    :sprintData="sprints[0]"
+                    :groupValue="grouped"
+                    :sprintId="sprints[0].id || sprints[0]._id"
+                    @toggle="wantCreate = false"
+                />
+            </div>
         </template>
     </div>
 </template>
@@ -64,14 +72,14 @@ import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import { markFirstRunStep, FIRST_RUN_STEPS } from '@/composable/firstRunProgress';
 import isEqual from 'lodash/isEqual';
 
-// Components
 import KanbanBoard from '@/views/Projects/Kanban/KanbanBoard.vue';
+import BoardViewTaskCreate from '@/views/Projects/Kanban/BoardViewTaskCreate.vue';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 
-// Helpers
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { useRoute } from 'vue-router';
+import { boardEmptyKind } from '@/utils/taskOpenProjectId';
 const route = useRoute();
 
 // --- Props & Emits ---
@@ -80,6 +88,7 @@ const props = defineProps({
     commonDateFormatForDate: { type: String, default: "DD/MM/YYYY" },
     sprints: { type: Array, default: () => [] },
     projectData: { type: Object, default: () => { } },
+    sprintLoading: { type: Boolean, default: false },
 });
 
 defineEmits(['change']);
@@ -90,7 +99,8 @@ const { groupBy, checkCase } = taskListHelper();
 const showArchiveVar = inject("showArchived");
 const searchedTask = inject('searchedTask');
 const project = inject('selectedProject');
-const emptyIsFilter = computed(() => Boolean(project.value?.lastTaskId) || Boolean(searchedTask && searchedTask.value) || !(props.sprints && props.sprints.length));
+const reloadSprintTasks = inject('reloadSprintTasks', () => Promise.resolve());
+const wantCreate = ref(false);
 
 // --- Reactive State ---
 const isLoading = ref(true);
@@ -180,7 +190,29 @@ const processedBoardData = computed(() => {
     });
 });
 
-// Watch for changes in grouping type or sprints to regenerate the group structure
+const shownBoardCount = computed(() => processedBoardData.value.reduce((n, group) => n + ((group && group.tasksArray) || []).length, 0));
+const emptyKind = computed(() => {
+    const sprint = props.sprints && props.sprints[0];
+    const expected = Number((sprint && (sprint.tasks || sprint.taskCount || sprint.archiveTaskCount)) || 0);
+    return boardEmptyKind({
+        loading: isLoading.value || props.sprintLoading,
+        sprintsBound: Boolean(props.sprints && props.sprints.length),
+        boardCount: shownBoardCount.value,
+        expectedCount: expected,
+        searchHits: Boolean(searchedTask && searchedTask.value && searchedTasksData.value.length),
+    });
+});
+
+function onEmptyAction() {
+    if (emptyKind.value === 'failed') {
+        Promise.resolve(reloadSprintTasks()).catch((error) => {
+            console.error('ERROR retrying sprint tasks: ', error);
+        });
+        return;
+    }
+    wantCreate.value = true;
+}
+
 watch([() => props.grouped, () => props.sprints,() => route?.params], ([newGroup, newSprints, newRouteParams], [oldGroup, oldSprints, oldRouteParams]) => {
     if (project.value?._id && (newGroup !== oldGroup || !isEqual(newSprints, oldSprints))) {        
         if((newRouteParams?.id !== oldRouteParams?.id) || (newRouteParams?.sprintId !== oldRouteParams?.sprintId) || (newRouteParams?.folderId !== oldRouteParams?.folderId)){
@@ -215,6 +247,8 @@ onMounted(async () => {
                 isLoading.value = false;
             }, 500);
         }
+    } else {
+        isLoading.value = false;
     }
 });
 

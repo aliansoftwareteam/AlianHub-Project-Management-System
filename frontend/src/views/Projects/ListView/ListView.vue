@@ -19,13 +19,13 @@
         />
     </div>
     <template v-else>
-        <div class="w-100 pr-20px pl-20px mt-20px" v-if="isLoading || sprintLoading">
+        <div class="w-100 pr-20px pl-20px mt-20px" v-if="emptyKind === 'loading'">
             <div class="bg-white border-radius-8-px p-10px mb-15px">
                 <div class="d-flex align-items-center mb-20px">
                     <img :src="triangleBlack" alt="triangleBlack">
                     <Skelaton class="border-radius-5-px ml-10px" style="height: 20px; width: 150px;"/>
                 </div>
-                <div v-for="i in 5" :key="i" class="sprint" style="background-color: #f4f5f7" :style="`${i == 5 ? 'margin-bottom: 0px !important;' : ''}`">
+                <div v-for="i in 5" :key="i" class="sprint" style="background-color: var(--kiln-paper, #f4ead8)" :style="`${i == 5 ? 'margin-bottom: 0px !important;' : ''}`">
                     <div class="d-flex align-items-center">
                         <Skelaton class="border-radius-5-px status-sprint" style="width: 80px;"/>
                         <Skelaton class="border-radius-5-px status-sprint ml-6px" style="width: 50px; height: 20px;"/>
@@ -40,7 +40,7 @@
             </div>
         </div>
         <template v-else>
-            <div class="list_view style-scroll" v-if="groupedTasks.length" id="list_scroll">
+            <div class="list_view style-scroll" v-if="emptyKind === 'ready'" id="list_scroll">
                 <SprintListing
                     v-for="(sprint, index) in groupedTasks"
                     :key="sprint?.id"
@@ -54,14 +54,13 @@
                 />
             </div>
             <div class="list_view d-flex align-items-center justify-content-center flex-column" v-else>
-                <!-- lastTaskId is 0 until the project's first task is ever created, which is what
-                     separates "nothing here yet" from "a filter is hiding the work". -->
                 <EmptyState
                     v-if="project?.deletedStatusKey !== 2"
-                    :image="noSearchResult"
-                    :title="showArchived ? $t('ProjectSlider.no_archived') : (emptyIsFilter ? $t('EmptyState.no_match_title') : $t('EmptyState.no_tasks_title'))"
-                    :message="showArchived ? '' : (emptyIsFilter ? $t('EmptyState.no_match_msg') : $t('EmptyState.no_tasks_msg'))"
-                    :helpPath="showArchived ? '' : 'tasks'"
+                    :title="showArchived ? $t('ProjectSlider.no_archived') : (emptyKind === 'failed' ? $t('EmptyState.load_failed_title') : $t('EmptyState.no_sprint_tasks_title'))"
+                    :message="showArchived ? '' : (emptyKind === 'failed' ? $t('EmptyState.load_failed_msg') : $t('EmptyState.no_sprint_tasks_msg'))"
+                    :actionLabel="showArchived ? '' : (emptyKind === 'failed' ? $t('EmptyState.load_failed_action') : $t('EmptyState.no_sprint_tasks_action'))"
+                    :tone="showArchived ? '' : (emptyKind === 'failed' ? 'copper' : 'pine')"
+                    @action="onEmptyAction"
                 />
             </div>
         </template>
@@ -85,6 +84,7 @@ import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPla
 import isEqual from 'lodash/isEqual';
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { useTaskSelection } from '@/composable/useTaskSelection.js';
+import { boardEmptyKind } from '@/utils/taskOpenProjectId';
 
 const triangleBlack = require('@/assets/images/svg/triangleBlack.svg');
 
@@ -95,7 +95,7 @@ const project = inject("selectedProject");
 const clientWidth = inject("$clientWidth");
 const showArchived = inject("showArchived");
 const searchedTask = inject('searchedTask', ref(false));
-const emptyIsFilter = computed(() => Boolean(project.value?.lastTaskId) || Boolean(searchedTask && searchedTask.value) || !(props.sprints && props.sprints.length));
+const reloadSprintTasks = inject('reloadSprintTasks', () => Promise.resolve());
 const {
     groupBy,
     getSprintTasks,
@@ -103,7 +103,7 @@ const {
 } = taskListHelper();
 
 // EMITS
-defineEmits(['change'])
+const emit = defineEmits(['change', 'create']);
 
 // PROPS
 const props = defineProps({
@@ -133,13 +133,31 @@ const props = defineProps({
     }
 })
 
-// IMAGES
-const noSearchResult = require("@/assets/images/svg/No-Search-Result.svg");
-
 const groupedTasks = ref([]);
 const expandedSprint = ref("");
 const initialDate = ref(0);
 const isLoading = ref(false);
+const searchedTasksData = computed(() => getters['projectData/searchedTasks'] || []);
+const emptyKind = computed(() => {
+    const sprint = props.sprints && props.sprints[0];
+    const expected = Number((sprint && (sprint.tasks || sprint.taskCount || sprint.archiveTaskCount)) || 0);
+    return boardEmptyKind({
+        loading: isLoading.value || props.sprintLoading,
+        sprintsBound: Boolean(props.sprints && props.sprints.length),
+        boardCount: groupedTasks.value.length,
+        expectedCount: expected,
+        searchHits: Boolean(searchedTask && searchedTask.value && searchedTasksData.value.length),
+    });
+});
+function onEmptyAction() {
+    if (emptyKind.value === 'failed') {
+        Promise.resolve(reloadSprintTasks()).catch((error) => {
+            console.error('ERROR retrying sprint tasks: ', error);
+        });
+        return;
+    }
+    emit('create');
+}
 
 const currentCompany = computed(() => getters["settings/selectedCompany"])
 

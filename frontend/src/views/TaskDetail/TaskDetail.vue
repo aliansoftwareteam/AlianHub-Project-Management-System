@@ -37,6 +37,7 @@
                         />
                         <TaskDetailTitle
                             v-if="taskLoaded || !isSpinner"
+                            ref="titleRef"
                             :taskName="task.TaskName"
                             :isSupport="isSupport"
                             :taskType="task.TaskTypeKey"
@@ -274,6 +275,21 @@
         loaded: taskLoaded.value,
         blocked: openBlocked.value,
     }));
+
+    const titleRef = ref(null);
+
+    function onPanelEscape(event) {
+        if (!event || event.key !== 'Escape') return;
+        if (titleRef.value && titleRef.value.isEditing) {
+            titleRef.value.cancelEdit();
+            event.preventDefault();
+            event.stopPropagation();
+            if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+            return;
+        }
+        if (event.defaultPrevented) return;
+        emit('toggleTaskDetail', task.value, true);
+    }
 
     const updateTaskName = (val) => {
         if(!val?.trim()?.length) return;
@@ -537,6 +553,7 @@
 
     onMounted(async () => {
         getQueryFun();
+        document.addEventListener('keydown', onPanelEscape);
         try {
             document.addEventListener('visibilitychange', visibilityHandler);            
             if(task.value && Object.keys(task.value).length > 0){
@@ -565,6 +582,7 @@
         });
         socket.value.emit('leaveTaskDetail',`taskDetail_${props.taskId}**${socket.value.id}`);
         clearTimeout(debounceTimeout);
+        document.removeEventListener('keydown', onPanelEscape);
         document.removeEventListener('visibilitychange', visibilityHandler);
     })
     provide("selectedProject", projectData);

@@ -4,6 +4,7 @@
         role="presentation"
         :class="{ active: isActive }"
         class="cursor-pointer"
+        @mousedown.stop
         @click.prevent.stop="selectTab"
     >
         <img

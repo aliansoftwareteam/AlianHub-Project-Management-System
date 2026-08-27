@@ -40,6 +40,7 @@
 <script setup>
 import { computed, inject, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { pageOpenRoute } from '@/utils/taskOpenProjectId';
 
 const props = defineProps({
     citations: { type: Array, default: () => [] },
@@ -60,10 +61,12 @@ const items = computed(() => {
             projectId: row.projectId ? String(row.projectId) : '',
             to: null,
         };
-        if (citation.type === 'page' && cid) {
-            const query = { page: citation.id };
-            if (citation.projectId) query.project = citation.projectId;
-            citation.to = { name: 'Pages', params: { cid }, query };
+        if (citation.type === 'page' && cid && citation.projectId) {
+            citation.to = pageOpenRoute({
+                companyId: cid,
+                projectId: citation.projectId,
+                pageId: citation.id,
+            });
         }
         return citation;
     });

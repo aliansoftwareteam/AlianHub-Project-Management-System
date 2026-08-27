@@ -738,6 +738,11 @@ provide('searchedTask', searchTask);
 provide('showArchived', showArchived);
 provide('selectedProject', projectData);
 provide('isSupport', ref(false));
+provide('reloadSprintTasks', async () => {
+    const pid = firstId(projectData.value && projectData.value._id, route.params && route.params.id);
+    if (!pid || !projectList.value || typeof projectList.value.getSprintFolderData !== 'function') return;
+    await projectList.value.getSprintFolderData(pid, true, true);
+});
 
 const icons = ref({
     Anything_url: require('@/assets/images/svg/anything.svg'),

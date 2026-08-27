@@ -15,6 +15,10 @@ const {
     taskOpenPath,
     taskOpenRoute,
     injectedId,
+    pageOpenRoute,
+    pageOpenPath,
+    pageDeepLinkNeedsResolve,
+    boardEmptyKind,
 } = require('../Modules/Project/helpers/taskOpenProjectId');
 
 describe('TASK OPEN - pass ProjectID so taskData is not empty', () => {
@@ -47,15 +51,19 @@ describe('TASK OPEN - pass ProjectID so taskData is not empty', () => {
         expect(search).toContain('task_not_in_project');
         expect(search).toContain('missingHit');
         expect(advance).toContain('openInApp');
+        expect(advance).toContain('openFromTitle');
+        expect(advance).toContain('openFromChip');
         expect(advance).toContain(':href="taskHref"');
-        expect(advance).toContain('imgOpenSameTab');
-        expect(advance).toContain('imgOpenNewTab');
+        expect(advance).toContain('advancefilter__open-chip');
+        expect(advance).toContain('Projects.search_open');
+        expect(advance).not.toContain('imgOpenSameTab');
+        expect(advance).not.toContain('imgOpenNewTab');
         expect(advance).toContain('taskOpenRoute');
         expect(advance).toContain('closeAdvanceSearch');
         expect(advance).not.toContain('window.open');
         expect(advance).not.toContain('target="_blank"');
         expect(advance).not.toContain('openModel');
-        expect(advance).not.toMatch(/event\.metaKey \|\| event\.ctrlKey/);
+        expect(advance).toMatch(/event\.metaKey \|\| event\.ctrlKey/);
         expect(detail).toContain('resolveOpenProjectId');
         expect(detail).toContain('task_not_in_project');
         expect(detail).toContain('openBlocked');
@@ -160,8 +168,16 @@ describe('LIST/BOARD - bind sprint rows so SMOKE tasks can load', () => {
         expect(listing).toContain('taskOpenRoute');
         expect(listing).toContain('onBareProject');
         expect(listing).toContain('sprintFetchStarted');
-        expect(list).toContain('EmptyState.no_match_title');
-        expect(board).toContain('EmptyState.no_match_title');
+        expect(list).toContain('EmptyState.no_sprint_tasks_title');
+        expect(board).toContain('EmptyState.no_sprint_tasks_title');
+        expect(list).toContain('EmptyState.load_failed_title');
+        expect(board).toContain('EmptyState.load_failed_title');
+        expect(list).toContain('boardEmptyKind');
+        expect(board).toContain('boardEmptyKind');
+        expect(list).not.toContain('EmptyState.no_match_title');
+        expect(board).not.toContain('EmptyState.no_match_title');
+        expect(list).not.toContain('no_data_found');
+        expect(board).not.toContain('no_data_found');
         expect(list).toContain('props.sprints && props.sprints.length');
         expect(board).toContain('props.sprints && props.sprints.length');
     });
@@ -245,16 +261,20 @@ describe('SEARCH OPEN - same-tab hash with ProjectID, TaskKey, and auto-select',
         const comments = fs.readFileSync(path.join(__dirname, '..', 'Modules', 'Comments', 'controller.js'), 'utf8');
 
         expect(advance).toContain('openInApp');
+        expect(advance).toContain('openFromTitle');
+        expect(advance).toContain('openFromChip');
         expect(advance).toContain(':href="taskHref"');
-        expect(advance).toContain('imgOpenSameTab');
-        expect(advance).toContain('imgOpenNewTab');
-        expect((advance.match(/:href="taskHref"/g) || []).length).toBe(3);
+        expect(advance).toContain('advancefilter__open-chip');
+        expect(advance).not.toContain('imgOpenSameTab');
+        expect(advance).not.toContain('imgOpenNewTab');
+        expect((advance.match(/:href="taskHref"/g) || []).length).toBe(2);
         expect(advance).toContain('taskOpenRoute');
         expect(advance).toContain('closeAdvanceSearch');
         expect(advance).not.toContain('window.open');
         expect(advance).not.toContain('target="_blank"');
         expect(advance).not.toContain('@click.prevent');
-        expect(advance).not.toMatch(/event\.metaKey \|\| event\.ctrlKey/);
+        expect(advance).toMatch(/event\.metaKey \|\| event\.ctrlKey/);
+        expect(advance).toContain('openFromChip');
         expect(helper).toContain('taskOpenPath');
         expect(helper).toContain('firstId');
         expect(filter).toContain('TaskKey');
@@ -278,9 +298,14 @@ describe('SEARCH OPEN - same-tab hash with ProjectID, TaskKey, and auto-select',
         expect(tabs).toContain('selectTab');
         expect(tabs).toContain("emit('changeTab'");
         expect(tabs).toContain('@click.prevent.stop="selectTab"');
-        expect(tabs).not.toContain('@click.stop');
+        expect(tabs).toContain('@mousedown.stop');
+        expect(tabs).not.toContain('@click.stop="');
         expect(title).toContain('startEditName');
+        expect(title).toContain('event.target !== event.currentTarget');
         expect(title).toContain("event.key !== 'Escape'");
+        expect(title).toContain('defineExpose');
+        expect(detail).toContain('onPanelEscape');
+        expect(detail).toContain('titleRef.value.isEditing');
         expect(comments).toContain('buildPaginatedCommentMatch');
         expect(comments).toContain('status(400)');
         expect(fs.readFileSync(path.join(__dirname, '..', 'Modules', 'Comments', 'helpers', 'commentThread.js'), 'utf8')).toContain('A valid projectId is required.');
@@ -289,5 +314,53 @@ describe('SEARCH OPEN - same-tab hash with ProjectID, TaskKey, and auto-select',
         expect(commentsVue).toContain('if (!projectId)');
         expect(comments).toContain('isHexCastError');
         expect(projects).toContain('isTaskDetail.value && firstId(selectedTask.value?.id');
+        expect(projects).toContain('reloadSprintTasks');
+    });
+});
+
+describe('BOARD EMPTY - three states, never No Data Found', () => {
+    test('loading, honest empty, and failed bind are distinct', () => {
+        expect(boardEmptyKind({ loading: true, sprintsBound: true, boardCount: 0, expectedCount: 4 })).toBe('loading');
+        expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 0, expectedCount: 0, searchHits: false })).toBe('empty');
+        expect(boardEmptyKind({ loading: false, sprintsBound: false, boardCount: 0, expectedCount: 0 })).toBe('failed');
+        expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 0, expectedCount: 3 })).toBe('failed');
+        expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 0, expectedCount: 0, searchHits: true })).toBe('failed');
+        expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 2, expectedCount: 2 })).toBe('ready');
+        const empty = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'atom', 'EmptyState', 'EmptyState.vue'), 'utf8');
+        const locale = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'locales', 'en.js'), 'utf8');
+        expect(empty).toContain('empty-state--pine');
+        expect(empty).toContain('empty-state--copper');
+        expect(empty).not.toContain('#172b4d');
+        expect(empty).not.toContain('#2f6fdb');
+        expect(locale).toContain('No tasks in this sprint');
+        expect(locale).toContain("Couldn't load tasks");
+        expect(locale).toContain('search_open: "Open"');
+    });
+});
+
+describe('PAGES DEEP LINK - project-scoped hash before first paint', () => {
+    const CID = '6a8ee973d625fca52e519a12';
+    const PROJECT = '6a8f09301f05e701eaf45c9a';
+    const PAGE = '6a8f0aaa0000000000000002';
+
+    test('pageOpenRoute builds /projects/pid/pages and fails closed without cid or pid', () => {
+        expect(pageOpenRoute({
+            companyId: CID,
+            projectId: PROJECT,
+            pageId: PAGE,
+        })).toEqual({
+            name: 'ProjectPages',
+            params: { cid: CID, projectId: PROJECT },
+            query: { page: PAGE },
+        });
+        expect(pageOpenPath({ companyId: CID, projectId: PROJECT, pageId: PAGE }))
+            .toBe(`/${CID}/projects/${PROJECT}/pages?page=${PAGE}`);
+        expect(pageOpenPath({ companyId: CID, projectId: PROJECT }))
+            .toBe(`/${CID}/projects/${PROJECT}/pages`);
+        expect(pageOpenRoute({ companyId: CID, pageId: PAGE })).toBe(null);
+        expect(pageOpenRoute({ projectId: PROJECT, pageId: PAGE })).toBe(null);
+        expect(pageDeepLinkNeedsResolve({ pageId: PAGE, projectId: '', routeName: 'Pages' })).toBe(true);
+        expect(pageDeepLinkNeedsResolve({ pageId: PAGE, projectId: PROJECT, routeName: 'Pages' })).toBe(false);
+        expect(pageDeepLinkNeedsResolve({ pageId: PAGE, projectId: '', routeName: 'ProjectPages' })).toBe(false);
     });
 });

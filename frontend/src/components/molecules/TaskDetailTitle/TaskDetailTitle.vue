@@ -17,7 +17,7 @@
                     class="title-name"
                     :title="taskName"
                     @mousedown.stop
-                    @click.stop="startEditName"
+                    @click.stop="startEditName($event)"
                 >
                     {{ taskName }}
                 </h4>
@@ -55,7 +55,7 @@
 </template>
 <script setup>
     import { useCustomComposable } from '@/composable';
-    import { computed, defineProps, defineEmits,inject,ref } from 'vue';
+    import { computed, defineProps, defineEmits, defineExpose, inject, ref } from 'vue';
     import InputText from '@/components/atom/InputText/InputText.vue';
     import { useToast } from 'vue-toast-notification';
     import ProjectTaskType from "@/components/atom/TaskTypeSelection/TaskTypeSelection.vue"
@@ -88,7 +88,8 @@
 
     const isEditName = ref(false);
 
-    const startEditName = () => {
+    const startEditName = (event) => {
+        if (event && event.target !== event.currentTarget) return;
         isEditName.value = true;
         editTaskName.value = props.taskName;
     };
@@ -105,9 +106,20 @@
         if (!event || event.key !== 'Escape') return;
         event.preventDefault();
         event.stopPropagation();
+        if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
         isEditName.value = false;
         editTaskName.value = '';
     };
+
+    const cancelEdit = () => {
+        isEditName.value = false;
+        editTaskName.value = '';
+    };
+
+    defineExpose({
+        isEditing: isEditName,
+        cancelEdit,
+    });
 
     const copyText = (text) => {
         $toast.success(t(`Toast.Task_name_copied`), {position: "top-right"})

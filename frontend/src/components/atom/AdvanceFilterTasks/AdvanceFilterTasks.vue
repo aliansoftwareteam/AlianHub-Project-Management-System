@@ -34,21 +34,14 @@
                     <div class="d-flex align-items-center">
                         <span class="advancefilter__body--marginright" v-if="props.taskObj?.isParentTask === false"><img :src="subTaskImage" /> </span>
                         <span class="advancefilter__body--marginright"><img :src="favourite(props.taskObj?.favouriteTasks) && favourite(props.taskObj?.favouriteTasks)?.length ? filledStar : blankStar" /></span>
-                        <a class="advancefilter__body--taskname black text-ellipse d-block advancefilter__body--width cursor-pointer" :href="taskHref" @click="openInApp($event, props.taskObj)" v-html="highlightSearchTerm(props.taskObj?.TaskName)"></a>
+                        <a class="advancefilter__body--taskname black text-ellipse d-block advancefilter__body--width cursor-pointer" :href="taskHref" @click="openFromTitle($event, props.taskObj)" v-html="highlightSearchTerm(props.taskObj?.TaskName)"></a>
                     </div>
                 </div>
             </div>
             <div class="advancefilter__body--list--right">
                 <ul class="advancefilter__body--ul align-items-center">
-                    <li class="cursor-pointer advancefilter__body--newtab">
-                        <a :href="taskHref" @click="openInApp($event, props.taskObj)">
-                            <img :src="imgOpenSameTab" alt="Open"/>
-                        </a>
-                    </li>
-                    <li class="cursor-pointer advancefilter__body--newtab">
-                        <a :href="taskHref" @click="openInApp($event, props.taskObj)">
-                            <img :src="imgOpenNewTab" alt="Open"/>
-                        </a>
+                    <li class="advancefilter__body--newtab">
+                        <a class="advancefilter__open-chip" :href="taskHref" @click="openFromChip($event, props.taskObj)">{{ $t('Projects.search_open') }}</a>
                     </li>
                     <li class="cursor-pointer" @click="copyLink(props.taskObj)">
                         <img :src="imgCopyLink" alt="Copy Link"/>
@@ -83,8 +76,6 @@
     const blankStar = require("@/assets/images/svg/blankStar.svg");
     const subTaskImage = require("@/assets/images/svg/sub_task_image.svg");
     const imgCopyLink = require('@/assets/images/png/task_copy_link.png');
-    const imgOpenNewTab = require('@/assets/images/png/task_open_new_tab.png');
-    const imgOpenSameTab = require('@/assets/images/svg/entertoopen.svg');
     const props = defineProps({
         taskObj : {type:Object,required:true},
         activeTab:{type:String,default:'all'},
@@ -162,10 +153,39 @@
             if (path) window.location.hash = path.replace(/^[^#]*#/, '');
         });
     };
+    const openFromTitle = (event, task) => {
+        if (event && (event.metaKey || event.ctrlKey)) return;
+        openInApp(event, task);
+    };
+    const openFromChip = (event, task) => {
+        openInApp(event, task);
+    };
 </script>
 <style scoped>
 .onlyComment{
     width: 18px !important;
     height: 18px !important;
+}
+.advancefilter__open-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 22px;
+    padding: 2px 10px;
+    border: 1px solid var(--kiln-line, #d8cbb3);
+    border-radius: var(--kiln-radius-sm, 9px);
+    background: var(--kiln-paper, #f4ead8);
+    color: var(--kiln-ember, #c45c26);
+    font-family: var(--kiln-font-body), sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-decoration: none;
+    line-height: 1;
+}
+.advancefilter__open-chip:active {
+    background: var(--kiln-paper, #f4ead8);
+    color: var(--kiln-ink, #1b2f28);
 }
 </style>

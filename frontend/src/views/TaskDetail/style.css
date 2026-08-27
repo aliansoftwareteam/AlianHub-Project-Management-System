@@ -20,6 +20,7 @@
 .task-detail-sidebar .task-details-title-wrapper {
     overflow: hidden;
     max-width: 100%;
+    min-width: 0;
 }
 .task-sub-sidebar .sidebar-head {
     background-color: #DFE1E6;

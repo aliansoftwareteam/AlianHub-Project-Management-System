@@ -280,7 +280,7 @@ import AiTaskCreator from "@/components/organisms/AiTaskCreator/AiTaskCreator.vu
 
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
-import { firstId } from '@/utils/taskOpenProjectId';
+import { firstId, pageOpenRoute } from '@/utils/taskOpenProjectId';
 import { useGetterFunctions } from "@/composable";
 import pageContent from '@pageContent';
 const { contentToEditorData, blocksToRawText } = pageContent.default || pageContent;
@@ -350,9 +350,12 @@ const pickerProjects = computed(() => {
 const routePageId = computed(() => firstId(Array.isArray(route.query && route.query.page)
     ? route.query.page[0]
     : (route.query && route.query.page)));
-const routeProjectId = computed(() => firstId(Array.isArray(route.query && (route.query.project || route.query.projectId))
-    ? (route.query.project || route.query.projectId)[0]
-    : (route.query && (route.query.project || route.query.projectId))));
+const routeProjectId = computed(() => firstId(
+    route.params && route.params.projectId,
+    Array.isArray(route.query && (route.query.project || route.query.projectId))
+        ? (route.query.project || route.query.projectId)[0]
+        : (route.query && (route.query.project || route.query.projectId)),
+));
 workspaceProjectId.value = routeProjectId.value;
 
 const projectId = computed(() => firstId(
@@ -457,16 +460,26 @@ function syncWorkspaceHash({ pageId, projectId: nextProject } = {}) {
     if (!props.workspace) return;
     const page = pageId !== undefined ? firstId(pageId) : routePageId.value;
     const project = nextProject !== undefined ? firstId(nextProject) : firstId(workspaceProjectId.value);
+    const cid = firstId(route.params && route.params.cid);
+    const dest = pageOpenRoute({ companyId: cid, projectId: project, pageId: page });
+    if (dest) {
+        const sameRoute = route.name === 'ProjectPages'
+            && firstId(route.params && route.params.projectId) === project
+            && firstId(route.query && route.query.page) === page;
+        if (sameRoute) return;
+        router.replace(dest).catch(() => {});
+        return;
+    }
     const query = { ...route.query };
     if (page) query.page = page;
     else delete query.page;
-    if (project) query.project = project;
-    else delete query.project;
+    delete query.project;
     delete query.projectId;
-    const samePage = firstId(route.query && route.query.page) === page;
-    const sameProject = firstId(route.query && (route.query.project || route.query.projectId)) === project;
-    if (samePage && sameProject) return;
-    router.replace({ query }).catch(() => {});
+    const sameWorkspace = route.name === 'Pages'
+        && firstId(route.query && route.query.page) === page
+        && !firstId(route.query && (route.query.project || route.query.projectId));
+    if (sameWorkspace) return;
+    router.replace({ name: 'Pages', params: { cid }, query }).catch(() => {});
 }
 
 // Embedded as a view there is no open/close cycle, so it is open from the start
@@ -985,19 +998,28 @@ function onKeydown(e) {
         e.preventDefault();
         savePage();
     } else if (e.key === 'Escape') {
-        if (showShare.value) { showShare.value = false; return; }
-        if (showLinker.value) { showLinker.value = false; return; }
-        if (!props.embedded && !props.workspace) requestClose();
+        const consume = () => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+        };
+        if (showShare.value) { showShare.value = false; consume(); return; }
+        if (showLinker.value) { showLinker.value = false; consume(); return; }
+        if (pageBriefing.value && !briefingDismissed.value) { briefingDismissed.value = true; consume(); return; }
+        if (!props.embedded && !props.workspace) {
+            consume();
+            requestClose();
+        }
     }
 }
 onMounted(() => {
-    document.addEventListener('keydown', onKeydown);
+    document.addEventListener('keydown', onKeydown, true);
     if (props.workspace && !pickerProjects.value.length) {
         dispatch('projectData/setProjects', { roleType: 'currentUser' }).catch(() => {});
     }
 });
 onBeforeUnmount(() => {
-    document.removeEventListener('keydown', onKeydown);
+    document.removeEventListener('keydown', onKeydown, true);
 });
 </script>
 

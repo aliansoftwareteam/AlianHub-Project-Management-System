@@ -15,10 +15,10 @@
 - [x] Comments pane lists existing Alian comments for the open taskId (no empty pane with badge 1)
 
 ## Last step
-Pages deep-link `#/<cid>/pages?page=…` kept `project` on the URL so Local Smoke is selected and the write-back strip shows without a dropdown hop. Write-back itself is not re-implemented. P0s stay queued: external-link OPEN, Comments tab, comments GET [], board No Data Found.
+Bot 3 leftovers on PR 522: one cream/copper search Open chip (Ctrl/Cmd+click only for a new tab); Comments tab no longer arms the title; Escape cancels title, then nested strip, then the panel; board empty is skeleton / “No tasks in this sprint” / “Couldn't load tasks”; `#/<cid>/pages?page=` resolves to `#/<cid>/projects/<pid>/pages?page=` before PagesPanel mounts.
 
 ## Blockers
-None. Live Local Smoke is not in this VM (no Mongo), so Ctrl+K OPEN was not browser-verified here.
+None. Live Local Smoke is not in this VM (no Mongo), so Ctrl+K / board / pages were not browser-verified here.
 
 ## Log
 
@@ -35,3 +35,4 @@ None. Live Local Smoke is not in this VM (no Mongo), so Ctrl+K OPEN was not brow
 - Bot 3 leftover 2: Ctrl+K OPEN was a real `<a href>` (new tab after Ctrl+K) and `GET taskData` `$lookup $expr` on `_id` never hydrated (skeleton). OPEN/title are in-app buttons; taskData is an indexed `findOne` on the task; 8s fail-fast instead of an infinite shimmer.
 - Bot 3 leftover 2 split: enter-to-open already hydrates same-tab. The middle external-link icon failed because `openInApp` returned on `ctrlKey` and let the native `<a>` open a new tab. Title + enter-to-open + middle icon now share one `taskHref`; click always `preventDefault` + `router.push`. Comments tab label no longer swallows the click (and the overflowing title no longer sits on the tab). Hash replace refuses to drop `taskId` while the modal is open.
 - S3.2 write-back confirmed via PROJECTS → Local Smoke; not re-implemented. Pages deep-link now carries `?page=&project=` so the picker lands on that project (strip visible, no duplicate Ask smoke race from a second fetch).
+- Bot 2 leftovers via Bot 3: killed the external-link OPEN icon; one cream chip with copper “Open” (pine on press) shares the in-app open with title/Enter; Ctrl/Cmd+click on the title is the only new tab. Title edit only on a direct h4 click; tabs mousedown-stop so they cannot arm the title. Escape: cancel title, then nested page strip/popover (capture + stopImmediatePropagation), then close the panel. Board/list empty is three states (quiet skeleton / “No tasks in this sprint” + pine create / “Couldn't load tasks” + copper Retry), never “No Data Found”. `#/<cid>/pages?page=` resolves the page’s projectId and `replace`s to `#/<cid>/projects/<pid>/pages?page=` before PagesPanel’s first paint; missing project/access is a kiln fail-fast line, not Workspace pages. Write-back was not re-implemented.
