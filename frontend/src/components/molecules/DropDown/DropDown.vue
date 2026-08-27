@@ -161,8 +161,6 @@ function closeNow(event) {
 
 function onEscape(event) {
     if (!event || event.key !== 'Escape') return;
-    const tag = document.activeElement && document.activeElement.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
     closeNow(event);
 }
 

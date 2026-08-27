@@ -6,28 +6,34 @@
             :disabled="busy"
             @click="preview"
         >{{ goLabel }}</button>
-        <p v-if="notice" class="taf__notice">{{ notice }}</p>
-        <div class="taf__preview">
+        <p v-if="notice && !showCard" class="taf__notice">{{ notice }}</p>
+        <div v-if="showCard" class="taf__preview">
             <h5 class="taf__heading">{{ $t('CustomField.autofill_preview') }}</h5>
+            <p v-if="notice" class="taf__notice">{{ notice }}</p>
             <ul class="taf__list">
                 <li v-for="row in rows" :key="row.fieldId" class="taf__item">
                     <label class="taf__pick">
+                        <input
+                            type="checkbox"
+                            :checked="row.checked"
+                            :disabled="row.filled || !row.item"
+                            @change="toggleRow(row.fieldId)"
+                        />
                         <span class="taf__title">{{ row.title }}</span>
-                        <span v-if="row.hint" class="taf__hint">{{ row.hint }}</span>
                     </label>
                     <span class="taf__value">{{ row.display || '—' }}</span>
                     <button
                         v-if="row.canApply"
                         type="button"
                         class="taf__apply"
-                        :disabled="busy"
-                        @click="applyOne(row.item)"
+                        :disabled="busy || !row.checked"
+                        @click="applyOne(row)"
                     >{{ busy ? $t('CustomField.autofill_working') : $t('CustomField.autofill_apply') }}</button>
                     <span v-else-if="row.filled" class="taf__filled">{{ $t('CustomField.autofill_filled') }}</span>
                 </li>
             </ul>
             <div class="taf__actions">
-                <button type="button" class="taf__dismiss" :disabled="busy || !suggestions.length" @click="dismiss">
+                <button type="button" class="taf__dismiss" :disabled="busy" @click="dismiss">
                     {{ $t('CustomField.autofill_dismiss') }}
                 </button>
             </div>
@@ -59,12 +65,14 @@ const { getters, commit } = useStore();
 const busy = ref(false);
 const notice = ref('');
 const suggestions = ref([]);
+const selectedIds = ref([]);
 const filledOnce = ref(false);
 const previewedFor = ref('');
+const showCard = ref(false);
 
 const canShow = computed(() => Boolean(props.task && props.task._id));
 const goLabel = computed(() => {
-    if (busy.value && !suggestions.value.length) return t('CustomField.autofill_working');
+    if (busy.value && !showCard.value) return t('CustomField.autofill_working');
     return filledOnce.value ? t('CustomField.autofill_fill_empty') : t('CustomField.autofill');
 });
 
@@ -99,11 +107,24 @@ function findSuggestion(match) {
     return suggestions.value.find(match) || null;
 }
 
+function isSelected(fieldId) {
+    return selectedIds.value.includes(String(fieldId));
+}
+
+function toggleRow(fieldId) {
+    const id = String(fieldId);
+    if (selectedIds.value.includes(id)) {
+        selectedIds.value = selectedIds.value.filter((item) => item !== id);
+    } else {
+        selectedIds.value = [...selectedIds.value, id];
+    }
+}
+
 const rows = computed(() => {
     const assigneeSug = findSuggestion((item) => item.source === 'native' || item.fieldId === 'assignee');
     const field = ownerField.value;
     const ownerSug = field
-        ? findSuggestion((item) => String(item.fieldId) === String(field._id))
+        ? findSuggestion((item) => String(item.fieldId) === String(field._id) && item.source !== 'native')
         : findSuggestion((item) => item.kind === 'owner' && item.source !== 'native');
     const dueSug = findSuggestion((item) => item.kind === 'date');
     const assigneeIsEmpty = assigneeEmpty();
@@ -113,44 +134,48 @@ const rows = computed(() => {
         {
             fieldId: 'assignee',
             title: t('ProjectDetails.assignee'),
-            hint: t('CustomField.autofill_native'),
             display: (assigneeSug && (assigneeSug.display || assigneeSug.value)) || '',
             item: assigneeSug,
+            checked: isSelected('assignee'),
             canApply: Boolean(props.enabled) && Boolean(assigneeSug) && assigneeIsEmpty,
             filled: !assigneeIsEmpty,
+            write: 'assignee',
         },
         {
             fieldId: (field && field._id) || 'owner',
             title: (field && field.fieldTitle) || 'Owner',
-            hint: t('CustomField.autofill_custom_people'),
             display: (ownerSug && (ownerSug.display || ownerSug.value)) || ownerLabel,
             item: ownerSug,
+            checked: Boolean(field) && isSelected(field._id),
             canApply: Boolean(props.enabled) && Boolean(ownerSug) && !ownerFilled,
             filled: ownerFilled,
+            write: 'owner',
         },
     ];
     if (dueSug) {
         out.push({
             fieldId: dueSug.fieldId,
             title: dueSug.title || t('Projects.due_date'),
-            hint: '',
             display: dueSug.display || dueSug.value || '',
             item: dueSug,
+            checked: isSelected(dueSug.fieldId),
             canApply: Boolean(props.enabled),
             filled: false,
+            write: 'date',
         });
     }
     return out;
 });
 
 function dismiss() {
-    suggestions.value = [];
+    showCard.value = false;
     notice.value = '';
 }
 
 function onEscape(event) {
     if (!event || event.key !== 'Escape') return;
-    if (!suggestions.value.length) return;
+    if (document.querySelector('.drop-down-menu')) return;
+    if (!showCard.value) return;
     const tag = document.activeElement && document.activeElement.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
     event.preventDefault();
@@ -194,15 +219,21 @@ async function preview() {
         if (!payload.status) {
             notice.value = payload.statusText || t('CustomField.autofill_failed');
             suggestions.value = [];
+            selectedIds.value = [];
             return;
         }
         const next = Array.isArray(payload.data?.suggestions) ? payload.data.suggestions : [];
         suggestions.value = next;
+        selectedIds.value = next
+            .filter((item) => item && item.fieldId)
+            .map((item) => String(item.fieldId));
         previewedFor.value = String(props.task._id);
+        showCard.value = true;
         if (!next.length) notice.value = t('CustomField.autofill_none');
     } catch (_error) {
         notice.value = t('CustomField.autofill_failed');
         suggestions.value = [];
+        selectedIds.value = [];
     } finally {
         busy.value = false;
     }
@@ -214,53 +245,53 @@ watch(() => [canShow.value, props.task && props.task._id], ([show, id]) => {
     preview();
 }, { immediate: true });
 
-function applyPatch(applied) {
+function applyPatch(applied, write) {
     const customField = { ...(props.task.customField || {}) };
-    let assignees = Array.isArray(props.task.AssigneeUserId) ? [...props.task.AssigneeUserId] : [];
-    let dueDate = props.task.DueDate;
     const appliedIds = [];
+    const next = {};
     applied.forEach((item) => {
         appliedIds.push(String(item.fieldId));
-        if (item.source === 'native' || item.fieldId === 'assignee') {
-            assignees = item.value || [];
-        } else if (item.kind === 'date') {
+        if (write === 'assignee' || item.source === 'native' || item.fieldId === 'assignee') {
+            next.AssigneeUserId = item.value || [];
+        } else if (write === 'date' || item.kind === 'date') {
             customField[item.fieldId] = { _id: item.fieldId, fieldValue: item.value };
-            if (!dueDate) {
-                dueDate = item.value;
+            if (!props.task.DueDate) {
+                next.DueDate = item.value;
                 appliedIds.push('due');
             }
         } else {
             customField[item.fieldId] = { _id: item.fieldId, fieldValue: item.value };
         }
     });
+    if (write !== 'assignee') next.customField = customField;
     const prior = Array.isArray(props.task._autofilledFields) ? props.task._autofilledFields : [];
-    const _autofilledFields = [...new Set([...prior, ...appliedIds])];
-    const next = { customField, AssigneeUserId: assignees, _autofilledFields };
-    if (dueDate) next.DueDate = dueDate;
+    next._autofilledFields = [...new Set([...prior, ...appliedIds])];
     patchTask(next);
     filledOnce.value = true;
     emit('applied', appliedIds);
     const used = new Set(applied.map((item) => String(item.fieldId)));
     suggestions.value = suggestions.value.filter((item) => !used.has(String(item.fieldId)));
+    selectedIds.value = selectedIds.value.filter((id) => !used.has(id));
 }
 
-async function applyOne(item) {
-    if (busy.value || !item || !props.task?._id) return;
+async function applyOne(row) {
+    if (busy.value || !row || !row.item || !row.checked || !props.task?._id) return;
+    if (row.write === 'assignee' && !row.checked) return;
     busy.value = true;
     notice.value = '';
     try {
         const response = await apiRequest('post', env.V2_TASKS_AI_AUTOFILL, {
             action: 'apply',
             taskId: props.task._id,
-            suggestions: [item],
+            suggestions: [row.item],
         });
         const payload = response.data || {};
         if (!payload.status) {
             notice.value = payload.statusText || t('CustomField.autofill_failed');
             return;
         }
-        const applied = Array.isArray(payload.data?.suggestions) ? payload.data.suggestions : [item];
-        applyPatch(applied);
+        const applied = Array.isArray(payload.data?.suggestions) ? payload.data.suggestions : [row.item];
+        applyPatch(applied, row.write);
         $toast.success(t('CustomField.autofill_applied'), { position: 'top-right' });
     } catch (_error) {
         notice.value = t('CustomField.autofill_failed');
@@ -277,10 +308,10 @@ async function applyOne(item) {
 .taf__go,
 .taf__apply,
 .taf__dismiss {
-    border: 1px solid var(--kiln-line);
-    border-radius: var(--kiln-radius-sm);
-    background: var(--kiln-paper);
-    color: var(--kiln-ink);
+    border: 1px solid var(--kiln-line, #d8cbb3);
+    border-radius: var(--kiln-radius-sm, 9px);
+    background: var(--kiln-paper, #f4ead8);
+    color: var(--kiln-ink, #1b2f28);
     font-family: var(--kiln-font-body);
     font-size: 12px;
     font-weight: 700;
@@ -290,8 +321,8 @@ async function applyOne(item) {
     cursor: pointer;
 }
 .taf__go {
-    background: var(--kiln-ember);
-    border-color: var(--kiln-ember);
+    background: var(--kiln-ember, #c45c26);
+    border-color: var(--kiln-ember, #c45c26);
     color: #fffaf3;
 }
 .taf__go:disabled,
@@ -303,16 +334,16 @@ async function applyOne(item) {
 .taf__notice {
     margin: 8px 0 0;
     font-size: 12px;
-    color: var(--kiln-muted);
+    color: var(--kiln-muted, #6b7280);
 }
 .taf__preview {
     margin-top: 10px;
-    background: var(--kiln-canvas);
-    border: 1px solid var(--kiln-line);
-    border-left: 3px solid var(--kiln-ember);
-    border-radius: var(--kiln-radius-sm);
+    background: var(--kiln-canvas, #fbf6ec);
+    border: 1px solid var(--kiln-line, #d8cbb3);
+    border-left: 3px solid var(--kiln-ember, #c45c26);
+    border-radius: var(--kiln-radius-sm, 9px);
     padding: 12px 14px;
-    color: var(--kiln-ink);
+    color: var(--kiln-ink, #1b2f28);
 }
 .taf__heading {
     margin: 0 0 8px;
@@ -320,7 +351,7 @@ async function applyOne(item) {
     font-weight: 700;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: var(--kiln-ember);
+    color: var(--kiln-ember, #c45c26);
 }
 .taf__list {
     list-style: none;
@@ -339,24 +370,23 @@ async function applyOne(item) {
 }
 .taf__pick {
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
+    align-items: center;
+    gap: 8px;
     min-width: 0;
+    cursor: pointer;
+}
+.taf__pick input {
+    margin: 0;
+    accent-color: var(--kiln-ember, #c45c26);
+    flex: 0 0 auto;
 }
 .taf__title {
     font-family: var(--kiln-font-display);
     font-weight: 600;
-    color: var(--kiln-ink);
-}
-.taf__hint {
-    font-size: 10px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--kiln-muted, #6b7280);
+    color: var(--kiln-ink, #1b2f28);
 }
 .taf__value {
-    color: var(--kiln-text);
+    color: var(--kiln-text, #1b2f28);
     word-break: break-word;
 }
 .taf__filled {
@@ -372,9 +402,9 @@ async function applyOne(item) {
     margin-top: 12px;
 }
 .taf__apply {
-    background: var(--kiln-ink);
-    border-color: var(--kiln-ink);
-    color: var(--kiln-paper);
+    background: var(--kiln-ink, #1b2f28);
+    border-color: var(--kiln-ink, #1b2f28);
+    color: var(--kiln-paper, #f4ead8);
     justify-self: end;
 }
 </style>

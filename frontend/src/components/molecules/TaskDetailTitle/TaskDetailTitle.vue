@@ -90,8 +90,10 @@
     const isEditName = ref(false);
 
     const startEditName = (event) => {
-        if (!event || event.target !== event.currentTarget) return;
+        if (!event || event.type !== 'click') return;
+        if (event.target !== event.currentTarget) return;
         if (event.defaultPrevented) return;
+        if (Number(event.detail) < 1) return;
         if (clickFromTab(event) || wasRecentTabPointer()) return;
         isEditName.value = true;
         editTaskName.value = props.taskName;

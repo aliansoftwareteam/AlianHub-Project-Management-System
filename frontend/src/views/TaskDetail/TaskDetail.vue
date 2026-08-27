@@ -11,6 +11,7 @@
             width="1545px"
             :defaultLayout="false"
             :visible="isTaskDetailSideBar"
+            :closeOnBackDrop="false"
             @update:visible="onSidebarVisible"
             className="task-detail-sidebar"
             headClass="task-detail-head"
@@ -280,19 +281,19 @@
     const titleRef = ref(null);
 
     function nestedLayerOpen() {
-        if (document.querySelector('.taf__preview')) return 'autofill';
         if (document.querySelector('.drop-down-menu')) return 'dropdown';
+        if (document.querySelector('.taf__preview')) return 'autofill';
         if (document.querySelector('.reminder-modal, .reminder-modal__overlay')) return 'modal';
         return '';
     }
 
     function dismissNestedLayer(kind) {
-        if (kind === 'autofill') {
-            document.dispatchEvent(new CustomEvent('kiln-dismiss-autofill'));
-            return;
-        }
         if (kind === 'dropdown') {
             document.dispatchEvent(new CustomEvent('kiln-dismiss-dropdown'));
+            return;
+        }
+        if (kind === 'autofill') {
+            document.dispatchEvent(new CustomEvent('kiln-dismiss-autofill'));
             return;
         }
         if (kind === 'modal') {
@@ -302,6 +303,14 @@
 
     function onPanelEscape(event) {
         if (!event || event.key !== 'Escape') return;
+        const nested = nestedLayerOpen();
+        if (nested === 'dropdown') {
+            dismissNestedLayer(nested);
+            event.preventDefault();
+            event.stopPropagation();
+            if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+            return;
+        }
         if (titleRef.value && titleRef.value.isEditing) {
             titleRef.value.cancelEdit();
             event.preventDefault();
@@ -309,7 +318,6 @@
             if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
             return;
         }
-        const nested = nestedLayerOpen();
         if (nested) {
             dismissNestedLayer(nested);
             event.preventDefault();

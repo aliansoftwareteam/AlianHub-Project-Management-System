@@ -334,11 +334,15 @@ describe('TASKS - AI autofill custom fields', () => {
         const card = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'molecules', 'TaskAiAutofill', 'TaskAiAutofill.vue'), 'utf8');
         const render = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'plugins', 'customFieldView', 'component', 'molecules', 'customFieldTaskView', 'customFieldRender.vue'), 'utf8');
         expect(card).toContain('applyOne');
-        expect(card).toContain('autofill_native');
-        expect(card).toContain('autofill_custom_people');
+        expect(card).toContain("write: 'assignee'");
+        expect(card).toContain("write: 'owner'");
+        expect(card).toContain('showCard');
+        expect(card).toContain('taf__go');
+        expect(card).toContain('autofill_fill_empty');
         expect(card).toContain("item.fieldId === 'assignee'");
         expect(card).toContain('\\bowner\\b');
         expect(card).toContain('canApply');
+        expect(card).not.toContain('taf__kind');
         expect(card).not.toContain("checkApps('CustomFields')");
         expect(card).not.toContain('getAppState');
         expect(render).toContain('TaskAiAutofill');

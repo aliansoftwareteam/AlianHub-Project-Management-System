@@ -191,24 +191,12 @@
 
     function syncDetailTab(tab) {
         activeTab.value = tab;
-        const openTid = firstId(threadTaskId.value, route.params && route.params.taskId);
-        if (!openTid) return;
-        const params = { ...route.params };
-        if (!params.taskId) params.taskId = openTid;
-        router.replace({
-            name: route.name,
-            params,
-            query: { ...route.query, detailTab: tab },
-        }).catch(() => {});
+        if (!route.params || !route.params.taskId) return;
+        router.replace({ query: { ...route.query, detailTab: tab } }).catch(() => {});
     }
 
     onMounted(() => {
-        const tab = route.query.detailTab ? route.query.detailTab : 'task-detail-tab';
-        if (!route.query?.detailTab || !route.params.taskId) {
-            syncDetailTab(tab);
-        } else {
-            activeTab.value = tab;
-        }
+        activeTab.value = route.query.detailTab ? route.query.detailTab : 'task-detail-tab';
     })
 
     const myCounts = computed(() => {

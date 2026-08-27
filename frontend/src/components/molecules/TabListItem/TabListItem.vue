@@ -6,7 +6,7 @@
         :data-tab-key="tabKey"
         :class="{ active: isActive }"
         class="cursor-pointer"
-        @mousedown.stop="onTabPointer"
+        @mousedown.stop.prevent="onTabPointer"
         @click.prevent.stop="selectTab"
     >
         <img
