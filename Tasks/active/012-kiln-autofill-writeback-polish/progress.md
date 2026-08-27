@@ -15,10 +15,10 @@
 - [x] Comments pane lists existing Alian comments for the open taskId (no empty pane with badge 1)
 
 ## Last step
-SMOKE-7 Comments tab showed badge 1 with an empty pane because the thread fetch required `selectedProject._id` and ANDed `sprintId`. The list now queries by `taskId` (string or ObjectId), mounts without waiting on inject, and `changeTab` / hydrate rewrite the hash to `#/<cid>/project/<pid>/s/<sid>/<tid>?detailTab=comment`.
+Bot 3 live GET with pid+tid+sid still returned `[]` for SMOKE-7's string `taskId` comments, and empty `projectId` 500'd on ObjectId cast. Task threads now match `$toString(taskId)` (no projectId/sprintId AND), empty/invalid projectId is 400 `{status:false,data:[]}` (never ObjectId('')), and write-back stays Activity + one strip.
 
 ## Blockers
-None. Live Local Smoke is not in this VM (no Mongo), so the Comments pane and hash restore are covered by source/unit tests, not a browser pass.
+None. Live Local Smoke is not in this VM (no Mongo), so the Comments GET was not re-run against the company DB here.
 
 ## Log
 
@@ -31,3 +31,4 @@ None. Live Local Smoke is not in this VM (no Mongo), so the Comments pane and ha
 - Jest 116 passing; frontend production build succeeded. PR 522 updated.
 - QA P0 leftover 2 retry: sidebar Local Smoke / sprint click still left the URL on `#/<cid>/project` because sprint rows used JS-only `router.push({ path })` without a real href, and search rows `@click.prevent`ed an empty hash. Both now use named routes with `cid` (`taskOpenRoute`) and a real `<a :href>` from `router.resolve`. Title and OPEN share that href (no `target=_blank`). PROJECTS without an id `router.replace`s onto the first listed project + first sprint.
 - QA P0 leftover 3 (SMOKE-7 comments): badge 1 with empty Comments pane. Thread fetch now uses `taskId` even when `selectedProject` is `{}`, does not AND sprintId on a task thread, and keeps pid/sid/tid in the hash while the modal is open. Empty projectId is still 400 only when there is no valid taskId either.
+- Bot 3 GET `/get-paginated-messages` with Local Smoke ids returned `{data:[]}` while 5 Alian comments exist with string `taskId`. The list query no longer ANDs `projectId`/`sprintId` (mongoose ObjectId-cast dropped string-stored thread ids) and matches `$toString(taskId)`. Empty/`undefined` projectId is 400, not a 500 ObjectId cast.

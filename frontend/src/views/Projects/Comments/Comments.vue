@@ -683,12 +683,12 @@ function tabSyncDataGet () {
     return new Promise((resolve, reject) => {
         try {
             let tabLeaveTime = sessionStorage.getItem('tableaveTime');
-            const { url, projectId, taskId } = commentMessagesUrl({
+            const { url, projectId } = commentMessagesUrl({
                 skipValue: 0,
                 batchLimit: messageLimit.value,
                 tabLeaveTime,
             });
-            if (!projectId && !taskId) {
+            if (!projectId) {
                 resolve();
                 return;
             }
@@ -1514,8 +1514,8 @@ function getPaginatedMessages(...args) {
 
     return new Promise((resolve, reject) => {
         try {
-            const { projectId, taskId } = commentThreadQuery();
-            if (!projectId && !taskId) {
+            const { projectId } = commentThreadQuery();
+            if (!projectId) {
                 loadingChat.value = false;
                 resolve("No data");
                 return;

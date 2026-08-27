@@ -6,6 +6,8 @@ const {
     incomingCommentDoc,
     acceptIncomingComment,
     mongoIdIn,
+    mixedIdMatch,
+    isHexCastError,
     buildPaginatedCommentMatch,
 } = require('../Modules/Comments/helpers/commentThread');
 const helper = require('../socket/helper');
@@ -37,6 +39,8 @@ describe('comment thread id contract', () => {
         expect(idString(null)).toBe('');
         expect(idString({ nope: true })).toBe('');
         expect(idString('[object Object]')).toBe('');
+        expect(idString('undefined')).toBe('');
+        expect(idString('null')).toBe('');
         expect(idString({ type: 'Buffer', data: [...Buffer.from(PID, 'hex')] })).toBe(PID);
         expect(idString({ _bsontype: 'ObjectId', id: Buffer.from(PID, 'hex') })).toBe(PID);
     });
@@ -159,6 +163,8 @@ describe('comment thread id contract', () => {
         expect(mongoIdIn('default')).toBe('default');
         expect(mongoIdIn('')).toBe(null);
         expect(mongoIdIn(null)).toBe(null);
+        expect(mongoIdIn('undefined')).toBe(null);
+        expect(mongoIdIn('null')).toBe(null);
         const comments = fs.readFileSync(path.join(__dirname, '..', 'Modules', 'Comments', 'controller.js'), 'utf8');
         const thread = fs.readFileSync(path.join(__dirname, '..', 'Modules', 'Comments', 'helpers', 'commentThread.js'), 'utf8');
         expect(comments).toContain('buildPaginatedCommentMatch');
@@ -166,20 +172,25 @@ describe('comment thread id contract', () => {
         expect(thread).toContain('A valid projectId is required.');
     });
 
-    test('task thread lists by taskId even without projectId and does not AND sprintId', () => {
-        const byTask = buildPaginatedCommentMatch({ taskId: TID, sprintId: SID });
-        expect(byTask.error).toBeUndefined();
-        expect(JSON.stringify(byTask.and)).toContain(TID);
-        expect(JSON.stringify(byTask.and)).not.toContain(SID);
-        expect(byTask.and.some((clause) => clause.taskId && clause.taskId.$in)).toBe(true);
-        expect(byTask.and.some((clause) => clause.projectId)).toBe(false);
-        expect(byTask.and.some((clause) => clause.sprintId)).toBe(false);
-
-        const withProject = buildPaginatedCommentMatch({ projectId: PID, taskId: TID, sprintId: SID });
-        expect(withProject.and.some((clause) => clause.projectId && clause.projectId.$in)).toBe(true);
-        expect(withProject.and.some((clause) => clause.sprintId)).toBe(false);
-
+    test('task thread lists string taskId comments without ANDing projectId or sprintId', () => {
+        expect(buildPaginatedCommentMatch({ taskId: TID, sprintId: SID }).error).toBe('A valid projectId is required.');
+        expect(buildPaginatedCommentMatch({ projectId: '', taskId: TID }).error).toBe('A valid projectId is required.');
+        expect(buildPaginatedCommentMatch({ projectId: 'undefined', taskId: TID }).error).toBe('A valid projectId is required.');
         expect(buildPaginatedCommentMatch({}).error).toBe('A valid projectId is required.');
+
+        const listed = buildPaginatedCommentMatch({ projectId: PID, taskId: TID, sprintId: SID });
+        expect(listed.error).toBeUndefined();
+        expect(listed.and.some((clause) => clause.projectId)).toBe(false);
+        expect(listed.and.some((clause) => clause.sprintId)).toBe(false);
+        const taskClause = listed.and.find((clause) => clause.$expr);
+        expect(taskClause.$expr.$eq[0].$toString).toBe('$taskId');
+        expect(taskClause.$expr.$eq[1]).toBe(TID);
+        expect(JSON.stringify(listed.and)).toContain(TID);
+
+        expect(mixedIdMatch('taskId', TID).$expr.$eq[1]).toBe(TID);
+        expect(isHexCastError({ message: 'input must be a 24 character hex string, got undefined' })).toBe(true);
+        expect(isHexCastError({ message: 'Internal Server Error' })).toBe(false);
+
         expect(buildPaginatedCommentMatch({ projectId: PID }).and.some((clause) => clause.project === true)).toBe(true);
     });
 });

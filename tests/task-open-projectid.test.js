@@ -267,7 +267,8 @@ describe('SEARCH OPEN - same-tab hash with ProjectID, TaskKey, and auto-select',
         expect(fs.readFileSync(path.join(__dirname, '..', 'Modules', 'Comments', 'helpers', 'commentThread.js'), 'utf8')).toContain('A valid projectId is required.');
         const commentsVue = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'views', 'Projects', 'Comments', 'Comments.vue'), 'utf8');
         expect(commentsVue).toContain('props.projectId');
-        expect(commentsVue).toContain('if (!projectId && !taskId)');
+        expect(commentsVue).toContain('if (!projectId)');
+        expect(comments).toContain('isHexCastError');
         expect(projects).toContain('isTaskDetail.value && firstId(selectedTask.value?.id');
     });
 });

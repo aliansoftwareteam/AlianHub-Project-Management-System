@@ -26,7 +26,7 @@ function idString(value) {
     if (value == null || value === '') return '';
     if (typeof value === 'string') {
         const trimmed = value.trim();
-        if (!trimmed || trimmed === OBJECT_OBJECT) return '';
+        if (!trimmed || trimmed === OBJECT_OBJECT || trimmed === 'undefined' || trimmed === 'null') return '';
         return trimmed;
     }
     if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'symbol') {
@@ -145,13 +145,25 @@ function mongoIdIn(value) {
     const raw = idString(value);
     if (!raw) return null;
     if (raw === 'default') return raw;
+    if (!HEX_ID.test(raw)) return null;
     const ids = [raw];
-    if (HEX_ID.test(raw)) {
-        try {
-            ids.push(new mongoose.Types.ObjectId(raw));
-        } catch (_e) { /* keep the string form */ }
-    }
+    try {
+        ids.push(new mongoose.Types.ObjectId(raw));
+    } catch (_e) { /* keep the string form */ }
     return { $in: ids };
+}
+
+function mixedIdMatch(field, value) {
+    const raw = idString(value);
+    if (!raw) return null;
+    if (raw === 'default') return { [field]: 'default' };
+    if (!HEX_ID.test(raw)) return null;
+    return { $expr: { $eq: [{ $toString: `$${field}` }, raw] } };
+}
+
+function isHexCastError(error) {
+    const msg = error && error.message ? String(error.message) : '';
+    return /24 character hex string|24 hex characters/i.test(msg);
 }
 
 function isTrueFlag(value) {
@@ -160,10 +172,13 @@ function isTrueFlag(value) {
 
 function buildPaginatedCommentMatch(query = {}) {
     const projectMatch = mongoIdIn(query.projectId);
+    if (!projectMatch || projectMatch === 'default') {
+        return { error: 'A valid projectId is required.' };
+    }
+
     const taskRaw = idString(query.taskId);
 
     if (!isTrueFlag(query.isDefault) && isTrueFlag(query.mainChat)) {
-        if (!projectMatch) return { error: 'A valid projectId is required.' };
         return {
             and: [
                 { projectId: projectMatch },
@@ -174,17 +189,16 @@ function buildPaginatedCommentMatch(query = {}) {
     }
 
     if (taskRaw && taskRaw !== 'default') {
-        const taskMatch = mongoIdIn(taskRaw);
+        const taskMatch = mixedIdMatch('taskId', taskRaw);
         if (!taskMatch) return { error: 'A valid taskId is required.' };
-        const and = [
-            { isDeleted: { $ne: true } },
-            { taskId: taskMatch },
-        ];
-        if (projectMatch) and.push({ projectId: projectMatch });
-        return { and };
+        return {
+            and: [
+                { isDeleted: { $ne: true } },
+                taskMatch,
+            ],
+        };
     }
 
-    if (!projectMatch) return { error: 'A valid projectId is required.' };
     if (taskRaw === 'default') {
         return {
             and: [
@@ -212,6 +226,8 @@ function acceptIncomingComment(doc) {
 module.exports = {
     idString,
     mongoIdIn,
+    mixedIdMatch,
+    isHexCastError,
     buildPaginatedCommentMatch,
     commentRoomPrefix,
     serializeCommentForSocket,

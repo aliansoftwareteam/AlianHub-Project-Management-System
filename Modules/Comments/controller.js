@@ -10,7 +10,7 @@ const { parseMentionIds } = require("./helpers/parseMentions");
 const { maybeReplyAsAlianSafe, emitCommentInsert } = require("./helpers/alianReply");
 const { handleNotificationtFun } = require("../notification/prepare-notification-data/controllerV2");
 const { getRoleType, isPrivileged } = require("../../Config/permissionGuard");
-const { buildPaginatedCommentMatch } = require("./helpers/commentThread");
+const { buildPaginatedCommentMatch, isHexCastError } = require("./helpers/commentThread");
 
 /* @mention delivery: record the mention (feeds the in-app "mentions" tab, which
  * queries the mentions collection by mentionIds) and fire the notification
@@ -253,6 +253,9 @@ exports.getPaginatedMessages = async (req, res) => {
         return res.status(200).json({ status: true, data: response || [] });
 
     } catch (error) {
+        if (isHexCastError(error)) {
+            return res.status(400).json({ status: false, message: 'A valid projectId is required.', data: [] });
+        }
         return res.status(500).json({
             status: false,
             message: 'Internal Server Error',
