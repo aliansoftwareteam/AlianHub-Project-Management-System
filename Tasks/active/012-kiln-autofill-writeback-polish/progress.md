@@ -6,10 +6,10 @@
 - [x] Search/Home/deep URL ProjectID; search title click
 - [x] Honest list/board empty copy; standup height + SOURCES count
 - [x] Tests: skip-filled per field, Owner-without-Assignee, activity vs comment
-- [ ] Draft stacked PR; tests green
+- [x] Draft stacked PR; tests green
 
 ## Last step
-Stacked Jest suite 108 passed. Frontend `npm run build` succeeded. Committing and opening the stacked draft PR.
+Draft stacked PR 522 opened on `feat/agent-writeback-status-page-comment-0b24`. Waiting on GitHub CI.
 
 ## Blockers
 None.
