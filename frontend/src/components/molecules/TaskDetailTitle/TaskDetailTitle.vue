@@ -16,7 +16,7 @@
                     v-if="checkPermission('task.task_name_edit',selectedProject?.isGlobalPermission) === true"
                     class="title-name"
                     :title="taskName"
-                    @mousedown.stop
+                    @mousedown.stop="onTitlePointerDown($event)"
                     @click.stop="startEditName($event)"
                 >
                     {{ taskName }}
@@ -55,8 +55,8 @@
 </template>
 <script setup>
     import { useCustomComposable } from '@/composable';
-    import { computed, defineProps, defineEmits, defineExpose, inject, ref } from 'vue';
-    import { clickFromTab, wasRecentTabPointer } from '@/utils/taskPanelGuard';
+    import { computed, defineProps, defineEmits, defineExpose, inject, onBeforeUnmount, onMounted, ref } from 'vue';
+    import { clickFromTab, ignoreTaskBackdrop, wasRecentTabPointer } from '@/utils/taskPanelGuard';
     import InputText from '@/components/atom/InputText/InputText.vue';
     import { useToast } from 'vue-toast-notification';
     import ProjectTaskType from "@/components/atom/TaskTypeSelection/TaskTypeSelection.vue"
@@ -88,13 +88,25 @@
     })
 
     const isEditName = ref(false);
+    const titlePointerDown = ref(false);
+
+    const onTitlePointerDown = (event) => {
+        titlePointerDown.value = Boolean(
+            event
+            && event.button === 0
+            && event.target === event.currentTarget
+        );
+    };
 
     const startEditName = (event) => {
+        const armed = titlePointerDown.value;
+        titlePointerDown.value = false;
+        if (!armed) return;
         if (!event || event.type !== 'click') return;
         if (event.target !== event.currentTarget) return;
         if (event.defaultPrevented) return;
         if (Number(event.detail) < 1) return;
-        if (clickFromTab(event) || wasRecentTabPointer()) return;
+        if (clickFromTab(event) || wasRecentTabPointer() || ignoreTaskBackdrop(1500)) return;
         isEditName.value = true;
         editTaskName.value = props.taskName;
     };
@@ -117,9 +129,17 @@
     };
 
     const cancelEdit = () => {
+        titlePointerDown.value = false;
         isEditName.value = false;
         editTaskName.value = '';
     };
+
+    onMounted(() => {
+        document.addEventListener('kiln-task-tab', cancelEdit);
+    });
+    onBeforeUnmount(() => {
+        document.removeEventListener('kiln-task-tab', cancelEdit);
+    });
 
     defineExpose({
         isEditing: isEditName,

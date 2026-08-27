@@ -49,11 +49,18 @@ const props = defineProps({
     commentCounts: Number
 })
 
+function emitTaskTab() {
+    if (typeof document === 'undefined' || !document.dispatchEvent) return;
+    document.dispatchEvent(new CustomEvent('kiln-task-tab', { detail: props.tabKey }));
+}
+
 function onTabPointer() {
+    emitTaskTab();
     markTabPointer();
 }
 
 function selectTab() {
+    emitTaskTab();
     markTabPointer();
     if (!props.isActive) emit('changeTab', props.tabKey);
 }

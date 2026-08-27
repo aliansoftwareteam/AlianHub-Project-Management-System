@@ -10,6 +10,7 @@ const logger = require('../../../Config/loggerConfig');
 const {
     OBJECT_ID,
     NATIVE_ASSIGNEE_ID,
+    NATIVE_DUE_ID,
     AUTOFILL_SYSTEM,
     isAiAction,
     permissionGate,
@@ -22,6 +23,7 @@ const {
     previewFromParts,
     descriptionText,
     recordId,
+    isDueDateEmpty,
 } = require('./taskAiAutofill');
 
 let providerFactory = null;
@@ -271,6 +273,7 @@ async function previewAutofill(context, options = {}) {
             description,
             comments: context.comments,
             pages: context.pages,
+            task: context.task,
         });
     }
     return previewFromParts(base, proposed);
@@ -289,6 +292,11 @@ async function writeCustomField(companyId, taskId, fieldId, updateDetail) {
                     { [`customField.${fieldId}.fieldValue`]: null },
                     { [`customField.${fieldId}.fieldValue`]: '' },
                     { [`customField.${fieldId}.fieldValue`]: [] },
+                    { [`customField.${fieldId}.fieldValue`]: 'DD/MM/YYYY' },
+                    { [`customField.${fieldId}.fieldValue`]: 'MM/DD/YYYY' },
+                    { [`customField.${fieldId}.fieldValue`]: 'YYYY/MM/DD' },
+                    { [`customField.${fieldId}.fieldValue`]: 'YYYY-MM-DD' },
+                    { [`customField.${fieldId}.fieldValue`]: {} },
                 ],
             },
             { $set: { [`customField.${fieldId}`]: updateDetail } },
@@ -334,6 +342,37 @@ async function writeAssignee(companyId, taskId, userIds) {
     return result;
 }
 
+async function writeDueDate(companyId, taskId, value) {
+    const oid = asObjectId(taskId);
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    const result = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TASKS,
+        data: [
+            {
+                _id: oid,
+                $or: [
+                    { DueDate: { $exists: false } },
+                    { DueDate: null },
+                    { DueDate: '' },
+                    { DueDate: 0 },
+                ],
+            },
+            { $set: { DueDate: date } },
+            { returnDocument: 'after' },
+        ],
+    }, 'findOneAndUpdate');
+    if (result) {
+        socketEmitter.emit('update', {
+            type: 'update',
+            data: result,
+            updatedFields: { DueDate: date },
+            module: 'task',
+        });
+    }
+    return result;
+}
+
 async function applyAutofillWrites({ companyId, task, suggestions }) {
     // S3.2 trigger write-back should call this after preview. This module does not run triggers.
     const writes = planAutofillWrites(suggestions);
@@ -346,10 +385,18 @@ async function applyAutofillWrites({ companyId, task, suggestions }) {
                 const result = await writeAssignee(companyId, taskId, write.value);
                 if (result) applied.push({ fieldId: NATIVE_ASSIGNEE_ID, kind: 'owner' });
                 else skipped.push({ fieldId: NATIVE_ASSIGNEE_ID, reason: 'filled' });
+            } else if (write.type === 'dueDate') {
+                const result = await writeDueDate(companyId, taskId, write.value);
+                if (result) applied.push({ fieldId: NATIVE_DUE_ID, kind: 'date' });
+                else skipped.push({ fieldId: NATIVE_DUE_ID, reason: 'filled' });
             } else {
                 const result = await writeCustomField(companyId, taskId, write.fieldId, write.updateDetail);
-                if (result) applied.push({ fieldId: write.fieldId });
-                else skipped.push({ fieldId: write.fieldId, reason: 'filled' });
+                if (result) {
+                    applied.push({ fieldId: write.fieldId });
+                    if (write.alsoDueDate && isDueDateEmpty(task)) {
+                        await writeDueDate(companyId, taskId, write.updateDetail.fieldValue);
+                    }
+                } else skipped.push({ fieldId: write.fieldId, reason: 'filled' });
             }
         } catch (error) {
             logger.error(`task autofill write failed: ${error && error.message ? error.message : error}`);

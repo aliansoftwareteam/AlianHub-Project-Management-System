@@ -3,8 +3,10 @@
 const {
     AUTOFILL_ACTIONS,
     NATIVE_ASSIGNEE_ID,
+    NATIVE_DUE_ID,
     isAiAction,
     kindForField,
+    isEmptyValue,
     permissionGate,
     listEmptyTargets,
     sanitizeSuggestions,
@@ -328,6 +330,53 @@ describe('TASKS - AI autofill custom fields', () => {
         expect(planAutofillWrites(tagOnly).every((row) => row.fieldId === 'f-tag')).toBe(true);
     });
 
+    test('placeholder Due is empty and sprint dates seed an apply-able Due row', () => {
+        expect(isEmptyValue('DD/MM/YYYY')).toBe(true);
+        expect(isEmptyValue('MM/DD/YYYY')).toBe(true);
+        expect(isEmptyValue({ date: '' })).toBe(true);
+        expect(isEmptyValue({})).toBe(true);
+        expect(isEmptyValue('2026-08-28')).toBe(false);
+
+        const smoke = emptyTask({
+            TaskName: 'Test Ask Smoke on mobile',
+            description: '',
+            AssigneeUserId: [],
+            DueDate: null,
+            sprintName: 'SMOKE - 24 - 28 Aug 2026',
+            customField: {
+                'f-summary': { fieldValue: 'Test Ask Smoke functionality on mobile devices' },
+                'f-tag': { fieldValue: ['opt-launch'] },
+                'f-owner': { fieldValue: ['opt-ada'] },
+                'f-date': { fieldValue: 'DD/MM/YYYY' },
+            },
+        });
+        const targets = listEmptyTargets({
+            task: smoke,
+            fields: FIELDS,
+            people: [ADA, GRACE],
+            permissions: { customField: true, assignee: true },
+        });
+        const ids = targets.map((row) => row.fieldId);
+        expect(ids).toContain('f-date');
+        expect(ids).toContain('f-notes');
+        expect(ids).toContain(NATIVE_ASSIGNEE_ID);
+        expect(ids).not.toContain('f-summary');
+        expect(ids).not.toContain('f-owner');
+        expect(ids).not.toContain('f-tag');
+        expect(ids).not.toContain(NATIVE_DUE_ID);
+
+        const result = preview(smoke, { comments: [] });
+        const due = result.data.suggestions.find((row) => row.fieldId === 'f-date');
+        expect(due).toEqual(expect.objectContaining({ kind: 'date', value: '2026-08-28' }));
+        expect(result.data.suggestions.every((row) => row.fieldId !== 'f-summary')).toBe(true);
+        expect(result.data.suggestions.every((row) => row.fieldId !== 'f-owner')).toBe(true);
+
+        const writes = planAutofillWrites([due]);
+        expect(writes).toEqual([
+            expect.objectContaining({ type: 'customField', fieldId: 'f-date', alsoDueDate: true }),
+        ]);
+    });
+
     test('task panel Autofill is two labeled rows with per-row apply, not gated on AI plan', () => {
         const fs = require('fs');
         const path = require('path');
@@ -342,6 +391,10 @@ describe('TASKS - AI autofill custom fields', () => {
         expect(card).toContain("item.fieldId === 'assignee'");
         expect(card).toContain('\\bowner\\b');
         expect(card).toContain('canApply');
+        expect(card).toContain("write: 'date'");
+        expect(card).toContain('customDueEmpty');
+        expect(card).toContain('DATE_PLACEHOLDER');
+        expect(card).toContain('dueField');
         expect(card).not.toContain('taf__kind');
         expect(card).not.toContain("checkApps('CustomFields')");
         expect(card).not.toContain('getAppState');

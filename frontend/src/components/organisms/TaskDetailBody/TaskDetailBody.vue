@@ -84,7 +84,7 @@
 
 <script setup>
     import { ref, defineProps, computed, inject, onMounted, watch } from 'vue';
-    import { useRoute, useRouter } from 'vue-router';
+    import { useRoute } from 'vue-router';
     import { useStore } from 'vuex';
 
     import TabListHeader from '@/components/molecules/TabListHeader/TabListHeader.vue'
@@ -160,11 +160,7 @@
         if (wasOpen && !open) docsRefreshKey.value += 1;
     });
 
-    const router = useRouter();
     const route = useRoute();
-    watch(() => route.query && route.query.detailTab, (tab) => {
-        if (tab) activeTab.value = tab;
-    })
 
     const projectData = inject("selectedProject");
     const users = computed(() => getters["settings/companyUsers"]?.map((x) =>x.userId));
@@ -189,15 +185,19 @@
     const customerId = ref(props.task?.customField?.[process.env.VUE_APP_CUSTOMFIELDID]?.fieldValue);
     const productName = ref(props.task?.customField?.[process.env.VUE_APP_CUSTOMFIELDPRODUCTID]?.fieldValue);
 
-    function syncDetailTab(tab) {
-        activeTab.value = tab;
-        if (!route.params || !route.params.taskId) return;
-        router.replace({ query: { ...route.query, detailTab: tab } }).catch(() => {});
+    function emitTaskTab(tab) {
+        if (typeof document === 'undefined' || !document.dispatchEvent) return;
+        document.dispatchEvent(new CustomEvent('kiln-task-tab', { detail: tab }));
     }
 
     onMounted(() => {
         activeTab.value = route.query.detailTab ? route.query.detailTab : 'task-detail-tab';
     })
+
+    watch(() => route.params && route.params.taskId, (id, prev) => {
+        if (!id || id === prev) return;
+        activeTab.value = route.query.detailTab ? route.query.detailTab : 'task-detail-tab';
+    });
 
     const myCounts = computed(() => {
         const pid = openProjectId.value;
@@ -231,8 +231,10 @@
     });
 
     const changeTab = (tab) => {
-        if (!tab || tab === activeTab.value) return;
-        syncDetailTab(tab);
+        if (!tab) return;
+        emitTaskTab(tab);
+        if (tab === activeTab.value) return;
+        activeTab.value = tab;
     }
 
     const commentUsers = computed(() => {

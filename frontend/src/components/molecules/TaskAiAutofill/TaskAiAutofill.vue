@@ -50,6 +50,8 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 
 const OWNER_TITLE = /\bowner\b/i;
+const DUE_TITLE = /\b(due|deadline)\b/i;
+const DATE_PLACEHOLDER = /^(dd|mm|yyyy)([/.-])(dd|mm|yyyy)\2(dd|mm|yyyy)$/i;
 
 const props = defineProps({
     task: { type: Object, default: () => ({}) },
@@ -67,7 +69,6 @@ const notice = ref('');
 const suggestions = ref([]);
 const selectedIds = ref([]);
 const filledOnce = ref(false);
-const previewedFor = ref('');
 const showCard = ref(false);
 
 const canShow = computed(() => Boolean(props.task && props.task._id));
@@ -84,9 +85,48 @@ const ownerField = computed(() => {
     )) || null;
 });
 
+const dueField = computed(() => {
+    const list = getters['settings/finalCustomFields'] || [];
+    return list.find((field) => (
+        DUE_TITLE.test(String((field && field.fieldTitle) || ''))
+        && String((field && field.fieldType) || '').toLowerCase() === 'date'
+    )) || null;
+});
+
+function valueIsEmpty(value) {
+    if (value == null || value === '' || value === 0) return true;
+    if (typeof value === 'number') return !Number.isFinite(value) || value <= 0;
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) return true;
+        if (DATE_PLACEHOLDER.test(trimmed)) return true;
+        return trimmed.toLowerCase() === 'invalid date';
+    }
+    if (value instanceof Date) return Number.isNaN(value.getTime());
+    if (typeof value === 'object') {
+        if (Object.prototype.hasOwnProperty.call(value, 'fieldValue')) return valueIsEmpty(value.fieldValue);
+        if (Object.prototype.hasOwnProperty.call(value, 'date')) return valueIsEmpty(value.date);
+        if (Object.prototype.hasOwnProperty.call(value, 'seconds')) return !Number(value.seconds);
+        return Object.keys(value).length === 0;
+    }
+    return false;
+}
+
 function assigneeEmpty() {
     const ids = props.task && Array.isArray(props.task.AssigneeUserId) ? props.task.AssigneeUserId : [];
     return ids.filter(Boolean).length === 0;
+}
+
+function nativeDueEmpty() {
+    return valueIsEmpty(props.task && props.task.DueDate);
+}
+
+function customDueEmpty() {
+    const field = dueField.value;
+    if (!field) return nativeDueEmpty();
+    const bag = (props.task && props.task.customField) || {};
+    const entry = bag[field._id] || bag[String(field._id)] || {};
+    return valueIsEmpty(entry && Object.prototype.hasOwnProperty.call(entry, 'fieldValue') ? entry.fieldValue : undefined);
 }
 
 function ownerValueLabel(field) {
@@ -126,10 +166,16 @@ const rows = computed(() => {
     const ownerSug = field
         ? findSuggestion((item) => String(item.fieldId) === String(field._id) && item.source !== 'native')
         : findSuggestion((item) => item.kind === 'owner' && item.source !== 'native');
-    const dueSug = findSuggestion((item) => item.kind === 'date');
+    const dueSug = findSuggestion((item) => (
+        item.kind === 'date'
+        || item.fieldId === 'due'
+        || (dueField.value && String(item.fieldId) === String(dueField.value._id))
+    ));
     const assigneeIsEmpty = assigneeEmpty();
     const ownerLabel = ownerValueLabel(field);
     const ownerFilled = Boolean(ownerLabel);
+    const dueIsEmpty = dueField.value ? customDueEmpty() : nativeDueEmpty();
+    const dueId = (dueSug && dueSug.fieldId) || (dueField.value && dueField.value._id) || 'due';
     const out = [
         {
             fieldId: 'assignee',
@@ -151,19 +197,17 @@ const rows = computed(() => {
             filled: ownerFilled,
             write: 'owner',
         },
-    ];
-    if (dueSug) {
-        out.push({
-            fieldId: dueSug.fieldId,
-            title: dueSug.title || t('Projects.due_date'),
-            display: dueSug.display || dueSug.value || '',
+        {
+            fieldId: dueId,
+            title: (dueField.value && dueField.value.fieldTitle) || (dueSug && dueSug.title) || t('Projects.due_date'),
+            display: (dueSug && (dueSug.display || dueSug.value)) || '',
             item: dueSug,
-            checked: isSelected(dueSug.fieldId),
-            canApply: Boolean(props.enabled),
-            filled: false,
+            checked: isSelected(dueId),
+            canApply: Boolean(props.enabled) && Boolean(dueSug) && dueIsEmpty,
+            filled: !dueIsEmpty,
             write: 'date',
-        });
-    }
+        },
+    ];
     return out;
 });
 
@@ -227,7 +271,6 @@ async function preview() {
         selectedIds.value = next
             .filter((item) => item && item.fieldId)
             .map((item) => String(item.fieldId));
-        previewedFor.value = String(props.task._id);
         showCard.value = true;
         if (!next.length) notice.value = t('CustomField.autofill_none');
     } catch (_error) {
@@ -239,11 +282,14 @@ async function preview() {
     }
 }
 
-watch(() => [canShow.value, props.task && props.task._id], ([show, id]) => {
-    if (!show || !id) return;
-    if (previewedFor.value === String(id) || busy.value) return;
-    preview();
-}, { immediate: true });
+watch(() => props.task && props.task._id, (id, prev) => {
+    if (String(id || '') === String(prev || '')) return;
+    showCard.value = false;
+    suggestions.value = [];
+    selectedIds.value = [];
+    notice.value = '';
+    filledOnce.value = false;
+});
 
 function applyPatch(applied, write) {
     const customField = { ...(props.task.customField || {}) };
@@ -251,13 +297,18 @@ function applyPatch(applied, write) {
     const next = {};
     applied.forEach((item) => {
         appliedIds.push(String(item.fieldId));
-        if (write === 'assignee' || item.source === 'native' || item.fieldId === 'assignee') {
+        if (write === 'assignee' || item.fieldId === 'assignee' || (item.source === 'native' && item.kind !== 'date')) {
             next.AssigneeUserId = item.value || [];
-        } else if (write === 'date' || item.kind === 'date') {
-            customField[item.fieldId] = { _id: item.fieldId, fieldValue: item.value };
-            if (!props.task.DueDate) {
+        } else if (write === 'date' || item.kind === 'date' || item.fieldId === 'due') {
+            if (item.fieldId === 'due' || item.source === 'native') {
                 next.DueDate = item.value;
                 appliedIds.push('due');
+            } else {
+                customField[item.fieldId] = { _id: item.fieldId, fieldValue: item.value };
+                if (nativeDueEmpty()) {
+                    next.DueDate = item.value;
+                    appliedIds.push('due');
+                }
             }
         } else {
             customField[item.fieldId] = { _id: item.fieldId, fieldValue: item.value };

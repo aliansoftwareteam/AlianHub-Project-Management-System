@@ -328,6 +328,7 @@ describe('AUTOMATIONS - write-back reuses 005-007 without wiring set_priority in
         expect(card).toContain('showCard');
         expect(card).toContain('taf__go');
         expect(card).toContain('autofill_fill_empty');
+        expect(card).toContain("write: 'date'");
         expect(activity).toContain('alian-mark');
         expect(activity).toContain('agent_writeback');
     });

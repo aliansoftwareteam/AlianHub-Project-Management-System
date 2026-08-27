@@ -22,6 +22,7 @@
         />
         <div id="message_container"
             @dragenter="messageAllowed ? showDropZone = true : showDropZone = false"
+            @wheel.stop
             class="overflow-y-auto style-scroll position-re msg__container"
         >
             <template v-if="loadingChat">
@@ -825,6 +826,7 @@ function getLatestMessage(projectId, taskId, sprintId, messageData) {
 
 
 function watchScroll(e) {
+    if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
     if(e.target.scrollTop < (e.target.scrollHeight - e.target.offsetHeight - 500)) {
         showScrollBotton.value = true;
     } else {
@@ -834,6 +836,11 @@ function watchScroll(e) {
     if(e.target.scrollTop < 400 && e.target.scrollTop > 0) {
         getPaginatedMessages();
     }
+}
+
+function scrollThreadEl(node, behavior) {
+    if (!node || typeof node.scrollIntoView !== 'function') return;
+    node.scrollIntoView({ behavior: behavior || 'auto', block: 'nearest', inline: 'nearest' });
 }
 
 function watchClick(e) {
@@ -1452,7 +1459,7 @@ function handleSocketData() {
                     nextTick(() => {
                         let ele = document.getElementById(messages.value[(messages.value.length) - unreadMessages.value]?._id)
                         if(ele) {
-                            ele.scrollIntoView();
+                            scrollThreadEl(ele);
                         }
                     })
                 } else {
@@ -1474,7 +1481,7 @@ function handleSocketData() {
                 nextTick(() => {
                     let ele = document.getElementById(messages.value[(messages.value.length) - unreadMessages.value]?._id)
                     if(ele) {
-                        ele.scrollIntoView();
+                        scrollThreadEl(ele);
                     }
                 })
             } else {
@@ -1490,7 +1497,7 @@ function handleSocketData() {
                 nextTick(() => {
                     let ele = document.getElementById(messages.value[(messages.value.length) - unreadMessages.value]?._id)
                     if(ele) {
-                        ele.scrollIntoView();
+                        scrollThreadEl(ele);
                     }
                 })
             } else {
@@ -1563,7 +1570,7 @@ function getPaginatedMessages(...args) {
                 if(findData) {
                     if(messages.value.filter((x) => x._id === findData._id).length) {
                         setTimeout(() => {
-                            document.getElementById(findData._id).scrollIntoView({behavior: 'smooth'});
+                            scrollThreadEl(document.getElementById(findData._id), 'smooth');
                             highlightMessage(findData);
                         }, 200)
                     } else {
@@ -1583,7 +1590,7 @@ function getPaginatedMessages(...args) {
                     nextTick(() => {
                         let ele = document.getElementById(messages.value[(messages.value.length) - unreadMessages.value]?._id)
                         if(ele) {
-                            ele.scrollIntoView();
+                            scrollThreadEl(ele);
                         }
                     })
                 }
@@ -1609,7 +1616,7 @@ function highlightMessage(data) {
 
     if(element !== undefined && element !== null) {
         element.classList.toggle("highlighted-message");
-        element.scrollIntoView({behavior: 'smooth'});
+        scrollThreadEl(element, 'smooth');
 
         setTimeout(()=>{
             element.classList.toggle("highlighted-message");
