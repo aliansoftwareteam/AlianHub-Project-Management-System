@@ -117,9 +117,14 @@ function isCustomFieldEmpty(task, field) {
     return isEmptyValue(entry && Object.prototype.hasOwnProperty.call(entry, 'fieldValue') ? entry.fieldValue : undefined);
 }
 
-function isAssigneeEmpty(task) {
-    const ids = task && Array.isArray(task.AssigneeUserId) ? task.AssigneeUserId : [];
-    return ids.map(recordId).filter(Boolean).length === 0;
+function isAssigneeEmpty(task, people) {
+    const raw = task && task.AssigneeUserId;
+    const list = Array.isArray(raw) ? raw : (raw != null && raw !== '' ? [raw] : []);
+    const ids = list.map(recordId).filter((id) => id && id !== '0' && id.toLowerCase() !== 'unassigned');
+    if (!ids.length) return true;
+    const allowed = normalizePeople(people);
+    if (allowed.length) return !ids.some((id) => allowed.some((person) => person.id === id));
+    return false;
 }
 
 function isDueDateEmpty(task) {
@@ -228,7 +233,7 @@ function listEmptyTargets({ task, fields, people, permissions }) {
         }
     }
 
-    if (gate.assignee && isAssigneeEmpty(task)) {
+    if (gate.assignee && isAssigneeEmpty(task, allowedPeople)) {
         targets.push({
             fieldId: NATIVE_ASSIGNEE_ID,
             kind: 'owner',
@@ -367,15 +372,34 @@ function pageTexts(pages) {
     })).filter((row) => row.id);
 }
 
-function suggestionHaystack({ title, description, comments, pages, task }) {
-    const commentsText = (comments || []).map((row) => row.message || stripHtml(row)).join(' ');
-    const pagesText = (pages || []).map((row) => `${row.title || ''} ${row.text || ''}`).join(' ');
-    const sprint = String((task && (task.sprintName || (task.sprintArray && task.sprintArray.name))) || '');
-    return `${title || ''} ${sprint} ${description || ''} ${commentsText} ${pagesText}`.toLowerCase();
+function sprintDueStamp(task, sprint) {
+    const end = sprint && (sprint.endDate || sprint.EndDate || sprint.end);
+    const fromEnd = parseDateValue(end);
+    if (fromEnd) return fromEnd;
+    const name = String(
+        (sprint && (sprint.name || sprint.sprintName))
+        || (task && (task.sprintName || (task.sprintArray && task.sprintArray.name)))
+        || '',
+    );
+    const stamps = extractDateStamps(name);
+    return stamps.length ? stamps[stamps.length - 1] : null;
 }
 
-function heuristicSuggestions({ targets, people, title, description, comments, pages, task }) {
-    const haystack = suggestionHaystack({ title, description, comments, pages, task });
+function suggestionHaystack({ title, description, comments, pages, task, sprint }) {
+    const commentsText = (comments || []).map((row) => row.message || stripHtml(row)).join(' ');
+    const pagesText = (pages || []).map((row) => `${row.title || ''} ${row.text || ''}`).join(' ');
+    const sprintName = String(
+        (sprint && (sprint.name || sprint.sprintName))
+        || (task && (task.sprintName || (task.sprintArray && task.sprintArray.name)))
+        || '',
+    );
+    const due = sprintDueStamp(task, sprint);
+    const sprintEnd = due ? due.toISOString().slice(0, 10) : '';
+    return `${title || ''} ${sprintName} ${sprintEnd} ${description || ''} ${commentsText} ${pagesText}`.toLowerCase();
+}
+
+function heuristicSuggestions({ targets, people, title, description, comments, pages, task, sprint }) {
+    const haystack = suggestionHaystack({ title, description, comments, pages, task, sprint });
     const allowedPeople = normalizePeople(people);
     const suggestions = [];
     for (const target of targets || []) {
@@ -385,8 +409,11 @@ function heuristicSuggestions({ targets, people, title, description, comments, p
             continue;
         }
         if (target.kind === 'date') {
-            const stamp = pickDueDate(`${description || ''} ${title || ''} ${haystack}`, target.fieldPastFuture);
-            if (stamp) suggestions.push({ fieldId: target.fieldId, kind: 'date', value: stamp.toISOString().slice(0, 10) });
+            let stamp = pickDueDate(`${description || ''} ${title || ''} ${haystack}`, target.fieldPastFuture);
+            if (!stamp) stamp = sprintDueStamp(task, sprint);
+            if (stamp && dateAllowed(stamp, target.fieldPastFuture)) {
+                suggestions.push({ fieldId: target.fieldId, kind: 'date', value: stamp.toISOString().slice(0, 10) });
+            }
             continue;
         }
         if (target.kind === 'tag') {
@@ -412,9 +439,9 @@ function heuristicSuggestions({ targets, people, title, description, comments, p
     return suggestions;
 }
 
-function skipReasonWhenMissingTarget(fieldId, task) {
+function skipReasonWhenMissingTarget(fieldId, task, people) {
     if (!fieldId) return 'unknown';
-    if (fieldId === NATIVE_ASSIGNEE_ID) return isAssigneeEmpty(task) ? 'unknown' : 'filled';
+    if (fieldId === NATIVE_ASSIGNEE_ID) return isAssigneeEmpty(task, people) ? 'unknown' : 'filled';
     if (fieldId === NATIVE_DUE_ID) return isDueDateEmpty(task) ? 'unknown' : 'filled';
     return isCustomFieldEmpty(task, { _id: fieldId }) ? 'unknown' : 'filled';
 }
@@ -429,7 +456,7 @@ function sanitizeSuggestions(suggestions, { targets, people, task } = {}) {
         const fieldId = recordId(raw.fieldId || raw.id);
         const target = byId.get(fieldId);
         if (!target) {
-            skipped.push({ fieldId, reason: skipReasonWhenMissingTarget(fieldId, task) });
+            skipped.push({ fieldId, reason: skipReasonWhenMissingTarget(fieldId, task, allowedPeople) });
             continue;
         }
         if (target.source === 'native') {
@@ -438,7 +465,7 @@ function sanitizeSuggestions(suggestions, { targets, people, task } = {}) {
                     skipped.push({ fieldId, reason: 'filled' });
                     continue;
                 }
-            } else if (!isAssigneeEmpty(task)) {
+            } else if (!isAssigneeEmpty(task, allowedPeople)) {
                 skipped.push({ fieldId, reason: 'filled' });
                 continue;
             }
@@ -586,13 +613,22 @@ function parseSuggestionsPayload(raw) {
     return [];
 }
 
-function buildAutofillPrompt({ task, targets, people, description, comments, pages }) {
+function buildAutofillPrompt({ task, targets, people, description, comments, pages, sprint }) {
     const title = clamp(String((task && (task.TaskName || task.title)) || ''), TITLE_CAP) || '(untitled task)';
     const key = String((task && task.TaskKey) || '').trim();
     const lines = [
         `Task: ${key ? `${key} ` : ''}${title}`,
         `Description: ${description || '(empty)'}`,
     ];
+    const due = sprintDueStamp(task, sprint);
+    const sprintName = String(
+        (sprint && (sprint.name || sprint.sprintName))
+        || (task && (task.sprintName || (task.sprintArray && task.sprintArray.name)))
+        || '',
+    );
+    if (sprintName || due) {
+        lines.push(`Sprint: ${sprintName || '(unnamed)'}${due ? ` (ends ${due.toISOString().slice(0, 10)})` : ''}`);
+    }
     const notes = commentTexts(comments);
     if (notes.length) {
         lines.push('Comments:');
@@ -633,7 +669,7 @@ No preamble, no code fences around the JSON.
 Rules:
 - Suggest only for listed empty fields. Do not invent fields, people, tags, or dates.
 - summary: a short grounded value from the title, description, comments, or linked page text.
-- date: YYYY-MM-DD, only when the task text supports it.
+- date: YYYY-MM-DD. A sprint end date is grounded. Do not invent other dates.
 - tag: optionId must be one of that field's listed options.
 - owner: personId must be a listed person, or optionId a listed option for an owner dropdown.
 - Prefer skip over guess. Do not mention that you are an AI.`;
@@ -663,10 +699,20 @@ function previewFromParts(input, rawSuggestions) {
         };
     }
 
-    const proposed = Array.isArray(rawSuggestions)
-        ? rawSuggestions
-        : heuristicSuggestions({ targets, people, title, description, comments, pages, task });
-    const sanitized = sanitizeSuggestions(proposed, { targets, people, task });
+    const proposed = Array.isArray(rawSuggestions) ? rawSuggestions : [];
+    const heuristic = heuristicSuggestions({
+        targets, people, title, description, comments, pages, task, sprint: input && input.sprint,
+    });
+    const byField = new Map();
+    proposed.forEach((row) => {
+        const id = recordId(row && (row.fieldId || row.id));
+        if (id && !byField.has(id)) byField.set(id, row);
+    });
+    heuristic.forEach((row) => {
+        const id = recordId(row && row.fieldId);
+        if (id && !byField.has(id)) byField.set(id, row);
+    });
+    const sanitized = sanitizeSuggestions([...byField.values()], { targets, people, task });
     return {
         status: true,
         data: {
@@ -700,6 +746,7 @@ module.exports = {
     listEmptyTargets,
     sanitizeSuggestions,
     heuristicSuggestions,
+    sprintDueStamp,
     selectSuggestionsByFieldIds,
     planAutofillWrites,
     parseSuggestionsPayload,

@@ -280,6 +280,11 @@
 
     const titleRef = ref(null);
 
+    function isEscapeKey(event) {
+        if (!event) return false;
+        return event.key === 'Escape' || event.key === 'Esc' || event.keyCode === 27;
+    }
+
     function nestedLayerOpen() {
         if (document.querySelector('.drop-down-menu')) return 'dropdown';
         if (document.querySelector('.taf__preview')) return 'autofill';
@@ -302,7 +307,7 @@
     }
 
     function onPanelEscape(event) {
-        if (!event || event.key !== 'Escape') return;
+        if (!isEscapeKey(event)) return;
         const nested = nestedLayerOpen();
         if (nested === 'dropdown') {
             dismissNestedLayer(nested);
@@ -327,6 +332,9 @@
         }
         if (event.defaultPrevented) return;
         emit('toggleTaskDetail', task.value, true);
+        event.preventDefault();
+        event.stopPropagation();
+        if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
     }
 
     function onSidebarVisible() {
@@ -596,7 +604,7 @@
 
     onMounted(async () => {
         getQueryFun();
-        document.addEventListener('keydown', onPanelEscape);
+        document.addEventListener('keydown', onPanelEscape, true);
         try {
             document.addEventListener('visibilitychange', visibilityHandler);            
             if(task.value && Object.keys(task.value).length > 0){
@@ -625,7 +633,7 @@
         });
         socket.value.emit('leaveTaskDetail',`taskDetail_${props.taskId}**${socket.value.id}`);
         clearTimeout(debounceTimeout);
-        document.removeEventListener('keydown', onPanelEscape);
+        document.removeEventListener('keydown', onPanelEscape, true);
         document.removeEventListener('visibilitychange', visibilityHandler);
     })
     provide("selectedProject", projectData);

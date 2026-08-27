@@ -33,6 +33,13 @@
                 </li>
             </ul>
             <div class="taf__actions">
+                <button
+                    v-if="canFillEmpty"
+                    type="button"
+                    class="taf__apply"
+                    :disabled="busy"
+                    @click="applyEmpty"
+                >{{ busy ? $t('CustomField.autofill_working') : $t('CustomField.autofill_fill_empty') }}</button>
                 <button type="button" class="taf__dismiss" :disabled="busy" @click="dismiss">
                     {{ $t('CustomField.autofill_dismiss') }}
                 </button>
@@ -48,6 +55,7 @@ import { useI18n } from 'vue-i18n';
 import { useToast } from 'vue-toast-notification';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import { useGetterFunctions } from '@/composable';
 
 const OWNER_TITLE = /\bowner\b/i;
 const DUE_TITLE = /\b(due|deadline)\b/i;
@@ -63,6 +71,7 @@ const emit = defineEmits(['applied']);
 const { t } = useI18n();
 const $toast = useToast();
 const { getters, commit } = useStore();
+const { getUser } = useGetterFunctions();
 
 const busy = ref(false);
 const notice = ref('');
@@ -113,8 +122,33 @@ function valueIsEmpty(value) {
 }
 
 function assigneeEmpty() {
-    const ids = props.task && Array.isArray(props.task.AssigneeUserId) ? props.task.AssigneeUserId : [];
-    return ids.filter(Boolean).length === 0;
+    const raw = props.task && props.task.AssigneeUserId;
+    const list = Array.isArray(raw) ? raw : [];
+    return list.filter((value) => {
+        const id = value && typeof value === 'object' ? String(value._id || value.id || '') : String(value || '');
+        if (!id || id === '0' || id.toLowerCase() === 'unassigned') return false;
+        try {
+            const user = getUser(id);
+            if (!user || user.ghostUser) return false;
+            const name = String(user.Employee_Name || user.name || '').trim();
+            return Boolean(name) && name.toLowerCase() !== 'ghost user';
+        } catch (_error) {
+            return false;
+        }
+    }).length === 0;
+}
+
+function sprintDueDisplay(task) {
+    const name = String((task && (task.sprintName || (task.sprintArray && task.sprintArray.name))) || '');
+    const range = name.match(/(\d{1,2})\s*[-–]\s*(\d{1,2})\s+([A-Za-z]{3,9})\.?\s+(20\d{2})/);
+    if (!range) return '';
+    const months = {
+        jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+        jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+    };
+    const month = months[String(range[3] || '').slice(0, 3).toLowerCase()];
+    if (!month) return '';
+    return `${range[4]}-${String(month).padStart(2, '0')}-${String(Number(range[2])).padStart(2, '0')}`;
 }
 
 function nativeDueEmpty() {
@@ -176,6 +210,10 @@ const rows = computed(() => {
     const ownerFilled = Boolean(ownerLabel);
     const dueIsEmpty = dueField.value ? customDueEmpty() : nativeDueEmpty();
     const dueId = (dueSug && dueSug.fieldId) || (dueField.value && dueField.value._id) || 'due';
+    const dueSeed = sprintDueDisplay(props.task);
+    const dueItem = dueSug || (dueIsEmpty && dueSeed
+        ? { fieldId: dueId, kind: 'date', value: dueSeed, display: dueSeed, source: dueField.value ? 'customField' : 'native' }
+        : null);
     const out = [
         {
             fieldId: 'assignee',
@@ -184,36 +222,44 @@ const rows = computed(() => {
             item: assigneeSug,
             checked: isSelected('assignee'),
             canApply: Boolean(props.enabled) && Boolean(assigneeSug) && assigneeIsEmpty,
-            filled: !assigneeIsEmpty,
+            filled: false,
             write: 'assignee',
         },
-        {
+    ];
+    if (!assigneeIsEmpty && !assigneeSug) out.pop();
+    if (!ownerFilled) {
+        out.push({
             fieldId: (field && field._id) || 'owner',
             title: (field && field.fieldTitle) || 'Owner',
-            display: (ownerSug && (ownerSug.display || ownerSug.value)) || ownerLabel,
+            display: (ownerSug && (ownerSug.display || ownerSug.value)) || '',
             item: ownerSug,
             checked: Boolean(field) && isSelected(field._id),
-            canApply: Boolean(props.enabled) && Boolean(ownerSug) && !ownerFilled,
-            filled: ownerFilled,
+            canApply: Boolean(props.enabled) && Boolean(ownerSug),
+            filled: false,
             write: 'owner',
-        },
-        {
+        });
+    }
+    if (dueIsEmpty) {
+        out.push({
             fieldId: dueId,
             title: (dueField.value && dueField.value.fieldTitle) || (dueSug && dueSug.title) || t('Projects.due_date'),
-            display: (dueSug && (dueSug.display || dueSug.value)) || '',
-            item: dueSug,
+            display: (dueItem && (dueItem.display || dueItem.value)) || dueSeed || '',
+            item: dueItem,
             checked: isSelected(dueId),
-            canApply: Boolean(props.enabled) && Boolean(dueSug) && dueIsEmpty,
-            filled: !dueIsEmpty,
+            canApply: Boolean(props.enabled) && Boolean(dueItem),
+            filled: false,
             write: 'date',
-        },
-    ];
+        });
+    }
     return out;
 });
+
+const canFillEmpty = computed(() => rows.value.some((row) => row.canApply && row.item));
 
 function dismiss() {
     showCard.value = false;
     notice.value = '';
+    filledOnce.value = true;
 }
 
 function onEscape(event) {
@@ -268,11 +314,16 @@ async function preview() {
         }
         const next = Array.isArray(payload.data?.suggestions) ? payload.data.suggestions : [];
         suggestions.value = next;
-        selectedIds.value = next
-            .filter((item) => item && item.fieldId)
-            .map((item) => String(item.fieldId));
+        const ids = next.filter((item) => item && item.fieldId).map((item) => String(item.fieldId));
+        const dueIso = sprintDueDisplay(props.task);
+        const dueTarget = (dueField.value && dueField.value._id) || 'due';
+        if (dueIso && !ids.includes(String(dueTarget)) && !ids.includes('due')) {
+            ids.push(String(dueTarget));
+        }
+        selectedIds.value = ids;
         showCard.value = true;
-        if (!next.length) notice.value = t('CustomField.autofill_none');
+        filledOnce.value = true;
+        if (!next.length && !dueIso) notice.value = t('CustomField.autofill_none');
     } catch (_error) {
         notice.value = t('CustomField.autofill_failed');
         suggestions.value = [];
@@ -323,6 +374,32 @@ function applyPatch(applied, write) {
     const used = new Set(applied.map((item) => String(item.fieldId)));
     suggestions.value = suggestions.value.filter((item) => !used.has(String(item.fieldId)));
     selectedIds.value = selectedIds.value.filter((id) => !used.has(id));
+}
+
+async function applyEmpty() {
+    const batch = rows.value.filter((row) => row.canApply && row.checked && row.item);
+    if (busy.value || !batch.length || !props.task?._id) return;
+    busy.value = true;
+    notice.value = '';
+    try {
+        const response = await apiRequest('post', env.V2_TASKS_AI_AUTOFILL, {
+            action: 'apply',
+            taskId: props.task._id,
+            suggestions: batch.map((row) => row.item),
+        });
+        const payload = response.data || {};
+        if (!payload.status) {
+            notice.value = payload.statusText || t('CustomField.autofill_failed');
+            return;
+        }
+        const applied = Array.isArray(payload.data?.suggestions) ? payload.data.suggestions : batch.map((row) => row.item);
+        applyPatch(applied);
+        $toast.success(t('CustomField.autofill_applied'), { position: 'top-right' });
+    } catch (_error) {
+        notice.value = t('CustomField.autofill_failed');
+    } finally {
+        busy.value = false;
+    }
 }
 
 async function applyOne(row) {

@@ -11,6 +11,7 @@ const {
     listEmptyTargets,
     sanitizeSuggestions,
     heuristicSuggestions,
+    sprintDueStamp,
     planAutofillWrites,
     selectSuggestionsByFieldIds,
     previewFromParts,
@@ -113,6 +114,14 @@ describe('TASKS - AI autofill custom fields', () => {
         expect(ids).not.toContain('f-summary');
         expect(ids).not.toContain('f-tag');
         expect(ids).not.toContain(NATIVE_ASSIGNEE_ID);
+
+        const ghosted = listEmptyTargets({
+            task: emptyTask({ AssigneeUserId: ['ghost-not-in-project'] }),
+            fields: FIELDS,
+            people: [ADA, GRACE],
+            permissions: { customField: true, assignee: true },
+        });
+        expect(ghosted.map((row) => row.fieldId)).toContain(NATIVE_ASSIGNEE_ID);
         expect(ids).not.toContain('f-money');
 
         const { suggestions, skipped } = sanitizeSuggestions([
@@ -375,6 +384,20 @@ describe('TASKS - AI autofill custom fields', () => {
         expect(writes).toEqual([
             expect.objectContaining({ type: 'customField', fieldId: 'f-date', alsoDueDate: true }),
         ]);
+
+        const llmSkipped = previewFromParts({
+            task: smoke,
+            fields: FIELDS,
+            people: [ADA, GRACE],
+            permissions: { customField: true, assignee: true, uid: 'u-ada', roleType: 1 },
+            comments: [],
+        }, []);
+        expect(llmSkipped.data.suggestions.find((row) => row.fieldId === 'f-date')).toEqual(
+            expect.objectContaining({ kind: 'date', value: '2026-08-28' }),
+        );
+        expect(sprintDueStamp(smoke)).toEqual(expect.any(Date));
+        expect(sprintDueStamp(smoke).toISOString().slice(0, 10)).toBe('2026-08-28');
+        expect(sprintDueStamp({}, { endDate: '2026-08-28' }).toISOString().slice(0, 10)).toBe('2026-08-28');
     });
 
     test('task panel Autofill is two labeled rows with per-row apply, not gated on AI plan', () => {
@@ -383,6 +406,11 @@ describe('TASKS - AI autofill custom fields', () => {
         const card = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'molecules', 'TaskAiAutofill', 'TaskAiAutofill.vue'), 'utf8');
         const render = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'plugins', 'customFieldView', 'component', 'molecules', 'customFieldTaskView', 'customFieldRender.vue'), 'utf8');
         expect(card).toContain('applyOne');
+        expect(card).toContain('applyEmpty');
+        expect(card).toContain('canFillEmpty');
+        expect(card).toContain('sprintDueDisplay');
+        expect(card).toContain('ghostUser');
+        expect(card).toContain('ownerFilled');
         expect(card).toContain("write: 'assignee'");
         expect(card).toContain("write: 'owner'");
         expect(card).toContain('showCard');

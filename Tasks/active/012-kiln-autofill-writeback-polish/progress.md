@@ -15,7 +15,10 @@
 - [x] Comments pane lists existing Alian comments for the open taskId (no empty pane with badge 1)
 
 ## Last step
-Bot 2 live-shot tighten: `#/<cid>/pages?page=` GET-resolves projectId in the router guard, then PagesPanel stays mounted (Ask smoke body). Sidebar swaps to Local Smoke with Ask smoke in the list and the write-back strip. Hash rewrites to `/projects/<pid>/pages?page=`. Board failed bind is copper Retry; Planned/Logged hours are hidden while bind failed so 00h is not a second lie.
+Bot 3 remainder: Escape stack is overflow menu, then title, then Autofill strip, then panel (one press must not close the menu and the panel). Autofill skip-filled matches Details: empty Assignee can apply, filled Owner is omitted, Due grounds to the sprint end (2026-08-28). Fill empty / per-row Apply stay after apply/dismiss.
+
+## Blockers
+None. Live Local Smoke is not in this VM (no Mongo), so Ctrl+K / board / pages were not browser-verified here.
 
 ## Blockers
 None. Live Local Smoke is not in this VM (no Mongo), so Ctrl+K / board / pages were not browser-verified here.
@@ -43,3 +46,4 @@ None. Live Local Smoke is not in this VM (no Mongo), so Ctrl+K / board / pages w
 - Bot 3 shot 2: Custom Fields rendered on SMOKE-7 (Summary / Due / Priority / Owner) but Autofill was still missing. The card was hidden when `planFeature.aiPermission` was off (`getAppState('AI') === 'upgrade'`). Autofill now sits in the custom-field block, always shows Assignee (native) + Owner (custom people) rows, per-row apply on empties, skip-filled on Owner when Local PM is already set, Due row only if seeded. Not gated on the AI plan flag. Comments tab guard unchanged. Gantt not started.
 - Overlay 360 of ca3cc74: `#/<cid>/pages?page=` still first-painted Workspace because `resolvePageDeepLink` returned null without GET when `knownPid` was missing. Guard now GETs the page (companyId header, `pageFromGetResponse` + `pageProjectId`) and replaces to `#/<cid>/projects/<pid>/pages?page=` before PagesPanel. PagesSpace starts as pine Opening when the hash has a page id and no project; it never mounts the Workspace picker for that case. No `unresolved=1`. Board: emptyKind treats missing status groups as failed bind (Loading / Retry), not a white void. Gantt not started.
 - Bot 2 live shots: Opening Ask smoke must not replace the document. PagesSpace keeps PagesPanel mounted; GET still runs before first paint; sidebar kicker/list bind to Local Smoke and keep Ask smoke in the tree; write-back strip follows `taskProjectId`. Board hours (`00h 00m`) hide unless bind is ready/empty; failed bind stays copper Retry with the sidebar count. Gantt not started. Comments/Autofill stay.
+- Bot 3 remainder on ca3cc74 overlay: header `…` Escape was closing the overflow menu and the panel in one press. TaskDetail now owns the stack in capture (menu, title, Autofill strip, panel). Autofill skip-filled matches Details: ghost/unresolved Assignee ids count as empty so Apply can land; filled Owner is omitted instead of a FILLED row; Due grounds to the sprint end even when the LLM returns `[]`. Fill empty stays in the card next to Dismiss. Gantt not started.

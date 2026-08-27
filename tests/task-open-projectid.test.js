@@ -347,10 +347,17 @@ describe('SEARCH OPEN - same-tab hash with ProjectID, TaskKey, and auto-select',
         expect(title).toContain("event.key !== 'Escape'");
         expect(title).toContain('defineExpose');
         expect(detail).toContain('onPanelEscape');
+        expect(detail).toContain("addEventListener('keydown', onPanelEscape, true)");
+        expect(detail).toContain("nested === 'dropdown'");
         expect(detail).toContain('titleRef.value.isEditing');
         expect(dropdown).toContain('kiln-dismiss-dropdown');
         expect(dropdown).toContain("event.key !== 'Escape'");
         expect(autofill).toContain('applyOne');
+        expect(autofill).toContain('applyEmpty');
+        expect(autofill).toContain('canFillEmpty');
+        expect(autofill).toContain('sprintDueDisplay');
+        expect(autofill).toContain('ghostUser');
+        expect(autofill).toContain('ownerFilled');
         expect(autofill).toContain("write: 'assignee'");
         expect(autofill).toContain("write: 'owner'");
         expect(autofill).toContain('showCard');

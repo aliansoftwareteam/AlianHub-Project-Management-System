@@ -181,18 +181,29 @@ async function gatherAutofillContext({ companyId, uid, taskId }) {
     }, 'find').catch(() => []);
 
     const people = await loadPeople(companyId, project);
+    let sprint = null;
+    const sprintOid = asObjectId(task.sprintId);
+    if (sprintOid) {
+        sprint = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.SPRINTS,
+            data: [{ _id: sprintOid, deletedStatusKey: { $ne: 1 } }, 'name startDate endDate'],
+        }, 'findOne').catch(() => null);
+    }
+    const taskRow = task && typeof task.toObject === 'function' ? task.toObject() : { ...task };
+    if (sprint && sprint.name && !taskRow.sprintName) taskRow.sprintName = sprint.name;
     return {
         allowed: true,
         companyId,
         uid,
-        task,
+        task: taskRow,
         project,
+        sprint,
         fields: fields || [],
         comments: comments || [],
         pages: pages || [],
         people,
         permissions,
-        description: descriptionText(task),
+        description: descriptionText(taskRow),
     };
 }
 
@@ -238,6 +249,7 @@ async function previewAutofill(context, options = {}) {
         comments: context.comments,
         pages: context.pages,
         description,
+        sprint: context.sprint,
     };
     if (!targets.length) return previewFromParts(base, []);
 
@@ -250,6 +262,7 @@ async function previewAutofill(context, options = {}) {
             description,
             comments: context.comments,
             pages: context.pages,
+            sprint: context.sprint,
         });
         proposed = await options.chat({ systemPrompt: AUTOFILL_SYSTEM, userPrompt });
     } else {
@@ -262,6 +275,7 @@ async function previewAutofill(context, options = {}) {
                 description,
                 comments: context.comments,
                 pages: context.pages,
+                sprint: context.sprint,
             }),
         });
     }
@@ -273,6 +287,7 @@ async function previewAutofill(context, options = {}) {
             description,
             comments: context.comments,
             pages: context.pages,
+            sprint: context.sprint,
             task: context.task,
         });
     }

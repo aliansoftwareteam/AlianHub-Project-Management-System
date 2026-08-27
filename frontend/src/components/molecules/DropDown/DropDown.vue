@@ -149,18 +149,18 @@ watch(dropdownVisible, (val) => {
 });
 
 function closeNow(event) {
-    if (!dropdownVisible.value) return;
-    if (event && event.key === 'Escape') {
+    if (event && (event.key === 'Escape' || event.key === 'Esc' || event.keyCode === 27)) {
         event.preventDefault();
         event.stopPropagation();
         if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
     }
+    if (!dropdownVisible.value) return;
     bind.value = false;
     dropdownVisible.value = false;
 }
 
 function onEscape(event) {
-    if (!event || event.key !== 'Escape') return;
+    if (!event || (event.key !== 'Escape' && event.key !== 'Esc' && event.keyCode !== 27)) return;
     closeNow(event);
 }
 
