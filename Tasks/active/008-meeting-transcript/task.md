@@ -29,13 +29,13 @@ A user can paste a meeting transcript on the Pages compose/Ask path and get a ki
 
 ## Acceptance criteria
 - [ ] Paste a transcript on a project-scoped page and receive summary + action items
-- [ ] Existing page content is not replaced
-- [ ] Turn into tasks is hidden until a project is selected
-- [ ] Turn into tasks opens AiTaskCreator seeded with the briefing on that project
-- [ ] Invented related task/page ids are dropped
-- [ ] Unit tests cover the four cases above; existing page-content tests stay green
-- [ ] Frontend build passes
-- [ ] Stacked draft PR opened on a new `feat/` branch from `feat/alian-mentions-6d61`
+- [x] Existing page content is not replaced
+- [x] Turn into tasks is hidden until a project is selected
+- [x] Turn into tasks opens AiTaskCreator seeded with the briefing on that project
+- [x] Invented related task/page ids are dropped
+- [x] Unit tests cover the four cases above; existing page-content tests stay green
+- [x] Frontend build passes
+- [x] Stacked draft PR opened on a new `feat/` branch from `feat/alian-mentions-6d61`
 
 ## Constraints & notes
 - Stack on `feat/alian-mentions-6d61` (PR 517). Branch: `feat/meeting-transcript-ee23`.
