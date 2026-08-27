@@ -17,6 +17,13 @@
                             <div class="pdc__rail-title">{{ $t('DevAgent.ai_developer') }}</div>
                             <div class="pdc__rail-sub" :title="projectData?.ProjectName">{{ projectData?.ProjectName }}</div>
                         </div>
+                        <button class="pdc__new" :title="$t('DevAgent.new_chat')"
+                            :aria-label="$t('DevAgent.new_chat')" @click="newChat()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" aria-hidden="true">
+                                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                            </svg>
+                        </button>
                         <button class="pdc__x pdc__x--rail" :aria-label="$t('Projects.close')" @click="close()">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
                                 stroke-linecap="round" aria-hidden="true">
@@ -24,14 +31,6 @@
                             </svg>
                         </button>
                     </div>
-
-                    <button class="pdc__new" @click="newChat()">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                            stroke-linecap="round" aria-hidden="true">
-                            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                        </svg>
-                        {{ $t('DevAgent.new_chat') }}
-                    </button>
 
                     <div v-if="chats.length > 6" class="pdc__search">
                         <input v-model="filter" type="text" class="pdc__search-input" :placeholder="$t('DevAgent.find_a_chat')">
@@ -51,16 +50,30 @@
                             @click="activeId = c.conversationId"
                         >
                             <span class="pdc__dot" :class="dotClass(c)"></span>
-                            <span class="pdc__conv-name">{{ titleOf(c) }}</span>
+                            <input
+                                v-if="renamingId === c.conversationId"
+                                ref="renameInputEl"
+                                v-model="renameDraft"
+                                class="pdc__conv-rename"
+                                maxlength="120"
+                                placeholder="Name this chat"
+                                @click.stop
+                                @blur="commitRename"
+                                @keydown.enter.prevent="commitRename"
+                                @keydown.esc.stop.prevent="cancelRename"
+                            />
+                            <span v-else class="pdc__conv-name">{{ titleOf(c) }}</span>
                             <button
-                                class="pdc__conv-del"
-                                :title="$t('DevAgent.delete_chat')"
-                                :aria-label="$t('DevAgent.delete_chat')"
-                                @click.stop="askDelete(c)"
+                                v-if="renamingId !== c.conversationId"
+                                class="pdc__conv-act"
+                                :class="{ 'is-open': menuId === c.conversationId }"
+                                title="Chat actions"
+                                aria-label="Chat actions"
+                                :aria-expanded="menuId === c.conversationId"
+                                @click.stop="openMenu(c, $event)"
                             >
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
-                                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                    <path d="M4 7h16M9 7V4.8A.8.8 0 0 1 9.8 4h4.4a.8.8 0 0 1 .8.8V7M6.5 7l.8 12.2a.9.9 0 0 0 .9.8h7.6a.9.9 0 0 0 .9-.8L17.5 7" />
+                                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                    <circle cx="12" cy="5" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="12" cy="19" r="1.6" />
                                 </svg>
                             </button>
                         </div>
@@ -79,6 +92,9 @@
                         </button>
                         <div class="pdc__head-text">
                             <div class="pdc__head-title">{{ active ? titleOf(active) : $t('DevAgent.ai_developer') }}</div>
+                            <!-- DevelopmentChat teleports its repository summary in here, so the
+                                 thread's title and the code it runs against read as one line. -->
+                            <div id="pdc-repo-slot" class="pdc__repo-slot"></div>
                         </div>
                         <button class="pdc__x" :aria-label="$t('Projects.close')" @click="close()">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
@@ -98,6 +114,7 @@
                             :key="activeId"
                             :conversationId="activeId"
                             :projectId="projectId"
+                            repo-target="#pdc-repo-slot"
                         />
                         <div v-else class="pdc__blank">
                             <div class="pdc__blank-mark">
@@ -124,12 +141,34 @@
                 @confirm="confirmDelete()"
                 @cancel="pendingDelete = null"
             />
+
+            <!-- Row actions. Fixed and positioned from the button's rect because the rail
+                 scrolls: anything absolutely positioned inside a row gets clipped by it. -->
+            <template v-if="menuId">
+                <div class="pdc__menu-veil" @click="closeMenu" @contextmenu.prevent="closeMenu"></div>
+                <div class="pdc__menu" :style="{ top: `${menuPos.top}px`, right: `${menuPos.right}px` }" role="menu">
+                    <button class="pdc__menu-item" role="menuitem" @click="menuRename">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+                            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+                        </svg>
+                        Rename
+                    </button>
+                    <button class="pdc__menu-item is-danger" role="menuitem" @click="menuDelete">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+                            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M4 7h16M9 7V4.8A.8.8 0 0 1 9.8 4h4.4a.8.8 0 0 1 .8.8V7M6.5 7l.8 12.2a.9.9 0 0 0 .9.8h7.6a.9.9 0 0 0 .9-.8L17.5 7" />
+                        </svg>
+                        Delete
+                    </button>
+                </div>
+            </template>
         </div>
     </Teleport>
 </template>
 
 <script setup>
-import { ref, computed, watch, onBeforeUnmount, defineProps, defineEmits } from 'vue';
+import { ref, computed, watch, nextTick, onBeforeUnmount, defineProps, defineEmits } from 'vue';
 import { useI18n } from 'vue-i18n';
 import DevelopmentChat from '@/components/organisms/Development/DevelopmentChat.vue';
 import ClaudeAuthStatus from '@/components/molecules/ClaudeAuthStatus/ClaudeAuthStatus.vue';
@@ -207,9 +246,16 @@ const rowTitle = (c) => {
 /* A chat is titled by its first instruction. A chat opened with only an attachment
  * has no text to take a title from, so it falls back to the file — otherwise every
  * such chat is called "New chat" forever and none of them can be told apart. */
-const titleOf = (c) => oneLine(c && c.title).slice(0, 70)
-    || (c && c.firstAttachment ? c.firstAttachment : '')
-    || 'New chat';
+/* Trim on a word boundary. A hard slice ended titles mid-word ("…what is you apporach
+ * a"), which reads as a rendering fault rather than a shortened sentence; CSS ellipsis
+ * still handles whatever overflows the rail or the header after this. */
+const titleOf = (c) => {
+    const t = oneLine(c && c.title);
+    const short = t.length > 70 ? `${t.slice(0, 70).replace(/\s+\S*$/, '')}…` : t;
+    return short
+        || (c && c.firstAttachment ? c.firstAttachment : '')
+        || 'New chat';
+};
 
 const shortWhen = (iso) => {
     if (!iso) return '';
@@ -280,6 +326,86 @@ const deleteDescription = computed(() => {
     return `"${titleOf(c)}" and its ${n === 1 ? '1 message' : `${n} messages`} will be deleted, along with any files sent in it. This cannot be undone.`;
 });
 
+/* Row actions menu.
+ *
+ * Local rather than the shared DropDown: that one teleports into #my-dropdown inside
+ * #app, while this window is teleported to <body> above it, and it becomes a
+ * full-screen sheet under 768px — neither suits a two-item row menu. It lives inside
+ * the overlay so it inherits the font and the overlay's stacking context. */
+const MENU_H = 88;
+const menuId = ref('');
+const menuPos = ref({ top: 0, right: 0 });
+
+const closeMenu = () => { menuId.value = ''; };
+
+const openMenu = (c, e) => {
+    if (menuId.value === c.conversationId) { closeMenu(); return; }
+    const r = e.currentTarget.getBoundingClientRect();
+    // Flip above the button when there is no room below, and never leave the viewport.
+    const below = r.bottom + 4;
+    const top = below + MENU_H > window.innerHeight - 8 ? Math.max(8, r.top - MENU_H - 4) : below;
+    // Anchored by its RIGHT edge, so the menu can size to its content: pinning `left`
+    // would need the width up front, which is what forced a fixed one before.
+    menuPos.value = { top: Math.round(top), right: Math.round(Math.max(8, window.innerWidth - r.right)) };
+    menuId.value = c.conversationId;
+};
+
+const menuChat = computed(() => chats.value.find((c) => c.conversationId === menuId.value) || null);
+const menuRename = () => { const c = menuChat.value; closeMenu(); if (c) startRename(c); };
+const menuDelete = () => { const c = menuChat.value; closeMenu(); if (c) askDelete(c); };
+
+/* Renaming a chat.
+ *
+ * The draft chat is deliberately excluded: nothing is stored until its first message
+ * is sent, so there is no document to carry a name yet. Sending one and renaming
+ * afterwards works normally. */
+const renamingId = ref('');
+const renameDraft = ref('');
+const renameInputEl = ref(null);
+const renaming = ref(false);
+
+const startRename = async (c) => {
+    if (draft.value && c.conversationId === draft.value.conversationId && !c.count) {
+        toast.info('Send a message first, then you can name this chat', { position: 'top-right', duration: 3000 });
+        return;
+    }
+    renamingId.value = c.conversationId;
+    // The raw title, not titleOf() — that one is shortened for display and ends in an
+    // ellipsis, which would otherwise be saved as part of the name.
+    renameDraft.value = oneLine(c.title).slice(0, 120);
+    await nextTick();
+    // A ref inside v-for resolves to an array.
+    const el = Array.isArray(renameInputEl.value) ? renameInputEl.value[0] : renameInputEl.value;
+    if (el) { el.focus(); el.select(); }
+};
+
+const cancelRename = () => { renamingId.value = ''; renameDraft.value = ''; };
+
+const commitRename = async () => {
+    const id = renamingId.value;
+    if (!id || renaming.value) return;
+    const title = renameDraft.value.replace(/\s+/g, ' ').trim().slice(0, 120);
+    const row = saved.value.find((x) => x.conversationId === id);
+    if (!row || title === oneLine(row.title).slice(0, 120)) { cancelRename(); return; }
+    renaming.value = true;
+    try {
+        const body = (await apiRequest('post', `${BASE}/conversation/rename`, { conversationId: id, title }))?.data;
+        if (body && body.status) {
+            // Reload rather than patch the row: clearing the name hands the chat back to
+            // its derived title, which only the server can work out.
+            await loadRail();
+        } else {
+            toast.error((body && (body.statusText || body.message)) || 'Could not rename the chat', { position: 'top-right', duration: 5000 });
+        }
+    } catch (e) {
+        toast.error((e && e.response && e.response.data && (e.response.data.statusText || e.response.data.message))
+            || (e && e.message) || 'Could not rename the chat', { position: 'top-right', duration: 5000 });
+    } finally {
+        renaming.value = false;
+        cancelRename();
+    }
+};
+
 const askDelete = (c) => {
     // A chat that was never sent has nothing stored, so it just goes away.
     if (draft.value && c.conversationId === draft.value.conversationId && !c.count) {
@@ -320,11 +446,24 @@ const close = () => emit('update:modelValue', false);
 
 // The confirm owns Escape while it is open, so one press closes the dialog
 // rather than the whole window behind it.
-const onKey = (e) => { if (e.key === 'Escape' && !pendingDelete.value) close(); };
+const onKey = (e) => {
+    if (e.key !== 'Escape') return;
+    // Innermost thing first: one press should dismiss the menu, not the window under it.
+    if (menuId.value) { closeMenu(); return; }
+    if (pendingDelete.value || renamingId.value) return;
+    close();
+};
+
+/* The menu is positioned from a rect, so any scroll or resize detaches it from its
+   row. Capture phase, because the rail is a nested scroller. */
+const onViewportChange = () => { if (menuId.value) closeMenu(); };
 
 const stop = () => {
     if (timer) { clearInterval(timer); timer = null; }
+    closeMenu();
     document.removeEventListener('keydown', onKey);
+    window.removeEventListener('resize', onViewportChange);
+    document.removeEventListener('scroll', onViewportChange, true);
 };
 
 watch(() => props.modelValue, (open) => {
@@ -338,6 +477,8 @@ watch(() => props.modelValue, (open) => {
     loadRail(true);
     timer = setInterval(() => loadRail(false), RAIL_POLL_MS);
     document.addEventListener('keydown', onKey);
+    window.addEventListener('resize', onViewportChange);
+    document.addEventListener('scroll', onViewportChange, true);
 }, { immediate: true });
 
 onBeforeUnmount(stop);
@@ -356,7 +497,6 @@ onBeforeUnmount(stop);
     align-items: center;
     justify-content: center;
     z-index: 1200;
-    padding: 16px;
 }
 .pdc__shell {
     /* The rail header carries two lines (name + project) and the thread header one,
@@ -365,12 +505,11 @@ onBeforeUnmount(stop);
     --pdc-head-h: 57px;
     background: #fff;
     color: #1f2333;
-    border-radius: 14px;
-    width: min(1440px, 96vw);
-    height: min(920px, 94vh);
+    border-radius: 0;
+    width: 100%;
+    height: 100%;
     display: flex;
     overflow: hidden;
-    box-shadow: 0 24px 60px rgba(28, 26, 80, 0.28);
 }
 
 /* rail */
@@ -394,7 +533,7 @@ onBeforeUnmount(stop);
     padding: 8px 14px;
     border-bottom: 1px solid #e9eaf2;
 }
-.pdc__rail-id { min-width: 0; }
+.pdc__rail-id { flex: 1; min-width: 0; }
 .pdc__rail-title { font-size: 14px; font-weight: 500; color: #1f2333; }
 .pdc__rail-sub {
     font-size: 12px;
@@ -403,24 +542,26 @@ onBeforeUnmount(stop);
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+/* An icon in the rail header rather than a full-width bar: it is one action among the
+   header's controls, and the width it used to take said otherwise. */
 .pdc__new {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 7px;
-    margin: 12px 12px 4px;
-    border: 1px solid #d7d9e6;
-    border-radius: 9px;
-    background: #fff;
+    width: 28px;
+    height: 28px;
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    border: 0;
+    border-radius: 7px;
+    background: none;
     color: #2f3990;
-    font-family: inherit;
-    font-size: 12.5px;
-    font-weight: 500;
-    padding: 8px 10px;
+    padding: 0;
     cursor: pointer;
 }
-.pdc__new svg { width: 13px; height: 13px; }
-.pdc__new:hover { background: #f2f3fb; border-color: #b9c0ea; }
+.pdc__new svg { width: 16px; height: 16px; }
+.pdc__new:hover { background: #e7eaf6; }
+.pdc__new:focus-visible { outline: 2px solid #7b8ce0; outline-offset: 1px; }
 
 .pdc__search { padding: 8px 12px 4px; }
 .pdc__search-input {
@@ -480,14 +621,13 @@ onBeforeUnmount(stop);
 @media (prefers-reduced-motion: no-preference) {
     .pdc__dot.is-live { animation: pdc-pulse 1.4s ease-in-out infinite; }
 }
-.pdc__conv-del {
+.pdc__conv-act {
     display: flex;
     align-items: center;
     justify-content: center;
     width: 20px;
     height: 20px;
     flex: 0 0 auto;
-    margin-right: -4px;
     border: 0;
     border-radius: 5px;
     background: none;
@@ -497,13 +637,64 @@ onBeforeUnmount(stop);
     opacity: 0;
     transition: opacity .12s ease;
 }
-.pdc__conv-del svg { width: 13px; height: 13px; }
-.pdc__conv:hover .pdc__conv-del, .pdc__conv--on .pdc__conv-del { opacity: 1; }
-.pdc__conv-del:hover { background: #fdeceb; color: #c0392b; }
-.pdc__conv-del:focus-visible { opacity: 1; outline: 2px solid #7b8ce0; outline-offset: 1px; }
+.pdc__conv-act:last-child { margin-right: -4px; }
+.pdc__conv-act svg { width: 13px; height: 13px; }
+.pdc__conv:hover .pdc__conv-act, .pdc__conv--on .pdc__conv-act { opacity: 1; }
+.pdc__conv-act:hover, .pdc__conv-act.is-open { background: #dfe4f3; color: #3b4252; }
+/* Its menu is open, so the trigger cannot fade out from under it. */
+.pdc__conv-act.is-open { opacity: 1; }
+.pdc__conv-act:focus-visible { opacity: 1; outline: 2px solid #7b8ce0; outline-offset: 1px; }
 /* A pointer device is what reveals the action on hover; without one it has to stay put. */
 @media (hover: none) {
-    .pdc__conv-del { opacity: 1; }
+    .pdc__conv-act { opacity: 1; }
+}
+
+.pdc__menu-veil { position: fixed; inset: 0; z-index: 20; }
+.pdc__menu {
+    position: fixed;
+    z-index: 21;
+    /* Sized by its widest item rather than a fixed width — see openMenu for why this
+       is anchored on the right. */
+    width: max-content;
+    max-width: min(280px, calc(100vw - 16px));
+    padding: 5px;
+    border: 1px solid #e3e5f0;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 10px 28px rgba(28, 26, 80, .16);
+}
+.pdc__menu-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    text-align: left;
+    white-space: nowrap;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    padding: 7px 12px 7px 9px;
+    font-family: inherit;
+    font-size: 13px;
+    color: #2f3444;
+    cursor: pointer;
+}
+.pdc__menu-item svg { width: 14px; height: 14px; flex: 0 0 auto; opacity: .65; }
+.pdc__menu-item:hover { background: #f1f2f8; }
+.pdc__menu-item.is-danger { color: #c0392b; }
+.pdc__menu-item.is-danger:hover { background: #fdeceb; }
+.pdc__conv-rename {
+    flex: 1;
+    min-width: 0;
+    font-family: inherit;
+    font-size: 13px;
+    color: #2f3444;
+    border: 1px solid #7b8ce0;
+    border-radius: 5px;
+    background: #fff;
+    padding: 3px 7px;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(123, 140, 224, .14);
 }
 @keyframes pdc-pulse { 50% { opacity: .25; } }
 
@@ -527,8 +718,13 @@ onBeforeUnmount(stop);
     padding: 8px 16px;
     border-bottom: 1px solid #e9eaf2;
 }
-.pdc__head-text { flex: 1; min-width: 0; }
+/* Title then repository, on one line. The title yields first so the repository pill
+   stays whole — which of the two is truncated matters: a shortened sentence still
+   reads, a shortened path does not tell you which checkout you are talking to. */
+.pdc__head-text { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
 .pdc__head-title {
+    flex: 0 1 auto;
+    min-width: 0;
     font-size: 14px;
     font-weight: 500;
     color: #1f2333;
@@ -536,6 +732,7 @@ onBeforeUnmount(stop);
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+.pdc__repo-slot { flex: 0 0 auto; display: flex; align-items: center; min-width: 0; }
 .pdc__x, .pdc__back {
     display: flex;
     align-items: center;

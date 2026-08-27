@@ -11,6 +11,7 @@ exports.init = (app) => {
     app.get('/api/v2/dev-agent/messages', ctrl.listMessages);  // conversation (JWT / PAT)
     app.get('/api/v2/dev-agent/conversations', ctrl.listConversations); // JWT: MY chats in a project (the chat window's rail)
     app.post('/api/v2/dev-agent/conversation/delete', ctrl.deleteConversation); // JWT: delete one of my chats + its files
+    app.post('/api/v2/dev-agent/conversation/rename', ctrl.renameConversation); // JWT: name one of my chats
     // Attachments on an instruction. Multipart only on the upload route: the
     // message endpoint stays JSON, so nothing that posts to it changes.
     app.post('/api/v2/dev-agent/attachment', attach.parseOne, ctrl.uploadAttachment); // JWT

@@ -555,6 +555,9 @@ exports.listConversations = async (req, res) => {
                     $group: {
                         _id: '$conversationId',
                         title: { $first: '$text' },
+                        // $max, not $first: only one message in the chat carries the
+                        // custom name, and it need not be the one this group sees first.
+                        customTitle: { $max: '$convTitle' },
                         // A chat can be opened with just a file and no words, and then
                         // there is nothing to title it with. Carry the first
                         // attachment's name so the rail can fall back to it.
@@ -591,7 +594,8 @@ exports.listConversations = async (req, res) => {
                 : '';
             return {
                 conversationId: String(r._id),
-                title: String(r.title || ''),
+                title: String(r.customTitle || r.title || ''),
+                isRenamed: !!String(r.customTitle || ''),
                 firstAttachment: firstFile,
                 repo: String(last.repo || ''),
                 lastText: String(r.lastText || ''),
@@ -689,6 +693,57 @@ exports.deleteConversation = async (req, res) => {
         });
     } catch (error) {
         logger.error(`ERROR in dev-agent deleteConversation: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+/* POST /api/v2/dev-agent/conversation/rename  (JWT) — name one of my chats.
+
+   A chat is normally named by its first instruction. Renaming replaces that for good:
+   a name someone chose should not be silently overwritten by derived text later. An
+   empty title clears the custom name and hands the chat back to the derived one.
+
+   Ownership is checked the same way delete does — knowing an id is not enough. */
+const TITLE_MAX = 120;
+
+exports.renameConversation = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'] || '';
+        const b = req.body || {};
+        const conversationId = String(b.conversationId || '').trim();
+        if (!companyId || !conversationId) {
+            return res.send({ status: false, statusText: 'companyId and conversationId are required.' });
+        }
+        if (!req.uid) return res.send({ status: false, statusText: 'A signed-in user is required.' });
+        if (!ID_SHAPE.test(conversationId)) return res.send({ status: false, statusText: 'Invalid conversation id.' });
+
+        const title = String(b.title || '').replace(/\s+/g, ' ').trim().slice(0, TITLE_MAX);
+
+        const owner = await conversationOwner(companyId, conversationId);
+        if (owner === null) return res.send({ status: false, statusText: 'That chat no longer exists.' });
+        if (owner !== String(req.uid)) return res.send({ status: false, statusText: 'This chat belongs to someone else.' });
+
+        // Exactly one document is written, and it is the oldest message rather than all
+        // of them: deleteConversation reads updatedAt to decide whether a job is still
+        // live, so a rename must not touch the timestamps of messages it does not own.
+        const first = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.DEV_MESSAGES,
+            data: [{ conversationId, role: 'user' }, { _id: 1 }, { sort: { createdAt: 1 } }],
+        }, 'findOne');
+        if (!first) return res.send({ status: false, statusText: 'That chat has no messages to name.' });
+
+        await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.DEV_MESSAGES,
+            data: [{ _id: String(first._id), conversationId }, { $set: { convTitle: title } }, {}],
+        }, 'updateOne');
+
+        return res.send({
+            status: true,
+            statusText: title ? 'Chat renamed.' : 'Chat name reset.',
+            data: { conversationId, title },
+        });
+    } catch (error) {
+        logger.error(`ERROR in dev-agent renameConversation: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
 };

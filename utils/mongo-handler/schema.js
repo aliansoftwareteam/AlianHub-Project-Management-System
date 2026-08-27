@@ -712,6 +712,11 @@ const schema = {
         prUrl: { type: String, default: '', required: false },
         parentId: { type: String, default: '', required: false },    // agent reply → the user message it answers
         userId: { type: String, default: '', required: false },
+        // A chat's own name, once someone renames it. Carried by the conversation's
+        // oldest message only — a chat has no record of its own by design, and the
+        // summary reads this with $max so which message holds it does not matter.
+        // Empty means the name falls back to the first instruction's text.
+        convTitle: { type: String, default: '', required: false },
         // Files attached to the instruction: [{id, filename, extension, size, type, url}].
         // Untyped on purpose — the module re-types every field on the way in.
         attachments: { type: Array, default: [], required: false },
