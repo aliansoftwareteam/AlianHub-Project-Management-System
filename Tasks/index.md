@@ -14,3 +14,4 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 007 | @Alian mentions in task comments | active | high | 006 | active/007-alian-mentions |
 | 008 | Meeting transcript to summary, action items, and linked tasks | active | high | 007 | active/008-meeting-transcript |
 | 009 | Standup / project update from real task history | active | high | 008 | active/009-standup-project-update |
+| 010 | AI Autofill on custom fields | active | high | 009 | active/010-ai-autofill-custom-fields |
