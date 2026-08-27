@@ -47,17 +47,26 @@ describe('TASK OPEN - pass ProjectID so taskData is not empty', () => {
         expect(search).toContain('task_not_in_project');
         expect(search).toContain('missingHit');
         expect(advance).toContain('openInApp');
-        expect(advance).toContain('@click="openInApp($event, props.taskObj)"');
-        expect(advance).toContain(':href="taskHref"');
+        expect(advance).toContain('type="button"');
+        expect(advance).toContain('taskOpenRoute');
+        expect(advance).toContain('closeAdvanceSearch');
+        expect(advance).not.toContain(':href="taskHref"');
         expect(advance).not.toContain('window.open');
         expect(advance).not.toContain('target="_blank"');
+        expect(advance).not.toContain('<a ');
         expect(advance).not.toContain('openModel');
+        expect(advance).not.toMatch(/event\.metaKey \|\| event\.ctrlKey/);
         expect(detail).toContain('resolveOpenProjectId');
         expect(detail).toContain('task_not_in_project');
         expect(detail).toContain('openBlocked');
         expect(detail).toContain('showTaskChrome');
         expect(detail).not.toContain('if (!resolvedProjectId.value || !props.taskId) return;');
         expect(query).toContain('resolvedProjectId');
+        expect(query).toContain("SCHEMA_TYPE.TASKS");
+        expect(query).toContain("findOne");
+        expect(query).not.toContain('$eq: ["$_id", "$$taskId"]');
+        expect(detail).toContain('markTaskMissing');
+        expect(detail).toContain('8000');
         expect(hits).toContain('shapeOpenTaskHit');
     });
 
@@ -235,12 +244,13 @@ describe('SEARCH OPEN - same-tab hash with ProjectID, TaskKey, and auto-select',
         const comments = fs.readFileSync(path.join(__dirname, '..', 'Modules', 'Comments', 'controller.js'), 'utf8');
 
         expect(advance).toContain('openInApp');
-        expect(advance).toContain(':href="taskHref"');
+        expect(advance).toContain('type="button"');
         expect(advance).toContain('taskOpenRoute');
-        expect(advance).toContain('router.resolve');
         expect(advance).toContain('closeAdvanceSearch');
+        expect(advance).not.toContain(':href="taskHref"');
         expect(advance).not.toContain('window.open');
         expect(advance).not.toContain('target="_blank"');
+        expect(advance).not.toContain('<a ');
         expect(advance).not.toContain('@click.prevent');
         expect(helper).toContain('taskOpenPath');
         expect(helper).toContain('firstId');

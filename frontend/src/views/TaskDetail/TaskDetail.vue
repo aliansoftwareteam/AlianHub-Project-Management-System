@@ -23,9 +23,9 @@
                         <img :src="sidebarArrowIcon" v-if="task.isParentTask === false" alt="sidebarArrowIcon" class="cursor-pointer mr-10px" style="width: 25px; height: 25px;" @click.stop="open('parent')"/>
                     </div>
                     <div class="task-details-title-wrapper">
-                        <Skelaton v-if="(task && projectData?.ProjectName && task?.sprintName && task.TaskName) ? false : isSpinner" style="height: 35px;width:55%;" class="border-radius-5-px"/>
+                        <Skelaton v-if="isSpinner && !taskLoaded" style="height: 35px;width:55%;" class="border-radius-5-px"/>
                         <TaskDetailNavBar
-                            v-if="((task && projectData?.ProjectName && task?.sprintName && task.TaskName) ? true : !isSpinner) && clientWidth > 764 && !isSupport"
+                            v-if="(taskLoaded || !isSpinner) && clientWidth > 764 && !isSupport"
                             :taskKey="task.TaskKey"
                             :isParent="task.isParentTask"
                             :sprintName="task.sprintName ? task.sprintName : ''"
@@ -36,7 +36,7 @@
                             @open="(val) => open(val)"
                         />
                         <TaskDetailTitle
-                            v-if="(task && Object.keys(task).length && task.TaskName && projectData?.ProjectName && task?.sprintName) ? true : !isSpinner"
+                            v-if="taskLoaded || !isSpinner"
                             :taskName="task.TaskName"
                             :isSupport="isSupport"
                             :taskType="task.TaskTypeKey"
@@ -262,6 +262,8 @@
     const currentUserId = inject("$userId");
     const user = getUser(currentUserId.value);
     const isSpinner = ref(true);
+    let hydrateGen = 0;
+    let hydrateTimer = null;
 
     const task = ref(props?.selectedTask ? props.selectedTask : {});
     const taskLoaded = computed(() => Boolean(
@@ -550,6 +552,11 @@
     })
 
     onBeforeUnmount(()=>{
+        hydrateGen += 1;
+        if (hydrateTimer) {
+            clearTimeout(hydrateTimer);
+            hydrateTimer = null;
+        }
         commit('projectData/setTaskDetailData',{});
         commit('projectData/setTaskdetailPayloadId',{});
         const events = ['taskDetail_taskUpdate', 'taskDetail_taskDelete'];
@@ -603,6 +610,10 @@
     function markTaskMissing() {
         openBlocked.value = true;
         isSpinner.value = false;
+        if (hydrateTimer) {
+            clearTimeout(hydrateTimer);
+            hydrateTimer = null;
+        }
     }
 
     function backToSearch() {
@@ -611,12 +622,21 @@
     }
 
     function getQueryFun () {
-        if (!props.taskId) {
+        const taskId = firstId(props.taskId, route.params && route.params.taskId);
+        if (!taskId) {
             markTaskMissing();
             return;
         }
+        const gen = ++hydrateGen;
+        if (hydrateTimer) clearTimeout(hydrateTimer);
+        hydrateTimer = setTimeout(() => {
+            if (gen === hydrateGen && !taskLoaded.value) {
+                hydrateGen += 1;
+                markTaskMissing();
+            }
+        }, 8000);
         const query = {
-            taskId: props.taskId,
+            taskId,
             subTaskLimit: String(subTaskLimit.value),
         };
         if (resolvedProjectId.value) query.projectId = resolvedProjectId.value;
@@ -624,6 +644,11 @@
         try{
             apiRequest('get', `${env.TASK_DATA}?${queryParams}`)
             .then((res) => {
+                if (gen !== hydrateGen) return;
+                if (hydrateTimer) {
+                    clearTimeout(hydrateTimer);
+                    hydrateTimer = null;
+                }
                 if (res.status  == 200 && res.data.length > 0) {
                     let response = res.data
                     const row = response[0].tasks && response[0].tasks[0];
@@ -640,6 +665,7 @@
                     const sprint = response[0].sprintsObj;
                     const folder = response[0].sprintsfolders;
                     getSprintFolderData(response[0]._id,sprint,folder).then((resp) => {
+                        if (gen !== hydrateGen) return;
                         if (resp && resp.sprints) response[0].sprintsObj = resp.sprints
                         if (resp && resp.folders) response[0].sprintsfolders = resp.folders
                         projectData.value = response[0];
@@ -658,6 +684,11 @@
                     markTaskMissing();
                 }
             }).catch((error)=>{
+                if (gen !== hydrateGen) return;
+                if (hydrateTimer) {
+                    clearTimeout(hydrateTimer);
+                    hydrateTimer = null;
+                }
                 console.error(error);
                 markTaskMissing();
             })
@@ -668,7 +699,7 @@
     }
 
     watch(resolvedProjectId, (id, prev) => {
-        if (id && id !== prev) {
+        if (id && id !== prev && !taskLoaded.value) {
             openBlocked.value = false;
             isSpinner.value = true;
             getQueryFun();

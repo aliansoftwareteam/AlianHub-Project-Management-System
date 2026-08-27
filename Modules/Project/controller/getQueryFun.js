@@ -15,111 +15,86 @@ function asObjectId(id) {
     }
 }
 
+function asPlain(doc) {
+    if (!doc) return null;
+    if (typeof doc.toObject === 'function') {
+        try { return doc.toObject(); } catch (_e) { /* fall through */ }
+    }
+    if (typeof doc.toJSON === 'function') {
+        try { return doc.toJSON(); } catch (_err) { /* fall through */ }
+    }
+    return doc;
+}
+
+function findById(companyId, type, id) {
+    const oid = asObjectId(id);
+    if (!companyId || !oid) return Promise.resolve(null);
+    return MongoDbCrudOpration(companyId, {
+        type,
+        data: [{ _id: oid }],
+    }, 'findOne').catch(() => null);
+}
+
 exports.getQueryFun = async (req, res) => {
     try {
-
         const { taskId, projectId, subTaskLimit } = req.query;
         const companyId = req.headers['companyid'];
+        const taskHex = String(taskId || '').trim();
+        const taskOid = asObjectId(taskHex);
 
-        if (!taskId || !subTaskLimit || !companyId) {
+        if (!taskHex || !subTaskLimit || !companyId || !taskOid) {
             return res.status(400).json({ message: "Missing required parameters." });
         }
 
-        const taskOid = asObjectId(taskId);
-        if (!taskOid) {
+        const taskDoc = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS,
+            data: [{ _id: taskOid, deletedStatusKey: { $ne: 1 } }],
+        }, 'findOne').catch(() => null);
+        const task = asPlain(taskDoc);
+        if (!task || !task._id) {
+            return res.status(200).json([]);
+        }
+
+        let resolvedProjectId = resolveOpenProjectId({ queryProjectId: projectId, task });
+        const projectOid = asObjectId(resolvedProjectId);
+        if (!projectOid) {
             return res.status(400).json({ message: "Missing required parameters." });
         }
 
-        let resolvedProjectId = resolveOpenProjectId({ queryProjectId: projectId });
-        if (!resolvedProjectId) {
-            const task = await MongoDbCrudOpration(companyId, {
+        const projectDoc = await findById(companyId, SCHEMA_TYPE.PROJECTS, resolvedProjectId);
+        const project = asPlain(projectDoc);
+        if (!project || !project._id) {
+            return res.status(200).json([]);
+        }
+
+        const limit = parseInt(subTaskLimit, 10) || 35;
+        const [sprintDoc, folderDoc, subtasks] = await Promise.all([
+            findById(companyId, SCHEMA_TYPE.SPRINTS, task.sprintId),
+            findById(companyId, SCHEMA_TYPE.FOLDERS, task.folderObjId),
+            MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.TASKS,
-                data: [{ _id: taskOid, deletedStatusKey: { $ne: 1 } }, 'ProjectID'],
-            }, 'findOne').catch(() => null);
-            resolvedProjectId = resolveOpenProjectId({ task });
-        }
-
-        if (!resolvedProjectId || !asObjectId(resolvedProjectId)) {
-            return res.status(400).json({ message: "Missing required parameters." });
-        }
-
-        const query = [
-            {
-                $match: { _id: new mongoose.Types.ObjectId(resolvedProjectId) }
-            },
-            {
-                $lookup: {
-                    from: "tasks",
-                    let: { taskId: new mongoose.Types.ObjectId(taskId) },
-                    pipeline: [
-                        {
-                            $match: {
-                                $expr: { $eq: ["$_id", "$$taskId"] }
-                            }
-                        },
-                        {
-                            $lookup: {
-                                from: "sprints",
-                                localField: "sprintId",
-                                foreignField: "_id",
-                                as: "sprintDetails"
-                            }
-                        },
-                        {
-                            $addFields: {
-                                sprintName: { $arrayElemAt: ["$sprintDetails.name", 0] }
-                            }
-                        },
-                        {
-                            $lookup: {
-                                from: "folders",
-                                localField: "folderObjId",
-                                foreignField: "_id",
-                                as: "folderDetails"
-                            }
-                        },
-                        {
-                            $addFields: {
-                                folderName: { $arrayElemAt: ["$folderDetails.name", 0] }
-                            }
-                        }
-                    ],
-                    as: "tasks"
-                }
-            },
-            {
-                $addFields: {
-                    sprintsObj: { $arrayElemAt: ["$tasks.sprintDetails", 0] },
-                    sprintsfolders: { $arrayElemAt: ["$tasks.folderDetails", 0] }
-                }
-            },
-            {
-                $lookup: {
-                    from: "tasks",
-                    let: { parentTaskId: taskId },
-                    pipeline: [
-                        {
-                            $match: {
-                                $expr: { $eq: ["$ParentTaskId", "$$parentTaskId"] },
-                                deletedStatusKey: { $in: [0, undefined] }
-                            }
-                        },
-                        { $sort: { createdAt: -1, _id: 1 } },
-                        { $limit: parseInt(subTaskLimit, 10) }
-                    ],
-                    as: "subtasks"
-                }
-            }
-        ];
-
-        const taskObj = {
-            type: SCHEMA_TYPE.PROJECTS,
-            data: [query]
+                data: [[
+                    { $match: { ParentTaskId: taskHex, deletedStatusKey: { $in: [0, undefined] } } },
+                    { $sort: { createdAt: -1, _id: 1 } },
+                    { $limit: limit },
+                ]],
+            }, 'aggregate').catch(() => []),
+        ]);
+        const sprint = asPlain(sprintDoc);
+        const folder = asPlain(folderDoc);
+        const taskRow = {
+            ...task,
+            sprintName: (sprint && sprint.name) || task.sprintName || '',
+            folderName: (folder && folder.name) || task.folderName || '',
         };
 
-        const taskData = await MongoDbCrudOpration(companyId, taskObj, "aggregate");
-
-        return res.status(200).json(taskData);
+        return res.status(200).json([{
+            ...project,
+            tasks: [taskRow],
+            sprintsObj: sprint || {},
+            sprintsfolders: folder || {},
+            subtasks: subtasks || [],
+        }]);
     } catch (error) {
         console.error("Error while processing query:", error);
         return res.status(500).json({ message: "An error occurred while fetching the project", error });

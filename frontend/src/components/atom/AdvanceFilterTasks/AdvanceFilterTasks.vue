@@ -34,21 +34,21 @@
                     <div class="d-flex align-items-center">
                         <span class="advancefilter__body--marginright" v-if="props.taskObj?.isParentTask === false"><img :src="subTaskImage" /> </span>
                         <span class="advancefilter__body--marginright"><img :src="favourite(props.taskObj?.favouriteTasks) && favourite(props.taskObj?.favouriteTasks)?.length ? filledStar : blankStar" /></span>
-                        <a class="advancefilter__body--taskname black text-ellipse d-block advancefilter__body--width cursor-pointer" :href="taskHref" @click="openInApp($event, props.taskObj)" v-html="highlightSearchTerm(props.taskObj?.TaskName)"></a>
+                        <button type="button" class="advancefilter__body--taskname black text-ellipse d-block advancefilter__body--width cursor-pointer" @click="openInApp($event, props.taskObj)" v-html="highlightSearchTerm(props.taskObj?.TaskName)"></button>
                     </div>
                 </div>
             </div>
             <div class="advancefilter__body--list--right">
                 <ul class="advancefilter__body--ul align-items-center">
                     <li class="cursor-pointer advancefilter__body--newtab">
-                        <a :href="taskHref" @click="openInApp($event, props.taskObj)">
+                        <button type="button" @click="openInApp($event, props.taskObj)">
                             <img :src="imgOpenSameTab" alt="Open"/>
-                        </a>
+                        </button>
                     </li>
                     <li class="cursor-pointer advancefilter__body--newtab">
-                        <a :href="taskHref" @click="openInApp($event, props.taskObj)">
+                        <button type="button" @click="openInApp($event, props.taskObj)">
                             <img :src="imgOpenNewTab" alt="Open"/>
-                        </a>
+                        </button>
                     </li>
                     <li class="cursor-pointer" @click="copyLink(props.taskObj)">
                         <img :src="imgCopyLink" alt="Copy Link"/>
@@ -60,7 +60,7 @@
 </template>
 
 <script setup>
-    import { inject,defineProps,computed } from 'vue';
+    import { inject,defineProps } from 'vue';
     import { useToast } from 'vue-toast-notification';
     import {filterFun} from '@/components/molecules/AdvanceSearch/helper';
     import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
@@ -141,12 +141,6 @@
         });
     };
 
-    const taskHref = computed(() => {
-        const dest = taskDest(props.taskObj);
-        if (!dest) return '';
-        return router.resolve({ ...dest, query: { detailTab: 'task-detail-tab' } }).href;
-    });
-
     const copyLink = (task) => {
         generateTaskURL(task, companyIdNow()).then((url)=>{
             if (!url) return;
@@ -155,14 +149,15 @@
         });
     };
     const openInApp = (event, task) => {
+        if (event && typeof event.preventDefault === 'function') event.preventDefault();
+        if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
         const dest = taskDest(task);
         if (!dest) return;
-        if (event && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button === 1)) return;
-        if (event && typeof event.preventDefault === 'function') event.preventDefault();
         if (typeof closeAdvanceSearch === 'function') closeAdvanceSearch();
         router.push({ ...dest, query: { detailTab: 'task-detail-tab' } }).catch((error) => {
             console.error('ERROR opening search task: ', error);
-            if (taskHref.value) window.location.hash = taskHref.value.replace(/^#/, '');
+            const path = router.resolve({ ...dest, query: { detailTab: 'task-detail-tab' } }).href || '';
+            if (path) window.location.hash = path.replace(/^[^#]*#/, '');
         });
     };
 </script>
@@ -170,5 +165,18 @@
 .onlyComment{
     width: 18px !important;
     height: 18px !important;
+}
+button.advancefilter__body--taskname {
+    background: none;
+    border: none;
+    padding: 0;
+    text-align: left;
+    font: inherit;
+}
+.advancefilter__body--newtab button {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
 }
 </style>
