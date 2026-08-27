@@ -11,7 +11,7 @@ const {
     blocksToRawText,
 } = require('./helpers/pageContent');
 const { composePage, isAiConfigured } = require('./helpers/pageAi');
-const { runWorkspaceAsk } = require('./helpers/runWorkspaceAsk');
+const { runWorkspaceAsk, gatherWorkspaceAskContext } = require('./helpers/runWorkspaceAsk');
 
 const emitPageChange = (type, data) => {
     try {
@@ -303,6 +303,8 @@ exports.composeWithAi = async (req, res) => {
         const { action, title, instruction, currentText, pageId } = req.body || {};
         let bodyText = String(currentText || '');
         let pageTitle = String(title || '');
+        let pages = [];
+        let tasks = [];
 
         if (pageId && isObjectIdString(pageId) && (!bodyText || !pageTitle)) {
             const page = await MongoDbCrudOpration(companyId, {
@@ -321,11 +323,24 @@ exports.composeWithAi = async (req, res) => {
             }
         }
 
+        if (String(action || '').toLowerCase() === 'transcript') {
+            try {
+                const context = await gatherWorkspaceAskContext({ companyId, uid: callerId(req) });
+                pages = context.pages || [];
+                tasks = context.tasks || [];
+            } catch (_e) {
+                pages = [];
+                tasks = [];
+            }
+        }
+
         const result = await composePage({
             action,
             title: pageTitle,
             instruction,
             currentText: bodyText,
+            pages,
+            tasks,
         });
         if (!result.status) {
             return res.send({

@@ -159,7 +159,9 @@
                         :page-id="current._id ? String(current._id) : ''"
                         :title="draftTitle"
                         :current-text="rawDraft"
+                        :project-id="taskProjectId"
                         @apply="onComposeApply"
+                        @turn-into-tasks="openTurnIntoTasks"
                     />
                     <!-- Share. Two separate questions, so they are asked separately: who
                          inside the company can open the doc, and whether it also has a link
@@ -628,14 +630,19 @@ function sprintsFromProject(project) {
     return out;
 }
 
-function openTurnIntoTasks() {
+function openTurnIntoTasks(requirements) {
     if (!taskProjectId.value) return;
     const project = pickerProjects.value.find((row) => String(row._id) === taskProjectId.value)
         || (props.projectData && String(props.projectData._id) === taskProjectId.value ? props.projectData : null);
     aiSprints.value = sprintsFromProject(project);
-    const title = (draftTitle.value || '').trim();
-    const body = (rawDraft.value || '').trim();
-    aiInitialRequirements.value = [title, body].filter(Boolean).join('\n\n');
+    const seed = typeof requirements === 'string' ? requirements.trim() : '';
+    if (seed) {
+        aiInitialRequirements.value = seed;
+    } else {
+        const title = (draftTitle.value || '').trim();
+        const body = (rawDraft.value || '').trim();
+        aiInitialRequirements.value = [title, body].filter(Boolean).join('\n\n');
+    }
     showAiTaskCreator.value = true;
 }
 

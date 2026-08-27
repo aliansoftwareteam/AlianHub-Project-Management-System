@@ -23,6 +23,7 @@ const {
     selectCitations,
     WORKSPACE_ASK_SYSTEM,
 } = require('./pageWorkspaceAsk');
+const { summarizeTranscript } = require('./pageTranscript');
 
 const TITLE_CAP = 200;
 const INTENT_CAP = 2000;
@@ -47,7 +48,8 @@ Action meanings:
 - summarize: compress the existing body into a tight briefing.
 - outline: produce a heading + bullet outline the author can fill in.
 - rewrite: rewrite the existing body for clarity, same meaning.
-- ask: answer the author's question about the current page. Do not rewrite or replace the page. Put the answer in markdown.`;
+- ask: answer the author's question about the current page. Do not rewrite or replace the page. Put the answer in markdown.
+- transcript: turn a meeting transcript into a summary and action items. Do not rewrite or replace the page.`;
 
 function clamp(value, cap) {
     if (typeof value !== 'string') return '';
@@ -60,30 +62,39 @@ function isAiConfigured() {
         && providerFactory.isAnyProviderConfigured());
 }
 
-function parseMarkdownPayload(raw) {
+function parseJsonObject(raw) {
     const text = String(raw || '').trim();
-    if (!text) return '';
+    if (!text) return null;
     try {
         const parsed = JSON.parse(text);
-        if (parsed && typeof parsed.markdown === 'string') return parsed.markdown;
-        if (parsed && typeof parsed.content === 'string') return parsed.content;
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
     } catch (_e) {
         const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
         if (fenced) {
             try {
                 const parsed = JSON.parse(fenced[1]);
-                if (parsed && typeof parsed.markdown === 'string') return parsed.markdown;
+                if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
             } catch (_err) {
-                return fenced[1].trim();
+                return null;
             }
         }
-        if (text.startsWith('{')) {
-            const match = text.match(/"markdown"\s*:\s*"([\s\S]*?)"\s*}\s*$/);
-            if (match) {
-                return match[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
-            }
+    }
+    return null;
+}
+
+function parseMarkdownPayload(raw) {
+    const parsed = parseJsonObject(raw);
+    if (parsed) {
+        if (typeof parsed.markdown === 'string') return parsed.markdown;
+        if (typeof parsed.content === 'string') return parsed.content;
+    }
+    const text = String(raw || '').trim();
+    if (!text) return '';
+    if (text.startsWith('{')) {
+        const match = text.match(/"markdown"\s*:\s*"([\s\S]*?)"\s*}\s*$/);
+        if (match) {
+            return match[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
         }
-        return text;
     }
     return text;
 }
@@ -99,7 +110,7 @@ function buildUserPrompt({ action, title, instruction, currentText }) {
     return parts.join('\n\n');
 }
 
-async function chatMarkdown({ systemPrompt, userPrompt, temperature }) {
+async function chatMarkdown({ systemPrompt, userPrompt, temperature, maxTokens }) {
     let provider;
     try {
         provider = providerFactory.getProvider();
@@ -107,15 +118,18 @@ async function chatMarkdown({ systemPrompt, userPrompt, temperature }) {
         return { status: false, reason: (error && error.message) || 'No LLM provider is available.' };
     }
 
+    const chatOpts = {
+        messages: [{ role: 'user', content: userPrompt }],
+        systemPrompt,
+        jsonMode: true,
+        temperature: temperature == null ? 0.6 : temperature,
+    };
+    if (maxTokens) chatOpts.maxTokens = maxTokens;
+
     let result;
     try {
         result = await Promise.race([
-            provider.chat({
-                messages: [{ role: 'user', content: userPrompt }],
-                systemPrompt,
-                jsonMode: true,
-                temperature: temperature == null ? 0.6 : temperature,
-            }),
+            provider.chat(chatOpts),
             new Promise((_, reject) => setTimeout(() => reject(new Error('AI request timed out.')), REQUEST_TIMEOUT_MS)),
         ]);
     } catch (error) {
@@ -124,20 +138,32 @@ async function chatMarkdown({ systemPrompt, userPrompt, temperature }) {
     }
 
     const raw = result && result.content;
+    const payload = parseJsonObject(raw);
     const markdown = parseMarkdownPayload(raw);
     if (!markdown.trim()) {
         return { status: false, reason: 'The model returned an empty answer.' };
     }
-    return { status: true, markdown, raw };
+    return { status: true, markdown, raw, payload };
 }
 
-async function composePage({ action, title, instruction, currentText }) {
+async function composePage({ action, title, instruction, currentText, pages, tasks }) {
     const resolvedAction = String(action || 'draft').toLowerCase();
     if (!isAiAction(resolvedAction)) {
         return { status: false, reason: `action must be one of: ${AI_ACTIONS.join(', ')}.` };
     }
     if (resolvedAction === 'ask' && !clamp(instruction, INTENT_CAP)) {
         return { status: false, reason: 'Ask needs a question.' };
+    }
+    if (resolvedAction === 'transcript') {
+        return summarizeTranscript({
+            title,
+            transcript: instruction,
+            currentText,
+            pages,
+            tasks,
+            chatMarkdown,
+            isAiConfigured,
+        });
     }
     if (!isAiConfigured()) {
         return { status: false, reason: 'AI is not integrated in your system', isNotAi: true };

@@ -10,8 +10,17 @@
                 @click="action = item.key"
             >{{ $t(item.label) }}</button>
         </div>
-        <form class="pcr__form" @submit.prevent="compose">
+        <form class="pcr__form" :class="{ 'is-stack': action === 'transcript' }" @submit.prevent="compose">
+            <textarea
+                v-if="action === 'transcript'"
+                v-model="instruction"
+                class="pcr__input pcr__input--area"
+                rows="6"
+                :placeholder="placeholder"
+                :disabled="busy"
+            ></textarea>
             <input
+                v-else
                 v-model="instruction"
                 type="text"
                 class="pcr__input"
@@ -22,7 +31,25 @@
                 {{ busy ? $t('Projects.pages_composing') : goLabel }}
             </button>
         </form>
-        <p v-if="notice" class="pcr__notice" :class="{ 'is-answer': Boolean(answer) }">{{ notice }}</p>
+        <p v-if="notice && !brief" class="pcr__notice" :class="{ 'is-answer': Boolean(answer) }">{{ notice }}</p>
+        <div v-if="brief" class="pcr__brief">
+            <p class="pcr__summary">{{ brief.markdown }}</p>
+            <ol v-if="brief.items.length" class="pcr__items">
+                <li v-for="(item, index) in brief.items" :key="'ai-' + index">
+                    <span class="pcr__item-title">{{ item.title }}</span>
+                    <span v-if="item.owner" class="pcr__item-meta">{{ item.owner }}</span>
+                    <span v-if="item.due" class="pcr__item-meta">{{ item.due }}</span>
+                    <p v-if="item.notes" class="pcr__item-notes">{{ item.notes }}</p>
+                </li>
+            </ol>
+            <button
+                v-if="projectId && brief.items.length"
+                type="button"
+                class="pcr__tasks"
+                @click="turnIntoTasks"
+            >{{ $t('Projects.pages_turn_into_tasks') }}</button>
+            <p v-else-if="brief.items.length" class="pcr__need-project">{{ $t('Projects.pages_transcript_need_project') }}</p>
+        </div>
         <WorkspaceAskCitations v-if="answer && citations.length" :citations="citations" />
     </div>
 </template>
@@ -42,9 +69,10 @@ const props = defineProps({
     pageId: { type: String, default: '' },
     title: { type: String, default: '' },
     currentText: { type: String, default: '' },
+    projectId: { type: String, default: '' },
 });
 
-const emit = defineEmits(['apply']);
+const emit = defineEmits(['apply', 'turn-into-tasks']);
 
 const actions = [
     { key: 'draft', label: 'Projects.pages_compose_draft' },
@@ -54,6 +82,7 @@ const actions = [
     { key: 'rewrite', label: 'Projects.pages_compose_rewrite' },
     { key: 'ask', label: 'Projects.pages_compose_ask' },
     { key: 'workspace', label: 'Projects.pages_compose_workspace' },
+    { key: 'transcript', label: 'Projects.pages_compose_transcript' },
 ];
 
 const action = ref('draft');
@@ -62,17 +91,21 @@ const busy = ref(false);
 const notice = ref('');
 const answer = ref('');
 const citations = ref([]);
+const brief = ref(null);
 const configured = ref(true);
 
 const needsQuestion = computed(() => action.value === 'ask' || action.value === 'workspace');
+const isTranscript = computed(() => action.value === 'transcript');
 const placeholder = computed(() => {
     if (action.value === 'ask') return t('Projects.pages_ask_placeholder');
     if (action.value === 'workspace') return t('Projects.pages_workspace_ask_placeholder');
+    if (action.value === 'transcript') return t('Projects.pages_transcript_placeholder');
     return t('Projects.pages_compose_placeholder');
 });
-const goLabel = computed(() => (
-    needsQuestion.value ? t('Projects.pages_ask') : t('Projects.pages_compose')
-));
+const goLabel = computed(() => {
+    if (isTranscript.value) return t('Projects.pages_transcript_go');
+    return needsQuestion.value ? t('Projects.pages_ask') : t('Projects.pages_compose');
+});
 
 onMounted(() => {
     apiRequest('get', '/api/v2/pages/ai-status')
@@ -90,7 +123,16 @@ function showMissing() {
     configured.value = false;
     answer.value = '';
     citations.value = [];
+    brief.value = null;
     notice.value = t('Projects.pages_ai_missing');
+}
+
+function turnIntoTasks() {
+    if (!props.projectId || !brief.value) return;
+    const seed = String(brief.value.requirementsText || '').trim()
+        || [brief.value.markdown, ...(brief.value.items || []).map((item) => item && item.title)].filter(Boolean).join('\n\n');
+    if (!seed) return;
+    emit('turn-into-tasks', seed);
 }
 
 function isMissing(payload) {
@@ -99,16 +141,25 @@ function isMissing(payload) {
 
 function compose() {
     if (busy.value) return;
-    const alian = extractAlianQuestion(instruction.value);
+    const alian = isTranscript.value ? { mentioned: false, question: '' } : extractAlianQuestion(instruction.value);
+    if (isTranscript.value && !instruction.value.trim()) {
+        answer.value = '';
+        citations.value = [];
+        brief.value = null;
+        notice.value = t('Projects.pages_transcript_needed');
+        return;
+    }
     if (needsQuestion.value && !instruction.value.trim() && !alian.mentioned) {
         answer.value = '';
         citations.value = [];
+        brief.value = null;
         notice.value = t('Projects.pages_ask_needed');
         return;
     }
     if (alian.mentioned && !alian.question) {
         answer.value = '';
         citations.value = [];
+        brief.value = null;
         notice.value = t('Projects.pages_ask_needed');
         return;
     }
@@ -116,6 +167,7 @@ function compose() {
     notice.value = '';
     answer.value = '';
     citations.value = [];
+    brief.value = null;
 
     const useWorkspace = action.value === 'workspace' || alian.mentioned;
     const question = alian.mentioned ? alian.question : instruction.value;
@@ -139,10 +191,23 @@ function compose() {
             return;
         }
         const payload = response.data.data || {};
-        if (useWorkspace || action.value === 'ask' || payload.apply === false) {
-            answer.value = payload.markdown || payload.previewText || '';
-            citations.value = useWorkspace && Array.isArray(payload.citations) ? payload.citations : [];
-            notice.value = answer.value;
+        if (useWorkspace || action.value === 'ask' || action.value === 'transcript' || payload.apply === false) {
+            const markdown = payload.markdown || payload.previewText || '';
+            answer.value = markdown;
+            citations.value = Array.isArray(payload.citations) ? payload.citations : [];
+            if (action.value === 'transcript' || payload.action === 'transcript') {
+                const items = Array.isArray(payload.actionItems)
+                    ? payload.actionItems.filter((item) => item && item.title)
+                    : [];
+                brief.value = {
+                    markdown,
+                    items,
+                    requirementsText: String(payload.requirementsText || ''),
+                };
+                notice.value = '';
+            } else {
+                notice.value = markdown;
+            }
             return;
         }
         emit('apply', {
@@ -195,6 +260,9 @@ function compose() {
     display: flex;
     gap: 8px;
 }
+.pcr__form.is-stack {
+    flex-direction: column;
+}
 .pcr__input {
     flex: 1 1 auto;
     min-width: 0;
@@ -206,6 +274,14 @@ function compose() {
     font-size: 14px;
     color: var(--kiln-text);
     outline: none;
+}
+.pcr__input--area {
+    height: auto;
+    min-height: 120px;
+    padding: 10px 12px;
+    resize: vertical;
+    line-height: 1.45;
+    font-family: inherit;
 }
 .pcr__input:focus {
     border-color: var(--kiln-ember);
@@ -223,6 +299,9 @@ function compose() {
     text-transform: uppercase;
     font-size: 12px;
     cursor: pointer;
+}
+.pcr__form.is-stack .pcr__go {
+    align-self: flex-end;
 }
 .pcr__go:disabled {
     opacity: 0.55;
@@ -244,5 +323,67 @@ function compose() {
     line-height: 1.5;
     max-height: 220px;
     overflow: auto;
+}
+.pcr__brief {
+    background: var(--kiln-canvas);
+    border: 1px solid var(--kiln-line);
+    border-left: 3px solid var(--kiln-ember);
+    border-radius: var(--kiln-radius-sm);
+    padding: 12px 14px;
+    color: var(--kiln-ink);
+    max-height: 320px;
+    overflow: auto;
+}
+.pcr__summary {
+    margin: 0;
+    white-space: pre-wrap;
+    font-size: 13px;
+    line-height: 1.55;
+}
+.pcr__items {
+    margin: 12px 0 0;
+    padding: 0 0 0 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.pcr__item-title {
+    font-family: var(--kiln-font-display);
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--kiln-ink);
+}
+.pcr__item-meta {
+    margin-left: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--kiln-ember);
+}
+.pcr__item-notes {
+    margin: 4px 0 0;
+    font-size: 12px;
+    color: var(--kiln-muted);
+    line-height: 1.4;
+}
+.pcr__tasks {
+    margin-top: 12px;
+    height: 36px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: var(--kiln-radius-sm);
+    background: var(--kiln-ink);
+    color: var(--kiln-paper);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-size: 11px;
+    cursor: pointer;
+}
+.pcr__need-project {
+    margin: 10px 0 0;
+    font-size: 12px;
+    color: var(--kiln-muted);
 }
 </style>
