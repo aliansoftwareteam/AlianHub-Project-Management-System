@@ -234,6 +234,11 @@ export function pageDeepLinkNeedsResolve({ pageId, projectId, routeName } = {}) 
     return Boolean(firstId(pageId)) && !firstId(projectId) && routeName !== 'ProjectPages';
 }
 
+export function pageOpeningLine(title) {
+    const name = String(title || '').trim();
+    return name ? `Opening ${name}…` : 'Opening…';
+}
+
 export function boardEmptyKind({ loading, sprintsBound, boardCount, expectedCount, searchHits } = {}) {
     if (loading) return 'loading';
     const shown = Number(boardCount) || 0;

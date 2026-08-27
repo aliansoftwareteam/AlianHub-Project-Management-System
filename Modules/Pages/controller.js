@@ -146,7 +146,13 @@ exports.getPage = async (req, res) => {
         }
         const page = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PAGES,
-            data: [{ _id: new mongoose.Types.ObjectId(id), deletedStatusKey: 0 }],
+            data: [{
+                deletedStatusKey: 0,
+                $or: [
+                    { _id: new mongoose.Types.ObjectId(id) },
+                    { _id: id },
+                ],
+            }],
         }, 'findOne');
         if (!page) {
             return res.send({ status: false, statusText: 'Page not found.' });

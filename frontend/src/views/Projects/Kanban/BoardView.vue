@@ -10,33 +10,8 @@
     </div>
     <div v-else>
         <template v-if="emptyKind === 'loading'">
-            <div class="kanban-board-skeleton">
-                <div class="kanban-column-skeleton" v-for="j in 3" :key="j">
-                    <div class="d-flex justify-content-between w-100 mb-15px">
-                        <Skelaton class="border-radius-5-px" style="height: 25px; width: 70px;" />
-                        <span>
-                            <Skelaton class="border-radius-5-px" style="height: 25px; width: 24px;" />
-                        </span>
-                    </div>
-                    <div class="">
-                        <div class="kanban-card-wrapper-skeleton">
-                            <div class="kanban-card-skeleton pt-10px pl-10px pr-10px pb-5px w-100 mb-10px" v-for="i in 3" :key="i">
-                                <Skelaton class="border-radius-5-px mt-5px" style="height: 22px; width: 278px;" />
-                                <div class="d-flex align-items-center mt-5px justify-content-between">
-                                    <div class="d-flex align-items-center">
-                                        <Skelaton class="mr-8px border-radius-50-per" style="height: 21px; width: 21px;" />
-                                    </div>
-                                    <div class="d-flex align-items-center justify-content-between">
-                                        <Skelaton class="mr-8px border-radius-50-per" style="height: 21px; width: 21px;" />
-                                        <Skelaton class="mr-8px border-radius-50-per" style="height: 21px; width: 21px;" />
-                                        <Skelaton class="mr-8px border-radius-5-px" style="height: 21px; width: 30px;" />
-                                        <Skelaton class="border-radius-50-per" style="height: 21px; width: 21px;" />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <div class="board-load-strip">
+                <p class="board-load-strip__line">{{ $t('EmptyState.board_loading') }}</p>
             </div>
         </template>
         <template v-else-if="emptyKind === 'ready'">
@@ -47,7 +22,7 @@
                 <EmptyState
                     v-if="project?.deletedStatusKey !== 2"
                     :title="emptyKind === 'failed' ? $t('EmptyState.load_failed_title') : $t('EmptyState.no_sprint_tasks_title')"
-                    :message="emptyKind === 'failed' ? $t('EmptyState.load_failed_msg') : $t('EmptyState.no_sprint_tasks_msg')"
+                    :message="emptyKind === 'failed' ? $t('EmptyState.load_failed_msg', { count: boardExpectedCount }) : ''"
                     :actionLabel="emptyKind === 'failed' ? $t('EmptyState.load_failed_action') : $t('EmptyState.no_sprint_tasks_action')"
                     :tone="emptyKind === 'failed' ? 'copper' : 'pine'"
                     @action="onEmptyAction"
@@ -75,11 +50,10 @@ import isEqual from 'lodash/isEqual';
 import KanbanBoard from '@/views/Projects/Kanban/KanbanBoard.vue';
 import BoardViewTaskCreate from '@/views/Projects/Kanban/BoardViewTaskCreate.vue';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
-import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { useRoute } from 'vue-router';
-import { boardEmptyKind, firstId, sprintTasksBucket } from '@/utils/taskOpenProjectId';
+import { boardEmptyKind, countSprintBoardTasks, firstId, sprintTasksBucket } from '@/utils/taskOpenProjectId';
 const route = useRoute();
 
 // --- Props & Emits ---
@@ -193,14 +167,19 @@ const processedBoardData = computed(() => {
 });
 
 const shownBoardCount = computed(() => processedBoardData.value.reduce((n, group) => n + ((group && group.tasksArray) || []).length, 0));
+const boardExpectedCount = computed(() => {
+    const sprint = props.sprints && props.sprints[0];
+    return Number((sprint && (sprint.tasks || sprint.taskCount || sprint.archiveTaskCount)) || 0);
+});
 const emptyKind = computed(() => {
     const sprint = props.sprints && props.sprints[0];
-    const expected = Number((sprint && (sprint.tasks || sprint.taskCount || sprint.archiveTaskCount)) || 0);
+    const pid = firstId(project.value && project.value._id);
+    const sid = firstId(sprint && (sprint.id || sprint._id));
     return boardEmptyKind({
         loading: isLoading.value || props.sprintLoading,
         sprintsBound: Boolean(props.sprints && props.sprints.length),
-        boardCount: shownBoardCount.value,
-        expectedCount: expected,
+        boardCount: Math.max(shownBoardCount.value, countSprintBoardTasks(allProjectTasks.value, pid, sid)),
+        expectedCount: boardExpectedCount.value,
         searchHits: Boolean(searchedTask && searchedTask.value && searchedTasksData.value.length),
     });
 });
@@ -264,3 +243,19 @@ onMounted(async () => {
 
 </script>
 <style src="./new-style.css" scoped />
+<style scoped>
+.board-load-strip {
+    background: var(--kiln-paper, #f4ead8);
+    border: 1px solid var(--kiln-line, #d8cbb3);
+    border-radius: var(--kiln-radius-sm, 9px);
+    padding: 12px 16px;
+    margin: 16px 20px;
+}
+.board-load-strip__line {
+    margin: 0;
+    font-family: var(--kiln-font-display), Georgia, serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--kiln-ink, #1b2f28);
+}
+</style>

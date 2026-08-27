@@ -241,6 +241,11 @@ function pageDeepLinkNeedsResolve({ pageId, projectId, routeName } = {}) {
     return Boolean(firstId(pageId)) && !firstId(projectId) && routeName !== 'ProjectPages';
 }
 
+function pageOpeningLine(title) {
+    const name = String(title || '').trim();
+    return name ? `Opening ${name}…` : 'Opening…';
+}
+
 function boardEmptyKind({ loading, sprintsBound, boardCount, expectedCount, searchHits } = {}) {
     if (loading) return 'loading';
     const shown = Number(boardCount) || 0;
@@ -266,6 +271,7 @@ module.exports = {
     pageOpenRoute,
     pageOpenPath,
     pageDeepLinkNeedsResolve,
+    pageOpeningLine,
     pageProjectId,
     pageFromGetResponse,
     lookupById,

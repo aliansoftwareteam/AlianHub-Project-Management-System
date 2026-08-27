@@ -240,7 +240,18 @@
                     <Skelaton v-for="i in 5" :key="i" class="border-radius-5-px skelaton__option m-5px border-bottom"/>
                 </div>
                 <span v-if="isError" class="red">{{$t('Toast.something_went_wrong')}}</span>
-                <div class="itemSprintWrapper style-scroll-6-px" id="tasklist_driver">
+                <div v-if="boardSurfaceKind === 'loading'" class="board-load-strip">
+                    <p class="board-load-strip__line">{{ $t('EmptyState.board_loading') }}</p>
+                </div>
+                <EmptyState
+                    v-else-if="boardSurfaceKind === 'failed' || boardSurfaceKind === 'empty'"
+                    :title="boardSurfaceKind === 'failed' ? $t('EmptyState.load_failed_title') : $t('EmptyState.no_sprint_tasks_title')"
+                    :message="boardSurfaceKind === 'failed' ? $t('EmptyState.load_failed_msg', { count: boardExpectedCount }) : ''"
+                    :actionLabel="boardSurfaceKind === 'failed' ? $t('EmptyState.load_failed_action') : $t('EmptyState.no_sprint_tasks_action')"
+                    :tone="boardSurfaceKind === 'failed' ? 'copper' : 'pine'"
+                    @action="onBoardSurfaceAction"
+                />
+                <div v-else class="itemSprintWrapper style-scroll-6-px" id="tasklist_driver">
                     <template v-if="$route?.query?.tab !== 'Calendar'">
                         <ItemList
                             v-for="(item,index) in sprint.items"
@@ -321,6 +332,7 @@ import Toggle from "@/components/atom/Toggle/Toggle.vue"
 import Assignee from "@/components/molecules/Assignee/Assignee.vue"
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue"
 import MoveToFolderModal from "@/components/molecules/MoveToFolder/MoveToFolderModal.vue"
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import SprintStateChip from "@/components/molecules/SprintScrum/SprintStateChip.vue"
 import SprintSetupModal from "@/components/molecules/SprintScrum/SprintSetupModal.vue"
 import CompleteSprintModal from "@/components/molecules/SprintScrum/CompleteSprintModal.vue"
@@ -341,6 +353,9 @@ const { t } = useI18n();
 const project = inject("selectedProject");
 const searchedTask = inject("searchedTask");
 const clientWidth = inject("$clientWidth");
+const boardSurfaceKind = inject('boardSurfaceKind', computed(() => 'ready'));
+const boardExpectedCount = inject('boardExpectedCount', computed(() => 0));
+const onBoardSurfaceAction = inject('onBoardSurfaceAction', () => {});
 const { checkPermission, debouncerWithPromise, checkApps} = useCustomComposable();
 const showArchiveVar = inject("showArchived");
 const companyId = inject("$companyId");
@@ -1113,6 +1128,20 @@ function startTaskTour(key) {
    even though the component style wins in dev hot-reload. */
 .suggest-tasks-cta{
     display: none !important;
+}
+.board-load-strip {
+    background: var(--kiln-paper, #f4ead8);
+    border: 1px solid var(--kiln-line, #d8cbb3);
+    border-radius: var(--kiln-radius-sm, 9px);
+    padding: 12px 16px;
+    margin: 8px 0 4px;
+}
+.board-load-strip__line {
+    margin: 0;
+    font-family: var(--kiln-font-display), Georgia, serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--kiln-ink, #1b2f28);
 }
 
 </style>

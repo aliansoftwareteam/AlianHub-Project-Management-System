@@ -18,6 +18,7 @@ const {
     pageOpenRoute,
     pageOpenPath,
     pageDeepLinkNeedsResolve,
+    pageOpeningLine,
     pageProjectId,
     pageFromGetResponse,
     countSprintBoardTasks,
@@ -163,6 +164,7 @@ describe('LIST/BOARD - bind sprint rows so SMOKE tasks can load', () => {
         const sprintFolder = fs.readFileSync(path.join(__dirname, '..', 'Modules', 'Project', 'controller', 'getSprintFolder.js'), 'utf8');
         const list = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'views', 'Projects', 'ListView', 'ListView.vue'), 'utf8');
         const board = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'views', 'Projects', 'Kanban', 'BoardView.vue'), 'utf8');
+        const sprintList = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'organisms', 'SprinstList', 'SprintsList.vue'), 'utf8');
         const actions = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'store', 'ProjectData', 'actions.js'), 'utf8');
         expect(listing).toContain('bindSprintsToProject');
         expect(listing).toContain('sameId(item._id, id)');
@@ -174,13 +176,15 @@ describe('LIST/BOARD - bind sprint rows so SMOKE tasks can load', () => {
         expect(listing).toContain('taskOpenRoute');
         expect(listing).toContain('onBareProject');
         expect(listing).toContain('sprintFetchStarted');
-        expect(list).toContain('EmptyState.no_sprint_tasks_title');
+        expect(sprintList).toContain('EmptyState.no_sprint_tasks_title');
         expect(board).toContain('EmptyState.no_sprint_tasks_title');
-        expect(list).toContain('EmptyState.load_failed_title');
+        expect(sprintList).toContain('EmptyState.load_failed_title');
         expect(board).toContain('EmptyState.load_failed_title');
+        expect(sprintList).toContain('EmptyState.board_loading');
+        expect(list).toContain('headerSprints');
+        expect(list).toContain('boardSurfaceKind');
         expect(list).toContain('countSprintBoardTasks');
-        expect(list).not.toContain('boardCount: groupedTasks.value.length');
-        expect(board).toContain('sprintTasksBucket');
+        expect(board).toContain('EmptyState.board_loading');
         expect(list).not.toContain('EmptyState.no_match_title');
         expect(board).not.toContain('EmptyState.no_match_title');
         expect(list).not.toContain('no_data_found');
@@ -353,9 +357,17 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(empty).toContain('empty-state--copper');
         expect(empty).not.toContain('#172b4d');
         expect(empty).not.toContain('#2f6fdb');
-        expect(locale).toContain('No tasks in this sprint');
-        expect(locale).toContain("Couldn't load tasks");
+        expect(locale).toContain('No tasks in this sprint.');
+        expect(locale).toContain("Couldn't load this board.");
+        expect(locale).toContain("This sprint has {count} tasks. They didn't show here.");
+        expect(locale).toContain('Loading this board…');
         expect(locale).toContain('search_open: "Open"');
+        expect(locale).toContain("You don't have this page.");
+        expect(locale).toContain("This page isn't in {project}.");
+        expect(locale).toContain('Opening {title}…');
+        expect(locale).toContain('Back to Pages');
+        expect(locale).not.toContain('Page not in a project you can open');
+        expect(locale).not.toContain("Couldn't load tasks");
     });
 });
 
@@ -387,6 +399,8 @@ describe('PAGES DEEP LINK - project-scoped hash before first paint', () => {
         expect(pageProjectId({ projectId: PROJECT })).toBe(PROJECT);
         expect(pageProjectId({ ProjectID: { $oid: PROJECT }, projectId: '[object Object]' })).toBe(PROJECT);
         expect(pageProjectId({ title: 'Ask smoke' })).toBe('');
+        expect(pageOpeningLine('Ask smoke')).toBe('Opening Ask smoke…');
+        expect(pageOpeningLine('')).toBe('Opening…');
         expect(pageFromGetResponse({
             data: { status: true, data: { _id: PAGE, ProjectID: { $oid: PROJECT }, projectId: '[object Object]' } },
         })).toEqual({ _id: PAGE, ProjectID: { $oid: PROJECT }, projectId: '[object Object]' });
@@ -400,11 +414,14 @@ describe('PAGES DEEP LINK - project-scoped hash before first paint', () => {
         const getPage = fs.readFileSync(path.join(__dirname, '..', 'Modules', 'Pages', 'controller.js'), 'utf8');
         expect(routerSrc).toContain('resolvePageDeepLink');
         expect(resolveSrc).toContain('pageOpenRoute');
-        expect(resolveSrc).toContain('pageProjectId');
-        expect(resolveSrc).toContain('pageFromGetResponse');
-        expect(resolveSrc).toContain('headers: { companyId: cid }');
+        expect(resolveSrc).not.toContain('unresolved');
         expect(space).toContain('route.params.projectId');
-        expect(space).toContain('v-else-if="ready"');
+        expect(space).toContain('kind === \'opening\'');
+        expect(space).toContain('pageOpeningLine');
+        expect(space).toContain('page_no_access');
+        expect(space).toContain('page_not_in_named_project');
+        expect(space).toContain('page_back_to_pages');
+        expect(space).not.toContain('page_not_in_project');
         expect(space).not.toContain('PagesPanel v-if="true"');
         expect(getPage).toContain('firstId(row.ProjectID');
         expect(getPage).toContain('row.projectId = pid');
