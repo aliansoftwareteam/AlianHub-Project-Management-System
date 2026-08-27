@@ -13,9 +13,7 @@
                 <Skelaton style="height: 30px;" class="border-radius-6-px mb-5px"/>
             </template>
         </template>
-        
-        <!-- Content -->
-        <!-- Content -->
+
         <template v-else>
             <template v-if="filteredCustomFields.length">
                 <template v-for="item in filteredCustomFields" :key="item._id">
