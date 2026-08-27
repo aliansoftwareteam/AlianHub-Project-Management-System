@@ -120,8 +120,8 @@ const emptyKind = computed(() => {
     const pid = firstId(project.value && project.value._id);
     const sid = firstId(sprint && (sprint.id || sprint._id));
     const groups = sprint && Array.isArray(sprint.items) ? sprint.items : [];
-    const shown = countRenderedSprintItems(groups);
     const stored = countSprintBoardTasks(allProjectTasks.value, pid, sid);
+    const shown = Math.max(countRenderedSprintItems(groups), stored);
     return boardEmptyKind({
         loading: isLoading.value || props.sprintLoading,
         sprintsBound: Boolean(props.sprints && props.sprints.length),
@@ -136,9 +136,20 @@ provide('boardExpectedCount', boardExpectedCount);
 provide('onBoardSurfaceAction', onEmptyAction);
 function onEmptyAction() {
     if (emptyKind.value === 'failed') {
+        const sprint = (headerSprints.value && headerSprints.value[0]) || (props.sprints && props.sprints[0]);
+        const pid = firstId(project.value && project.value._id);
+        const sid = firstId(sprint && (sprint.id || sprint._id));
+        const stored = countSprintBoardTasks(allProjectTasks.value, pid, sid);
+        const rebind = (refetch) => {
+            init(props.grouped, refetch, project.value, props.sprints, groupedTasks, false, true);
+        };
+        if (stored > 0) {
+            rebind(false);
+            return;
+        }
         Promise.resolve(reloadSprintTasks())
             .then(() => {
-                init(props.grouped, true, project.value, props.sprints, groupedTasks, false, true);
+                rebind(true);
             })
             .catch((error) => {
                 console.error('ERROR retrying sprint tasks: ', error);

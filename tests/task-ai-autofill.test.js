@@ -475,6 +475,10 @@ describe('TASKS - AI autofill custom fields', () => {
         expect(card).not.toContain("'—'");
         expect(card).not.toContain("checkApps('CustomFields')");
         expect(card).not.toContain('getAppState');
-        expect(render).toContain('TaskAiAutofill');
+        expect(render).not.toContain('TaskAiAutofill');
+        const tab = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'molecules', 'TaskDetailTab', 'TaskDetailTab.vue'), 'utf8');
+        expect(tab).toContain('TaskAiAutofill');
+        expect(tab.indexOf('TaskAiAutofill')).toBeLessThan(tab.indexOf('CheckListComponent'));
+        expect(tab.indexOf('TaskAiAutofill')).toBeLessThan(tab.indexOf('CustomFieldRenderViewComponent'));
     });
 });

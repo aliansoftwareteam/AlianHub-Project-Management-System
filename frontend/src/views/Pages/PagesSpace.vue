@@ -6,12 +6,14 @@
                 <button type="button" class="pages-space__back" @click="backToPages">{{ $t('Projects.page_back_to_pages') }}</button>
             </div>
         </div>
-        <PagesPanel
-            v-else
-            workspace
-            embedded
-            :project-data="boundProject"
-        />
+        <template v-else>
+            <p v-if="kind === 'opening'" class="pages-space__opening pages-space__line pages-space__line--pine">{{ openingLine }}</p>
+            <PagesPanel
+                workspace
+                embedded
+                :project-data="boundProject"
+            />
+        </template>
     </div>
 </template>
 
@@ -22,7 +24,7 @@ import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import PagesPanel from '@/components/molecules/Pages/PagesPanel.vue';
 import { apiRequest } from '@/services';
-import { firstId, pageFromGetResponse, pageOpenRoute, pageProjectId } from '@/utils/taskOpenProjectId';
+import { firstId, pageFromGetResponse, pageOpeningLine, pageOpenRoute, pageProjectId } from '@/utils/taskOpenProjectId';
 
 const { t } = useI18n();
 const route = useRoute();
@@ -31,6 +33,7 @@ const { getters } = useStore();
 
 const kind = ref('ready');
 const missingProjectName = ref('');
+const openingTitle = ref('');
 let hydrateGen = 0;
 
 const pageId = computed(() => firstId(route.query && route.query.page));
@@ -43,6 +46,8 @@ const boundProject = computed(() => {
     const hit = projectRow(pid);
     return hit || { _id: pid };
 });
+
+const openingLine = computed(() => pageOpeningLine(openingTitle.value));
 
 const errorLine = computed(() => {
     if (kind.value === 'forbidden') return t('Projects.page_no_access');
@@ -105,9 +110,10 @@ async function hydrate() {
     const cid = companyId.value;
     if (!id) {
         kind.value = 'ready';
+        openingTitle.value = '';
         return;
     }
-    kind.value = 'ready';
+    kind.value = 'opening';
     const found = await fetchPageRow(id, cid);
     if (gen !== hydrateGen) return;
     if (found.forbidden) {
@@ -115,16 +121,27 @@ async function hydrate() {
         return;
     }
     if (!found.page) {
-        if (found.network) return;
+        if (found.network) {
+            kind.value = 'ready';
+            return;
+        }
+        if (pid) {
+            missingProjectName.value = projectNameOf(pid) || t('Projects.pages_project_none');
+            kind.value = 'missing';
+            return;
+        }
         kind.value = 'forbidden';
         return;
     }
+    openingTitle.value = (found.page && found.page.title) || '';
     const bound = pageProjectId(found.page);
     if (pid) {
         if (bound && bound !== pid) {
             missingProjectName.value = projectNameOf(pid) || projectNameOf(bound);
             kind.value = 'missing';
+            return;
         }
+        kind.value = 'ready';
         return;
     }
     if (bound) {
@@ -134,8 +151,7 @@ async function hydrate() {
             return;
         }
     }
-    missingProjectName.value = projectNameOf(bound) || t('Projects.pages_project_none');
-    kind.value = 'missing';
+    kind.value = 'ready';
 }
 
 onMounted(hydrate);
@@ -147,6 +163,10 @@ watch([pageId, projectId, companyId], hydrate);
     height: 100%;
     min-height: calc(100dvh - var(--kiln-header-h, 58px));
     background: var(--kiln-paper, #f4ead8);
+}
+.pages-space__opening {
+    margin: 0;
+    padding: 10px 16px 0;
 }
 .pages-space__missing {
     display: flex;

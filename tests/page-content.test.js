@@ -282,7 +282,9 @@ describe('PAGES - kiln follow-up guards', () => {
         expect(space).toContain('route.params.projectId');
         expect(space).toContain('boundProject');
         expect(space).toContain('page_no_access');
-        expect(space).not.toContain("kind === 'opening'");
+        expect(space).toContain("kind === 'opening'");
+        expect(space).toContain('pages-space__opening');
+        expect(space).toContain('pageOpeningLine');
         expect(space).not.toContain('<PagesPanel workspace embedded />');
         expect(space).toContain('PagesPanel');
         expect(pagesRouter).toContain("name: 'ProjectPages'");
@@ -295,6 +297,9 @@ describe('PAGES - kiln follow-up guards', () => {
         expect(resolveSrc).not.toContain('pageDeepLinkNeedsResolve');
         expect(resolveSrc).toContain('knownPid');
         expect(appRouter).toContain('resolvePageDeepLink');
+        const getPage = fs.readFileSync(path.join(__dirname, '..', 'Modules', 'Pages', 'controller.js'), 'utf8');
+        expect(getPage).toContain('attachProjectsToPages');
+        expect(getPage).toContain("statusText: 'Pages fetched.'");
         expect(locale).toContain('workspace_ask_sources');
         expect(locale).toContain('pages_citation_page');
         expect(locale).toContain('pages_citation_task');

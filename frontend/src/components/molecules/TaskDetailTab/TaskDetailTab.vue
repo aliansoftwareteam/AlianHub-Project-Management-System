@@ -4,6 +4,10 @@
             <a href="#" @click.prevent="scrollToBottom" class="btn-scroll-to-bottom" :style="{paddingBottom: checkApps('tags') ? '15px' : ''}" v-if="clientWidth < 767">
                 {{$t('general.scroll_to_bottom')}}
             </a>
+            <TaskAiAutofill
+                :task="props.task"
+                :enabled="autofillEnabled"
+            />
             <div class="d-flex mobile__bg--withPadding" v-if="checkApps('tags')">
                 <div class="d-flex align-items-center overflow-auto style-scroll tagList__main-wrapper-sidebar pb-1px">
                     <div v-for="(item, index) in tagChipArray" :key="index" @click.stop="">
@@ -135,6 +139,7 @@ import { dbCollections } from '@/utils/Collections';
 import Description from '@/components/atom/Description/Description.vue'
 import Attachments from '@/components/atom/Attachments/Attachments.vue'
 import CheckListComponent from '@/components/molecules/CheckList/CheckList.vue'
+import TaskAiAutofill from '@/components/molecules/TaskAiAutofill/TaskAiAutofill.vue'
 import SubTasks from '@/components/organisms/SubTasks/SubTasks.vue'
 import LinkedTasks from '@/components/organisms/LinkedTasks/LinkedTasks.vue'
 import LinkedDocs from '@/components/molecules/Pages/LinkedDocs.vue'
@@ -204,6 +209,10 @@ const checkList = computed(() => props.task.checklistArray);
 const currentCompany = computed(() => getters["settings/selectedCompany"]);
 const projectsGetter = computed(() => getters["projectData/onlyActiveProjects"]);
 const showCustomField = computed(() => checkPermission("task.task_custom_field", projectData.value?.isGlobalPermission, {gettersVal: getters}));
+const autofillEnabled = computed(() => (
+    checkPermission('task.task_custom_field', projectData.value?.isGlobalPermission)
+    || checkPermission('task.task_assignee', projectData.value?.isGlobalPermission)
+));
 
 // ref
 const ids = ref();

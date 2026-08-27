@@ -181,7 +181,7 @@ const emptyKind = computed(() => {
     return boardEmptyKind({
         loading: isLoading.value || props.sprintLoading,
         sprintsBound: Boolean(props.sprints && props.sprints.length),
-        boardCount: shownBoardCount.value,
+        boardCount: Math.max(shownBoardCount.value, stored),
         expectedCount: Math.max(boardExpectedCount.value, stored),
         searchHits: Boolean(searchedTask && searchedTask.value && searchedTasksData.value.length),
         hasGroups: groups.length > 0,
@@ -190,14 +190,25 @@ const emptyKind = computed(() => {
 
 function onEmptyAction() {
     if (emptyKind.value === 'failed') {
-        Promise.resolve(reloadSprintTasks()).then(() => {
+        const sprint = props.sprints && props.sprints[0];
+        const pid = firstId(project.value && project.value._id);
+        const sid = firstId(sprint && (sprint.id || sprint._id));
+        const stored = countSprintBoardTasks(allProjectTasks.value, pid, sid);
+        const runGroup = (refetch) => {
             if (project.value?._id && props.sprints?.length) {
                 isLoading.value = true;
-                groupBy(props.grouped, true, project.value, props.sprints, internalGroupedTasks, true, 'board', false, true, (resp) => {
+                groupBy(props.grouped, refetch, project.value, props.sprints, internalGroupedTasks, true, 'board', false, true, (resp) => {
                     internalGroupedTasks.value = resp;
                     isLoading.value = false;
                 });
             }
+        };
+        if (stored > 0) {
+            runGroup(false);
+            return;
+        }
+        Promise.resolve(reloadSprintTasks()).then(() => {
+            runGroup(true);
         }).catch((error) => {
             console.error('ERROR retrying sprint tasks: ', error);
         });
