@@ -824,6 +824,8 @@ export default {
         global_search: "Search all",
         search_everything: "Search tasks, projects and comments...",
         no_search_results: "Nothing found",
+        task_not_in_project: "Task not in this project",
+        task_back_to_search: "Back to search",
         epics: "Epics",
         add_epic: "Add",
         epic_name_placeholder: "New epic name...",

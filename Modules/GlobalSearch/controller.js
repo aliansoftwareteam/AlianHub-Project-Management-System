@@ -3,6 +3,7 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const logger = require("../../Config/loggerConfig");
 const { escapeRegex } = require("../../utils/escapeRegex");
 const { validateSearchInput, truncate, RESULT_LIMIT_PER_TYPE } = require('./helpers/searchRules');
+const { shapeOpenTaskHit } = require('../Project/helpers/taskOpenProjectId');
 
 // Company-wide search across tasks, projects and comments. Regex-based so it
 // works on every existing tenant database immediately (the text indexes added
@@ -84,7 +85,7 @@ exports.globalSearch = async (req, res) => {
             status: true,
             statusText: 'Search complete.',
             data: {
-                tasks: tasks || [],
+                tasks: (tasks || []).map(shapeOpenTaskHit).filter(Boolean),
                 projects: projectResults,
                 comments: (comments || []).map((comment) => ({
                     _id: comment._id,

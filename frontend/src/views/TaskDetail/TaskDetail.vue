@@ -1,6 +1,13 @@
 <template>
     <div>
+        <div v-if="openBlocked" class="td-missing">
+            <div class="td-missing__card">
+                <p class="td-missing__line">{{ $t('Projects.task_not_in_project') }}</p>
+                <button type="button" class="td-missing__back" @click="backToSearch">{{ $t('Projects.task_back_to_search') }}</button>
+            </div>
+        </div>
         <Sidebar
+            v-else-if="showTaskChrome"
             width="1545px"
             :defaultLayout="false"
             :visible="isTaskDetailSideBar"
@@ -113,7 +120,8 @@
     import taskClass from "@/utils/TaskOperations";
     import { apiRequest } from '../../services';
     import * as env from '@/config/env';
-    import { resolveOpenProjectId } from '@/utils/taskOpenProjectId';
+    import { resolveOpenProjectId, shouldShowTaskChrome } from '@/utils/taskOpenProjectId';
+    import { openGlobalSearch } from '@/utils/openGlobalSearch';
     import Sidebar from '@/components/molecules/Sidebar/Sidebar.vue'
     import TaskDetailNavBar from '@/components/molecules/TaskDetailNavBar/TaskDetailNavBar.vue'
     import TaskDetailTitle from '@/components/molecules/TaskDetailTitle/TaskDetailTitle.vue'
@@ -178,6 +186,7 @@
         selectedTask: props.selectedTask,
         routeProjectId: route.params && route.params.id,
     }));
+    const openBlocked = ref(false);
 
     const clientWidth = ref(document.documentElement.clientWidth);
     window.addEventListener('resize', (e) => {
@@ -254,8 +263,15 @@
     const user = getUser(currentUserId.value);
     const isSpinner = ref(true);
 
-    // Get task details from MongoDB
     const task = ref(props?.selectedTask ? props.selectedTask : {});
+    const taskLoaded = computed(() => Boolean(
+        task.value && task.value.TaskName && projectData.value && projectData.value.ProjectName
+    ));
+    const showTaskChrome = computed(() => shouldShowTaskChrome({
+        projectId: resolvedProjectId.value,
+        loaded: taskLoaded.value,
+        blocked: openBlocked.value,
+    }));
 
     const updateTaskName = (val) => {
         if(!val?.trim()?.length) return;
@@ -595,13 +611,27 @@
         }
     }
 
+    function markTaskMissing() {
+        openBlocked.value = true;
+        isSpinner.value = false;
+    }
+
+    function backToSearch() {
+        emit('toggleTaskDetail', task.value, true);
+        openGlobalSearch();
+    }
+
     function getQueryFun () {
-        if (!resolvedProjectId.value || !props.taskId) return;
-        const queryParams = new URLSearchParams({
+        if (!props.taskId) {
+            markTaskMissing();
+            return;
+        }
+        const query = {
             taskId: props.taskId,
-            projectId: resolvedProjectId.value,
-            subTaskLimit: subTaskLimit.value
-        }).toString();
+            subTaskLimit: String(subTaskLimit.value),
+        };
+        if (resolvedProjectId.value) query.projectId = resolvedProjectId.value;
+        const queryParams = new URLSearchParams(query).toString();
         try{
             apiRequest('get', `${env.TASK_DATA}?${queryParams}`)
             .then((res) => {
@@ -612,32 +642,45 @@
                     getSprintFolderData(response[0]._id,sprint,folder).then((resp) => {
                         response[0].sprintsObj = resp.sprints
                         response[0].sprintsfolders = resp.folders
+                        openBlocked.value = false;
                         isSpinner.value = false;
                         emit('handleSpinner');
                         projectData.value = response[0];
                         task.value = response[0].tasks[0] || {};
+                        if (!task.value || !task.value._id) {
+                            markTaskMissing();
+                            return;
+                        }
                         subTasks.value = response[0].subtasks || [];
                         commit('projectData/setTaskDetailData',{isSubTaskData: true, data: subTasks.value});
-                        fetchSubtaskCount();   // accurate %/count when subtasks exceed the loaded slice
+                        fetchSubtaskCount();
 
                         if(!projectData.value?.isGlobalPermission && !(getters["settings/projectRules"] && Object.keys(getters["settings/projectRules"])?.length > 0)) {
-                            dispatch("settings/setProjectRules", {pid: resolvedProjectId.value})
+                            dispatch("settings/setProjectRules", {pid: resolvedProjectId.value || response[0]._id})
                             .catch((error) => {
                                 console.error("ERROR in get project rules", error);
                             });
                         }
                     })
+                } else {
+                    markTaskMissing();
                 }
             }).catch((error)=>{
                 console.error(error);
+                markTaskMissing();
             })
         }catch(error){
             console.error(error)
+            markTaskMissing();
         }
     }
 
     watch(resolvedProjectId, (id, prev) => {
-        if (id && id !== prev) getQueryFun();
+        if (id && id !== prev) {
+            openBlocked.value = false;
+            isSpinner.value = true;
+            getQueryFun();
+        }
     });
 
     function changeTaskType(status) {

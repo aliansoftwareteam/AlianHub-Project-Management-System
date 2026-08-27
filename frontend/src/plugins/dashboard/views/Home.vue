@@ -125,10 +125,11 @@ const toggleTaskDetail = (task,close=false,isComment = false) => {
 }
 const openInNewTab = (task) => {
     const ids = resolveTaskOpenIds(task);
+    if (!ids.taskId) return;
     projectId.value = ids.projectId;
     sprintId.value = ids.sprintId;
     taskId.value = ids.taskId;
-    isTaskDetail.value = Boolean(ids.taskId && ids.projectId);
+    isTaskDetail.value = true;
 };
 
 const companyUser = computed(() => getUser(userId.value));

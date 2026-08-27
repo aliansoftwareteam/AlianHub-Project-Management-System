@@ -99,7 +99,7 @@ const detailSprintId = ref('');
 const detailTaskId = ref('');
 function openTaskDetail(r) {
     const ids = resolveTaskOpenIds(r);
-    if (!ids.taskId || !ids.projectId) return;
+    if (!ids.taskId) return;
     detailProjectId.value = ids.projectId;
     detailSprintId.value = ids.sprintId;
     detailTaskId.value = ids.taskId;

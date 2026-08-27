@@ -1,7 +1,18 @@
+export function coerceId(value) {
+    if (value == null) return '';
+    if (typeof value === 'object') {
+        if (typeof value.toHexString === 'function') return value.toHexString();
+        return coerceId(value._id || value.id || '');
+    }
+    const raw = String(value).trim();
+    if (!raw || raw === 'undefined' || raw === 'null' || raw === '[object Object]') return '';
+    return raw;
+}
+
 export function firstId(...values) {
     for (const value of values) {
-        const raw = value == null ? '' : String(value).trim();
-        if (raw && raw !== 'undefined' && raw !== 'null') return raw;
+        const raw = coerceId(value);
+        if (raw) return raw;
     }
     return '';
 }
@@ -24,4 +35,13 @@ export function resolveOpenProjectId({ queryProjectId, task, selectedTask, route
         selectedTask && (selectedTask.ProjectID || selectedTask.projectId || selectedTask.ProjectId),
         routeProjectId,
     );
+}
+
+export function shouldShowTaskSkeleton({ projectId, loaded, blocked } = {}) {
+    return Boolean(projectId) && !loaded && !blocked;
+}
+
+export function shouldShowTaskChrome({ projectId, loaded, blocked } = {}) {
+    if (blocked) return false;
+    return Boolean(projectId) || Boolean(loaded);
 }

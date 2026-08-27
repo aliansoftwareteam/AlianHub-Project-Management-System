@@ -11,6 +11,10 @@
                 @keydown.esc="close"
             />
             <div v-if="isSearching" class="gray81 font-size-12 gsearch__hint">{{ $t('Projects.searching') }}</div>
+            <div v-else-if="missingHit" class="td-missing__card gsearch__missing">
+                <p class="td-missing__line">{{ $t('Projects.task_not_in_project') }}</p>
+                <button type="button" class="td-missing__back" @click="missingHit = false">{{ $t('Projects.task_back_to_search') }}</button>
+            </div>
             <template v-else-if="hasResults">
                 <div v-if="results.tasks.length" class="gsearch__group">
                     <div class="gsearch__group-title font-size-11">{{ $t('Projects.tasks') }}</div>
@@ -79,6 +83,7 @@ const inputEl = ref(null);
 const query = ref('');
 const isSearching = ref(false);
 const searched = ref(false);
+const missingHit = ref(false);
 const results = ref({ tasks: [], projects: [], comments: [] });
 
 const hasResults = computed(() =>
@@ -89,6 +94,7 @@ watch(() => props.modelValue, (open) => {
     if (open) {
         query.value = '';
         searched.value = false;
+        missingHit.value = false;
         results.value = { tasks: [], projects: [], comments: [] };
         nextTick(() => inputEl.value && inputEl.value.focus());
     }
@@ -124,10 +130,14 @@ const onInput = debounce(() => {
 // Task routes: /:cid/project/:id/fs/:folderId/:sprintId/:taskId (folder) or
 // /:cid/project/:id/s/:sprintId/:taskId (plain sprint).
 function openTask(task) {
-    close();
     const ids = resolveTaskOpenIds(task);
+    if (!ids.taskId) return;
+    if (!ids.projectId) {
+        missingHit.value = true;
+        return;
+    }
+    close();
     const projectId = ids.projectId;
-    if (!projectId || !ids.taskId) return;
     const base = `/${companyId.value}/project/${projectId}`;
     const path = task.folderObjId
         ? `${base}/fs/${task.folderObjId}/${ids.sprintId}/${ids.taskId}`
@@ -218,5 +228,33 @@ function openProject(project) {
     margin-left: 8px;
     white-space: nowrap;
     color: #6a6a6a;
+}
+.gsearch__missing {
+    margin-top: 14px;
+    background: var(--kiln-canvas, #fbf6ec);
+    border: 1px solid var(--kiln-line, #d8cbb3);
+    border-left: 3px solid var(--kiln-ember, #c45c26);
+    border-radius: var(--kiln-radius-sm, 9px);
+    padding: 16px 18px;
+    color: var(--kiln-ink, #1b2f28);
+}
+.gsearch__missing .td-missing__line {
+    margin: 0 0 12px;
+    font-family: var(--kiln-font-display), Georgia, serif;
+    font-size: 15px;
+    font-weight: 600;
+}
+.gsearch__missing .td-missing__back {
+    border: 1px solid var(--kiln-line, #d8cbb3);
+    border-radius: var(--kiln-radius-sm, 9px);
+    background: var(--kiln-ink, #1b2f28);
+    color: var(--kiln-paper, #f4ead8);
+    font-family: var(--kiln-font-body), sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 6px 10px;
+    cursor: pointer;
 }
 </style>
