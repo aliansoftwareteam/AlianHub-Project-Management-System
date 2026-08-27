@@ -4,7 +4,7 @@
         role="presentation"
         :class="{ active: isActive }"
         class="cursor-pointer"
-        @click="!isActive ? $emit('changeTab' ,tabKey) : ''"
+        @click.stop="!isActive ? $emit('changeTab' ,tabKey) : ''"
     >
         <img
             v-if="isActive"
@@ -18,12 +18,13 @@
             :src="tab.inactiveIcon"
             alt=""
         />
-        <a
+        <span
             :aria-controls="tabKey"
             role="tab"
+            @click.stop
         >
             {{ $t(`Header.${tab.name}`) }}
-        </a>
+        </span>
         <span
             v-if="tabKey == 'comment' && commentCounts"
             class="chat-count  position-ab white text-center"

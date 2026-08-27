@@ -511,6 +511,7 @@ import { useProjectSearch } from './composables/useProjectSearch';
 import { useProjectTour } from './composables/useProjectTour';
 
 import { useProjectsHelper } from './helper';
+import { firstId, sameId } from '@/utils/taskOpenProjectId';
 
 // UTILS
 const { checkErrors } = useValidation();
@@ -968,7 +969,7 @@ onMounted(() => {
                 if (getters['projectData/projects'] && getters['projectData/projects']?.data?.length) {
                     if (!route.query?.tab) {
                         if (route.params.id) {
-                            const index = projects.value.findIndex((e) => e._id === route.params.id);
+                            const index = projects.value.findIndex((e) => sameId(e._id, route.params.id));
                             if (index !== -1) {
                                 const viewFind = projects.value[index].ProjectRequiredComponent?.find((e) => e.setAsDefault) || projects.value[index].ProjectRequiredComponent?.find((e) => e.viewStatus) || projects.value[index].ProjectRequiredComponent[0];
                                 router.replace({ query: { tab: (viewFind ? viewFind?.keyName : 'ProjectListView'), ...route.query } });
@@ -1012,32 +1013,30 @@ onUnmounted(() => {
 });
 
 // UPDATE PROJECT DATA ON UPDATES IN DATABASE
-watch([projects, route], () => {
-    if (projects.value && route?.params?.id && projectData.value && Object.keys(projectData.value).length) {
-        if (route.params.id !== projectData.value._id) {
-            searchMongoDB();
-        }
+function findListedProject(id) {
+    if (!id || !projects.value || !projects.value.length) return null;
+    return projects.value.find((x) => sameId(x._id, id)) || null;
+}
 
-        if (projects.value && projects.value.length) {
-            const index = projects.value.findIndex((x) => x._id == projectData.value._id);
-            if (index !== -1) {
-                projectData.value = projects.value[index] || {};
-            } else {
-                projectData.value = projects.value[0] || {};
-            }
-        }
-    }
+function bindActiveProject() {
+    if (!projects.value || !projects.value.length) return;
+    const routeId = route.params && route.params.id;
+    const currentId = projectData.value && projectData.value._id;
+    const next = findListedProject(routeId) || findListedProject(currentId) || projects.value[0];
+    if (!next) return;
+    const switched = currentId && !sameId(currentId, next._id);
+    projectData.value = next;
+    if (switched) searchMongoDB();
+}
+
+watch([projects, route], () => {
+    bindActiveProject();
 });
 
 watch(route, () => {
-    if (projects.value && route?.params?.id && projectData.value && Object.keys(projectData.value).length && route.params.id !== projectData.value._id) {
-        const index = projects.value.findIndex((x) => x._id == route.params.id);
-        if (index !== -1) {
-            projectData.value = projects.value[index] || {};
-        } else {
-            router.replace({ name: 'Project', params: { cid: route.params?.cid, id: route.params?.id }, query: { ...route.query } });
-            projectData.value = projects.value[0] || {};
-        }
+    if (!projects.value || !projects.value.length) return;
+    if (route.params?.id && !findListedProject(route.params.id) && projectData.value && projectData.value._id) {
+        router.replace({ name: 'Project', params: { cid: route.params?.cid, id: firstId(projectData.value._id) }, query: { ...route.query } });
     }
 });
 
@@ -1091,7 +1090,7 @@ watch([projectData, route, () => getters['projectData/searchedTasks']], () => {
             });
         } else if (route.name.includes('ProjectFolder')) {
             if (route.params.sprintId && !project?.sprintsfolders?.[route.params.folderId]?.deletedStatusKey) {
-                const sprintIndex = Object.values(project?.sprintsfolders?.[route.params.folderId]?.sprintsObj || {})?.findIndex((x) => x.id === route.params.sprintId);
+                const sprintIndex = Object.values(project?.sprintsfolders?.[route.params.folderId]?.sprintsObj || {})?.findIndex((x) => sameId(x.id || x._id, route.params.sprintId));
                 if (sprintIndex !== -1) {
                     tmp = [Object.values(project.sprintsfolders[route.params.folderId].sprintsObj)[sprintIndex]];
                 } else {
@@ -1119,7 +1118,7 @@ watch([projectData, route, () => getters['projectData/searchedTasks']], () => {
             }
         } else if (route.name.includes('ProjectSprint')) {
             const sprintsArray = Object.values(project?.sprintsObj || {});
-            const sprintIndex = sprintsArray.findIndex((x) => x.id === route.params.sprintId && (!showArchived.value ? (x?.deletedStatusKey === 0 || x?.deletedStatusKey === undefined) : true));
+            const sprintIndex = sprintsArray.findIndex((x) => sameId(x.id || x._id, route.params.sprintId) && (!showArchived.value ? (x?.deletedStatusKey === 0 || x?.deletedStatusKey === undefined) : true));
             if ((companyUserDetail.value.roleType === 1 || companyUserDetail.value.roleType === 2) || (sprintIndex !== -1 && (!sprintsArray[sprintIndex]?.private || sprintsArray[sprintIndex]?.AssigneeUserId?.includes(userId.value)))) {
                 tmp = sprintIndex !== -1 ? [sprintsArray[sprintIndex]] : [];
             } else {
@@ -1252,12 +1251,11 @@ function getView(val) {
 // Task Detail
 const isTaskDetail = ref(false);
 const selectedTask = ref({});
-const openTaskProjectId = computed(() => String(
-    selectedTask.value?.ProjectID
-    || selectedTask.value?.projectId
-    || projectData.value?._id
-    || route.params.id
-    || ''
+const openTaskProjectId = computed(() => firstId(
+    selectedTask.value?.ProjectID,
+    selectedTask.value?.projectId,
+    projectData.value?._id,
+    route.params.id
 ));
 
 watch(() => route.params.taskId, (taskId) => {
@@ -1274,16 +1272,16 @@ const toggleTaskDetail = async (task) => {
     skipWatcher.value = true;
     const routeObj = {
         cid: companyId.value,
-        id: task.ProjectID,
-        sprintId: task.sprintId,
+        id: firstId(task.ProjectID, task.projectId, projectData.value && projectData.value._id, route.params.id),
+        sprintId: firstId(task.sprintId, route.params.sprintId),
     };
     if (task.folderObjId) {
-        routeObj.folderId = task.folderObjId;
+        routeObj.folderId = firstId(task.folderObjId);
     }
 
     if (!isTaskDetail.value) {
-        routeObj.taskId = task._id;
-        const taskDetail = { ...task, sprintName: task?.sprintArray?.name, folderName: task?.sprintArray?.folderName, id: task._id };
+        routeObj.taskId = firstId(task._id, task.id);
+        const taskDetail = { ...task, sprintName: task?.sprintArray?.name, folderName: task?.sprintArray?.folderName, id: firstId(task._id, task.id) };
         selectedTask.value = taskDetail;
         isTaskDetail.value = true;
         await router.push({ name: task.folderObjId?.length ? 'ProjectFolderSprint' : 'ProjectSprint', params: routeObj });

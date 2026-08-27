@@ -239,7 +239,10 @@ exports.searchTasks = async (req, res) => {
                     { ...additionalFilter },
                     { ProjectID: { $in: convertedProjectIds } },
                     { deletedStatusKey: { $in: [undefined, 0] } },
-                    ...(searchStr ? [{ TaskName: { $regex: escapeRegex(searchStr), $options: "i" } }] : []),
+                    ...(searchStr ? [{ $or: [
+                        { TaskName: { $regex: escapeRegex(searchStr), $options: "i" } },
+                        { TaskKey: { $regex: escapeRegex(searchStr), $options: "i" } },
+                    ] }] : []),
                 ],
             },
         }

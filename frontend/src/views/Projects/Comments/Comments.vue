@@ -244,6 +244,7 @@ import { useI18n } from "vue-i18n";
 import {generateFileName} from '@/utils/storageQueryBuild.js';
 import ImagesPreviewer from "@/components/organisms/ImagePreviewer/ImagesPreviewer.vue";
 import { storageHelper } from "@/composable/commonFunction";
+import { firstId } from '@/utils/taskOpenProjectId';
 
 const { t } = useI18n();
 
@@ -645,11 +646,23 @@ const visibilityHandler = async () => {
     }, 1000);
 };
 
+function commentThreadQuery() {
+    const projectId = firstId(projectData.value && projectData.value._id);
+    const taskId = firstId(props.taskId) || props.taskId || '';
+    const sprintId = firstId(props.sprintId);
+    return { projectId, taskId, sprintId };
+}
+
 function tabSyncDataGet () {
     return new Promise((resolve, reject) => {
         try {
             let tabLeaveTime = sessionStorage.getItem('tableaveTime');
-            const url = `${env.API_COMMENTS}/get-paginated-messages?projectId=${projectData.value._id}&taskId=${props.taskId}&sprintId=${props.sprintId}&isDefault=${projectData.value?.default}&mainChat=${props.mainChat}&skipValue=${0}&batchLimit=${messageLimit.value}&tabLeaveTime=${tabLeaveTime}`;
+            const { projectId, taskId, sprintId } = commentThreadQuery();
+            if (!projectId) {
+                resolve();
+                return;
+            }
+            const url = `${env.API_COMMENTS}/get-paginated-messages?projectId=${projectId}&taskId=${taskId}&sprintId=${sprintId}&isDefault=${projectData.value?.default}&mainChat=${props.mainChat}&skipValue=${0}&batchLimit=${messageLimit.value}&tabLeaveTime=${tabLeaveTime}`;
             apiRequest("get", url).then((response) => {
                 response.data.data.forEach((docData)=> {
                     let index = messages.value.findIndex((x) => x._id === docData._id);
@@ -752,7 +765,7 @@ watch(projectData, (val) => {
 function getLatestMessage(projectId, taskId, sprintId, messageData) {
     return new Promise((resolve, reject) => {
         try {
-            const url = `${env.API_COMMENTS}/get-paginated-messages?projectId=${projectId}&taskId=${taskId}&sprintId=${sprintId}&sort=createdAt:desc&batchLimit=1`;
+            const url = `${env.API_COMMENTS}/get-paginated-messages?projectId=${firstId(projectId)}&taskId=${firstId(taskId) || taskId}&sprintId=${firstId(sprintId)}&sort=createdAt:desc&batchLimit=1`;
             apiRequest("get", url)
             .then((response) => {
                 const latestMessage = response.data.data[0];
@@ -1459,7 +1472,13 @@ function getPaginatedMessages(...args) {
 
     return new Promise((resolve, reject) => {
         try {
-            const url = `${env.API_COMMENTS}/get-paginated-messages?projectId=${projectData.value._id}&taskId=${props.taskId}&sprintId=${props.sprintId}&isDefault=${projectData.value?.default}&mainChat=${props.mainChat}&skipValue=${totalMessages.value}&batchLimit=${messageLimit.value}`
+            const { projectId, taskId, sprintId } = commentThreadQuery();
+            if (!projectId) {
+                loadingChat.value = false;
+                resolve("No data");
+                return;
+            }
+            const url = `${env.API_COMMENTS}/get-paginated-messages?projectId=${projectId}&taskId=${taskId}&sprintId=${sprintId}&isDefault=${projectData.value?.default}&mainChat=${props.mainChat}&skipValue=${totalMessages.value}&batchLimit=${messageLimit.value}`
             apiRequest("get", url).then((response) => {
                 const results = response.data.data;
 

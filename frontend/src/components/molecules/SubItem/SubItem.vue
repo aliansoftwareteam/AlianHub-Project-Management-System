@@ -171,6 +171,7 @@ import Spinner from "@/components/atom/SpinnerComp/SpinnerComp.vue"
 import { apiRequest } from '../../../services';
 import * as env from '@/config/env';
 import { useI18n } from "vue-i18n";
+import { taskOpenPath } from '@/utils/taskOpenProjectId';
 const { t } = useI18n();
 
 // UTILS
@@ -305,46 +306,16 @@ function changeRoute() {
         let viewFind = project.value?.ProjectRequiredComponent?.find((e) => e.setAsDefault) || project.value?.ProjectRequiredComponent?.find((e) => e.viewStatus) || project.value?.ProjectRequiredComponent[0];
         tab = viewFind ? viewFind?.keyName :"ProjectListView";
     }
-    if(props.data.folderId && props.data.sprintsObj) {
-        router.push({
-            name: "ProjectFolder",
-            params: {
-                id: project.value._id,
-                folderId: props.data.folderId
-            },
-            query: {
-                ...route.query,
-                tab
-            }
-        })
-    } else {
-        if(props.data.folderId) {
-            router.push({
-                name: "ProjectFolderSprint",
-                params: {
-                    id: project.value._id,
-                    folderId: props.data.folderId,
-                    sprintId: props.data.id ? props.data.id : props.data._id
-                },
-                query: {
-                    ...route.query,
-                    tab
-                }
-            })
-        } else {
-            router.push({
-                name: "ProjectSprint",
-                params: {
-                    id: project.value._id,
-                    sprintId: props.data.id ? props.data.id : props.data._id
-                },
-                query: {
-                    ...route.query,
-                    tab
-                }
-            })
-        }
-    }
+    const path = taskOpenPath({
+        companyId: companyId.value,
+        projectId: (project.value && project.value._id) || props.data.projectId || route.params.id,
+        sprintId: props.data.sprintsObj ? '' : (props.data.id || props.data._id),
+        folderId: props.data.folderId,
+    });
+    if (!path) return;
+    router.push({ path, query: { ...route.query, tab } }).catch((error) => {
+        console.error('ERROR opening sprint: ', error);
+    });
     emit('handleSidebarClose')
 }
 

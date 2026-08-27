@@ -34,17 +34,21 @@
                     <div class="d-flex align-items-center">
                         <span class="advancefilter__body--marginright" v-if="props.taskObj?.isParentTask === false"><img :src="subTaskImage" /> </span>
                         <span class="advancefilter__body--marginright"><img :src="favourite(props.taskObj?.favouriteTasks) && favourite(props.taskObj?.favouriteTasks)?.length ? filledStar : blankStar" /></span>
-                        <span class="advancefilter__body--taskname black text-ellipse d-block advancefilter__body--width cursor-pointer" v-html="highlightSearchTerm(props.taskObj?.TaskName)" @click="openModel(props.taskObj)"></span>
+                        <a class="advancefilter__body--taskname black text-ellipse d-block advancefilter__body--width cursor-pointer" :href="taskHref" @click.prevent="openInApp(props.taskObj)" v-html="highlightSearchTerm(props.taskObj?.TaskName)"></a>
                     </div>
                 </div>
             </div>
             <div class="advancefilter__body--list--right">
                 <ul class="advancefilter__body--ul align-items-center">
-                    <li class="cursor-pointer advancefilter__body--newtab" @click="openModel(props.taskObj)">
-                        <img :src="imgOpenSameTab" alt="Copy Link"/>
+                    <li class="cursor-pointer advancefilter__body--newtab">
+                        <a :href="taskHref" @click.prevent="openInApp(props.taskObj)">
+                            <img :src="imgOpenSameTab" alt="Open"/>
+                        </a>
                     </li>
-                    <li class="cursor-pointer advancefilter__body--newtab" @click="openInNewTab(props.taskObj)">
-                        <img :src="imgOpenNewTab" alt="Copy Link"/>
+                    <li class="cursor-pointer advancefilter__body--newtab">
+                        <a :href="taskHref" @click.prevent="openInApp(props.taskObj)">
+                            <img :src="imgOpenNewTab" alt="Open"/>
+                        </a>
                     </li>
                     <li class="cursor-pointer" @click="copyLink(props.taskObj)">
                         <img :src="imgCopyLink" alt="Copy Link"/>
@@ -53,42 +57,25 @@
             </div>
         </div>
     </template>
-    <TaskDetail
-        v-if="isTaskDetail"
-        :companyId="companyId"
-        :projectId="projectId"
-        :sprintId="sprintId"
-        :taskId="taskId"
-        :isTaskDetailSideBar="isTaskDetail"
-        @toggleTaskDetail="toggleTaskDetail"
-        :zIndex='9'
-    />
 </template>
 
 <script setup>
-    import { inject,defineProps,ref,provide, nextTick } from 'vue';
+    import { inject,defineProps,computed } from 'vue';
     import { useToast } from 'vue-toast-notification';
     import {filterFun} from '@/components/molecules/AdvanceSearch/helper';
-    import TaskDetail from '@/views/TaskDetail/TaskDetail.vue';
     import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
-    import { useRoute, useRouter } from 'vue-router';
+    import { useRouter } from 'vue-router';
     import { useI18n } from "vue-i18n";
     const { t } = useI18n();
     import { useCustomComposable } from '../../../composable';
+    import { resolveTaskOpenIds, sameId, taskOpenPath } from '@/utils/taskOpenProjectId';
     const { generateTaskURL } = filterFun();
     const $toast = useToast();
     const {sanitizeInput} = useCustomComposable();
 
-    //inject
     const userId = inject("$userId");
     const companyId = inject("$companyId");
-    // variable
-    const isTaskDetail = ref(false);
-    // const selectedTask = ref({});
-    const projectId = ref('');
-    const sprintId = ref('');
-    const taskId = ref('');
-    const route = useRoute();
+    const closeAdvanceSearch = inject('closeAdvanceSearch', () => {});
     const router = useRouter();
 
     // image
@@ -121,7 +108,7 @@
     };
     const findParticularProject = (id) => {
         if(props.allProjectsArray && props.allProjectsArray.length && id){
-            return props.allProjectsArray.find((xt) => xt._id === id)
+            return props.allProjectsArray.find((xt) => sameId(xt._id, id))
         }else{
             return []
         }
@@ -136,41 +123,40 @@
     };
 
     // This function is use to copy link of selected task
+    const taskHref = computed(() => {
+        const ids = resolveTaskOpenIds(props.taskObj || {});
+        const path = taskOpenPath({
+            companyId: companyId.value,
+            projectId: ids.projectId,
+            sprintId: ids.sprintId,
+            taskId: ids.taskId,
+            folderId: props.taskObj && props.taskObj.folderObjId,
+        });
+        return path ? `#${path}?detailTab=task-detail-tab` : '';
+    });
+
     const copyLink = (task) => {
         generateTaskURL(task,companyId.value).then((url)=>{
+            if (!url) return;
             navigator.clipboard.writeText(url);
             $toast.success(t("Toast.Link_is_Copied_to_clipboard"),{position: 'top-right'});
         });
     };
-    const openModel = (task) => {
-        isTaskDetail.value = true;
-        projectId.value = task.ProjectID || task.projectId || '';
-        sprintId.value = task.sprintId
-        taskId.value = task._id
-    };
-    const openInNewTab = (task) => {
-        generateTaskURL(task,companyId.value).then((url)=>{
-            window.open(url, '_blank');
+    const openInApp = (task) => {
+        const ids = resolveTaskOpenIds(task);
+        const path = taskOpenPath({
+            companyId: companyId.value,
+            projectId: ids.projectId,
+            sprintId: ids.sprintId,
+            taskId: ids.taskId,
+            folderId: task && task.folderObjId,
+        });
+        if (!path || !ids.projectId || !ids.taskId) return;
+        if (typeof closeAdvanceSearch === 'function') closeAdvanceSearch();
+        router.push({ path, query: { detailTab: 'task-detail-tab' } }).catch((error) => {
+            console.error('ERROR opening search task: ', error);
         });
     };
-    const toggleTaskDetail = (task,close=false) => {
-        isTaskDetail.value = false;
-        if(close == true) {
-            router.push({...route,query: {}})
-            return;
-        }
-        projectId.value = '';
-        sprintId.value = '';
-        taskId.value = '';
-        nextTick(()=>{
-            router.push({...route,query: {detailTab: "task-detail-tab"}})
-            openModel(task);
-        })
-    }
-    provide('toggleTaskDetail', toggleTaskDetail);
-    provide('isSupport', ref(false));
-    provide('isRouteRequired', false);
-    provide('showArchived', ref(false));
 </script>
 <style scoped>
 .onlyComment{

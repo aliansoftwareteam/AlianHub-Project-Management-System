@@ -99,6 +99,40 @@ function bindSprintsToProject(sprints, folders, projectId) {
     return { sprintsObj, sprintsfolders: foldersObject, sprintsArray: root };
 }
 
+function asDocList(value) {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    if (value._id || value.id) return [value];
+    return Object.values(value).filter((row) => row && (row._id || row.id));
+}
+
+function firstSprintOf(project) {
+    if (!project) return null;
+    const root = Object.values(project.sprintsObj || {});
+    if (root[0]) return root[0];
+    for (const folder of Object.values(project.sprintsfolders || {})) {
+        const rows = Object.values((folder && folder.sprintsObj) || {});
+        if (rows[0]) return rows[0];
+    }
+    return null;
+}
+
+function taskOpenPath({ companyId, projectId, sprintId, taskId, folderId } = {}) {
+    const cid = firstId(companyId);
+    const pid = firstId(projectId);
+    if (!cid || !pid) return '';
+    const sid = firstId(sprintId);
+    const tid = firstId(taskId);
+    const fid = firstId(folderId);
+    const base = `/${cid}/project/${pid}`;
+    if (tid && sid && fid) return `${base}/fs/${fid}/${sid}/${tid}`;
+    if (tid && sid) return `${base}/s/${sid}/${tid}`;
+    if (sid && fid) return `${base}/fs/${fid}/${sid}`;
+    if (sid) return `${base}/s/${sid}`;
+    if (fid) return `${base}/f/${fid}`;
+    return `${base}/p`;
+}
+
 module.exports = {
     firstId,
     resolveOpenProjectId,
@@ -107,4 +141,7 @@ module.exports = {
     shouldShowTaskChrome,
     sameId,
     bindSprintsToProject,
+    asDocList,
+    firstSprintOf,
+    taskOpenPath,
 };

@@ -10,6 +10,9 @@ const {
     shouldShowTaskChrome,
     bindSprintsToProject,
     sameId,
+    asDocList,
+    firstSprintOf,
+    taskOpenPath,
 } = require('../Modules/Project/helpers/taskOpenProjectId');
 
 describe('TASK OPEN - pass ProjectID so taskData is not empty', () => {
@@ -41,7 +44,11 @@ describe('TASK OPEN - pass ProjectID so taskData is not empty', () => {
         expect(search).toContain('@click.stop="openTask(task)"');
         expect(search).toContain('task_not_in_project');
         expect(search).toContain('missingHit');
-        expect(advance).toContain('@click="openModel(props.taskObj)"');
+        expect(advance).toContain('openInApp');
+        expect(advance).toContain('@click.prevent="openInApp(props.taskObj)"');
+        expect(advance).not.toContain('window.open');
+        expect(advance).not.toContain('target="_blank"');
+        expect(advance).not.toContain('openModel');
         expect(detail).toContain('resolveOpenProjectId');
         expect(detail).toContain('task_not_in_project');
         expect(detail).toContain('openBlocked');
@@ -137,9 +144,98 @@ describe('LIST/BOARD - bind sprint rows so SMOKE tasks can load', () => {
         expect(sprintFolder).toContain('function projectIdMatch');
         expect(sprintFolder).toContain('exports.projectIdMatch = projectIdMatch');
         expect(sprintFolder).toContain('$in');
+        expect(listing).toContain('firstSprintOf');
+        expect(listing).toContain('taskOpenPath');
+        expect(listing).toContain('onBareProject');
+        expect(listing).toContain('sprintFetchStarted');
         expect(list).toContain('EmptyState.no_match_title');
         expect(board).toContain('EmptyState.no_match_title');
         expect(list).toContain('props.sprints && props.sprints.length');
         expect(board).toContain('props.sprints && props.sprints.length');
+    });
+});
+
+describe('SEARCH OPEN - same-tab hash with ProjectID, TaskKey, and auto-select', () => {
+    const CID = '6a8ee973d625fca52e519a12';
+    const PROJECT = '6a8f09301f05e701eaf45c9a';
+    const SPRINT = '6a8f0b22e2ad4d0997553eb4';
+    const TASK = '6a8f8cc420e171dfa740fc43';
+    const FOLDER = '6a8f0aaa0000000000000001';
+
+    test('taskOpenPath builds /project/pid/s/sid/tid and fails closed without cid or pid', () => {
+        expect(taskOpenPath({
+            companyId: CID,
+            projectId: PROJECT,
+            sprintId: SPRINT,
+            taskId: TASK,
+        })).toBe(`/${CID}/project/${PROJECT}/s/${SPRINT}/${TASK}`);
+        expect(taskOpenPath({
+            companyId: { $oid: CID },
+            projectId: { toHexString: () => PROJECT },
+            sprintId: SPRINT,
+        })).toBe(`/${CID}/project/${PROJECT}/s/${SPRINT}`);
+        expect(taskOpenPath({
+            companyId: CID,
+            projectId: PROJECT,
+            folderId: FOLDER,
+            sprintId: SPRINT,
+            taskId: TASK,
+        })).toBe(`/${CID}/project/${PROJECT}/fs/${FOLDER}/${SPRINT}/${TASK}`);
+        expect(taskOpenPath({
+            companyId: CID,
+            projectId: PROJECT,
+            folderId: FOLDER,
+        })).toBe(`/${CID}/project/${PROJECT}/f/${FOLDER}`);
+        expect(taskOpenPath({ companyId: CID, projectId: PROJECT })).toBe(`/${CID}/project/${PROJECT}/p`);
+        expect(taskOpenPath({ companyId: CID })).toBe('');
+        expect(taskOpenPath({ projectId: PROJECT })).toBe('');
+        expect(taskOpenPath({ companyId: CID, projectId: { nope: true } })).toBe('');
+    });
+
+    test('firstSprintOf and asDocList unwrap a single sprint document', () => {
+        expect(asDocList({ _id: SPRINT, name: 'Ask Smoke' })).toEqual([{ _id: SPRINT, name: 'Ask Smoke' }]);
+        expect(asDocList([{ _id: SPRINT }])).toEqual([{ _id: SPRINT }]);
+        expect(asDocList(null)).toEqual([]);
+        expect(asDocList({ [SPRINT]: { _id: SPRINT, id: SPRINT } })).toEqual([{ _id: SPRINT, id: SPRINT }]);
+
+        const bound = bindSprintsToProject(
+            [{ _id: SPRINT, name: 'Ask Smoke', projectId: PROJECT, deletedStatusKey: 0 }],
+            [],
+            PROJECT,
+        );
+        expect(firstSprintOf(bound)._id).toBe(SPRINT);
+        expect(firstSprintOf({ sprintsObj: {}, sprintsfolders: { [FOLDER]: { sprintsObj: { [SPRINT]: { _id: SPRINT } } } } })._id).toBe(SPRINT);
+        expect(firstSprintOf({})).toBe(null);
+    });
+
+    test('Ctrl+K title and OPEN share one in-app href; TaskKey hits AdvancedGlobalFilter', () => {
+        const advance = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'atom', 'AdvanceFilterTasks', 'AdvanceFilterTasks.vue'), 'utf8');
+        const helper = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'molecules', 'AdvanceSearch', 'helper.js'), 'utf8');
+        const filter = fs.readFileSync(path.join(__dirname, '..', 'Modules', 'AdvancedGlobalFilter', 'controller.js'), 'utf8');
+        const subItem = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'molecules', 'SubItem', 'SubItem.vue'), 'utf8');
+        const projects = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'views', 'Projects', 'Projects.vue'), 'utf8');
+        const detail = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'views', 'TaskDetail', 'TaskDetail.vue'), 'utf8');
+        const body = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'organisms', 'TaskDetailBody', 'TaskDetailBody.vue'), 'utf8');
+        const tabs = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'molecules', 'TabListItem', 'TabListItem.vue'), 'utf8');
+        const comments = fs.readFileSync(path.join(__dirname, '..', 'Modules', 'Comments', 'controller.js'), 'utf8');
+
+        expect(advance).toContain('openInApp');
+        expect(advance).toContain('taskOpenPath');
+        expect(advance).toContain('closeAdvanceSearch');
+        expect(advance).not.toContain('window.open');
+        expect(helper).toContain('taskOpenPath');
+        expect(helper).toContain('firstId');
+        expect(filter).toContain('TaskKey');
+        expect(filter).toContain('$regex: escapeRegex(searchStr)');
+        expect(subItem).toContain('taskOpenPath');
+        expect(subItem).toContain('companyId.value');
+        expect(projects).toContain('bindActiveProject');
+        expect(projects).toContain('findListedProject');
+        expect(detail).toContain('task.value = row');
+        expect(detail).toContain('bindSprintsToProject(asDocList');
+        expect(body).toContain('params: { ...route.params }');
+        expect(tabs).toContain('@click.stop="!isActive ? $emit(\'changeTab\' ,tabKey) : \'\'"');
+        expect(comments).toContain('mongoIdIn');
+        expect(comments).toContain('A valid projectId is required.');
     });
 });

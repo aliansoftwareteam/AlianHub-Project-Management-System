@@ -72,7 +72,7 @@ import { useRoute, useRouter } from 'vue-router';
 import ProjectListComponent from '@/components/molecules/ProjectListComponent/ProjectListComponent.vue'
 import Sidebar from "@/components/molecules/Sidebar/Sidebar.vue"
 import { useProjectsHelper } from '../helper';
-import { bindSprintsToProject, sameId } from '@/utils/taskOpenProjectId';
+import { bindSprintsToProject, firstSprintOf, sameId, taskOpenPath } from '@/utils/taskOpenProjectId';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useToast } from 'vue-toast-notification';
@@ -148,13 +148,13 @@ const isProjectFilterApplied = ref(false);
 const isSidebarClose = ref(false);
 const visible = ref(false)
 const isSearchAPIWait = ref(false);
+const sprintFetchStarted = {};
 
 watch(projects, () => {
-    // UPDATE SELECTED PROJECT
     if(projects.value && projects.value.length) {
         if(props.projectData && !Object.keys(props.projectData).length) {
             if(route.params && route.params.id) {
-                const projectIndex = projects.value.findIndex((item) => item._id === route.params.id);
+                const projectIndex = projects.value.findIndex((item) => sameId(item._id, route.params.id));
                 if(projectIndex !== -1) {
                     mutateCurrentProjectDetails(projects.value[projectIndex]);
                 } else {
@@ -165,7 +165,7 @@ watch(projects, () => {
                 mutateCurrentProjectDetails(projects.value[0], true);
             }
         } else {
-            const projIndex = projects.value.findIndex((item) => item._id === props.projectData._id);
+            const projIndex = projects.value.findIndex((item) => sameId(item._id, props.projectData._id));
             if(projIndex !== -1) {
                 mutateCurrentProjectDetails({...projects.value[projIndex]});
             } else {
@@ -238,37 +238,41 @@ function mutateCurrentProjectDetails(data, updateRoute = false,isClicked = false
     }
 
     if(updateRoute) {
-        router.push({
-            name: "Project",
-            params: {
-                cid: companyId.value,
-                id: data._id
-            },
-            query: {
-                ...route.query,
-                tab: tab
-            }
-        })
+        const sprint = firstSprintOf(data);
+        const path = taskOpenPath({
+            companyId: companyId.value,
+            projectId: data._id,
+            sprintId: sprint && (sprint.id || sprint._id),
+            folderId: sprint && sprint.folderId,
+        });
+        if (path) {
+            router.push({ path, query: { ...route.query, tab } }).catch((error) => {
+                console.error('ERROR opening project: ', error);
+            });
+        }
     }
-    let project = projects.value.find((item) => item._id === data._id);
+    let project = (projects.value || []).find((item) => sameId(item._id, data._id));
     if (search.value === '' || projectSearch.value || (isProjectFilterApplied.value && search.value !== '' && projectSearch.value === false)) {
-        project = projects.value.find((item) => item._id === data._id);
+        project = (projects.value || []).find((item) => sameId(item._id, data._id));
     } else {
-        project = searchProject.value.find((item) => item._id === data._id);
+        project = (searchProject.value || []).find((item) => sameId(item._id, data._id));
     }
-    
-    
-    if (search.value === '' || projectSearch.value || (isProjectFilterApplied.value && search.value !== '' && projectSearch.value === false)) {
+
+    if (project && (search.value === '' || projectSearch.value || (isProjectFilterApplied.value && search.value !== '' && projectSearch.value === false))) {
         let sprints = [...(project?.sprintsObj && Object.values(project?.sprintsObj).length ? Object.values(project.sprintsObj) : [])];
 
         project.sprintsfolders && Object.values(project.sprintsfolders).forEach((item) => {
             sprints = [...sprints, ...(item?.sprintsObj && Object.values(item?.sprintsObj).length ? Object.values(item.sprintsObj) : [])];
         })
-        
+
         commit("projectData/mutateCurrentProjectDetails", project);
     }
 
     emit('update:projectData', project);
+    if (project && project._id && !sprintFetchStarted[project._id]) {
+        sprintFetchStarted[project._id] = true;
+        getSprintFolderData(project._id);
+    }
 }
 
 watch(() => props.projectData,(newVal, oldVal) => {
@@ -321,21 +325,15 @@ onMounted(async() => {
             // caller's `tab` query (mutateCurrentProjectDetails swaps any tab that is
             // not one of the project's own views — which is what `tab=ProjectDetail` is).
             const routeIndex = route.params?.id
-                ? projects.value.findIndex((item) => item._id === route.params.id)
+                ? projects.value.findIndex((item) => sameId(item._id, route.params.id))
                 : -1;
             const target = routeIndex !== -1 ? projects.value[routeIndex] : projects.value[0];
             if(route.params?.id && routeIndex === -1) reportUnreachableRouteProject();
             mutateCurrentProjectDetails(target, routeIndex === -1);
-            if(target?.isGlobalPermission === false) {
-                getSprintFolderData(target?._id);
-            }
         } else {
-            const projIndex = projects.value.findIndex((item) => item._id === props.projectData._id);
+            const projIndex = projects.value.findIndex((item) => sameId(item._id, props.projectData._id));
             if(projIndex !== -1) {
                 mutateCurrentProjectDetails(projects.value[projIndex]);
-                if(projects.value[projIndex]?.isGlobalPermission === false) {
-                    getSprintFolderData(projects.value[projIndex]?._id);
-                }
             }
         }
     }
@@ -504,6 +502,19 @@ const getSprintFolderData = async (id,isUpdate = false, forceRefresh = false) =>
                     commit("projectData/mutateProjects",[newObj]);
                     if (search.value !== '' && projectSearch.value || search.value !== '' && (isProjectFilterApplied.value && search.value !== '' && projectSearch.value === false)) {
                         commit("projectData/mutateExistingSearchedProjects",project);
+                    }
+                    const firstSprint = firstSprintOf(project);
+                    const onBareProject = !route.params.sprintId && (route.name === 'Projects' || route.name === 'Project' || !route.params.id);
+                    if (onBareProject && firstSprint && sameId(id, project._id)) {
+                        const path = taskOpenPath({
+                            companyId: companyId.value,
+                            projectId: id,
+                            sprintId: firstSprint.id || firstSprint._id,
+                            folderId: firstSprint.folderId,
+                        });
+                        if (path) {
+                            router.replace({ path, query: { ...route.query } }).catch(() => {});
+                        }
                     }
                     nextTick(() => {
                         loadingData.value[id] = false;

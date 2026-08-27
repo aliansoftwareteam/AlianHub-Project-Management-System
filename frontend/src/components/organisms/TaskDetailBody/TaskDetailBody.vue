@@ -175,7 +175,7 @@
 
     onMounted(() => {
         if(!route.query?.detailTab) {
-            router.replace({query: {detailTab: "task-detail-tab"}})
+            router.replace({ name: route.name, params: { ...route.params }, query: { ...route.query, detailTab: 'task-detail-tab' } })
         }
         activeTab.value = route.query.detailTab ? route.query.detailTab : 'task-detail-tab'
     })
@@ -207,7 +207,7 @@
 
     const changeTab = (tab) => {
         activeTab.value = tab;
-        router.replace({...route, query: {...route.query, detailTab: tab}})
+        router.replace({ name: route.name, params: { ...route.params }, query: { ...route.query, detailTab: tab } })
     }
 
     const commentUsers = computed(() => {

@@ -813,6 +813,7 @@ provide("$dateFormat", dateFormat);
 provide("$companyId", companyId);
 provide("$axios", axios);
 provide("$userId", userId);
+provide('closeAdvanceSearch', () => { isAdvanceSearch.value = false; });
 provide("$moneysymbol", '');
 provide("$isLogginedIn", logged.value);
 provide("$clientWidth", clientWidth);

@@ -1,5 +1,6 @@
 'use strict';
 
+const mongoose = require('mongoose');
 const HEX_ID = /^[0-9a-fA-F]{24}$/;
 const OBJECT_OBJECT = '[object Object]';
 
@@ -140,6 +141,19 @@ function incomingCommentDoc(payload) {
     return payload.fullDocument || payload;
 }
 
+function mongoIdIn(value) {
+    const raw = idString(value);
+    if (!raw) return null;
+    if (raw === 'default') return raw;
+    const ids = [raw];
+    if (HEX_ID.test(raw)) {
+        try {
+            ids.push(new mongoose.Types.ObjectId(raw));
+        } catch (_e) { /* keep the string form */ }
+    }
+    return { $in: ids };
+}
+
 function acceptIncomingComment(doc) {
     if (!doc || typeof doc !== 'object') return false;
     return Boolean(idString(doc._id || doc.id) || doc.userId || doc.message);
@@ -147,6 +161,7 @@ function acceptIncomingComment(doc) {
 
 module.exports = {
     idString,
+    mongoIdIn,
     commentRoomPrefix,
     serializeCommentForSocket,
     incomingCommentDoc,

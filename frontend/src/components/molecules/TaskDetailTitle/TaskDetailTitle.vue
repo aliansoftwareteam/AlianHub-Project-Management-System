@@ -16,7 +16,7 @@
                     v-if="checkPermission('task.task_name_edit',selectedProject?.isGlobalPermission) === true"
                     class="title-name"
                     :title="taskName"
-                    @click="isEditName = true, editTaskName = taskName"
+                    @click.stop="isEditName = true, editTaskName = taskName"
                 >
                     {{ taskName }}
                 </h4>

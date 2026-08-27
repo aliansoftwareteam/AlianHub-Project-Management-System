@@ -5,6 +5,7 @@ const {
     serializeCommentForSocket,
     incomingCommentDoc,
     acceptIncomingComment,
+    mongoIdIn,
 } = require('../Modules/Comments/helpers/commentThread');
 const helper = require('../socket/helper');
 const { handleCommentChange } = require('../socket/controller/commentSocket');
@@ -148,6 +149,19 @@ describe('comment thread id contract', () => {
         expect(acceptIncomingComment({ _id: 'c2', userId: 'alian', message: 'hi' })).toBe(true);
         expect(incomingCommentDoc({ fullDocument: { userId: 'alian' } })).toEqual({ userId: 'alian' });
         expect(acceptIncomingComment(null)).toBe(false);
+    });
+
+    test('mongoIdIn matches string or ObjectId and leaves default as a string', () => {
+        const match = mongoIdIn(TID);
+        expect(match.$in).toContain(TID);
+        expect(match.$in.some((id) => id && id.toHexString && id.toHexString() === TID)).toBe(true);
+        expect(mongoIdIn('default')).toBe('default');
+        expect(mongoIdIn('')).toBe(null);
+        expect(mongoIdIn(null)).toBe(null);
+        const comments = fs.readFileSync(path.join(__dirname, '..', 'Modules', 'Comments', 'controller.js'), 'utf8');
+        expect(comments).toContain('mongoIdIn(projectId)');
+        expect(comments).toContain('A valid projectId is required.');
+        expect(comments).toContain('status(400)');
     });
 });
 

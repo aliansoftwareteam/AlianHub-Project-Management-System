@@ -10,6 +10,7 @@ const { parseMentionIds } = require("./helpers/parseMentions");
 const { maybeReplyAsAlianSafe, emitCommentInsert } = require("./helpers/alianReply");
 const { handleNotificationtFun } = require("../notification/prepare-notification-data/controllerV2");
 const { getRoleType, isPrivileged } = require("../../Config/permissionGuard");
+const { idString, mongoIdIn } = require("./helpers/commentThread");
 
 /* @mention delivery: record the mention (feeds the in-app "mentions" tab, which
  * queries the mentions collection by mentionIds) and fire the notification
@@ -217,25 +218,31 @@ exports.getPaginatedMessages = async (req, res) => {
             tabLeaveTime = null
         } = req.query;
 
+        const projectMatch = mongoIdIn(projectId);
+        if (!projectMatch) {
+            return res.status(400).json({ status: false, message: 'A valid projectId is required.', data: [] });
+        }
+
+        const taskMatch = !isDefault && mainChat
+            ? { taskId: 'default' }
+            : (taskId
+                ? { taskId: taskId !== 'default' ? mongoIdIn(taskId) : taskId }
+                : { project: true });
+        if (taskId && taskId !== 'default' && !mongoIdIn(taskId)) {
+            return res.status(400).json({ status: false, message: 'A valid taskId is required.', data: [] });
+        }
+
+        const and = [
+            { projectId: projectMatch },
+            { isDeleted: { $ne: true } },
+            taskMatch,
+        ];
+        const sprintMatch = sprintId ? mongoIdIn(sprintId) : null;
+        if (sprintMatch) and.push({ sprintId: sprintMatch });
+        if (tabLeaveTime) and.push({ updatedAt: { $gte: new Date(Number(tabLeaveTime)) } });
+
         const searchResultMatch = {
-            $match: {
-                $and: [
-                    { projectId: new mongoose.Types.ObjectId(projectId) },
-                    // BUG-032 / #86 fix: align soft-delete handling with the other
-                    // comment-listing endpoints (searchMessageFromMainChat /
-                    // searchComments). Without this filter, soft-deleted comments
-                    // (isDeleted === true) reappeared in main-chat pagination.
-                    // `$ne: true` keeps documents whose flag is missing/false.
-                    { isDeleted: { $ne: true } },
-                    ...(sprintId ? [{ sprintId: new mongoose.Types.ObjectId(sprintId) }] : []),
-                    ...(tabLeaveTime ? [{ updatedAt: { $gte: new Date(Number(tabLeaveTime)) } }] : []),
-                    ...(!isDefault && mainChat
-                        ? [{ taskId: "default" }]
-                        : taskId
-                            ? [{ taskId: taskId !== 'default' ?  new mongoose.Types.ObjectId(taskId) : taskId }]
-                            : [{ project: true }]),
-                ]
-            }
+            $match: { $and: and }
         };
 
         const sortOption = {

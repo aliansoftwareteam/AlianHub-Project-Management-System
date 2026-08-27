@@ -120,7 +120,7 @@
     import taskClass from "@/utils/TaskOperations";
     import { apiRequest } from '../../services';
     import * as env from '@/config/env';
-    import { resolveOpenProjectId, shouldShowTaskChrome } from '@/utils/taskOpenProjectId';
+    import { resolveOpenProjectId, shouldShowTaskChrome, bindSprintsToProject, asDocList } from '@/utils/taskOpenProjectId';
     import { openGlobalSearch } from '@/utils/openGlobalSearch';
     import Sidebar from '@/components/molecules/Sidebar/Sidebar.vue'
     import TaskDetailNavBar from '@/components/molecules/TaskDetailNavBar/TaskDetailNavBar.vue'
@@ -499,42 +499,11 @@
 
     const getSprintFolderData = async (id,sprintsResult,foldersResult) => {
         try {
-            return new Promise((resolve) => {
-                const sprintsArray = sprintsResult?.filter(sprint => sprint.projectId === id && !sprint.folderId).map((x) => ({ ...x, id:x._id }));
-
-                const foldersObject = foldersResult?.reduce((acc, folder) => {
-                    if (folder.projectId === id) {
-                        let folId = folder._id
-                        acc[folId] = {
-                            folderId: folId,
-                            name: folder.name,
-                            sprintsObj: {},
-                            deletedStatusKey: folder.deletedStatusKey,
-                            legacyId : folder?.legacyId ? folder?.legacyId : '',
-                            id: folder._id,
-                            _id: folder._id,
-                        };
-                    }
-                    return acc;
-                }, {});
-
-                sprintsResult?.forEach(sprint => {
-                    if (sprint.projectId === id && sprint.folderId && foldersObject[sprint.folderId]) {
-                        sprint.folderName = foldersObject[sprint.folderId].name;
-                        sprint.id = sprint._id;
-                        foldersObject[sprint.folderId].sprintsObj[sprint.id] = sprint;
-                    }
-                });
-                let allSprints = sprintsArray ? sprintsArray : []
-
-                let allFolders = foldersObject ? foldersObject : {}
-
-                const sprintIdToObject = {};
-                allSprints.forEach(item => {sprintIdToObject[item.id] = item;});
-                resolve({sprints:sprintIdToObject,folders:allFolders})
-            })
+            const bound = bindSprintsToProject(asDocList(sprintsResult), asDocList(foldersResult), id);
+            return { sprints: bound.sprintsObj, folders: bound.sprintsfolders };
         } catch (error) {
             console.error("ERROR", error);
+            return { sprints: {}, folders: {} };
         }
     }
 
@@ -565,9 +534,6 @@
     });
 
     onMounted(async () => {
-        if(route.query?.detailTab) {
-            router.replace({query: {...route.query}})
-        }
         getQueryFun();
         try {
             document.addEventListener('visibilitychange', visibilityHandler);            
@@ -637,20 +603,22 @@
             .then((res) => {
                 if (res.status  == 200 && res.data.length > 0) {
                     let response = res.data
+                    const row = response[0].tasks && response[0].tasks[0];
+                    if (!row || !row._id) {
+                        markTaskMissing();
+                        return;
+                    }
+                    openBlocked.value = false;
+                    isSpinner.value = false;
+                    emit('handleSpinner');
+                    task.value = row;
+                    projectData.value = response[0];
                     const sprint = response[0].sprintsObj;
                     const folder = response[0].sprintsfolders;
                     getSprintFolderData(response[0]._id,sprint,folder).then((resp) => {
-                        response[0].sprintsObj = resp.sprints
-                        response[0].sprintsfolders = resp.folders
-                        openBlocked.value = false;
-                        isSpinner.value = false;
-                        emit('handleSpinner');
+                        if (resp && resp.sprints) response[0].sprintsObj = resp.sprints
+                        if (resp && resp.folders) response[0].sprintsfolders = resp.folders
                         projectData.value = response[0];
-                        task.value = response[0].tasks[0] || {};
-                        if (!task.value || !task.value._id) {
-                            markTaskMissing();
-                            return;
-                        }
                         subTasks.value = response[0].subtasks || [];
                         commit('projectData/setTaskDetailData',{isSubTaskData: true, data: subTasks.value});
                         fetchSubtaskCount();

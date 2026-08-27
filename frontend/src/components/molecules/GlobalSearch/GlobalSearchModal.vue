@@ -64,7 +64,7 @@ import { useRouter } from "vue-router";
 // UTILS
 import { apiRequest } from '@/services';
 import { useCustomComposable } from "@/composable";
-import { resolveTaskOpenIds } from '@/utils/taskOpenProjectId';
+import { resolveTaskOpenIds, taskOpenPath } from '@/utils/taskOpenProjectId';
 
 const { debounce } = useCustomComposable();
 const router = useRouter();
@@ -136,13 +136,19 @@ function openTask(task) {
         missingHit.value = true;
         return;
     }
+    const path = taskOpenPath({
+        companyId: companyId.value,
+        projectId: ids.projectId,
+        sprintId: ids.sprintId,
+        taskId: ids.taskId,
+        folderId: task.folderObjId,
+    });
+    if (!path) {
+        missingHit.value = true;
+        return;
+    }
     close();
-    const projectId = ids.projectId;
-    const base = `/${companyId.value}/project/${projectId}`;
-    const path = task.folderObjId
-        ? `${base}/fs/${task.folderObjId}/${ids.sprintId}/${ids.taskId}`
-        : `${base}/s/${ids.sprintId}/${ids.taskId}`;
-    router.push(path).catch((error) => console.error('ERROR opening search task: ', error));
+    router.push({ path, query: { detailTab: 'task-detail-tab' } }).catch((error) => console.error('ERROR opening search task: ', error));
 }
 
 // Project routes always include a sprint segment (see router/projects), so the

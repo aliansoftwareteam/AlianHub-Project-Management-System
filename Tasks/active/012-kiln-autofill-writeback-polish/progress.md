@@ -6,18 +6,18 @@
 - [x] Search/Home/deep URL ProjectID; search title click; fail-fast if id missing (no skeleton)
 - [x] Honest list/board empty copy; standup height + SOURCES count
 - [x] Bind Local Smoke sprint rows onto list/board (id coerce, dangling folder, sprint GET $in)
+- [x] Ctrl+K title + OPEN: same-tab in-app hash with ProjectID (no blank tab, no overlay)
+- [x] Ctrl+K TaskKey (`SMOKE-7`) hits AdvancedGlobalFilter TaskName **or** TaskKey
+- [x] PROJECTS tab without a selected project auto-selects/loads first project + first sprint
+- [x] Comments list matches string or ObjectId taskId; empty projectId is 400
 - [x] Tests: skip-filled per field, Owner-without-Assignee, activity vs comment
 - [x] Draft stacked PR; tests green
 
 ## Last step
-Fail-fast for empty projectId is on the same PR. Search hits stringify ProjectID; missing id shows one kiln line + Back to search, never a skeleton.
-
-QA confirmed leftover 3 is UI-side: POST /search SMOKE returns SMOKE-1..7 and GET project is 200, but list/board stayed empty because sprints never bound (strict projectId ===, dangling folderId dropped, sprint GET ObjectId-only). Bind + $in match so sprint tasks can load; empty copy stays "No matching filters" when the list is still empty.
-
-Jest 116 passing (page/comment/autofill/writeback/search + sprint bind). Frontend `npm run build` succeeded. Draft PR 522 updated. Live Local Smoke not exercised (no Mongo).
+Ctrl+K from Home (Local Smoke not selected): title click and OPEN now share one in-app `taskOpenPath` href and `router.push` (no `window.open`, no `[object Object]` project segment). TaskKey queries hit the same AdvancedGlobalFilter `$or` as TaskName. PROJECTS tab without an id auto-binds the first listed project (Local Smoke in the smoke company) and loads sprints so Tags/AI and the board can bind SMOKE-1..7. Comments `$in` string+ObjectId; missing projectId is 400.
 
 ## Blockers
-None.
+None. Live Local Smoke is not in this VM (no Mongo), so the Home Ctrl+K and PROJECTS auto-select paths are covered by source/unit tests, not a browser pass.
 
 ## Log
 
@@ -28,3 +28,4 @@ None.
 - Search/Home/deep URL resolve the task `ProjectID`. Search result titles open the task. Empty projectId fails fast (one kiln line + Back to search) instead of a spinner skeleton. List/board empty copy is "No matching filters". Standup briefing height is capped; SOURCES collapse to a count.
 - List/board bind: sprint GET matches string or ObjectId `projectId`; dangling `folderId` still lands in `sprintsObj`; cache no longer returns another project's sprints. Empty status columns no longer skip the task fetch.
 - Jest 116 passing; frontend production build succeeded. PR 522 updated.
+- QA P0 leftover 2: Ctrl+K title/OPEN from Home did nothing / opened a blank tab because `generateTaskURL` interpolated raw `ProjectID` objects and OPEN used `window.open`. Title + both OPEN icons now `router.push` the `/project/pid/s/sid/tid` hash and close search. `SMOKE-7` missed because AdvancedGlobalFilter `$match`ed TaskName only — TaskKey is in the same `$or`. PROJECTS tab with no selected project left `currentProjectDetails` empty (Tags/AI Enable teasers, empty board); auto-select first listed project, always fetch sprints, and rewrite `#/<cid>/project` to the first sprint. Comments list `$in` string+ObjectId; empty projectId 400. Task modal hydrates `tasks[0]` before sprint bind. Comments tab `@click.stop`; hash replace keeps `params`.
