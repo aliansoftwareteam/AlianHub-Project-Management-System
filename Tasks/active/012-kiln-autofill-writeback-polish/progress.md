@@ -14,6 +14,8 @@ Fail-fast for empty projectId is on the same PR. Search hits stringify ProjectID
 
 QA confirmed leftover 3 is UI-side: POST /search SMOKE returns SMOKE-1..7 and GET project is 200, but list/board stayed empty because sprints never bound (strict projectId ===, dangling folderId dropped, sprint GET ObjectId-only). Bind + $in match so sprint tasks can load; empty copy stays "No matching filters" when the list is still empty.
 
+Jest 116 passing (page/comment/autofill/writeback/search + sprint bind). Frontend `npm run build` succeeded. Draft PR 522 updated. Live Local Smoke not exercised (no Mongo).
+
 ## Blockers
 None.
 
@@ -25,3 +27,4 @@ None.
 - Write-back posts one Activity Log row (copper Alian mark) instead of a new comment per event. Project toggle is checked before that write. Page briefing stays a replace-in-place strip with dismiss/collapse.
 - Search/Home/deep URL resolve the task `ProjectID`. Search result titles open the task. Empty projectId fails fast (one kiln line + Back to search) instead of a spinner skeleton. List/board empty copy is "No matching filters". Standup briefing height is capped; SOURCES collapse to a count.
 - List/board bind: sprint GET matches string or ObjectId `projectId`; dangling `folderId` still lands in `sprintsObj`; cache no longer returns another project's sprints. Empty status columns no longer skip the task fetch.
+- Jest 116 passing; frontend production build succeeded. PR 522 updated.
