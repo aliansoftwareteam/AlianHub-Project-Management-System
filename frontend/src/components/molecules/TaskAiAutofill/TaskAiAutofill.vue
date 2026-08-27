@@ -16,7 +16,7 @@
                         <input
                             type="checkbox"
                             :checked="row.checked"
-                            :disabled="row.filled || !row.item"
+                            :disabled="!row.item"
                             @change="toggleRow(row.fieldId)"
                         />
                         <span class="taf__title">{{ row.title }}</span>
@@ -29,7 +29,6 @@
                         :disabled="busy || !row.checked"
                         @click="applyOne(row)"
                     >{{ busy ? $t('CustomField.autofill_working') : $t('CustomField.autofill_apply') }}</button>
-                    <span v-else-if="row.filled" class="taf__filled">{{ $t('CustomField.autofill_filled') }}</span>
                 </li>
             </ul>
             <div class="taf__actions">
@@ -49,7 +48,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import { useToast } from 'vue-toast-notification';
@@ -72,6 +71,7 @@ const { t } = useI18n();
 const $toast = useToast();
 const { getters, commit } = useStore();
 const { getUser } = useGetterFunctions();
+const selectedProject = inject('selectedProject', null);
 
 const busy = ref(false);
 const notice = ref('');
@@ -86,11 +86,16 @@ const goLabel = computed(() => {
     return filledOnce.value ? t('CustomField.autofill_fill_empty') : t('CustomField.autofill');
 });
 
+function ownerFieldType(type) {
+    const raw = String(type || '').toLowerCase();
+    return raw === 'dropdown' || raw === 'people' || raw === 'person';
+}
+
 const ownerField = computed(() => {
     const list = getters['settings/finalCustomFields'] || [];
     return list.find((field) => (
         OWNER_TITLE.test(String((field && field.fieldTitle) || ''))
-        && String((field && field.fieldType) || '').toLowerCase() === 'dropdown'
+        && ownerFieldType(field && field.fieldType)
     )) || null;
 });
 
@@ -121,12 +126,24 @@ function valueIsEmpty(value) {
     return false;
 }
 
+function canWrite() {
+    const value = props.enabled;
+    return value === true || value === 1 || value === 2;
+}
+
+function assigneeChipId(value) {
+    if (typeof value !== 'string') return '';
+    const id = value.trim();
+    if (!id || id === '0' || id.toLowerCase() === 'unassigned' || id === '[object Object]') return '';
+    return id;
+}
+
 function assigneeEmpty() {
     const raw = props.task && props.task.AssigneeUserId;
-    const list = Array.isArray(raw) ? raw : [];
+    const list = Array.isArray(raw) ? raw : (raw != null && raw !== '' ? [raw] : []);
     return list.filter((value) => {
-        const id = value && typeof value === 'object' ? String(value._id || value.id || '') : String(value || '');
-        if (!id || id === '0' || id.toLowerCase() === 'unassigned') return false;
+        const id = assigneeChipId(value);
+        if (!id) return false;
         try {
             const user = getUser(id);
             if (!user || user.ghostUser) return false;
@@ -138,8 +155,48 @@ function assigneeEmpty() {
     }).length === 0;
 }
 
+function projectBag() {
+    const injected = selectedProject && typeof selectedProject === 'object' && 'value' in selectedProject
+        ? selectedProject.value
+        : selectedProject;
+    return injected || getters['projectData/currentProjectDetails'] || {};
+}
+
+function sprintRecord(task) {
+    const sid = String((task && (task.sprintId || (task.sprintArray && (task.sprintArray.id || task.sprintArray._id)))) || '');
+    const project = projectBag();
+    const bags = [project.sprintsObj || {}];
+    Object.values(project.sprintsfolders || {}).forEach((folder) => {
+        bags.push((folder && folder.sprintsObj) || {});
+    });
+    if (sid) {
+        for (const bag of bags) {
+            if (bag[sid]) return bag[sid];
+            const hit = Object.values(bag).find((sprint) => String((sprint && (sprint.id || sprint._id)) || '') === sid);
+            if (hit) return hit;
+        }
+    }
+    return (task && task.sprintArray) || null;
+}
+
+function isoDate(value) {
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+        return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+    }
+    return '';
+}
+
 function sprintDueDisplay(task) {
-    const name = String((task && (task.sprintName || (task.sprintArray && task.sprintArray.name))) || '');
+    const sprint = sprintRecord(task);
+    const end = isoDate((sprint && (sprint.endDate || sprint.EndDate))
+        || (task && task.sprintArray && (task.sprintArray.endDate || task.sprintArray.EndDate)));
+    if (end) return end;
+    const name = String(
+        (task && (task.sprintName || (task.sprintArray && task.sprintArray.name)))
+        || (sprint && (sprint.name || sprint.sprintName))
+        || '',
+    );
     const range = name.match(/(\d{1,2})\s*[-–]\s*(\d{1,2})\s+([A-Za-z]{3,9})\.?\s+(20\d{2})/);
     if (!range) return '';
     const months = {
@@ -149,6 +206,30 @@ function sprintDueDisplay(task) {
     const month = months[String(range[3] || '').slice(0, 3).toLowerCase()];
     if (!month) return '';
     return `${range[4]}-${String(month).padStart(2, '0')}-${String(Number(range[2])).padStart(2, '0')}`;
+}
+
+function assigneeSeed() {
+    if (!assigneeEmpty()) return null;
+    const leader = props.task && (props.task.Task_Leader || props.task.createdBy || props.task.createdById);
+    const id = typeof leader === 'string'
+        ? leader
+        : String((leader && (leader._id || leader.id)) || (leader && typeof leader.toHexString === 'function' ? leader.toHexString() : '') || '');
+    if (!id || id === '[object Object]') return null;
+    try {
+        const user = getUser(id);
+        const name = String((user && (user.Employee_Name || user.name)) || '').trim();
+        if (!user || user.ghostUser || !name || name.toLowerCase() === 'ghost user') return null;
+        return {
+            fieldId: 'assignee',
+            kind: 'owner',
+            source: 'native',
+            personId: id,
+            value: [id],
+            display: name,
+        };
+    } catch (_error) {
+        return null;
+    }
 }
 
 function nativeDueEmpty() {
@@ -173,7 +254,15 @@ function ownerValueLabel(field) {
     const options = Array.isArray(field.fieldOptions) ? field.fieldOptions : [];
     return ids.map((id) => {
         const hit = options.find((option) => String(option.id || option._id) === String(id));
-        return (hit && (hit.label || hit.value || hit.name)) || String(id);
+        if (hit) return hit.label || hit.value || hit.name || '';
+        try {
+            const user = getUser(String(id));
+            const name = String((user && (user.Employee_Name || user.name)) || '').trim();
+            if (user && !user.ghostUser && name && name.toLowerCase() !== 'ghost user') return name;
+        } catch (_error) {
+            return '';
+        }
+        return '';
     }).filter(Boolean).join(', ');
 }
 
@@ -195,7 +284,6 @@ function toggleRow(fieldId) {
 }
 
 const rows = computed(() => {
-    const assigneeSug = findSuggestion((item) => item.source === 'native' || item.fieldId === 'assignee');
     const field = ownerField.value;
     const ownerSug = field
         ? findSuggestion((item) => String(item.fieldId) === String(field._id) && item.source !== 'native')
@@ -205,49 +293,58 @@ const rows = computed(() => {
         || item.fieldId === 'due'
         || (dueField.value && String(item.fieldId) === String(dueField.value._id))
     ));
-    const assigneeIsEmpty = assigneeEmpty();
-    const ownerLabel = ownerValueLabel(field);
-    const ownerFilled = Boolean(ownerLabel);
-    const dueIsEmpty = dueField.value ? customDueEmpty() : nativeDueEmpty();
-    const dueId = (dueSug && dueSug.fieldId) || (dueField.value && dueField.value._id) || 'due';
+    const assigneeItem = assigneeEmpty()
+        ? (findSuggestion((item) => item.fieldId === 'assignee' || (item.source === 'native' && item.kind === 'owner')) || assigneeSeed())
+        : null;
+    const ownerFilled = Boolean(ownerValueLabel(field));
+    const nativeEmpty = nativeDueEmpty();
+    const customEmpty = dueField.value ? customDueEmpty() : false;
+    const dueIsEmpty = nativeEmpty || customEmpty;
     const dueSeed = sprintDueDisplay(props.task);
+    const dueId = (dueSug && dueSug.fieldId)
+        || (customEmpty && dueField.value && dueField.value._id)
+        || 'due';
     const dueItem = dueSug || (dueIsEmpty && dueSeed
-        ? { fieldId: dueId, kind: 'date', value: dueSeed, display: dueSeed, source: dueField.value ? 'customField' : 'native' }
+        ? {
+            fieldId: dueId,
+            kind: 'date',
+            value: dueSeed,
+            display: dueSeed,
+            source: (customEmpty && dueField.value && String(dueId) === String(dueField.value._id)) ? 'customField' : 'native',
+        }
         : null);
-    const out = [
-        {
+    const out = [];
+    if (assigneeItem) {
+        const display = assigneeItem.display || (Array.isArray(assigneeItem.value) ? '' : assigneeItem.value) || '';
+        out.push({
             fieldId: 'assignee',
             title: t('ProjectDetails.assignee'),
-            display: (assigneeSug && (assigneeSug.display || assigneeSug.value)) || '',
-            item: assigneeSug,
+            display,
+            item: assigneeItem,
             checked: isSelected('assignee'),
-            canApply: Boolean(props.enabled) && Boolean(assigneeSug) && assigneeIsEmpty,
-            filled: false,
+            canApply: canWrite() && Boolean(assigneeItem),
             write: 'assignee',
-        },
-    ];
-    if (!assigneeIsEmpty && !assigneeSug) out.pop();
-    if (!ownerFilled) {
+        });
+    }
+    if (!ownerFilled && ownerSug) {
         out.push({
             fieldId: (field && field._id) || 'owner',
             title: (field && field.fieldTitle) || 'Owner',
-            display: (ownerSug && (ownerSug.display || ownerSug.value)) || '',
+            display: ownerSug.display || ownerSug.value || '',
             item: ownerSug,
             checked: Boolean(field) && isSelected(field._id),
-            canApply: Boolean(props.enabled) && Boolean(ownerSug),
-            filled: false,
+            canApply: canWrite() && Boolean(ownerSug),
             write: 'owner',
         });
     }
-    if (dueIsEmpty) {
+    if (dueIsEmpty && dueItem) {
         out.push({
             fieldId: dueId,
             title: (dueField.value && dueField.value.fieldTitle) || (dueSug && dueSug.title) || t('Projects.due_date'),
-            display: (dueItem && (dueItem.display || dueItem.value)) || dueSeed || '',
+            display: dueItem.display || dueItem.value || dueSeed || '',
             item: dueItem,
             checked: isSelected(dueId),
-            canApply: Boolean(props.enabled) && Boolean(dueItem),
-            filled: false,
+            canApply: canWrite() && Boolean(dueItem),
             write: 'date',
         });
     }
@@ -316,14 +413,16 @@ async function preview() {
         suggestions.value = next;
         const ids = next.filter((item) => item && item.fieldId).map((item) => String(item.fieldId));
         const dueIso = sprintDueDisplay(props.task);
-        const dueTarget = (dueField.value && dueField.value._id) || 'due';
-        if (dueIso && !ids.includes(String(dueTarget)) && !ids.includes('due')) {
-            ids.push(String(dueTarget));
+        if (dueIso) {
+            if (!ids.includes('due')) ids.push('due');
+            if (dueField.value && !ids.includes(String(dueField.value._id))) ids.push(String(dueField.value._id));
         }
+        const seed = assigneeSeed();
+        if (seed && !ids.includes('assignee')) ids.push('assignee');
         selectedIds.value = ids;
         showCard.value = true;
         filledOnce.value = true;
-        if (!next.length && !dueIso) notice.value = t('CustomField.autofill_none');
+        if (!next.length && !dueIso && !seed) notice.value = t('CustomField.autofill_none');
     } catch (_error) {
         notice.value = t('CustomField.autofill_failed');
         suggestions.value = [];
@@ -516,13 +615,6 @@ async function applyOne(row) {
 .taf__value {
     color: var(--kiln-text, #1b2f28);
     word-break: break-word;
-}
-.taf__filled {
-    font-size: 10px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--kiln-muted, #6b7280);
-    align-self: center;
 }
 .taf__actions {
     display: flex;

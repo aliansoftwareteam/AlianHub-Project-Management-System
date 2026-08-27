@@ -35,8 +35,24 @@ const PAGE_CAP = 4;
 
 function recordId(row) {
     if (row == null) return '';
-    if (typeof row === 'string' || typeof row === 'number') return String(row).trim();
-    return String(row._id || row.id || '').trim();
+    if (typeof row === 'string' || typeof row === 'number') {
+        const raw = String(row).trim();
+        return raw === '[object Object]' ? '' : raw;
+    }
+    if (typeof row.toHexString === 'function') {
+        const hex = String(row.toHexString()).trim();
+        if (OBJECT_ID.test(hex)) return hex;
+    }
+    const nested = row._id || row.id;
+    if (nested && nested !== row) {
+        const inner = recordId(nested);
+        if (inner) return inner;
+    }
+    if (typeof row.toString === 'function') {
+        const asString = String(row.toString()).trim();
+        if (OBJECT_ID.test(asString)) return asString;
+    }
+    return '';
 }
 
 function clamp(value, cap) {
@@ -71,6 +87,9 @@ function kindForField(field) {
     const type = String((field && field.fieldType) || '').toLowerCase();
     if (SUMMARY_TYPES.has(type)) return 'summary';
     if (DATE_TYPES.has(type)) return 'date';
+    if (type === 'people' || type === 'person') {
+        return OWNER_TITLE.test(String((field && field.fieldTitle) || '')) ? 'owner' : null;
+    }
     if (TAG_TYPES.has(type)) {
         return OWNER_TITLE.test(String((field && field.fieldTitle) || '')) ? 'owner' : 'tag';
     }
@@ -120,11 +139,14 @@ function isCustomFieldEmpty(task, field) {
 function isAssigneeEmpty(task, people) {
     const raw = task && task.AssigneeUserId;
     const list = Array.isArray(raw) ? raw : (raw != null && raw !== '' ? [raw] : []);
-    const ids = list.map(recordId).filter((id) => id && id !== '0' && id.toLowerCase() !== 'unassigned');
+    const ids = list
+        .filter((item) => typeof item === 'string' || typeof item === 'number')
+        .map(recordId)
+        .filter((id) => id && id !== '0' && id.toLowerCase() !== 'unassigned');
     if (!ids.length) return true;
     const allowed = normalizePeople(people);
-    if (allowed.length) return !ids.some((id) => allowed.some((person) => person.id === id));
-    return false;
+    if (!allowed.length) return false;
+    return !ids.some((id) => allowed.some((person) => person.id === id));
 }
 
 function isDueDateEmpty(task) {
@@ -423,8 +445,11 @@ function heuristicSuggestions({ targets, people, title, description, comments, p
         }
         if (target.kind === 'owner') {
             const mentioned = allowedPeople.find((person) => person.name && haystack.includes(person.name.toLowerCase()));
+            const leaderId = recordId(task && (task.Task_Leader || task.createdBy || task.createdById));
+            const leader = leaderId ? allowedPeople.find((person) => person.id === leaderId) : null;
             if (target.source === 'native') {
-                if (mentioned) suggestions.push({ fieldId: target.fieldId, kind: 'owner', personId: mentioned.id, value: mentioned.name });
+                const person = mentioned || leader;
+                if (person) suggestions.push({ fieldId: target.fieldId, kind: 'owner', personId: person.id, value: person.name });
                 continue;
             }
             const option = (target.options || []).find((row) => {
@@ -433,7 +458,14 @@ function heuristicSuggestions({ targets, people, title, description, comments, p
                 if (haystack.includes(label)) return true;
                 return Boolean(mentioned && mentioned.name && mentioned.name.toLowerCase() === label);
             });
-            if (option) suggestions.push({ fieldId: target.fieldId, kind: 'owner', optionId: option.id, value: option.label });
+            if (option) {
+                suggestions.push({ fieldId: target.fieldId, kind: 'owner', optionId: option.id, value: option.label });
+                continue;
+            }
+            const person = mentioned || leader;
+            if (person && !(target.options || []).length) {
+                suggestions.push({ fieldId: target.fieldId, kind: 'owner', personId: person.id, value: person.name });
+            }
         }
     }
     return suggestions;
@@ -517,7 +549,7 @@ function sanitizeSuggestions(suggestions, { targets, people, task } = {}) {
         }
 
         if (target.kind === 'owner') {
-            if (target.source === 'native') {
+            if (target.source === 'native' || !(target.options || []).length) {
                 const person = matchPerson(raw.personId || raw.value || raw.name, allowedPeople);
                 if (!person) {
                     skipped.push({ fieldId, reason: 'invented-person' });
@@ -526,7 +558,7 @@ function sanitizeSuggestions(suggestions, { targets, people, task } = {}) {
                 out.push({
                     fieldId,
                     kind: 'owner',
-                    source: 'native',
+                    source: target.source || 'customField',
                     title: target.title,
                     value: [person.id],
                     personId: person.id,

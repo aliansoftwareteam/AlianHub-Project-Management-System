@@ -346,12 +346,15 @@ describe('TASKS - AI autofill custom fields', () => {
         expect(isEmptyValue({})).toBe(true);
         expect(isEmptyValue('2026-08-28')).toBe(false);
 
+        const pm = { id: 'u-pm', name: 'Local PM', email: 'pm@local.test' };
         const smoke = emptyTask({
             TaskName: 'Test Ask Smoke on mobile',
             description: '',
-            AssigneeUserId: [],
-            DueDate: null,
+            AssigneeUserId: [{ toHexString: () => 'deadbeefdeadbeefdeadbeef' }],
+            Task_Leader: pm.id,
+            DueDate: 'DD/MM/YYYY',
             sprintName: 'SMOKE - 24 - 28 Aug 2026',
+            sprintArray: { name: 'SMOKE - 24 - 28 Aug 2026', endDate: '2026-08-28' },
             customField: {
                 'f-summary': { fieldValue: 'Test Ask Smoke functionality on mobile devices' },
                 'f-tag': { fieldValue: ['opt-launch'] },
@@ -359,10 +362,11 @@ describe('TASKS - AI autofill custom fields', () => {
                 'f-date': { fieldValue: 'DD/MM/YYYY' },
             },
         });
+        const people = [pm, ADA, GRACE];
         const targets = listEmptyTargets({
             task: smoke,
             fields: FIELDS,
-            people: [ADA, GRACE],
+            people,
             permissions: { customField: true, assignee: true },
         });
         const ids = targets.map((row) => row.fieldId);
@@ -374,9 +378,11 @@ describe('TASKS - AI autofill custom fields', () => {
         expect(ids).not.toContain('f-tag');
         expect(ids).not.toContain(NATIVE_DUE_ID);
 
-        const result = preview(smoke, { comments: [] });
+        const result = preview(smoke, { comments: [], people });
         const due = result.data.suggestions.find((row) => row.fieldId === 'f-date');
+        const assignee = result.data.suggestions.find((row) => row.fieldId === NATIVE_ASSIGNEE_ID);
         expect(due).toEqual(expect.objectContaining({ kind: 'date', value: '2026-08-28' }));
+        expect(assignee).toEqual(expect.objectContaining({ personId: pm.id, display: 'Local PM' }));
         expect(result.data.suggestions.every((row) => row.fieldId !== 'f-summary')).toBe(true);
         expect(result.data.suggestions.every((row) => row.fieldId !== 'f-owner')).toBe(true);
 
@@ -388,16 +394,48 @@ describe('TASKS - AI autofill custom fields', () => {
         const llmSkipped = previewFromParts({
             task: smoke,
             fields: FIELDS,
-            people: [ADA, GRACE],
+            people,
             permissions: { customField: true, assignee: true, uid: 'u-ada', roleType: 1 },
             comments: [],
         }, []);
         expect(llmSkipped.data.suggestions.find((row) => row.fieldId === 'f-date')).toEqual(
             expect.objectContaining({ kind: 'date', value: '2026-08-28' }),
         );
+        expect(llmSkipped.data.suggestions.find((row) => row.fieldId === NATIVE_ASSIGNEE_ID)).toEqual(
+            expect.objectContaining({ personId: pm.id }),
+        );
         expect(sprintDueStamp(smoke)).toEqual(expect.any(Date));
         expect(sprintDueStamp(smoke).toISOString().slice(0, 10)).toBe('2026-08-28');
         expect(sprintDueStamp({}, { endDate: '2026-08-28' }).toISOString().slice(0, 10)).toBe('2026-08-28');
+
+        const nativeOnly = listEmptyTargets({
+            task: emptyTask({
+                TaskName: 'Test Ask Smoke on mobile',
+                AssigneeUserId: [],
+                DueDate: 'DD/MM/YYYY',
+                sprintName: 'SMOKE - 24 - 28 Aug 2026',
+            }),
+            fields: FIELDS.filter((field) => field._id !== 'f-date'),
+            people: [pm],
+            permissions: { customField: true, assignee: true },
+        });
+        expect(nativeOnly.map((row) => row.fieldId)).toContain(NATIVE_DUE_ID);
+        const nativePreview = previewFromParts({
+            task: emptyTask({
+                TaskName: 'Test Ask Smoke on mobile',
+                AssigneeUserId: [],
+                DueDate: 'DD/MM/YYYY',
+                Task_Leader: pm.id,
+                sprintName: 'SMOKE - 24 - 28 Aug 2026',
+            }),
+            fields: FIELDS.filter((field) => field._id !== 'f-date'),
+            people: [pm],
+            permissions: { customField: true, assignee: true },
+            comments: [],
+        }, []);
+        expect(nativePreview.data.suggestions.find((row) => row.fieldId === NATIVE_DUE_ID)).toEqual(
+            expect.objectContaining({ kind: 'date', value: '2026-08-28' }),
+        );
     });
 
     test('task panel Autofill is two labeled rows with per-row apply, not gated on AI plan', () => {
@@ -411,6 +449,10 @@ describe('TASKS - AI autofill custom fields', () => {
         expect(card).toContain('sprintDueDisplay');
         expect(card).toContain('ghostUser');
         expect(card).toContain('ownerFilled');
+        expect(card).toContain('canWrite');
+        expect(card).toContain('assigneeSeed');
+        expect(card).toContain('assigneeChipId');
+        expect(card).toContain('nativeDueEmpty');
         expect(card).toContain("write: 'assignee'");
         expect(card).toContain("write: 'owner'");
         expect(card).toContain('showCard');
@@ -424,6 +466,8 @@ describe('TASKS - AI autofill custom fields', () => {
         expect(card).toContain('DATE_PLACEHOLDER');
         expect(card).toContain('dueField');
         expect(card).not.toContain('taf__kind');
+        expect(card).not.toContain('taf__filled');
+        expect(card).not.toContain('autofill_filled');
         expect(card).not.toContain("checkApps('CustomFields')");
         expect(card).not.toContain('getAppState');
         expect(render).toContain('TaskAiAutofill');
