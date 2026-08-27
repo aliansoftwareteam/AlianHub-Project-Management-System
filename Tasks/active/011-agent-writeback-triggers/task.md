@@ -32,7 +32,7 @@ When a user changes a task status, saves a page, or posts a comment, an agent ca
 - [ ] Filled fields are not clobbered; invented people/tags/task ids are dropped
 - [ ] Permission-aware and companyId multi-tenant
 - [ ] Tests cover event gate, skip-filled, invented ids dropped, and permission
-- [ ] Draft stacked PR on a new `feat/` branch from `feat/ai-autofill-custom-fields-32f3`; tests green
+- [x] Draft stacked PR on a new `feat/` branch from `feat/ai-autofill-custom-fields-32f3`; tests green
 
 ## Constraints & notes
 - Stack on `feat/ai-autofill-custom-fields-32f3` (PR 520). New `feat/` branch — not piled onto 515–519.
