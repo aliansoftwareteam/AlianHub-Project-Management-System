@@ -144,23 +144,29 @@ export const getPaginatedTasks = ({state, commit}, payload) => {
             const pageSize = unfiltered ? (payload.limit || 250) : 35;
 
             const matchAnd = [
-                { $or: [{ objId: { ProjectID: pid } }, { ProjectID: pid }] },
-                { $or: [{ objId: { sprintId } }, { sprintId }] },
-                { deletedStatusKey: 0 },
+                { $or: [
+                    { ProjectID: { objId: { $in: [pid] } } },
+                    { objId: { ProjectID: pid } },
+                    { ProjectID: pid },
+                ] },
+                { $or: [
+                    { sprintId: { objId: { $in: [sprintId] } } },
+                    { objId: { sprintId } },
+                    { sprintId },
+                ] },
+                { deletedStatusKey: { $in: [0] } },
             ];
-            if (!(showAllTasks === undefined || showAllTasks === true || showAllTasks === 2)) {
+            if (!unfiltered && !(showAllTasks === undefined || showAllTasks === true || showAllTasks === 2)) {
                 matchAnd.push({ AssigneeUserId: { $in: [payload.userId] } });
             }
             if (parentId && parentId.length) {
                 matchAnd.push({ ParentTaskId: parentId });
-            } else {
+            } else if (!unfiltered) {
                 matchAnd.push({ isParentTask: true });
-                if (!unfiltered) {
-                    if (item.mongoConditions && item.mongoConditions.length) {
-                        matchAnd.push(item.mongoConditions[0]);
-                    } else if (item.conditions && item.conditions.length) {
-                        matchAnd.push(item.conditions[0]);
-                    }
+                if (item.mongoConditions && item.mongoConditions.length) {
+                    matchAnd.push(item.mongoConditions[0]);
+                } else if (item.conditions && item.conditions.length) {
+                    matchAnd.push(item.conditions[0]);
                 }
             }
 
@@ -206,19 +212,26 @@ export const getPaginatedTasks = ({state, commit}, payload) => {
                         resCount = { [foundKey]: response.count?.[0]?.count || 0 };
                     }
     
-                    if(responseData && responseData.length) {
+                    const stampDates = (doc) => {
+                        if(doc.startDate && doc.startDate > 0) {
+                            doc.startDate = new Date(doc.startDate * 1000);
+                        }
+                        if(doc.DueDate && doc.DueDate > 0) {
+                            doc.DueDate = new Date(doc.DueDate * 1000);
+                        }
+                        return doc;
+                    };
+                    if (unfiltered) {
+                        const stamped = (responseData || []).map((task) => stampDates({ ...task }));
+                        const parents = stamped.filter((task) => task && task.isParentTask !== false);
+                        commit('setSprintBoardTasks', {
+                            pid,
+                            sprintId,
+                            tasks: parents.length ? parents : stamped,
+                        });
+                    } else if(responseData && responseData.length) {
                         responseData.forEach((task) => {
-                            const doc = task;
-
-                            if(doc.startDate && doc.startDate > 0) {
-                                doc.startDate = new Date(doc.startDate * 1000);
-                            }
-
-                            if(doc.DueDate && doc.DueDate > 0) {
-                                doc.DueDate = new Date(doc.DueDate * 1000);
-                            }
-
-                            commit('mutateTypesenseTasks', {found: resCount, nextPage: {[indexKey]: (cursor || 0) + responseData?.length || 0}, pid, sprintId, data: {...doc}})
+                            commit('mutateTypesenseTasks', {found: resCount, nextPage: {[indexKey]: (cursor || 0) + responseData?.length || 0}, pid, sprintId, data: stampDates({...task})})
                         })
                     } else {
                         commit('mutateTypesenseTasks', {found: resCount, nextPage: {[indexKey]: (cursor || 0) + responseData?.length || 0}, pid, sprintId, data: null})

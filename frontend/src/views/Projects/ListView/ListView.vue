@@ -134,27 +134,29 @@ const emptyKind = computed(() => {
 });
 provide('boardSurfaceKind', emptyKind);
 provide('boardExpectedCount', boardExpectedCount);
-provide('onBoardSurfaceAction', onEmptyAction);
 function onEmptyAction() {
-    if (emptyKind.value === 'failed') {
-        const sprint = (headerSprints.value && headerSprints.value[0]) || (props.sprints && props.sprints[0]);
-        const pid = firstId(project.value && project.value._id);
-        const sid = firstId(sprint && (sprint.id || sprint._id));
-        commit('projectData/resetSprintTaskBucket', { pid, sprintId: sid });
-        isLoading.value = true;
-        Promise.resolve(reloadSprintTasks())
-            .then(() => refetchSprintBoardTasks({ projectId: pid, sprintId: sid, projectData: project.value }))
-            .then(() => {
-                init(props.grouped, false, project.value, props.sprints, groupedTasks, false, true);
-            })
-            .catch((error) => {
-                console.error('ERROR retrying sprint tasks: ', error);
-                isLoading.value = false;
-            });
+    if (emptyKind.value !== 'failed') {
+        emit('create');
         return;
     }
-    emit('create');
+    const sprint = (headerSprints.value && headerSprints.value[0]) || (props.sprints && props.sprints[0]);
+    const pid = firstId(project.value && project.value._id);
+    const sid = firstId(sprint && (sprint.id || sprint._id));
+    isLoading.value = true;
+    commit('projectData/resetSprintTaskBucket', { pid, sprintId: sid });
+    Promise.resolve(refetchSprintBoardTasks({ projectId: pid, sprintId: sid, projectData: project.value }))
+        .then(() => {
+            init(props.grouped, false, project.value, props.sprints, groupedTasks, false, true);
+        })
+        .catch((error) => {
+            console.error('ERROR retrying sprint tasks: ', error);
+            isLoading.value = false;
+        })
+        .finally(() => {
+            Promise.resolve(reloadSprintTasks()).catch(() => {});
+        });
 }
+provide('onBoardSurfaceAction', onEmptyAction);
 
 const currentCompany = computed(() => getters["settings/selectedCompany"])
 

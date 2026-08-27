@@ -8,7 +8,7 @@
             type="button"
             class="cursor-pointer font-roboto-sans empty-state__btn"
             :class="tone ? 'empty-state__btn--tone' : 'blue_btn'"
-            @click="$emit('action')"
+            @click.stop.prevent="$emit('action')"
         >{{ actionLabel }}</button>
         <a
             v-if="resolvedHelpHref"

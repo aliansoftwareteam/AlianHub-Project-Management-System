@@ -473,6 +473,8 @@ describe('TASKS - AI autofill custom fields', () => {
         expect(card).toContain('seedPerson');
         expect(card).toContain('!Array.isArray(raw)');
         expect(card).toContain("t('ProjectDetails.assignee')");
+        expect(card).toContain('next.unshift(seed)');
+        expect(card).toContain("getters['users/users']");
         expect(card).toContain('dueIsEmpty');
         expect(card).toContain("item.fieldId === 'assignee'");
         expect(card).toContain('\\bowner\\b');

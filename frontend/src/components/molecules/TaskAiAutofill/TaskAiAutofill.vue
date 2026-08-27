@@ -214,6 +214,21 @@ function sprintDueDisplay(task) {
 function seedPerson(value) {
     const id = firstId(value) || (typeof value === 'string' ? value.trim() : '');
     if (!id || id === '[object Object]') return null;
+    const users = getters['users/users'] || [];
+    const hit = users.find((row) => firstId(row && (row._id || row.id)) === id);
+    const fromStore = hit
+        ? String((hit.Employee_Name || hit.name || '')).trim()
+        : '';
+    if (fromStore && fromStore.toLowerCase() !== 'ghost user') {
+        return {
+            fieldId: 'assignee',
+            kind: 'owner',
+            source: 'native',
+            personId: id,
+            value: [id],
+            display: fromStore,
+        };
+    }
     try {
         const user = getUser(id);
         const name = String((user && (user.Employee_Name || user.name)) || '').trim();
@@ -347,7 +362,7 @@ const rows = computed(() => {
     if (assigneeEmpty()) {
         out.push({
             fieldId: 'assignee',
-            title: t('ProjectDetails.assignee'),
+            title: t('ProjectDetails.assignee') || 'Assignee',
             display: suggestionLabel(assigneeItem),
             item: assigneeItem,
             checked: Boolean(assigneeItem) && isSelected('assignee'),
@@ -438,7 +453,14 @@ async function preview() {
             selectedIds.value = [];
             return;
         }
-        const next = Array.isArray(payload.data?.suggestions) ? payload.data.suggestions : [];
+        const next = Array.isArray(payload.data?.suggestions) ? payload.data.suggestions.slice() : [];
+        if (assigneeEmpty()) {
+            const fromApi = next.find((item) => item && (item.fieldId === 'assignee' || (item.source === 'native' && item.kind === 'owner')));
+            const seed = fromApi || assigneeSeed();
+            if (seed && !next.some((item) => item && item.fieldId === 'assignee')) {
+                next.unshift(seed);
+            }
+        }
         suggestions.value = next;
         const ids = next.filter((item) => item && item.fieldId).map((item) => String(item.fieldId));
         const dueIso = sprintDueDisplay(props.task);

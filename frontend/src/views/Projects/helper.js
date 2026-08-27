@@ -811,13 +811,9 @@ export function taskListHelper() {
             }
         })
     }
-    function refetchSprintBoardTasks({ projectId, sprintId, projectData }) {
+    function refetchSprintBoardTasks({ projectId, sprintId }) {
         return new Promise((resolve, reject) => {
             try {
-                if(permit === null && projectData && projectData.isGlobalPermission === false) {
-                    resolve();
-                    return;
-                }
                 dispatch("projectData/getPaginatedTasks", {
                     cid: companyId.value,
                     pid: firstId(projectId),
@@ -827,7 +823,7 @@ export function taskListHelper() {
                     unfiltered: true,
                     resetCursor: true,
                     userId: userId.value,
-                    showAllTasks: projectData && projectData.isGlobalPermission === false ? permit : true,
+                    showAllTasks: true,
                     indexName: 'kanbanIndex',
                     parentId: '',
                 })

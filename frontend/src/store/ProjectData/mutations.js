@@ -448,6 +448,30 @@ export const removeProjectTaskSnap = (state, payload) => {
     delete state.tasks[payload];
 }
 
+export const setSprintBoardTasks = (state, payload) => {
+    const pid = firstId(payload && (payload.pid || payload.projectId));
+    const sprintId = firstId(payload && payload.sprintId);
+    const rows = Array.isArray(payload && payload.tasks) ? payload.tasks.filter(Boolean) : [];
+    if (!pid || !sprintId) return;
+    let project = lookupById(state.tasks, pid);
+    if (!project || typeof project !== 'object') {
+        state.tasks[pid] = { projectId: pid, sprints: [], snapshot: null };
+        project = state.tasks[pid];
+    }
+    const projectKey = Object.keys(state.tasks).find((key) => state.tasks[key] === project) || pid;
+    const proj = state.tasks[projectKey];
+    if (!Array.isArray(proj.sprints)) proj.sprints = [];
+    if (!proj.sprints.some((sid) => firstId(sid) === sprintId)) proj.sprints.push(sprintId);
+    let bucket = lookupById(proj, sprintId);
+    if (!bucket || typeof bucket !== 'object' || Array.isArray(bucket)) {
+        proj[sprintId] = { index: {}, found: {}, tasks: [], snapshot: null };
+        bucket = proj[sprintId];
+    }
+    bucket.index = {};
+    bucket.found = { all: rows.length };
+    bucket.tasks = rows;
+};
+
 export const resetSprintTaskBucket = (state, payload) => {
     const pid = firstId(payload && (payload.pid || payload.projectId));
     const sprintId = firstId(payload && payload.sprintId);

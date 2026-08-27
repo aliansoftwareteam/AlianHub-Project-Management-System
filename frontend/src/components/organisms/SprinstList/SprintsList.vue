@@ -242,7 +242,7 @@
                     :message="boardSurfaceKind === 'failed' ? $t('EmptyState.load_failed_msg', { count: boardExpectedCount }) : ''"
                     :actionLabel="boardSurfaceKind === 'failed' ? $t('EmptyState.load_failed_action') : $t('EmptyState.no_sprint_tasks_action')"
                     :tone="boardSurfaceKind === 'failed' ? 'copper' : 'pine'"
-                    @action="onBoardSurfaceAction"
+                    @action="retrySurface"
                 />
                 <div v-else class="itemSprintWrapper style-scroll-6-px" id="tasklist_driver">
                     <template v-if="$route?.query?.tab !== 'Calendar'">
@@ -349,6 +349,9 @@ const clientWidth = inject("$clientWidth");
 const boardSurfaceKind = inject('boardSurfaceKind', computed(() => 'loading'));
 const boardExpectedCount = inject('boardExpectedCount', computed(() => 0));
 const onBoardSurfaceAction = inject('onBoardSurfaceAction', () => {});
+function retrySurface() {
+    if (typeof onBoardSurfaceAction === 'function') onBoardSurfaceAction();
+}
 const { checkPermission, debouncerWithPromise, checkApps} = useCustomComposable();
 const showArchiveVar = inject("showArchived");
 const companyId = inject("$companyId");

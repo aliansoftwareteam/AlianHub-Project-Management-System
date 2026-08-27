@@ -190,28 +190,39 @@ const emptyKind = computed(() => {
 });
 
 function onEmptyAction() {
-    if (emptyKind.value === 'failed') {
-        const sprint = props.sprints && props.sprints[0];
-        const pid = firstId(project.value && project.value._id);
-        const sid = firstId(sprint && (sprint.id || sprint._id));
-        commit('projectData/resetSprintTaskBucket', { pid, sprintId: sid });
-        const bindGroups = () => new Promise((resolve) => {
-            groupBy(props.grouped, false, project.value, props.sprints, internalGroupedTasks, true, 'board', false, true, (resp) => {
-                internalGroupedTasks.value = resp;
-                resolve();
-            });
-        });
-        isLoading.value = true;
-        Promise.resolve(reloadSprintTasks()).then(() => {
-            return refetchSprintBoardTasks({ projectId: pid, sprintId: sid, projectData: project.value });
-        }).then(() => bindGroups()).catch((error) => {
-            console.error('ERROR retrying sprint tasks: ', error);
-        }).finally(() => {
-            isLoading.value = false;
-        });
+    const sprint = props.sprints && props.sprints[0];
+    const pid = firstId(project.value && project.value._id);
+    const sid = firstId(sprint && (sprint.id || sprint._id));
+    if (emptyKind.value !== 'failed') {
+        wantCreate.value = true;
         return;
     }
-    wantCreate.value = true;
+    isLoading.value = true;
+    commit('projectData/resetSprintTaskBucket', { pid, sprintId: sid });
+    const fallbackGroups = () => [{
+        ...(sprint || {}),
+        id: sid,
+        items: [{ name: 'Tasks', searchKey: 'statusKey', searchValue: '', tasksArray: [] }],
+    }];
+    const bindGroups = () => new Promise((resolve) => {
+        groupBy(props.grouped, false, project.value, props.sprints, internalGroupedTasks, true, 'board', false, true, (resp) => {
+            const next = Array.isArray(resp) && resp[0] ? resp : fallbackGroups();
+            if (!next[0].items || !next[0].items.length) {
+                next[0].items = fallbackGroups()[0].items;
+            }
+            internalGroupedTasks.value = next;
+            resolve();
+        });
+    });
+    Promise.resolve(refetchSprintBoardTasks({ projectId: pid, sprintId: sid, projectData: project.value }))
+        .then(() => bindGroups())
+        .catch((error) => {
+            console.error('ERROR retrying sprint tasks: ', error);
+        })
+        .finally(() => {
+            isLoading.value = false;
+            Promise.resolve(reloadSprintTasks()).catch(() => {});
+        });
 }
 
 watch([() => props.grouped, () => props.sprints,() => route?.params], ([newGroup, newSprints, newRouteParams], [oldGroup, oldSprints, oldRouteParams]) => {
