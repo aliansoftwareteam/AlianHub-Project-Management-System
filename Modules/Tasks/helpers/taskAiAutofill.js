@@ -305,6 +305,12 @@ function heuristicSuggestions({ targets, people, title, description, comments, p
     return suggestions;
 }
 
+function skipReasonWhenMissingTarget(fieldId, task) {
+    if (!fieldId) return 'unknown';
+    if (fieldId === NATIVE_ASSIGNEE_ID) return isAssigneeEmpty(task) ? 'unknown' : 'filled';
+    return isCustomFieldEmpty(task, { _id: fieldId }) ? 'unknown' : 'filled';
+}
+
 function sanitizeSuggestions(suggestions, { targets, people, task } = {}) {
     const byId = new Map((targets || []).map((target) => [target.fieldId, target]));
     const allowedPeople = normalizePeople(people);
@@ -315,7 +321,7 @@ function sanitizeSuggestions(suggestions, { targets, people, task } = {}) {
         const fieldId = recordId(raw.fieldId || raw.id);
         const target = byId.get(fieldId);
         if (!target) {
-            skipped.push({ fieldId, reason: 'unknown' });
+            skipped.push({ fieldId, reason: skipReasonWhenMissingTarget(fieldId, task) });
             continue;
         }
         if (target.source === 'native') {

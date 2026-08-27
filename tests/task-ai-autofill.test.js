@@ -111,6 +111,23 @@ describe('TASKS - AI autofill custom fields', () => {
         expect(ids).not.toContain('f-tag');
         expect(ids).not.toContain(NATIVE_ASSIGNEE_ID);
         expect(ids).not.toContain('f-money');
+
+        const { suggestions, skipped } = sanitizeSuggestions([
+            { fieldId: 'f-summary', value: 'Overwrite me' },
+            { fieldId: 'f-tag', optionId: 'opt-blocked' },
+            { fieldId: 'assignee', personId: GRACE.id },
+            { fieldId: 'f-notes', value: 'Still empty notes' },
+            { fieldId: 'f-invented', value: 'nope' },
+        ], { targets, people: [ADA, GRACE], task: filled });
+        expect(skipped).toEqual([
+            { fieldId: 'f-summary', reason: 'filled' },
+            { fieldId: 'f-tag', reason: 'filled' },
+            { fieldId: 'assignee', reason: 'filled' },
+            { fieldId: 'f-invented', reason: 'unknown' },
+        ]);
+        expect(suggestions).toEqual([
+            expect.objectContaining({ fieldId: 'f-notes', value: 'Still empty notes' }),
+        ]);
     });
 
     test('invented people and tags are dropped', () => {
@@ -220,7 +237,10 @@ describe('TASKS - AI autofill custom fields', () => {
             people: [ADA, GRACE],
             task: filledTask,
         });
-        expect(clobber.skipped.map((row) => row.reason)).toEqual(expect.arrayContaining(['filled']));
+        expect(clobber.skipped).toEqual([
+            { fieldId: 'f-summary', reason: 'filled' },
+            { fieldId: 'assignee', reason: 'filled' },
+        ]);
         expect(clobber.suggestions).toEqual([
             expect.objectContaining({ fieldId: 'f-notes', value: 'Still empty notes' }),
         ]);
