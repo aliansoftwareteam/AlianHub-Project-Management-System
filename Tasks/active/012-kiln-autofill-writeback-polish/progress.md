@@ -15,7 +15,7 @@
 - [x] Comments pane lists existing Alian comments for the open taskId (no empty pane with badge 1)
 
 ## Last step
-List emptyKind counts painted rows (status match + unmatched dump), not Vuex stored=7. Store=7 / shown=0 is failed again (fail card, no 00h). Retry fetch then paintSprintGroups / ItemList unmatched bind SMOKE-1..7. Autofill Assignee is a first-class row when the rail has no named chip.
+Hours paint only on ready or honest empty. Failed bind keeps the cream fail card and hides 00h. Loading is pine “Loading this board…” with hours hidden (dash until a bind, never zero). Retry still paints unmatched SMOKE-1..7. Autofill Assignee row stays when the rail is empty.
 
 ## Blockers
 None. Live Local Smoke is not in this VM (no Mongo), so Retry / Autofill / pages were not browser-verified here.
@@ -52,3 +52,4 @@ None. Live Local Smoke is not in this VM (no Mongo), so Retry / Autofill / pages
 - Bot 3 overlay Retry: BoardView now resets `state.tasks[pid][sid].index/tasks` then refetches (`$skip` 0). `processedBoardData` coerces statusKey and dumps unmatched rows into the first column so store=7 becomes shownBoardCount=7. Failed card only when the fetch itself fails. Autofill stays under Task Details tabs, above Description/Checklist, not in customFieldRender. Handshake Ask smoke ObjectId ProjectID stamps hex; workspace never paints “isn't in Workspace pages” for an existing project-scoped page. Gantt not started.
 - Bot 2 kiln lock leftovers: Retry click was still dead after a successful fetch because `finally` called `reloadSprintTasks()`, which re-ran `groupBy(..., true)` and wiped the 7-row bind. Click now sets `retrying` (pine “Loading this board…”), fetches, `groupBy(false)` only, and never reloads the sprint. EmptyState fires once (mousedown wins, click does not navigate). Autofill always includes an Assignee row when the rail has no named chip (`assigneeRow`, pine Apply or “No suggestion”); Owner Local PM stays off the card; Due Apply 2026-08-28 and Fill empty stay. Pages hydrate frozen. Gantt not started.
 - Bot 3 overlay 695df56 regression: ListView `emptyKind` used `Math.max(rendered, stored)` so Vuex=7 / painted=0 flipped to ready (00h pills, no fail card, no Retry). Count painted rows only (status match + unmatched dump). ItemList first status column gets unmatched so Retry/F5 can bind SMOKE-1..7. Autofill Assignee is a first-class template row when the rail has no named chip. Pages hydrate frozen. Gantt not started.
+- Bot 2 hours lock: Planned/Logged/Overdue paint only on ready or honest empty. Failed bind keeps the cream fail card and hides 00h. Loading stays pine “Loading this board…” with hours hidden (dash until fetched, never zero). Retry bind and Autofill Assignee row unchanged.

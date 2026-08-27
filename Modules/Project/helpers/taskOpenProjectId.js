@@ -271,7 +271,7 @@ function sprintExpectedCount(sprint) {
 }
 
 function boardHoursVisible(kind) {
-    return kind === 'ready';
+    return kind === 'ready' || kind === 'empty';
 }
 
 function countRenderedSprintItems(groups) {

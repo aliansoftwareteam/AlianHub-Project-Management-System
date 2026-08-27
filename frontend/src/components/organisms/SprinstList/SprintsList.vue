@@ -405,12 +405,15 @@ const props = defineProps({
 })
 
 const sprintHours = ref({ plannedMinutes: 0, loggedMinutes: 0, overdueMinutes: 0 });
+const hoursFetched = ref(false);
 const currentCompanyForHours = computed(() => getters["settings/selectedCompany"]);
-const showSprintHours = computed(() => boardHoursVisible(unref(boardSurfaceKind))
+const surfaceKind = computed(() => unref(boardSurfaceKind));
+const showSprintHours = computed(() => boardHoursVisible(surfaceKind.value)
     && !!currentCompanyForHours.value?.planFeature?.timeEstimateProjectApp
     && checkPermission('task.task_list', project.value?.isGlobalPermission) === true);
 
 const hoursLabel = (minutes) => {
+    if (!hoursFetched.value) return '—';
     const total = Number(minutes) || 0;
     const h = Math.floor(total / 60);
     const m = total % 60;
@@ -423,14 +426,13 @@ const loadSprintHours = () => {
         .then((res) => {
             const d = res?.data?.data;
             if (d) sprintHours.value = d;
+            hoursFetched.value = true;
         })
         .catch(() => {
-            // A failed count must not blank numbers that were right a moment ago.
+            hoursFetched.value = true;
         });
 };
 
-// Re-count when this sprint's tasks change — an estimate edited, time logged, a task
-// added, moved or deleted. Debounced because a bulk change fires this once per task.
 let hoursTimer = null;
 const refreshSprintHours = () => {
     clearTimeout(hoursTimer);
@@ -438,7 +440,15 @@ const refreshSprintHours = () => {
 };
 watch(() => sprintTasksBucket(getters["projectData/tasks"], project.value?._id, props.sprint?.id)?.tasks,
     refreshSprintHours, { deep: true });
-onMounted(loadSprintHours);
+watch(surfaceKind, (kind) => {
+    if (kind === 'loading' || kind === 'failed') {
+        hoursFetched.value = false;
+        sprintHours.value = { plannedMinutes: 0, loggedMinutes: 0, overdueMinutes: 0 };
+    }
+});
+watch(showSprintHours, (show) => {
+    if (show) loadSprintHours();
+}, { immediate: true });
 onUnmounted(() => clearTimeout(hoursTimer));
 
 watch(route, () => {

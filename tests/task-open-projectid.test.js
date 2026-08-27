@@ -460,7 +460,7 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(boardHoursVisible('failed')).toBe(false);
         expect(boardHoursVisible('loading')).toBe(false);
         expect(boardHoursVisible('ready')).toBe(true);
-        expect(boardHoursVisible('empty')).toBe(false);
+        expect(boardHoursVisible('empty')).toBe(true);
         expect(countPaintedSprintTasks(
             [{ searchKey: 'statusKey', searchValue: 'todo', tasksArray: [] }],
             [{ _id: 'a', statusKey: 'in-progress' }, { _id: 'b', statusKey: 'todo' }],
@@ -532,6 +532,9 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(sprintsList).toContain('boardHoursVisible');
         expect(sprintsList).toContain('v-if="showSprintHours"');
         expect(sprintsList).toContain('data-board-hours');
+        expect(sprintsList).toContain('hoursFetched');
+        expect(sprintsList).toContain("kind === 'loading' || kind === 'failed'");
+        expect(sprintsList).toContain("if (!hoursFetched.value) return '—'");
         expect(sprintsList).toContain("boardSurfaceKind === 'failed'");
         expect(sprintsList).toContain('EmptyState.load_failed_title');
         expect(sprintsList).toContain('retrySurface');

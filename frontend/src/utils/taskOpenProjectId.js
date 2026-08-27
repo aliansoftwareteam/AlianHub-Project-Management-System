@@ -256,7 +256,7 @@ export function sprintExpectedCount(sprint) {
 }
 
 export function boardHoursVisible(kind) {
-    return kind === 'ready';
+    return kind === 'ready' || kind === 'empty';
 }
 
 export function countRenderedSprintItems(groups) {
