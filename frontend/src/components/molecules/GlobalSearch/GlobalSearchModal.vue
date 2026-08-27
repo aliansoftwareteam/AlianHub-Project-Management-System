@@ -59,16 +59,25 @@
 <script setup>
 // PACKAGES
 import { computed, defineProps, inject, nextTick, ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 
 // UTILS
 import { apiRequest } from '@/services';
 import { useCustomComposable } from "@/composable";
-import { resolveTaskOpenIds, taskOpenPath } from '@/utils/taskOpenProjectId';
+import { resolveTaskOpenIds, firstId, injectedId, taskOpenRoute } from '@/utils/taskOpenProjectId';
 
 const { debounce } = useCustomComposable();
 const router = useRouter();
+const route = useRoute();
 const companyId = inject('$companyId');
+
+function companyIdNow() {
+    return firstId(
+        injectedId(companyId),
+        route.params && route.params.cid,
+        typeof localStorage !== 'undefined' && localStorage.getItem('selectedCompany'),
+    );
+}
 
 const props = defineProps({
     modelValue: {
@@ -136,34 +145,31 @@ function openTask(task) {
         missingHit.value = true;
         return;
     }
-    const path = taskOpenPath({
-        companyId: companyId.value,
+    const dest = taskOpenRoute({
+        companyId: companyIdNow(),
         projectId: ids.projectId,
         sprintId: ids.sprintId,
         taskId: ids.taskId,
         folderId: task.folderObjId,
     });
-    if (!path) {
+    if (!dest) {
         missingHit.value = true;
         return;
     }
     close();
-    router.push({ path, query: { detailTab: 'task-detail-tab' } }).catch((error) => console.error('ERROR opening search task: ', error));
+    router.push({ ...dest, query: { detailTab: 'task-detail-tab' } }).catch((error) => console.error('ERROR opening search task: ', error));
 }
 
-// Project routes always include a sprint segment (see router/projects), so the
-// API returns each project's first active sprint. Projects without one fall
-// back to the sprint-less /p route, keeping the list view as landing tab.
 function openProject(project) {
     close();
-    const base = `/${companyId.value}/project/${project._id}`;
-    let path = `${base}/p?tab=ProjectListView`;
-    if (project.sprintId) {
-        path = project.folderId
-            ? `${base}/fs/${project.folderId}/${project.sprintId}?tab=ProjectListView`
-            : `${base}/s/${project.sprintId}?tab=ProjectListView`;
-    }
-    router.push(path).catch((error) => console.error('ERROR opening search project: ', error));
+    const dest = taskOpenRoute({
+        companyId: companyIdNow(),
+        projectId: project._id,
+        sprintId: project.sprintId,
+        folderId: project.folderId,
+    });
+    if (!dest) return;
+    router.push({ ...dest, query: { tab: 'ProjectListView' } }).catch((error) => console.error('ERROR opening search project: ', error));
 }
 </script>
 

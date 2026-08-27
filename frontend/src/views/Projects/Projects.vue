@@ -511,7 +511,7 @@ import { useProjectSearch } from './composables/useProjectSearch';
 import { useProjectTour } from './composables/useProjectTour';
 
 import { useProjectsHelper } from './helper';
-import { firstId, sameId } from '@/utils/taskOpenProjectId';
+import { firstId, firstSprintOf, injectedId, sameId, taskOpenRoute } from '@/utils/taskOpenProjectId';
 
 // UTILS
 const { checkErrors } = useValidation();
@@ -967,17 +967,27 @@ onMounted(() => {
         .then(() => {
             nextTick(() => {
                 if (getters['projectData/projects'] && getters['projectData/projects']?.data?.length) {
-                    if (!route.query?.tab) {
-                        if (route.params.id) {
-                            const index = projects.value.findIndex((e) => sameId(e._id, route.params.id));
-                            if (index !== -1) {
-                                const viewFind = projects.value[index].ProjectRequiredComponent?.find((e) => e.setAsDefault) || projects.value[index].ProjectRequiredComponent?.find((e) => e.viewStatus) || projects.value[index].ProjectRequiredComponent[0];
-                                router.replace({ query: { tab: (viewFind ? viewFind?.keyName : 'ProjectListView'), ...route.query } });
-                            }
-                        } else {
-                            const viewFind = projects.value[0]?.ProjectRequiredComponent?.find((e) => e.setAsDefault) || projects.value[0]?.ProjectRequiredComponent?.find((e) => e.viewStatus) || projects.value[0]?.ProjectRequiredComponent[0];
-                            router.replace({ query: { tab: (viewFind ? viewFind?.keyName : 'ProjectListView'), ...route.query } });
+                    const listed = route.params.id
+                        ? projects.value.find((e) => sameId(e._id, route.params.id))
+                        : projects.value[0];
+                    if (listed && !route.params.id) {
+                        const viewFind = listed.ProjectRequiredComponent?.find((e) => e.setAsDefault) || listed.ProjectRequiredComponent?.find((e) => e.viewStatus) || listed.ProjectRequiredComponent[0];
+                        const tab = viewFind ? viewFind?.keyName : 'ProjectListView';
+                        const sprint = firstSprintOf(listed);
+                        const dest = taskOpenRoute({
+                            companyId: firstId(route.params.cid, injectedId(companyId)),
+                            projectId: listed._id,
+                            sprintId: sprint && (sprint.id || sprint._id),
+                            folderId: sprint && sprint.folderId,
+                        });
+                        if (dest) {
+                            router.replace({ ...dest, query: { ...route.query, tab } });
+                        } else if (!route.query?.tab) {
+                            router.replace({ query: { tab, ...route.query } });
                         }
+                    } else if (listed && !route.query?.tab) {
+                        const viewFind = listed.ProjectRequiredComponent?.find((e) => e.setAsDefault) || listed.ProjectRequiredComponent?.find((e) => e.viewStatus) || listed.ProjectRequiredComponent[0];
+                        router.replace({ query: { tab: (viewFind ? viewFind?.keyName : 'ProjectListView'), ...route.query } });
                     }
                 }
                 loadingProjects.value = false;

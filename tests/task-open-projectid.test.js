@@ -13,6 +13,8 @@ const {
     asDocList,
     firstSprintOf,
     taskOpenPath,
+    taskOpenRoute,
+    injectedId,
 } = require('../Modules/Project/helpers/taskOpenProjectId');
 
 describe('TASK OPEN - pass ProjectID so taskData is not empty', () => {
@@ -45,7 +47,8 @@ describe('TASK OPEN - pass ProjectID so taskData is not empty', () => {
         expect(search).toContain('task_not_in_project');
         expect(search).toContain('missingHit');
         expect(advance).toContain('openInApp');
-        expect(advance).toContain('@click.prevent="openInApp(props.taskObj)"');
+        expect(advance).toContain('@click="openInApp($event, props.taskObj)"');
+        expect(advance).toContain(':href="taskHref"');
         expect(advance).not.toContain('window.open');
         expect(advance).not.toContain('target="_blank"');
         expect(advance).not.toContain('openModel');
@@ -145,7 +148,7 @@ describe('LIST/BOARD - bind sprint rows so SMOKE tasks can load', () => {
         expect(sprintFolder).toContain('exports.projectIdMatch = projectIdMatch');
         expect(sprintFolder).toContain('$in');
         expect(listing).toContain('firstSprintOf');
-        expect(listing).toContain('taskOpenPath');
+        expect(listing).toContain('taskOpenRoute');
         expect(listing).toContain('onBareProject');
         expect(listing).toContain('sprintFetchStarted');
         expect(list).toContain('EmptyState.no_match_title');
@@ -190,6 +193,18 @@ describe('SEARCH OPEN - same-tab hash with ProjectID, TaskKey, and auto-select',
         expect(taskOpenPath({ companyId: CID })).toBe('');
         expect(taskOpenPath({ projectId: PROJECT })).toBe('');
         expect(taskOpenPath({ companyId: CID, projectId: { nope: true } })).toBe('');
+        expect(taskOpenRoute({
+            companyId: { value: CID },
+            projectId: PROJECT,
+            sprintId: SPRINT,
+            taskId: TASK,
+        })).toEqual({
+            name: 'ProjectSprintTask',
+            params: { cid: CID, id: PROJECT, sprintId: SPRINT, taskId: TASK },
+        });
+        expect(taskOpenRoute({ companyId: CID, projectId: PROJECT, sprintId: SPRINT }).name).toBe('ProjectSprint');
+        expect(taskOpenRoute({ companyId: CID })).toBe(null);
+        expect(injectedId({ value: CID })).toBe(CID);
     });
 
     test('firstSprintOf and asDocList unwrap a single sprint document', () => {
@@ -220,17 +235,23 @@ describe('SEARCH OPEN - same-tab hash with ProjectID, TaskKey, and auto-select',
         const comments = fs.readFileSync(path.join(__dirname, '..', 'Modules', 'Comments', 'controller.js'), 'utf8');
 
         expect(advance).toContain('openInApp');
-        expect(advance).toContain('taskOpenPath');
+        expect(advance).toContain(':href="taskHref"');
+        expect(advance).toContain('taskOpenRoute');
+        expect(advance).toContain('router.resolve');
         expect(advance).toContain('closeAdvanceSearch');
         expect(advance).not.toContain('window.open');
+        expect(advance).not.toContain('target="_blank"');
+        expect(advance).not.toContain('@click.prevent');
         expect(helper).toContain('taskOpenPath');
         expect(helper).toContain('firstId');
         expect(filter).toContain('TaskKey');
         expect(filter).toContain('$regex: escapeRegex(searchStr)');
-        expect(subItem).toContain('taskOpenPath');
-        expect(subItem).toContain('companyId.value');
+        expect(subItem).toContain('taskOpenRoute');
+        expect(subItem).toContain(':href="sprintHref"');
+        expect(subItem).toContain('onSprintClick');
+        expect(subItem).not.toContain('target="_blank"');
         expect(projects).toContain('bindActiveProject');
-        expect(projects).toContain('findListedProject');
+        expect(projects).toContain('taskOpenRoute');
         expect(detail).toContain('task.value = row');
         expect(detail).toContain('bindSprintsToProject(asDocList');
         expect(body).toContain('params: { ...route.params }');

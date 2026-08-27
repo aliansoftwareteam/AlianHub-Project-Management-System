@@ -10,7 +10,7 @@
             <div class="position-ab drop__arrow-div">
                 <img @click.stop="$emit('change', data)" v-if="sprints && sprints.length && (sprints.filter(e=>(showArchived ? e.deletedStatusKey == 2 : !e.deletedStatusKey))).length && !data.deletedStatusKey" src="@/assets/images/svg/triangleBlack.svg" alt="" :style="`transform: rotateZ(${isExpanded ? '90' : '0'}deg)`">
             </div>
-            <div class="item-left" @click.stop.prevent="$emit('changeProject'),changeRoute()">
+            <a class="item-left text-decoration-none" :href="sprintHref" @click="onSprintClick">
                 <Spinner v-if="!folder" :isSpinner="spinner" class="position-re list-spinner"/>
                 <div class="text-ellipsis">
                     <img v-if="data.deletedStatusKey !== undefined && data.deletedStatusKey === 2" :src="inventoryIcon" alt="inventoryIcon">
@@ -24,7 +24,7 @@
                        {{data.name}}
                     </span>
                 </div>
-            </div>
+            </a>
             <div class="item-right">
                 <template v-if="!isOpened">
                     <span v-if="!folder && !isShowArchived" class="gray sptint-total" :class="{'font-size-13': clientWidth > 767, 'font-size-16': clientWidth <= 767}">{{showArchived ? (data.archiveTaskCount || 0) : ((data.tasks < 0 ? 0 : data.tasks) || 0)}}</span>
@@ -124,6 +124,7 @@
                     v-if="showArchived ? (subItem.deletedStatusKey === 2 || subItem.archiveTaskCount) : (!subItem.deletedStatusKey)"
                     :key="subItem.id"
                     :data="subItem"
+                    :projectId="projectId"
                     :subItems="[...(sprints || [])]"
                     :isShowArchived="isShowArchived"
                     @change="toggleSubItem($event)"
@@ -171,7 +172,7 @@ import Spinner from "@/components/atom/SpinnerComp/SpinnerComp.vue"
 import { apiRequest } from '../../../services';
 import * as env from '@/config/env';
 import { useI18n } from "vue-i18n";
-import { taskOpenPath } from '@/utils/taskOpenProjectId';
+import { firstId, injectedId, taskOpenRoute } from '@/utils/taskOpenProjectId';
 const { t } = useI18n();
 
 // UTILS
@@ -236,6 +237,10 @@ const props = defineProps({
     isShowArchived: {
         type: Boolean,
         default: false
+    },
+    projectId: {
+        type: [String, Object],
+        default: ''
     }
 })
 
@@ -300,23 +305,47 @@ function getUserData() {
     return userData;
 }
 
-function changeRoute() {
+function companyIdNow() {
+    return firstId(
+        injectedId(companyId),
+        route.params && route.params.cid,
+        typeof localStorage !== 'undefined' && localStorage.getItem('selectedCompany'),
+    );
+}
+
+function sprintDest() {
     let tab = route.query?.tab;
     if(!project.value?.ProjectRequiredComponent?.find((x) => x.keyName === route.query?.tab)) {
         let viewFind = project.value?.ProjectRequiredComponent?.find((e) => e.setAsDefault) || project.value?.ProjectRequiredComponent?.find((e) => e.viewStatus) || project.value?.ProjectRequiredComponent[0];
         tab = viewFind ? viewFind?.keyName :"ProjectListView";
     }
-    const path = taskOpenPath({
-        companyId: companyId.value,
-        projectId: (project.value && project.value._id) || props.data.projectId || route.params.id,
-        sprintId: props.data.sprintsObj ? '' : (props.data.id || props.data._id),
+    const dest = taskOpenRoute({
+        companyId: companyIdNow(),
+        projectId: firstId(props.projectId, project.value && project.value._id, props.data.projectId, route.params.id),
+        sprintId: props.data.sprintsObj ? '' : firstId(props.data.id, props.data._id),
         folderId: props.data.folderId,
     });
-    if (!path) return;
-    router.push({ path, query: { ...route.query, tab } }).catch((error) => {
+    return { dest, tab };
+}
+
+const sprintHref = computed(() => {
+    const { dest, tab } = sprintDest();
+    if (!dest) return '';
+    return router.resolve({ ...dest, query: { ...route.query, tab } }).href;
+});
+
+function onSprintClick(event) {
+    emit('changeProject');
+    const { dest, tab } = sprintDest();
+    if (!dest) return;
+    if (event && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button === 1)) return;
+    if (event && typeof event.preventDefault === 'function') event.preventDefault();
+    if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
+    router.push({ ...dest, query: { ...route.query, tab } }).catch((error) => {
         console.error('ERROR opening sprint: ', error);
+        if (sprintHref.value) window.location.hash = sprintHref.value.replace(/^#/, '');
     });
-    emit('handleSidebarClose')
+    emit('handleSidebarClose');
 }
 
 function toggleSubItem(data) {

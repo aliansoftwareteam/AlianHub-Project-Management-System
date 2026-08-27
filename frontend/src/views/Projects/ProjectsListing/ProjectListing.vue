@@ -72,7 +72,7 @@ import { useRoute, useRouter } from 'vue-router';
 import ProjectListComponent from '@/components/molecules/ProjectListComponent/ProjectListComponent.vue'
 import Sidebar from "@/components/molecules/Sidebar/Sidebar.vue"
 import { useProjectsHelper } from '../helper';
-import { bindSprintsToProject, firstSprintOf, sameId, taskOpenPath } from '@/utils/taskOpenProjectId';
+import { bindSprintsToProject, firstId, firstSprintOf, injectedId, sameId, taskOpenRoute } from '@/utils/taskOpenProjectId';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useToast } from 'vue-toast-notification';
@@ -239,14 +239,14 @@ function mutateCurrentProjectDetails(data, updateRoute = false,isClicked = false
 
     if(updateRoute) {
         const sprint = firstSprintOf(data);
-        const path = taskOpenPath({
-            companyId: companyId.value,
+        const dest = taskOpenRoute({
+            companyId: firstId(injectedId(companyId), route.params && route.params.cid),
             projectId: data._id,
             sprintId: sprint && (sprint.id || sprint._id),
             folderId: sprint && sprint.folderId,
         });
-        if (path) {
-            router.push({ path, query: { ...route.query, tab } }).catch((error) => {
+        if (dest) {
+            router.push({ ...dest, query: { ...route.query, tab } }).catch((error) => {
                 console.error('ERROR opening project: ', error);
             });
         }
@@ -506,14 +506,14 @@ const getSprintFolderData = async (id,isUpdate = false, forceRefresh = false) =>
                     const firstSprint = firstSprintOf(project);
                     const onBareProject = !route.params.sprintId && (route.name === 'Projects' || route.name === 'Project' || !route.params.id);
                     if (onBareProject && firstSprint && sameId(id, project._id)) {
-                        const path = taskOpenPath({
-                            companyId: companyId.value,
+                        const dest = taskOpenRoute({
+                            companyId: firstId(injectedId(companyId), route.params && route.params.cid),
                             projectId: id,
                             sprintId: firstSprint.id || firstSprint._id,
                             folderId: firstSprint.folderId,
                         });
-                        if (path) {
-                            router.replace({ path, query: { ...route.query } }).catch(() => {});
+                        if (dest) {
+                            router.replace({ ...dest, query: { ...route.query } }).catch(() => {});
                         }
                     }
                     nextTick(() => {

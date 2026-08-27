@@ -117,24 +117,45 @@ function firstSprintOf(project) {
     return null;
 }
 
-function taskOpenPath({ companyId, projectId, sprintId, taskId, folderId } = {}) {
-    const cid = firstId(companyId);
+function injectedId(value) {
+    if (value && typeof value === 'object' && typeof value.value === 'string') {
+        return firstId(value.value);
+    }
+    return firstId(value);
+}
+
+function taskOpenRoute({ companyId, projectId, sprintId, taskId, folderId } = {}) {
+    const cid = injectedId(companyId);
     const pid = firstId(projectId);
-    if (!cid || !pid) return '';
+    if (!cid || !pid) return null;
     const sid = firstId(sprintId);
     const tid = firstId(taskId);
     const fid = firstId(folderId);
-    const base = `/${cid}/project/${pid}`;
-    if (tid && sid && fid) return `${base}/fs/${fid}/${sid}/${tid}`;
-    if (tid && sid) return `${base}/s/${sid}/${tid}`;
-    if (sid && fid) return `${base}/fs/${fid}/${sid}`;
-    if (sid) return `${base}/s/${sid}`;
-    if (fid) return `${base}/f/${fid}`;
+    const params = { cid, id: pid };
+    if (tid && sid && fid) return { name: 'ProjectFolderSprintTask', params: { ...params, folderId: fid, sprintId: sid, taskId: tid } };
+    if (tid && sid) return { name: 'ProjectSprintTask', params: { ...params, sprintId: sid, taskId: tid } };
+    if (sid && fid) return { name: 'ProjectFolderSprint', params: { ...params, folderId: fid, sprintId: sid } };
+    if (sid) return { name: 'ProjectSprint', params: { ...params, sprintId: sid } };
+    if (fid) return { name: 'ProjectFolder', params: { ...params, folderId: fid } };
+    return { name: 'Project', params };
+}
+
+function taskOpenPath(ids = {}) {
+    const dest = taskOpenRoute(ids);
+    if (!dest) return '';
+    const { cid, id, folderId, sprintId, taskId } = dest.params;
+    const base = `/${cid}/project/${id}`;
+    if (taskId && sprintId && folderId) return `${base}/fs/${folderId}/${sprintId}/${taskId}`;
+    if (taskId && sprintId) return `${base}/s/${sprintId}/${taskId}`;
+    if (sprintId && folderId) return `${base}/fs/${folderId}/${sprintId}`;
+    if (sprintId) return `${base}/s/${sprintId}`;
+    if (folderId) return `${base}/f/${folderId}`;
     return `${base}/p`;
 }
 
 module.exports = {
     firstId,
+    injectedId,
     resolveOpenProjectId,
     shapeOpenTaskHit,
     shouldShowTaskSkeleton,
@@ -143,5 +164,6 @@ module.exports = {
     bindSprintsToProject,
     asDocList,
     firstSprintOf,
+    taskOpenRoute,
     taskOpenPath,
 };

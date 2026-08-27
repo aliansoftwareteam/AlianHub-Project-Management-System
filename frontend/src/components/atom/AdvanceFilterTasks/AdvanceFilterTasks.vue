@@ -34,19 +34,19 @@
                     <div class="d-flex align-items-center">
                         <span class="advancefilter__body--marginright" v-if="props.taskObj?.isParentTask === false"><img :src="subTaskImage" /> </span>
                         <span class="advancefilter__body--marginright"><img :src="favourite(props.taskObj?.favouriteTasks) && favourite(props.taskObj?.favouriteTasks)?.length ? filledStar : blankStar" /></span>
-                        <a class="advancefilter__body--taskname black text-ellipse d-block advancefilter__body--width cursor-pointer" :href="taskHref" @click.prevent="openInApp(props.taskObj)" v-html="highlightSearchTerm(props.taskObj?.TaskName)"></a>
+                        <a class="advancefilter__body--taskname black text-ellipse d-block advancefilter__body--width cursor-pointer" :href="taskHref" @click="openInApp($event, props.taskObj)" v-html="highlightSearchTerm(props.taskObj?.TaskName)"></a>
                     </div>
                 </div>
             </div>
             <div class="advancefilter__body--list--right">
                 <ul class="advancefilter__body--ul align-items-center">
                     <li class="cursor-pointer advancefilter__body--newtab">
-                        <a :href="taskHref" @click.prevent="openInApp(props.taskObj)">
+                        <a :href="taskHref" @click="openInApp($event, props.taskObj)">
                             <img :src="imgOpenSameTab" alt="Open"/>
                         </a>
                     </li>
                     <li class="cursor-pointer advancefilter__body--newtab">
-                        <a :href="taskHref" @click.prevent="openInApp(props.taskObj)">
+                        <a :href="taskHref" @click="openInApp($event, props.taskObj)">
                             <img :src="imgOpenNewTab" alt="Open"/>
                         </a>
                     </li>
@@ -64,11 +64,11 @@
     import { useToast } from 'vue-toast-notification';
     import {filterFun} from '@/components/molecules/AdvanceSearch/helper';
     import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
-    import { useRouter } from 'vue-router';
+    import { useRouter, useRoute } from 'vue-router';
     import { useI18n } from "vue-i18n";
     const { t } = useI18n();
     import { useCustomComposable } from '../../../composable';
-    import { resolveTaskOpenIds, sameId, taskOpenPath } from '@/utils/taskOpenProjectId';
+    import { firstId, injectedId, resolveTaskOpenIds, sameId, taskOpenRoute } from '@/utils/taskOpenProjectId';
     const { generateTaskURL } = filterFun();
     const $toast = useToast();
     const {sanitizeInput} = useCustomComposable();
@@ -77,6 +77,7 @@
     const companyId = inject("$companyId");
     const closeAdvanceSearch = inject('closeAdvanceSearch', () => {});
     const router = useRouter();
+    const route = useRoute();
 
     // image
     const filledStar = require("@/assets/images/svg/start10.svg");
@@ -123,38 +124,45 @@
     };
 
     // This function is use to copy link of selected task
-    const taskHref = computed(() => {
-        const ids = resolveTaskOpenIds(props.taskObj || {});
-        const path = taskOpenPath({
-            companyId: companyId.value,
-            projectId: ids.projectId,
-            sprintId: ids.sprintId,
-            taskId: ids.taskId,
-            folderId: props.taskObj && props.taskObj.folderObjId,
-        });
-        return path ? `#${path}?detailTab=task-detail-tab` : '';
-    });
+    const companyIdNow = () => firstId(
+        injectedId(companyId),
+        route.params && route.params.cid,
+        typeof localStorage !== 'undefined' && localStorage.getItem('selectedCompany'),
+    );
 
-    const copyLink = (task) => {
-        generateTaskURL(task,companyId.value).then((url)=>{
-            if (!url) return;
-            navigator.clipboard.writeText(url);
-            $toast.success(t("Toast.Link_is_Copied_to_clipboard"),{position: 'top-right'});
-        });
-    };
-    const openInApp = (task) => {
-        const ids = resolveTaskOpenIds(task);
-        const path = taskOpenPath({
-            companyId: companyId.value,
+    const taskDest = (task) => {
+        const ids = resolveTaskOpenIds(task || {});
+        return taskOpenRoute({
+            companyId: companyIdNow(),
             projectId: ids.projectId,
             sprintId: ids.sprintId,
             taskId: ids.taskId,
             folderId: task && task.folderObjId,
         });
-        if (!path || !ids.projectId || !ids.taskId) return;
+    };
+
+    const taskHref = computed(() => {
+        const dest = taskDest(props.taskObj);
+        if (!dest) return '';
+        return router.resolve({ ...dest, query: { detailTab: 'task-detail-tab' } }).href;
+    });
+
+    const copyLink = (task) => {
+        generateTaskURL(task, companyIdNow()).then((url)=>{
+            if (!url) return;
+            navigator.clipboard.writeText(url);
+            $toast.success(t("Toast.Link_is_Copied_to_clipboard"),{position: 'top-right'});
+        });
+    };
+    const openInApp = (event, task) => {
+        const dest = taskDest(task);
+        if (!dest) return;
+        if (event && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button === 1)) return;
+        if (event && typeof event.preventDefault === 'function') event.preventDefault();
         if (typeof closeAdvanceSearch === 'function') closeAdvanceSearch();
-        router.push({ path, query: { detailTab: 'task-detail-tab' } }).catch((error) => {
+        router.push({ ...dest, query: { detailTab: 'task-detail-tab' } }).catch((error) => {
             console.error('ERROR opening search task: ', error);
+            if (taskHref.value) window.location.hash = taskHref.value.replace(/^#/, '');
         });
     };
 </script>
