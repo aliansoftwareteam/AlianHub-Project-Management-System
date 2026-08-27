@@ -61,7 +61,9 @@ const items = computed(() => {
             to: null,
         };
         if (citation.type === 'page' && cid) {
-            citation.to = { name: 'Pages', params: { cid }, query: { page: citation.id } };
+            const query = { page: citation.id };
+            if (citation.projectId) query.project = citation.projectId;
+            citation.to = { name: 'Pages', params: { cid }, query };
         }
         return citation;
     });

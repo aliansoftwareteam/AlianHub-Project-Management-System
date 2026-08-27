@@ -280,6 +280,7 @@ import AiTaskCreator from "@/components/organisms/AiTaskCreator/AiTaskCreator.vu
 
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import { firstId } from '@/utils/taskOpenProjectId';
 import { useGetterFunctions } from "@/composable";
 import pageContent from '@pageContent';
 const { contentToEditorData, blocksToRawText } = pageContent.default || pageContent;
@@ -338,6 +339,7 @@ const workspaceProjectId = ref('');
 const showAiTaskCreator = ref(false);
 const aiSprints = ref([]);
 const aiInitialRequirements = ref('');
+let pagesFetchGen = 0;
 
 const pickerProjects = computed(() => {
     const raw = getters['projectData/projects'];
@@ -345,16 +347,23 @@ const pickerProjects = computed(() => {
     return list.filter((project) => project && project._id);
 });
 
-const projectId = computed(() => String(
-    (props.projectData && props.projectData._id)
-    || workspaceProjectId.value
-    || ''
+const routePageId = computed(() => firstId(Array.isArray(route.query && route.query.page)
+    ? route.query.page[0]
+    : (route.query && route.query.page)));
+const routeProjectId = computed(() => firstId(Array.isArray(route.query && (route.query.project || route.query.projectId))
+    ? (route.query.project || route.query.projectId)[0]
+    : (route.query && (route.query.project || route.query.projectId))));
+workspaceProjectId.value = routeProjectId.value;
+
+const projectId = computed(() => firstId(
+    props.projectData && props.projectData._id,
+    workspaceProjectId.value,
 ));
 
-const taskProjectId = computed(() => String(
-    projectId.value
-    || (current.value && current.value.ProjectID)
-    || ''
+const taskProjectId = computed(() => firstId(
+    projectId.value,
+    current.value && current.value.ProjectID,
+    current.value && current.value.projectId,
 ));
 const rawDraft = computed(() => blocksToRawText(contentBlocks.value) || contentHtml.value || '');
 const pageBriefing = computed(() => String((current.value && current.value.briefing && current.value.briefing.markdown) || '').trim());
@@ -368,7 +377,6 @@ const writebackOn = ref(true);
 const writebackBusy = ref(false);
 
 const query = ref('');
-const routePageId = computed(() => String((route.query && route.query.page) || ''));
 const expanded = ref(new Set());
 const showLinker = ref(false);
 // [{ id, key }] — the key is only what the picker handed over, for a readable chip. The
@@ -445,6 +453,22 @@ const toggle = (id) => {
 
 const nameOf = (id) => (id ? (getUser(String(id))?.Employee_Name || '—') : '—');
 
+function syncWorkspaceHash({ pageId, projectId: nextProject } = {}) {
+    if (!props.workspace) return;
+    const page = pageId !== undefined ? firstId(pageId) : routePageId.value;
+    const project = nextProject !== undefined ? firstId(nextProject) : firstId(workspaceProjectId.value);
+    const query = { ...route.query };
+    if (page) query.page = page;
+    else delete query.page;
+    if (project) query.project = project;
+    else delete query.project;
+    delete query.projectId;
+    const samePage = firstId(route.query && route.query.page) === page;
+    const sameProject = firstId(route.query && (route.query.project || route.query.projectId)) === project;
+    if (samePage && sameProject) return;
+    router.replace({ query }).catch(() => {});
+}
+
 // Embedded as a view there is no open/close cycle, so it is open from the start
 // and the watch below must fire immediately or the tree would never load.
 const isOpen = computed(() => props.embedded || props.workspace || props.modelValue);
@@ -475,6 +499,12 @@ watch(routePageId, (id, previous) => {
     if (isOpen.value) openPage(id);
 });
 
+watch(routeProjectId, (id) => {
+    if (!props.workspace) return;
+    if (firstId(workspaceProjectId.value) === firstId(id)) return;
+    workspaceProjectId.value = id || '';
+});
+
 // Switching projects does not remount this component — only the injected project
 // changes — so nothing above re-ran and the previous project's tree and open doc
 // stayed on screen until a tab change or reload forced a rebuild.
@@ -502,6 +532,12 @@ watch(() => (props.projectData && props.projectData._id) || '', (id, previous) =
 
 watch(workspaceProjectId, (id, previous) => {
     if (!props.workspace || previous === undefined || id === previous) return;
+    syncWorkspaceHash({ projectId: id });
+    const boundFromOpen = current.value && firstId(current.value.ProjectID, current.value.projectId) === firstId(id);
+    if (boundFromOpen) {
+        if (isOpen.value) fetchPages();
+        return;
+    }
     if (isDirty.value && !window.confirm(t('Projects.page_discard_confirm'))) {
         workspaceProjectId.value = previous || '';
         return;
@@ -551,9 +587,11 @@ watch(taskProjectId, (id) => {
 }, { immediate: true });
 
 function fetchPages() {
+    const gen = ++pagesFetchGen;
     const queryString = projectId.value ? `?projectId=${projectId.value}` : '';
     apiRequest('get', `/api/v2/pages${queryString}`)
     .then((response) => {
+        if (gen !== pagesFetchGen) return;
         pages.value = response.data?.status ? (response.data.data || []) : [];
         // Open every branch that has children the first time the panel loads, so the
         // tree shows what exists rather than hiding it behind twisties.
@@ -600,8 +638,17 @@ function openPage(id) {
             showShare.value = false;
             share.value = null;
             previewHtml.value = '';
-            if (props.workspace && String(routePageId.value || '') !== String(id)) {
-                router.replace({ query: { ...route.query, page: String(id) } });
+            if (props.workspace) {
+                const pid = firstId(
+                    current.value && current.value.ProjectID,
+                    current.value && current.value.projectId,
+                    workspaceProjectId.value,
+                    routeProjectId.value,
+                );
+                if (pid && firstId(workspaceProjectId.value) !== pid) {
+                    workspaceProjectId.value = pid;
+                }
+                syncWorkspaceHash({ pageId: String(id), projectId: pid || workspaceProjectId.value });
             }
         }
     })

@@ -263,9 +263,13 @@ describe('PAGES - kiln follow-up guards', () => {
         expect(chips).toContain('data-citation-type');
         expect(chips).toContain('data-citation-id');
         expect(chips).toContain("name: 'Pages'");
-        expect(chips).toContain('query: { page:');
+        expect(chips).toContain('query.project');
+        expect(chips).toContain('citation.projectId');
         expect(panel).toContain('route.query');
         expect(panel).toContain('routePageId');
+        expect(panel).toContain('routeProjectId');
+        expect(panel).toContain('syncWorkspaceHash');
+        expect(panel).toContain('query.project');
         expect(locale).toContain('workspace_ask_sources');
         expect(locale).toContain('pages_citation_page');
         expect(locale).toContain('pages_citation_task');
