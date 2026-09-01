@@ -1,6 +1,6 @@
 <template>
     <Transition v-if="!isLoading">
-        <div v-if="groupType === 1 ? ((searchedTask ? filteredTasksGetter.length : items?.length) || !item?.users?.length) : (!searchedTask || filteredTasksGetter.length)" class="item_wrapper" @scroll="checkScroll">
+        <div v-if="groupType === 1 ? ((searchMode ? filteredTasksGetter.length : items?.length) || !item?.users?.length) : true" class="item_wrapper" @scroll="checkScroll">
             <div class="new-row item_head">
                 <div class="new-col1" :style="`${clientWidth > sideScrollWidth ? 'border:0px' : ''};`">
                     <div class="common-section head" @click="() => {emit('toggle', item); $forceUpdate();}">
@@ -126,7 +126,7 @@
                     :class="{'isDisabled': item.isDisabled}"
                     :clone="clone"
                     :move="checkMove"
-                    :list="(!searchedTask ? items : filteredTasksGetter)"
+                    :list="visibleTaskRows"
                     tag="div"
                     @change="draggedTaskId = '',updateItem('task',$event, item)"
                     item-key="TaskName"
@@ -351,9 +351,14 @@ const {updateTaskByGroup} = useUpdateTasks();
 const isLoading = ref(false);
 const sprintBucket = computed(() => sprintTasksBucket(
     getters['projectData/tasks'],
-    props.projectId,
-    props.sprintId,
+    firstId(props.projectId),
+    firstId(props.sprintId),
 ));
+const searchMode = computed(() => Boolean(unref(searchedTask)));
+const visibleTaskRows = computed(() => {
+    if (searchMode.value && filteredTasksGetter.value.length) return filteredTasksGetter.value;
+    return items.value;
+});
 
 
 // IMAGES
@@ -590,8 +595,10 @@ const filteredTasksGetter = computed(() => {
                 return x.sprintId === props.sprintId && x.AssigneeUserId.sort((a,b) => a > b ? 1 : -1).join("_") === props.item.value;
             })
         } else {
-            
-            return getters['projectData/searchedTasks'].filter((x) => x.sprintId === props.sprintId && x[props.item.searchKey] === props.item.searchValue);
+            if (props.item.searchKey === "statusKey") {
+                return getters['projectData/searchedTasks'].filter((x) => firstId(x.sprintId, x.SprintId) === firstId(props.sprintId) && sameGroupValue(x.statusKey, props.item.searchValue));
+            }
+            return getters['projectData/searchedTasks'].filter((x) => firstId(x.sprintId, x.SprintId) === firstId(props.sprintId) && x[props.item.searchKey] === props.item.searchValue);
         }
     } else {
         return [];
@@ -651,7 +658,7 @@ const selection = useTaskSelection();
 const canGroupSelect = computed(() => checkPermission('task.task_status', projectData.value?.isGlobalPermission) === true
     && !showArchived.value);
 const groupTaskIds = computed(() => {
-    const source = searchedTask ? filteredTasksGetter.value : items.value;
+    const source = visibleTaskRows.value;
     if (!Array.isArray(source)) return [];
     const ids = [];
     for (const t of source) {

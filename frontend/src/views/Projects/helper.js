@@ -763,7 +763,8 @@ export function taskListHelper() {
     function getSprintTasks({projectId, sprintId, item, fetchNew = false, projectData ,indexName,parentId = '',groupType,resetTable}) {
         return new Promise((resolve, reject) => {
             try {
-                if(permit === null && projectData.isGlobalPermission === false) {
+                const permitNow = checkPermission("task.show_tasks", projectData?.isGlobalPermission);
+                if(permitNow === null && projectData.isGlobalPermission === false) {
                     resolve();
                     return;
                 }
@@ -775,7 +776,7 @@ export function taskListHelper() {
                         item,
                         fetchNew,
                         userId: userId.value,
-                        showAllTasks: projectData.isGlobalPermission === false ? permit : true,
+                        showAllTasks: projectData.isGlobalPermission === false ? permitNow : true,
                         isFirst : false,
                         resetTable:resetTable
                     })
@@ -794,7 +795,7 @@ export function taskListHelper() {
                         item,
                         fetchNew,
                         userId: userId.value,
-                        showAllTasks: projectData.isGlobalPermission === false ? permit : true,
+                        showAllTasks: projectData.isGlobalPermission === false ? permitNow : true,
                         indexName: indexName,
                         parentId : parentId
                     })
@@ -1205,20 +1206,13 @@ export function taskListHelper() {
                 }
 
                 if(refetch === true && fetchTask === true) {
-                    let promises = [];
-                    sprints[0].items.forEach((item) => {
-                        promises.push(
-                            getSprintTasks({projectId: firstId(project._id), sprintId: firstId(sprints[0]?.id, sprints[0]?._id), item, fetchNew: lView == 'table' ? refetch : true,projectData: project, indexName: item.indexName, groupType: lView,resetTable:resetTable})
-                        )
-                    })
-                    Promise.allSettled(promises)
-                    .then(() => {
+                    const pid = firstId(project._id);
+                    const sid = firstId(sprints[0]?.id, sprints[0]?._id);
+                    const finish = (error) => {
+                        if (error) console.error("ERROR in toggleSprints > Promise.allSettled: ", error);
                         groupedTasks.value = sprints;
-                        cb(groupedTasks.value)
-                        // getTaskArray();
-
+                        cb(groupedTasks.value);
                         const sprintData = sprints[0];
-
                         getMongoDBUpdate({
                             projectId: project._id,
                             sprintId: sprintData.id ? sprintData.id : sprintData._id,
@@ -1226,12 +1220,26 @@ export function taskListHelper() {
                             groupBy: {type: type,items: sprintData.items?.map((x) => ({key: `${x.searchKey}_${x.searchValue}`, value: x.searchValue, name: x.name}))},
                             currentView: lView == 'table' ? 'tableTasks' : 'tasks'
                         });
-                    })
-                    .catch((error) => {
-                        groupedTasks.value = sprints;
-                        cb(groupedTasks.value)
-                        console.error("ERROR in toggleSprints > Promise.allSettled: ", error);
-                    })
+                    };
+                    if ((lView === 'list' || lView === 'board') && pid && sid) {
+                        refetchSprintBoardTasks({ projectId: pid, sprintId: sid, projectData: project })
+                            .then(() => finish())
+                            .catch((error) => finish(error));
+                    } else {
+                        let promises = [];
+                        sprints[0].items.forEach((item) => {
+                            promises.push(
+                                getSprintTasks({projectId: pid, sprintId: sid, item, fetchNew: lView == 'table' ? refetch : true,projectData: project, indexName: item.indexName, groupType: lView,resetTable:resetTable})
+                            )
+                        })
+                        Promise.allSettled(promises)
+                        .then(() => finish())
+                        .catch((error) => {
+                            groupedTasks.value = sprints;
+                            cb(groupedTasks.value)
+                            console.error("ERROR in toggleSprints > Promise.allSettled: ", error);
+                        })
+                    }
                 } else {
                     groupedTasks.value = sprints;
                     cb(groupedTasks.value)

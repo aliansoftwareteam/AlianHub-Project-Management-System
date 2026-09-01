@@ -11,22 +11,22 @@
             <h5 class="taf__heading">{{ $t('CustomField.autofill_preview') }}</h5>
             <p v-if="notice" class="taf__notice">{{ notice }}</p>
             <ul class="taf__list">
-                <li v-if="assigneeRow" class="taf__item" data-taf-row="assignee">
+                <li v-if="assigneeEmpty()" class="taf__item" data-taf-row="assignee">
                     <label class="taf__pick">
                         <input
                             type="checkbox"
-                            :checked="assigneeRow.checked"
-                            :disabled="!assigneeRow.item"
+                            :checked="assigneeRow && assigneeRow.checked"
+                            :disabled="!(assigneeRow && assigneeRow.item)"
                             @change="toggleRow('assignee')"
                         />
-                        <span class="taf__title">{{ assigneeRow.title }}</span>
+                        <span class="taf__title">{{ (assigneeRow && assigneeRow.title) || 'Assignee' }}</span>
                     </label>
-                    <span class="taf__value" :class="{ 'taf__value--none': !assigneeRow.item }">{{ assigneeRow.display }}</span>
+                    <span class="taf__value" :class="{ 'taf__value--none': !(assigneeRow && assigneeRow.item) }">{{ (assigneeRow && assigneeRow.display) || $t('CustomField.autofill_no_suggestion') }}</span>
                     <button
-                        v-if="assigneeRow.canApply"
+                        v-if="assigneeRow && assigneeRow.canApply"
                         type="button"
                         class="taf__apply"
-                        :disabled="busy || !assigneeRow.checked"
+                        :disabled="busy || !(assigneeRow && assigneeRow.checked)"
                         @click="applyOne(assigneeRow)"
                     >{{ busy ? $t('CustomField.autofill_working') : $t('CustomField.autofill_apply') }}</button>
                 </li>
@@ -183,8 +183,12 @@ function namedAssigneeChip(value) {
 
 function assigneeEmpty() {
     const raw = props.task && props.task.AssigneeUserId;
-    if (!Array.isArray(raw)) return true;
-    return raw.filter(namedAssigneeChip).length === 0;
+    if (!Array.isArray(raw) || !raw.length) return true;
+    try {
+        return raw.filter(namedAssigneeChip).length === 0;
+    } catch (_error) {
+        return true;
+    }
 }
 
 function projectBag() {
@@ -363,7 +367,6 @@ function suggestionLabel(item) {
 }
 
 const assigneeRow = computed(() => {
-    if (!assigneeEmpty()) return null;
     const assigneeItem = findSuggestion((item) => item.fieldId === 'assignee' || (item.source === 'native' && item.kind === 'owner')) || assigneeSeed();
     return {
         fieldId: 'assignee',
@@ -404,7 +407,7 @@ const rows = computed(() => {
         }
         : null);
     const out = [];
-    if (assigneeRow.value) out.push(assigneeRow.value);
+    if (assigneeEmpty()) out.push(assigneeRow.value);
     if (field && !ownerFilled) {
         out.push({
             fieldId: field._id || 'owner',
@@ -493,8 +496,15 @@ async function preview() {
         const next = Array.isArray(payload.data?.suggestions) ? payload.data.suggestions.slice() : [];
         if (assigneeEmpty()) {
             const fromApi = next.find((item) => item && (item.fieldId === 'assignee' || (item.source === 'native' && item.kind === 'owner')));
-            const seed = fromApi || assigneeSeed();
-            if (seed && !next.some((item) => item && item.fieldId === 'assignee')) {
+            const seed = fromApi || assigneeSeed() || {
+                fieldId: 'assignee',
+                kind: 'owner',
+                source: 'native',
+                personId: '',
+                value: [],
+                display: '',
+            };
+            if (!next.some((item) => item && item.fieldId === 'assignee')) {
                 next.unshift(seed);
             }
         }

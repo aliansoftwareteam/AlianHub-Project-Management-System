@@ -233,15 +233,15 @@
                     <Skelaton v-for="i in 5" :key="i" class="border-radius-5-px skelaton__option m-5px border-bottom"/>
                 </div>
                 <span v-if="isError" class="red">{{$t('Toast.something_went_wrong')}}</span>
-                <div v-if="boardSurfaceKind === 'loading'" class="board-load-strip">
+                <div v-if="surfaceKind === 'loading'" class="board-load-strip">
                     <p class="board-load-strip__line">{{ $t('EmptyState.board_loading') }}</p>
                 </div>
                 <EmptyState
-                    v-else-if="boardSurfaceKind === 'failed' || boardSurfaceKind === 'empty'"
-                    :title="boardSurfaceKind === 'failed' ? $t('EmptyState.load_failed_title') : $t('EmptyState.no_sprint_tasks_title')"
-                    :message="boardSurfaceKind === 'failed' ? $t('EmptyState.load_failed_msg', { count: boardExpectedCount }) : ''"
-                    :actionLabel="boardSurfaceKind === 'failed' ? $t('EmptyState.load_failed_action') : $t('EmptyState.no_sprint_tasks_action')"
-                    :tone="boardSurfaceKind === 'failed' ? 'copper' : 'pine'"
+                    v-else-if="surfaceKind === 'failed' || surfaceKind === 'empty'"
+                    :title="surfaceKind === 'failed' ? $t('EmptyState.load_failed_title') : $t('EmptyState.no_sprint_tasks_title')"
+                    :message="surfaceKind === 'failed' ? $t('EmptyState.load_failed_msg', { count: surfaceExpected }) : ''"
+                    :actionLabel="surfaceKind === 'failed' ? $t('EmptyState.load_failed_action') : $t('EmptyState.no_sprint_tasks_action')"
+                    :tone="surfaceKind === 'failed' ? 'copper' : 'pine'"
                     @action="retrySurface"
                 />
                 <div v-else class="itemSprintWrapper style-scroll-6-px" id="tasklist_driver">
@@ -408,6 +408,10 @@ const sprintHours = ref({ plannedMinutes: 0, loggedMinutes: 0, overdueMinutes: 0
 const hoursFetched = ref(false);
 const currentCompanyForHours = computed(() => getters["settings/selectedCompany"]);
 const surfaceKind = computed(() => unref(boardSurfaceKind));
+const surfaceExpected = computed(() => {
+    const n = Number(unref(boardExpectedCount));
+    return Number.isFinite(n) ? n : 0;
+});
 const showSprintHours = computed(() => boardHoursVisible(surfaceKind.value)
     && !!currentCompanyForHours.value?.planFeature?.timeEstimateProjectApp
     && checkPermission('task.task_list', project.value?.isGlobalPermission) === true);

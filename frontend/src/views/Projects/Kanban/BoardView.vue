@@ -14,7 +14,7 @@
                 <p class="board-load-strip__line">{{ $t('EmptyState.board_loading') }}</p>
             </div>
         </template>
-        <template v-else-if="emptyKind === 'ready'">
+        <template v-else-if="emptyKind === 'ready' && shownBoardCount > 0">
             <KanbanBoard :data="processedBoardData" :group="grouped" :sprintId="sprintId" />
         </template>
         <template v-else>
@@ -41,7 +41,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, inject, defineProps, defineEmits } from 'vue';
+import { ref, computed, onMounted, watch, inject, provide, defineProps, defineEmits } from 'vue';
 import { useStore } from 'vuex';
 import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import { markFirstRunStep, FIRST_RUN_STEPS } from '@/composable/firstRunProgress';
@@ -53,7 +53,7 @@ import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPla
 
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { useRoute } from 'vue-router';
-import { appendUnmatchedToFirstGroup, boardEmptyKind, countSprintBoardTasks, firstId, sameGroupValue, sprintExpectedCount, sprintTasksBucket, unmatchedBoardTasks } from '@/utils/taskOpenProjectId';
+import { appendUnmatchedToFirstGroup, bindSprintTaskSource, boardEmptyKind, countPaintedTaskRows, countSprintBoardTasks, firstId, sameGroupValue, sprintExpectedCount, sprintTasksBucket, sprintTreeExpectedCount, unmatchedBoardTasks } from '@/utils/taskOpenProjectId';
 const route = useRoute();
 
 // --- Props & Emits ---
@@ -88,14 +88,13 @@ const searchedTasksData = computed(() => getters['projectData/searchedTasks'] ||
 const taskSourceArray = computed(() => {
     const sprint = props.sprints && props.sprints[0];
     const sid = firstId(sprint && (sprint.id || sprint._id));
-    if (searchedTask.value && searchedTasksData.value.length > 0) {
-        if (!sid) return [];
-        return searchedTasksData.value.filter(task => firstId(task.sprintId, task.SprintId) === sid);
-    } else if (!searchedTask.value && project.value?._id && sid) {
-        const bucket = sprintTasksBucket(allProjectTasks.value, project.value._id, sid);
-        return (bucket && bucket.tasks) || [];
-    }
-    return [];
+    const bucket = sprintTasksBucket(allProjectTasks.value, project.value && project.value._id, sid);
+    return bindSprintTaskSource({
+        searched: Boolean(searchedTask && searchedTask.value),
+        searchRows: searchedTasksData.value,
+        storedRows: (bucket && bucket.tasks) || [],
+        sprintId: sid,
+    });
 });
 
 // The core logic: Computed property that processes tasks based on grouping
@@ -165,11 +164,16 @@ const processedBoardData = computed(() => {
     return appendUnmatchedToFirstGroup(mapped, unmatchedBoardTasks(mapped, filteredSourceTasks));
 });
 
-const shownBoardCount = computed(() => processedBoardData.value.reduce((n, group) => n + ((group && group.tasksArray) || []).length, 0));
+const shownBoardCount = computed(() => countPaintedTaskRows(processedBoardData.value));
 const boardExpectedCount = computed(() => {
     const sprint = props.sprints && props.sprints[0];
     const grouped = internalGroupedTasks.value && internalGroupedTasks.value[0];
-    return Math.max(sprintExpectedCount(sprint), sprintExpectedCount(grouped));
+    const sid = firstId(sprint && (sprint.id || sprint._id), grouped && (grouped.id || grouped._id));
+    return Math.max(
+        sprintExpectedCount(sprint),
+        sprintExpectedCount(grouped),
+        sprintTreeExpectedCount(project.value, sid),
+    );
 });
 const emptyKind = computed(() => {
     const sprint = props.sprints && props.sprints[0];
@@ -181,11 +185,14 @@ const emptyKind = computed(() => {
         loading: retrying.value || isLoading.value || props.sprintLoading,
         sprintsBound: Boolean(props.sprints && props.sprints.length),
         boardCount: shownBoardCount.value,
-        expectedCount: Math.max(boardExpectedCount.value, stored),
+        expectedCount: boardExpectedCount.value,
+        storedCount: stored,
         searchHits: Boolean(searchedTask && searchedTask.value && searchedTasksData.value.length),
         hasGroups: groups.length > 0,
     });
 });
+provide('boardSurfaceKind', emptyKind);
+provide('boardExpectedCount', boardExpectedCount);
 
 function onEmptyAction() {
     if (retrying.value) return;
@@ -225,6 +232,8 @@ function onEmptyAction() {
         });
 }
 
+provide('onBoardSurfaceAction', onEmptyAction);
+
 watch([() => props.grouped, () => props.sprints,() => route?.params], ([newGroup, newSprints, newRouteParams], [oldGroup, oldSprints, oldRouteParams]) => {
     if (retrying.value) return;
     if (project.value?._id && (newGroup !== oldGroup || !isEqual(newSprints, oldSprints))) {        
@@ -243,16 +252,19 @@ onMounted(async () => {
     markFirstRunStep(FIRST_RUN_STEPS.BOARD_VIEW);
     if (project.value?._id && props.sprints?.length) {
         isLoading.value = true;
-
+        const pid = firstId(project.value._id);
+        const sid = firstId(props.sprints[0] && (props.sprints[0].id || props.sprints[0]._id));
         try {
-            const needsInitialGrouping = !sprintTasksBucket(allProjectTasks.value, project.value._id, props.sprints[0] && (props.sprints[0].id || props.sprints[0]._id));
+            const stored = countSprintBoardTasks(allProjectTasks.value, pid, sid);
+            if (stored === 0) {
+                await Promise.resolve(refetchSprintBoardTasks({ projectId: pid, sprintId: sid, projectData: project.value }));
+            }
             await new Promise((resolve) => {
-                groupBy(props.grouped, needsInitialGrouping, project.value, props.sprints, internalGroupedTasks, true, 'board', false, true, (resp) => {
+                groupBy(props.grouped, false, project.value, props.sprints, internalGroupedTasks, true, 'board', false, true, (resp) => {
                     internalGroupedTasks.value = resp;
-                    resolve(); 
+                    resolve();
                 });
             });
-
         } catch (error) {
             console.error("Error during initial groupBy:", error);
         } finally {

@@ -50,7 +50,7 @@ import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPla
 import isEqual from 'lodash/isEqual';
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { useTaskSelection } from '@/composable/useTaskSelection.js';
-import { boardEmptyKind, countPaintedSprintTasks, countSprintBoardTasks, firstId, paintSprintGroups, sprintExpectedCount, sprintTasksBucket } from '@/utils/taskOpenProjectId';
+import { boardEmptyKind, countPaintedSprintTasks, countSprintBoardTasks, firstId, paintSprintGroups, sprintExpectedCount, sprintTasksBucket, sprintTreeExpectedCount } from '@/utils/taskOpenProjectId';
 
 // UTILS
 const {getters, commit} = useStore();
@@ -114,7 +114,12 @@ const headerSprints = computed(() => {
 const boardExpectedCount = computed(() => {
     const header = headerSprints.value && headerSprints.value[0];
     const listed = props.sprints && props.sprints[0];
-    return Math.max(sprintExpectedCount(header), sprintExpectedCount(listed));
+    const sid = firstId(header && (header.id || header._id), listed && (listed.id || listed._id));
+    return Math.max(
+        sprintExpectedCount(header),
+        sprintExpectedCount(listed),
+        sprintTreeExpectedCount(project.value, sid),
+    );
 });
 const emptyKind = computed(() => {
     const sprint = (headerSprints.value && headerSprints.value[0]) || (props.sprints && props.sprints[0]);
@@ -128,7 +133,8 @@ const emptyKind = computed(() => {
         loading: retrying.value || isLoading.value || props.sprintLoading,
         sprintsBound: Boolean(props.sprints && props.sprints.length),
         boardCount: shown,
-        expectedCount: Math.max(boardExpectedCount.value, stored),
+        expectedCount: boardExpectedCount.value,
+        storedCount: stored,
         searchHits: Boolean(searchedTask && searchedTask.value && searchedTasksData.value.length),
         hasGroups: groups.length > 0,
     });

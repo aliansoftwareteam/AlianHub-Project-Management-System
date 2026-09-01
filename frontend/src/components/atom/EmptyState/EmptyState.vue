@@ -67,10 +67,16 @@ const resolvedHelpHref = computed(() => {
 </script>
 
 <style scoped>
-.empty-state {
-    width: 100%;
-    padding: 24px 20px;
-    text-align: center;
+.empty-state--pine,
+.empty-state--copper {
+    background: var(--kiln-paper, #f4ead8);
+    border: 1px solid var(--kiln-line, #d8cbb3);
+    border-radius: var(--kiln-radius-sm, 9px);
+    max-width: 420px;
+    margin: 16px auto;
+}
+.empty-state--copper {
+    border-left: 3px solid var(--kiln-ember, #c45c26);
 }
 .empty-state__img {
     max-width: 180px;

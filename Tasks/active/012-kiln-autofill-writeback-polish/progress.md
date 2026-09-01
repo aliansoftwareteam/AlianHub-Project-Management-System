@@ -15,12 +15,15 @@
 - [x] Comments pane lists existing Alian comments for the open taskId (no empty pane with badge 1)
 
 ## Last step
-Hours paint only on ready or honest empty. Failed bind keeps the cream fail card and hides 00h. Loading is pine “Loading this board…” with hours hidden (dash until a bind, never zero). Retry still paints unmatched SMOKE-1..7. Autofill Assignee row stays when the rail is empty.
+Failed bind (sidebar/store count > 0, painted 0) is cream fail card + copper Retry, no 00h. Initial list/board fetch is unfiltered. Autofill lists Assignee whenever the rail has no named chip (Apply or No suggestion).
 
 ## Blockers
 None. Live Local Smoke is not in this VM (no Mongo), so Retry / Autofill / pages were not browser-verified here.
 
 ## Log
+
+### 2026-09-01
+- Bot 3 FAIL on 448110b: emptyKind could still go ready/empty while the board painted no cards, and hours showed 00h. Painted count is now only task rows with ids; expected count also reads `sprintsObj`/`sprintsfolders`. store=7 + shown=0 is failed. List/board initial bind uses one unfiltered fetch. ItemList no longer hides status groups when search is stale. Fail card is cream. Autofill Assignee row is `v-if="assigneeEmpty()"` even when seed is null.
 
 ### 2026-08-27
 - Task created. Stacked on PR 521 (`feat/agent-writeback-status-page-comment-0b24`).

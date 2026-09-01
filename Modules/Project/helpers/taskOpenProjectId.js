@@ -229,8 +229,60 @@ function sprintTasksBucket(tasksMap, projectId, sprintId) {
 
 function countSprintBoardTasks(tasksMap, projectId, sprintId) {
     const bucket = sprintTasksBucket(tasksMap, projectId, sprintId);
-    const rows = bucket && Array.isArray(bucket.tasks) ? bucket.tasks : [];
-    return rows.filter((row) => row && !row.deletedStatusKey).length;
+    if (bucket && Array.isArray(bucket.tasks)) {
+        return bucket.tasks.filter((row) => row && !row.deletedStatusKey).length;
+    }
+    const sid = firstId(sprintId);
+    if (!tasksMap || typeof tasksMap !== 'object' || !sid) return 0;
+    let max = 0;
+    for (const project of Object.values(tasksMap)) {
+        if (!project || typeof project !== 'object') continue;
+        const hit = lookupById(project, sid);
+        if (hit && Array.isArray(hit.tasks)) {
+            max = Math.max(max, hit.tasks.filter((row) => row && !row.deletedStatusKey).length);
+        }
+    }
+    return max;
+}
+
+function sprintTreeExpectedCount(project, sprintId) {
+    const sid = firstId(sprintId);
+    if (!project || typeof project !== 'object' || !sid) return 0;
+    const bags = [project.sprintsObj || {}];
+    for (const folder of Object.values(project.sprintsfolders || {})) {
+        bags.push((folder && folder.sprintsObj) || {});
+    }
+    let max = 0;
+    for (const bag of bags) {
+        if (!bag || typeof bag !== 'object') continue;
+        const hit = lookupById(bag, sid);
+        if (hit) max = Math.max(max, sprintExpectedCount(hit));
+        for (const row of Object.values(bag)) {
+            if (row && sameId(row.id || row._id, sid)) max = Math.max(max, sprintExpectedCount(row));
+        }
+    }
+    return max;
+}
+
+function bindSprintTaskSource({ searched, searchRows, storedRows, sprintId } = {}) {
+    const stored = Array.isArray(storedRows) ? storedRows : [];
+    const sid = firstId(sprintId);
+    if (searched && Array.isArray(searchRows) && searchRows.length) {
+        const hits = sid
+            ? searchRows.filter((task) => firstId(task && (task.sprintId || task.SprintId)) === sid)
+            : searchRows.slice();
+        if (hits.length) return hits;
+    }
+    return stored;
+}
+
+function countPaintedTaskRows(groups) {
+    if (!Array.isArray(groups)) return 0;
+    return groups.reduce((n, group) => {
+        const rows = (group && group.tasksArray) || [];
+        if (!Array.isArray(rows)) return n;
+        return n + rows.filter((row) => row && !row.deletedStatusKey && firstId(row._id, row.id)).length;
+    }, 0);
 }
 
 function pageOpenRoute({ companyId, projectId, pageId } = {}) {
@@ -346,15 +398,15 @@ function paintSprintGroups(groups, tasks) {
 }
 
 function countPaintedSprintTasks(groups, tasks) {
-    return paintSprintGroups(groups, tasks).reduce((n, group) => n + (((group && group.tasksArray) || []).length), 0);
+    return countPaintedTaskRows(paintSprintGroups(groups, tasks));
 }
 
-function boardEmptyKind({ loading, sprintsBound, boardCount, expectedCount, searchHits, hasGroups } = {}) {
+function boardEmptyKind({ loading, sprintsBound, boardCount, expectedCount, searchHits, hasGroups, storedCount } = {}) {
     if (loading) return 'loading';
-    if (hasGroups === false) return 'failed';
     const shown = Number(boardCount) || 0;
     if (shown > 0) return 'ready';
-    const expected = Number(expectedCount) || 0;
+    if (hasGroups === false) return 'failed';
+    const expected = Math.max(Number(expectedCount) || 0, Number(storedCount) || 0);
     if (!sprintsBound || expected > 0 || searchHits) return 'failed';
     return 'empty';
 }
@@ -382,6 +434,9 @@ module.exports = {
     lookupById,
     sprintTasksBucket,
     countSprintBoardTasks,
+    sprintTreeExpectedCount,
+    bindSprintTaskSource,
+    countPaintedTaskRows,
     countRenderedSprintItems,
     sameGroupValue,
     unmatchedBoardTasks,

@@ -21,7 +21,7 @@
                     class="kanban-cards"
                     :list="column.tasksArray"
                     group="tasks"
-                    item-key="id"
+                    :item-key="columnItemKey"
                     @start="onDragStart"
                     @change="updateEvent($event, column)"
                     @scroll="checkScroll($event, column)"
@@ -128,9 +128,9 @@ const columnMaxHeight = computed(() => {
 })
 
 watch(() => (props.data), (value) => {
-    columns.value = value;
+    columns.value = Array.isArray(value) ? value : [];
     init();
-})
+}, { deep: true })
 
 watch(() => (props.group), (value) => {
     groupValue.value = value;
@@ -195,6 +195,10 @@ function debouncer(timeout = 1000) {
             resolve();
         }, timeout);
     })
+}
+
+function columnItemKey(row) {
+    return (row && (row._id || row.id || row.TaskKey)) || '';
 }
 
 const onDragStart = (evt) => {

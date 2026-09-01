@@ -31,6 +31,9 @@ const {
     sprintTasksBucket,
     boardEmptyKind,
     sprintExpectedCount,
+    sprintTreeExpectedCount,
+    bindSprintTaskSource,
+    countPaintedTaskRows,
     boardHoursVisible,
 } = require('../Modules/Project/helpers/taskOpenProjectId');
 
@@ -471,6 +474,27 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         )).toBe(0);
         expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 0, expectedCount: 7, hasGroups: true })).toBe('failed');
         expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 7, expectedCount: 7, hasGroups: true })).toBe('ready');
+        expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 0, expectedCount: 0, storedCount: 7, hasGroups: true })).toBe('failed');
+        expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 0, expectedCount: 0, storedCount: 0, hasGroups: true })).toBe('empty');
+        expect(sprintTreeExpectedCount({
+            sprintsObj: { [SPRINT]: { id: SPRINT, tasks: 7 } },
+        }, SPRINT)).toBe(7);
+        expect(sprintTreeExpectedCount({
+            sprintsfolders: { f1: { sprintsObj: { [SPRINT]: { _id: SPRINT, taskCount: 7 } } } },
+        }, SPRINT)).toBe(7);
+        expect(bindSprintTaskSource({
+            searched: true,
+            searchRows: [],
+            storedRows: [{ _id: 't1' }, { _id: 't2' }],
+            sprintId: SPRINT,
+        })).toHaveLength(2);
+        expect(bindSprintTaskSource({
+            searched: true,
+            searchRows: [{ _id: 'hit', sprintId: SPRINT }],
+            storedRows: [{ _id: 't1' }],
+            sprintId: SPRINT,
+        }).map((row) => row._id)).toEqual(['hit']);
+        expect(countPaintedTaskRows([{ tasksArray: [{ _id: 'a' }, { TaskName: 'ghost' }] }])).toBe(1);
         const store = {
             [PROJECT]: {
                 sprints: [SPRINT],
@@ -484,7 +508,8 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         const board = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'views', 'Projects', 'Kanban', 'BoardView.vue'), 'utf8');
         expect(list).toContain('hasGroups');
         expect(list).toContain('sprintExpectedCount');
-        expect(list).toContain('Math.max(sprintExpectedCount(header), sprintExpectedCount(listed))');
+        expect(list).toContain('sprintTreeExpectedCount');
+        expect(list).toContain('storedCount: stored');
         expect(list).toContain('countPaintedSprintTasks');
         expect(list).toContain('paintSprintGroups');
         expect(list).not.toContain('Math.max(countRenderedSprintItems(groups), stored)');
@@ -498,7 +523,8 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         const itemList = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'organisms', 'ItemList', 'ItemList.vue'), 'utf8');
         expect(itemList).toContain('sameGroupValue');
         expect(itemList).toContain('unmatchedBoardTasks');
-        expect(itemList).toContain('Number(props.statusIndex) === 0');
+        expect(itemList).toContain('visibleTaskRows');
+        expect(itemList).toContain('searchMode');
         expect(board).toContain('hasGroups');
         expect(board).toContain('sprintExpectedCount');
         expect(board).toContain('sameGroupValue');
@@ -506,6 +532,11 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(board).toContain('resetSprintTaskBucket');
         expect(board).toContain('refetchSprintBoardTasks');
         expect(board).toContain('boardCount: shownBoardCount.value');
+        expect(board).toContain('storedCount: stored');
+        expect(board).toContain('sprintTreeExpectedCount');
+        expect(board).toContain('bindSprintTaskSource');
+        expect(board).toContain("emptyKind === 'ready' && shownBoardCount > 0");
+        expect(board).toContain("provide('boardSurfaceKind', emptyKind)");
         expect(board).toContain('const retrying = ref(false)');
         expect(board).toContain('if (retrying.value) return');
         expect(board).toContain('groupBy(props.grouped, false');
@@ -517,6 +548,7 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(helper).toContain('unfiltered: true');
         expect(helper).toContain('resetCursor: true');
         expect(helper).toContain('showAllTasks: true');
+        expect(helper).toContain("lView === 'list' || lView === 'board'");
         const actions = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'store', 'ProjectData', 'actions.js'), 'utf8');
         expect(actions).toContain('sprintTasksBucket');
         expect(actions).toContain('unfiltered');
@@ -535,7 +567,7 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(sprintsList).toContain('hoursFetched');
         expect(sprintsList).toContain("kind === 'loading' || kind === 'failed'");
         expect(sprintsList).toContain("if (!hoursFetched.value) return '—'");
-        expect(sprintsList).toContain("boardSurfaceKind === 'failed'");
+        expect(sprintsList).toContain("surfaceKind === 'failed'");
         expect(sprintsList).toContain('EmptyState.load_failed_title');
         expect(sprintsList).toContain('retrySurface');
         const empty = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'atom', 'EmptyState', 'EmptyState.vue'), 'utf8');
@@ -546,6 +578,7 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         const locale = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'locales', 'en.js'), 'utf8');
         expect(empty).toContain('empty-state--pine');
         expect(empty).toContain('empty-state--copper');
+        expect(empty).toContain('#f4ead8');
         expect(empty).not.toContain('#172b4d');
         expect(empty).not.toContain('#2f6fdb');
         expect(locale).toContain('No tasks in this sprint.');
