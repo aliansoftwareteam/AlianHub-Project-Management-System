@@ -224,11 +224,14 @@ export const getPaginatedTasks = ({state, commit}, payload) => {
                     if (unfiltered) {
                         const stamped = (responseData || []).map((task) => stampDates({ ...task }));
                         const parents = stamped.filter((task) => task && task.isParentTask !== false);
-                        commit('setSprintBoardTasks', {
-                            pid,
-                            sprintId,
-                            tasks: parents.length ? parents : stamped,
-                        });
+                        const next = parents.length ? parents : stamped;
+                        if (next.length) {
+                            commit('setSprintBoardTasks', {
+                                pid,
+                                sprintId,
+                                tasks: next,
+                            });
+                        }
                     } else if(responseData && responseData.length) {
                         responseData.forEach((task) => {
                             commit('mutateTypesenseTasks', {found: resCount, nextPage: {[indexKey]: (cursor || 0) + responseData?.length || 0}, pid, sprintId, data: stampDates({...task})})

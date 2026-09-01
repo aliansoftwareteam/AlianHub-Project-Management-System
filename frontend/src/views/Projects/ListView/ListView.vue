@@ -50,7 +50,7 @@ import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPla
 import isEqual from 'lodash/isEqual';
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { useTaskSelection } from '@/composable/useTaskSelection.js';
-import { boardEmptyKind, countPaintedTaskRows, countSprintBoardTasks, firstId, paintSprintGroups, sprintCountFromSprintBags, sprintExpectedCount, sprintTasksBucket, sprintTreeExpectedCount } from '@/utils/taskOpenProjectId';
+import { boardEmptyKind, bindSprintTaskSource, collectSprintBoardTasks, countPaintedTaskRows, countSprintBoardTasks, firstId, paintSprintGroups, sprintCountFromSprintBags, sprintExpectedCount, sprintTasksBucket, sprintTreeExpectedCount, uniqueTaskRows } from '@/utils/taskOpenProjectId';
 
 // UTILS
 const {getters, commit} = useStore();
@@ -143,15 +143,40 @@ const emptyKind = computed(() => {
 });
 provide('boardSurfaceKind', emptyKind);
 provide('boardExpectedCount', boardExpectedCount);
-function bindPaintedSprints(resp) {
+const BOARD_RETRY_HOLD_MS = 400;
+function preferredTaskRows(...groups) {
+    let best = [];
+    for (const group of groups) {
+        const rows = uniqueTaskRows(group);
+        if (rows.length > best.length) best = rows;
+    }
+    return best;
+}
+function bindPaintedSprints(resp, fallbackRows) {
     const pid = firstId(project.value && project.value._id);
     const rows = Array.isArray(resp) ? resp : [];
     groupedTasks.value = rows.map((sprint) => {
-        const bucket = sprintTasksBucket(allProjectTasks.value, pid, firstId(sprint && (sprint.id || sprint._id)));
+        const sid = firstId(sprint && (sprint.id || sprint._id));
+        const bucket = sprintTasksBucket(allProjectTasks.value, pid, sid);
+        const source = bindSprintTaskSource({
+            searched: true,
+            searchRows: searchedTasksData.value,
+            storedRows: uniqueTaskRows((bucket && bucket.tasks) || [], fallbackRows),
+            sprintId: sid,
+        });
         return {
             ...sprint,
-            items: paintSprintGroups(sprint && sprint.items, bucket && bucket.tasks),
+            items: paintSprintGroups(sprint && sprint.items, source),
         };
+    });
+}
+function paintRetryFrame() {
+    return new Promise((resolve) => {
+        if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(() => requestAnimationFrame(resolve));
+            return;
+        }
+        setTimeout(resolve, 32);
     });
 }
 
@@ -164,23 +189,51 @@ function onEmptyAction(mode) {
     const sprint = (headerSprints.value && headerSprints.value[0]) || (props.sprints && props.sprints[0]);
     const pid = firstId(project.value && project.value._id);
     const sid = firstId(sprint && (sprint.id || sprint._id));
+    const kept = preferredTaskRows(
+        collectSprintBoardTasks(allProjectTasks.value, pid, sid),
+        bindSprintTaskSource({
+            searched: true,
+            searchRows: searchedTasksData.value,
+            storedRows: [],
+            sprintId: sid,
+        }),
+        (getters['projectData/alltasks'] || []).filter((row) => (
+            row && !row.deletedStatusKey && firstId(row.sprintId, row.SprintId) === sid
+        )),
+    );
     retrying.value = true;
     isLoading.value = true;
-    commit('projectData/resetSprintTaskBucket', { pid, sprintId: sid });
-    const bindGroups = () => new Promise((resolve) => {
+    const started = Date.now();
+    const holdLoading = () => {
+        const wait = Math.max(0, BOARD_RETRY_HOLD_MS - (Date.now() - started));
+        return new Promise((resolve) => setTimeout(resolve, wait));
+    };
+    const bindGroups = (fallbackRows) => new Promise((resolve) => {
         groupBy(props.grouped, false, project.value, props.sprints, groupedTasks, false, 'list', false, true, (resp) => {
-            bindPaintedSprints(resp);
+            bindPaintedSprints(resp, fallbackRows);
             resolve();
         });
     });
-    Promise.resolve(refetchSprintBoardTasks({ projectId: pid, sprintId: sid, projectData: project.value }))
-        .then(() => bindGroups())
+    Promise.resolve()
+        .then(() => paintRetryFrame())
+        .then(() => refetchSprintBoardTasks({ projectId: pid, sprintId: sid, projectData: project.value }))
         .catch((error) => {
             console.error('ERROR retrying sprint tasks: ', error);
+            return null;
+        })
+        .then(() => {
+            const fetched = collectSprintBoardTasks(allProjectTasks.value, pid, sid);
+            const source = preferredTaskRows(fetched, kept);
+            if (source.length) {
+                commit('projectData/setSprintBoardTasks', { pid, sprintId: sid, tasks: source });
+            }
+            return bindGroups(source);
         })
         .finally(() => {
-            retrying.value = false;
-            isLoading.value = false;
+            holdLoading().then(() => {
+                retrying.value = false;
+                isLoading.value = false;
+            });
         });
 }
 provide('onBoardSurfaceAction', onEmptyAction);

@@ -228,21 +228,52 @@ function sprintTasksBucket(tasksMap, projectId, sprintId) {
 }
 
 function countSprintBoardTasks(tasksMap, projectId, sprintId) {
-    const bucket = sprintTasksBucket(tasksMap, projectId, sprintId);
-    if (bucket && Array.isArray(bucket.tasks)) {
-        return bucket.tasks.filter((row) => row && !row.deletedStatusKey).length;
-    }
+    return collectSprintBoardTasks(tasksMap, projectId, sprintId).length;
+}
+
+function collectSprintBoardTasks(tasksMap, projectId, sprintId) {
     const sid = firstId(sprintId);
-    if (!tasksMap || typeof tasksMap !== 'object' || !sid) return 0;
-    let max = 0;
+    const seen = new Set();
+    const out = [];
+    const take = (rows, matchSid) => {
+        if (!Array.isArray(rows)) return;
+        for (const row of rows) {
+            if (!row || row.deletedStatusKey) continue;
+            const id = firstId(row._id, row.id);
+            if (!id || seen.has(id)) continue;
+            const rowSid = firstId(row.sprintId, row.SprintId);
+            if (matchSid && rowSid && rowSid !== sid) continue;
+            seen.add(id);
+            out.push(row);
+        }
+    };
+    take((sprintTasksBucket(tasksMap, projectId, sprintId) || {}).tasks, false);
+    if (!tasksMap || typeof tasksMap !== 'object' || !sid) return out;
     for (const project of Object.values(tasksMap)) {
         if (!project || typeof project !== 'object') continue;
         const hit = lookupById(project, sid);
-        if (hit && Array.isArray(hit.tasks)) {
-            max = Math.max(max, hit.tasks.filter((row) => row && !row.deletedStatusKey).length);
+        take(hit && hit.tasks, false);
+        for (const value of Object.values(project)) {
+            if (value && typeof value === 'object' && Array.isArray(value.tasks)) take(value.tasks, true);
         }
     }
-    return max;
+    return out;
+}
+
+function uniqueTaskRows(...lists) {
+    const seen = new Set();
+    const out = [];
+    for (const list of lists) {
+        if (!Array.isArray(list)) continue;
+        for (const row of list) {
+            if (!row || row.deletedStatusKey) continue;
+            const id = firstId(row._id, row.id);
+            if (!id || seen.has(id)) continue;
+            seen.add(id);
+            out.push(row);
+        }
+    }
+    return out;
 }
 
 function sprintTreeExpectedCount(project, sprintId) {
@@ -535,6 +566,8 @@ module.exports = {
     lookupById,
     sprintTasksBucket,
     countSprintBoardTasks,
+    collectSprintBoardTasks,
+    uniqueTaskRows,
     sprintTreeExpectedCount,
     sprintCountFromSprintBags,
     bindSprintTaskSource,

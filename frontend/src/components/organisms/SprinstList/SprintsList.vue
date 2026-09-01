@@ -233,23 +233,22 @@
                     <Skelaton v-for="i in 5" :key="i" class="border-radius-5-px skelaton__option m-5px border-bottom"/>
                 </div>
                 <span v-if="isError" class="red">{{$t('Toast.something_went_wrong')}}</span>
-                <div v-if="surfaceKind === 'loading'" class="board-load-strip">
+                <div v-show="surfaceKind === 'loading'" class="board-load-strip">
                     <p class="board-load-strip__line">{{ $t('EmptyState.board_loading') }}</p>
                 </div>
-                <template v-else>
-                    <EmptyState
-                        v-if="surfaceKind === 'failed' || surfaceKind === 'empty'"
-                        :title="surfaceKind === 'failed' ? $t('EmptyState.load_failed_title') : $t('EmptyState.no_sprint_tasks_title')"
-                        :message="surfaceKind === 'failed' ? $t('EmptyState.load_failed_msg', { count: surfaceExpected }) : ''"
-                        :actionLabel="surfaceKind === 'failed' ? $t('EmptyState.load_failed_action') : $t('EmptyState.no_sprint_tasks_action')"
-                        :tone="surfaceKind === 'failed' ? 'copper' : 'pine'"
-                        @action="retrySurface"
-                    />
-                    <div
-                        v-show="surfaceKind === 'ready'"
-                        class="itemSprintWrapper style-scroll-6-px"
-                        id="tasklist_driver"
-                    >
+                <EmptyState
+                    v-if="surfaceKind === 'failed' || surfaceKind === 'empty'"
+                    :title="surfaceKind === 'failed' ? $t('EmptyState.load_failed_title') : $t('EmptyState.no_sprint_tasks_title')"
+                    :message="surfaceKind === 'failed' ? $t('EmptyState.load_failed_msg', { count: surfaceExpected }) : ''"
+                    :actionLabel="surfaceKind === 'failed' ? $t('EmptyState.load_failed_action') : $t('EmptyState.no_sprint_tasks_action')"
+                    :tone="surfaceKind === 'failed' ? 'copper' : 'pine'"
+                    @action="retrySurface"
+                />
+                <div
+                    v-show="surfaceKind === 'ready'"
+                    class="itemSprintWrapper style-scroll-6-px"
+                    id="tasklist_driver"
+                >
                         <template v-if="$route?.query?.tab !== 'Calendar'">
                             <ItemList
                                 v-for="(item,index) in sprint.items"
@@ -276,7 +275,6 @@
                             />
                         </template>
                     </div>
-                </template>
             </div>
         </Transition>
 
@@ -431,9 +429,18 @@ function onItemVisible(key, count) {
 }
 const listVisible = computed(() => Object.values(reportedVisible.value).reduce((sum, n) => sum + (Number(n) || 0), 0));
 const paintedForKind = computed(() => listVisible.value);
+let retryHoldTimer = null;
+const retryStartedAt = ref(0);
+function releaseRetryHold() {
+    const wait = Math.max(0, 400 - (Date.now() - (retryStartedAt.value || 0)));
+    clearTimeout(retryHoldTimer);
+    retryHoldTimer = setTimeout(() => {
+        surfaceRetrying.value = false;
+    }, wait);
+}
 watch(() => unref(boardSurfaceKind), (kind) => {
     if (kind === 'loading') reportedVisible.value = {};
-    else surfaceRetrying.value = false;
+    else if (surfaceRetrying.value) releaseRetryHold();
 });
 watch(sprintSid, () => {
     reportedVisible.value = {};
@@ -455,7 +462,12 @@ function retrySurface() {
     if (surfaceKind.value === 'failed') {
         surfaceRetrying.value = true;
         reportedVisible.value = {};
+        retryStartedAt.value = Date.now();
         if (typeof onBoardSurfaceAction === 'function') onBoardSurfaceAction('retry');
+        clearTimeout(retryHoldTimer);
+        retryHoldTimer = setTimeout(() => {
+            if (unref(boardSurfaceKind) !== 'loading') surfaceRetrying.value = false;
+        }, 400);
         return;
     }
     if (typeof onBoardSurfaceAction === 'function') onBoardSurfaceAction('create');
@@ -505,7 +517,10 @@ watch(surfaceKind, (kind) => {
 watch(showSprintHours, (show) => {
     if (show) loadSprintHours();
 }, { immediate: true });
-onUnmounted(() => clearTimeout(hoursTimer));
+onUnmounted(() => {
+    clearTimeout(hoursTimer);
+    clearTimeout(retryHoldTimer);
+});
 
 watch(route, () => {
     if (createTask.value) {

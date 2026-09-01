@@ -15,7 +15,7 @@
 - [x] Comments pane lists existing Alian comments for the open taskId (no empty pane with badge 1)
 
 ## Last step
-RETRY on the fail card always refetches (pine Loading, then rows or the same fail card). Fail-card copy and Autofill stay locked.
+RETRY holds pine Loading ~400ms (two animation frames first), then paints in-memory/search rows if the refetch is empty. Fail-card copy and Autofill stay locked.
 
 ## Blockers
 None. Live Local Smoke is not in this VM (no Mongo), so Retry / Autofill / pages were not browser-verified here.
@@ -23,6 +23,7 @@ None. Live Local Smoke is not in this VM (no Mongo), so Retry / Autofill / pages
 ## Log
 
 ### 2026-09-01
+- Bot 3 360 on 91eb8fd5: RETRY is not a dead click, but Loading lasted ~31ms then the same fail card (no SMOKE-1..7). Cause: `resetSprintTaskBucket` wiped in-memory rows, unfiltered fetch wrote `[]` over the bucket, and loading cleared before a compositor frame. Retry now snapshots store/search rows, does not reset/wipe on empty fetch, paints `requestAnimationFrame`×2 then holds pine Loading 400ms, then binds the kept 7 or the same fail card. Fail-card copy / Autofill untouched. Gantt / Pages not touched.
 - Bot 3 360 on 47820681: fail-card copy PASS, Autofill Assignee PASS (neither touched). RETRY was a dead click because ListView `onEmptyAction` no-op'd unless `emptyKind === 'failed'`, while SprintsList owned the fail card (`emptyKind` stayed ready from tasksArray). RETRY now passes `'retry'` and always refetches unfiltered `$skip` 0. SprintsList sets `surfaceRetrying` so pine “Loading this board…” shows even if inject never goes loading, then rows or the same fail card. Hours-off / fail copy / Autofill unchanged. Gantt / Pages not touched.
 - Bot 3 FAIL on c82a7519: Autofill stays PASS (untouched). Board still ready/00h/void because `paintedForKind` fell back to `countPaintedTaskRows(tasksArray)` until every group emitted `visibleCount`, so surfaceKind stayed `ready` even when ItemList painted nothing. Painted is now `listVisible` only (0 until ItemList reports). Tree badge 7 is sidebarCount via `sprintsObj` / folder `.sprints` / `allProjects.data` / `projectData/sprints`. ItemList stays mounted (`v-show` ready) so in-memory rows can still paint; otherwise cream fail + copper Retry, hours off. Gantt / Pages / Autofill not touched.
 - Bot 3 FAIL on 66719ee6: Autofill stays PASS (untouched). Board still ready/00h/void because ItemList hid rows behind `v-if="!isLoading"` while `prepareIndexData` reindexed, and paintedCount counted tasksArray not visible ItemList rows. List always paints; row keys are ids; ItemList reports visibleCount; sidebar 7 + visible 0 is failed (cream fail + copper Retry, hours off). Gantt / Pages / Autofill not touched.

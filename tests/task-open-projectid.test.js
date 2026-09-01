@@ -34,6 +34,8 @@ const {
     sprintTreeExpectedCount,
     sprintCountFromSprintBags,
     bindSprintTaskSource,
+    collectSprintBoardTasks,
+    uniqueTaskRows,
     countPaintedTaskRows,
     boardHoursVisible,
     sprintSurfaceKind,
@@ -533,6 +535,11 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
             },
         };
         expect(countSprintBoardTasks(store, { $oid: PROJECT }, { toHexString: () => SPRINT })).toBe(2);
+        expect(collectSprintBoardTasks({
+            [PROJECT]: { [SPRINT]: { tasks: [] } },
+            other: { [SPRINT]: { tasks: [{ _id: 'a', sprintId: SPRINT }, { _id: 'b', sprintId: SPRINT }] } },
+        }, PROJECT, SPRINT).map((row) => row._id)).toEqual(['a', 'b']);
+        expect(uniqueTaskRows([{ _id: 'a' }], [{ _id: 'a' }, { _id: 'b' }]).map((row) => row._id)).toEqual(['a', 'b']);
         expect(countSprintBoardTasks({}, PROJECT, SPRINT)).toBe(0);
         expect(sprintTasksBucket(store, PROJECT, SPRINT).tasks).toHaveLength(2);
         const list = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'views', 'Projects', 'ListView', 'ListView.vue'), 'utf8');
@@ -548,7 +555,12 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(list).toContain('paintSprintGroups');
         expect(list).not.toContain('Math.max(countRenderedSprintItems(groups), stored)');
         expect(list).toContain('boardCount: shown');
-        expect(list).toContain('resetSprintTaskBucket');
+        expect(list).not.toContain('resetSprintTaskBucket');
+        expect(list).toContain('collectSprintBoardTasks');
+        expect(list).toContain('bindSprintTaskSource');
+        expect(list).toContain('setSprintBoardTasks');
+        expect(list).toContain('BOARD_RETRY_HOLD_MS');
+        expect(list).toContain('requestAnimationFrame');
         expect(list).toContain('refetchSprintBoardTasks');
         expect(list).toContain('const retrying = ref(false)');
         expect(list).toContain('if (retrying.value) return');
@@ -599,6 +611,7 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(actions).toContain('resetCursor');
         expect(actions).toContain('sprintTasksBucket(state.tasks, pid, sprintId)');
         expect(actions).toContain('setSprintBoardTasks');
+        expect(actions).toContain('if (next.length)');
         expect(actions).toContain('ProjectID: { objId: { $in: [pid] } }');
         const mutations = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'store', 'ProjectData', 'mutations.js'), 'utf8');
         expect(mutations).toContain('lookupById(state.tasks, pid)');
@@ -630,6 +643,8 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(sprintsList).toContain('sprintTreeExpectedCount');
         expect(sprintsList).toContain('sprintCountFromSprintBags');
         expect(sprintsList).toContain("v-show=\"surfaceKind === 'ready'\"");
+        expect(sprintsList).toContain("v-show=\"surfaceKind === 'loading'\"");
+        expect(sprintsList).toContain('releaseRetryHold');
         expect(sprintsList).toContain('projectData/allProjects');
         expect(itemList).toContain('props.sprintObject && (props.sprintObject.id || props.sprintObject._id)');
         const empty = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'atom', 'EmptyState', 'EmptyState.vue'), 'utf8');
