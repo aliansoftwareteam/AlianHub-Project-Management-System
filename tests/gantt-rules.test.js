@@ -78,7 +78,7 @@ describe('Gantt collision copper hint', () => {
     });
 
     test('today-line uses Asia/Kolkata when the host instant is still UTC Tuesday', () => {
-        const utcTue = new Date(Date.UTC(2026, 8, 1, 21, 4, 0));
+        const utcTue = new Date(Date.UTC(2026, 8, 1, 21, 20, 0));
         const week = todayLineDate(utcTue, 'Week', 'Asia/Kolkata');
         const day = todayLineDate(utcTue, 'Day', 'Asia/Kolkata');
         expect(week.getFullYear()).toBe(2026);
@@ -87,7 +87,8 @@ describe('Gantt collision copper hint', () => {
         expect(week.getHours()).toBe(12);
         expect(day.getDate()).toBe(2);
         expect(day.getHours()).toBe(2);
-        expect(day.getMinutes()).toBe(34);
+        expect(day.getMinutes()).toBe(50);
+        expect(day.getHours()).not.toBe(0);
         expect(day.getDate()).not.toBe(1);
         expect(day.getHours()).not.toBe(21);
         const hostTue = todayLineDate(utcTue, 'Week', 'UTC');

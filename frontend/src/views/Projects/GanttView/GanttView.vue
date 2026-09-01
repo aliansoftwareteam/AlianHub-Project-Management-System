@@ -264,8 +264,16 @@ function calendarDayInZone(value, timeZone) {
             second: 'numeric',
             hourCycle: 'h23',
         }).formatToParts(d);
-        const num = (type) => Number((parts.find((p) => p.type === type) || {}).value);
-        return { y: num('year'), m: num('month') - 1, day: num('day'), hour: num('hour') || 0, minute: num('minute') || 0 };
+        const raw = (type) => Number((parts.find((p) => p.type === type) || {}).value);
+        const hour = raw('hour');
+        const minute = raw('minute');
+        return {
+            y: raw('year'),
+            m: raw('month') - 1,
+            day: raw('day'),
+            hour: Number.isFinite(hour) ? hour : 0,
+            minute: Number.isFinite(minute) ? minute : 0,
+        };
     } catch (e) {
         return { y: d.getFullYear(), m: d.getMonth(), day: d.getDate(), hour: d.getHours(), minute: d.getMinutes() };
     }
@@ -285,13 +293,8 @@ function sameTenantDay(date) {
         && cell.getMonth() === today.m
         && cell.getDate() === today.day;
 }
-function todayCellClass(date) {
-    if (!sameTenantDay(date)) return '';
-    if (zoom.value === 'Day' && date instanceof Date) {
-        const bucket = Math.floor((tenantToday().hour || 0) / 6) * 6;
-        if (date.getHours() !== bucket) return '';
-    }
-    return 'gantt_today';
+function todayCellClass() {
+    return '';
 }
 function todayOverlayHost() {
     if (!gantt) return null;
@@ -330,16 +333,27 @@ function paintTodayOverlay() {
     line.style.display = 'block';
     line.style.left = `${left}px`;
 }
-function syncTodayMarker() {
-    if (!gantt || typeof gantt.addMarker !== 'function') return;
-    try {
-        if (todayMarker != null && typeof gantt.deleteMarker === 'function') {
-            try { gantt.deleteMarker(todayMarker); } catch (e) { /* ignore */ }
-            todayMarker = null;
-        }
-        todayMarker = gantt.addMarker({ start_date: todayForScale(), css: 'gantt-today-line', text: '' });
-    } catch (e) {
+function stripNativeToday() {
+    if (!gantt) return;
+    if ('mark_now' in gantt.config) gantt.config.mark_now = false;
+    if ('show_markers' in gantt.config) gantt.config.show_markers = false;
+    if (todayMarker != null && typeof gantt.deleteMarker === 'function') {
+        try { gantt.deleteMarker(todayMarker); } catch (e) { /* ignore */ }
         todayMarker = null;
+    }
+    try {
+        if (typeof gantt.getMarkers === 'function') {
+            (gantt.getMarkers() || []).forEach((m) => {
+                const id = m && (m.id != null ? m.id : m);
+                if (id != null && typeof gantt.deleteMarker === 'function') gantt.deleteMarker(id);
+            });
+        }
+    } catch (e) { /* ignore */ }
+    const root = ganttEl.value;
+    if (root) {
+        root.querySelectorAll('.gantt_now, .gantt_current, .gantt_marker, .gantt-today-line').forEach((el) => {
+            if (!el.classList.contains('gantt-today-overlay')) el.remove();
+        });
     }
 }
 let paintingToday = false;
@@ -347,7 +361,7 @@ function paintTodayLine() {
     if (!ready || !gantt || paintingToday) return;
     paintingToday = true;
     try {
-        syncTodayMarker();
+        stripNativeToday();
         paintTodayOverlay();
     } finally {
         paintingToday = false;
@@ -504,6 +518,8 @@ function applyKilnSkin() {
     gantt.config.date_format = '%Y-%m-%d %H:%i';
     gantt.config.start_on_monday = true;
     if ('utc' in gantt.config) gantt.config.utc = false;
+    if ('mark_now' in gantt.config) gantt.config.mark_now = false;
+    if ('show_markers' in gantt.config) gantt.config.show_markers = false;
     gantt.config.columns = [
         { name: 'text', label: 'Task', tree: true, width: 220, resize: true },
     ];
@@ -538,7 +554,7 @@ onMounted(async () => {
 
     try {
         if (typeof gantt.plugins === 'function') {
-            try { gantt.plugins({ marker: true, auto_scheduling: false, critical_path: false }); } catch (e) { /* gpl build */ }
+            try { gantt.plugins({ auto_scheduling: false, critical_path: false }); } catch (e) { /* gpl build */ }
         }
         applyKilnSkin();
         applyScales(zoom.value);
@@ -835,24 +851,21 @@ onBeforeUnmount(() => {
 .gantt-view .gantt_current,
 .gantt-view .gantt_marker,
 .gantt-view .gantt_marker.gantt-today-line,
-.gantt-view .gantt-today-line,
-.gantt-view .gantt-today-overlay {
-    background-color: #c45c26 !important;
-    background: #c45c26 !important;
-    width: 2px !important;
-    border: none;
+.gantt-view .gantt-today-line {
+    display: none !important;
 }
 .gantt-view .gantt-today-overlay {
     position: absolute;
     top: 0;
     bottom: 0;
     width: 2px;
+    background: #c45c26 !important;
     pointer-events: none;
     z-index: 20;
 }
 .gantt-view .gantt_task_cell.gantt_today,
 .gantt-view .gantt_scale_cell.gantt_today {
-    box-shadow: inset 2px 0 0 #c45c26;
+    box-shadow: none;
 }
 .gantt-view .gantt_cal_light,
 .gantt-view .gantt_cal_cover,

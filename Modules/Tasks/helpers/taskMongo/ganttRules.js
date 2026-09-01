@@ -18,12 +18,20 @@ const calendarDayInZone = (value = new Date(), timeZone = DEFAULT_TZ) => {
             second: 'numeric',
             hourCycle: 'h23',
         }).formatToParts(d);
-        const num = (type) => Number((parts.find((p) => p.type === type) || {}).value);
-        const y = num('year');
-        const m = num('month');
-        const day = num('day');
+        const raw = (type) => Number((parts.find((p) => p.type === type) || {}).value);
+        const y = raw('year');
+        const m = raw('month');
+        const day = raw('day');
+        const hour = raw('hour');
+        const minute = raw('minute');
         if (!y || !m || !day) return null;
-        return { y, m: m - 1, day, hour: num('hour') || 0, minute: num('minute') || 0 };
+        return {
+            y,
+            m: m - 1,
+            day,
+            hour: Number.isFinite(hour) ? hour : 0,
+            minute: Number.isFinite(minute) ? minute : 0,
+        };
     } catch (e) {
         return { y: d.getFullYear(), m: d.getMonth(), day: d.getDate(), hour: d.getHours(), minute: d.getMinutes() };
     }
