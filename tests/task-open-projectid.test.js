@@ -546,6 +546,9 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(itemList).toContain('searchMode');
         expect(itemList).toContain('idBearingTaskRows');
         expect(itemList).toContain('props.item && props.item.tasksArray');
+        expect(itemList).toContain('visibleCount');
+        expect(itemList).toContain('taskRowKey');
+        expect(itemList).not.toContain('v-if="!isLoading"');
         expect(board).toContain('hasGroups');
         expect(board).toContain('sprintExpectedCount');
         expect(board).toContain('sameGroupValue');
@@ -598,6 +601,9 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(sprintsList).toContain('localStored');
         expect(sprintsList).toContain('countPaintedTaskRows');
         expect(sprintsList).toContain('storedCount: localStored.value');
+        expect(sprintsList).toContain('paintedForKind');
+        expect(sprintsList).toContain('listVisible');
+        expect(sprintsList).toContain('onItemVisible');
         expect(sprintsList).toContain('sprintTreeExpectedCount');
         expect(itemList).toContain('props.sprintObject && (props.sprintObject.id || props.sprintObject._id)');
         const empty = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'atom', 'EmptyState', 'EmptyState.vue'), 'utf8');

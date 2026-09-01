@@ -1,5 +1,5 @@
 <template>
-    <Transition v-if="!isLoading">
+    <Transition>
         <div v-if="groupType === 1 ? ((searchMode ? filteredTasksGetter.length : items?.length) || !item?.users?.length) : true" class="item_wrapper" @scroll="checkScroll">
             <div class="new-row item_head">
                 <div class="new-col1" :style="`${clientWidth > sideScrollWidth ? 'border:0px' : ''};`">
@@ -120,7 +120,7 @@
                     </div>
                 </div>
             </div>
-            <div v-if="item.isExpanded">
+            <div v-if="item.isExpanded !== false">
                 <draggable
                     handle=".draggable_icon"
                     :class="{'isDisabled': item.isDisabled}"
@@ -129,7 +129,7 @@
                     :list="visibleTaskRows"
                     tag="div"
                     @change="draggedTaskId = '',updateItem('task',$event, item)"
-                    item-key="TaskName"
+                    :item-key="taskRowKey"
                     :group="{name: 'task'}"
                     :sortable="true"
                     :id="`subtasklist_driver ${item.value}`"
@@ -138,7 +138,7 @@
                         <div @dragend="dragEnd" @dragstart="dragStart" @dragover="changeExpanded($event, task, true)">
                             <Task
                                 :data="task"
-                                :key="task._id" 
+                                :key="taskRowKey(task)" 
                                 @toggle="(e)=>(toggleTask(task,e))"
                                 @createTask="createTask = task._id"
                                 class="Task main-task"
@@ -196,7 +196,7 @@
             </div>
         </div>
     </Transition>
-    <div v-else>
+    <div v-if="false">
         <div class="new-row item_head">
             <div class="new-col1" :style="`${clientWidth > sideScrollWidth ? 'border:0px' : ''};`">
                 <div class="common-section head" @click="() => {emit('toggle', item); $forceUpdate();}">
@@ -348,7 +348,6 @@ const taskCollapsed = inject("taskCollapsed");
 const showArchived = inject("showArchived");
 const companyId = inject("$companyId");
 const {updateTaskByGroup} = useUpdateTasks();
-const isLoading = ref(false);
 const sprintBucket = computed(() => sprintTasksBucket(
     getters['projectData/tasks'],
     firstId(props.projectId, props.project && (props.project._id || props.project.id)),
@@ -390,7 +389,11 @@ const props = defineProps({
     }
 });
 
-const emit = defineEmits(["toggle"])
+const emit = defineEmits(["toggle", "visibleCount"])
+
+function taskRowKey(row) {
+    return firstId(row && (row._id || row.id)) || String((row && (row.TaskKey || row.TaskName)) || '');
+}
 
 const languageCheckHeaders = ["commentCounts","AssigneeUserId","DueDate","Task_Priority","TaskKey","created_date","created_by"]
 
@@ -399,7 +402,11 @@ const customFieldList = computed(() => (getters['settings/finalCustomFields'] &&
 onMounted(() => {
     setHeader(customFieldList.value);
     if(tasksGetter.value && tasksGetter.value.length) {
-        items.value =  JSON.parse(JSON.stringify(tasksGetter.value));
+        try {
+            items.value = JSON.parse(JSON.stringify(tasksGetter.value));
+        } catch (_error) {
+            items.value = cloneTaskRows(tasksGetter.value);
+        }
         prepareIndexData();
     }
 
@@ -684,6 +691,9 @@ watch(() => unref(tasksGetter), (newVal) => {
     });
     // prepareIndexData();
 })
+watch(() => idBearingTaskRows(visibleTaskRows.value).length, (n) => {
+    emit('visibleCount', Number(n) || 0);
+}, { immediate: true, flush: 'post' });
 
 const createTask = ref(false);
 
@@ -1265,12 +1275,8 @@ function prepareIndexData () {
         var newObj = {pid: projectData.value._id, sprintId: items.value[0].sprintId, tasksArray: taskArray, indexName: items.value[0].indexName};
         commit("projectData/mutateTaskIndex",newObj)
         let count = 0;
-        if (taskArray.length !== 1) {
-            isLoading.value = true;
-        }
         let countFunction = (row) => {
             if (count >= taskWithoutFilter.length) {
-                isLoading.value = false;
                 return;
             } else {
                 if (row.taskKey != '--') {

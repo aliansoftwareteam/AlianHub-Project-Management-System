@@ -256,6 +256,7 @@
                             :groupType="groupType"
                             :commonDateFormatForDate="commonDateFormatForDate"
                             @toggle="item.isExpanded = !item.isExpanded"
+                            @visibleCount="(n) => onItemVisible(item.key, n)"
                             :project="project"
                             :sprintObject="sprint"
                         />
@@ -418,13 +419,30 @@ const localExpected = computed(() => Math.max(
     Number(unref(boardExpectedCount)) || 0,
     localStored.value,
 ));
+const reportedVisible = ref({});
+function onItemVisible(key, count) {
+    reportedVisible.value = { ...reportedVisible.value, [String(key)]: Number(count) || 0 };
+}
+const listVisible = computed(() => Object.values(reportedVisible.value).reduce((sum, n) => sum + (Number(n) || 0), 0));
+const groupsReported = computed(() => {
+    const groups = Array.isArray(props.sprint?.items) ? props.sprint.items : [];
+    if (!groups.length) return false;
+    return groups.every((group) => Object.prototype.hasOwnProperty.call(reportedVisible.value, String(group && group.key)));
+});
+const paintedForKind = computed(() => (groupsReported.value ? listVisible.value : localPainted.value));
+watch(() => unref(boardSurfaceKind), (kind) => {
+    if (kind === 'loading') reportedVisible.value = {};
+});
+watch(sprintSid, () => {
+    reportedVisible.value = {};
+});
 
 const sprintHours = ref({ plannedMinutes: 0, loggedMinutes: 0, overdueMinutes: 0 });
 const hoursFetched = ref(false);
 const currentCompanyForHours = computed(() => getters["settings/selectedCompany"]);
 const surfaceKind = computed(() => sprintSurfaceKind({
     injected: unref(boardSurfaceKind),
-    paintedCount: localPainted.value,
+    paintedCount: paintedForKind.value,
     sidebarCount: localExpected.value,
     storedCount: localStored.value,
 }));
