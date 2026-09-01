@@ -248,17 +248,70 @@ function countSprintBoardTasks(tasksMap, projectId, sprintId) {
 function sprintTreeExpectedCount(project, sprintId) {
     const sid = firstId(sprintId);
     if (!project || typeof project !== 'object' || !sid) return 0;
-    const bags = [project.sprintsObj || {}];
-    for (const folder of Object.values(project.sprintsfolders || {})) {
-        bags.push((folder && folder.sprintsObj) || {});
-    }
     let max = 0;
-    for (const bag of bags) {
-        if (!bag || typeof bag !== 'object') continue;
-        const hit = lookupById(bag, sid);
-        if (hit) max = Math.max(max, sprintExpectedCount(hit));
-        for (const row of Object.values(bag)) {
-            if (row && sameId(row.id || row._id, sid)) max = Math.max(max, sprintExpectedCount(row));
+    const take = (row) => {
+        if (!row || typeof row !== 'object') return;
+        if (sameId(row.id || row._id, sid) || sameId(row.sprintId, sid)) {
+            max = Math.max(max, sprintExpectedCount(row));
+        }
+    };
+    const takeBag = (bag) => {
+        if (!bag || typeof bag !== 'object') return;
+        if (Array.isArray(bag)) {
+            bag.forEach(take);
+            return;
+        }
+        take(lookupById(bag, sid));
+        Object.values(bag).forEach(take);
+    };
+    take(project);
+    takeBag(project.sprintsObj);
+    takeBag(project.sprints);
+    for (const folder of Object.values(project.sprintsfolders || {})) {
+        takeBag(folder && folder.sprintsObj);
+        takeBag(folder && folder.sprints);
+    }
+    const folders = project.folders;
+    if (Array.isArray(folders)) {
+        folders.forEach((folder) => {
+            takeBag(folder && folder.sprintsObj);
+            takeBag(folder && folder.sprints);
+        });
+    } else if (folders && typeof folders === 'object') {
+        Object.values(folders).forEach((folder) => {
+            takeBag(folder && folder.sprintsObj);
+            takeBag(folder && folder.sprints);
+            if (Array.isArray(folder)) folder.forEach(take);
+        });
+    }
+    if (Array.isArray(project.data)) {
+        for (const row of project.data) {
+            max = Math.max(max, sprintTreeExpectedCount(row, sid));
+        }
+    }
+    return max;
+}
+
+function sprintCountFromSprintBags(bags, sprintId) {
+    const sid = firstId(sprintId);
+    if (!sid || bags == null || typeof bags !== 'object') return 0;
+    let max = 0;
+    const rows = [];
+    if (Array.isArray(bags)) {
+        rows.push(...bags);
+    } else {
+        for (const value of Object.values(bags)) {
+            if (Array.isArray(value)) rows.push(...value);
+            else if (value && typeof value === 'object') rows.push(value);
+        }
+    }
+    for (const row of rows) {
+        if (!row || typeof row !== 'object') continue;
+        if (sameId(row.id || row._id || row.sprintId, sid)) {
+            max = Math.max(max, sprintExpectedCount(row));
+        }
+        if (row.sprintsObj || row.sprintsfolders || row.sprints || row.folders || row.data) {
+            max = Math.max(max, sprintTreeExpectedCount(row, sid));
         }
     }
     return max;
@@ -483,6 +536,7 @@ module.exports = {
     sprintTasksBucket,
     countSprintBoardTasks,
     sprintTreeExpectedCount,
+    sprintCountFromSprintBags,
     bindSprintTaskSource,
     countPaintedTaskRows,
     countRenderedSprintItems,

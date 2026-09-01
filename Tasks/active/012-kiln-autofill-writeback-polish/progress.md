@@ -15,7 +15,7 @@
 - [x] Comments pane lists existing Alian comments for the open taskId (no empty pane with badge 1)
 
 ## Last step
-Failed bind (sidebar 7 + zero visible ItemList rows) is cream fail card + copper Retry, no 00h. Autofill untouched.
+Failed bind (tree/store 7 + zero visible ItemList rows) is cream fail card + copper Retry, no 00h. Painted is ItemList visible rows only. Autofill untouched.
 
 ## Blockers
 None. Live Local Smoke is not in this VM (no Mongo), so Retry / Autofill / pages were not browser-verified here.
@@ -23,6 +23,7 @@ None. Live Local Smoke is not in this VM (no Mongo), so Retry / Autofill / pages
 ## Log
 
 ### 2026-09-01
+- Bot 3 FAIL on c82a7519: Autofill stays PASS (untouched). Board still ready/00h/void because `paintedForKind` fell back to `countPaintedTaskRows(tasksArray)` until every group emitted `visibleCount`, so surfaceKind stayed `ready` even when ItemList painted nothing. Painted is now `listVisible` only (0 until ItemList reports). Tree badge 7 is sidebarCount via `sprintsObj` / folder `.sprints` / `allProjects.data` / `projectData/sprints`. ItemList stays mounted (`v-show` ready) so in-memory rows can still paint; otherwise cream fail + copper Retry, hours off. Gantt / Pages / Autofill not touched.
 - Bot 3 FAIL on 66719ee6: Autofill stays PASS (untouched). Board still ready/00h/void because ItemList hid rows behind `v-if="!isLoading"` while `prepareIndexData` reindexed, and paintedCount counted tasksArray not visible ItemList rows. List always paints; row keys are ids; ItemList reports visibleCount; sidebar 7 + visible 0 is failed (cream fail + copper Retry, hours off). Gantt / Pages / Autofill not touched.
 - Bot 3 FAIL on cf05b4c9: overlay landed, but list still painted a white void with 00h because ListView `emptyKind` could be `ready` while ItemList looked up `sprint.id` / `project._id` without coerce, and Autofill hid Assignee when leftover non-string chips made `assigneeEmpty()` false. SprintsList now owns surface kind from this sprint’s sidebar count vs painted rows (sidebar N>0 and painted 0 is cream fail + copper Retry, hours off). ItemList gets `firstId` sprint/project ids. Autofill always lists the Assignee row; leftover object/placeholder/`tId_` chips count as empty so Apply or “No suggestion” can show. Gantt / Pages hydrate not touched.
 - Bot 3 FAIL on 448110b: emptyKind could still go ready/empty while the board painted no cards, and hours showed 00h. Painted count is now only task rows with ids; expected count also reads `sprintsObj`/`sprintsfolders`. store=7 + shown=0 is failed. List/board initial bind uses one unfiltered fetch. ItemList no longer hides status groups when search is stale. Fail card is cream. Autofill Assignee row is `v-if="assigneeEmpty()"` even when seed is null.

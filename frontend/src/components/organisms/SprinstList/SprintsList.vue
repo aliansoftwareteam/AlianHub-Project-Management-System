@@ -236,41 +236,47 @@
                 <div v-if="surfaceKind === 'loading'" class="board-load-strip">
                     <p class="board-load-strip__line">{{ $t('EmptyState.board_loading') }}</p>
                 </div>
-                <EmptyState
-                    v-else-if="surfaceKind === 'failed' || surfaceKind === 'empty'"
-                    :title="surfaceKind === 'failed' ? $t('EmptyState.load_failed_title') : $t('EmptyState.no_sprint_tasks_title')"
-                    :message="surfaceKind === 'failed' ? $t('EmptyState.load_failed_msg', { count: surfaceExpected }) : ''"
-                    :actionLabel="surfaceKind === 'failed' ? $t('EmptyState.load_failed_action') : $t('EmptyState.no_sprint_tasks_action')"
-                    :tone="surfaceKind === 'failed' ? 'copper' : 'pine'"
-                    @action="retrySurface"
-                />
-                <div v-else-if="surfaceKind === 'ready'" class="itemSprintWrapper style-scroll-6-px" id="tasklist_driver">
-                    <template v-if="$route?.query?.tab !== 'Calendar'">
-                        <ItemList
-                            v-for="(item,index) in sprint.items"
-                            :statusIndex="index"
-                            :key="item.key"
-                            :item="item"
-                            :sprintId="sprintSid"
-                            :projectId="sprintPid"
-                            :groupType="groupType"
-                            :commonDateFormatForDate="commonDateFormatForDate"
-                            @toggle="item.isExpanded = !item.isExpanded"
-                            @visibleCount="(n) => onItemVisible(item.key, n)"
-                            :project="project"
-                            :sprintObject="sprint"
-                        />
-                    </template>
-                    <template v-else>
-                        <CalendarViewComponent
-                            :projectData="project"
-                            :sprint="sprint"
-                            :newTaskData="newTaskData"
-                            :calendarDate="initialDate"
-                            @openTaskModel="openTaskModel"
-                        />
-                    </template>
-                </div>
+                <template v-else>
+                    <EmptyState
+                        v-if="surfaceKind === 'failed' || surfaceKind === 'empty'"
+                        :title="surfaceKind === 'failed' ? $t('EmptyState.load_failed_title') : $t('EmptyState.no_sprint_tasks_title')"
+                        :message="surfaceKind === 'failed' ? $t('EmptyState.load_failed_msg', { count: surfaceExpected }) : ''"
+                        :actionLabel="surfaceKind === 'failed' ? $t('EmptyState.load_failed_action') : $t('EmptyState.no_sprint_tasks_action')"
+                        :tone="surfaceKind === 'failed' ? 'copper' : 'pine'"
+                        @action="retrySurface"
+                    />
+                    <div
+                        v-show="surfaceKind === 'ready'"
+                        class="itemSprintWrapper style-scroll-6-px"
+                        id="tasklist_driver"
+                    >
+                        <template v-if="$route?.query?.tab !== 'Calendar'">
+                            <ItemList
+                                v-for="(item,index) in sprint.items"
+                                :statusIndex="index"
+                                :key="item.key"
+                                :item="item"
+                                :sprintId="sprintSid"
+                                :projectId="sprintPid"
+                                :groupType="groupType"
+                                :commonDateFormatForDate="commonDateFormatForDate"
+                                @toggle="item.isExpanded = !item.isExpanded"
+                                @visibleCount="(n) => onItemVisible(item.key, n)"
+                                :project="project"
+                                :sprintObject="sprint"
+                            />
+                        </template>
+                        <template v-else>
+                            <CalendarViewComponent
+                                :projectData="project"
+                                :sprint="sprint"
+                                :newTaskData="newTaskData"
+                                :calendarDate="initialDate"
+                                @openTaskModel="openTaskModel"
+                            />
+                        </template>
+                    </div>
+                </template>
             </div>
         </Transition>
 
@@ -337,7 +343,7 @@ import * as env from '@/config/env';
 import { useStore } from 'vuex';
 import { useRoute } from 'vue-router';
 import { apiRequest } from '../../../services'
-import { boardHoursVisible, countPaintedTaskRows, countSprintBoardTasks, firstId, sprintExpectedCount, sprintSurfaceKind, sprintTasksBucket, sprintTreeExpectedCount } from '@/utils/taskOpenProjectId';
+import { boardHoursVisible, countSprintBoardTasks, firstId, sprintCountFromSprintBags, sprintExpectedCount, sprintSurfaceKind, sprintTasksBucket, sprintTreeExpectedCount } from '@/utils/taskOpenProjectId';
 import { useAiApiFunction } from "@/composable/aiHelper";
 import taskClass from "@/utils/TaskOperations"
 import { useI18n } from "vue-i18n";
@@ -412,10 +418,12 @@ const localStored = computed(() => countSprintBoardTasks(
     sprintPid.value,
     sprintSid.value,
 ));
-const localPainted = computed(() => countPaintedTaskRows(props.sprint?.items));
 const localExpected = computed(() => Math.max(
     sprintExpectedCount(props.sprint),
     sprintTreeExpectedCount(project.value, sprintSid.value),
+    sprintTreeExpectedCount(getters['projectData/allProjects'], sprintSid.value),
+    sprintCountFromSprintBags(getters['projectData/sprints'], sprintSid.value),
+    sprintCountFromSprintBags(getters['projectData/folders'], sprintSid.value),
     Number(unref(boardExpectedCount)) || 0,
     localStored.value,
 ));
@@ -424,12 +432,7 @@ function onItemVisible(key, count) {
     reportedVisible.value = { ...reportedVisible.value, [String(key)]: Number(count) || 0 };
 }
 const listVisible = computed(() => Object.values(reportedVisible.value).reduce((sum, n) => sum + (Number(n) || 0), 0));
-const groupsReported = computed(() => {
-    const groups = Array.isArray(props.sprint?.items) ? props.sprint.items : [];
-    if (!groups.length) return false;
-    return groups.every((group) => Object.prototype.hasOwnProperty.call(reportedVisible.value, String(group && group.key)));
-});
-const paintedForKind = computed(() => (groupsReported.value ? listVisible.value : localPainted.value));
+const paintedForKind = computed(() => listVisible.value);
 watch(() => unref(boardSurfaceKind), (kind) => {
     if (kind === 'loading') reportedVisible.value = {};
 });

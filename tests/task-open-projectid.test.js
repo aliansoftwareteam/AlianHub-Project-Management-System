@@ -32,6 +32,7 @@ const {
     boardEmptyKind,
     sprintExpectedCount,
     sprintTreeExpectedCount,
+    sprintCountFromSprintBags,
     bindSprintTaskSource,
     countPaintedTaskRows,
     boardHoursVisible,
@@ -500,6 +501,17 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(sprintTreeExpectedCount({
             sprintsfolders: { f1: { sprintsObj: { [SPRINT]: { _id: SPRINT, taskCount: 7 } } } },
         }, SPRINT)).toBe(7);
+        expect(sprintTreeExpectedCount({
+            sprintsObj: {},
+            sprintsfolders: { f1: { sprints: [{ id: SPRINT, tasks: 7 }] } },
+        }, SPRINT)).toBe(7);
+        expect(sprintTreeExpectedCount({
+            data: [{ sprintsObj: {}, sprintsfolders: { f1: { sprintsObj: { [SPRINT]: { _id: SPRINT, tasks: 7 } } } } }],
+        }, SPRINT)).toBe(7);
+        expect(sprintCountFromSprintBags({
+            pid: [{ _id: SPRINT, tasks: 7 }],
+        }, SPRINT)).toBe(7);
+        expect(sprintExpectedCount({ items: [{ tasksArray: [{ _id: 'a' }, { _id: 'b' }] }] })).toBe(0);
         expect(bindSprintTaskSource({
             searched: true,
             searchRows: [],
@@ -527,6 +539,8 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(list).toContain('hasGroups');
         expect(list).toContain('sprintExpectedCount');
         expect(list).toContain('sprintTreeExpectedCount');
+        expect(list).toContain('sprintCountFromSprintBags');
+        expect(list).toContain('projectData/allProjects');
         expect(list).toContain('storedCount: stored');
         expect(list).toContain('countPaintedTaskRows');
         expect(list).toContain('bindPaintedSprints');
@@ -558,6 +572,8 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(board).toContain('boardCount: shownBoardCount.value');
         expect(board).toContain('storedCount: stored');
         expect(board).toContain('sprintTreeExpectedCount');
+        expect(board).toContain('sprintCountFromSprintBags');
+        expect(board).toContain('projectData/allProjects');
         expect(board).toContain('bindSprintTaskSource');
         expect(board).toContain("emptyKind === 'ready' && shownBoardCount > 0");
         expect(board).toContain("provide('boardSurfaceKind', emptyKind)");
@@ -597,14 +613,18 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(sprintsList).toContain('retrySurface');
         expect(sprintsList).toContain('sprintSurfaceKind');
         expect(sprintsList).toContain('sprintSid');
-        expect(sprintsList).toContain('localPainted');
         expect(sprintsList).toContain('localStored');
-        expect(sprintsList).toContain('countPaintedTaskRows');
         expect(sprintsList).toContain('storedCount: localStored.value');
         expect(sprintsList).toContain('paintedForKind');
         expect(sprintsList).toContain('listVisible');
+        expect(sprintsList).toContain("paintedForKind = computed(() => listVisible.value)");
+        expect(sprintsList).not.toContain('groupsReported.value ? listVisible.value : localPainted.value');
+        expect(sprintsList).not.toContain('countPaintedTaskRows(props.sprint');
         expect(sprintsList).toContain('onItemVisible');
         expect(sprintsList).toContain('sprintTreeExpectedCount');
+        expect(sprintsList).toContain('sprintCountFromSprintBags');
+        expect(sprintsList).toContain("v-show=\"surfaceKind === 'ready'\"");
+        expect(sprintsList).toContain('projectData/allProjects');
         expect(itemList).toContain('props.sprintObject && (props.sprintObject.id || props.sprintObject._id)');
         const empty = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'atom', 'EmptyState', 'EmptyState.vue'), 'utf8');
         expect(empty).toContain('@mousedown.stop.prevent="onActionPointer"');

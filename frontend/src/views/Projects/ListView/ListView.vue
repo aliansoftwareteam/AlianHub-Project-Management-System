@@ -50,7 +50,7 @@ import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPla
 import isEqual from 'lodash/isEqual';
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { useTaskSelection } from '@/composable/useTaskSelection.js';
-import { boardEmptyKind, countPaintedTaskRows, countSprintBoardTasks, firstId, paintSprintGroups, sprintExpectedCount, sprintTasksBucket, sprintTreeExpectedCount } from '@/utils/taskOpenProjectId';
+import { boardEmptyKind, countPaintedTaskRows, countSprintBoardTasks, firstId, paintSprintGroups, sprintCountFromSprintBags, sprintExpectedCount, sprintTasksBucket, sprintTreeExpectedCount } from '@/utils/taskOpenProjectId';
 
 // UTILS
 const {getters, commit} = useStore();
@@ -119,6 +119,9 @@ const boardExpectedCount = computed(() => {
         sprintExpectedCount(header),
         sprintExpectedCount(listed),
         sprintTreeExpectedCount(project.value, sid),
+        sprintTreeExpectedCount(getters['projectData/allProjects'], sid),
+        sprintCountFromSprintBags(getters['projectData/sprints'], sid),
+        sprintCountFromSprintBags(getters['projectData/folders'], sid),
     );
 });
 const emptyKind = computed(() => {

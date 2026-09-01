@@ -53,7 +53,7 @@ import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPla
 
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { useRoute } from 'vue-router';
-import { appendUnmatchedToFirstGroup, bindSprintTaskSource, boardEmptyKind, countPaintedTaskRows, countSprintBoardTasks, firstId, sameGroupValue, sprintExpectedCount, sprintTasksBucket, sprintTreeExpectedCount, unmatchedBoardTasks } from '@/utils/taskOpenProjectId';
+import { appendUnmatchedToFirstGroup, bindSprintTaskSource, boardEmptyKind, countPaintedTaskRows, countSprintBoardTasks, firstId, sameGroupValue, sprintCountFromSprintBags, sprintExpectedCount, sprintTasksBucket, sprintTreeExpectedCount, unmatchedBoardTasks } from '@/utils/taskOpenProjectId';
 const route = useRoute();
 
 // --- Props & Emits ---
@@ -173,6 +173,9 @@ const boardExpectedCount = computed(() => {
         sprintExpectedCount(sprint),
         sprintExpectedCount(grouped),
         sprintTreeExpectedCount(project.value, sid),
+        sprintTreeExpectedCount(getters['projectData/allProjects'], sid),
+        sprintCountFromSprintBags(getters['projectData/sprints'], sid),
+        sprintCountFromSprintBags(getters['projectData/folders'], sid),
     );
 });
 const emptyKind = computed(() => {
