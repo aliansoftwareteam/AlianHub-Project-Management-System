@@ -250,7 +250,7 @@
                     @action="retrySurface"
                 />
                 <div
-                    v-show="surfaceKind === 'ready' || surfaceKind === 'loading'"
+                    v-show="surfaceKind === 'ready'"
                     class="itemSprintWrapper style-scroll-6-px"
                     :class="{ 'itemSprintWrapper--hold': surfaceKind === 'loading' }"
                     id="tasklist_driver"

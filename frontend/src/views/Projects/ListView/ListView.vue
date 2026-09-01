@@ -51,7 +51,7 @@ import isEqual from 'lodash/isEqual';
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { useTaskSelection } from '@/composable/useTaskSelection.js';
 import { apiRequest } from '@/services';
-import { boardEmptyKind, bindSprintTaskSource, collectRetryTaskRows, collectSprintBoardTasks, countPaintedTaskRows, countSprintBoardTasks, firstId, paintSprintGroups, searchTasksFromResponse, sprintCountFromSprintBags, sprintExpectedCount, sprintTasksBucket, sprintTreeExpectedCount, taskMatchesBoard, uniqueTaskRows } from '@/utils/taskOpenProjectId';
+import { boardEmptyKind, bindSprintTaskSource, collectRetryTaskRows, collectSprintBoardTasks, countPaintedTaskRows, countSprintBoardTasks, firstId, paintSprintGroups, searchTasksFromResponse, sprintCountFromSprintBags, sprintExpectedCount, sprintTreeExpectedCount, taskMatchesBoard, uniqueTaskRows } from '@/utils/taskOpenProjectId';
 import { lastSearchTasks, rememberSearchTasks } from '@/utils/openGlobalSearch';
 
 // UTILS
@@ -175,13 +175,12 @@ function bindPaintedSprints(resp, fallbackRows) {
     const rows = raw.filter((sprint) => sprint && (sprint.id || sprint._id));
     groupedTasks.value = rows.map((sprint) => {
         const sid = firstId(sprint && (sprint.id || sprint._id));
-        const bucket = sprintTasksBucket(allProjectTasks.value, pid, sid);
         const source = uniqueTaskRows(
             fallbackRows,
             bindSprintTaskSource({
                 searched: true,
                 searchRows: uniqueTaskRows(searchedTasksData.value, lastSearchTasks.value),
-                storedRows: (bucket && bucket.tasks) || [],
+                storedRows: collectSprintBoardTasks(allProjectTasks.value, pid, sid),
                 sprintId: sid,
                 projectId: pid,
             }),

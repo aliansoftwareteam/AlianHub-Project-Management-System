@@ -39,6 +39,7 @@ const {
     uniqueTaskRows,
     asTaskRowList,
     searchTasksFromResponse,
+    rowHasPaintedLabel,
     countPaintedTaskRows,
     paintSprintGroups,
     taskMatchesBoard,
@@ -478,11 +479,11 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(boardHoursVisible('empty')).toBe(true);
         expect(countPaintedSprintTasks(
             [{ searchKey: 'statusKey', searchValue: 'todo', tasksArray: [] }],
-            [{ _id: 'a', statusKey: 'in-progress' }, { _id: 'b', statusKey: 'todo' }],
+            [{ _id: 'a', TaskKey: 'SMOKE-1', statusKey: 'in-progress' }, { _id: 'b', TaskKey: 'SMOKE-2', statusKey: 'todo' }],
         )).toBe(2);
         expect(countPaintedSprintTasks(
             [{ searchKey: 'statusKey', searchValue: 'todo', tasksArray: [] }],
-            [],
+            [{ _id: 'ghost', statusKey: 'todo' }],
         )).toBe(0);
         expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 0, expectedCount: 7, hasGroups: true })).toBe('failed');
         expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 7, expectedCount: 7, hasGroups: true })).toBe('ready');
@@ -590,7 +591,14 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
             [{ key: 'todo', searchKey: 'statusKey', searchValue: 'done', tasksArray: [] }],
             [{ _id: 'loose', statusKey: 'other' }],
         )[0].tasksArray.map((row) => row._id)).toEqual(['loose']);
-        expect(countPaintedTaskRows([{ tasksArray: [{ _id: 'a' }, { TaskName: 'ghost' }] }])).toBe(1);
+        expect(countPaintedTaskRows([{ tasksArray: [{ _id: 'a' }, { _id: 'b', TaskName: 'ghost' }] }])).toBe(1);
+        expect(rowHasPaintedLabel({ _id: 'a' })).toBe(false);
+        expect(rowHasPaintedLabel({ _id: 'a', TaskKey: 'SMOKE-1' })).toBe(true);
+        expect(rowHasPaintedLabel({ _id: 'a', TaskName: 'Do it' })).toBe(true);
+        expect(paintSprintGroups(
+            [{ key: 'todo', searchKey: 'statusKey', searchValue: 'done', tasksArray: [] }],
+            [{ _id: 'named', TaskKey: 'SMOKE-1', statusKey: 'other' }],
+        )[0].tasksArray.map((row) => row.TaskKey)).toEqual(['SMOKE-1']);
         const store = {
             [PROJECT]: {
                 sprints: [SPRINT],
@@ -658,6 +666,10 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(itemList).toContain('viewColumnList(projectData.value && projectData.value.viewColumn)');
         expect(itemList).not.toContain('const headers = ref(projectData.value.viewColumn)');
         expect(itemList).not.toContain('const setHeader = (customFieldArray) => {');
+        expect(itemList).toContain('uniqueTaskRows');
+        expect(itemList).toContain('paintedVisibleRows');
+        expect(itemList).toContain('rowHasPaintedLabel');
+        expect(itemList).toContain('taskMatchesBoard');
         expect(board).toContain('hasGroups');
         expect(board).toContain('sprintExpectedCount');
         expect(board).toContain('sameGroupValue');
@@ -724,8 +736,9 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(sprintsList).toContain('onItemVisible');
         expect(sprintsList).toContain('sprintTreeExpectedCount');
         expect(sprintsList).toContain('sprintCountFromSprintBags');
-        expect(sprintsList).toContain("v-show=\"surfaceKind === 'ready' || surfaceKind === 'loading'\"");
+        expect(sprintsList).toContain("v-show=\"surfaceKind === 'ready'\"");
         expect(sprintsList).toContain("v-show=\"surfaceKind === 'loading'\"");
+        expect(sprintsList).not.toContain("v-show=\"surfaceKind === 'ready' || surfaceKind === 'loading'\"");
         expect(sprintsList).toContain('itemSprintWrapper--hold');
         expect(sprintsList).not.toContain("if (kind === 'loading') reportedVisible.value = {}");
         expect(sprintsList).toContain('releaseRetryHold');

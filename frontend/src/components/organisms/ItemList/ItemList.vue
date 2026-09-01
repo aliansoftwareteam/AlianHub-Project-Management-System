@@ -332,7 +332,7 @@ const {isCustomFields} = customField();
 import * as env from '@/config/env';
 import { useI18n } from "vue-i18n";
 import { apiRequest } from "../../../services";
-import { firstId, sameGroupValue, sprintTasksBucket, unmatchedBoardTasks } from '@/utils/taskOpenProjectId';
+import { firstId, rowHasPaintedLabel, sameGroupValue, sprintTasksBucket, taskMatchesBoard, uniqueTaskRows, unmatchedBoardTasks } from '@/utils/taskOpenProjectId';
 import Skelaton from "@/components/atom/Skelaton/AiSkelaton.vue"
 const { t } = useI18n();
 // UTILS
@@ -553,63 +553,60 @@ function idBearingTaskRows(rows) {
         row && !row.deletedStatusKey && firstId(row._id, row.id)
     ));
 }
+function paintedVisibleRows(rows) {
+    return idBearingTaskRows(rows).filter(rowHasPaintedLabel);
+}
 function bindListRows() {
-    const grouped = idBearingTaskRows(props.item && props.item.tasksArray);
-    if (grouped.length) {
-        tasksGetter.value = cloneTaskRows(grouped);
-        return;
+    const pid = firstId(props.projectId, props.project && (props.project._id || props.project.id));
+    const sid = firstId(props.sprintId, props.sprintObject && (props.sprintObject.id || props.sprintObject._id));
+    const grouped = idBearingTaskRows(props.item && props.item.tasksArray)
+        .filter((row) => taskMatchesBoard(row, { sprintId: sid, projectId: pid }) || (!sid && !pid));
+    let store;
+    try {
+        store = sprintBucket.value ? JSON.parse(JSON.stringify(sprintBucket.value)) : null;
+    } catch (_error) {
+        store = sprintBucket.value;
     }
-    if(sprintBucket.value) {
-        let store;
-        try {
-            store = JSON.parse(JSON.stringify(sprintBucket.value))
-        } catch (_error) {
-            store = sprintBucket.value;
+    const storeTasks = Array.isArray(store && store.tasks) ? store.tasks : [];
+    let tmp = [];
+    if (props.item.searchKey === "DueDate") {
+        tmp = storeTasks.filter((x) => {
+            return (x.DueDate ? checkCase(props.item.operation, props.item.searchValue, (new Date(x?.[props.item.searchKey]).getTime() / 1000)) : props.item.operation === "non") && !x?.deletedStatusKey
+        })?.sort((a,b)=> a?.groupByDueDateIndex - b?.groupByDueDateIndex);
+    } else if(props.item.searchKey === "AssigneeUserId") {
+        tmp = storeTasks.filter((x) => {
+            const ids = Array.isArray(x.AssigneeUserId) ? x.AssigneeUserId.slice().sort((a,b) => a > b ? 1 : -1) : [];
+            return ids.join("_") === props.item.value && !x?.deletedStatusKey;
+        })?.sort((a,b)=> a.groupByAssigneeIndex - b.groupByAssigneeIndex);
+    } else if (props.item.searchKey === "statusKey") {
+        tmp = storeTasks.filter((x) => sameGroupValue(x.statusKey, props.item.searchValue) && !x?.deletedStatusKey)?.sort((a,b)=> a?.groupByStatusIndex - b?.groupByStatusIndex);
+        if (Number(props.statusIndex) === 0) {
+            const siblings = (props.sprintObject && Array.isArray(props.sprintObject.items))
+                ? props.sprintObject.items
+                : [props.item];
+            const mapped = siblings.map((group) => ({
+                tasksArray: storeTasks.filter((x) => sameGroupValue(x.statusKey, group.searchValue) && !x?.deletedStatusKey),
+            }));
+            const extra = unmatchedBoardTasks(mapped, storeTasks);
+            extra.forEach((row) => {
+                const id = firstId(row && (row._id || row.id));
+                if (id && !tmp.some((have) => firstId(have && (have._id || have.id)) === id)) tmp.push(row);
+            });
         }
-        const storeTasks = Array.isArray(store && store.tasks) ? store.tasks : [];
-        let tmp = [];
-        if(props.item.searchKey === "DueDate") {
-            tmp = storeTasks.filter((x) => {
-                return (x.DueDate ? checkCase(props.item.operation, props.item.searchValue, (new Date(x?.[props.item.searchKey]).getTime() / 1000)) : props.item.operation === "non") && !x?.deletedStatusKey
-            })?.sort((a,b)=> a?.groupByDueDateIndex - b?.groupByDueDateIndex);
-        } else if(props.item.searchKey === "AssigneeUserId") {
-            tmp = storeTasks.filter((x) => {
-                return x.AssigneeUserId.sort((a,b) => a > b ? 1 : -1).join("_") === props.item.value && !x?.deletedStatusKey;
-            })?.sort((a,b)=> a.groupByAssigneeIndex - b.groupByAssigneeIndex);
-        } else {
-            if (props.item.searchKey === "statusKey") {
-                tmp = storeTasks.filter((x) => sameGroupValue(x.statusKey, props.item.searchValue) && !x?.deletedStatusKey)?.sort((a,b)=> a?.groupByStatusIndex - b?.groupByStatusIndex);
-                if (Number(props.statusIndex) === 0) {
-                    const siblings = (props.sprintObject && Array.isArray(props.sprintObject.items))
-                        ? props.sprintObject.items
-                        : [props.item];
-                    const mapped = siblings.map((group) => ({
-                        tasksArray: storeTasks.filter((x) => sameGroupValue(x.statusKey, group.searchValue) && !x?.deletedStatusKey),
-                    }));
-                    const extra = unmatchedBoardTasks(mapped, storeTasks);
-                    extra.forEach((row) => {
-                        const id = firstId(row && (row._id || row.id));
-                        if (id && !tmp.some((have) => firstId(have && (have._id || have.id)) === id)) tmp.push(row);
-                    });
-                }
-            } else if (props.item.searchKey === "Task_Priority") {
-                tmp = storeTasks.filter((x) => x[props.item.searchKey] === props.item.searchValue && !x?.deletedStatusKey)?.sort((a,b)=> a.groupByPriorityIndex - b.groupByPriorityIndex);
-            } else {
-                tmp = storeTasks.filter((x) => x[props.item.searchKey] === props.item.searchValue && !x?.deletedStatusKey)
-            }
-        }
-
-        tmp = tmp.map((x) => {            
-            if(x?.subtaskArray) {
-                x.subtaskArray = x.subtaskArray.filter((y) => !y?.deletedStatusKey);
-            }
-            return x;
-        })
-
-        tasksGetter.value = idBearingTaskRows(tmp);
+    } else if (props.item.searchKey === "Task_Priority") {
+        tmp = storeTasks.filter((x) => x[props.item.searchKey] === props.item.searchValue && !x?.deletedStatusKey)?.sort((a,b)=> a.groupByPriorityIndex - b.groupByPriorityIndex);
+    } else if (props.item.searchKey) {
+        tmp = storeTasks.filter((x) => x[props.item.searchKey] === props.item.searchValue && !x?.deletedStatusKey)
     } else {
-        tasksGetter.value = [];
+        tmp = storeTasks.filter((x) => !x?.deletedStatusKey);
     }
+    tmp = tmp.map((x) => {
+        if(x?.subtaskArray) {
+            x.subtaskArray = x.subtaskArray.filter((y) => !y?.deletedStatusKey);
+        }
+        return x;
+    });
+    tasksGetter.value = uniqueTaskRows(grouped, tmp);
 }
 watch([
     () => props.item && props.item.tasksArray,
@@ -685,9 +682,8 @@ watch(() => unref(tasksGetter), (newVal) => {
 
         return x;
     });
-    // prepareIndexData();
-})
-watch(() => idBearingTaskRows(visibleTaskRows.value).length, (n) => {
+}, { immediate: true })
+watch(() => paintedVisibleRows(visibleTaskRows.value).length, (n) => {
     emit('visibleCount', Number(n) || 0);
 }, { immediate: true, flush: 'post' });
 

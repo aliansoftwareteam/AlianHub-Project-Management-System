@@ -397,12 +397,17 @@ export function collectRetryTaskRows({
     );
 }
 
+export function rowHasPaintedLabel(row) {
+    if (!row || row.deletedStatusKey || !firstId(row._id, row.id)) return false;
+    return Boolean(String(row.TaskKey || row.taskKey || row.TaskName || row.taskName || '').trim());
+}
+
 export function countPaintedTaskRows(groups) {
     if (!Array.isArray(groups)) return 0;
     return groups.reduce((n, group) => {
         const rows = (group && group.tasksArray) || [];
         if (!Array.isArray(rows)) return n;
-        return n + rows.filter((row) => row && !row.deletedStatusKey && firstId(row._id, row.id)).length;
+        return n + rows.filter(rowHasPaintedLabel).length;
     }, 0);
 }
 
@@ -523,7 +528,11 @@ export function paintSprintGroups(groups, tasks) {
             tasksArray: source,
         }];
     }
-    return appendUnmatchedToFirstGroup(mapped, unmatchedBoardTasks(mapped, source));
+    const bound = appendUnmatchedToFirstGroup(mapped, unmatchedBoardTasks(mapped, source));
+    if (countPaintedTaskRows(bound) === 0 && source.length) {
+        return appendUnmatchedToFirstGroup(mapped, source);
+    }
+    return bound;
 }
 
 export function countPaintedSprintTasks(groups, tasks) {
