@@ -653,6 +653,11 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(itemList).toContain('visibleCount');
         expect(itemList).toContain('taskRowKey');
         expect(itemList).not.toContain('v-if="!isLoading"');
+        expect(itemList).toContain('function viewColumnList');
+        expect(itemList).toContain('function setHeader');
+        expect(itemList).toContain('viewColumnList(projectData.value && projectData.value.viewColumn)');
+        expect(itemList).not.toContain('const headers = ref(projectData.value.viewColumn)');
+        expect(itemList).not.toContain('const setHeader = (customFieldArray) => {');
         expect(board).toContain('hasGroups');
         expect(board).toContain('sprintExpectedCount');
         expect(board).toContain('sameGroupValue');

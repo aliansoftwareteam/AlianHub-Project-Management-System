@@ -443,24 +443,18 @@ onMounted(() => {
     })
 });
 
-watch(()=> projectData.value.viewColumn,(newValue,oldValue)=>{
-    if(newValue != oldValue){        
-        headers.value = newValue;
-        headerHideShow.value = headers.value; 
-        if(props.statusIndex === 0){
-            setHeader(getters['settings/finalCustomFields']);
-        }
-    }
-});
+function viewColumnList(columns) {
+    return Array.isArray(columns) ? columns : [];
+}
 
-const headers = ref(projectData.value.viewColumn);
+const headers = ref(viewColumnList(projectData.value && projectData.value.viewColumn));
 const headerHideShow = ref(headers.value);
 const search = ref('');
 const searchKey = ref("");
 const isCustomField = ref(false);
 const sideScrollWidth= 765;
 const taskFields = ref(projectData.value?.taskFields || {});
-const filteredTaskFields = ref(Object.values(taskFields.value));
+const filteredTaskFields = ref(Object.values(taskFields.value || {}));
 const draggedTaskId = ref('');
 
 watch(projectData, () => {
@@ -469,7 +463,9 @@ watch(projectData, () => {
 
 const filterHeaders = ref(headers.value.filter((x) => filteredTaskFields.value.find((y) => y.key === x.key && y.visible)));
 watch([headers, filteredTaskFields], ([val]) => {
-    filterHeaders.value = val.filter((x) => filteredTaskFields.value.find((y) => y.key === x.key && y.visible));
+    const cols = viewColumnList(val);
+    const fields = Array.isArray(filteredTaskFields.value) ? filteredTaskFields.value : [];
+    filterHeaders.value = cols.filter((x) => fields.find((y) => y.key === x.key && y.visible));
 })
 
 watch([searchKey, taskFields], () => {
@@ -1120,7 +1116,7 @@ function fetchSubTask(task, fetchNew = false) {
 }
 
 const handleInput = () => {
-    headerHideShow.value = headers.value;
+    headerHideShow.value = viewColumnList(headers.value);
     if(search.value){
         const filters = headerHideShow.value.filter(x => x?.label?.toLowerCase()?.includes(search.value?.toLowerCase()));
         headerHideShow.value = filters;
@@ -1180,7 +1176,7 @@ const customFieldStore = async(object) => {
                     viewColumn:  {
                         label: value.fieldTitle,
                         key: res?.data?._id || '',
-                        postition: projectData?.value?.viewColumn.length ? projectData?.value?.viewColumn.length + 1 : 0,
+                        postition: viewColumnList(projectData.value && projectData.value.viewColumn).length,
                         show: true
                     }
                 },
@@ -1188,10 +1184,11 @@ const customFieldStore = async(object) => {
             }
             apiRequest("put",`${env.PROJECT}/${props.projectId}`,object).then((response) => {
                 if(response.status === 200){
+                    if (!Array.isArray(projectData.value.viewColumn)) projectData.value.viewColumn = [];
                     projectData.value.viewColumn.push({
                         label: value.fieldTitle,
                         key: res?.data?._id || '',
-                        postition: projectData?.value?.viewColumn.length ? projectData?.value?.viewColumn.length + 1 : 0,
+                        postition: viewColumnList(projectData.value && projectData.value.viewColumn).length,
                         show: true
                     })
                     commit('projectData/mutateProjects', [{ op: "modified", data: { ...projectData.value } }]);
@@ -1222,7 +1219,9 @@ const handleCloseSidebar = (val,pageIndex) => {
     if(pageIndex === 0) isCustomField.value = val;
 };
 
-const setHeader = (customFieldArray) => {
+function setHeader(customFieldArray) {
+    headers.value = viewColumnList(headers.value);
+    headerHideShow.value = viewColumnList(headerHideShow.value);
     if(!isCustomFields()){
         headers.value = headers.value.filter(e => e?.appPermission !== 'CustomFields');
         headerHideShow.value = headerHideShow.value.filter(e => e?.appPermission !== 'CustomFields');
@@ -1259,6 +1258,15 @@ const setHeader = (customFieldArray) => {
     }
 }
 
+watch(() => projectData.value && projectData.value.viewColumn, (newValue, oldValue) => {
+    if (newValue != oldValue) {
+        headers.value = viewColumnList(newValue);
+        headerHideShow.value = headers.value;
+        if (props.statusIndex === 0) {
+            setHeader(getters['settings/finalCustomFields']);
+        }
+    }
+});
 
 function prepareIndexData () {    
     // setTimeout(() => {
