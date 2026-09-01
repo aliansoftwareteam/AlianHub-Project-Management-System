@@ -155,9 +155,9 @@ function bindPaintedSprints(resp) {
     });
 }
 
-function onEmptyAction() {
+function onEmptyAction(mode) {
     if (retrying.value) return;
-    if (emptyKind.value !== 'failed') {
+    if (mode !== 'retry') {
         emit('create');
         return;
     }

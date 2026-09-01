@@ -356,9 +356,7 @@ const clientWidth = inject("$clientWidth");
 const boardSurfaceKind = inject('boardSurfaceKind', computed(() => 'loading'));
 const boardExpectedCount = inject('boardExpectedCount', computed(() => 0));
 const onBoardSurfaceAction = inject('onBoardSurfaceAction', () => {});
-function retrySurface() {
-    if (typeof onBoardSurfaceAction === 'function') onBoardSurfaceAction();
-}
+const surfaceRetrying = ref(false);
 const { checkPermission, debouncerWithPromise, checkApps} = useCustomComposable();
 const showArchiveVar = inject("showArchived");
 const companyId = inject("$companyId");
@@ -435,20 +433,33 @@ const listVisible = computed(() => Object.values(reportedVisible.value).reduce((
 const paintedForKind = computed(() => listVisible.value);
 watch(() => unref(boardSurfaceKind), (kind) => {
     if (kind === 'loading') reportedVisible.value = {};
+    else surfaceRetrying.value = false;
 });
 watch(sprintSid, () => {
     reportedVisible.value = {};
+    surfaceRetrying.value = false;
 });
 
 const sprintHours = ref({ plannedMinutes: 0, loggedMinutes: 0, overdueMinutes: 0 });
 const hoursFetched = ref(false);
 const currentCompanyForHours = computed(() => getters["settings/selectedCompany"]);
 const surfaceKind = computed(() => sprintSurfaceKind({
+    loading: surfaceRetrying.value,
     injected: unref(boardSurfaceKind),
     paintedCount: paintedForKind.value,
     sidebarCount: localExpected.value,
     storedCount: localStored.value,
 }));
+function retrySurface() {
+    if (surfaceRetrying.value) return;
+    if (surfaceKind.value === 'failed') {
+        surfaceRetrying.value = true;
+        reportedVisible.value = {};
+        if (typeof onBoardSurfaceAction === 'function') onBoardSurfaceAction('retry');
+        return;
+    }
+    if (typeof onBoardSurfaceAction === 'function') onBoardSurfaceAction('create');
+}
 const surfaceExpected = computed(() => {
     const n = localExpected.value;
     return Number.isFinite(n) ? n : 0;

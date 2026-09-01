@@ -484,6 +484,7 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(sprintSurfaceKind({ injected: 'ready', paintedCount: 0, sidebarCount: 7 })).toBe('failed');
         expect(sprintSurfaceKind({ injected: 'ready', paintedCount: 7, sidebarCount: 7 })).toBe('ready');
         expect(sprintSurfaceKind({ injected: 'loading', paintedCount: 0, sidebarCount: 7 })).toBe('loading');
+        expect(sprintSurfaceKind({ loading: true, injected: 'ready', paintedCount: 0, sidebarCount: 7 })).toBe('loading');
         expect(sprintSurfaceKind({ injected: 'ready', paintedCount: 0, sidebarCount: 0 })).toBe('empty');
         expect(sprintSurfaceKind({ injected: 'ready', paintedCount: 0, sidebarCount: 0, storedCount: 7 })).toBe('failed');
         expect(coerceAssigneeChipId({ userId: 'u-ada' })).toBe('u-ada');
@@ -551,6 +552,9 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(list).toContain('refetchSprintBoardTasks');
         expect(list).toContain('const retrying = ref(false)');
         expect(list).toContain('if (retrying.value) return');
+        expect(list).toContain("mode !== 'retry'");
+        expect(list).toContain("onEmptyAction(mode)");
+        expect(list).not.toContain("if (emptyKind.value !== 'failed')");
         expect(list).toContain('groupBy(props.grouped, false');
         expect(list).not.toContain('reloadSprintTasks');
         const itemList = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'organisms', 'ItemList', 'ItemList.vue'), 'utf8');
@@ -610,7 +614,9 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(sprintsList).toContain("surfaceKind === 'failed'");
         expect(sprintsList).toContain('EmptyState.load_failed_title');
         expect(sprintsList).toContain('retrySurface');
-        expect(sprintsList).toContain('retrySurface');
+        expect(sprintsList).toContain("onBoardSurfaceAction('retry')");
+        expect(sprintsList).toContain('surfaceRetrying');
+        expect(sprintsList).toContain('loading: surfaceRetrying.value');
         expect(sprintsList).toContain('sprintSurfaceKind');
         expect(sprintsList).toContain('sprintSid');
         expect(sprintsList).toContain('localStored');
