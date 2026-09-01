@@ -259,19 +259,23 @@ function calendarDayInZone(value, timeZone) {
             year: 'numeric',
             month: 'numeric',
             day: 'numeric',
+            hour: 'numeric',
+            minute: 'numeric',
+            second: 'numeric',
+            hourCycle: 'h23',
         }).formatToParts(d);
         const num = (type) => Number((parts.find((p) => p.type === type) || {}).value);
-        return { y: num('year'), m: num('month') - 1, day: num('day') };
+        return { y: num('year'), m: num('month') - 1, day: num('day'), hour: num('hour') || 0, minute: num('minute') || 0 };
     } catch (e) {
-        return { y: d.getFullYear(), m: d.getMonth(), day: d.getDate() };
+        return { y: d.getFullYear(), m: d.getMonth(), day: d.getDate(), hour: d.getHours(), minute: d.getMinutes() };
     }
 }
 function tenantToday() {
     return calendarDayInZone(new Date(), tenantTimeZone());
 }
 function todayForScale() {
-    const { y, m, day } = tenantToday();
-    if (zoom.value === 'Day') return new Date(y, m, day, 0, 0, 0, 0);
+    const { y, m, day, hour, minute } = tenantToday();
+    if (zoom.value === 'Day') return new Date(y, m, day, hour, minute, 0, 0);
     return new Date(y, m, day, 12, 0, 0, 0);
 }
 function sameTenantDay(date) {
@@ -283,7 +287,10 @@ function sameTenantDay(date) {
 }
 function todayCellClass(date) {
     if (!sameTenantDay(date)) return '';
-    if (zoom.value === 'Day' && date instanceof Date && date.getHours() !== 0) return '';
+    if (zoom.value === 'Day' && date instanceof Date) {
+        const bucket = Math.floor((tenantToday().hour || 0) / 6) * 6;
+        if (date.getHours() !== bucket) return '';
+    }
     return 'gantt_today';
 }
 function todayOverlayHost() {

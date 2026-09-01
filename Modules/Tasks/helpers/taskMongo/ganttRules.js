@@ -13,22 +13,26 @@ const calendarDayInZone = (value = new Date(), timeZone = DEFAULT_TZ) => {
             year: 'numeric',
             month: 'numeric',
             day: 'numeric',
+            hour: 'numeric',
+            minute: 'numeric',
+            second: 'numeric',
+            hourCycle: 'h23',
         }).formatToParts(d);
         const num = (type) => Number((parts.find((p) => p.type === type) || {}).value);
         const y = num('year');
         const m = num('month');
         const day = num('day');
         if (!y || !m || !day) return null;
-        return { y, m: m - 1, day };
+        return { y, m: m - 1, day, hour: num('hour') || 0, minute: num('minute') || 0 };
     } catch (e) {
-        return { y: d.getFullYear(), m: d.getMonth(), day: d.getDate() };
+        return { y: d.getFullYear(), m: d.getMonth(), day: d.getDate(), hour: d.getHours(), minute: d.getMinutes() };
     }
 };
 
 const todayLineDate = (value = new Date(), scale = 'Week', timeZone = DEFAULT_TZ) => {
     const parts = calendarDayInZone(value, timeZone);
     if (!parts) return null;
-    if (scale === 'Day') return new Date(parts.y, parts.m, parts.day, 0, 0, 0, 0);
+    if (scale === 'Day') return new Date(parts.y, parts.m, parts.day, parts.hour, parts.minute, 0, 0);
     return new Date(parts.y, parts.m, parts.day, 12, 0, 0, 0);
 };
 
