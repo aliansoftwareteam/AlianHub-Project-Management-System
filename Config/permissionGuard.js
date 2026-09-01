@@ -57,6 +57,8 @@ const TASK_ACTION_PERMISSION = {
     updatePriority: 'task.task_priority',
     updateAssignee: 'task.task_assignee',
     updateDueDate: 'task.task_due_date',
+    updateDates: 'task.task_due_date',
+    updateRecurrence: 'task.task_due_date',
     updateStartDate: 'task.task_due_date',
     updateTaskType: 'task.task_type',
     updateDescription: 'task.task_description',

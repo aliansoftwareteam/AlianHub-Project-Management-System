@@ -1,43 +1,68 @@
 <template>
-  <div class="gantt-view">
-    <div class="gantt-view__bar">
-      <div class="gantt-view__zoom">
-        <button
-          v-for="z in zoomLevels"
-          :key="z"
-          type="button"
-          :class="{ active: zoom === z }"
-          @click="setZoom(z)"
-        >{{ z }}</button>
-      </div>
-      <span v-if="readOnly" class="gantt-view__ro">View only</span>
-      <span class="gantt-view__count">
-        {{ scheduled.length }} scheduled<template v-if="unscheduled.length"> · {{ unscheduled.length }} unscheduled</template>
-      </span>
-    </div>
-
-    <div class="gantt-view__main">
-      <div v-if="loadError" class="gantt-view__msg">
-        Couldn't load the Gantt module. Install the dependency and reload:
-        <code>cd frontend &amp;&amp; npm install</code>
-      </div>
-      <template v-else>
-        <div ref="ganttEl" class="gantt-view__chart"></div>
-        <div v-if="!scheduled.length && !loading" class="gantt-view__empty">
-          No scheduled tasks yet — give a task a start &amp; due date (or use the Unscheduled tray) to see it on the timeline.
+  <div class="gantt-view" :style="{ '--gantt-collision-line': collisionLineCss }">
+    <div v-if="!hasProject" class="gantt-view__pick">{{ $t('Projects.gantt_select_project') }}</div>
+    <template v-else>
+      <div class="gantt-view__bar">
+        <div class="gantt-view__zoom">
+          <button
+            v-for="z in zoomLevels"
+            :key="z"
+            type="button"
+            :class="{ active: zoom === z }"
+            @click="setZoom(z)"
+          >{{ z }}</button>
         </div>
-      </template>
+        <span v-if="readOnly" class="gantt-view__ro">{{ $t('Projects.gantt_view_only') }}</span>
+        <span class="gantt-view__count">
+          {{ $t('Projects.gantt_scheduled_count', { n: scheduled.length }) }}
+        </span>
+      </div>
 
-      <aside v-if="unscheduled.length" class="gantt-view__tray">
-        <h4 class="gantt-view__tray-title">Unscheduled ({{ unscheduled.length }})</h4>
-        <ul class="gantt-view__tray-list">
-          <li v-for="t in unscheduled" :key="t._id" class="gantt-view__tray-item">
-            <span class="gantt-view__tray-name" :title="t.TaskName">{{ t.TaskName || t.TaskKey }}</span>
-            <button v-if="!readOnly" type="button" class="gantt-view__tray-btn" @click="schedule(t)">Schedule</button>
-          </li>
-        </ul>
-      </aside>
-    </div>
+      <div class="gantt-view__body">
+        <aside
+          v-if="unscheduled.length"
+          class="gantt-view__nodates"
+        >
+          <span class="gantt-view__nodates-label">{{ $t('Projects.gantt_no_dates') }}</span>
+          <ul class="gantt-view__nodates-list">
+            <li
+              v-for="t in unscheduled"
+              :key="t._id"
+              class="gantt-view__nodates-item"
+              :draggable="!readOnly"
+              @dragstart="onStackDrag($event, t)"
+              :title="t.TaskName || t.TaskKey"
+            >
+              <span class="gantt-view__nodates-name">{{ t.TaskName || t.TaskKey }}</span>
+              <button
+                v-if="!readOnly"
+                type="button"
+                class="gantt-view__nodates-btn"
+                @click="schedule(t)"
+              >{{ $t('Projects.gantt_schedule') }}</button>
+            </li>
+          </ul>
+        </aside>
+
+        <div class="gantt-view__main">
+          <div v-if="loadError" class="gantt-view__msg">
+            Couldn't load the Gantt module. Install the dependency and reload:
+            <code>cd frontend &amp;&amp; npm install</code>
+          </div>
+          <template v-else>
+            <div
+              ref="ganttEl"
+              class="gantt-view__chart"
+              @dragover.prevent="onChartDragOver"
+              @drop="onChartDrop"
+            ></div>
+            <div v-if="!scheduled.length && !loading" class="gantt-view__empty">
+              {{ $t('Projects.gantt_empty') }}
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -53,6 +78,7 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import taskClass from '@/utils/TaskOperations';
 import { taskListHelper } from '@/views/Projects/helper.js';
+import { useI18n } from 'vue-i18n';
 
 const props = defineProps({
     projectData: { type: Object, default: () => ({}) },
@@ -60,6 +86,7 @@ const props = defineProps({
 });
 
 const { getters } = useStore();
+const { t } = useI18n();
 const { checkPermission } = useCustomComposable();
 const { groupBy } = taskListHelper();
 const selectedProject = inject('selectedProject', ref({}));
@@ -70,46 +97,86 @@ const loading = ref(true);
 const milestones = ref([]);
 const zoomLevels = ['Day', 'Week', 'Month'];
 const zoom = ref('Week');
+const collisionLineCss = computed(() => JSON.stringify(t('Projects.gantt_collision')));
 
-let gantt = null;     // dhtmlx instance (lazy-loaded)
-let ready = false;    // init complete
-let suppress = false; // guard: programmatic re-renders must not fire write handlers
+let gantt = null;
+let ready = false;
+let suppress = false;
 let eventIds = [];
+let todayMarker = null;
 
-/* ----------------------- data in: from the live Vuex store ----------------------- */
-// Same task source the List/Table views use, so socket-driven updates flow in for free.
-const sprintId = computed(() => props.sprints?.[0]?.id || props.sprints?.[0]?._id || '');
+const hasProject = computed(() => Boolean(props.projectData && props.projectData._id));
+const loadedRows = ref([]);
 
-function pickTasks(map) {
-    const pid = props.projectData?._id;
-    const sid = sprintId.value;
-    if (!pid || !sid || !map || !map[pid] || !map[pid][sid]) return null;
-    const node = map[pid][sid];
-    return Array.isArray(node.tasks) ? node.tasks : null;
+function hasDate(value) {
+    if (value == null || value === '' || value === 0 || value === '0') return false;
+    const ms = new Date(value).getTime();
+    return Number.isFinite(ms);
 }
-const tasks = computed(() =>
-    pickTasks(getters['projectData/tasks']) || pickTasks(getters['projectData/tableTasks']) || []
-);
+function pushTask(rows, task) {
+    if (!task || !task._id) return;
+    rows.push(task);
+    (task.subtaskArray || []).forEach((child) => pushTask(rows, child));
+}
+function flattenBucket(bucket, rows) {
+    if (!bucket) return;
+    if (Array.isArray(bucket)) {
+        bucket.forEach((t) => pushTask(rows, t));
+        return;
+    }
+    if (typeof bucket !== 'object') return;
+    const list = Array.isArray(bucket.tasks) ? bucket.tasks
+        : Array.isArray(bucket.tasksArray) ? bucket.tasksArray
+        : [];
+    list.forEach((t) => pushTask(rows, t));
+    (bucket.items || []).forEach((item) => flattenBucket(item, rows));
+}
+function collectFromMap(map) {
+    const pid = props.projectData?._id;
+    if (!pid || !map || !map[pid]) return [];
+    const node = map[pid];
+    const rows = [];
+    Object.keys(node).forEach((key) => {
+        if (key === 'sprints' || key === 'projectId' || key === 'groupBy') return;
+        flattenBucket(node[key], rows);
+    });
+    return rows;
+}
+function flattenGroupResp(resp) {
+    const rows = [];
+    (resp || []).forEach((sprint) => flattenBucket(sprint, rows));
+    return rows;
+}
+function mergeTasks(...lists) {
+    const byId = new Map();
+    lists.flat().forEach((t) => {
+        if (t && t._id) byId.set(String(t._id), t);
+    });
+    return [...byId.values()];
+}
+const tasks = computed(() => mergeTasks(
+    collectFromMap(getters['projectData/tasks']),
+    collectFromMap(getters['projectData/tableTasks']),
+    (getters['projectData/alltasks'] || []).filter((t) => t && String(t.ProjectID) === String(props.projectData?._id)),
+    loadedRows.value,
+));
 
-// active = not deleted (0 active, 2 archived, undefined legacy)
 const activeTasks = computed(() => tasks.value.filter((t) => t && [0, 2, undefined, null].includes(t.deletedStatusKey)));
-const scheduled = computed(() => activeTasks.value.filter((t) => t.startDate && t.DueDate));
-const unscheduled = computed(() => activeTasks.value.filter((t) => !(t.startDate && t.DueDate)));
+const scheduled = computed(() => activeTasks.value.filter((t) => hasDate(t.startDate) && hasDate(t.DueDate)));
+const unscheduled = computed(() => activeTasks.value.filter((t) => !(hasDate(t.startDate) && hasDate(t.DueDate))));
 
 const readOnly = computed(() =>
     checkPermission('task.task_due_date', selectedProject.value?.isGlobalPermission ?? props.projectData?.isGlobalPermission) !== true
 );
 
-// Re-render only when something the chart actually shows has changed.
 const signature = computed(() =>
-    JSON.stringify(scheduled.value.map((t) => [
+    JSON.stringify(activeTasks.value.map((t) => [
         t._id, t.TaskName, t.startDate, t.DueDate, t.ParentTaskId || 0,
         t.status?.type || t.statusType || '',
         (t.relations || []).filter((r) => r.type === 'blocks').map((r) => r.taskId),
     ]))
 );
 
-/* ----------------------------------- helpers ----------------------------------- */
 function progressOf(task) {
     const type = task?.status?.type || task?.statusType;
     if (type === 'close') return 1;
@@ -127,6 +194,22 @@ function buildUserData() {
     return { Employee_Name: me.Employee_Name || '', id: uid, companyOwnerId: getters['settings/companyOwnerDetail']?.userId || '' };
 }
 
+function collidingLinkIds() {
+    const ids = new Set();
+    const byId = new Map(scheduled.value.map((t) => [String(t._id), t]));
+    scheduled.value.forEach((t) => {
+        (t.relations || []).forEach((rel) => {
+            if (rel.type !== 'blocks') return;
+            const target = byId.get(String(rel.taskId));
+            if (!target || !target.startDate || !t.DueDate) return;
+            if (new Date(target.startDate).getTime() < new Date(t.DueDate).getTime()) {
+                ids.add(`${t._id}_${rel.taskId}`);
+            }
+        });
+    });
+    return ids;
+}
+
 function toGanttData() {
     const data = scheduled.value.map((t) => ({
         id: String(t._id),
@@ -138,11 +221,8 @@ function toGanttData() {
         open: true,
     }));
     const ids = new Set(data.map((d) => d.id));
-    // drop parent refs pointing outside the visible set (else dhtmlx throws)
     data.forEach((d) => { if (d.parent && !ids.has(String(d.parent))) d.parent = 0; });
 
-    // dependency arrows: only emit from the 'blocks' side (relations are stored
-    // bidirectionally, so this avoids duplicate links). 'blocks' => finish-to-start ('0').
     const links = [];
     scheduled.value.forEach((t) => {
         (t.relations || []).forEach((rel) => {
@@ -151,7 +231,6 @@ function toGanttData() {
             }
         });
     });
-    // Project milestones as read-only diamond markers.
     (milestones.value || []).forEach((m) => {
         if (m && m.date) {
             data.push({
@@ -167,6 +246,128 @@ function toGanttData() {
     return { data, links };
 }
 
+function tenantTimeZone() {
+    const uid = localStorage.getItem('userId');
+    const me = (getters['users/users'] || []).find((u) => String(u._id) === String(uid)) || {};
+    return me.Time_Zone || me.timeZone || 'Asia/Kolkata';
+}
+function calendarDayInZone(value, timeZone) {
+    const d = value instanceof Date ? value : new Date();
+    try {
+        const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone: timeZone || 'Asia/Kolkata',
+            year: 'numeric',
+            month: 'numeric',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: 'numeric',
+            second: 'numeric',
+            hourCycle: 'h23',
+        }).formatToParts(d);
+        const raw = (type) => Number((parts.find((p) => p.type === type) || {}).value);
+        const hour = raw('hour');
+        const minute = raw('minute');
+        return {
+            y: raw('year'),
+            m: raw('month') - 1,
+            day: raw('day'),
+            hour: Number.isFinite(hour) ? hour : 0,
+            minute: Number.isFinite(minute) ? minute : 0,
+        };
+    } catch (e) {
+        return { y: d.getFullYear(), m: d.getMonth(), day: d.getDate(), hour: d.getHours(), minute: d.getMinutes() };
+    }
+}
+function tenantToday() {
+    return calendarDayInZone(new Date(), tenantTimeZone());
+}
+function todayForScale() {
+    const { y, m, day, hour, minute } = tenantToday();
+    if (zoom.value === 'Day') return new Date(y, m, day, hour, minute, 0, 0);
+    return new Date(y, m, day, 12, 0, 0, 0);
+}
+function sameTenantDay(date) {
+    const cell = date instanceof Date ? date : new Date(date);
+    const today = tenantToday();
+    return cell.getFullYear() === today.y
+        && cell.getMonth() === today.m
+        && cell.getDate() === today.day;
+}
+function todayCellClass() {
+    return '';
+}
+function todayOverlayHost() {
+    if (!gantt) return null;
+    return gantt.$task
+        || (ganttEl.value && ganttEl.value.querySelector('.gantt_task'))
+        || null;
+}
+function todayViewportLeft() {
+    if (!gantt || typeof gantt.posFromDate !== 'function') return null;
+    let pos;
+    try {
+        pos = gantt.posFromDate(todayForScale());
+    } catch (e) {
+        return null;
+    }
+    if (pos == null || pos === false || Number.isNaN(Number(pos))) return null;
+    const scrollX = (gantt.getScrollState && gantt.getScrollState().x) || 0;
+    return Number(pos) - scrollX;
+}
+function paintTodayOverlay() {
+    const host = todayOverlayHost();
+    if (!host) return;
+    let line = host.querySelector(':scope > .gantt-today-overlay');
+    if (!line) {
+        line = document.createElement('div');
+        line.className = 'gantt-today-overlay';
+        line.setAttribute('aria-hidden', 'true');
+        host.appendChild(line);
+    }
+    const left = todayViewportLeft();
+    const view = host.clientWidth || 0;
+    if (left == null || left < -1 || (view && left > view)) {
+        line.style.display = 'none';
+        return;
+    }
+    line.style.display = 'block';
+    line.style.left = `${left}px`;
+}
+function stripNativeToday() {
+    if (!gantt) return;
+    if ('mark_now' in gantt.config) gantt.config.mark_now = false;
+    if ('show_markers' in gantt.config) gantt.config.show_markers = false;
+    if (todayMarker != null && typeof gantt.deleteMarker === 'function') {
+        try { gantt.deleteMarker(todayMarker); } catch (e) { /* ignore */ }
+        todayMarker = null;
+    }
+    try {
+        if (typeof gantt.getMarkers === 'function') {
+            (gantt.getMarkers() || []).forEach((m) => {
+                const id = m && (m.id != null ? m.id : m);
+                if (id != null && typeof gantt.deleteMarker === 'function') gantt.deleteMarker(id);
+            });
+        }
+    } catch (e) { /* ignore */ }
+    const root = ganttEl.value;
+    if (root) {
+        root.querySelectorAll('.gantt_now, .gantt_current, .gantt_marker, .gantt-today-line').forEach((el) => {
+            if (!el.classList.contains('gantt-today-overlay')) el.remove();
+        });
+    }
+}
+let paintingToday = false;
+function paintTodayLine() {
+    if (!ready || !gantt || paintingToday) return;
+    paintingToday = true;
+    try {
+        stripNativeToday();
+        paintTodayOverlay();
+    } finally {
+        paintingToday = false;
+    }
+}
+
 function renderData() {
     if (!ready || !gantt) return;
     suppress = true;
@@ -176,9 +377,9 @@ function renderData() {
     } finally {
         suppress = false;
     }
+    paintTodayLine();
 }
 
-/* ------------------------------------ writes ------------------------------------ */
 function persistDates(id) {
     if (suppress) return;
     const g = gantt.getTask(id);
@@ -193,6 +394,10 @@ function persistDates(id) {
 }
 function persistLinkAdd(id, link) {
     if (suppress) return;
+    if (String(link.type) !== '0') {
+        rollbackLink(id);
+        return;
+    }
     apiRequest('post', '/api/v2/tasks/relations', {
         action: 'add', taskId: link.source, relatedTaskId: link.target, type: 'blocks', userData: buildUserData(),
     }).then((res) => {
@@ -212,18 +417,49 @@ function persistLinkDelete(link) {
         action: 'remove', taskId: link.source, relatedTaskId: link.target, userData: buildUserData(),
     }).catch((e) => console.error('Gantt: link remove failed', e));
 }
-function schedule(task) {
-    const start = new Date(); start.setHours(0, 0, 0, 0);
-    const end = new Date(start); end.setDate(end.getDate() + 1);
+function datesForSchedule(anchor) {
+    const start = new Date(anchor || Date.now());
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    return { startDate: start, DueDate: end };
+}
+function schedule(task, anchor) {
+    const dates = datesForSchedule(anchor);
     taskClass.updateDates({
-        firebaseObj: { startDate: start, DueDate: end },
+        firebaseObj: dates,
         projectData: buildProjectData(),
         taskData: task,
         userData: buildUserData(),
     }).catch((e) => console.error('Gantt: schedule failed', e));
 }
+function onStackDrag(event, task) {
+    if (readOnly.value) return;
+    event.dataTransfer.setData('text/task-id', String(task._id));
+    event.dataTransfer.effectAllowed = 'copyMove';
+}
+function onChartDragOver(event) {
+    if (readOnly.value) return;
+    event.dataTransfer.dropEffect = 'move';
+}
+function onChartDrop(event) {
+    if (readOnly.value) return;
+    event.preventDefault();
+    const id = event.dataTransfer.getData('text/task-id');
+    const task = unscheduled.value.find((row) => String(row._id) === String(id));
+    if (!task) return;
+    let anchor = new Date();
+    try {
+        if (gantt && typeof gantt.dateFromPos === 'function' && gantt.$task) {
+            const rect = gantt.$task.getBoundingClientRect();
+            const scrollX = (gantt.getScrollState && gantt.getScrollState().x) || 0;
+            const pos = gantt.dateFromPos(event.clientX - rect.left + scrollX);
+            if (pos) anchor = pos;
+        }
+    } catch (e) { /* today */ }
+    schedule(task, anchor);
+}
 
-/* ------------------------------------- zoom ------------------------------------- */
 function applyScales(level) {
     if (!gantt) return;
     gantt.config.scale_height = 50;
@@ -247,26 +483,58 @@ function applyScales(level) {
 function setZoom(level) {
     zoom.value = level;
     applyScales(level);
-    if (ready && gantt) gantt.render();
+    if (ready && gantt) {
+        gantt.render();
+        paintTodayLine();
+    }
 }
 
-/* ----------------------------------- lifecycle ---------------------------------- */
-// Ensure the project's task list is in the store. Other views (List/Table/Board) trigger
-// this load via taskListHelper on mount; Gantt must too — otherwise a direct reload INTO
-// the Gantt tab finds an empty store and renders nothing (it only worked when another view
-// had already populated it). Mirrors ListView's onMounted loader (state.tasks via Mongo).
 function ensureTasksLoaded() {
-    if (tasks.value.length) return; // already loaded (e.g. arrived here from another view)
+    if (!hasProject.value) return;
     const proj = (selectedProject.value && selectedProject.value._id) ? selectedProject.value : props.projectData;
     if (!proj || !proj._id || !Array.isArray(props.sprints) || !props.sprints.length) return;
     try {
-        groupBy(0, true, proj, props.sprints, ref([]), false, 'list', false, true, () => {});
+        groupBy(0, true, proj, props.sprints, ref([]), false, 'list', false, true, (resp) => {
+            loadedRows.value = flattenGroupResp(resp);
+        });
     } catch (e) {
         console.error('Gantt: task-load trigger failed', e);
     }
 }
 
+function applyKilnSkin() {
+    if (!gantt) return;
+    gantt.config.auto_scheduling = false;
+    gantt.config.highlight_critical_path = false;
+    gantt.config.drag_progress = false;
+    gantt.config.fit_tasks = true;
+    gantt.config.details_on_dblclick = false;
+    gantt.config.details_on_create = false;
+    gantt.config.show_quick_info = false;
+    gantt.config.drag_move = !readOnly.value;
+    gantt.config.drag_resize = !readOnly.value;
+    gantt.config.drag_links = !readOnly.value;
+    gantt.config.readonly = readOnly.value;
+    gantt.config.date_format = '%Y-%m-%d %H:%i';
+    gantt.config.start_on_monday = true;
+    if ('utc' in gantt.config) gantt.config.utc = false;
+    if ('mark_now' in gantt.config) gantt.config.mark_now = false;
+    if ('show_markers' in gantt.config) gantt.config.show_markers = false;
+    gantt.config.columns = [
+        { name: 'text', label: 'Task', tree: true, width: 220, resize: true },
+    ];
+    gantt.templates.task_class = () => 'gantt-bar--kiln';
+    gantt.templates.link_class = (link) => (collidingLinkIds().has(String(link.id)) ? 'gantt-link--collision' : 'gantt-link--fs');
+    gantt.templates.timeline_cell_class = (task, date) => todayCellClass(date);
+    gantt.templates.scale_cell_class = (date) => todayCellClass(date);
+    gantt.showLightbox = function () {};
+}
+
 onMounted(async () => {
+    if (!hasProject.value) {
+        loading.value = false;
+        return;
+    }
     ensureTasksLoaded();
     let mod;
     try {
@@ -279,35 +547,26 @@ onMounted(async () => {
     }
     try { await import(/* webpackChunkName: "dhtmlx-gantt-css" */ 'dhtmlx-gantt/codebase/dhtmlxgantt.css'); } catch (e) { /* styling only */ }
 
-    // Use the dhtmlx singleton (fully initialised on import). We deliberately do NOT
-    // call getGanttInstance()/destructor(): re-initialising a destructed instance throws
-    // "Cannot read properties of undefined (reading 'tasksStore')" when the Gantt tab is
-    // reopened. We re-init the singleton each mount, detaching handlers + clearing on unmount.
     gantt = mod.gantt || mod.default || mod;
 
     await nextTick();
     if (!ganttEl.value || !gantt) { loading.value = false; return; }
 
     try {
-        gantt.config.date_format = '%Y-%m-%d %H:%i';
-        gantt.config.readonly = readOnly.value;
-        gantt.config.drag_move = !readOnly.value;
-        gantt.config.drag_resize = !readOnly.value;
-        gantt.config.drag_links = !readOnly.value;
-        gantt.config.drag_progress = false;
-        gantt.config.fit_tasks = true;
-        gantt.config.columns = [
-            { name: 'text', label: 'Task', tree: true, width: 220, resize: true },
-            { name: 'start_date', label: 'Start', align: 'center', width: 90 },
-            { name: 'duration', label: 'Days', align: 'center', width: 54 },
-        ];
+        if (typeof gantt.plugins === 'function') {
+            try { gantt.plugins({ auto_scheduling: false, critical_path: false }); } catch (e) { /* gpl build */ }
+        }
+        applyKilnSkin();
         applyScales(zoom.value);
-
         gantt.init(ganttEl.value);
 
+        eventIds.push(gantt.attachEvent('onBeforeLightbox', () => false));
+        eventIds.push(gantt.attachEvent('onBeforeLinkAdd', (id, link) => String(link.type) === '0'));
         eventIds.push(gantt.attachEvent('onAfterTaskDrag', (id) => persistDates(id)));
         eventIds.push(gantt.attachEvent('onAfterLinkAdd', (id, link) => persistLinkAdd(id, link)));
         eventIds.push(gantt.attachEvent('onAfterLinkDelete', (id, link) => persistLinkDelete(link)));
+        eventIds.push(gantt.attachEvent('onGanttRender', () => paintTodayLine()));
+        eventIds.push(gantt.attachEvent('onGanttScroll', () => paintTodayOverlay()));
 
         ready = true;
         renderData();
@@ -317,7 +576,6 @@ onMounted(async () => {
     }
     loading.value = false;
 
-    // Milestones as read-only diamond markers — best-effort; re-render when they arrive.
     try {
         const pid = props.projectData && props.projectData._id;
         if (pid) {
@@ -332,6 +590,7 @@ onMounted(async () => {
 });
 
 watch(signature, () => { if (ready && !suppress) renderData(); });
+watch(hasProject, (ok) => { if (ok) ensureTasksLoaded(); });
 
 watch(readOnly, (ro) => {
     if (!ready || !gantt) return;
@@ -342,16 +601,19 @@ watch(readOnly, (ro) => {
     gantt.render();
 });
 
-// Sprints can arrive after mount on a fresh reload — trigger the load once they're present.
 watch(() => props.sprints, () => ensureTasksLoaded(), { deep: true });
 
 onBeforeUnmount(() => {
     try {
         if (gantt) {
             eventIds.forEach((id) => gantt.detachEvent(id));
+            if (todayMarker != null && typeof gantt.deleteMarker === 'function') {
+                try { gantt.deleteMarker(todayMarker); } catch (e) { /* ignore */ }
+            }
+            const host = todayOverlayHost();
+            const line = host && host.querySelector('.gantt-today-overlay');
+            if (line) line.remove();
             gantt.clearAll();
-            // Intentionally NOT calling gantt.destructor() — destructing the shared
-            // singleton breaks re-init when the Gantt tab is reopened (tasksStore undefined).
         }
     } catch (e) { /* ignore */ }
     eventIds = [];
@@ -361,24 +623,255 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.gantt-view { display: flex; flex-direction: column; width: 100%; height: 100%; background: #fff; }
-.gantt-view__bar { display: flex; align-items: center; gap: 14px; padding: 8px 12px; border-bottom: 1px solid #eee; flex: 0 0 auto; }
-.gantt-view__zoom { display: inline-flex; border: 1px solid #d8d8e0; border-radius: 6px; overflow: hidden; }
-.gantt-view__zoom button { border: none; background: #fff; color: #555; padding: 5px 14px; font-size: 13px; cursor: pointer; }
-.gantt-view__zoom button + button { border-left: 1px solid #d8d8e0; }
-.gantt-view__zoom button.active { background: #2F3990; color: #fff; }
-.gantt-view__ro { font-size: 12px; color: #b06a00; background: #fff5e6; border: 1px solid #ffd591; border-radius: 4px; padding: 2px 8px; }
-.gantt-view__count { margin-left: auto; font-size: 12px; color: #888; }
-.gantt-view__main { position: relative; flex: 1 1 auto; display: flex; min-height: 360px; }
-.gantt-view__chart { flex: 1 1 auto; height: 100%; min-height: 360px; }
-.gantt-view__empty,
-.gantt-view__msg { position: absolute; top: 48px; left: 0; right: 0; text-align: center; color: #999; font-size: 14px; padding: 20px; pointer-events: none; }
-.gantt-view__msg code { background: #f3f3f7; padding: 2px 6px; border-radius: 4px; pointer-events: auto; }
-.gantt-view__tray { width: 210px; flex: 0 0 auto; border-left: 1px solid #eee; padding: 10px; overflow: auto; background: #fafafe; }
-.gantt-view__tray-title { font-size: 12px; text-transform: uppercase; color: #999; margin: 0 0 8px; letter-spacing: .04em; }
-.gantt-view__tray-list { list-style: none; margin: 0; padding: 0; }
-.gantt-view__tray-item { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-bottom: 1px dashed #eee; }
-.gantt-view__tray-name { flex: 1 1 auto; font-size: 13px; color: #444; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.gantt-view__tray-btn { border: 1px solid #2F3990; color: #2F3990; background: #fff; border-radius: 5px; font-size: 12px; padding: 3px 8px; cursor: pointer; white-space: nowrap; }
-.gantt-view__tray-btn:hover { background: #2F3990; color: #fff; }
+.gantt-view {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    background: #f4ead8;
+    color: #1b2f28;
+}
+.gantt-view__pick,
+.gantt-view__msg {
+    padding: 28px 16px;
+    text-align: center;
+    color: #1b2f28;
+    font-size: 14px;
+}
+.gantt-view__bar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 8px 12px;
+    border-bottom: 1px solid #d8cbb3;
+    flex: 0 0 auto;
+    background: #f4ead8;
+}
+.gantt-view__zoom {
+    display: inline-flex;
+    border: 1px solid #1b2f28;
+    border-radius: 6px;
+    overflow: hidden;
+}
+.gantt-view__zoom button {
+    border: none;
+    background: #f4ead8;
+    color: #1b2f28;
+    padding: 5px 14px;
+    font-size: 13px;
+    cursor: pointer;
+}
+.gantt-view__zoom button + button { border-left: 1px solid #1b2f28; }
+.gantt-view__zoom button.active { background: #1b2f28; color: #f4ead8; }
+.gantt-view__ro {
+    font-size: 12px;
+    color: #c45c26;
+    background: #f4ead8;
+    border: 1px solid #c45c26;
+    border-radius: 4px;
+    padding: 2px 8px;
+}
+.gantt-view__count { margin-left: auto; font-size: 12px; color: #1b2f28; }
+.gantt-view__body {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    flex: 1 1 auto;
+    min-height: 360px;
+}
+.gantt-view__nodates {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    flex: 0 0 200px;
+    width: 200px;
+    max-width: 220px;
+    gap: 4px;
+    padding: 8px 10px;
+    border-right: 1px solid #d8cbb3;
+    background: #f4ead8;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+.gantt-view__nodates-label {
+    flex: 0 0 auto;
+    font-size: 11px;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: #1b2f28;
+    font-weight: 700;
+}
+.gantt-view__nodates-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+}
+.gantt-view__nodates-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    max-width: none;
+}
+.gantt-view__nodates-name {
+    font-size: 12px;
+    color: #1b2f28;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.gantt-view__nodates-btn {
+    border: none;
+    background: #c45c26;
+    color: #f4ead8;
+    border-radius: 4px;
+    font-size: 11px;
+    padding: 2px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    margin-left: auto;
+}
+.gantt-view__main { position: relative; flex: 1 1 auto; display: flex; min-height: 360px; min-width: 0; }
+.gantt-view__chart { flex: 1 1 auto; height: 100%; min-height: 360px; background: #fbf6ec; }
+.gantt-view__empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 28px 16px;
+    text-align: center;
+    color: #1b2f28;
+    font-size: 14px;
+    pointer-events: none;
+    z-index: 3;
+    background: transparent;
+}
+.gantt-view__msg code { background: #f4ead8; padding: 2px 6px; border-radius: 4px; pointer-events: auto; }
+</style>
+
+<style>
+.gantt-view .gantt_grid,
+.gantt-view .gantt_grid_scale,
+.gantt-view .gantt_grid_data .gantt_row,
+.gantt-view .gantt_grid_data .gantt_row.odd,
+.gantt-view .gantt_grid_data .gantt_row.gantt_selected,
+.gantt-view .gantt_task_row.gantt_selected {
+    background-color: #f4ead8 !important;
+    color: #1b2f28;
+    border-color: #d8cbb3 !important;
+}
+.gantt-view .gantt_task_line,
+.gantt-view .gantt_task_line.gantt_bar_task,
+.gantt-view .gantt_task_line.gantt_project,
+.gantt-view .gantt_task_line.gantt_milestone,
+.gantt-view .gantt_task_line.gantt-bar--kiln,
+.gantt-view .gantt_task_drag,
+.gantt-view .gantt_selected .gantt_task_line {
+    background-color: #1b2f28 !important;
+    border-color: #1b2f28 !important;
+    border-radius: 4px;
+    box-shadow: none;
+}
+.gantt-view .gantt_task_progress {
+    background-color: rgba(244, 234, 216, 0.28) !important;
+}
+.gantt-view .gantt_task_content {
+    color: #f4ead8 !important;
+}
+.gantt-view .gantt_link_control,
+.gantt-view .gantt_link_point,
+.gantt-view .gantt_link_tooltip {
+    background: #1b2f28 !important;
+    border-color: #1b2f28 !important;
+}
+.gantt-view .gantt_task_link .gantt_line_wrapper div,
+.gantt-view .gantt_task_link.gantt-link--fs .gantt_line_wrapper div,
+.gantt-view .gantt_link_line_right,
+.gantt-view .gantt_link_line_left,
+.gantt-view .gantt_link_corner {
+    background-color: #1b2f28 !important;
+}
+.gantt-view .gantt_task_link .gantt_link_arrow,
+.gantt-view .gantt_task_link.gantt-link--fs .gantt_link_arrow,
+.gantt-view .gantt_link_arrow_right,
+.gantt-view .gantt_link_arrow_left {
+    border-color: #1b2f28 !important;
+    border-left-color: #1b2f28 !important;
+    border-right-color: #1b2f28 !important;
+    border-top-color: #1b2f28 !important;
+    border-bottom-color: #1b2f28 !important;
+}
+.gantt-view .gantt_critical_task,
+.gantt-view .gantt_critical_link .gantt_line_wrapper div,
+.gantt-view .gantt_task_link.gantt_critical_link .gantt_line_wrapper div {
+    background-color: #1b2f28 !important;
+    border-color: #1b2f28 !important;
+}
+.gantt-view .gantt_task_link.gantt-link--collision .gantt_line_wrapper {
+    overflow: visible;
+}
+.gantt-view .gantt_task_link.gantt-link--collision .gantt_line_wrapper div {
+    background-color: #c45c26 !important;
+}
+.gantt-view .gantt_task_link.gantt-link--collision .gantt_link_arrow {
+    border-left-color: #c45c26 !important;
+    border-right-color: #c45c26 !important;
+    border-top-color: #c45c26 !important;
+    border-bottom-color: #c45c26 !important;
+}
+.gantt-view .gantt_task_link.gantt-link--collision .gantt_line_wrapper::after {
+    content: var(--gantt-collision-line, "Dates overlap. Blocked task stayed put.");
+    position: absolute;
+    left: 50%;
+    top: -16px;
+    transform: translateX(-50%);
+    color: #c45c26;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    pointer-events: none;
+    background: #f4ead8;
+    padding: 0 4px;
+    line-height: 1.2;
+}
+.gantt-view .gantt_task,
+.gantt-view .gantt_data_area,
+.gantt-view .gantt_task_bg {
+    position: relative;
+}
+.gantt-view .gantt_now,
+.gantt-view .gantt_current,
+.gantt-view .gantt_marker,
+.gantt-view .gantt_marker.gantt-today-line,
+.gantt-view .gantt-today-line {
+    display: none !important;
+}
+.gantt-view .gantt-today-overlay {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #c45c26 !important;
+    pointer-events: none;
+    z-index: 20;
+}
+.gantt-view .gantt_task_cell.gantt_today,
+.gantt-view .gantt_scale_cell.gantt_today {
+    box-shadow: none;
+}
+.gantt-view .gantt_cal_light,
+.gantt-view .gantt_cal_cover,
+.gantt-view + .gantt_cal_light,
+.gantt_cal_light,
+.gantt_cal_cover {
+    display: none !important;
+}
 </style>

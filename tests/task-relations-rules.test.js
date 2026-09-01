@@ -141,6 +141,52 @@ describe('🔗 TASK RELATIONS - Rules', () => {
         });
     });
 
+    describe('planFinishToStartAdd (Gantt + Blocking write the same link)', () => {
+        const {
+            planFinishToStartAdd,
+            ganttLinkToRelation,
+            GANTT_LINK_FINISH_TO_START,
+        } = require('../Modules/Tasks/helpers/taskMongo/relationRules');
+
+        test('creating a blocks link also writes blocked_by on the other task', () => {
+            const plan = planFinishToStartAdd({
+                companyId: COMPANY_ID,
+                taskId: VALID_ID_A,
+                relatedTaskId: VALID_ID_B,
+            });
+            expect(plan.valid).toBe(true);
+            expect(plan.type).toBe(RELATION_TYPES.BLOCKS);
+            expect(plan.inverseType).toBe(RELATION_TYPES.BLOCKED_BY);
+            expect(plan.ganttLinkType).toBe(GANTT_LINK_FINISH_TO_START);
+            expect(plan.writes).toEqual([
+                { taskId: VALID_ID_A, relatedTaskId: VALID_ID_B, type: 'blocks' },
+                { taskId: VALID_ID_B, relatedTaskId: VALID_ID_A, type: 'blocked_by' },
+            ]);
+        });
+
+        test('a Gantt finish-to-start arrow is the same blocks write', () => {
+            const plan = ganttLinkToRelation({
+                sourceId: VALID_ID_A,
+                targetId: VALID_ID_B,
+                linkType: '0',
+            });
+            expect(plan.valid).toBe(true);
+            expect(plan.writes[0].type).toBe('blocks');
+        });
+
+        test('start-to-start / finish-to-finish / start-to-finish are rejected (v2)', () => {
+            ['1', '2', '3', 'ss', 'ff'].forEach((linkType) => {
+                const plan = ganttLinkToRelation({
+                    sourceId: VALID_ID_A,
+                    targetId: VALID_ID_B,
+                    linkType,
+                });
+                expect(plan.valid).toBe(false);
+                expect(plan.reason).toMatch(/finish-to-start/i);
+            });
+        });
+    });
+
     describe('isClosedStatusType', () => {
 
         test('only "close" counts as closed', () => {

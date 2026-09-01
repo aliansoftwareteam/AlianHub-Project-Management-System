@@ -250,6 +250,21 @@ module.exports = {
                     }
                 }
 
+                if (String(newStatus.statusType || (newStatus.status && newStatus.status.type) || '') === 'close') {
+                    for (const task of tasks) {
+                        this.maybeSpawnNextOnComplete({
+                            companyId,
+                            task,
+                            prevStatusType: task.statusType || (task.status && task.status.type),
+                            nextStatusType: newStatus.statusType || (newStatus.status && newStatus.status.type),
+                            projectData: null,
+                            userData,
+                        }).catch((error) => {
+                            logger.error(`bulkUpdateStatus spawn ${task._id}: ${error.message}`);
+                        });
+                    }
+                }
+
                 emitBulkSummary('bulkUpdateStatus', { taskIds: updated, newStatus });
                 resolve(summarize({ updated, skipped, errors }));
             } catch (error) {

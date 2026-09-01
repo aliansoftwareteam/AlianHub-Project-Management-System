@@ -92,15 +92,54 @@ const selectOpenBlockers = (relationItems) =>
         !isClosedStatusType(item.task.statusType)
     );
 
+const GANTT_LINK_FINISH_TO_START = '0';
+
+const planFinishToStartAdd = ({ companyId, taskId, relatedTaskId }) => {
+    const check = validateRelationInput({
+        companyId,
+        taskId,
+        relatedTaskId,
+        type: RELATION_TYPES.BLOCKS,
+    });
+    if (!check.valid) {
+        return check;
+    }
+    return {
+        valid: true,
+        reason: '',
+        type: RELATION_TYPES.BLOCKS,
+        inverseType: RELATION_TYPES.BLOCKED_BY,
+        ganttLinkType: GANTT_LINK_FINISH_TO_START,
+        writes: [
+            { taskId, relatedTaskId, type: RELATION_TYPES.BLOCKS },
+            { taskId: relatedTaskId, relatedTaskId: taskId, type: RELATION_TYPES.BLOCKED_BY },
+        ],
+    };
+};
+
+const ganttLinkToRelation = ({ sourceId, targetId, linkType }) => {
+    if (String(linkType) !== GANTT_LINK_FINISH_TO_START) {
+        return { valid: false, reason: 'Only finish-to-start links are allowed.' };
+    }
+    return planFinishToStartAdd({
+        companyId: 'gantt',
+        taskId: sourceId,
+        relatedTaskId: targetId,
+    });
+};
+
 module.exports = {
     RELATION_TYPES,
     RELATION_TYPE_LIST,
     INVERSE_RELATION,
     RELATION_LABELS,
+    GANTT_LINK_FINISH_TO_START,
     isObjectIdString,
     isClosedStatusType,
     selectOpenBlockers,
     validateTaskRef,
     validateRelationPair,
     validateRelationInput,
+    planFinishToStartAdd,
+    ganttLinkToRelation,
 };
