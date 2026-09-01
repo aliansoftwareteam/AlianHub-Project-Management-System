@@ -11,7 +11,7 @@
             <h5 class="taf__heading">{{ $t('CustomField.autofill_preview') }}</h5>
             <p v-if="notice" class="taf__notice">{{ notice }}</p>
             <ul class="taf__list">
-                <li v-if="assigneeEmpty()" class="taf__item" data-taf-row="assignee">
+                <li class="taf__item" data-taf-row="assignee">
                     <label class="taf__pick">
                         <input
                             type="checkbox"
@@ -74,7 +74,7 @@ import { useToast } from 'vue-toast-notification';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useGetterFunctions } from '@/composable';
-import { firstId } from '@/utils/taskOpenProjectId';
+import { assigneeChipDisplayName, assigneeRailEmpty, coerceAssigneeChipId, firstId } from '@/utils/taskOpenProjectId';
 
 const OWNER_TITLE = /\bowner\b/i;
 const DUE_TITLE = /\b(due|deadline)\b/i;
@@ -90,7 +90,7 @@ const emit = defineEmits(['applied']);
 const { t } = useI18n();
 const $toast = useToast();
 const { getters, commit } = useStore();
-const { getUser } = useGetterFunctions();
+const { getUser, getTeam } = useGetterFunctions();
 const selectedProject = inject('selectedProject', null);
 
 const busy = ref(false);
@@ -152,25 +152,32 @@ function canWrite() {
 }
 
 function assigneeChipId(value) {
-    if (typeof value !== 'string') return '';
-    const id = value.trim();
-    if (!id || id === '0' || id.toLowerCase() === 'unassigned' || id === '[object Object]') return '';
-    return id;
+    return coerceAssigneeChipId(value);
+}
+
+function lookupAssigneeChip(id) {
+    if (!id) return null;
+    if (String(id).indexOf('tId_') === 0) {
+        try {
+            const team = getTeam(String(id).slice(4));
+            const title = String((team && team.name) || '').trim();
+            if (!team || !title) return { ghostUser: true };
+            return { Employee_Name: title, name: title, ghostUser: false };
+        } catch (_error) {
+            return { ghostUser: true };
+        }
+    }
+    return getUser(id);
 }
 
 function paintedAssigneeChips(raw) {
-    if (!Array.isArray(raw) || !raw.length) return [];
+    const list = Array.isArray(raw) ? raw : (raw == null || raw === '' ? [] : [raw]);
+    if (!list.length) return [];
     try {
-        return raw.map((value) => {
-            if (typeof value !== 'string') return null;
-            if (value.indexOf('tId_') === 0) return { id: value, title: 'team' };
-            const id = assigneeChipId(value);
-            if (!id) return null;
-            const user = getUser(id);
-            if (!user || user.ghostUser) return null;
-            const title = String(user.Employee_Name || user.name || '').trim();
-            if (!title || title.toLowerCase() === 'ghost user') return null;
-            return { id, title };
+        return list.map((value) => {
+            if (!namedAssigneeChip(value)) return null;
+            const title = assigneeChipDisplayName(value, lookupAssigneeChip);
+            return { id: assigneeChipId(value) || title, title };
         }).filter(Boolean);
     } catch (_error) {
         return [];
@@ -178,14 +185,13 @@ function paintedAssigneeChips(raw) {
 }
 
 function namedAssigneeChip(value) {
-    return paintedAssigneeChips([value]).length > 0;
+    return Boolean(assigneeChipDisplayName(value, lookupAssigneeChip));
 }
 
 function assigneeEmpty() {
-    const raw = props.task && props.task.AssigneeUserId;
-    if (!Array.isArray(raw) || !raw.length) return true;
     try {
-        return raw.filter(namedAssigneeChip).length === 0;
+        if (assigneeRailEmpty(props.task && props.task.AssigneeUserId, lookupAssigneeChip)) return true;
+        return paintedAssigneeChips(props.task && props.task.AssigneeUserId).length === 0;
     } catch (_error) {
         return true;
     }
@@ -374,7 +380,7 @@ const assigneeRow = computed(() => {
         display: suggestionLabel(assigneeItem),
         item: assigneeItem,
         checked: Boolean(assigneeItem) && isSelected('assignee'),
-        canApply: canWrite() && Boolean(assigneeItem),
+        canApply: canWrite() && Boolean(assigneeItem) && assigneeEmpty(),
         write: 'assignee',
     };
 });

@@ -244,15 +244,15 @@
                     :tone="surfaceKind === 'failed' ? 'copper' : 'pine'"
                     @action="retrySurface"
                 />
-                <div v-else class="itemSprintWrapper style-scroll-6-px" id="tasklist_driver">
+                <div v-else-if="surfaceKind === 'ready'" class="itemSprintWrapper style-scroll-6-px" id="tasklist_driver">
                     <template v-if="$route?.query?.tab !== 'Calendar'">
                         <ItemList
                             v-for="(item,index) in sprint.items"
                             :statusIndex="index"
                             :key="item.key"
                             :item="item"
-                            :sprintId="sprint?.id"
-                            :projectId="project._id"
+                            :sprintId="sprintSid"
+                            :projectId="sprintPid"
                             :groupType="groupType"
                             :commonDateFormatForDate="commonDateFormatForDate"
                             @toggle="item.isExpanded = !item.isExpanded"
@@ -336,7 +336,7 @@ import * as env from '@/config/env';
 import { useStore } from 'vuex';
 import { useRoute } from 'vue-router';
 import { apiRequest } from '../../../services'
-import { boardHoursVisible, sprintTasksBucket } from '@/utils/taskOpenProjectId';
+import { boardHoursVisible, countPaintedSprintTasks, firstId, sprintExpectedCount, sprintSurfaceKind, sprintTasksBucket, sprintTreeExpectedCount } from '@/utils/taskOpenProjectId';
 import { useAiApiFunction } from "@/composable/aiHelper";
 import taskClass from "@/utils/TaskOperations"
 import { useI18n } from "vue-i18n";
@@ -404,12 +404,28 @@ const props = defineProps({
     calendarDate: Number
 })
 
+const sprintSid = computed(() => firstId(props.sprint?.id, props.sprint?._id));
+const sprintPid = computed(() => firstId(project.value?._id, project.value?.id));
+const localPainted = computed(() => {
+    const bucket = sprintTasksBucket(getters['projectData/tasks'], sprintPid.value, sprintSid.value);
+    return countPaintedSprintTasks(props.sprint?.items, bucket && bucket.tasks);
+});
+const localExpected = computed(() => Math.max(
+    sprintExpectedCount(props.sprint),
+    sprintTreeExpectedCount(project.value, sprintSid.value),
+    Number(unref(boardExpectedCount)) || 0,
+));
+
 const sprintHours = ref({ plannedMinutes: 0, loggedMinutes: 0, overdueMinutes: 0 });
 const hoursFetched = ref(false);
 const currentCompanyForHours = computed(() => getters["settings/selectedCompany"]);
-const surfaceKind = computed(() => unref(boardSurfaceKind));
+const surfaceKind = computed(() => sprintSurfaceKind({
+    injected: unref(boardSurfaceKind),
+    paintedCount: localPainted.value,
+    sidebarCount: localExpected.value,
+}));
 const surfaceExpected = computed(() => {
-    const n = Number(unref(boardExpectedCount));
+    const n = localExpected.value;
     return Number.isFinite(n) ? n : 0;
 });
 const showSprintHours = computed(() => boardHoursVisible(surfaceKind.value)
@@ -425,8 +441,8 @@ const hoursLabel = (minutes) => {
 };
 
 const loadSprintHours = () => {
-    if (!showSprintHours.value || !props.sprint?.id) return;
-    apiRequest("post", `${env.SPRINT_HOURS}`, { sprintId: props.sprint.id })
+    if (!showSprintHours.value || !sprintSid.value) return;
+    apiRequest("post", `${env.SPRINT_HOURS}`, { sprintId: sprintSid.value })
         .then((res) => {
             const d = res?.data?.data;
             if (d) sprintHours.value = d;
@@ -442,7 +458,7 @@ const refreshSprintHours = () => {
     clearTimeout(hoursTimer);
     hoursTimer = setTimeout(loadSprintHours, 600);
 };
-watch(() => sprintTasksBucket(getters["projectData/tasks"], project.value?._id, props.sprint?.id)?.tasks,
+watch(() => sprintTasksBucket(getters["projectData/tasks"], sprintPid.value, sprintSid.value)?.tasks,
     refreshSprintHours, { deep: true });
 watch(surfaceKind, (kind) => {
     if (kind === 'loading' || kind === 'failed') {

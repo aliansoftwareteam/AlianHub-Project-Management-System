@@ -35,6 +35,10 @@ const {
     bindSprintTaskSource,
     countPaintedTaskRows,
     boardHoursVisible,
+    sprintSurfaceKind,
+    coerceAssigneeChipId,
+    assigneeChipDisplayName,
+    assigneeRailEmpty,
 } = require('../Modules/Project/helpers/taskOpenProjectId');
 
 describe('TASK OPEN - pass ProjectID so taskData is not empty', () => {
@@ -476,6 +480,19 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 7, expectedCount: 7, hasGroups: true })).toBe('ready');
         expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 0, expectedCount: 0, storedCount: 7, hasGroups: true })).toBe('failed');
         expect(boardEmptyKind({ loading: false, sprintsBound: true, boardCount: 0, expectedCount: 0, storedCount: 0, hasGroups: true })).toBe('empty');
+        expect(sprintSurfaceKind({ injected: 'ready', paintedCount: 0, sidebarCount: 7 })).toBe('failed');
+        expect(sprintSurfaceKind({ injected: 'ready', paintedCount: 7, sidebarCount: 7 })).toBe('ready');
+        expect(sprintSurfaceKind({ injected: 'loading', paintedCount: 0, sidebarCount: 7 })).toBe('loading');
+        expect(sprintSurfaceKind({ injected: 'ready', paintedCount: 0, sidebarCount: 0 })).toBe('empty');
+        expect(coerceAssigneeChipId({ userId: 'u-ada' })).toBe('u-ada');
+        expect(coerceAssigneeChipId('  ')).toBe('');
+        expect(assigneeChipDisplayName('u-ada', () => ({ Employee_Name: 'Ada Lovelace' }))).toBe('Ada Lovelace');
+        expect(assigneeChipDisplayName('u-ghost', () => ({ Employee_Name: 'Ghost User', ghostUser: true }))).toBe('');
+        expect(assigneeChipDisplayName({ userId: 'u-ada' }, () => ({ Employee_Name: 'Ada Lovelace' }))).toBe('');
+        expect(assigneeRailEmpty(['u-ada'], () => ({ Employee_Name: 'Ada Lovelace' }))).toBe(false);
+        expect(assigneeRailEmpty([{ userId: 'u-ada' }], () => ({ Employee_Name: 'Ada Lovelace' }))).toBe(true);
+        expect(assigneeRailEmpty(['tId_missing'], () => null)).toBe(true);
+        expect(assigneeRailEmpty(['  unassigned  '], () => ({ Employee_Name: 'Ada' }))).toBe(true);
         expect(sprintTreeExpectedCount({
             sprintsObj: { [SPRINT]: { id: SPRINT, tasks: 7 } },
         }, SPRINT)).toBe(7);
@@ -570,6 +587,15 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(sprintsList).toContain("surfaceKind === 'failed'");
         expect(sprintsList).toContain('EmptyState.load_failed_title');
         expect(sprintsList).toContain('retrySurface');
+        expect(sprintsList).toContain('retrySurface');
+        expect(sprintsList).toContain('sprintSurfaceKind');
+        expect(sprintsList).toContain('sprintSid');
+        expect(sprintsList).toContain('localPainted');
+        expect(sprintsList).toContain('localExpected');
+        expect(sprintsList).toContain("surfaceKind === 'ready'");
+        expect(sprintsList).toContain('countPaintedSprintTasks');
+        expect(sprintsList).toContain('sprintTreeExpectedCount');
+        expect(itemList).toContain('props.sprintObject && (props.sprintObject.id || props.sprintObject._id)');
         const empty = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'atom', 'EmptyState', 'EmptyState.vue'), 'utf8');
         expect(empty).toContain('@mousedown.stop.prevent="onActionPointer"');
         expect(empty).toContain('@click.stop.prevent="onActionClick"');

@@ -351,8 +351,8 @@ const {updateTaskByGroup} = useUpdateTasks();
 const isLoading = ref(false);
 const sprintBucket = computed(() => sprintTasksBucket(
     getters['projectData/tasks'],
-    firstId(props.projectId),
-    firstId(props.sprintId),
+    firstId(props.projectId, props.project && (props.project._id || props.project.id)),
+    firstId(props.sprintId, props.sprintObject && (props.sprintObject.id || props.sprintObject._id)),
 ));
 const searchMode = computed(() => Boolean(unref(searchedTask)));
 const visibleTaskRows = computed(() => {

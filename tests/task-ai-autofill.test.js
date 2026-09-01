@@ -469,8 +469,10 @@ describe('TASKS - AI autofill custom fields', () => {
         expect(card).toContain('autofill_no_suggestion');
         expect(card).toContain('suggestionLabel');
         expect(card).toContain('assigneeEmpty()');
-        expect(card).toContain('v-if="assigneeEmpty()"');
         expect(card).toContain('data-taf-row="assignee"');
+        expect(card).toContain('assigneeRailEmpty');
+        expect(card).toContain('assigneeChipDisplayName');
+        expect(card).toContain('coerceAssigneeChipId');
         expect(card).toContain('assigneeRow');
         expect(card).toContain('assigneeTitle');
         expect(card).toContain("'Assignee'");
@@ -478,8 +480,8 @@ describe('TASKS - AI autofill custom fields', () => {
         expect(card).toContain('paintedAssigneeChips');
         expect(card).toContain('otherRows');
         expect(card).toContain('namedAssigneeChip');
+        expect(card).toContain('assigneeRailEmpty');
         expect(card).toContain('seedPerson');
-        expect(card).toContain('!Array.isArray(raw)');
         expect(card).toContain("t('ProjectDetails.assignee')");
         expect(card).toContain('next.unshift(seed)');
         expect(card).toContain("getters['users/users']");

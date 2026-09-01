@@ -411,6 +411,54 @@ function boardEmptyKind({ loading, sprintsBound, boardCount, expectedCount, sear
     return 'empty';
 }
 
+function sprintSurfaceKind({ loading, injected, paintedCount, sidebarCount } = {}) {
+    if (loading || injected === 'loading') return 'loading';
+    const painted = Number(paintedCount) || 0;
+    if (painted > 0) return 'ready';
+    const sidebar = Number(sidebarCount) || 0;
+    if (sidebar > 0) return 'failed';
+    if (injected === 'failed') return 'failed';
+    return 'empty';
+}
+
+const PLACEHOLDER_CHIP_NAMES = new Set(['', 'ghost user', 'n/a', 'unassigned', 'un-assigned', 'none', '—', '-']);
+
+function coerceAssigneeChipId(value) {
+    if (value == null || value === false) return '';
+    if (typeof value === 'number' && Number.isFinite(value) && value !== 0) return String(value);
+    if (typeof value === 'string') {
+        const id = value.trim();
+        if (!id || id === '0' || PLACEHOLDER_CHIP_NAMES.has(id.toLowerCase()) || id === '[object Object]') return '';
+        return id;
+    }
+    if (typeof value === 'object') {
+        return firstId(value.userId, value._id, value.id, value);
+    }
+    return '';
+}
+
+function assigneeChipDisplayName(chip, lookup) {
+    if (typeof chip !== 'string') return '';
+    const id = coerceAssigneeChipId(chip);
+    if (!id) return '';
+    if (typeof lookup !== 'function') return '';
+    try {
+        const user = lookup(id);
+        if (!user || user.ghostUser) return '';
+        const title = String(user.Employee_Name || user.name || user.title || '').trim();
+        if (!title || PLACEHOLDER_CHIP_NAMES.has(title.toLowerCase())) return '';
+        return title;
+    } catch (_error) {
+        return '';
+    }
+}
+
+function assigneeRailEmpty(raw, lookup) {
+    const list = Array.isArray(raw) ? raw : (raw == null || raw === '' ? [] : [raw]);
+    if (!list.length) return true;
+    return list.every((entry) => !assigneeChipDisplayName(entry, lookup));
+}
+
 module.exports = {
     firstId,
     injectedId,
@@ -447,4 +495,8 @@ module.exports = {
     sprintExpectedCount,
     boardHoursVisible,
     boardEmptyKind,
+    sprintSurfaceKind,
+    coerceAssigneeChipId,
+    assigneeChipDisplayName,
+    assigneeRailEmpty,
 };
