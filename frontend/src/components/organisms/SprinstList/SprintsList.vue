@@ -234,6 +234,7 @@
                 </div>
                 <span v-if="isError" class="red">{{$t('Toast.something_went_wrong')}}</span>
                 <div
+                    ref="loadStripEl"
                     v-show="surfaceKind === 'loading'"
                     class="board-load-strip"
                     :data-board-loading="surfaceKind === 'loading' ? '1' : undefined"
@@ -319,7 +320,7 @@
 
 <script setup>
 // PACKAGES
-import { computed, defineComponent, defineEmits, defineProps, flushSync, inject, onMounted, onUnmounted, ref, unref, watch} from 'vue';
+import { computed, defineComponent, defineEmits, defineProps, inject, onMounted, onUnmounted, ref, unref, watch} from 'vue';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { useToast } from 'vue-toast-notification';
 
@@ -434,8 +435,24 @@ function onItemVisible(key, count) {
 const listVisible = computed(() => Object.values(reportedVisible.value).reduce((sum, n) => sum + (Number(n) || 0), 0));
 const paintedForKind = computed(() => listVisible.value);
 const BOARD_RETRY_HOLD_MS = 2000;
+const loadStripEl = ref(null);
 let retryHoldTimer = null;
 const retryStartedAt = ref(0);
+function paintLoadingNow() {
+    surfaceRetrying.value = true;
+    reportedVisible.value = {};
+    const strip = loadStripEl.value
+        || (typeof document !== 'undefined' && document.querySelector('.board-load-strip'));
+    if (strip && strip.style) {
+        strip.style.display = 'block';
+        strip.setAttribute('data-board-loading', '1');
+    }
+    const host = strip && strip.parentElement;
+    const fail = host && host.querySelector
+        ? host.querySelector('.empty-state--copper')
+        : (typeof document !== 'undefined' && document.querySelector('.empty-state--copper'));
+    if (fail && fail.style) fail.style.display = 'none';
+}
 function paintRetryFrame() {
     return new Promise((resolve) => {
         if (typeof requestAnimationFrame === 'function') {
@@ -491,22 +508,23 @@ function onRetryPointer(event) {
 function retrySurface() {
     if (surfaceRetrying.value) return;
     if (surfaceKind.value === 'failed') {
-        if (typeof document !== 'undefined' && document.dispatchEvent) {
-            document.dispatchEvent(new CustomEvent('kiln-dismiss-dropdown'));
+        try {
+            if (typeof document !== 'undefined' && document.dispatchEvent) {
+                document.dispatchEvent(new CustomEvent('kiln-dismiss-dropdown'));
+            }
+            paintLoadingNow();
+            retryStartedAt.value = Date.now();
+            if (typeof onBoardSurfaceAction === 'function') onBoardSurfaceAction('retry');
+            paintRetryFrame().then(() => {
+                const wait = Math.max(0, BOARD_RETRY_HOLD_MS - (Date.now() - retryStartedAt.value));
+                clearTimeout(retryHoldTimer);
+                retryHoldTimer = setTimeout(() => {
+                    if (unref(boardSurfaceKind) !== 'loading') surfaceRetrying.value = false;
+                }, wait);
+            });
+        } catch (error) {
+            console.error('ERROR retrying board surface: ', error);
         }
-        flushSync(() => {
-            surfaceRetrying.value = true;
-            reportedVisible.value = {};
-        });
-        retryStartedAt.value = Date.now();
-        if (typeof onBoardSurfaceAction === 'function') onBoardSurfaceAction('retry');
-        paintRetryFrame().then(() => {
-            const wait = Math.max(0, BOARD_RETRY_HOLD_MS - (Date.now() - retryStartedAt.value));
-            clearTimeout(retryHoldTimer);
-            retryHoldTimer = setTimeout(() => {
-                if (unref(boardSurfaceKind) !== 'loading') surfaceRetrying.value = false;
-            }, wait);
-        });
         return;
     }
     if (typeof onBoardSurfaceAction === 'function') onBoardSurfaceAction('create');

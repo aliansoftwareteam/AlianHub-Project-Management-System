@@ -561,7 +561,7 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(list).toContain('setSprintBoardTasks');
         expect(list).toContain('BOARD_RETRY_HOLD_MS');
         expect(list).toContain('BOARD_RETRY_HOLD_MS = 2000');
-        expect(list).toContain('flushSync');
+        expect(list).not.toContain('flushSync');
         expect(list).toContain('fromGroups');
         expect(list).toContain('lastSearchTasks');
         expect(list).toContain('paintRetryFrame');
@@ -652,7 +652,9 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(sprintsList).toContain('releaseRetryHold');
         expect(sprintsList).toContain('BOARD_RETRY_HOLD_MS');
         expect(sprintsList).toContain('BOARD_RETRY_HOLD_MS = 2000');
-        expect(sprintsList).toContain('flushSync');
+        expect(sprintsList).not.toContain('flushSync');
+        expect(sprintsList).toContain('paintLoadingNow');
+        expect(sprintsList).toContain("strip.style.display = 'block'");
         expect(sprintsList).toContain('eventHitsRetry');
         expect(sprintsList).toContain('onRetryPointer');
         expect(sprintsList).toContain('getBoundingClientRect');

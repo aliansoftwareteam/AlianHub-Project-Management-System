@@ -39,7 +39,7 @@
 <script setup>
 // PACKAGES
 import { ref, defineProps, defineEmits, nextTick, inject, watch, 
-    onMounted, computed, provide, flushSync
+    onMounted, computed, provide
 } from 'vue';
 import { useStore } from 'vuex';
 import { useRoute } from 'vue-router';
@@ -204,10 +204,8 @@ function onEmptyAction(mode) {
             row && !row.deletedStatusKey && firstId(row.sprintId, row.SprintId) === sid
         )),
     );
-    flushSync(() => {
-        retrying.value = true;
-        isLoading.value = true;
-    });
+    retrying.value = true;
+    isLoading.value = true;
     const paintedAt = Date.now();
     const holdAfterPaint = () => {
         const wait = Math.max(0, BOARD_RETRY_HOLD_MS - (Date.now() - paintedAt));
