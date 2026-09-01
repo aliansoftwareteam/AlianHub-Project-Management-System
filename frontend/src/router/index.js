@@ -17,6 +17,7 @@ import pages from './pages';
 import { useCustomComposable } from '@/composable'
 import dashboard from "../plugins/dashboard/router";
 import { apiRequestWithoutCompnay } from '@/services'
+import { resolvePageDeepLink } from './pages/resolvePageDeepLink'
 import * as env from '@/config/env';
 import Cookies from 'js-cookie'
 
@@ -130,6 +131,11 @@ router.beforeEach(async(to, _, next) => {
 			}
 			return;
 		} else {
+			const pageDest = await resolvePageDeepLink(to);
+			if (pageDest) {
+				next(pageDest);
+				return;
+			}
 			next();
 			return;
 		}

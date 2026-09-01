@@ -45,6 +45,7 @@ import * as env from '@/config/env';
 import { buildFilterQuery } from '@/composable/commonFunction';
 import CardSkeleton from '@/components/atom/CardSkeleton/CardSkeleton.vue';
 import TaskDetail from '@/views/TaskDetail/TaskDetail.vue';
+import { resolveTaskOpenIds } from '@/utils/taskOpenProjectId';
 import { useI18n } from 'vue-i18n';
 
 const { t: translate } = useI18n();
@@ -104,10 +105,11 @@ const detailProjectId = ref('');
 const detailSprintId = ref('');
 const detailTaskId = ref('');
 function openTaskDetail(r) {
-    if (!r || !r.taskId || !r.projectId) return;
-    detailProjectId.value = r.projectId;
-    detailSprintId.value = r.sprintId || '';
-    detailTaskId.value = r.taskId;
+    const ids = resolveTaskOpenIds(r);
+    if (!ids.taskId) return;
+    detailProjectId.value = ids.projectId;
+    detailSprintId.value = ids.sprintId;
+    detailTaskId.value = ids.taskId;
     isTaskDetail.value = true;
 }
 function toggleTaskDetail(_task, close = false) {

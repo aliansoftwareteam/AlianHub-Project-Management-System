@@ -9,6 +9,19 @@
     padding-bottom: 9px;
     align-items: center;
 }
+.assignee-autofill-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+.cf-autofill-mark {
+    width: 6px;
+    height: 6px;
+    background: var(--kiln-ember, #c45c26);
+    border-radius: 1px;
+    flex: 0 0 auto;
+}
 .task-detail-right-side-label h4{
     padding: 0px;
     margin: 0px;

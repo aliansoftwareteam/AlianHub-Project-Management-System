@@ -53,6 +53,7 @@
                 <h4>{{$t('ProjectDetails.assignee')}}</h4>
                 <Skelaton v-if="task?.AssigneeUserId?.length <= 0 && isMainSpinner" style="height: 30px;" class="w-30px border-radius-50-per"/>
                 <template v-else>
+                    <span class="assignee-autofill-wrap">
                     <Assignee
                         v-if="checkPermission('task.task_assignee',project?.isGlobalPermission) === true && checkPermission('task.task_list',project?.isGlobalPermission) == true"
                         class="taskdetail-label task-detail-right-wrapper ml-5px"
@@ -82,6 +83,8 @@
                         :isDisplayTeam="true"
                         :multiSelect="checkApps('MultipleAssignees')"
                     />
+                    <span v-if="isAssigneeAutofilled" class="cf-autofill-mark" aria-hidden="true"></span>
+                    </span>
                 </template>
             </div>
             <div class="d-flex task-detail-right-side-label">
@@ -179,6 +182,7 @@
                 <h4>{{$t('Projects.due_date')}}</h4>
                 <Skelaton v-if="!task?.DueDate && isMainSpinner" style="height: 36px;" class="w-100px border-radius-7-px"/>
                 <template v-else>
+                    <span class="assignee-autofill-wrap">
                     <DueDateCompo
                         id="due-date-task"
                         class="taskdetail-label task-detail-right-wrapper"
@@ -193,6 +197,8 @@
                         <span v-if="task.DueDate">{{convertDateFormat(task.DueDate,'',{showDayName:false})}}</span>
                         <span v-else>{{$t('ProjectDetails.no_due_date')}}</span>
                     </template>
+                    <span v-if="isDueAutofilled" class="cf-autofill-mark" aria-hidden="true"></span>
+                    </span>
                 </template>
             </div>
              <div class="d-flex task-detail-right-side-label" v-if="checkApps('TimeEstimates') && checkPermission('task.task_estimated_hours',project?.isGlobalPermission) !== null">
@@ -356,6 +362,14 @@ const props = defineProps({
 
 // Only assignees of the task can start tracking it.
 const isAssignee = computed(() => (props.task?.AssigneeUserId || []).includes(userId.value));
+const isAssigneeAutofilled = computed(() => {
+    const marks = Array.isArray(props.task && props.task._autofilledFields) ? props.task._autofilledFields : [];
+    return marks.map(String).includes('assignee');
+});
+const isDueAutofilled = computed(() => {
+    const marks = Array.isArray(props.task && props.task._autofilledFields) ? props.task._autofilledFields : [];
+    return marks.map(String).includes('due');
+});
 
 // Only OPEN tasks can be tracked — hide "Start Tracker" on completed/closed
 // tasks. A task is completed when its status type is 'close' (the same rule the

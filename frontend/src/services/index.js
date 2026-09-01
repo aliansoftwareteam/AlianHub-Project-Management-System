@@ -17,14 +17,16 @@ export const axiosInstanceWithoutSecureWithFormData = axios.create({ baseURL: ap
 
 axiosInstance.interceptors.request.use((req) => {
     const token = Cookies.get('accessToken') || '';
-    const companyId = localStorage.getItem('selectedCompany') || "";
-    const headers = {
+    const incoming = req.headers || {};
+    const existing = incoming.companyId || incoming.companyid
+        || (typeof incoming.get === 'function' && (incoming.get('companyId') || incoming.get('companyid')));
+    const companyId = existing || localStorage.getItem('selectedCompany') || "";
+    req.headers = {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + token,
         'companyId': companyId
     }
-    req.headers = headers;
     return req;
 }, error => {
     return Promise.reject(error);

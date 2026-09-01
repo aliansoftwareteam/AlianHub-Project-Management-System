@@ -61,6 +61,7 @@ import { useRouter } from 'vue-router';
 import { useCustomComposable } from '@/composable';
 import { apiRequest, apiRequestWithoutCompnay } from '@/services';
 import { useGetterFunctions } from "@/composable/index.js";
+import { resolveTaskOpenIds } from '@/utils/taskOpenProjectId';
 import TaskDetail from '@/views/TaskDetail/TaskDetail.vue';
 import ConfirmModal from '@/components/atom/Modal/Modal.vue';
 import { defineComponent ,ref,inject,computed,onMounted,provide, nextTick} from "vue";
@@ -123,9 +124,11 @@ const toggleTaskDetail = (task,close=false,isComment = false) => {
     })
 }
 const openInNewTab = (task) => {
-    projectId.value = task.ProjectID
-    sprintId.value = task.sprintId
-    taskId.value = task._id
+    const ids = resolveTaskOpenIds(task);
+    if (!ids.taskId) return;
+    projectId.value = ids.projectId;
+    sprintId.value = ids.sprintId;
+    taskId.value = ids.taskId;
     isTaskDetail.value = true;
 };
 

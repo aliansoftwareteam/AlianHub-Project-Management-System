@@ -2,12 +2,30 @@
 
 const AUTOFILL_ACTIONS = ['preview', 'apply'];
 const NATIVE_ASSIGNEE_ID = 'assignee';
+const NATIVE_DUE_ID = 'due';
 const SUMMARY_TYPES = new Set(['text', 'textarea']);
 const DATE_TYPES = new Set(['date']);
 const TAG_TYPES = new Set(['dropdown']);
 const OWNER_TITLE = /\b(owner|assignee|people|person|lead)\b/i;
+const DUE_TITLE = /\b(due|deadline)\b/i;
 const ISO_DATE = /\b(20\d{2}-\d{2}-\d{2})\b/;
+const DATE_PLACEHOLDER = /^(dd|mm|yyyy)([/.-])(dd|mm|yyyy)\2(dd|mm|yyyy)$/i;
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
+const MONTH_INDEX = {
+    jan: 0, january: 0,
+    feb: 1, february: 1,
+    mar: 2, march: 2,
+    apr: 3, april: 3,
+    may: 4,
+    jun: 5, june: 5,
+    jul: 6, july: 6,
+    aug: 7, august: 7,
+    sep: 8, sept: 8, september: 8,
+    oct: 9, october: 9,
+    nov: 10, november: 10,
+    dec: 11, december: 11,
+};
+const MONTH_NAME = 'Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?';
 
 const TITLE_CAP = 400;
 const TEXT_CAP = 2400;
@@ -17,8 +35,24 @@ const PAGE_CAP = 4;
 
 function recordId(row) {
     if (row == null) return '';
-    if (typeof row === 'string' || typeof row === 'number') return String(row).trim();
-    return String(row._id || row.id || '').trim();
+    if (typeof row === 'string' || typeof row === 'number') {
+        const raw = String(row).trim();
+        return raw === '[object Object]' ? '' : raw;
+    }
+    if (typeof row.toHexString === 'function') {
+        const hex = String(row.toHexString()).trim();
+        if (OBJECT_ID.test(hex)) return hex;
+    }
+    const nested = row._id || row.id;
+    if (nested && nested !== row) {
+        const inner = recordId(nested);
+        if (inner) return inner;
+    }
+    if (typeof row.toString === 'function') {
+        const asString = String(row.toString()).trim();
+        if (OBJECT_ID.test(asString)) return asString;
+    }
+    return '';
 }
 
 function clamp(value, cap) {
@@ -53,6 +87,9 @@ function kindForField(field) {
     const type = String((field && field.fieldType) || '').toLowerCase();
     if (SUMMARY_TYPES.has(type)) return 'summary';
     if (DATE_TYPES.has(type)) return 'date';
+    if (type === 'people' || type === 'person') {
+        return OWNER_TITLE.test(String((field && field.fieldTitle) || '')) ? 'owner' : null;
+    }
     if (TAG_TYPES.has(type)) {
         return OWNER_TITLE.test(String((field && field.fieldTitle) || '')) ? 'owner' : 'tag';
     }
@@ -65,11 +102,31 @@ function customFieldEntry(task, fieldId) {
     return bag[fieldId] || bag[String(fieldId)] || null;
 }
 
+function utcDate(year, month, day) {
+    const date = new Date(Date.UTC(year, month, day));
+    if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month || date.getUTCDate() !== day) return null;
+    return date;
+}
+
 function isEmptyValue(value) {
     if (value == null) return true;
+    if (typeof value === 'number') return !Number.isFinite(value) || value <= 0;
     if (Array.isArray(value)) return value.filter((item) => item !== '' && item != null).length === 0;
-    if (typeof value === 'string') return !value.trim();
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) return true;
+        if (DATE_PLACEHOLDER.test(trimmed)) return true;
+        if (trimmed.toLowerCase() === 'invalid date') return true;
+        return false;
+    }
     if (value instanceof Date) return Number.isNaN(value.getTime());
+    if (typeof value === 'object') {
+        if (Object.prototype.hasOwnProperty.call(value, 'fieldValue')) return isEmptyValue(value.fieldValue);
+        if (Object.prototype.hasOwnProperty.call(value, 'date')) return isEmptyValue(value.date);
+        if (Object.prototype.hasOwnProperty.call(value, 'seconds')) return !Number(value.seconds);
+        if (Object.prototype.hasOwnProperty.call(value, '$date')) return isEmptyValue(value.$date);
+        return Object.keys(value).length === 0;
+    }
     return false;
 }
 
@@ -79,9 +136,21 @@ function isCustomFieldEmpty(task, field) {
     return isEmptyValue(entry && Object.prototype.hasOwnProperty.call(entry, 'fieldValue') ? entry.fieldValue : undefined);
 }
 
-function isAssigneeEmpty(task) {
-    const ids = task && Array.isArray(task.AssigneeUserId) ? task.AssigneeUserId : [];
-    return ids.map(recordId).filter(Boolean).length === 0;
+function isAssigneeEmpty(task, people) {
+    const raw = task && task.AssigneeUserId;
+    if (!Array.isArray(raw)) return true;
+    const ids = raw
+        .filter((item) => typeof item === 'string' || typeof item === 'number')
+        .map(recordId)
+        .filter((id) => id && id !== '0' && id.toLowerCase() !== 'unassigned');
+    if (!ids.length) return true;
+    const allowed = normalizePeople(people);
+    if (!allowed.length) return true;
+    return !ids.some((id) => allowed.some((person) => person.id === id));
+}
+
+function isDueDateEmpty(task) {
+    return isEmptyValue(task && task.DueDate);
 }
 
 function fieldAppliesToTask(field, task) {
@@ -186,13 +255,22 @@ function listEmptyTargets({ task, fields, people, permissions }) {
         }
     }
 
-    if (gate.assignee && isAssigneeEmpty(task)) {
+    if (gate.assignee && isAssigneeEmpty(task, allowedPeople)) {
         targets.push({
             fieldId: NATIVE_ASSIGNEE_ID,
             kind: 'owner',
             source: 'native',
             title: 'Assignee',
             people: allowedPeople,
+        });
+    }
+
+    if (gate.customField && isDueDateEmpty(task) && !targets.some((row) => row.kind === 'date')) {
+        targets.push({
+            fieldId: NATIVE_DUE_ID,
+            kind: 'date',
+            source: 'native',
+            title: 'Due Date',
         });
     }
 
@@ -204,13 +282,68 @@ function parseDateValue(value) {
         return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
     }
     const raw = String(value || '').trim();
+    if (!raw || DATE_PLACEHOLDER.test(raw)) return null;
     const iso = raw.match(ISO_DATE);
     const stamp = iso ? iso[1] : '';
-    if (!stamp) return null;
-    const [year, month, day] = stamp.split('-').map(Number);
-    const date = new Date(Date.UTC(year, month - 1, day));
-    if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
-    return date;
+    if (stamp) {
+        const [year, month, day] = stamp.split('-').map(Number);
+        return utcDate(year, month - 1, day);
+    }
+    const slash = raw.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](20\d{2})$/);
+    if (slash) {
+        const a = Number(slash[1]);
+        const b = Number(slash[2]);
+        const year = Number(slash[3]);
+        if (a > 12) return utcDate(year, b - 1, a);
+        if (b > 12) return utcDate(year, a - 1, b);
+        return utcDate(year, b - 1, a);
+    }
+    return null;
+}
+
+function pushStamp(stamps, date) {
+    if (date) stamps.push(date);
+}
+
+function extractDateStamps(text) {
+    const raw = String(text || '');
+    const stamps = [];
+    const isoRe = /\b(20\d{2}-\d{2}-\d{2})\b/g;
+    let match;
+    while ((match = isoRe.exec(raw))) {
+        pushStamp(stamps, parseDateValue(match[1]));
+    }
+    const rangeRe = new RegExp(`\\b(\\d{1,2})\\s*[-–]\\s*(\\d{1,2})\\s+(${MONTH_NAME})\\.?\\s+(20\\d{2})\\b`, 'gi');
+    while ((match = rangeRe.exec(raw))) {
+        const month = MONTH_INDEX[String(match[3] || '').slice(0, 3).toLowerCase()];
+        if (month == null) continue;
+        pushStamp(stamps, utcDate(Number(match[4]), month, Number(match[2])));
+    }
+    const dayMonthRe = new RegExp(`\\b(\\d{1,2})\\s+(${MONTH_NAME})\\.?\\s+(20\\d{2})\\b`, 'gi');
+    while ((match = dayMonthRe.exec(raw))) {
+        const month = MONTH_INDEX[String(match[2] || '').slice(0, 3).toLowerCase()];
+        if (month == null) continue;
+        pushStamp(stamps, utcDate(Number(match[3]), month, Number(match[1])));
+    }
+    const monthDayRe = new RegExp(`\\b(${MONTH_NAME})\\.?\\s+(\\d{1,2}),?\\s+(20\\d{2})\\b`, 'gi');
+    while ((match = monthDayRe.exec(raw))) {
+        const month = MONTH_INDEX[String(match[1] || '').slice(0, 3).toLowerCase()];
+        if (month == null) continue;
+        pushStamp(stamps, utcDate(Number(match[3]), month, Number(match[2])));
+    }
+    const slashRe = /\b(\d{1,2})[/.-](\d{1,2})[/.-](20\d{2})\b/g;
+    while ((match = slashRe.exec(raw))) {
+        pushStamp(stamps, parseDateValue(match[0]));
+    }
+    return stamps;
+}
+
+function pickDueDate(text, fieldPastFuture) {
+    const stamps = extractDateStamps(text);
+    for (let i = stamps.length - 1; i >= 0; i -= 1) {
+        if (dateAllowed(stamps[i], fieldPastFuture)) return stamps[i];
+    }
+    return null;
 }
 
 function dateAllowed(date, fieldPastFuture) {
@@ -261,14 +394,34 @@ function pageTexts(pages) {
     })).filter((row) => row.id);
 }
 
-function suggestionHaystack({ title, description, comments, pages }) {
-    const commentsText = (comments || []).map((row) => row.message || stripHtml(row)).join(' ');
-    const pagesText = (pages || []).map((row) => `${row.title || ''} ${row.text || ''}`).join(' ');
-    return `${title || ''} ${description || ''} ${commentsText} ${pagesText}`.toLowerCase();
+function sprintDueStamp(task, sprint) {
+    const end = sprint && (sprint.endDate || sprint.EndDate || sprint.end);
+    const fromEnd = parseDateValue(end);
+    if (fromEnd) return fromEnd;
+    const name = String(
+        (sprint && (sprint.name || sprint.sprintName))
+        || (task && (task.sprintName || (task.sprintArray && task.sprintArray.name)))
+        || '',
+    );
+    const stamps = extractDateStamps(name);
+    return stamps.length ? stamps[stamps.length - 1] : null;
 }
 
-function heuristicSuggestions({ targets, people, title, description, comments, pages }) {
-    const haystack = suggestionHaystack({ title, description, comments, pages });
+function suggestionHaystack({ title, description, comments, pages, task, sprint }) {
+    const commentsText = (comments || []).map((row) => row.message || stripHtml(row)).join(' ');
+    const pagesText = (pages || []).map((row) => `${row.title || ''} ${row.text || ''}`).join(' ');
+    const sprintName = String(
+        (sprint && (sprint.name || sprint.sprintName))
+        || (task && (task.sprintName || (task.sprintArray && task.sprintArray.name)))
+        || '',
+    );
+    const due = sprintDueStamp(task, sprint);
+    const sprintEnd = due ? due.toISOString().slice(0, 10) : '';
+    return `${title || ''} ${sprintName} ${sprintEnd} ${description || ''} ${commentsText} ${pagesText}`.toLowerCase();
+}
+
+function heuristicSuggestions({ targets, people, title, description, comments, pages, task, sprint }) {
+    const haystack = suggestionHaystack({ title, description, comments, pages, task, sprint });
     const allowedPeople = normalizePeople(people);
     const suggestions = [];
     for (const target of targets || []) {
@@ -278,8 +431,11 @@ function heuristicSuggestions({ targets, people, title, description, comments, p
             continue;
         }
         if (target.kind === 'date') {
-            const match = `${description || ''} ${title || ''} ${haystack}`.match(ISO_DATE);
-            if (match) suggestions.push({ fieldId: target.fieldId, kind: 'date', value: match[1] });
+            let stamp = pickDueDate(`${description || ''} ${title || ''} ${haystack}`, target.fieldPastFuture);
+            if (!stamp) stamp = sprintDueStamp(task, sprint);
+            if (stamp && dateAllowed(stamp, target.fieldPastFuture)) {
+                suggestions.push({ fieldId: target.fieldId, kind: 'date', value: stamp.toISOString().slice(0, 10) });
+            }
             continue;
         }
         if (target.kind === 'tag') {
@@ -289,8 +445,11 @@ function heuristicSuggestions({ targets, people, title, description, comments, p
         }
         if (target.kind === 'owner') {
             const mentioned = allowedPeople.find((person) => person.name && haystack.includes(person.name.toLowerCase()));
+            const leaderId = recordId(task && (task.Task_Leader || task.createdBy || task.createdById));
+            const leader = leaderId ? allowedPeople.find((person) => person.id === leaderId) : null;
             if (target.source === 'native') {
-                if (mentioned) suggestions.push({ fieldId: target.fieldId, kind: 'owner', personId: mentioned.id, value: mentioned.name });
+                const person = mentioned || leader;
+                if (person) suggestions.push({ fieldId: target.fieldId, kind: 'owner', personId: person.id, value: person.name });
                 continue;
             }
             const option = (target.options || []).find((row) => {
@@ -299,15 +458,23 @@ function heuristicSuggestions({ targets, people, title, description, comments, p
                 if (haystack.includes(label)) return true;
                 return Boolean(mentioned && mentioned.name && mentioned.name.toLowerCase() === label);
             });
-            if (option) suggestions.push({ fieldId: target.fieldId, kind: 'owner', optionId: option.id, value: option.label });
+            if (option) {
+                suggestions.push({ fieldId: target.fieldId, kind: 'owner', optionId: option.id, value: option.label });
+                continue;
+            }
+            const person = mentioned || leader;
+            if (person && !(target.options || []).length) {
+                suggestions.push({ fieldId: target.fieldId, kind: 'owner', personId: person.id, value: person.name });
+            }
         }
     }
     return suggestions;
 }
 
-function skipReasonWhenMissingTarget(fieldId, task) {
+function skipReasonWhenMissingTarget(fieldId, task, people) {
     if (!fieldId) return 'unknown';
-    if (fieldId === NATIVE_ASSIGNEE_ID) return isAssigneeEmpty(task) ? 'unknown' : 'filled';
+    if (fieldId === NATIVE_ASSIGNEE_ID) return isAssigneeEmpty(task, people) ? 'unknown' : 'filled';
+    if (fieldId === NATIVE_DUE_ID) return isDueDateEmpty(task) ? 'unknown' : 'filled';
     return isCustomFieldEmpty(task, { _id: fieldId }) ? 'unknown' : 'filled';
 }
 
@@ -321,11 +488,16 @@ function sanitizeSuggestions(suggestions, { targets, people, task } = {}) {
         const fieldId = recordId(raw.fieldId || raw.id);
         const target = byId.get(fieldId);
         if (!target) {
-            skipped.push({ fieldId, reason: skipReasonWhenMissingTarget(fieldId, task) });
+            skipped.push({ fieldId, reason: skipReasonWhenMissingTarget(fieldId, task, allowedPeople) });
             continue;
         }
         if (target.source === 'native') {
-            if (!isAssigneeEmpty(task)) {
+            if (target.kind === 'date') {
+                if (!isDueDateEmpty(task)) {
+                    skipped.push({ fieldId, reason: 'filled' });
+                    continue;
+                }
+            } else if (!isAssigneeEmpty(task, allowedPeople)) {
                 skipped.push({ fieldId, reason: 'filled' });
                 continue;
             }
@@ -377,7 +549,7 @@ function sanitizeSuggestions(suggestions, { targets, people, task } = {}) {
         }
 
         if (target.kind === 'owner') {
-            if (target.source === 'native') {
+            if (target.source === 'native' || !(target.options || []).length) {
                 const person = matchPerson(raw.personId || raw.value || raw.name, allowedPeople);
                 if (!person) {
                     skipped.push({ fieldId, reason: 'invented-person' });
@@ -386,7 +558,7 @@ function sanitizeSuggestions(suggestions, { targets, people, task } = {}) {
                 out.push({
                     fieldId,
                     kind: 'owner',
-                    source: 'native',
+                    source: target.source || 'customField',
                     title: target.title,
                     value: [person.id],
                     personId: person.id,
@@ -414,10 +586,20 @@ function sanitizeSuggestions(suggestions, { targets, people, task } = {}) {
     return { suggestions: out, skipped };
 }
 
+function selectSuggestionsByFieldIds(suggestions, fieldIds) {
+    if (!Array.isArray(fieldIds)) return suggestions || [];
+    const allowed = new Set(fieldIds.map((id) => String(id || '').trim()).filter(Boolean));
+    if (!allowed.size) return [];
+    return (suggestions || []).filter((row) => allowed.has(String(row && row.fieldId)));
+}
+
 function planAutofillWrites(suggestions) {
     return (suggestions || []).map((item) => {
-        if (item.source === 'native' || item.fieldId === NATIVE_ASSIGNEE_ID) {
+        if (item.fieldId === NATIVE_ASSIGNEE_ID || (item.source === 'native' && item.kind === 'owner')) {
             return { type: 'assignee', fieldId: item.fieldId, value: item.value };
+        }
+        if (item.fieldId === NATIVE_DUE_ID || (item.source === 'native' && item.kind === 'date')) {
+            return { type: 'dueDate', fieldId: item.fieldId, value: parseDateValue(item.value) };
         }
         let fieldValue = item.value;
         if (item.kind === 'date') fieldValue = parseDateValue(item.value);
@@ -425,8 +607,13 @@ function planAutofillWrites(suggestions) {
             type: 'customField',
             fieldId: item.fieldId,
             updateDetail: { _id: item.fieldId, fieldValue },
+            alsoDueDate: item.kind === 'date' && DUE_TITLE.test(String(item.title || '')),
         };
-    }).filter((row) => row.type !== 'customField' || row.updateDetail.fieldValue != null);
+    }).filter((row) => {
+        if (row.type === 'dueDate') return row.value != null;
+        if (row.type === 'customField') return row.updateDetail.fieldValue != null;
+        return true;
+    });
 }
 
 function parseSuggestionsPayload(raw) {
@@ -458,13 +645,22 @@ function parseSuggestionsPayload(raw) {
     return [];
 }
 
-function buildAutofillPrompt({ task, targets, people, description, comments, pages }) {
+function buildAutofillPrompt({ task, targets, people, description, comments, pages, sprint }) {
     const title = clamp(String((task && (task.TaskName || task.title)) || ''), TITLE_CAP) || '(untitled task)';
     const key = String((task && task.TaskKey) || '').trim();
     const lines = [
         `Task: ${key ? `${key} ` : ''}${title}`,
         `Description: ${description || '(empty)'}`,
     ];
+    const due = sprintDueStamp(task, sprint);
+    const sprintName = String(
+        (sprint && (sprint.name || sprint.sprintName))
+        || (task && (task.sprintName || (task.sprintArray && task.sprintArray.name)))
+        || '',
+    );
+    if (sprintName || due) {
+        lines.push(`Sprint: ${sprintName || '(unnamed)'}${due ? ` (ends ${due.toISOString().slice(0, 10)})` : ''}`);
+    }
     const notes = commentTexts(comments);
     if (notes.length) {
         lines.push('Comments:');
@@ -505,7 +701,7 @@ No preamble, no code fences around the JSON.
 Rules:
 - Suggest only for listed empty fields. Do not invent fields, people, tags, or dates.
 - summary: a short grounded value from the title, description, comments, or linked page text.
-- date: YYYY-MM-DD, only when the task text supports it.
+- date: YYYY-MM-DD. A sprint end date is grounded. Do not invent other dates.
 - tag: optionId must be one of that field's listed options.
 - owner: personId must be a listed person, or optionId a listed option for an owner dropdown.
 - Prefer skip over guess. Do not mention that you are an AI.`;
@@ -535,10 +731,20 @@ function previewFromParts(input, rawSuggestions) {
         };
     }
 
-    const proposed = Array.isArray(rawSuggestions)
-        ? rawSuggestions
-        : heuristicSuggestions({ targets, people, title, description, comments, pages });
-    const sanitized = sanitizeSuggestions(proposed, { targets, people, task });
+    const proposed = Array.isArray(rawSuggestions) ? rawSuggestions : [];
+    const heuristic = heuristicSuggestions({
+        targets, people, title, description, comments, pages, task, sprint: input && input.sprint,
+    });
+    const byField = new Map();
+    proposed.forEach((row) => {
+        const id = recordId(row && (row.fieldId || row.id));
+        if (id && !byField.has(id)) byField.set(id, row);
+    });
+    heuristic.forEach((row) => {
+        const id = recordId(row && row.fieldId);
+        if (id && !byField.has(id)) byField.set(id, row);
+    });
+    const sanitized = sanitizeSuggestions([...byField.values()], { targets, people, task });
     return {
         status: true,
         data: {
@@ -559,16 +765,21 @@ module.exports = {
     AUTOFILL_ACTIONS,
     AUTOFILL_SYSTEM,
     NATIVE_ASSIGNEE_ID,
+    NATIVE_DUE_ID,
     OBJECT_ID,
     isAiAction,
     isWritablePermission,
     kindForField,
+    isEmptyValue,
     isCustomFieldEmpty,
     isAssigneeEmpty,
+    isDueDateEmpty,
     permissionGate,
     listEmptyTargets,
     sanitizeSuggestions,
     heuristicSuggestions,
+    sprintDueStamp,
+    selectSuggestionsByFieldIds,
     planAutofillWrites,
     parseSuggestionsPayload,
     buildAutofillPrompt,

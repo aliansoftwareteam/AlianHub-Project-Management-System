@@ -42,7 +42,7 @@
             </button>
         </form>
         <p v-if="notice && !brief" class="pcr__notice" :class="{ 'is-answer': Boolean(answer) }">{{ notice }}</p>
-        <div v-if="brief" class="pcr__brief">
+        <div v-if="brief" class="pcr__brief" :class="{ 'is-standup': isStandup }">
             <p class="pcr__summary">{{ brief.markdown }}</p>
             <ol v-if="brief.items && brief.items.length" class="pcr__items">
                 <li v-for="(item, index) in brief.items" :key="'ai-' + index">
@@ -73,7 +73,7 @@
             >{{ $t('Projects.pages_turn_into_tasks') }}</button>
             <p v-else-if="brief.items && brief.items.length" class="pcr__need-project">{{ $t('Projects.pages_transcript_need_project') }}</p>
         </div>
-        <WorkspaceAskCitations v-if="answer && citations.length" :citations="citations" />
+        <WorkspaceAskCitations v-if="answer && citations.length" :citations="citations" :compact="isStandup" />
     </div>
 </template>
 
@@ -419,6 +419,9 @@ function compose() {
     color: var(--kiln-ink);
     max-height: 320px;
     overflow: auto;
+}
+.pcr__brief.is-standup {
+    max-height: min(28vh, 220px);
 }
 .pcr__summary {
     margin: 0;

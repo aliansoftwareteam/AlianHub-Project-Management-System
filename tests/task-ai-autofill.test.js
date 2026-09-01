@@ -3,13 +3,17 @@
 const {
     AUTOFILL_ACTIONS,
     NATIVE_ASSIGNEE_ID,
+    NATIVE_DUE_ID,
     isAiAction,
     kindForField,
+    isEmptyValue,
     permissionGate,
     listEmptyTargets,
     sanitizeSuggestions,
     heuristicSuggestions,
+    sprintDueStamp,
     planAutofillWrites,
+    selectSuggestionsByFieldIds,
     previewFromParts,
     parseSuggestionsPayload,
 } = require('../Modules/Tasks/helpers/taskAiAutofill');
@@ -110,7 +114,23 @@ describe('TASKS - AI autofill custom fields', () => {
         expect(ids).not.toContain('f-summary');
         expect(ids).not.toContain('f-tag');
         expect(ids).not.toContain(NATIVE_ASSIGNEE_ID);
+
+        const ghosted = listEmptyTargets({
+            task: emptyTask({ AssigneeUserId: ['ghost-not-in-project'] }),
+            fields: FIELDS,
+            people: [ADA, GRACE],
+            permissions: { customField: true, assignee: true },
+        });
+        expect(ghosted.map((row) => row.fieldId)).toContain(NATIVE_ASSIGNEE_ID);
         expect(ids).not.toContain('f-money');
+
+        const leftoverString = listEmptyTargets({
+            task: emptyTask({ AssigneeUserId: ADA.id }),
+            fields: FIELDS,
+            people: [ADA, GRACE],
+            permissions: { customField: true, assignee: true },
+        });
+        expect(leftoverString.map((row) => row.fieldId)).toContain(NATIVE_ASSIGNEE_ID);
 
         const { suggestions, skipped } = sanitizeSuggestions([
             { fieldId: 'f-summary', value: 'Overwrite me' },
@@ -286,5 +306,204 @@ describe('TASKS - AI autofill custom fields', () => {
     test('parses model JSON even with fences', () => {
         const parsed = parseSuggestionsPayload('```json\n{"suggestions":[{"fieldId":"f-tag","optionId":"opt-launch"}]}\n```');
         expect(parsed).toEqual([{ fieldId: 'f-tag', optionId: 'opt-launch' }]);
+    });
+
+    test('Assignee and Owner stay two writes; Owner can fill without assigning', () => {
+        const result = preview(emptyTask());
+        const byId = Object.fromEntries(result.data.suggestions.map((row) => [row.fieldId, row]));
+        expect(byId.assignee.title).toBe('Assignee');
+        expect(byId['f-owner'].title).toBe('Owner');
+        expect(byId.assignee.fieldId).not.toBe(byId['f-owner'].fieldId);
+
+        const ownerOnly = selectSuggestionsByFieldIds(result.data.suggestions, ['f-owner']);
+        const writes = planAutofillWrites(ownerOnly);
+        expect(writes).toEqual([
+            expect.objectContaining({ type: 'customField', fieldId: 'f-owner' }),
+        ]);
+        expect(writes.some((row) => row.type === 'assignee')).toBe(false);
+
+        const none = selectSuggestionsByFieldIds(result.data.suggestions, []);
+        expect(none).toEqual([]);
+        expect(planAutofillWrites(none)).toEqual([]);
+    });
+
+    test('skip-filled is per field so Priority tag can land without re-applying Summary', () => {
+        const first = preview(emptyTask());
+        const summary = first.data.suggestions.find((row) => row.fieldId === 'f-summary');
+        const filled = emptyTask({
+            customField: {
+                'f-summary': { fieldValue: summary.value },
+            },
+        });
+        const second = preview(filled);
+        const ids = second.data.suggestions.map((row) => row.fieldId);
+        expect(ids).toContain('f-tag');
+        expect(ids).toContain('f-owner');
+        expect(ids).toContain(NATIVE_ASSIGNEE_ID);
+        expect(ids).not.toContain('f-summary');
+
+        const tagOnly = selectSuggestionsByFieldIds(second.data.suggestions, ['f-tag']);
+        expect(tagOnly).toEqual([expect.objectContaining({ fieldId: 'f-tag' })]);
+        expect(planAutofillWrites(tagOnly).every((row) => row.fieldId === 'f-tag')).toBe(true);
+    });
+
+    test('placeholder Due is empty and sprint dates seed an apply-able Due row', () => {
+        expect(isEmptyValue('DD/MM/YYYY')).toBe(true);
+        expect(isEmptyValue('MM/DD/YYYY')).toBe(true);
+        expect(isEmptyValue({ date: '' })).toBe(true);
+        expect(isEmptyValue({})).toBe(true);
+        expect(isEmptyValue('2026-08-28')).toBe(false);
+
+        const pm = { id: 'u-pm', name: 'Local PM', email: 'pm@local.test' };
+        const smoke = emptyTask({
+            TaskName: 'Test Ask Smoke on mobile',
+            description: '',
+            AssigneeUserId: [{ toHexString: () => 'deadbeefdeadbeefdeadbeef' }],
+            Task_Leader: pm.id,
+            DueDate: 'DD/MM/YYYY',
+            sprintName: 'SMOKE - 24 - 28 Aug 2026',
+            sprintArray: { name: 'SMOKE - 24 - 28 Aug 2026', endDate: '2026-08-28' },
+            customField: {
+                'f-summary': { fieldValue: 'Test Ask Smoke functionality on mobile devices' },
+                'f-tag': { fieldValue: ['opt-launch'] },
+                'f-owner': { fieldValue: ['opt-ada'] },
+                'f-date': { fieldValue: 'DD/MM/YYYY' },
+            },
+        });
+        const people = [pm, ADA, GRACE];
+        const targets = listEmptyTargets({
+            task: smoke,
+            fields: FIELDS,
+            people,
+            permissions: { customField: true, assignee: true },
+        });
+        const ids = targets.map((row) => row.fieldId);
+        expect(ids).toContain('f-date');
+        expect(ids).toContain('f-notes');
+        expect(ids).toContain(NATIVE_ASSIGNEE_ID);
+        expect(ids).not.toContain('f-summary');
+        expect(ids).not.toContain('f-owner');
+        expect(ids).not.toContain('f-tag');
+        expect(ids).not.toContain(NATIVE_DUE_ID);
+
+        const result = preview(smoke, { comments: [], people });
+        const due = result.data.suggestions.find((row) => row.fieldId === 'f-date');
+        const assignee = result.data.suggestions.find((row) => row.fieldId === NATIVE_ASSIGNEE_ID);
+        expect(due).toEqual(expect.objectContaining({ kind: 'date', value: '2026-08-28' }));
+        expect(assignee).toEqual(expect.objectContaining({ personId: pm.id, display: 'Local PM' }));
+        expect(result.data.suggestions.every((row) => row.fieldId !== 'f-summary')).toBe(true);
+        expect(result.data.suggestions.every((row) => row.fieldId !== 'f-owner')).toBe(true);
+
+        const writes = planAutofillWrites([due]);
+        expect(writes).toEqual([
+            expect.objectContaining({ type: 'customField', fieldId: 'f-date', alsoDueDate: true }),
+        ]);
+
+        const llmSkipped = previewFromParts({
+            task: smoke,
+            fields: FIELDS,
+            people,
+            permissions: { customField: true, assignee: true, uid: 'u-ada', roleType: 1 },
+            comments: [],
+        }, []);
+        expect(llmSkipped.data.suggestions.find((row) => row.fieldId === 'f-date')).toEqual(
+            expect.objectContaining({ kind: 'date', value: '2026-08-28' }),
+        );
+        expect(llmSkipped.data.suggestions.find((row) => row.fieldId === NATIVE_ASSIGNEE_ID)).toEqual(
+            expect.objectContaining({ personId: pm.id }),
+        );
+        expect(sprintDueStamp(smoke)).toEqual(expect.any(Date));
+        expect(sprintDueStamp(smoke).toISOString().slice(0, 10)).toBe('2026-08-28');
+        expect(sprintDueStamp({}, { endDate: '2026-08-28' }).toISOString().slice(0, 10)).toBe('2026-08-28');
+
+        const nativeOnly = listEmptyTargets({
+            task: emptyTask({
+                TaskName: 'Test Ask Smoke on mobile',
+                AssigneeUserId: [],
+                DueDate: 'DD/MM/YYYY',
+                sprintName: 'SMOKE - 24 - 28 Aug 2026',
+            }),
+            fields: FIELDS.filter((field) => field._id !== 'f-date'),
+            people: [pm],
+            permissions: { customField: true, assignee: true },
+        });
+        expect(nativeOnly.map((row) => row.fieldId)).toContain(NATIVE_DUE_ID);
+        const nativePreview = previewFromParts({
+            task: emptyTask({
+                TaskName: 'Test Ask Smoke on mobile',
+                AssigneeUserId: [],
+                DueDate: 'DD/MM/YYYY',
+                Task_Leader: pm.id,
+                sprintName: 'SMOKE - 24 - 28 Aug 2026',
+            }),
+            fields: FIELDS.filter((field) => field._id !== 'f-date'),
+            people: [pm],
+            permissions: { customField: true, assignee: true },
+            comments: [],
+        }, []);
+        expect(nativePreview.data.suggestions.find((row) => row.fieldId === NATIVE_DUE_ID)).toEqual(
+            expect.objectContaining({ kind: 'date', value: '2026-08-28' }),
+        );
+    });
+
+    test('task panel Autofill is two labeled rows with per-row apply, not gated on AI plan', () => {
+        const fs = require('fs');
+        const path = require('path');
+        const card = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'molecules', 'TaskAiAutofill', 'TaskAiAutofill.vue'), 'utf8');
+        const render = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'plugins', 'customFieldView', 'component', 'molecules', 'customFieldTaskView', 'customFieldRender.vue'), 'utf8');
+        expect(card).toContain('applyOne');
+        expect(card).toContain('applyEmpty');
+        expect(card).toContain('canFillEmpty');
+        expect(card).toContain('sprintDueDisplay');
+        expect(card).toContain('ghostUser');
+        expect(card).toContain('ownerFilled');
+        expect(card).toContain('canWrite');
+        expect(card).toContain('assigneeSeed');
+        expect(card).toContain('assigneeChipId');
+        expect(card).toContain('nativeDueEmpty');
+        expect(card).toContain("write: 'assignee'");
+        expect(card).toContain("write: 'owner'");
+        expect(card).toContain('showCard');
+        expect(card).toContain('taf__go');
+        expect(card).toContain('autofill_fill_empty');
+        expect(card).toContain('autofill_no_suggestion');
+        expect(card).toContain('suggestionLabel');
+        expect(card).toContain('assigneeEmpty()');
+        expect(card).toContain('data-taf-row="assignee"');
+        expect(card).toContain('assigneeRailEmpty');
+        expect(card).toContain('assigneeChipDisplayName');
+        expect(card).toContain('coerceAssigneeChipId');
+        expect(card).toContain('assigneeRow');
+        expect(card).toContain('assigneeTitle');
+        expect(card).toContain("'Assignee'");
+        expect(card).toContain('data-taf-row="assignee"');
+        expect(card).toContain('paintedAssigneeChips');
+        expect(card).toContain('otherRows');
+        expect(card).toContain('namedAssigneeChip');
+        expect(card).toContain('assigneeRailEmpty');
+        expect(card).toContain('seedPerson');
+        expect(card).toContain("t('ProjectDetails.assignee')");
+        expect(card).toContain('next.unshift(seed)');
+        expect(card).toContain("getters['users/users']");
+        expect(card).toContain('dueIsEmpty');
+        expect(card).toContain("item.fieldId === 'assignee'");
+        expect(card).toContain('\\bowner\\b');
+        expect(card).toContain('canApply');
+        expect(card).toContain("write: 'date'");
+        expect(card).toContain('customDueEmpty');
+        expect(card).toContain('DATE_PLACEHOLDER');
+        expect(card).toContain('dueField');
+        expect(card).not.toContain('taf__kind');
+        expect(card).not.toContain('taf__filled');
+        expect(card).not.toContain('autofill_filled');
+        expect(card).not.toContain("'—'");
+        expect(card).not.toContain("checkApps('CustomFields')");
+        expect(card).not.toContain('getAppState');
+        expect(render).not.toContain('TaskAiAutofill');
+        const tab = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'molecules', 'TaskDetailTab', 'TaskDetailTab.vue'), 'utf8');
+        expect(tab).toContain('TaskAiAutofill');
+        expect(tab.indexOf('TaskAiAutofill')).toBeLessThan(tab.indexOf('CheckListComponent'));
+        expect(tab.indexOf('TaskAiAutofill')).toBeLessThan(tab.indexOf('CustomFieldRenderViewComponent'));
+        expect(tab.indexOf('TaskAiAutofill')).toBeLessThan(tab.indexOf('Description'));
     });
 });

@@ -4,7 +4,7 @@
             <!-- ─── Sidebar: the page tree ─────────────────────────────── -->
             <aside class="pg__side">
                 <div class="pg__side-head">
-                    <span v-if="workspace" class="pg__side-kicker">{{ $t('Projects.pages_space_kicker') }}</span>
+                    <span v-if="workspace" class="pg__side-kicker">{{ workspaceSideKicker }}</span>
                     <span class="pg__side-title">{{ $t('Projects.pages') }}</span>
                     <button type="button" class="pg__icon-btn" :title="$t('Projects.add_page')" @click="createPage(null)">
                         <span v-html="ICONS.plus"></span>
@@ -14,6 +14,10 @@
                     <label class="pg__picker-label">{{ $t('Projects.pages_project_picker') }}</label>
                     <select v-model="workspaceProjectId" class="pg__picker">
                         <option value="">{{ $t('Projects.pages_project_none') }}</option>
+                        <option
+                            v-if="workspaceProjectId && !pickerProjects.some((project) => String(project._id) === String(workspaceProjectId))"
+                            :value="workspaceProjectId"
+                        >{{ workspaceProjectId }}</option>
                         <option v-for="project in pickerProjects" :key="project._id" :value="String(project._id)">
                             {{ project.ProjectName || project.ProjectCode || project._id }}
                         </option>
@@ -26,7 +30,7 @@
                 </div>
 
                 <div class="pg__tree">
-                    <div v-if="!rows.length" class="pg__empty">
+                    <div v-if="!rows.length && !current" class="pg__empty">
                         {{ query ? $t('Projects.no_pages_match') : $t('Projects.no_pages') }}
                     </div>
                     <!-- Flattened rather than a recursive component: depth is just an
@@ -148,9 +152,17 @@
                                 @click="toggleWriteback"
                             ><i></i></button>
                         </div>
-                        <div v-if="pageBriefing" class="pg__briefing">
-                            <span class="pg__briefing-kicker">{{ $t('Projects.pages_writeback_fired') }}</span>
-                            <pre class="pg__briefing-body">{{ pageBriefing }}</pre>
+                        <div v-if="pageBriefing && !briefingDismissed" class="pg__briefing">
+                            <div class="pg__briefing-bar">
+                                <span class="pg__briefing-kicker">{{ $t('Projects.pages_writeback_fired') }}</span>
+                                <button type="button" class="pg__briefing-btn" @click="briefingCollapsed = !briefingCollapsed">
+                                    {{ briefingCollapsed ? $t('Projects.pages_briefing_expand') : $t('Projects.pages_briefing_collapse') }}
+                                </button>
+                                <button type="button" class="pg__briefing-btn" @click="briefingDismissed = true">
+                                    {{ $t('Projects.pages_briefing_dismiss') }}
+                                </button>
+                            </div>
+                            <pre v-if="!briefingCollapsed" class="pg__briefing-body">{{ pageBriefing }}</pre>
                         </div>
                     </div>
 
@@ -272,6 +284,7 @@ import AiTaskCreator from "@/components/organisms/AiTaskCreator/AiTaskCreator.vu
 
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import { firstId, pageFromGetResponse, pageOpenRoute, pageProjectId } from '@/utils/taskOpenProjectId';
 import { useGetterFunctions } from "@/composable";
 import pageContent from '@pageContent';
 const { contentToEditorData, blocksToRawText } = pageContent.default || pageContent;
@@ -330,31 +343,58 @@ const workspaceProjectId = ref('');
 const showAiTaskCreator = ref(false);
 const aiSprints = ref([]);
 const aiInitialRequirements = ref('');
+let pagesFetchGen = 0;
 
 const pickerProjects = computed(() => {
     const raw = getters['projectData/projects'];
     const list = raw && Array.isArray(raw.data) ? raw.data : [];
-    return list.filter((project) => project && project._id);
+    const rows = list.filter((project) => project && project._id);
+    const bound = props.projectData && firstId(props.projectData._id);
+    if (bound && !rows.some((project) => firstId(project._id) === bound)) {
+        return [props.projectData, ...rows];
+    }
+    return rows;
 });
 
-const projectId = computed(() => String(
-    (props.projectData && props.projectData._id)
-    || workspaceProjectId.value
-    || ''
+const workspaceSideKicker = computed(() => {
+    const pid = firstId(workspaceProjectId.value, routeProjectId.value, props.projectData && props.projectData._id);
+    if (!pid) return t('Projects.pages_space_kicker');
+    const hit = pickerProjects.value.find((project) => firstId(project && project._id) === pid);
+    return (hit && (hit.ProjectName || hit.ProjectCode)) || t('Projects.pages');
+});
+
+const routePageId = computed(() => firstId(Array.isArray(route.query && route.query.page)
+    ? route.query.page[0]
+    : (route.query && route.query.page)));
+const routeProjectId = computed(() => firstId(
+    route.params && route.params.projectId,
+    Array.isArray(route.query && (route.query.project || route.query.projectId))
+        ? (route.query.project || route.query.projectId)[0]
+        : (route.query && (route.query.project || route.query.projectId)),
+));
+workspaceProjectId.value = routeProjectId.value;
+
+const projectId = computed(() => firstId(
+    props.projectData && props.projectData._id,
+    workspaceProjectId.value,
 ));
 
-const taskProjectId = computed(() => String(
-    projectId.value
-    || (current.value && current.value.ProjectID)
-    || ''
+const taskProjectId = computed(() => firstId(
+    projectId.value,
+    pageProjectId(current.value),
 ));
 const rawDraft = computed(() => blocksToRawText(contentBlocks.value) || contentHtml.value || '');
 const pageBriefing = computed(() => String((current.value && current.value.briefing && current.value.briefing.markdown) || '').trim());
+const briefingCollapsed = ref(false);
+const briefingDismissed = ref(false);
+watch(() => current.value && current.value._id, () => {
+    briefingCollapsed.value = false;
+    briefingDismissed.value = false;
+});
 const writebackOn = ref(true);
 const writebackBusy = ref(false);
 
 const query = ref('');
-const routePageId = computed(() => String((route.query && route.query.page) || ''));
 const expanded = ref(new Set());
 const showLinker = ref(false);
 // [{ id, key }] — the key is only what the picker handed over, for a readable chip. The
@@ -431,6 +471,32 @@ const toggle = (id) => {
 
 const nameOf = (id) => (id ? (getUser(String(id))?.Employee_Name || '—') : '—');
 
+function syncWorkspaceHash({ pageId, projectId: nextProject } = {}) {
+    if (!props.workspace) return;
+    const page = pageId !== undefined ? firstId(pageId) : routePageId.value;
+    const project = nextProject !== undefined ? firstId(nextProject) : firstId(workspaceProjectId.value);
+    const cid = firstId(route.params && route.params.cid);
+    const dest = pageOpenRoute({ companyId: cid, projectId: project, pageId: page });
+    if (dest) {
+        const sameRoute = route.name === 'ProjectPages'
+            && firstId(route.params && route.params.projectId) === project
+            && firstId(route.query && route.query.page) === page;
+        if (sameRoute) return;
+        router.replace(dest).catch(() => {});
+        return;
+    }
+    const query = { ...route.query };
+    if (page) query.page = page;
+    else delete query.page;
+    delete query.project;
+    delete query.projectId;
+    const sameWorkspace = route.name === 'Pages'
+        && firstId(route.query && route.query.page) === page
+        && !firstId(route.query && (route.query.project || route.query.projectId));
+    if (sameWorkspace) return;
+    router.replace({ name: 'Pages', params: { cid }, query }).catch(() => {});
+}
+
 // Embedded as a view there is no open/close cycle, so it is open from the start
 // and the watch below must fire immediately or the tree would never load.
 const isOpen = computed(() => props.embedded || props.workspace || props.modelValue);
@@ -459,6 +525,12 @@ watch(() => props.openDocId, (id) => {
 watch(routePageId, (id, previous) => {
     if (!props.workspace || !id || id === previous) return;
     if (isOpen.value) openPage(id);
+}, { immediate: true });
+
+watch(routeProjectId, (id) => {
+    if (!props.workspace) return;
+    if (firstId(workspaceProjectId.value) === firstId(id)) return;
+    workspaceProjectId.value = id || '';
 });
 
 // Switching projects does not remount this component — only the injected project
@@ -488,6 +560,12 @@ watch(() => (props.projectData && props.projectData._id) || '', (id, previous) =
 
 watch(workspaceProjectId, (id, previous) => {
     if (!props.workspace || previous === undefined || id === previous) return;
+    syncWorkspaceHash({ projectId: id });
+    const boundFromOpen = current.value && firstId(current.value.ProjectID, current.value.projectId) === firstId(id);
+    if (boundFromOpen) {
+        if (isOpen.value) fetchPages();
+        return;
+    }
     if (isDirty.value && !window.confirm(t('Projects.page_discard_confirm'))) {
         workspaceProjectId.value = previous || '';
         return;
@@ -536,27 +614,61 @@ watch(taskProjectId, (id) => {
     if (id) loadWriteback();
 }, { immediate: true });
 
+function ensurePageInList(page) {
+    const id = firstId(page && (page._id || page.id));
+    if (!id) return;
+    if (pages.value.some((row) => firstId(row && (row._id || row.id)) === id)) return;
+    pages.value = [page, ...pages.value];
+}
+
 function fetchPages() {
-    const queryString = projectId.value ? `?projectId=${projectId.value}` : '';
-    apiRequest('get', `/api/v2/pages${queryString}`)
-    .then((response) => {
-        pages.value = response.data?.status ? (response.data.data || []) : [];
-        // Open every branch that has children the first time the panel loads, so the
-        // tree shows what exists rather than hiding it behind twisties.
-        if (!expanded.value.size) {
-            expanded.value = new Set(pages.value.filter((p) => p.parentPageId).map((p) => String(p.parentPageId)));
-        }
-        // As a view, landing on "pick a doc" reads as an empty project even when
-        // it has docs, so start on the first one. Only when nothing is open and
-        // no doc was asked for — and with no docs at all the empty state is still
-        // the right answer. The panel keeps its picker: it is opened FROM a doc.
-        if (props.workspace && routePageId.value) {
+    const gen = ++pagesFetchGen;
+    const loadTree = (pid) => {
+        const queryString = pid ? `?projectId=${pid}` : '';
+        apiRequest('get', `/api/v2/pages${queryString}`)
+        .then((response) => {
+            if (gen !== pagesFetchGen) return;
+            pages.value = response.data?.status ? (response.data.data || []) : [];
+            if (current.value) ensurePageInList(current.value);
+            if (!expanded.value.size) {
+                expanded.value = new Set(pages.value.filter((p) => p.parentPageId).map((p) => String(p.parentPageId)));
+            }
+            if (props.workspace && routePageId.value) {
+                openPage(routePageId.value);
+            } else if (props.embedded && !current.value && !props.openDocId && rows.value.length) {
+                openPage(rows.value[0]._id);
+            }
+        })
+        .catch((error) => console.error('ERROR in fetch pages: ', error));
+    };
+    if (props.workspace && routePageId.value && !projectId.value) {
+        const cid = firstId(route.params && route.params.cid);
+        apiRequest('get', `/api/v2/pages/${routePageId.value}`, null, null, { headers: { companyId: cid } })
+        .then((response) => {
+            if (gen !== pagesFetchGen) return;
+            const page = pageFromGetResponse(response) || (response.data && response.data.status ? response.data.data : null);
+            if (page) {
+                ensurePageInList(page);
+                const pid = pageProjectId(page);
+                if (pid && firstId(workspaceProjectId.value) !== pid) {
+                    workspaceProjectId.value = pid;
+                }
+                if (pid) {
+                    loadTree(pid);
+                    syncWorkspaceHash({ pageId: routePageId.value, projectId: pid });
+                    openPage(routePageId.value);
+                    return;
+                }
+            }
             openPage(routePageId.value);
-        } else if (props.embedded && !current.value && !props.openDocId && rows.value.length) {
-            openPage(rows.value[0]._id);
-        }
-    })
-    .catch((error) => console.error('ERROR in fetch pages: ', error));
+        })
+        .catch((error) => {
+            console.error('ERROR in fetch page project: ', error);
+            openPage(routePageId.value);
+        });
+        return;
+    }
+    loadTree(projectId.value);
 }
 
 // Leaving a page with unsaved edits is the one way to lose work here, so it is the one
@@ -570,8 +682,9 @@ function openPage(id) {
     if (!confirmDiscard()) return;
     apiRequest('get', `/api/v2/pages/${id}`)
     .then((response) => {
-        if (response.data?.status) {
-            current.value = response.data.data;
+        const page = pageFromGetResponse(response) || (response.data && response.data.status ? response.data.data : null);
+        if (page) {
+            current.value = page;
             draftTitle.value = current.value.title || '';
             contentHtml.value = (current.value.content && current.value.content.html) || '';
             contentBlocks.value = contentToEditorData(current.value.content);
@@ -586,8 +699,18 @@ function openPage(id) {
             showShare.value = false;
             share.value = null;
             previewHtml.value = '';
-            if (props.workspace && String(routePageId.value || '') !== String(id)) {
-                router.replace({ query: { ...route.query, page: String(id) } });
+            ensurePageInList(page);
+            if (props.workspace) {
+                const pid = firstId(
+                    pageProjectId(current.value),
+                    workspaceProjectId.value,
+                    routeProjectId.value,
+                    props.projectData && props.projectData._id,
+                );
+                if (pid && firstId(workspaceProjectId.value) !== pid) {
+                    workspaceProjectId.value = pid;
+                }
+                syncWorkspaceHash({ pageId: String(id), projectId: pid || workspaceProjectId.value });
             }
         }
     })
@@ -924,19 +1047,28 @@ function onKeydown(e) {
         e.preventDefault();
         savePage();
     } else if (e.key === 'Escape') {
-        if (showShare.value) { showShare.value = false; return; }
-        if (showLinker.value) { showLinker.value = false; return; }
-        if (!props.embedded && !props.workspace) requestClose();
+        const consume = () => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+        };
+        if (showShare.value) { showShare.value = false; consume(); return; }
+        if (showLinker.value) { showLinker.value = false; consume(); return; }
+        if (pageBriefing.value && !briefingDismissed.value) { briefingDismissed.value = true; consume(); return; }
+        if (!props.embedded && !props.workspace) {
+            consume();
+            requestClose();
+        }
     }
 }
 onMounted(() => {
-    document.addEventListener('keydown', onKeydown);
+    document.addEventListener('keydown', onKeydown, true);
     if (props.workspace && !pickerProjects.value.length) {
         dispatch('projectData/setProjects', { roleType: 'currentUser' }).catch(() => {});
     }
 });
 onBeforeUnmount(() => {
-    document.removeEventListener('keydown', onKeydown);
+    document.removeEventListener('keydown', onKeydown, true);
 });
 </script>
 
@@ -1201,8 +1333,29 @@ onBeforeUnmount(() => {
 .pg__briefing {
     margin-top: 8px;
 }
+.pg__briefing-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.pg__briefing-btn {
+    border: 0;
+    background: transparent;
+    color: var(--kiln-ink);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    padding: 0;
+}
+.pg__briefing-btn:hover {
+    color: var(--kiln-ember);
+}
 .pg__briefing-body {
     margin: 6px 0 0;
+    max-height: 160px;
+    overflow: auto;
     white-space: pre-wrap;
     word-break: break-word;
     font-family: var(--kiln-font-body);

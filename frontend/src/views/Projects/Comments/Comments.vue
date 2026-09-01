@@ -22,6 +22,7 @@
         />
         <div id="message_container"
             @dragenter="messageAllowed ? showDropZone = true : showDropZone = false"
+            @wheel.stop
             class="overflow-y-auto style-scroll position-re msg__container"
         >
             <template v-if="loadingChat">
@@ -244,6 +245,7 @@ import { useI18n } from "vue-i18n";
 import {generateFileName} from '@/utils/storageQueryBuild.js';
 import ImagesPreviewer from "@/components/organisms/ImagePreviewer/ImagesPreviewer.vue";
 import { storageHelper } from "@/composable/commonFunction";
+import { firstId } from '@/utils/taskOpenProjectId';
 
 const { t } = useI18n();
 
@@ -291,6 +293,10 @@ defineComponent({
 // PROPS
 const props = defineProps({
     taskId: {
+        type: String,
+        default: ""
+    },
+    projectId: {
         type: String,
         default: ""
     },
@@ -443,7 +449,10 @@ const users = ref([]);
 const unreadMessages = ref(0);
 let debounceTimeout;
 const countGetter = computed(() => {
-    return getters["users/myCounts"]?.data?.[`${props.taskId ? "task" : "project"}_${projectData.value._id}${props.taskId ? `_${props.sprintId}_${props.taskId}` : ``}_comments`] || 0
+    const { projectId, taskId, sprintId } = commentThreadQuery();
+    const pid = projectId || firstId(projectData.value && projectData.value._id);
+    if (!pid) return 0;
+    return getters["users/myCounts"]?.data?.[`${taskId ? "task" : "project"}_${pid}${taskId ? `_${sprintId}_${taskId}` : ``}_comments`] || 0
 })
 watch(countGetter, (val) => {
     unreadMessages.value = val;
@@ -539,8 +548,8 @@ watch(projectData, (newProj, oldProj) => {
     }
 })
 
-watch([() => props.sprintId, () => props.taskId], ([newSprint, newTask], [oldSprint, oldTask]) => {
-    if(newSprint !== oldSprint || newTask !== oldTask) {
+watch([() => props.sprintId, () => props.taskId, () => props.projectId], ([newSprint, newTask, newProject], [oldSprint, oldTask, oldProject]) => {
+    if(newSprint !== oldSprint || newTask !== oldTask || newProject !== oldProject) {
         initialize();
     }
 })
@@ -645,11 +654,45 @@ const visibilityHandler = async () => {
     }, 1000);
 };
 
+function commentThreadQuery() {
+    const projectId = firstId(
+        props.projectId,
+        projectData.value && projectData.value._id,
+        route.params && route.params.id,
+    );
+    const taskId = firstId(props.taskId) || (props.taskId === 'default' ? 'default' : '');
+    const sprintId = firstId(props.sprintId);
+    return { projectId, taskId, sprintId };
+}
+
+function commentMessagesUrl({ skipValue = 0, batchLimit = messageLimit.value, tabLeaveTime = '', sort = '' } = {}) {
+    const { projectId, taskId, sprintId } = commentThreadQuery();
+    const params = new URLSearchParams();
+    if (projectId) params.set('projectId', projectId);
+    if (taskId) params.set('taskId', taskId);
+    if (sprintId) params.set('sprintId', sprintId);
+    params.set('isDefault', projectData.value?.default ? 'true' : 'false');
+    params.set('mainChat', props.mainChat ? 'true' : 'false');
+    params.set('skipValue', String(skipValue));
+    params.set('batchLimit', String(batchLimit));
+    if (tabLeaveTime) params.set('tabLeaveTime', String(tabLeaveTime));
+    if (sort) params.set('sort', sort);
+    return { url: `${env.API_COMMENTS}/get-paginated-messages?${params.toString()}`, projectId, taskId, sprintId };
+}
+
 function tabSyncDataGet () {
     return new Promise((resolve, reject) => {
         try {
             let tabLeaveTime = sessionStorage.getItem('tableaveTime');
-            const url = `${env.API_COMMENTS}/get-paginated-messages?projectId=${projectData.value._id}&taskId=${props.taskId}&sprintId=${props.sprintId}&isDefault=${projectData.value?.default}&mainChat=${props.mainChat}&skipValue=${0}&batchLimit=${messageLimit.value}&tabLeaveTime=${tabLeaveTime}`;
+            const { url, projectId } = commentMessagesUrl({
+                skipValue: 0,
+                batchLimit: messageLimit.value,
+                tabLeaveTime,
+            });
+            if (!projectId) {
+                resolve();
+                return;
+            }
             apiRequest("get", url).then((response) => {
                 response.data.data.forEach((docData)=> {
                     let index = messages.value.findIndex((x) => x._id === docData._id);
@@ -752,7 +795,16 @@ watch(projectData, (val) => {
 function getLatestMessage(projectId, taskId, sprintId, messageData) {
     return new Promise((resolve, reject) => {
         try {
-            const url = `${env.API_COMMENTS}/get-paginated-messages?projectId=${projectId}&taskId=${taskId}&sprintId=${sprintId}&sort=createdAt:desc&batchLimit=1`;
+            const params = new URLSearchParams();
+            const pid = firstId(projectId);
+            const tid = firstId(taskId) || (taskId === 'default' ? 'default' : '');
+            const sid = firstId(sprintId);
+            if (pid) params.set('projectId', pid);
+            if (tid) params.set('taskId', tid);
+            if (sid) params.set('sprintId', sid);
+            params.set('sort', 'createdAt:desc');
+            params.set('batchLimit', '1');
+            const url = `${env.API_COMMENTS}/get-paginated-messages?${params.toString()}`;
             apiRequest("get", url)
             .then((response) => {
                 const latestMessage = response.data.data[0];
@@ -774,6 +826,7 @@ function getLatestMessage(projectId, taskId, sprintId, messageData) {
 
 
 function watchScroll(e) {
+    if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
     if(e.target.scrollTop < (e.target.scrollHeight - e.target.offsetHeight - 500)) {
         showScrollBotton.value = true;
     } else {
@@ -783,6 +836,11 @@ function watchScroll(e) {
     if(e.target.scrollTop < 400 && e.target.scrollTop > 0) {
         getPaginatedMessages();
     }
+}
+
+function scrollThreadEl(node, behavior) {
+    if (!node || typeof node.scrollIntoView !== 'function') return;
+    node.scrollIntoView({ behavior: behavior || 'auto', block: 'nearest', inline: 'nearest' });
 }
 
 function watchClick(e) {
@@ -1238,10 +1296,13 @@ function detachSnapshot() {
 }
 
 function getRoomName(obj) {
-    if (obj.sprintId && obj.taskId) {
-        return `comments_${obj.projectId}_${obj.sprintId}_${obj.taskId}**${socket.value.id}`;
+    const projectId = firstId(obj && obj.projectId);
+    const sprintId = firstId(obj && obj.sprintId);
+    const taskId = firstId(obj && obj.taskId) || (obj && obj.taskId === 'default' ? 'default' : '');
+    if (sprintId && taskId) {
+        return `comments_${projectId}_${sprintId}_${taskId}**${socket.value.id}`;
     } else {
-        return `comments_project_${obj.projectId}**${socket.value.id}`;
+        return `comments_project_${projectId}**${socket.value.id}`;
     }
 }
 
@@ -1250,13 +1311,14 @@ function getMessages() {
     messages.value = [];
     totalMessages.value = 0;
     currentTime.value = new Date().setHours(new Date().getHours() - 1)
+    const thread = commentThreadQuery();
     let obj = {
-        'projectId': projectData.value._id,
-        ...(props.sprintId ? {'sprintId': props.sprintId} : ''),
-        ...(!projectData.value?.default && props.mainChat ? {'taskId':"default"} : props.taskId ? {'taskId': props.mainChat ? newMainChat.value : props.taskId} : {"project": true})
+        'projectId': thread.projectId,
+        ...(thread.sprintId ? {'sprintId': thread.sprintId} : ''),
+        ...(!projectData.value?.default && props.mainChat ? {'taskId':"default"} : thread.taskId ? {'taskId': props.mainChat ? newMainChat.value : thread.taskId} : {"project": true})
     }
-    if(props.mainChat && props.taskId && props.taskId !== "default") {
-        obj.taskId = props.taskId;
+    if(props.mainChat && thread.taskId && thread.taskId !== "default") {
+        obj.taskId = thread.taskId;
     }
     
     if(props.mainChat && projectData.value?.default && props.newChat) {
@@ -1397,7 +1459,7 @@ function handleSocketData() {
                     nextTick(() => {
                         let ele = document.getElementById(messages.value[(messages.value.length) - unreadMessages.value]?._id)
                         if(ele) {
-                            ele.scrollIntoView();
+                            scrollThreadEl(ele);
                         }
                     })
                 } else {
@@ -1419,7 +1481,7 @@ function handleSocketData() {
                 nextTick(() => {
                     let ele = document.getElementById(messages.value[(messages.value.length) - unreadMessages.value]?._id)
                     if(ele) {
-                        ele.scrollIntoView();
+                        scrollThreadEl(ele);
                     }
                 })
             } else {
@@ -1435,7 +1497,7 @@ function handleSocketData() {
                 nextTick(() => {
                     let ele = document.getElementById(messages.value[(messages.value.length) - unreadMessages.value]?._id)
                     if(ele) {
-                        ele.scrollIntoView();
+                        scrollThreadEl(ele);
                     }
                 })
             } else {
@@ -1459,7 +1521,16 @@ function getPaginatedMessages(...args) {
 
     return new Promise((resolve, reject) => {
         try {
-            const url = `${env.API_COMMENTS}/get-paginated-messages?projectId=${projectData.value._id}&taskId=${props.taskId}&sprintId=${props.sprintId}&isDefault=${projectData.value?.default}&mainChat=${props.mainChat}&skipValue=${totalMessages.value}&batchLimit=${messageLimit.value}`
+            const { projectId } = commentThreadQuery();
+            if (!projectId) {
+                loadingChat.value = false;
+                resolve("No data");
+                return;
+            }
+            const { url } = commentMessagesUrl({
+                skipValue: totalMessages.value,
+                batchLimit: messageLimit.value,
+            });
             apiRequest("get", url).then((response) => {
                 const results = response.data.data;
 
@@ -1499,7 +1570,7 @@ function getPaginatedMessages(...args) {
                 if(findData) {
                     if(messages.value.filter((x) => x._id === findData._id).length) {
                         setTimeout(() => {
-                            document.getElementById(findData._id).scrollIntoView({behavior: 'smooth'});
+                            scrollThreadEl(document.getElementById(findData._id), 'smooth');
                             highlightMessage(findData);
                         }, 200)
                     } else {
@@ -1519,7 +1590,7 @@ function getPaginatedMessages(...args) {
                     nextTick(() => {
                         let ele = document.getElementById(messages.value[(messages.value.length) - unreadMessages.value]?._id)
                         if(ele) {
-                            ele.scrollIntoView();
+                            scrollThreadEl(ele);
                         }
                     })
                 }
@@ -1545,7 +1616,7 @@ function highlightMessage(data) {
 
     if(element !== undefined && element !== null) {
         element.classList.toggle("highlighted-message");
-        element.scrollIntoView({behavior: 'smooth'});
+        scrollThreadEl(element, 'smooth');
 
         setTimeout(()=>{
             element.classList.toggle("highlighted-message");

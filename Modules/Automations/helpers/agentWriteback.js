@@ -82,7 +82,11 @@ function chooseWrite({ event, emptyTargets, pageText } = {}) {
         return { action: 'briefing' };
     }
     if (Array.isArray(emptyTargets) && emptyTargets.length) return { action: 'autofill' };
-    return { action: 'comment' };
+    return { action: 'activity' };
+}
+
+function shouldNotifyForWriteback({ taggedUserIds } = {}) {
+    return Array.isArray(taggedUserIds) && taggedUserIds.map(String).filter(Boolean).length > 0;
 }
 
 function planTaskAutofill({ incoming, targets, people, task } = {}) {
@@ -92,6 +96,12 @@ function planTaskAutofill({ incoming, targets, people, task } = {}) {
         skipped: sanitized.skipped,
         writes: planAutofillWrites(sanitized.suggestions),
     };
+}
+
+function followupActivityMessage(input) {
+    const note = followupCommentText(input);
+    if (!note) return '<b>Alian</b> noted this change.';
+    return `<b>Alian</b> ${note.charAt(0).toLowerCase()}${note.slice(1)}`;
 }
 
 function followupCommentText({ event, applied, statusText, commentExcerpt, taskTitle } = {}) {
@@ -159,8 +169,10 @@ module.exports = {
     isAlianAuthor,
     eventGate,
     chooseWrite,
+    shouldNotifyForWriteback,
     planTaskAutofill,
     followupCommentText,
+    followupActivityMessage,
     heuristicPageBriefing,
     shapePageBriefing,
     linkedTaskCitations,

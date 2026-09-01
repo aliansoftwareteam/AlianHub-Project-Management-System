@@ -218,7 +218,7 @@
     import WasabiIamgeCompp from '@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue';
     import SubtaskProgressBadge from '@/components/atom/SubtaskProgressBadge/SubtaskProgressBadge.vue';
 
-    import { computed, defineProps,defineEmits, ref, inject, watch } from 'vue';
+    import { computed, defineProps,defineEmits, ref, inject, watch, onMounted, onBeforeUnmount } from 'vue';
     import taskClass from "@/utils/TaskOperations"
     import { apiRequest } from '@/services';
     import { useGetterFunctions, useCustomComposable } from '@/composable';
@@ -292,6 +292,16 @@
     const reminderAt = ref('');
     const reminderText = ref('');
     const reminderSaving = ref(false);
+
+    function dismissReminder() {
+        showReminderModal.value = false;
+    }
+    onMounted(() => {
+        document.addEventListener('kiln-dismiss-modal', dismissReminder);
+    });
+    onBeforeUnmount(() => {
+        document.removeEventListener('kiln-dismiss-modal', dismissReminder);
+    });
 
     //watchers user details
     const getWatcherUsers = () => {

@@ -1,6 +1,6 @@
 <template>
-    <Transition v-if="!isLoading">
-        <div v-if="groupType === 1 ? ((searchedTask ? filteredTasksGetter.length : items?.length) || !item?.users?.length) : (!searchedTask || filteredTasksGetter.length)" class="item_wrapper" @scroll="checkScroll">
+    <Transition>
+        <div v-if="boundPaintedCount > 0" class="item_wrapper" @scroll="checkScroll">
             <div class="new-row item_head">
                 <div class="new-col1" :style="`${clientWidth > sideScrollWidth ? 'border:0px' : ''};`">
                     <div class="common-section head" @click="() => {emit('toggle', item); $forceUpdate();}">
@@ -120,16 +120,16 @@
                     </div>
                 </div>
             </div>
-            <div v-if="item.isExpanded">
+            <div v-if="item.isExpanded !== false">
                 <draggable
                     handle=".draggable_icon"
                     :class="{'isDisabled': item.isDisabled}"
                     :clone="clone"
                     :move="checkMove"
-                    :list="(!searchedTask ? items : filteredTasksGetter)"
+                    :list="visibleTaskRows"
                     tag="div"
                     @change="draggedTaskId = '',updateItem('task',$event, item)"
-                    item-key="TaskName"
+                    :item-key="taskRowKey"
                     :group="{name: 'task'}"
                     :sortable="true"
                     :id="`subtasklist_driver ${item.value}`"
@@ -138,7 +138,7 @@
                         <div @dragend="dragEnd" @dragstart="dragStart" @dragover="changeExpanded($event, task, true)">
                             <Task
                                 :data="task"
-                                :key="task._id" 
+                                :key="taskRowKey(task)" 
                                 @toggle="(e)=>(toggleTask(task,e))"
                                 @createTask="createTask = task._id"
                                 class="Task main-task"
@@ -196,7 +196,7 @@
             </div>
         </div>
     </Transition>
-    <div v-else>
+    <div v-if="false">
         <div class="new-row item_head">
             <div class="new-col1" :style="`${clientWidth > sideScrollWidth ? 'border:0px' : ''};`">
                 <div class="common-section head" @click="() => {emit('toggle', item); $forceUpdate();}">
@@ -332,6 +332,7 @@ const {isCustomFields} = customField();
 import * as env from '@/config/env';
 import { useI18n } from "vue-i18n";
 import { apiRequest } from "../../../services";
+import { bindListGroupRows, collectSprintBoardTasks, firstId, rowHasPaintedLabel, sameGroupValue, sprintTasksBucket } from '@/utils/taskOpenProjectId';
 import Skelaton from "@/components/atom/Skelaton/AiSkelaton.vue"
 const { t } = useI18n();
 // UTILS
@@ -347,7 +348,26 @@ const taskCollapsed = inject("taskCollapsed");
 const showArchived = inject("showArchived");
 const companyId = inject("$companyId");
 const {updateTaskByGroup} = useUpdateTasks();
-const isLoading = ref(false);
+const sprintBucket = computed(() => sprintTasksBucket(
+    getters['projectData/tasks'],
+    firstId(props.projectId, props.project && (props.project._id || props.project.id)),
+    firstId(props.sprintId, props.sprintObject && (props.sprintObject.id || props.sprintObject._id)),
+));
+const searchMode = computed(() => Boolean(unref(searchedTask)));
+const visibleTaskRows = computed({
+    get() {
+        if (searchMode.value && paintedVisibleRows(filteredTasksGetter.value).length) {
+            return filteredTasksGetter.value;
+        }
+        return items.value;
+    },
+    set(next) {
+        if (searchMode.value) return;
+        const rows = Array.isArray(next) ? next : [];
+        if (!rows.length && paintedVisibleRows(items.value).length) return;
+        items.value = rows;
+    },
+});
 
 
 // IMAGES
@@ -373,7 +393,11 @@ const props = defineProps({
     }
 });
 
-const emit = defineEmits(["toggle"])
+const emit = defineEmits(["toggle", "visibleCount"])
+
+function taskRowKey(row) {
+    return firstId(row && (row._id || row.id)) || String((row && (row.TaskKey || row.TaskName)) || '');
+}
 
 const languageCheckHeaders = ["commentCounts","AssigneeUserId","DueDate","Task_Priority","TaskKey","created_date","created_by"]
 
@@ -382,7 +406,11 @@ const customFieldList = computed(() => (getters['settings/finalCustomFields'] &&
 onMounted(() => {
     setHeader(customFieldList.value);
     if(tasksGetter.value && tasksGetter.value.length) {
-        items.value =  JSON.parse(JSON.stringify(tasksGetter.value));
+        try {
+            items.value = JSON.parse(JSON.stringify(tasksGetter.value));
+        } catch (_error) {
+            items.value = cloneTaskRows(tasksGetter.value);
+        }
         prepareIndexData();
     }
 
@@ -394,7 +422,7 @@ onMounted(() => {
         };
         let obs = new IntersectionObserver((e) => {
             if(e[0] && e[0]?.isIntersecting) {
-                if(getters['projectData/tasks']?.[props.projectId]?.[props.sprintId]?.tasks.length) {
+                if(sprintBucket.value?.tasks?.length) {
                     getSprintTasks({
                         projectId: props.projectId,
                         sprintId: props.sprintId,
@@ -419,24 +447,18 @@ onMounted(() => {
     })
 });
 
-watch(()=> projectData.value.viewColumn,(newValue,oldValue)=>{
-    if(newValue != oldValue){        
-        headers.value = newValue;
-        headerHideShow.value = headers.value; 
-        if(props.statusIndex === 0){
-            setHeader(getters['settings/finalCustomFields']);
-        }
-    }
-});
+function viewColumnList(columns) {
+    return Array.isArray(columns) ? columns : [];
+}
 
-const headers = ref(projectData.value.viewColumn);
+const headers = ref(viewColumnList(projectData.value && projectData.value.viewColumn));
 const headerHideShow = ref(headers.value);
 const search = ref('');
 const searchKey = ref("");
 const isCustomField = ref(false);
 const sideScrollWidth= 765;
 const taskFields = ref(projectData.value?.taskFields || {});
-const filteredTaskFields = ref(Object.values(taskFields.value));
+const filteredTaskFields = ref(Object.values(taskFields.value || {}));
 const draggedTaskId = ref('');
 
 watch(projectData, () => {
@@ -445,7 +467,9 @@ watch(projectData, () => {
 
 const filterHeaders = ref(headers.value.filter((x) => filteredTaskFields.value.find((y) => y.key === x.key && y.visible)));
 watch([headers, filteredTaskFields], ([val]) => {
-    filterHeaders.value = val.filter((x) => filteredTaskFields.value.find((y) => y.key === x.key && y.visible));
+    const cols = viewColumnList(val);
+    const fields = Array.isArray(filteredTaskFields.value) ? filteredTaskFields.value : [];
+    filterHeaders.value = cols.filter((x) => fields.find((y) => y.key === x.key && y.visible));
 })
 
 watch([searchKey, taskFields], () => {
@@ -506,8 +530,8 @@ function changeExpanded(e, field) {
     }
 }
 const tasksFound = computed(() => {
-    if(getters['projectData/tasks'][props.projectId] && getters['projectData/tasks'][props.projectId][props.sprintId]) {
-        const found = JSON.parse(JSON.stringify(getters['projectData/tasks'][props.projectId][props.sprintId]?.found))
+    if(sprintBucket.value) {
+        const found = JSON.parse(JSON.stringify(sprintBucket.value.found || {}))
         return found?.[`${props.item.searchKey}_${props.item.searchValue}`] || 0
     } else {
         return 0;
@@ -521,41 +545,41 @@ const pointsTotal = computed(() => {
 });
 
 const tasksGetter = ref([])
-watch(() => getters['projectData/tasks']?.[props.projectId]?.[props.sprintId]?.tasks, () => {
-    if(getters['projectData/tasks'][props.projectId] && getters['projectData/tasks'][props.projectId][props.sprintId]) {
-        const store = JSON.parse(JSON.stringify(getters['projectData/tasks'][props.projectId][props.sprintId]))
-        let tmp = [];
-        if(props.item.searchKey === "DueDate") {
-            tmp = store.tasks.filter((x) => {
-                return (x.DueDate ? checkCase(props.item.operation, props.item.searchValue, (new Date(x?.[props.item.searchKey]).getTime() / 1000)) : props.item.operation === "non") && !x?.deletedStatusKey
-            })?.sort((a,b)=> a?.groupByDueDateIndex - b?.groupByDueDateIndex);
-        } else if(props.item.searchKey === "AssigneeUserId") {
-            tmp = store.tasks.filter((x) => {
-                return x.AssigneeUserId.sort((a,b) => a > b ? 1 : -1).join("_") === props.item.value && !x?.deletedStatusKey;
-            })?.sort((a,b)=> a.groupByAssigneeIndex - b.groupByAssigneeIndex);
-        } else {
-            if (props.item.searchKey === "statusKey") {
-                tmp = store.tasks.filter((x) => x[props.item.searchKey] === props.item.searchValue && !x?.deletedStatusKey)?.sort((a,b)=> a?.groupByStatusIndex - b?.groupByStatusIndex);
-            } else if (props.item.searchKey === "Task_Priority") {
-                tmp = store.tasks.filter((x) => x[props.item.searchKey] === props.item.searchValue && !x?.deletedStatusKey)?.sort((a,b)=> a.groupByPriorityIndex - b.groupByPriorityIndex);
-            } else {
-                tmp = store.tasks.filter((x) => x[props.item.searchKey] === props.item.searchValue && !x?.deletedStatusKey)
-            }
-        }
-
-        tmp = tmp.map((x) => {            
-            if(x?.subtaskArray) {
-                x.subtaskArray = x.subtaskArray.filter((y) => !y?.deletedStatusKey);
-            }
-            return x;
-        })
-
-        tasksGetter.value = tmp;
-    } else {
-        tasksGetter.value = [];
+function cloneTaskRows(rows) {
+    try {
+        return JSON.parse(JSON.stringify(rows || []));
+    } catch (_error) {
+        return (rows || []).map((row) => ({ ...row }));
     }
-}, {immediate: true, deep: true})
-const currentProjectTasks = computed(() => getters['projectData/tasks']);
+}
+function paintedVisibleRows(rows) {
+    return (Array.isArray(rows) ? rows : []).filter(rowHasPaintedLabel);
+}
+function listStoreTasks() {
+    const pid = firstId(props.projectId, props.project && (props.project._id || props.project.id));
+    const sid = firstId(props.sprintId, props.sprintObject && (props.sprintObject.id || props.sprintObject._id));
+    return collectSprintBoardTasks(getters['projectData/tasks'], pid, sid);
+}
+function bindGroupArgs() {
+    return {
+        group: props.item,
+        groups: props.sprintObject && Array.isArray(props.sprintObject.items)
+            ? props.sprintObject.items
+            : (props.item ? [props.item] : []),
+        statusIndex: props.statusIndex,
+        storeTasks: listStoreTasks(),
+        groupedTasks: props.item && props.item.tasksArray,
+    };
+}
+const boundRows = computed(() => bindListGroupRows(bindGroupArgs()));
+const boundPaintedCount = computed(() => paintedVisibleRows(boundRows.value).length);
+function bindListRows() {
+    tasksGetter.value = bindListGroupRows(bindGroupArgs());
+}
+watch([
+    () => props.item && props.item.tasksArray,
+    () => listStoreTasks(),
+], bindListRows, {immediate: true, deep: true})
 const filteredTasksGetter = computed(() => {
     if(getters['projectData/searchedTasks']?.length && props.sprintId) {
         if(props.item.searchKey === "DueDate") {
@@ -572,8 +596,10 @@ const filteredTasksGetter = computed(() => {
                 return x.sprintId === props.sprintId && x.AssigneeUserId.sort((a,b) => a > b ? 1 : -1).join("_") === props.item.value;
             })
         } else {
-            
-            return getters['projectData/searchedTasks'].filter((x) => x.sprintId === props.sprintId && x[props.item.searchKey] === props.item.searchValue);
+            if (props.item.searchKey === "statusKey") {
+                return getters['projectData/searchedTasks'].filter((x) => firstId(x.sprintId, x.SprintId) === firstId(props.sprintId) && sameGroupValue(x.statusKey, props.item.searchValue));
+            }
+            return getters['projectData/searchedTasks'].filter((x) => firstId(x.sprintId, x.SprintId) === firstId(props.sprintId) && x[props.item.searchKey] === props.item.searchValue);
         }
     } else {
         return [];
@@ -613,17 +639,21 @@ watch([taskCollapsed], ([newVal], [oldVal]) => {
 })
 
 const items = ref([]);
-watch(() => unref(tasksGetter), (newVal) => {       
-    items.value = newVal.map((x) => {
-        let index = items.value.findIndex((y) => x._id === y._id);        
+watch(() => unref(tasksGetter), (newVal) => {
+    const rows = Array.isArray(newVal) ? newVal : [];
+    items.value = rows.map((x) => {
+        const id = firstId(x && (x._id || x.id));
+        let index = items.value.findIndex((y) => id && id === firstId(y && (y._id || y.id)));
         if(index !== -1) {
             x.isExpanded = items.value[index].isExpanded;
         }
 
         return x;
     });
-    // prepareIndexData();
-})
+}, { immediate: true })
+watch(() => paintedVisibleRows(visibleTaskRows.value).length, (n) => {
+    emit('visibleCount', Number(n) || 0);
+}, { immediate: true, flush: 'post' });
 
 const createTask = ref(false);
 
@@ -633,7 +663,7 @@ const selection = useTaskSelection();
 const canGroupSelect = computed(() => checkPermission('task.task_status', projectData.value?.isGlobalPermission) === true
     && !showArchived.value);
 const groupTaskIds = computed(() => {
-    const source = searchedTask ? filteredTasksGetter.value : items.value;
+    const source = visibleTaskRows.value;
     if (!Array.isArray(source)) return [];
     const ids = [];
     for (const t of source) {
@@ -674,7 +704,7 @@ function toggleTask(task,e) {
             };
             let obs = new IntersectionObserver((e) => {
                 if(e[0] && e[0]?.isIntersecting) {
-                    let storeSprintTasks = getters['projectData/tasks']?.[props.projectId]?.[props.sprintId]?.tasks || [];
+                    let storeSprintTasks = (sprintBucket.value && sprintBucket.value.tasks) || [];
                     if(storeSprintTasks.length && storeSprintTasks.find((x) => x._id === task._id)) {
                         fetchSubTask(task, true);
                     }
@@ -694,7 +724,7 @@ function toggleTask(task,e) {
     }
 
     if(task.isExpanded === true && (!task.subtaskArray || task.subtaskArray.length < 25)) {
-        let fetchNew = currentProjectTasks.value?.[props.projectId]?.[props.sprintId].index[`${task._id}_${props.item.searchKey}_${props.item.searchValue}`] === undefined;
+        let fetchNew = sprintBucket.value?.index?.[`${task._id}_${props.item.searchKey}_${props.item.searchValue}`] === undefined;
         fetchSubTask(task, fetchNew);
     }
 }
@@ -737,7 +767,7 @@ function updateItem(type,e, item) {
         (e.removed && (!e.removed.element || !Object.keys(e.removed.element).length))) || (props.item.value === "NO_DUE_DATE") || (props.item.value === "NEXT")
     ){
         if((props.item.value === "NO_DUE_DATE") || (props.item.value === "NEXT")) {
-            const store = JSON.parse(JSON.stringify(getters['projectData/tasks'][props.projectId][props.sprintId]))
+            const store = JSON.parse(JSON.stringify(sprintBucket.value || { tasks: [] }))
             let tmp = [];
             if(store?.tasks?.length){
                 tmp = store.tasks.filter((x) => {
@@ -888,7 +918,7 @@ function updateItem(type,e, item) {
                 });
             }
 
-            let countTask = getters['projectData/tasks'][props.projectId][props.sprintId];
+            let countTask = sprintBucket.value || { found: {} };
 
             const { indexName, searchKey } = props.item;
 
@@ -1050,7 +1080,7 @@ function fetchSubTask(task, fetchNew = false) {
 }
 
 const handleInput = () => {
-    headerHideShow.value = headers.value;
+    headerHideShow.value = viewColumnList(headers.value);
     if(search.value){
         const filters = headerHideShow.value.filter(x => x?.label?.toLowerCase()?.includes(search.value?.toLowerCase()));
         headerHideShow.value = filters;
@@ -1110,7 +1140,7 @@ const customFieldStore = async(object) => {
                     viewColumn:  {
                         label: value.fieldTitle,
                         key: res?.data?._id || '',
-                        postition: projectData?.value?.viewColumn.length ? projectData?.value?.viewColumn.length + 1 : 0,
+                        postition: viewColumnList(projectData.value && projectData.value.viewColumn).length,
                         show: true
                     }
                 },
@@ -1118,10 +1148,11 @@ const customFieldStore = async(object) => {
             }
             apiRequest("put",`${env.PROJECT}/${props.projectId}`,object).then((response) => {
                 if(response.status === 200){
+                    if (!Array.isArray(projectData.value.viewColumn)) projectData.value.viewColumn = [];
                     projectData.value.viewColumn.push({
                         label: value.fieldTitle,
                         key: res?.data?._id || '',
-                        postition: projectData?.value?.viewColumn.length ? projectData?.value?.viewColumn.length + 1 : 0,
+                        postition: viewColumnList(projectData.value && projectData.value.viewColumn).length,
                         show: true
                     })
                     commit('projectData/mutateProjects', [{ op: "modified", data: { ...projectData.value } }]);
@@ -1152,7 +1183,9 @@ const handleCloseSidebar = (val,pageIndex) => {
     if(pageIndex === 0) isCustomField.value = val;
 };
 
-const setHeader = (customFieldArray) => {
+function setHeader(customFieldArray) {
+    headers.value = viewColumnList(headers.value);
+    headerHideShow.value = viewColumnList(headerHideShow.value);
     if(!isCustomFields()){
         headers.value = headers.value.filter(e => e?.appPermission !== 'CustomFields');
         headerHideShow.value = headerHideShow.value.filter(e => e?.appPermission !== 'CustomFields');
@@ -1189,6 +1222,15 @@ const setHeader = (customFieldArray) => {
     }
 }
 
+watch(() => projectData.value && projectData.value.viewColumn, (newValue, oldValue) => {
+    if (newValue != oldValue) {
+        headers.value = viewColumnList(newValue);
+        headerHideShow.value = headers.value;
+        if (props.statusIndex === 0) {
+            setHeader(getters['settings/finalCustomFields']);
+        }
+    }
+});
 
 function prepareIndexData () {    
     // setTimeout(() => {
@@ -1205,12 +1247,8 @@ function prepareIndexData () {
         var newObj = {pid: projectData.value._id, sprintId: items.value[0].sprintId, tasksArray: taskArray, indexName: items.value[0].indexName};
         commit("projectData/mutateTaskIndex",newObj)
         let count = 0;
-        if (taskArray.length !== 1) {
-            isLoading.value = true;
-        }
         let countFunction = (row) => {
             if (count >= taskWithoutFilter.length) {
-                isLoading.value = false;
                 return;
             } else {
                 if (row.taskKey != '--') {

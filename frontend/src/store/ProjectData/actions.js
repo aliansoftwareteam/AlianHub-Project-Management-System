@@ -1,5 +1,6 @@
 import * as env from '@/config/env';
 import { apiRequest } from '../../services/index'
+import { firstId, sprintTasksBucket } from '@/utils/taskOpenProjectId';
 /**
  * This function is used to get all the projects from MongoDB and add into the Vuex project store.
  * @param {*} state 
@@ -28,7 +29,9 @@ export const setProjects = (state, payload) => {
 export const getTasksFromMongoDB = ({  state,commit,rootState  }, payload) => {
     return new Promise((resolve, reject) => {
         try {
-            const {pid, sprintId, userId, showAllTasks,groupBy,currentView = 'tasks'} = payload;
+            const {userId, showAllTasks,groupBy,currentView = 'tasks'} = payload;
+            const pid = firstId(payload && payload.pid);
+            const sprintId = firstId(payload && payload.sprintId);
             commit("setTaskSnapShotPayload",payload);
             const projectFound = Object.keys(state[currentView]).includes(pid);
             if(projectFound && groupBy?.type !== state[currentView]?.[pid]?.groupBy?.type) {
@@ -112,55 +115,64 @@ export const getTasksFromMongoDB = ({  state,commit,rootState  }, payload) => {
 export const getPaginatedTasks = ({state, commit}, payload) => {
     return new Promise((resolve, reject) => {
         try {
-            const {pid, sprintId, item, fetchNew, parentId = "", indexName = "", showAllTasks} = payload;
-            commit("setGetPaginatedTasksPayload",{data:payload,op: 'add'});
+            const pid = firstId(payload && payload.pid);
+            const sprintId = firstId(payload && payload.sprintId);
+            const {fetchNew, parentId = "", indexName = "", showAllTasks, unfiltered, resetCursor} = payload || {};
+            const item = (payload && payload.item) || (unfiltered
+                ? { searchKey: 'all', searchValue: 'all', indexName: 'kanbanIndex', conditions: [] }
+                : null);
+            if (!pid || !sprintId || !item) {
+                resolve();
+                return;
+            }
+            commit("setGetPaginatedTasksPayload",{data:{...payload, pid, sprintId},op: 'add'});
             const indName = indexName || item.indexName
 
-            const projectFound = Object.keys(state.tasks).includes(pid);
-            let sprintFound = false;
-            if(projectFound) {
-                sprintFound = state.tasks[pid].sprints.includes(sprintId);
-            }
+            const bucket = sprintTasksBucket(state.tasks, pid, sprintId);
+            const sprintFound = Boolean(bucket);
 
-            if(sprintFound && !fetchNew) {
+            if(sprintFound && !fetchNew && !unfiltered && !resetCursor) {
                 resolve();
                 return;
             }
 
-            let cursor = null;
-            let foundKey = `${item.searchKey}_${item.searchValue}`;
+            const foundKey = unfiltered ? 'all' : `${item.searchKey}_${item.searchValue}`;
+            const indexKey = unfiltered
+                ? `${parentId && parentId.length ? `${parentId}_` : ''}all`
+                : `${parentId && parentId.length ? `${parentId}_` : ''}${item.searchKey}_${item.searchValue}`;
+            const cursor = resetCursor ? 0 : ((bucket && bucket.index && bucket.index[indexKey]) || 0);
+            const pageSize = unfiltered ? (payload.limit || 250) : 35;
 
-            const indexKey = `${parentId && parentId.length ? `${parentId}_` : ''}${item.searchKey}_${item.searchValue}`;
-
-            if(sprintFound) {
-                cursor = state.tasks[pid][sprintId].index[indexKey] || null;
+            const matchAnd = [
+                { $or: [
+                    { ProjectID: { objId: { $in: [pid] } } },
+                    { objId: { ProjectID: pid } },
+                    { ProjectID: pid },
+                ] },
+                { $or: [
+                    { sprintId: { objId: { $in: [sprintId] } } },
+                    { objId: { sprintId } },
+                    { sprintId },
+                ] },
+                { deletedStatusKey: { $in: [0] } },
+            ];
+            if (!unfiltered && !(showAllTasks === undefined || showAllTasks === true || showAllTasks === 2)) {
+                matchAnd.push({ AssigneeUserId: { $in: [payload.userId] } });
+            }
+            if (parentId && parentId.length) {
+                matchAnd.push({ ParentTaskId: parentId });
+            } else if (!unfiltered) {
+                matchAnd.push({ isParentTask: true });
+                if (item.mongoConditions && item.mongoConditions.length) {
+                    matchAnd.push(item.mongoConditions[0]);
+                } else if (item.conditions && item.conditions.length) {
+                    matchAnd.push(item.conditions[0]);
+                }
             }
 
             const queryParams = [
                 {
-                    $match: {
-                        objId: {
-                            sprintId: sprintId,
-                            ProjectID: pid
-                        },
-                        deletedStatusKey: 0,
-                        ...((showAllTasks === undefined || showAllTasks === true || showAllTasks === 2) ? {} : {AssigneeUserId: {$in: [payload.userId]}}),
-                        ...( parentId && parentId.length ? 
-                            { ParentTaskId: parentId }
-                        :
-                            {
-                                isParentTask: true,
-                                ...( item.mongoConditions?.length ? 
-                                    { ...item.mongoConditions[0] }
-                                :
-                                    item?.conditions?.length ?
-                                        { ...item.conditions[0] }
-                                    :
-                                        {}
-                                )
-                            }
-                        ),
-                    }
+                    $match: { $and: matchAnd },
                 },
                 { $sort: {[indName]: 1, "createdAt": 1, _id: 1}},
             ]
@@ -171,7 +183,7 @@ export const getPaginatedTasks = ({state, commit}, payload) => {
                     $facet: {
                         result:[
                             { $skip: cursor || 0},
-                            { $limit: 35}
+                            { $limit: pageSize}
                         ],
                         count:[
                             {$count: "count" }
@@ -189,39 +201,43 @@ export const getPaginatedTasks = ({state, commit}, payload) => {
                     let resCount = {};
     
                     if (parentId && parentId.length) {
-                        resCount = { [foundKey]: state.tasks[pid]?.[sprintId]?.found?.[foundKey] || 0 };
-                    } else if (sprintFound && state.tasks[pid]?.[sprintId]?.found?.[foundKey]) {
+                        resCount = { [foundKey]: (bucket && bucket.found && bucket.found[foundKey]) || 0 };
+                    } else if (sprintFound && bucket && bucket.found && bucket.found[foundKey]) {
                         if (response.count?.[0]?.count) {
                             resCount = { [foundKey]: response?.count[0]?.count || 0 };
                         } else {
-                            // resCount = { [foundKey]: state.tasks[pid][sprintId].found[foundKey] || 0};
-                            resCount = { [foundKey]: (state.tasks[pid][sprintId].found[foundKey] === 1 ? 0 : state.tasks[pid][sprintId].found[foundKey]) || 0 };
+                            resCount = { [foundKey]: (bucket.found[foundKey] === 1 ? 0 : bucket.found[foundKey]) || 0 };
                         }
                     } else {
                         resCount = { [foundKey]: response.count?.[0]?.count || 0 };
                     }
     
-                    // SET CURSOR
-                    if(responseData && responseData.length) {
-                        // BUG-017 / #71 fix: body is fully synchronous (Date
-                        // construction + Vuex commit). Drop the unused
-                        // `async` keyword.
+                    const stampDates = (doc) => {
+                        if(doc.startDate && doc.startDate > 0) {
+                            doc.startDate = new Date(doc.startDate * 1000);
+                        }
+                        if(doc.DueDate && doc.DueDate > 0) {
+                            doc.DueDate = new Date(doc.DueDate * 1000);
+                        }
+                        return doc;
+                    };
+                    if (unfiltered) {
+                        const stamped = (responseData || []).map((task) => stampDates({ ...task }));
+                        const parents = stamped.filter((task) => task && task.isParentTask !== false);
+                        const next = parents.length ? parents : stamped;
+                        if (next.length) {
+                            commit('setSprintBoardTasks', {
+                                pid,
+                                sprintId,
+                                tasks: next,
+                            });
+                        }
+                    } else if(responseData && responseData.length) {
                         responseData.forEach((task) => {
-                            const doc = task;
-
-                            if(doc.startDate && doc.startDate > 0) {
-                                doc.startDate = new Date(doc.startDate * 1000);
-                            }
-
-                            if(doc.DueDate && doc.DueDate > 0) {
-                                doc.DueDate = new Date(doc.DueDate * 1000);
-                                // doc.dueDateDeadLine = doc.dueDateDeadLine.map((x) => JSON.parse(x)).map((x) => ({date: new Date(x.date * 1000)}));
-                            }
-
-                            commit('mutateTypesenseTasks', {found: resCount, nextPage: {[indexKey]: (cursor || 0) + responseData?.length || 0}, pid: pid, sprintId: sprintId, data: {...doc}})
+                            commit('mutateTypesenseTasks', {found: resCount, nextPage: {[indexKey]: (cursor || 0) + responseData?.length || 0}, pid, sprintId, data: stampDates({...task})})
                         })
                     } else {
-                        commit('mutateTypesenseTasks', {found: resCount, nextPage: {[indexKey]: (cursor || 0) + responseData?.length || 0}, pid: pid, sprintId: sprintId, data: null})
+                        commit('mutateTypesenseTasks', {found: resCount, nextPage: {[indexKey]: (cursor || 0) + responseData?.length || 0}, pid, sprintId, data: null})
                     }
     
                     resolve({responseData});

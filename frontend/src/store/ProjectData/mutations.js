@@ -1,5 +1,6 @@
 import Cookies from 'js-cookie';
 import { useCustomComposable } from '@/composable/index.js';
+import { firstId, lookupById } from '@/utils/taskOpenProjectId';
 const { checkPermission } = useCustomComposable();
 
 export const mutateMongoUpdatedTask = (state, payload) => {
@@ -12,7 +13,7 @@ export const mutateProjects = (state, payload) => {
     const sortObject = (object = {}) => {
         let obj = {};
         Object.values(object).sort((a, b) => a?.createdAt?.seconds > b?.createdAt?.seconds ? -1 : 1).forEach((x) => {
-            obj[x.id] = x;
+            obj[x.id || x._id] = x;
         });
 
         return obj;
@@ -447,56 +448,110 @@ export const removeProjectTaskSnap = (state, payload) => {
     delete state.tasks[payload];
 }
 
-export const mutateTypesenseTasks = (state, payload) => {
-    const {pid, sprintId, data, nextPage, found = 0} = payload;
+export const setSprintBoardTasks = (state, payload) => {
+    const pid = firstId(payload && (payload.pid || payload.projectId));
+    const sprintId = firstId(payload && payload.sprintId);
+    const rows = Array.isArray(payload && payload.tasks) ? payload.tasks.filter(Boolean) : [];
+    if (!pid || !sprintId) return;
+    let project = lookupById(state.tasks, pid);
+    if (!project || typeof project !== 'object') {
+        state.tasks[pid] = { projectId: pid, sprints: [], snapshot: null };
+        project = state.tasks[pid];
+    }
+    const projectKey = Object.keys(state.tasks).find((key) => state.tasks[key] === project) || pid;
+    const proj = state.tasks[projectKey];
+    if (!Array.isArray(proj.sprints)) proj.sprints = [];
+    if (!proj.sprints.some((sid) => firstId(sid) === sprintId)) proj.sprints.push(sprintId);
+    let bucket = lookupById(proj, sprintId);
+    if (!bucket || typeof bucket !== 'object' || Array.isArray(bucket)) {
+        proj[sprintId] = { index: {}, found: {}, tasks: [], snapshot: null };
+        bucket = proj[sprintId];
+    }
+    bucket.index = {};
+    bucket.found = { all: rows.length };
+    bucket.tasks = rows;
+};
 
-    const keys = Object.keys(state.tasks);
-    const projectFound = keys.includes(pid);
+export const resetSprintTaskBucket = (state, payload) => {
+    const pid = firstId(payload && (payload.pid || payload.projectId));
+    const sprintId = firstId(payload && payload.sprintId);
+    if (!pid || !sprintId) return;
+    const project = lookupById(state.tasks, pid);
+    if (!project || typeof project !== 'object') return;
+    const bucket = lookupById(project, sprintId);
+    if (!bucket || typeof bucket !== 'object') return;
+    bucket.index = {};
+    bucket.found = {};
+    bucket.tasks = [];
+};
+
+export const mutateTypesenseTasks = (state, payload) => {
+    const pid = firstId(payload && payload.pid);
+    const sprintId = firstId(payload && payload.sprintId);
+    const {data, nextPage, found = 0} = payload || {};
+    if (!pid || !sprintId) return;
+
+    const projectHit = lookupById(state.tasks, pid);
+    const projectKey = projectHit
+        ? (Object.keys(state.tasks).find((key) => state.tasks[key] === projectHit) || pid)
+        : pid;
+    const projectFound = Boolean(projectHit);
 
     if(projectFound) {
-        const sprintFound = state.tasks[pid].sprints.includes(sprintId);
+        const project = state.tasks[projectKey];
+        const bucketHit = lookupById(project, sprintId);
+        const sprintKey = bucketHit
+            ? (Object.keys(project).find((key) => project[key] === bucketHit) || sprintId)
+            : sprintId;
+        const sprintFound = Boolean(bucketHit)
+            || (Array.isArray(project.sprints) && project.sprints.some((sid) => firstId(sid) === sprintId));
 
-        if(sprintFound) {
-            state.tasks[pid][sprintId].index = {
-                ...state.tasks[pid][sprintId].index,
+        if(sprintFound && project[sprintKey] && typeof project[sprintKey] === 'object') {
+            const bucket = project[sprintKey];
+            bucket.index = {
+                ...bucket.index,
                 ...nextPage
             };
-            state.tasks[pid][sprintId].found = {
-                ...state.tasks[pid][sprintId].found,
+            bucket.found = {
+                ...bucket.found,
                 ...found
             };
             if(!data) return;
 
             if(data.isParentTask === false) {
 
-                const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data.ParentTaskId);
+                const taskIndex = (bucket.tasks || []).findIndex((x) => x._id === data.ParentTaskId);
 
                 if(taskIndex !== -1) {
-                    if(state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray) {
-                        const subTaskIndex = state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray.findIndex((x) => x._id === data._id);
+                    if(bucket.tasks[taskIndex].subtaskArray) {
+                        const subTaskIndex = bucket.tasks[taskIndex].subtaskArray.findIndex((x) => x._id === data._id);
 
                         if(subTaskIndex !== -1) {
-                            state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray[subTaskIndex] = {...data};
+                            bucket.tasks[taskIndex].subtaskArray[subTaskIndex] = {...data};
                         } else {
-                            state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray.push(data);
+                            bucket.tasks[taskIndex].subtaskArray.push(data);
                         }
                     } else {
-                        state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray = [data];
+                        bucket.tasks[taskIndex].subtaskArray = [data];
                     }
                 }
             } else {
-                const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data._id);
+                if (!Array.isArray(bucket.tasks)) bucket.tasks = [];
+                const taskIndex = bucket.tasks.findIndex((x) => x._id === data._id);
 
                 if(taskIndex !== -1) {
-                    state.tasks[pid][sprintId].tasks[taskIndex] = {...state.tasks[pid][sprintId].tasks[taskIndex], ...data};
+                    bucket.tasks[taskIndex] = {...bucket.tasks[taskIndex], ...data};
                 } else {
-                    state.tasks[pid][sprintId].tasks.push(data);
+                    bucket.tasks.push(data);
                 }
             }
         } else {
 
-            state.tasks[pid].sprints.push(sprintId);
-            state.tasks[pid][sprintId]={
+            if (!Array.isArray(project.sprints)) project.sprints = [];
+            if (!project.sprints.some((sid) => firstId(sid) === sprintId)) {
+                project.sprints.push(sprintId);
+            }
+            project[sprintId]={
                 index: {
                     ...nextPage
                 },
@@ -507,7 +562,7 @@ export const mutateTypesenseTasks = (state, payload) => {
                 snapshot: null
             };
             if(data) {
-                state.tasks[pid][sprintId].tasks = [data];
+                project[sprintId].tasks = [data];
             }
         }
     } else {
@@ -800,7 +855,7 @@ export const mutatedefaultTemplate = (state,payload) =>{
 
 export const mutateSprints = (state,payload) => {
     const {op, data} = payload;
-    let pId = data?.projectId;
+    let pId = firstId(data?.projectId);
     if(op === "added"){
         let projecIdFound = Object.keys(state.sprints).includes(pId);
         if(projecIdFound){
@@ -930,7 +985,7 @@ export const relocateSprint = (state, payload) => {
 
 export const mutateFolders = (state,payload) => {
     const {op, data} = payload;
-    let pId = data?.projectId;
+    let pId = firstId(data?.projectId);
     if(op === "added"){
         let projecIdFound = Object.keys(state.folders).includes(pId)
         if(projecIdFound){

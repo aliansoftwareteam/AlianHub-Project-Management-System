@@ -22,10 +22,11 @@
                     @openDoc="openDoc"
                 />
                 <Comments
-                    v-else-if="activeTab === 'comment' && Object.keys(projectData).length && Object.keys(task).length"
-                    :taskId="task?._id"
+                    v-else-if="activeTab === 'comment' && threadTaskId"
+                    :projectId="openProjectId"
+                    :taskId="threadTaskId"
                     :parentTaskId="task?.ParentTaskId"
-                    :sprintId="task?.sprintId"
+                    :sprintId="threadSprintId"
                     :folderId="task?.folderObjId || null"
                     :userIds="commentUsers"
                     :watchers="[...(task?.watchers || [])]"
@@ -83,7 +84,7 @@
 
 <script setup>
     import { ref, defineProps, computed, inject, onMounted, watch } from 'vue';
-    import { useRoute, useRouter } from 'vue-router';
+    import { useRoute } from 'vue-router';
     import { useStore } from 'vuex';
 
     import TabListHeader from '@/components/molecules/TabListHeader/TabListHeader.vue'
@@ -94,6 +95,7 @@
     import ActivityLog from '@/components/templates/ActivityLog/ActivityLog.vue'
     import TimeLog from '@/views/TimeLog/TimeLog.vue'
     import { useCustomComposable } from '@/composable';
+    import { firstId } from '@/utils/taskOpenProjectId';
 
     const {getters} = useStore();
     const { checkPermission } = useCustomComposable();
@@ -158,11 +160,7 @@
         if (wasOpen && !open) docsRefreshKey.value += 1;
     });
 
-    const router = useRouter();
     const route = useRoute();
-    watch(route, (newVal) => {
-        activeTab.value = newVal.query.detailTab
-    })
 
     const projectData = inject("selectedProject");
     const users = computed(() => getters["settings/companyUsers"]?.map((x) =>x.userId));
@@ -170,17 +168,44 @@
     const activeTab = ref('');
     const isSupportProject = computed(() => process.env.VUE_APP_SUPPORT_PROJECTID === projectData.value._id)
 
+    const openProjectId = computed(() => firstId(
+        props.task && (props.task.ProjectID || props.task.projectId),
+        projectData.value && projectData.value._id,
+        route.params && route.params.id,
+    ));
+    const threadTaskId = computed(() => firstId(
+        props.task && (props.task._id || props.task.id),
+        route.params && route.params.taskId,
+    ));
+    const threadSprintId = computed(() => firstId(
+        props.task && props.task.sprintId,
+        route.params && route.params.sprintId,
+    ));
+
     const customerId = ref(props.task?.customField?.[process.env.VUE_APP_CUSTOMFIELDID]?.fieldValue);
     const productName = ref(props.task?.customField?.[process.env.VUE_APP_CUSTOMFIELDPRODUCTID]?.fieldValue);
 
+    function emitTaskTab(tab) {
+        if (typeof document === 'undefined' || !document.dispatchEvent) return;
+        document.dispatchEvent(new CustomEvent('kiln-task-tab', { detail: tab }));
+    }
+
     onMounted(() => {
-        if(!route.query?.detailTab) {
-            router.replace({query: {detailTab: "task-detail-tab"}})
-        }
-        activeTab.value = route.query.detailTab ? route.query.detailTab : 'task-detail-tab'
+        activeTab.value = route.query.detailTab ? route.query.detailTab : 'task-detail-tab';
     })
 
-    const myCounts = computed(() => getters["users/myCounts"]?.data?.[`task_${projectData.value._id}_${props.task.sprintId}_${props.task._id}_comments`] || 0)
+    watch(() => route.params && route.params.taskId, (id, prev) => {
+        if (!id || id === prev) return;
+        activeTab.value = route.query.detailTab ? route.query.detailTab : 'task-detail-tab';
+    });
+
+    const myCounts = computed(() => {
+        const pid = openProjectId.value;
+        const sid = threadSprintId.value;
+        const tid = threadTaskId.value;
+        if (!pid || !sid || !tid) return 0;
+        return getters["users/myCounts"]?.data?.[`task_${pid}_${sid}_${tid}_comments`] || 0;
+    })
 
     const tabs = ref({
         ...(checkPermission('task.task_details',projectData.value?.isGlobalPermission) === true && {'task-detail-tab': {
@@ -206,8 +231,10 @@
     });
 
     const changeTab = (tab) => {
+        if (!tab) return;
+        emitTaskTab(tab);
+        if (tab === activeTab.value) return;
         activeTab.value = tab;
-        router.replace({...route, query: {...route.query, detailTab: tab}})
     }
 
     const commentUsers = computed(() => {

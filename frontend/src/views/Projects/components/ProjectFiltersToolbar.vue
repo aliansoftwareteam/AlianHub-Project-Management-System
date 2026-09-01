@@ -119,7 +119,7 @@
                             </button>
                         </template>
                         <template #options>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showGlobalSearch = true">
+                            <DropDownOption @click="$refs.more_features_trigger.click(); globalSearchOpen = true">
                                 <div><span class="dropdown-label">{{ $t('Projects.global_search') }}</span></div>
                             </DropDownOption>
                             <DropDownOption @click="$refs.more_features_trigger.click(); showRecent = true">
@@ -163,7 +163,7 @@
                             </DropDownOption>
                         </template>
                     </DropDown>
-                    <GlobalSearchModal v-model="showGlobalSearch" />
+                    <GlobalSearchModal v-model="globalSearchOpen" />
                     <RecentVisitsDropdown v-model="showRecent" />
                     <BurndownModal v-model="showBurndown" :projectData="projectData" />
                     <EpicsPanel v-model="showEpics" :projectData="projectData" />
@@ -265,6 +265,7 @@ import MonthlyCalendarMilestone from '@/components/atom/MonthlyCalendarMilestone
 import BurndownModal from '@/components/molecules/Burndown/BurndownModal.vue';
 import RecentVisitsDropdown from '@/components/molecules/RecentVisits/RecentVisitsDropdown.vue';
 import GlobalSearchModal from '@/components/molecules/GlobalSearch/GlobalSearchModal.vue';
+import { globalSearchOpen } from '@/utils/openGlobalSearch';
 import EpicsPanel from '@/components/molecules/Epics/EpicsPanel.vue';
 import ExportTasksDropdown from '@/components/molecules/ExportTasks/ExportTasksDropdown.vue';
 import PagesPanel from '@/components/molecules/Pages/PagesPanel.vue';
@@ -278,7 +279,6 @@ import AutoArchiveModal from '@/components/molecules/AutoArchive/AutoArchiveModa
 import EstimationScaleModal from '@/components/molecules/EstimationScale/EstimationScaleModal.vue';
 
 const showBurndown = ref(false);
-const showGlobalSearch = ref(false);
 const showEpics = ref(false);
 const showPages = ref(false);
 const showPublicShare = ref(false);

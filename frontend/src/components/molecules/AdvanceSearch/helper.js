@@ -1,28 +1,24 @@
 import { inject } from "vue";
+import { firstId, taskOpenPath } from '@/utils/taskOpenProjectId';
 
 export function filterFun() {
     const urlRegex = inject("$urlRegex");
-    // generateTaskURL
     function generateTaskURL(obj,companyId,action){
         try {
             return new Promise((resolve, reject) => {
                 try{
-                    let path = null;
-                    let navigation = `${window.location.origin}/#`;
-                    if(action){
-                        if(obj.folderId){
-                            path = `${navigation}/${companyId}/project/${obj.ProjectID}/fs/${obj.folderId}/${obj.sprintId}/${obj._id}`
-                        } else {
-                            path = `${navigation}/${companyId}/project/${obj.ProjectID}/s/${obj.sprintId}/${obj._id}`
-                        }
-                    }else{
-                        if(obj.folderObjId){
-                            path = `${navigation}/${companyId}/project/${obj.ProjectID}/fs/${obj.folderObjId}/${obj.sprintId}/${obj._id}`
-                        } else {
-                            path = `${navigation}/${companyId}/project/${obj.ProjectID}/s/${obj.sprintId}/${obj._id}`
-                        }
+                    const path = taskOpenPath({
+                        companyId,
+                        projectId: obj && firstId(obj.ProjectID, obj.projectId),
+                        sprintId: obj && firstId(obj.sprintId, obj.SprintId),
+                        taskId: obj && firstId(obj._id, obj.taskId),
+                        folderId: firstId(action ? (obj && obj.folderId) : (obj && obj.folderObjId)),
+                    });
+                    if (!path) {
+                        resolve('');
+                        return;
                     }
-                    resolve(path);
+                    resolve(`${window.location.origin}/#${path}`);
                 } catch (e) {
                     reject(e)
                     console.error(e);

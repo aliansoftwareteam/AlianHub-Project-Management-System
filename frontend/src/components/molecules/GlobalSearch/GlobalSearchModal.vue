@@ -11,6 +11,10 @@
                 @keydown.esc="close"
             />
             <div v-if="isSearching" class="gray81 font-size-12 gsearch__hint">{{ $t('Projects.searching') }}</div>
+            <div v-else-if="missingHit" class="td-missing__card gsearch__missing">
+                <p class="td-missing__line">{{ $t('Projects.task_not_in_project') }}</p>
+                <button type="button" class="td-missing__back" @click="missingHit = false">{{ $t('Projects.task_back_to_search') }}</button>
+            </div>
             <template v-else-if="hasResults">
                 <div v-if="results.tasks.length" class="gsearch__group">
                     <div class="gsearch__group-title font-size-11">{{ $t('Projects.tasks') }}</div>
@@ -21,7 +25,7 @@
                         @click="openTask(task)"
                     >
                         <span class="font-size-12 font-weight-600 blue mr-5px">{{ task.TaskKey }}</span>
-                        <span class="font-size-13 gsearch__name">{{ task.TaskName }}</span>
+                        <span class="font-size-13 gsearch__name" @click.stop="openTask(task)">{{ task.TaskName }}</span>
                         <span v-if="task.status && task.status.text" class="font-size-11 gsearch__chip">{{ task.status.text }}</span>
                     </div>
                 </div>
@@ -55,15 +59,26 @@
 <script setup>
 // PACKAGES
 import { computed, defineProps, inject, nextTick, ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 
 // UTILS
 import { apiRequest } from '@/services';
 import { useCustomComposable } from "@/composable";
+import { resolveTaskOpenIds, firstId, injectedId, taskOpenRoute } from '@/utils/taskOpenProjectId';
+import { closeGlobalSearch, rememberSearchTasks } from '@/utils/openGlobalSearch';
 
 const { debounce } = useCustomComposable();
 const router = useRouter();
+const route = useRoute();
 const companyId = inject('$companyId');
+
+function companyIdNow() {
+    return firstId(
+        injectedId(companyId),
+        route.params && route.params.cid,
+        typeof localStorage !== 'undefined' && localStorage.getItem('selectedCompany'),
+    );
+}
 
 const props = defineProps({
     modelValue: {
@@ -78,6 +93,7 @@ const inputEl = ref(null);
 const query = ref('');
 const isSearching = ref(false);
 const searched = ref(false);
+const missingHit = ref(false);
 const results = ref({ tasks: [], projects: [], comments: [] });
 
 const hasResults = computed(() =>
@@ -88,12 +104,14 @@ watch(() => props.modelValue, (open) => {
     if (open) {
         query.value = '';
         searched.value = false;
+        missingHit.value = false;
         results.value = { tasks: [], projects: [], comments: [] };
         nextTick(() => inputEl.value && inputEl.value.focus());
     }
 });
 
 function close() {
+    closeGlobalSearch();
     emit('update:modelValue', false);
 }
 
@@ -109,6 +127,7 @@ const onInput = debounce(() => {
     .then((response) => {
         if (response.data?.status) {
             results.value = response.data.data;
+            rememberSearchTasks(response.data.data && response.data.data.tasks);
         }
         searched.value = true;
     })
@@ -123,27 +142,37 @@ const onInput = debounce(() => {
 // Task routes: /:cid/project/:id/fs/:folderId/:sprintId/:taskId (folder) or
 // /:cid/project/:id/s/:sprintId/:taskId (plain sprint).
 function openTask(task) {
+    const ids = resolveTaskOpenIds(task);
+    if (!ids.taskId) return;
+    if (!ids.projectId) {
+        missingHit.value = true;
+        return;
+    }
+    const dest = taskOpenRoute({
+        companyId: companyIdNow(),
+        projectId: ids.projectId,
+        sprintId: ids.sprintId,
+        taskId: ids.taskId,
+        folderId: task.folderObjId,
+    });
+    if (!dest) {
+        missingHit.value = true;
+        return;
+    }
     close();
-    const base = `/${companyId.value}/project/${task.ProjectID}`;
-    const path = task.folderObjId
-        ? `${base}/fs/${task.folderObjId}/${task.sprintId}/${task._id}`
-        : `${base}/s/${task.sprintId}/${task._id}`;
-    router.push(path).catch((error) => console.error('ERROR opening search task: ', error));
+    router.push({ ...dest, query: { detailTab: 'task-detail-tab' } }).catch((error) => console.error('ERROR opening search task: ', error));
 }
 
-// Project routes always include a sprint segment (see router/projects), so the
-// API returns each project's first active sprint. Projects without one fall
-// back to the sprint-less /p route, keeping the list view as landing tab.
 function openProject(project) {
     close();
-    const base = `/${companyId.value}/project/${project._id}`;
-    let path = `${base}/p?tab=ProjectListView`;
-    if (project.sprintId) {
-        path = project.folderId
-            ? `${base}/fs/${project.folderId}/${project.sprintId}?tab=ProjectListView`
-            : `${base}/s/${project.sprintId}?tab=ProjectListView`;
-    }
-    router.push(path).catch((error) => console.error('ERROR opening search project: ', error));
+    const dest = taskOpenRoute({
+        companyId: companyIdNow(),
+        projectId: project._id,
+        sprintId: project.sprintId,
+        folderId: project.folderId,
+    });
+    if (!dest) return;
+    router.push({ ...dest, query: { tab: 'ProjectListView' } }).catch((error) => console.error('ERROR opening search project: ', error));
 }
 </script>
 
@@ -214,5 +243,33 @@ function openProject(project) {
     margin-left: 8px;
     white-space: nowrap;
     color: #6a6a6a;
+}
+.gsearch__missing {
+    margin-top: 14px;
+    background: var(--kiln-canvas, #fbf6ec);
+    border: 1px solid var(--kiln-line, #d8cbb3);
+    border-left: 3px solid var(--kiln-ember, #c45c26);
+    border-radius: var(--kiln-radius-sm, 9px);
+    padding: 16px 18px;
+    color: var(--kiln-ink, #1b2f28);
+}
+.gsearch__missing .td-missing__line {
+    margin: 0 0 12px;
+    font-family: var(--kiln-font-display), Georgia, serif;
+    font-size: 15px;
+    font-weight: 600;
+}
+.gsearch__missing .td-missing__back {
+    border: 1px solid var(--kiln-line, #d8cbb3);
+    border-radius: var(--kiln-radius-sm, 9px);
+    background: var(--kiln-ink, #1b2f28);
+    color: var(--kiln-paper, #f4ead8);
+    font-family: var(--kiln-font-body), sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 6px 10px;
+    cursor: pointer;
 }
 </style>

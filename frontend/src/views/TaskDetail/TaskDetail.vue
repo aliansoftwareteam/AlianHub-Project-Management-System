@@ -1,10 +1,18 @@
 <template>
     <div>
+        <div v-if="openBlocked" class="td-missing">
+            <div class="td-missing__card">
+                <p class="td-missing__line">{{ $t('Projects.task_not_in_project') }}</p>
+                <button type="button" class="td-missing__back" @click="backToSearch">{{ $t('Projects.task_back_to_search') }}</button>
+            </div>
+        </div>
         <Sidebar
+            v-else-if="showTaskChrome"
             width="1545px"
             :defaultLayout="false"
             :visible="isTaskDetailSideBar"
-            @update:visible="() => $emit('toggleTaskDetail' , task, true)"
+            :closeOnBackDrop="false"
+            @update:visible="onSidebarVisible"
             className="task-detail-sidebar"
             headClass="task-detail-head"
             :zIndex="props.zIndex"
@@ -16,9 +24,9 @@
                         <img :src="sidebarArrowIcon" v-if="task.isParentTask === false" alt="sidebarArrowIcon" class="cursor-pointer mr-10px" style="width: 25px; height: 25px;" @click.stop="open('parent')"/>
                     </div>
                     <div class="task-details-title-wrapper">
-                        <Skelaton v-if="(task && projectData?.ProjectName && task?.sprintName && task.TaskName) ? false : isSpinner" style="height: 35px;width:55%;" class="border-radius-5-px"/>
+                        <Skelaton v-if="isSpinner && !taskLoaded" style="height: 35px;width:55%;" class="border-radius-5-px"/>
                         <TaskDetailNavBar
-                            v-if="((task && projectData?.ProjectName && task?.sprintName && task.TaskName) ? true : !isSpinner) && clientWidth > 764 && !isSupport"
+                            v-if="(taskLoaded || !isSpinner) && clientWidth > 764 && !isSupport"
                             :taskKey="task.TaskKey"
                             :isParent="task.isParentTask"
                             :sprintName="task.sprintName ? task.sprintName : ''"
@@ -29,7 +37,8 @@
                             @open="(val) => open(val)"
                         />
                         <TaskDetailTitle
-                            v-if="(task && Object.keys(task).length && task.TaskName && projectData?.ProjectName && task?.sprintName) ? true : !isSpinner"
+                            v-if="taskLoaded || !isSpinner"
+                            ref="titleRef"
                             :taskName="task.TaskName"
                             :isSupport="isSupport"
                             :taskType="task.TaskTypeKey"
@@ -113,6 +122,9 @@
     import taskClass from "@/utils/TaskOperations";
     import { apiRequest } from '../../services';
     import * as env from '@/config/env';
+    import { resolveOpenProjectId, shouldShowTaskChrome, bindSprintsToProject, asDocList, taskOpenRoute, firstId } from '@/utils/taskOpenProjectId';
+    import { openGlobalSearch } from '@/utils/openGlobalSearch';
+    import { ignoreTaskBackdrop } from '@/utils/taskPanelGuard';
     import Sidebar from '@/components/molecules/Sidebar/Sidebar.vue'
     import TaskDetailNavBar from '@/components/molecules/TaskDetailNavBar/TaskDetailNavBar.vue'
     import TaskDetailTitle from '@/components/molecules/TaskDetailTitle/TaskDetailTitle.vue'
@@ -171,6 +183,13 @@
     const snap = ref(null);
     const projectDataObj = inject("selectedProject");
     const projectData = ref(projectDataObj?.value ? projectDataObj?.value : {});
+
+    const resolvedProjectId = computed(() => resolveOpenProjectId({
+        queryProjectId: props.projectId,
+        selectedTask: props.selectedTask,
+        routeProjectId: route.params && route.params.id,
+    }));
+    const openBlocked = ref(false);
 
     const clientWidth = ref(document.documentElement.clientWidth);
     window.addEventListener('resize', (e) => {
@@ -246,9 +265,82 @@
     const currentUserId = inject("$userId");
     const user = getUser(currentUserId.value);
     const isSpinner = ref(true);
+    let hydrateGen = 0;
+    let hydrateTimer = null;
 
-    // Get task details from MongoDB
     const task = ref(props?.selectedTask ? props.selectedTask : {});
+    const taskLoaded = computed(() => Boolean(
+        task.value && task.value.TaskName && projectData.value && projectData.value.ProjectName
+    ));
+    const showTaskChrome = computed(() => shouldShowTaskChrome({
+        projectId: resolvedProjectId.value,
+        loaded: taskLoaded.value,
+        blocked: openBlocked.value,
+    }));
+
+    const titleRef = ref(null);
+
+    function isEscapeKey(event) {
+        if (!event) return false;
+        return event.key === 'Escape' || event.key === 'Esc' || event.keyCode === 27;
+    }
+
+    function nestedLayerOpen() {
+        if (document.querySelector('.drop-down-menu')) return 'dropdown';
+        if (document.querySelector('.taf__preview')) return 'autofill';
+        if (document.querySelector('.reminder-modal, .reminder-modal__overlay')) return 'modal';
+        return '';
+    }
+
+    function dismissNestedLayer(kind) {
+        if (kind === 'dropdown') {
+            document.dispatchEvent(new CustomEvent('kiln-dismiss-dropdown'));
+            return;
+        }
+        if (kind === 'autofill') {
+            document.dispatchEvent(new CustomEvent('kiln-dismiss-autofill'));
+            return;
+        }
+        if (kind === 'modal') {
+            document.dispatchEvent(new CustomEvent('kiln-dismiss-modal'));
+        }
+    }
+
+    function onPanelEscape(event) {
+        if (!isEscapeKey(event)) return;
+        const nested = nestedLayerOpen();
+        if (nested === 'dropdown') {
+            dismissNestedLayer(nested);
+            event.preventDefault();
+            event.stopPropagation();
+            if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+            return;
+        }
+        if (titleRef.value && titleRef.value.isEditing) {
+            titleRef.value.cancelEdit();
+            event.preventDefault();
+            event.stopPropagation();
+            if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+            return;
+        }
+        if (nested) {
+            dismissNestedLayer(nested);
+            event.preventDefault();
+            event.stopPropagation();
+            if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+            return;
+        }
+        if (event.defaultPrevented) return;
+        emit('toggleTaskDetail', task.value, true);
+        event.preventDefault();
+        event.stopPropagation();
+        if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+    }
+
+    function onSidebarVisible() {
+        if (ignoreTaskBackdrop()) return;
+        emit('toggleTaskDetail', task.value, true);
+    }
 
     const updateTaskName = (val) => {
         if(!val?.trim()?.length) return;
@@ -476,42 +568,11 @@
 
     const getSprintFolderData = async (id,sprintsResult,foldersResult) => {
         try {
-            return new Promise((resolve) => {
-                const sprintsArray = sprintsResult?.filter(sprint => sprint.projectId === id && !sprint.folderId).map((x) => ({ ...x, id:x._id }));
-
-                const foldersObject = foldersResult?.reduce((acc, folder) => {
-                    if (folder.projectId === id) {
-                        let folId = folder._id
-                        acc[folId] = {
-                            folderId: folId,
-                            name: folder.name,
-                            sprintsObj: {},
-                            deletedStatusKey: folder.deletedStatusKey,
-                            legacyId : folder?.legacyId ? folder?.legacyId : '',
-                            id: folder._id,
-                            _id: folder._id,
-                        };
-                    }
-                    return acc;
-                }, {});
-
-                sprintsResult?.forEach(sprint => {
-                    if (sprint.projectId === id && sprint.folderId && foldersObject[sprint.folderId]) {
-                        sprint.folderName = foldersObject[sprint.folderId].name;
-                        sprint.id = sprint._id;
-                        foldersObject[sprint.folderId].sprintsObj[sprint.id] = sprint;
-                    }
-                });
-                let allSprints = sprintsArray ? sprintsArray : []
-
-                let allFolders = foldersObject ? foldersObject : {}
-
-                const sprintIdToObject = {};
-                allSprints.forEach(item => {sprintIdToObject[item.id] = item;});
-                resolve({sprints:sprintIdToObject,folders:allFolders})
-            })
+            const bound = bindSprintsToProject(asDocList(sprintsResult), asDocList(foldersResult), id);
+            return { sprints: bound.sprintsObj, folders: bound.sprintsfolders };
         } catch (error) {
             console.error("ERROR", error);
+            return { sprints: {}, folders: {} };
         }
     }
 
@@ -542,10 +603,8 @@
     });
 
     onMounted(async () => {
-        if(route.query?.detailTab) {
-            router.replace({query: {...route.query}})
-        }
         getQueryFun();
+        document.addEventListener('keydown', onPanelEscape, true);
         try {
             document.addEventListener('visibilitychange', visibilityHandler);            
             if(task.value && Object.keys(task.value).length > 0){
@@ -561,6 +620,11 @@
     })
 
     onBeforeUnmount(()=>{
+        hydrateGen += 1;
+        if (hydrateTimer) {
+            clearTimeout(hydrateTimer);
+            hydrateTimer = null;
+        }
         commit('projectData/setTaskDetailData',{});
         commit('projectData/setTaskdetailPayloadId',{});
         const events = ['taskDetail_taskUpdate', 'taskDetail_taskDelete'];
@@ -569,12 +633,42 @@
         });
         socket.value.emit('leaveTaskDetail',`taskDetail_${props.taskId}**${socket.value.id}`);
         clearTimeout(debounceTimeout);
+        document.removeEventListener('keydown', onPanelEscape, true);
         document.removeEventListener('visibilitychange', visibilityHandler);
     })
     provide("selectedProject", projectData);
     // Shared so both the header badge (TaskDetailAction) and the subtask section
     // header (SubTasks) read one identical value and never disagree.
     provide("subtaskCompletion", subtaskCompletion);
+
+    function keepTaskOpenHash() {
+        const openTid = firstId(
+            task.value && (task.value._id || task.value.id),
+            props.taskId,
+            route.params && route.params.taskId,
+        );
+        const dest = taskOpenRoute({
+            companyId: firstId(props.companyId, route.params && route.params.cid),
+            projectId: firstId(
+                resolvedProjectId.value,
+                task.value && (task.value.ProjectID || task.value.projectId),
+                projectData.value && projectData.value._id,
+                route.params && route.params.id,
+            ),
+            sprintId: firstId(task.value && task.value.sprintId, props.sprintId, route.params && route.params.sprintId),
+            taskId: openTid,
+            folderId: firstId(task.value && task.value.folderObjId, route.params && route.params.folderId),
+        });
+        if (!dest) return;
+        if (openTid && !dest.params.taskId) return;
+        const sameName = route.name === dest.name;
+        const sameParams = firstId(route.params.id) === dest.params.id
+            && firstId(route.params.sprintId) === dest.params.sprintId
+            && firstId(route.params.taskId) === dest.params.taskId
+            && firstId(route.params.folderId) === firstId(dest.params.folderId);
+        if (sameName && sameParams) return;
+        router.replace({ ...dest, query: { ...route.query } }).catch(() => {});
+    }
 
     function getParentTask() {
         if(task?.value?.ParentTaskId) {
@@ -588,45 +682,104 @@
         }
     }
 
+    function markTaskMissing() {
+        openBlocked.value = true;
+        isSpinner.value = false;
+        if (hydrateTimer) {
+            clearTimeout(hydrateTimer);
+            hydrateTimer = null;
+        }
+    }
+
+    function backToSearch() {
+        emit('toggleTaskDetail', task.value, true);
+        openGlobalSearch();
+    }
+
     function getQueryFun () {
-        const queryParams = new URLSearchParams({
-            taskId: props.taskId,
-            projectId: props.projectId,
-            subTaskLimit: subTaskLimit.value
-        }).toString();
+        const taskId = firstId(props.taskId, route.params && route.params.taskId);
+        if (!taskId) {
+            markTaskMissing();
+            return;
+        }
+        const gen = ++hydrateGen;
+        if (hydrateTimer) clearTimeout(hydrateTimer);
+        hydrateTimer = setTimeout(() => {
+            if (gen === hydrateGen && !taskLoaded.value) {
+                hydrateGen += 1;
+                markTaskMissing();
+            }
+        }, 8000);
+        const query = {
+            taskId,
+            subTaskLimit: String(subTaskLimit.value),
+        };
+        if (resolvedProjectId.value) query.projectId = resolvedProjectId.value;
+        const queryParams = new URLSearchParams(query).toString();
         try{
             apiRequest('get', `${env.TASK_DATA}?${queryParams}`)
             .then((res) => {
+                if (gen !== hydrateGen) return;
+                if (hydrateTimer) {
+                    clearTimeout(hydrateTimer);
+                    hydrateTimer = null;
+                }
                 if (res.status  == 200 && res.data.length > 0) {
                     let response = res.data
+                    const row = response[0].tasks && response[0].tasks[0];
+                    if (!row || !row._id) {
+                        markTaskMissing();
+                        return;
+                    }
+                    openBlocked.value = false;
+                    isSpinner.value = false;
+                    emit('handleSpinner');
+                    task.value = row;
+                    projectData.value = response[0];
+                    keepTaskOpenHash();
                     const sprint = response[0].sprintsObj;
                     const folder = response[0].sprintsfolders;
                     getSprintFolderData(response[0]._id,sprint,folder).then((resp) => {
-                        response[0].sprintsObj = resp.sprints
-                        response[0].sprintsfolders = resp.folders
-                        isSpinner.value = false;
-                        emit('handleSpinner');
+                        if (gen !== hydrateGen) return;
+                        if (resp && resp.sprints) response[0].sprintsObj = resp.sprints
+                        if (resp && resp.folders) response[0].sprintsfolders = resp.folders
                         projectData.value = response[0];
-                        task.value = response[0].tasks[0] || {};
                         subTasks.value = response[0].subtasks || [];
                         commit('projectData/setTaskDetailData',{isSubTaskData: true, data: subTasks.value});
-                        fetchSubtaskCount();   // accurate %/count when subtasks exceed the loaded slice
+                        fetchSubtaskCount();
 
                         if(!projectData.value?.isGlobalPermission && !(getters["settings/projectRules"] && Object.keys(getters["settings/projectRules"])?.length > 0)) {
-                            dispatch("settings/setProjectRules", {pid: props.projectId})
+                            dispatch("settings/setProjectRules", {pid: resolvedProjectId.value || response[0]._id})
                             .catch((error) => {
                                 console.error("ERROR in get project rules", error);
                             });
                         }
                     })
+                } else {
+                    markTaskMissing();
                 }
             }).catch((error)=>{
+                if (gen !== hydrateGen) return;
+                if (hydrateTimer) {
+                    clearTimeout(hydrateTimer);
+                    hydrateTimer = null;
+                }
                 console.error(error);
+                markTaskMissing();
             })
         }catch(error){
             console.error(error)
+            markTaskMissing();
         }
     }
+
+    watch(resolvedProjectId, (id, prev) => {
+        if (id && id !== prev && !taskLoaded.value) {
+            openBlocked.value = false;
+            isSpinner.value = true;
+            getQueryFun();
+        }
+    });
 
     function changeTaskType(status) {
         const statusIndex = projectData.value.taskTypeCounts.findIndex((x) => x.key === task.value.TaskTypeKey);

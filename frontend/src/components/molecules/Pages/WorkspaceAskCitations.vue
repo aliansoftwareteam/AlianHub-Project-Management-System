@@ -1,44 +1,55 @@
 <template>
     <div v-if="items.length" class="wac">
-        <div class="wac__label">{{ $t('Header.workspace_ask_sources') }}</div>
-        <ul class="wac__list">
-            <li v-for="item in items" :key="item.type + ':' + item.id">
-                <router-link
-                    v-if="item.to"
-                    class="wac__chip"
-                    :to="item.to"
-                    :data-citation-type="item.type"
-                    :data-citation-id="item.id"
-                    :data-project-id="item.projectId || undefined"
-                >
-                    <span class="wac__kind">{{ kindLabel(item.type) }}</span>
-                    <span class="wac__title">{{ item.title }}</span>
-                </router-link>
-                <span
-                    v-else
-                    class="wac__chip is-static"
-                    :data-citation-type="item.type"
-                    :data-citation-id="item.id"
-                    :data-project-id="item.projectId || undefined"
-                >
-                    <span class="wac__kind">{{ kindLabel(item.type) }}</span>
-                    <span class="wac__title">{{ item.title }}</span>
-                </span>
-            </li>
-        </ul>
+        <button
+            v-if="compact && !open"
+            type="button"
+            class="wac__count"
+            @click="open = true"
+        >{{ $t('Projects.pages_sources_count', { n: items.length }) }}</button>
+        <template v-else>
+            <div class="wac__label">{{ $t('Header.workspace_ask_sources') }}</div>
+            <ul class="wac__list">
+                <li v-for="item in items" :key="item.type + ':' + item.id">
+                    <router-link
+                        v-if="item.to"
+                        class="wac__chip"
+                        :to="item.to"
+                        :data-citation-type="item.type"
+                        :data-citation-id="item.id"
+                        :data-project-id="item.projectId || undefined"
+                    >
+                        <span class="wac__kind">{{ kindLabel(item.type) }}</span>
+                        <span class="wac__title">{{ item.title }}</span>
+                    </router-link>
+                    <span
+                        v-else
+                        class="wac__chip is-static"
+                        :data-citation-type="item.type"
+                        :data-citation-id="item.id"
+                        :data-project-id="item.projectId || undefined"
+                    >
+                        <span class="wac__kind">{{ kindLabel(item.type) }}</span>
+                        <span class="wac__title">{{ item.title }}</span>
+                    </span>
+                </li>
+            </ul>
+        </template>
     </div>
 </template>
 
 <script setup>
-import { computed, inject } from 'vue';
+import { computed, inject, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { pageOpenRoute } from '@/utils/taskOpenProjectId';
 
 const props = defineProps({
     citations: { type: Array, default: () => [] },
+    compact: { type: Boolean, default: false },
 });
 
 const { t } = useI18n();
 const companyId = inject('$companyId', '');
+const open = ref(false);
 
 const items = computed(() => {
     const cid = (companyId && companyId.value) || (typeof companyId === 'string' ? companyId : '') || localStorage.getItem('selectedCompany') || '';
@@ -50,8 +61,12 @@ const items = computed(() => {
             projectId: row.projectId ? String(row.projectId) : '',
             to: null,
         };
-        if (citation.type === 'page' && cid) {
-            citation.to = { name: 'Pages', params: { cid }, query: { page: citation.id } };
+        if (citation.type === 'page' && cid && citation.projectId) {
+            citation.to = pageOpenRoute({
+                companyId: cid,
+                projectId: citation.projectId,
+                pageId: citation.id,
+            });
         }
         return citation;
     });
@@ -73,6 +88,17 @@ function kindLabel(type) {
     text-transform: uppercase;
     color: var(--kiln-muted);
     margin-bottom: 6px;
+}
+.wac__count {
+    border: 0;
+    background: transparent;
+    color: var(--kiln-ember);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    padding: 0;
 }
 .wac__list {
     list-style: none;

@@ -15,7 +15,7 @@
                         <div class="d-flex align-items-center advancefilter__body--taskblock">
                             <span class="d-block" :style="[{'background-color':(props?.allTaskStatusArray && props.allTaskStatusArray?.settings?.length) ? props?.allTaskStatusArray?.settings.find((ut)=> ut.key === props?.taskObj?.statusKey)?.bgColor : '','width':'10px','height':'10px','margin-right': '5px'}]"></span>
                             <span class="advancefilter__body--taskstatus gray81 status_text_overflow">
-                                {{(props?.allTaskStatusArray && props?.allTaskStatusArray?.settings?.length) ? props.allTaskStatusArray?.settings.find((ut)=> ut.key === props?.taskObj?.statusKey)?.name : ''}}
+                                {{(props?.allTaskStatusArray && props.allTaskStatusArray?.settings?.length) ? props.allTaskStatusArray?.settings.find((ut)=> ut.key === props?.taskObj?.statusKey)?.name : ''}}
                             </span>
                         </div>
                         <div v-if="findParticularProject(props?.taskObj?.ProjectID)" class="text-ellipse">
@@ -34,17 +34,14 @@
                     <div class="d-flex align-items-center">
                         <span class="advancefilter__body--marginright" v-if="props.taskObj?.isParentTask === false"><img :src="subTaskImage" /> </span>
                         <span class="advancefilter__body--marginright"><img :src="favourite(props.taskObj?.favouriteTasks) && favourite(props.taskObj?.favouriteTasks)?.length ? filledStar : blankStar" /></span>
-                        <span class="advancefilter__body--taskname black text-ellipse d-block advancefilter__body--width" v-html="highlightSearchTerm(props.taskObj?.TaskName)"></span>
+                        <a class="advancefilter__body--taskname black text-ellipse d-block advancefilter__body--width cursor-pointer" :href="taskHref" @click="openFromTitle($event, props.taskObj)" v-html="highlightSearchTerm(props.taskObj?.TaskName)"></a>
                     </div>
                 </div>
             </div>
             <div class="advancefilter__body--list--right">
                 <ul class="advancefilter__body--ul align-items-center">
-                    <li class="cursor-pointer advancefilter__body--newtab" @click="openModel(props.taskObj)">
-                        <img :src="imgOpenSameTab" alt="Copy Link"/>
-                    </li>
-                    <li class="cursor-pointer advancefilter__body--newtab" @click="openInNewTab(props.taskObj)">
-                        <img :src="imgOpenNewTab" alt="Copy Link"/>
+                    <li class="advancefilter__body--newtab">
+                        <a class="advancefilter__open-chip" :href="taskHref" @click="openFromChip($event, props.taskObj)">{{ $t('Projects.search_open') }}</a>
                     </li>
                     <li class="cursor-pointer" @click="copyLink(props.taskObj)">
                         <img :src="imgCopyLink" alt="Copy Link"/>
@@ -53,52 +50,34 @@
             </div>
         </div>
     </template>
-    <TaskDetail
-        v-if="isTaskDetail"
-        :companyId="companyId"
-        :projectId="projectId"
-        :sprintId="sprintId"
-        :taskId="taskId"
-        :isTaskDetailSideBar="isTaskDetail"
-        @toggleTaskDetail="toggleTaskDetail"
-        :zIndex='9'
-    />
 </template>
 
 <script setup>
-    import { inject,defineProps,ref,provide, nextTick } from 'vue';
+    import { inject,defineProps,computed } from 'vue';
     import { useToast } from 'vue-toast-notification';
     import {filterFun} from '@/components/molecules/AdvanceSearch/helper';
-    import TaskDetail from '@/views/TaskDetail/TaskDetail.vue';
     import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
-    import { useRoute, useRouter } from 'vue-router';
+    import { useRouter, useRoute } from 'vue-router';
     import { useI18n } from "vue-i18n";
     const { t } = useI18n();
     import { useCustomComposable } from '../../../composable';
+    import { firstId, injectedId, resolveTaskOpenIds, sameId, taskOpenRoute } from '@/utils/taskOpenProjectId';
+    import { closeGlobalSearch } from '@/utils/openGlobalSearch';
+    import { markSearchClosed } from '@/utils/taskPanelGuard';
     const { generateTaskURL } = filterFun();
     const $toast = useToast();
     const {sanitizeInput} = useCustomComposable();
 
-    //inject
     const userId = inject("$userId");
     const companyId = inject("$companyId");
-    // variable
-    const isTaskDetail = ref(false);
-    // const selectedTask = ref({});
-    const projectId = ref('');
-    const sprintId = ref('');
-    const taskId = ref('');
-    const route = useRoute();
+    const closeAdvanceSearch = inject('closeAdvanceSearch', () => {});
     const router = useRouter();
+    const route = useRoute();
 
-    // image
     const filledStar = require("@/assets/images/svg/start10.svg");
     const blankStar = require("@/assets/images/svg/blankStar.svg");
     const subTaskImage = require("@/assets/images/svg/sub_task_image.svg");
     const imgCopyLink = require('@/assets/images/png/task_copy_link.png');
-    const imgOpenNewTab = require('@/assets/images/png/task_open_new_tab.png');
-    const imgOpenSameTab = require('@/assets/images/svg/entertoopen.svg');
-    // props
     const props = defineProps({
         taskObj : {type:Object,required:true},
         activeTab:{type:String,default:'all'},
@@ -106,7 +85,6 @@
         allTaskStatusArray:{type:Object,required:true},
         searchText:{type:String,default:""}
     });
-    // favourite function
     const favourite = (value) => {
         if(value && value.length){
             let filteredArray = value
@@ -121,7 +99,7 @@
     };
     const findParticularProject = (id) => {
         if(props.allProjectsArray && props.allProjectsArray.length && id){
-            return props.allProjectsArray.find((xt) => xt._id === id)
+            return props.allProjectsArray.find((xt) => sameId(xt._id, id))
         }else{
             return []
         }
@@ -135,51 +113,85 @@
         }
     };
 
-    // This function is use to copy link of selected task
+    const companyIdNow = () => firstId(
+        injectedId(companyId),
+        route.params && route.params.cid,
+        typeof localStorage !== 'undefined' && localStorage.getItem('selectedCompany'),
+    );
+
+    const taskDest = (task) => {
+        const ids = resolveTaskOpenIds(task || {});
+        const listed = findParticularProject(task && task.ProjectID);
+        return taskOpenRoute({
+            companyId: companyIdNow(),
+            projectId: ids.projectId || firstId(listed && listed._id),
+            sprintId: ids.sprintId,
+            taskId: ids.taskId,
+            folderId: firstId(task && (task.folderObjId || (task.sprintArray && task.sprintArray.folderId))),
+        });
+    };
+
+    const taskHref = computed(() => {
+        const dest = taskDest(props.taskObj);
+        if (!dest) return '';
+        return router.resolve({ ...dest, query: { detailTab: 'task-detail-tab' } }).href;
+    });
+
     const copyLink = (task) => {
-        generateTaskURL(task,companyId.value).then((url)=>{
+        generateTaskURL(task, companyIdNow()).then((url)=>{
+            if (!url) return;
             navigator.clipboard.writeText(url);
             $toast.success(t("Toast.Link_is_Copied_to_clipboard"),{position: 'top-right'});
         });
     };
-    // Open task in new tab
-    const openModel = (task) => {
-        isTaskDetail.value = true;
-        projectId.value = task.ProjectID
-        sprintId.value = task.sprintId
-        taskId.value = task._id
-        // generateTaskURL(task,companyId.value).then((url)=>{
-        //     window.open(url, '_blank');
-        // });  
-    };
-    // Open task in new tab
-    const openInNewTab = (task) => {
-        generateTaskURL(task,companyId.value).then((url)=>{
-            window.open(url, '_blank');
+    const openInApp = (event, task) => {
+        if (event && typeof event.preventDefault === 'function') event.preventDefault();
+        if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
+        const dest = taskDest(task);
+        if (!dest || !dest.params || !dest.params.taskId) return;
+        const next = { ...dest, query: { detailTab: 'task-detail-tab' } };
+        router.push(next).catch((error) => {
+            console.error('ERROR opening search task: ', error);
+            const path = router.resolve(next).href || '';
+            if (path) window.location.hash = path.replace(/^[^#]*#/, '');
         });
+        if (typeof closeAdvanceSearch === 'function') closeAdvanceSearch();
+        closeGlobalSearch();
+        markSearchClosed();
     };
-    const toggleTaskDetail = (task,close=false) => {
-        isTaskDetail.value = false;
-        if(close == true) {
-            router.push({...route,query: {}})
-            return;
-        }
-        projectId.value = '';
-        sprintId.value = '';
-        taskId.value = '';
-        nextTick(()=>{
-            router.push({...route,query: {detailTab: "task-detail-tab"}})
-            openModel(task);
-        })
-    }
-    provide('toggleTaskDetail', toggleTaskDetail);
-    provide('isSupport', ref(false));
-    provide('isRouteRequired', false);
-    provide('showArchived', ref(false));
+    const openFromTitle = (event, task) => {
+        if (event && (event.metaKey || event.ctrlKey)) return;
+        openInApp(event, task);
+    };
+    const openFromChip = (event, task) => {
+        openInApp(event, task);
+    };
 </script>
 <style scoped>
 .onlyComment{
     width: 18px !important;
     height: 18px !important;
+}
+.advancefilter__open-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 22px;
+    padding: 2px 10px;
+    border: 1px solid var(--kiln-line, #d8cbb3);
+    border-radius: var(--kiln-radius-sm, 9px);
+    background: var(--kiln-paper, #f4ead8);
+    color: var(--kiln-ember, #c45c26);
+    font-family: var(--kiln-font-body), sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-decoration: none;
+    line-height: 1;
+}
+.advancefilter__open-chip:active {
+    background: var(--kiln-paper, #f4ead8);
+    color: var(--kiln-ink, #1b2f28);
 }
 </style>

@@ -13,6 +13,7 @@ const {
 const { composePage, isAiConfigured } = require('./helpers/pageAi');
 const { runWorkspaceAsk, gatherWorkspaceAskContext, gatherStandupContext } = require('./helpers/runWorkspaceAsk');
 const { applyPageWriteback } = require('../Automations/helpers/agentWritebackRun');
+const { attachProjectsToPages } = require('./helpers/pageProject');
 
 const emitPageChange = (type, data) => {
     try {
@@ -128,7 +129,8 @@ exports.listPages = async (req, res) => {
             type: SCHEMA_TYPE.PAGES,
             data: [filter, 'title parentPageId ProjectID visibility createdBy linkedTasks updatedBy updatedAt order', { sort: { order: 1 } }],
         }, 'find');
-        return res.send({ status: true, statusText: 'Pages fetched.', data: pages || [] });
+        const rows = await attachProjectsToPages(companyId, pages || []);
+        return res.send({ status: true, statusText: 'Pages fetched.', data: rows });
     } catch (error) {
         logger.error(`ERROR in list pages: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
@@ -145,7 +147,13 @@ exports.getPage = async (req, res) => {
         }
         const page = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PAGES,
-            data: [{ _id: new mongoose.Types.ObjectId(id), deletedStatusKey: 0 }],
+            data: [{
+                deletedStatusKey: 0,
+                $or: [
+                    { _id: new mongoose.Types.ObjectId(id) },
+                    { _id: id },
+                ],
+            }],
         }, 'findOne');
         if (!page) {
             return res.send({ status: false, statusText: 'Page not found.' });
@@ -155,7 +163,8 @@ exports.getPage = async (req, res) => {
         if (String(page.visibility || '') === 'private' && String(page.createdBy || '') !== callerId(req)) {
             return res.send({ status: false, statusText: 'Page not found.' });
         }
-        return res.send({ status: true, statusText: 'Page fetched.', data: page });
+        const rows = await attachProjectsToPages(companyId, [page]);
+        return res.send({ status: true, statusText: 'Page fetched.', data: rows[0] || page });
     } catch (error) {
         logger.error(`ERROR in get page: ${error.message}`);
         return res.send({ status: false, statusText: error.message });

@@ -219,7 +219,7 @@
     padding: 1rem;
     overflow-x: auto;
     align-items: flex-start;
-    background: #FFF;
+    background: var(--kiln-paper, #f4ead8);
     height: calc(100vh - 144px);
 }
 
@@ -230,7 +230,6 @@
     border-radius: 8px;
     background-color: transparent;
     min-height: auto;
-    transition: outline 0.2s ease;
     height: 100%;
 }
 
@@ -239,12 +238,11 @@
 }
 
 .kanban-card-skeleton {
-    background-color: white;
+    background-color: var(--kiln-canvas, #fbf6ec);
     padding: 1rem;
     border-radius: 6px;
     font-size: 0.95rem;
-    border: 1px solid #DFE1E6;
-    box-shadow: 0px 1px 6px 0px #4E4E4E1A;
+    border: 1px solid var(--kiln-line, #d8cbb3);
 }
 
 @media (max-width: 1690px) {

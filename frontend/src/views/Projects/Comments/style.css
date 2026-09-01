@@ -44,7 +44,7 @@
     left: 7px;
 }
 .msg__container{
-  /* transition: all 0.05s ease; */
+  overscroll-behavior: contain;
 }
 .convert_dateformat{
   left: 50%;

@@ -37,12 +37,7 @@
                         <img :src="aiIcon" class="mr-3px" />
                         <span @click.stop="suggestTask()" class="ai-color font-size-14 font-weight-500 ai-border-bottom" :class="[{'pointer-event-none' : isSpinner}]">{{$t("AI.suggest_tasks")}}</span>
                     </div>
-                    <!-- Planned / Logged / Overdue for the whole sprint, on the same
-                         definitions the Tasks Summary by Status card uses. Counted on the
-                         server: the list pages at 35 and subtasks are not loaded at all
-                         while collapsed, so a client-side sum would quietly under-report.
-                         No period here — this is the sprint entire. -->
-                    <span v-if="showSprintHours" class="sprint-hours ml-10px" @click.stop>
+                    <span v-if="showSprintHours" class="sprint-hours ml-10px" @click.stop data-board-hours>
                         <span class="sprint-hours__item" :title="$t('Projects.sprint_planned_hint')">
                             <span class="sprint-hours__label">{{ $t('Projects.sprint_planned') }}</span>
                             <span class="sprint-hours__value">{{ hoursLabel(sprintHours.plannedMinutes) }}</span>
@@ -51,8 +46,6 @@
                             <span class="sprint-hours__label">{{ $t('Projects.sprint_logged') }}</span>
                             <span class="sprint-hours__value">{{ hoursLabel(sprintHours.loggedMinutes) }}</span>
                         </span>
-                        <!-- Only an overrun is worth colouring; a sprint inside its plan
-                             has nothing to report. -->
                         <span class="sprint-hours__item" :title="$t('Projects.sprint_overdue_hint')">
                             <span class="sprint-hours__label">{{ $t('Projects.sprint_overdue') }}</span>
                             <span class="sprint-hours__value" :class="{ 'sprint-hours__value--over': sprintHours.overdueMinutes > 0 }">
@@ -240,32 +233,53 @@
                     <Skelaton v-for="i in 5" :key="i" class="border-radius-5-px skelaton__option m-5px border-bottom"/>
                 </div>
                 <span v-if="isError" class="red">{{$t('Toast.something_went_wrong')}}</span>
-                <div class="itemSprintWrapper style-scroll-6-px" id="tasklist_driver">
-                    <template v-if="$route?.query?.tab !== 'Calendar'">
-                        <ItemList
-                            v-for="(item,index) in sprint.items"
-                            :statusIndex="index"
-                            :key="item.key"
-                            :item="item"
-                            :sprintId="sprint?.id"
-                            :projectId="project._id"
-                            :groupType="groupType"
-                            :commonDateFormatForDate="commonDateFormatForDate"
-                            @toggle="item.isExpanded = !item.isExpanded"
-                            :project="project"
-                            :sprintObject="sprint"
-                        />
-                    </template>
-                    <template v-else>
-                        <CalendarViewComponent
-                            :projectData="project"
-                            :sprint="sprint"
-                            :newTaskData="newTaskData"
-                            :calendarDate="initialDate"
-                            @openTaskModel="openTaskModel"
-                        />
-                    </template>
+                <div
+                    ref="loadStripEl"
+                    v-show="surfaceKind === 'loading'"
+                    class="board-load-strip"
+                    :data-board-loading="surfaceKind === 'loading' ? '1' : undefined"
+                >
+                    <p class="board-load-strip__line">{{ $t('EmptyState.board_loading') }}</p>
                 </div>
+                <EmptyState
+                    v-if="surfaceKind === 'failed' || surfaceKind === 'empty'"
+                    :title="surfaceKind === 'failed' ? $t('EmptyState.load_failed_title') : $t('EmptyState.no_sprint_tasks_title')"
+                    :message="surfaceKind === 'failed' ? $t('EmptyState.load_failed_msg', { count: surfaceExpected }) : ''"
+                    :actionLabel="surfaceKind === 'failed' ? $t('EmptyState.load_failed_action') : $t('EmptyState.no_sprint_tasks_action')"
+                    :tone="surfaceKind === 'failed' ? 'copper' : 'pine'"
+                    @action="retrySurface"
+                />
+                <div
+                    v-if="surfaceKind === 'ready' && listPainted > 0"
+                    class="itemSprintWrapper style-scroll-6-px"
+                    id="tasklist_driver"
+                >
+                        <template v-if="$route?.query?.tab !== 'Calendar'">
+                            <ItemList
+                                v-for="(item,index) in sprint.items"
+                                :statusIndex="index"
+                                :key="item.key"
+                                :item="item"
+                                :sprintId="sprintSid"
+                                :projectId="sprintPid"
+                                :groupType="groupType"
+                                :commonDateFormatForDate="commonDateFormatForDate"
+                                @toggle="item.isExpanded = !item.isExpanded"
+                                @visibleCount="(n) => onItemVisible(item.key, n)"
+                                :project="project"
+                                :sprintObject="sprint"
+                            />
+                        </template>
+                        <template v-else>
+                            <CalendarViewComponent
+                                :projectData="project"
+                                :sprint="sprint"
+                                :newTaskData="newTaskData"
+                                :calendarDate="initialDate"
+                                @openTaskModel="openTaskModel"
+                            />
+                        </template>
+                    </div>
             </div>
         </Transition>
 
@@ -306,7 +320,7 @@
 
 <script setup>
 // PACKAGES
-import { computed, defineComponent, defineEmits, defineProps, inject, onMounted, onUnmounted, ref, watch} from 'vue';
+import { computed, defineComponent, defineEmits, defineProps, inject, onMounted, onUnmounted, ref, unref, watch} from 'vue';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { useToast } from 'vue-toast-notification';
 
@@ -321,6 +335,7 @@ import Toggle from "@/components/atom/Toggle/Toggle.vue"
 import Assignee from "@/components/molecules/Assignee/Assignee.vue"
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue"
 import MoveToFolderModal from "@/components/molecules/MoveToFolder/MoveToFolderModal.vue"
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import SprintStateChip from "@/components/molecules/SprintScrum/SprintStateChip.vue"
 import SprintSetupModal from "@/components/molecules/SprintScrum/SprintSetupModal.vue"
 import CompleteSprintModal from "@/components/molecules/SprintScrum/CompleteSprintModal.vue"
@@ -331,6 +346,7 @@ import * as env from '@/config/env';
 import { useStore } from 'vuex';
 import { useRoute } from 'vue-router';
 import { apiRequest } from '../../../services'
+import { boardHoursVisible, collectSprintBoardTasks, countBoundPaintedRows, countSprintBoardTasks, firstId, sprintCountFromSprintBags, sprintExpectedCount, sprintSurfaceKind, sprintTasksBucket, sprintTreeExpectedCount } from '@/utils/taskOpenProjectId';
 import { useAiApiFunction } from "@/composable/aiHelper";
 import taskClass from "@/utils/TaskOperations"
 import { useI18n } from "vue-i18n";
@@ -340,6 +356,10 @@ const { t } = useI18n();
 const project = inject("selectedProject");
 const searchedTask = inject("searchedTask");
 const clientWidth = inject("$clientWidth");
+const boardSurfaceKind = inject('boardSurfaceKind', computed(() => 'loading'));
+const boardExpectedCount = inject('boardExpectedCount', computed(() => 0));
+const onBoardSurfaceAction = inject('onBoardSurfaceAction', () => {});
+const surfaceRetrying = ref(false);
 const { checkPermission, debouncerWithPromise, checkApps} = useCustomComposable();
 const showArchiveVar = inject("showArchived");
 const companyId = inject("$companyId");
@@ -392,25 +412,140 @@ const props = defineProps({
     calendarDate: Number
 })
 
-// ─── Sprint hours: Planned, Logged, Overdue ─────────────────────────────────────
-//
-// The same three figures the Tasks Summary by Status card shows, on the same
-// definitions, for the whole sprint rather than a period. The projection that turns
-// them into "overdue" lives on the server (Modules/Sprints/hours.js) so the two places
-// cannot drift — the card and this header must always agree about what overdue means.
-//
-// Counted on the server for a second reason: the list pages at 35 and subtasks are not
-// fetched at all while the Subtask toggle is Collapsed, so summing what the client
-// happens to hold would under-report — silently, and by more the bigger the sprint.
+const sprintSid = computed(() => firstId(props.sprint?.id, props.sprint?._id));
+const sprintPid = computed(() => firstId(project.value?._id, project.value?.id));
+const localStored = computed(() => countSprintBoardTasks(
+    getters['projectData/tasks'],
+    sprintPid.value,
+    sprintSid.value,
+));
+const localExpected = computed(() => Math.max(
+    sprintExpectedCount(props.sprint),
+    sprintTreeExpectedCount(project.value, sprintSid.value),
+    sprintTreeExpectedCount(getters['projectData/allProjects'], sprintSid.value),
+    sprintCountFromSprintBags(getters['projectData/sprints'], sprintSid.value),
+    sprintCountFromSprintBags(getters['projectData/folders'], sprintSid.value),
+    Number(unref(boardExpectedCount)) || 0,
+    localStored.value,
+));
+const reportedVisible = ref({});
+function onItemVisible(key, count) {
+    reportedVisible.value = { ...reportedVisible.value, [String(key)]: Number(count) || 0 };
+}
+const storeRows = computed(() => collectSprintBoardTasks(
+    getters['projectData/tasks'],
+    sprintPid.value,
+    sprintSid.value,
+));
+const listPainted = computed(() => countBoundPaintedRows(
+    props.sprint && props.sprint.items,
+    storeRows.value,
+));
+const paintedForKind = computed(() => listPainted.value);
+const BOARD_RETRY_HOLD_MS = 4000;
+const loadStripEl = ref(null);
+let retryHoldTimer = null;
+const retryStartedAt = ref(0);
+function paintLoadingNow() {
+    surfaceRetrying.value = true;
+    reportedVisible.value = {};
+    const strip = loadStripEl.value
+        || (typeof document !== 'undefined' && document.querySelector('.board-load-strip'));
+    if (strip && strip.style) {
+        strip.style.display = 'block';
+        strip.setAttribute('data-board-loading', '1');
+    }
+    const host = strip && strip.parentElement;
+    const fail = host && host.querySelector
+        ? host.querySelector('.empty-state--copper')
+        : (typeof document !== 'undefined' && document.querySelector('.empty-state--copper'));
+    if (fail && fail.style) fail.style.display = 'none';
+}
+function paintRetryFrame() {
+    return new Promise((resolve) => {
+        if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(() => requestAnimationFrame(resolve));
+            return;
+        }
+        setTimeout(resolve, 32);
+    });
+}
+function releaseRetryHold() {
+    const wait = Math.max(0, BOARD_RETRY_HOLD_MS - (Date.now() - (retryStartedAt.value || 0)));
+    clearTimeout(retryHoldTimer);
+    retryHoldTimer = setTimeout(() => {
+        surfaceRetrying.value = false;
+    }, wait);
+}
+watch(() => unref(boardSurfaceKind), (kind) => {
+    if (kind !== 'loading' && surfaceRetrying.value) releaseRetryHold();
+});
+watch(sprintSid, () => {
+    reportedVisible.value = {};
+    surfaceRetrying.value = false;
+});
+
 const sprintHours = ref({ plannedMinutes: 0, loggedMinutes: 0, overdueMinutes: 0 });
+const hoursFetched = ref(false);
 const currentCompanyForHours = computed(() => getters["settings/selectedCompany"]);
-// Gated on the same plan feature that gates the estimate editor on a task: a company
-// without time estimates would otherwise stare at three permanent 00h 00m.
-const showSprintHours = computed(() => !!currentCompanyForHours.value?.planFeature?.timeEstimateProjectApp
+const surfaceKind = computed(() => sprintSurfaceKind({
+    loading: surfaceRetrying.value,
+    injected: unref(boardSurfaceKind),
+    paintedCount: paintedForKind.value,
+    sidebarCount: localExpected.value,
+    storedCount: localStored.value,
+}));
+function eventHitsRetry(event) {
+    if (surfaceKind.value !== 'failed' || surfaceRetrying.value) return false;
+    const t = event && event.target;
+    if (t && t.closest && t.closest('.drop-down-menu')) return false;
+    if (t && t.closest && t.closest('[data-board-retry]')) return true;
+    const btn = typeof document === 'undefined' ? null : document.querySelector('[data-board-retry]');
+    if (!btn || event == null) return false;
+    const x = event.clientX;
+    const y = event.clientY;
+    if (typeof x !== 'number' || typeof y !== 'number') return false;
+    const r = btn.getBoundingClientRect();
+    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+}
+function onRetryPointer(event) {
+    if (!eventHitsRetry(event)) return;
+    retrySurface();
+}
+function retrySurface() {
+    if (surfaceRetrying.value) return;
+    if (surfaceKind.value === 'failed') {
+        try {
+            if (typeof document !== 'undefined' && document.dispatchEvent) {
+                document.dispatchEvent(new CustomEvent('kiln-dismiss-dropdown'));
+            }
+            paintLoadingNow();
+            retryStartedAt.value = Date.now();
+            if (typeof onBoardSurfaceAction === 'function') onBoardSurfaceAction('retry');
+            paintRetryFrame().then(() => {
+                const wait = Math.max(0, BOARD_RETRY_HOLD_MS - (Date.now() - retryStartedAt.value));
+                clearTimeout(retryHoldTimer);
+                retryHoldTimer = setTimeout(() => {
+                    if (unref(boardSurfaceKind) !== 'loading') surfaceRetrying.value = false;
+                }, wait);
+            });
+        } catch (error) {
+            console.error('ERROR retrying board surface: ', error);
+        }
+        return;
+    }
+    if (typeof onBoardSurfaceAction === 'function') onBoardSurfaceAction('create');
+}
+const surfaceExpected = computed(() => {
+    const n = localExpected.value;
+    return Number.isFinite(n) ? n : 0;
+});
+const showSprintHours = computed(() => boardHoursVisible(surfaceKind.value)
+    && !!currentCompanyForHours.value?.planFeature?.timeEstimateProjectApp
     && checkPermission('task.task_list', project.value?.isGlobalPermission) === true);
 
-// Same shape the task detail shows ("01h 00m"), so the numbers read as one family.
 const hoursLabel = (minutes) => {
+    if (!hoursFetched.value) return '—';
     const total = Number(minutes) || 0;
     const h = Math.floor(total / 60);
     const m = total % 60;
@@ -418,28 +553,40 @@ const hoursLabel = (minutes) => {
 };
 
 const loadSprintHours = () => {
-    if (!showSprintHours.value || !props.sprint?.id) return;
-    apiRequest("post", `${env.SPRINT_HOURS}`, { sprintId: props.sprint.id })
+    if (!showSprintHours.value || !sprintSid.value) return;
+    apiRequest("post", `${env.SPRINT_HOURS}`, { sprintId: sprintSid.value })
         .then((res) => {
             const d = res?.data?.data;
             if (d) sprintHours.value = d;
+            hoursFetched.value = true;
         })
         .catch(() => {
-            // A failed count must not blank numbers that were right a moment ago.
+            hoursFetched.value = true;
         });
 };
 
-// Re-count when this sprint's tasks change — an estimate edited, time logged, a task
-// added, moved or deleted. Debounced because a bulk change fires this once per task.
 let hoursTimer = null;
 const refreshSprintHours = () => {
     clearTimeout(hoursTimer);
     hoursTimer = setTimeout(loadSprintHours, 600);
 };
-watch(() => getters["projectData/tasks"]?.[project.value?._id]?.[props.sprint?.id]?.tasks,
+watch(() => sprintTasksBucket(getters["projectData/tasks"], sprintPid.value, sprintSid.value)?.tasks,
     refreshSprintHours, { deep: true });
-onMounted(loadSprintHours);
-onUnmounted(() => clearTimeout(hoursTimer));
+watch(surfaceKind, (kind) => {
+    if (kind === 'loading' || kind === 'failed') {
+        hoursFetched.value = false;
+        sprintHours.value = { plannedMinutes: 0, loggedMinutes: 0, overdueMinutes: 0 };
+    }
+});
+watch(showSprintHours, (show) => {
+    if (show) loadSprintHours();
+}, { immediate: true });
+onUnmounted(() => {
+    clearTimeout(hoursTimer);
+    clearTimeout(retryHoldTimer);
+    document.removeEventListener('click', onRetryPointer, true);
+    document.removeEventListener('pointerup', onRetryPointer, true);
+});
 
 watch(route, () => {
     if (createTask.value) {
@@ -816,6 +963,8 @@ function updateSprintAPICALL(updateData = null,historyObj, oldFolderId = undefin
 // WATCHERS
 onMounted(() => {
     handleWatcherList();
+    document.addEventListener('click', onRetryPointer, true);
+    document.addEventListener('pointerup', onRetryPointer, true);
 })
 function handleWatcherList() {
     watcherUsers.value = [];
@@ -1112,6 +1261,33 @@ function startTaskTour(key) {
    even though the component style wins in dev hot-reload. */
 .suggest-tasks-cta{
     display: none !important;
+}
+.board-load-strip {
+    position: relative;
+    z-index: 40;
+    pointer-events: none;
+    background: var(--kiln-paper, #f4ead8);
+    border: 1px solid var(--kiln-line, #d8cbb3);
+    border-radius: var(--kiln-radius-sm, 9px);
+    padding: 12px 16px;
+    margin: 8px 0 4px;
+    min-height: 48px;
+}
+.board-load-strip__line {
+    margin: 0;
+    font-family: var(--kiln-font-display), Georgia, serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--kiln-ink, #1b2f28);
+}
+.itemSprintWrapper--hold {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    visibility: hidden;
+    pointer-events: none;
 }
 
 </style>

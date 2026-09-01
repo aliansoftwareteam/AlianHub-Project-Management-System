@@ -10,6 +10,7 @@ const { parseMentionIds } = require("./helpers/parseMentions");
 const { maybeReplyAsAlianSafe, emitCommentInsert } = require("./helpers/alianReply");
 const { handleNotificationtFun } = require("../notification/prepare-notification-data/controllerV2");
 const { getRoleType, isPrivileged } = require("../../Config/permissionGuard");
+const { buildPaginatedCommentMatch, isHexCastError } = require("./helpers/commentThread");
 
 /* @mention delivery: record the mention (feeds the in-app "mentions" tab, which
  * queries the mentions collection by mentionIds) and fire the notification
@@ -217,25 +218,16 @@ exports.getPaginatedMessages = async (req, res) => {
             tabLeaveTime = null
         } = req.query;
 
+        const match = buildPaginatedCommentMatch({ projectId, taskId, sprintId, isDefault, mainChat });
+        if (match.error) {
+            return res.status(400).json({ status: false, message: match.error, data: [] });
+        }
+
+        const and = match.and;
+        if (tabLeaveTime) and.push({ updatedAt: { $gte: new Date(Number(tabLeaveTime)) } });
+
         const searchResultMatch = {
-            $match: {
-                $and: [
-                    { projectId: new mongoose.Types.ObjectId(projectId) },
-                    // BUG-032 / #86 fix: align soft-delete handling with the other
-                    // comment-listing endpoints (searchMessageFromMainChat /
-                    // searchComments). Without this filter, soft-deleted comments
-                    // (isDeleted === true) reappeared in main-chat pagination.
-                    // `$ne: true` keeps documents whose flag is missing/false.
-                    { isDeleted: { $ne: true } },
-                    ...(sprintId ? [{ sprintId: new mongoose.Types.ObjectId(sprintId) }] : []),
-                    ...(tabLeaveTime ? [{ updatedAt: { $gte: new Date(Number(tabLeaveTime)) } }] : []),
-                    ...(!isDefault && mainChat
-                        ? [{ taskId: "default" }]
-                        : taskId
-                            ? [{ taskId: taskId !== 'default' ?  new mongoose.Types.ObjectId(taskId) : taskId }]
-                            : [{ project: true }]),
-                ]
-            }
+            $match: { $and: and }
         };
 
         const sortOption = {
@@ -261,6 +253,9 @@ exports.getPaginatedMessages = async (req, res) => {
         return res.status(200).json({ status: true, data: response || [] });
 
     } catch (error) {
+        if (isHexCastError(error)) {
+            return res.status(400).json({ status: false, message: 'A valid projectId is required.', data: [] });
+        }
         return res.status(500).json({
             status: false,
             message: 'Internal Server Error',
