@@ -10,7 +10,7 @@
 - [x] Jest + i18n; existing tests green
 
 ## Last step
-Live 360 FAIL fix: copper today-line re-paints after `clearAll`, No dates is a slim stack, empty overlay paints when 0 scheduled.
+Live 360 on 9e6e5ace: Week today-line uses local noon so IST Wed is not Monday; No dates is a left slim stack; all board tasks bind; empty copy is only “No scheduled tasks yet…”.
 
 ## Blockers
 None.
@@ -29,3 +29,9 @@ None.
 - Live 360 FAIL on 636b4398: today-line missing on Day (02 Sep visible) and Week #36; No dates was a horizontal Schedule-chip shelf; empty copy did not overlay the chart.
 - Cause: `renderData()` `clearAll()` wiped the one-shot marker and never re-added it; `.gantt_today` cell class was never assigned; No dates list was `display: flex` row of pills; empty sat as a flex sibling of the chart instead of an overlay.
 - Fix in `GanttView.vue` only: re-paint copper today overlay + marker after every parse/render/scroll; `timeline_cell_class` / `scale_cell_class` mark today; No dates is a slim vertical stack; empty is an absolute pine overlay gated on `scheduled.length === 0`. Board/list files untouched.
+
+### 2026-09-01 (9e6e5ace 360)
+- Week line sat on Mon|Tue: dhtmlx week scale reads UTC day of local midnight (IST Wed 00:00 → Tue 18:30 UTC). Week now paints noon on the local calendar day; Day stays midnight so 02 Sep is unchanged.
+- No dates was still a full-width top shelf. It is a left slim stack beside the chart, with or without bars.
+- SMOKE-2 dropped: first-sprint `node.tasks` only, no subtasks, ignored groupBy callback. Gantt now merges every sprint bucket, subtasks, `alltasks`, and the groupBy callback.
+- Empty copy shortened to “No scheduled tasks yet…”.

@@ -1,6 +1,20 @@
 const { RELATION_TYPES } = require('./relationRules');
 
 const COLLISION_LINE = 'Dates overlap. Blocked task stayed put.';
+const EMPTY_LINE = 'No scheduled tasks yet…';
+
+const localCalendarDay = (value = new Date()) => {
+    const d = value instanceof Date ? value : new Date(value);
+    if (!Number.isFinite(d.getTime())) return null;
+    return { y: d.getFullYear(), m: d.getMonth(), day: d.getDate() };
+};
+
+const todayLineDate = (value = new Date(), scale = 'Week') => {
+    const parts = localCalendarDay(value);
+    if (!parts) return null;
+    if (scale === 'Day') return new Date(parts.y, parts.m, parts.day, 0, 0, 0, 0);
+    return new Date(parts.y, parts.m, parts.day, 12, 0, 0, 0);
+};
 
 const toTime = (value) => {
     if (!value) return NaN;
@@ -56,6 +70,9 @@ const collisionHints = (tasks = [], relationsByTaskId = {}) => {
 
 module.exports = {
     COLLISION_LINE,
+    EMPTY_LINE,
+    localCalendarDay,
+    todayLineDate,
     planBarMove,
     fsCollision,
     collisionHints,

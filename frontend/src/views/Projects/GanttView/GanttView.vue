@@ -18,47 +18,49 @@
         </span>
       </div>
 
-      <div
-        v-if="unscheduled.length"
-        class="gantt-view__nodates"
-      >
-        <span class="gantt-view__nodates-label">{{ $t('Projects.gantt_no_dates') }}</span>
-        <ul class="gantt-view__nodates-list">
-          <li
-            v-for="t in unscheduled"
-            :key="t._id"
-            class="gantt-view__nodates-item"
-            :draggable="!readOnly"
-            @dragstart="onStackDrag($event, t)"
-            :title="t.TaskName || t.TaskKey"
-          >
-            <span class="gantt-view__nodates-name">{{ t.TaskName || t.TaskKey }}</span>
-            <button
-              v-if="!readOnly"
-              type="button"
-              class="gantt-view__nodates-btn"
-              @click="schedule(t)"
-            >{{ $t('Projects.gantt_schedule') }}</button>
-          </li>
-        </ul>
-      </div>
+      <div class="gantt-view__body">
+        <aside
+          v-if="unscheduled.length"
+          class="gantt-view__nodates"
+        >
+          <span class="gantt-view__nodates-label">{{ $t('Projects.gantt_no_dates') }}</span>
+          <ul class="gantt-view__nodates-list">
+            <li
+              v-for="t in unscheduled"
+              :key="t._id"
+              class="gantt-view__nodates-item"
+              :draggable="!readOnly"
+              @dragstart="onStackDrag($event, t)"
+              :title="t.TaskName || t.TaskKey"
+            >
+              <span class="gantt-view__nodates-name">{{ t.TaskName || t.TaskKey }}</span>
+              <button
+                v-if="!readOnly"
+                type="button"
+                class="gantt-view__nodates-btn"
+                @click="schedule(t)"
+              >{{ $t('Projects.gantt_schedule') }}</button>
+            </li>
+          </ul>
+        </aside>
 
-      <div class="gantt-view__main">
-        <div v-if="loadError" class="gantt-view__msg">
-          Couldn't load the Gantt module. Install the dependency and reload:
-          <code>cd frontend &amp;&amp; npm install</code>
-        </div>
-        <template v-else>
-          <div
-            ref="ganttEl"
-            class="gantt-view__chart"
-            @dragover.prevent="onChartDragOver"
-            @drop="onChartDrop"
-          ></div>
-          <div v-if="!scheduled.length && !loading" class="gantt-view__empty">
-            {{ $t('Projects.gantt_empty') }}
+        <div class="gantt-view__main">
+          <div v-if="loadError" class="gantt-view__msg">
+            Couldn't load the Gantt module. Install the dependency and reload:
+            <code>cd frontend &amp;&amp; npm install</code>
           </div>
-        </template>
+          <template v-else>
+            <div
+              ref="ganttEl"
+              class="gantt-view__chart"
+              @dragover.prevent="onChartDragOver"
+              @drop="onChartDrop"
+            ></div>
+            <div v-if="!scheduled.length && !loading" class="gantt-view__empty">
+              {{ $t('Projects.gantt_empty') }}
+            </div>
+          </template>
+        </div>
       </div>
     </template>
   </div>
@@ -104,29 +106,71 @@ let eventIds = [];
 let todayMarker = null;
 
 const hasProject = computed(() => Boolean(props.projectData && props.projectData._id));
-const sprintId = computed(() => props.sprints?.[0]?.id || props.sprints?.[0]?._id || '');
+const loadedRows = ref([]);
 
-function pickTasks(map) {
-    const pid = props.projectData?._id;
-    const sid = sprintId.value;
-    if (!pid || !sid || !map || !map[pid] || !map[pid][sid]) return null;
-    const node = map[pid][sid];
-    return Array.isArray(node.tasks) ? node.tasks : null;
+function hasDate(value) {
+    if (value == null || value === '' || value === 0 || value === '0') return false;
+    const ms = new Date(value).getTime();
+    return Number.isFinite(ms);
 }
-const tasks = computed(() =>
-    pickTasks(getters['projectData/tasks']) || pickTasks(getters['projectData/tableTasks']) || []
-);
+function pushTask(rows, task) {
+    if (!task || !task._id) return;
+    rows.push(task);
+    (task.subtaskArray || []).forEach((child) => pushTask(rows, child));
+}
+function flattenBucket(bucket, rows) {
+    if (!bucket) return;
+    if (Array.isArray(bucket)) {
+        bucket.forEach((t) => pushTask(rows, t));
+        return;
+    }
+    if (typeof bucket !== 'object') return;
+    const list = Array.isArray(bucket.tasks) ? bucket.tasks
+        : Array.isArray(bucket.tasksArray) ? bucket.tasksArray
+        : [];
+    list.forEach((t) => pushTask(rows, t));
+    (bucket.items || []).forEach((item) => flattenBucket(item, rows));
+}
+function collectFromMap(map) {
+    const pid = props.projectData?._id;
+    if (!pid || !map || !map[pid]) return [];
+    const node = map[pid];
+    const rows = [];
+    Object.keys(node).forEach((key) => {
+        if (key === 'sprints' || key === 'projectId' || key === 'groupBy') return;
+        flattenBucket(node[key], rows);
+    });
+    return rows;
+}
+function flattenGroupResp(resp) {
+    const rows = [];
+    (resp || []).forEach((sprint) => flattenBucket(sprint, rows));
+    return rows;
+}
+function mergeTasks(...lists) {
+    const byId = new Map();
+    lists.flat().forEach((t) => {
+        if (t && t._id) byId.set(String(t._id), t);
+    });
+    return [...byId.values()];
+}
+const tasks = computed(() => mergeTasks(
+    collectFromMap(getters['projectData/tasks']),
+    collectFromMap(getters['projectData/tableTasks']),
+    (getters['projectData/alltasks'] || []).filter((t) => t && String(t.ProjectID) === String(props.projectData?._id)),
+    loadedRows.value,
+));
 
 const activeTasks = computed(() => tasks.value.filter((t) => t && [0, 2, undefined, null].includes(t.deletedStatusKey)));
-const scheduled = computed(() => activeTasks.value.filter((t) => t.startDate && t.DueDate));
-const unscheduled = computed(() => activeTasks.value.filter((t) => !(t.startDate && t.DueDate)));
+const scheduled = computed(() => activeTasks.value.filter((t) => hasDate(t.startDate) && hasDate(t.DueDate)));
+const unscheduled = computed(() => activeTasks.value.filter((t) => !(hasDate(t.startDate) && hasDate(t.DueDate))));
 
 const readOnly = computed(() =>
     checkPermission('task.task_due_date', selectedProject.value?.isGlobalPermission ?? props.projectData?.isGlobalPermission) !== true
 );
 
 const signature = computed(() =>
-    JSON.stringify(scheduled.value.map((t) => [
+    JSON.stringify(activeTasks.value.map((t) => [
         t._id, t.TaskName, t.startDate, t.DueDate, t.ParentTaskId || 0,
         t.status?.type || t.statusType || '',
         (t.relations || []).filter((r) => r.type === 'blocks').map((r) => r.taskId),
@@ -202,10 +246,18 @@ function toGanttData() {
     return { data, links };
 }
 
+function localCalendarDay(value) {
+    const d = value instanceof Date ? value : new Date();
+    return { y: d.getFullYear(), m: d.getMonth(), day: d.getDate() };
+}
 function startOfLocalDay(value) {
-    const d = value instanceof Date ? new Date(value.getTime()) : new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
+    const { y, m, day } = localCalendarDay(value instanceof Date ? value : new Date());
+    return new Date(y, m, day, 0, 0, 0, 0);
+}
+function todayForScale(value) {
+    const { y, m, day } = localCalendarDay(value instanceof Date ? value : new Date());
+    if (zoom.value === 'Day') return new Date(y, m, day, 0, 0, 0, 0);
+    return new Date(y, m, day, 12, 0, 0, 0);
 }
 function sameLocalDay(a, b) {
     const left = a instanceof Date ? a : new Date(a);
@@ -229,7 +281,7 @@ function todayViewportLeft() {
     if (!gantt || typeof gantt.posFromDate !== 'function') return null;
     let pos;
     try {
-        pos = gantt.posFromDate(startOfLocalDay());
+        pos = gantt.posFromDate(todayForScale());
     } catch (e) {
         return null;
     }
@@ -263,7 +315,7 @@ function syncTodayMarker() {
             try { gantt.deleteMarker(todayMarker); } catch (e) { /* ignore */ }
             todayMarker = null;
         }
-        todayMarker = gantt.addMarker({ start_date: startOfLocalDay(), css: 'gantt-today-line', text: '' });
+        todayMarker = gantt.addMarker({ start_date: todayForScale(), css: 'gantt-today-line', text: '' });
     } catch (e) {
         todayMarker = null;
     }
@@ -402,11 +454,13 @@ function setZoom(level) {
 }
 
 function ensureTasksLoaded() {
-    if (!hasProject.value || tasks.value.length) return;
+    if (!hasProject.value) return;
     const proj = (selectedProject.value && selectedProject.value._id) ? selectedProject.value : props.projectData;
     if (!proj || !proj._id || !Array.isArray(props.sprints) || !props.sprints.length) return;
     try {
-        groupBy(0, true, proj, props.sprints, ref([]), false, 'list', false, true, () => {});
+        groupBy(0, true, proj, props.sprints, ref([]), false, 'list', false, true, (resp) => {
+            loadedRows.value = flattenGroupResp(resp);
+        });
     } catch (e) {
         console.error('Gantt: task-load trigger failed', e);
     }
@@ -426,6 +480,8 @@ function applyKilnSkin() {
     gantt.config.drag_links = !readOnly.value;
     gantt.config.readonly = readOnly.value;
     gantt.config.date_format = '%Y-%m-%d %H:%i';
+    gantt.config.start_on_monday = true;
+    if ('utc' in gantt.config) gantt.config.utc = false;
     gantt.config.columns = [
         { name: 'text', label: 'Task', tree: true, width: 220, resize: true },
     ];
@@ -578,15 +634,24 @@ onBeforeUnmount(() => {
     padding: 2px 8px;
 }
 .gantt-view__count { margin-left: auto; font-size: 12px; color: #1b2f28; }
+.gantt-view__body {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    flex: 1 1 auto;
+    min-height: 360px;
+}
 .gantt-view__nodates {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
+    flex: 0 0 200px;
+    width: 200px;
+    max-width: 220px;
     gap: 4px;
-    padding: 6px 12px 8px;
-    border-bottom: 1px solid #d8cbb3;
+    padding: 8px 10px;
+    border-right: 1px solid #d8cbb3;
     background: #f4ead8;
-    max-height: 168px;
     overflow-x: hidden;
     overflow-y: auto;
 }
@@ -605,7 +670,7 @@ onBeforeUnmount(() => {
     list-style: none;
     margin: 0;
     padding: 0;
-    width: min(100%, 320px);
+    width: 100%;
 }
 .gantt-view__nodates-item {
     display: flex;
@@ -635,7 +700,7 @@ onBeforeUnmount(() => {
     white-space: nowrap;
     margin-left: auto;
 }
-.gantt-view__main { position: relative; flex: 1 1 auto; display: flex; min-height: 360px; }
+.gantt-view__main { position: relative; flex: 1 1 auto; display: flex; min-height: 360px; min-width: 0; }
 .gantt-view__chart { flex: 1 1 auto; height: 100%; min-height: 360px; background: #fbf6ec; }
 .gantt-view__empty {
     position: absolute;

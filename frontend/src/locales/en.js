@@ -824,7 +824,7 @@ export default {
         gantt_no_dates: "No dates",
         gantt_schedule: "Schedule",
         gantt_collision: "Dates overlap. Blocked task stayed put.",
-        gantt_empty: "No scheduled tasks yet — give a task dates, or drag one from No dates onto the timeline.",
+        gantt_empty: "No scheduled tasks yet…",
         recurrence: "Repeats",
         recurrence_none: "Doesn't repeat",
         recurrence_week: "Weekly",

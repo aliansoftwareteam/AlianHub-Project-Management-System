@@ -1,5 +1,7 @@
 const {
     COLLISION_LINE,
+    EMPTY_LINE,
+    todayLineDate,
     planBarMove,
     fsCollision,
     collisionHints,
@@ -68,6 +70,23 @@ describe('Gantt collision copper hint', () => {
         expect(COLLISION_LINE).toBe('Dates overlap. Blocked task stayed put.');
         expect(hints[0].banner).toBe(false);
         expect(tasks[1].startDate).toBe('2026-08-08');
+    });
+
+    test('empty copy is only the pine sentence', () => {
+        expect(EMPTY_LINE).toBe('No scheduled tasks yet…');
+        expect(EMPTY_LINE).not.toMatch(/give a task dates/);
+    });
+
+    test('week today-line uses noon on the local calendar day so UTC does not snap to week-start', () => {
+        const istWed = new Date(2026, 8, 2, 0, 30, 0, 0);
+        const week = todayLineDate(istWed, 'Week');
+        const day = todayLineDate(istWed, 'Day');
+        expect(week.getFullYear()).toBe(2026);
+        expect(week.getMonth()).toBe(8);
+        expect(week.getDate()).toBe(2);
+        expect(week.getHours()).toBe(12);
+        expect(day.getHours()).toBe(0);
+        expect(day.getDate()).toBe(2);
     });
 
     test('non-overlapping FS arrows have no hint', () => {
