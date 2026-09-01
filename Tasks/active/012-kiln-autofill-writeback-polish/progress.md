@@ -15,7 +15,7 @@
 - [x] Comments pane lists existing Alian comments for the open taskId (no empty pane with badge 1)
 
 ## Last step
-Failed bind (sidebar/store count > 0, painted 0) is cream fail card + copper Retry, no 00h. List ItemList gets coerced sprint/project ids. Autofill always lists Assignee when the rail has no named string chip (Apply or No suggestion).
+Failed bind (store/sidebar N>0, attached list `tasksArray` painted 0) is cream fail card + copper Retry, no 00h. Autofill Assignee row stays.
 
 ## Blockers
 None. Live Local Smoke is not in this VM (no Mongo), so Retry / Autofill / pages were not browser-verified here.
@@ -23,6 +23,7 @@ None. Live Local Smoke is not in this VM (no Mongo), so Retry / Autofill / pages
 ## Log
 
 ### 2026-09-01
+- Bot 3 FAIL on c93a2e93: Autofill Assignee row PASSed (keep). Board still went ready because `localPainted` counted store-mapped `countPaintedSprintTasks` while ItemList had empty `tasksArray`. Painted count is now attached `tasksArray` rows only; store N>0 + painted 0 is failed (cream fail + copper Retry, hours off). Init/Retry write `paintSprintGroups` onto the groups ItemList binds. Gantt / Pages hydrate / Autofill not touched.
 - Bot 3 FAIL on cf05b4c9: overlay landed, but list still painted a white void with 00h because ListView `emptyKind` could be `ready` while ItemList looked up `sprint.id` / `project._id` without coerce, and Autofill hid Assignee when leftover non-string chips made `assigneeEmpty()` false. SprintsList now owns surface kind from this sprint’s sidebar count vs painted rows (sidebar N>0 and painted 0 is cream fail + copper Retry, hours off). ItemList gets `firstId` sprint/project ids. Autofill always lists the Assignee row; leftover object/placeholder/`tId_` chips count as empty so Apply or “No suggestion” can show. Gantt / Pages hydrate not touched.
 - Bot 3 FAIL on 448110b: emptyKind could still go ready/empty while the board painted no cards, and hours showed 00h. Painted count is now only task rows with ids; expected count also reads `sprintsObj`/`sprintsfolders`. store=7 + shown=0 is failed. List/board initial bind uses one unfiltered fetch. ItemList no longer hides status groups when search is stale. Fail card is cream. Autofill Assignee row is `v-if="assigneeEmpty()"` even when seed is null.
 

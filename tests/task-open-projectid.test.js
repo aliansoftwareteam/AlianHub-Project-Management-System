@@ -484,6 +484,7 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(sprintSurfaceKind({ injected: 'ready', paintedCount: 7, sidebarCount: 7 })).toBe('ready');
         expect(sprintSurfaceKind({ injected: 'loading', paintedCount: 0, sidebarCount: 7 })).toBe('loading');
         expect(sprintSurfaceKind({ injected: 'ready', paintedCount: 0, sidebarCount: 0 })).toBe('empty');
+        expect(sprintSurfaceKind({ injected: 'ready', paintedCount: 0, sidebarCount: 0, storedCount: 7 })).toBe('failed');
         expect(coerceAssigneeChipId({ userId: 'u-ada' })).toBe('u-ada');
         expect(coerceAssigneeChipId('  ')).toBe('');
         expect(assigneeChipDisplayName('u-ada', () => ({ Employee_Name: 'Ada Lovelace' }))).toBe('Ada Lovelace');
@@ -527,7 +528,8 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(list).toContain('sprintExpectedCount');
         expect(list).toContain('sprintTreeExpectedCount');
         expect(list).toContain('storedCount: stored');
-        expect(list).toContain('countPaintedSprintTasks');
+        expect(list).toContain('countPaintedTaskRows');
+        expect(list).toContain('bindPaintedSprints');
         expect(list).toContain('paintSprintGroups');
         expect(list).not.toContain('Math.max(countRenderedSprintItems(groups), stored)');
         expect(list).toContain('boardCount: shown');
@@ -542,6 +544,8 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(itemList).toContain('unmatchedBoardTasks');
         expect(itemList).toContain('visibleTaskRows');
         expect(itemList).toContain('searchMode');
+        expect(itemList).toContain('idBearingTaskRows');
+        expect(itemList).toContain('props.item && props.item.tasksArray');
         expect(board).toContain('hasGroups');
         expect(board).toContain('sprintExpectedCount');
         expect(board).toContain('sameGroupValue');
@@ -591,9 +595,9 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(sprintsList).toContain('sprintSurfaceKind');
         expect(sprintsList).toContain('sprintSid');
         expect(sprintsList).toContain('localPainted');
-        expect(sprintsList).toContain('localExpected');
-        expect(sprintsList).toContain("surfaceKind === 'ready'");
-        expect(sprintsList).toContain('countPaintedSprintTasks');
+        expect(sprintsList).toContain('localStored');
+        expect(sprintsList).toContain('countPaintedTaskRows');
+        expect(sprintsList).toContain('storedCount: localStored.value');
         expect(sprintsList).toContain('sprintTreeExpectedCount');
         expect(itemList).toContain('props.sprintObject && (props.sprintObject.id || props.sprintObject._id)');
         const empty = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'atom', 'EmptyState', 'EmptyState.vue'), 'utf8');

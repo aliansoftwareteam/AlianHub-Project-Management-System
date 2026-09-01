@@ -336,7 +336,7 @@ import * as env from '@/config/env';
 import { useStore } from 'vuex';
 import { useRoute } from 'vue-router';
 import { apiRequest } from '../../../services'
-import { boardHoursVisible, countPaintedSprintTasks, firstId, sprintExpectedCount, sprintSurfaceKind, sprintTasksBucket, sprintTreeExpectedCount } from '@/utils/taskOpenProjectId';
+import { boardHoursVisible, countPaintedTaskRows, countSprintBoardTasks, firstId, sprintExpectedCount, sprintSurfaceKind, sprintTasksBucket, sprintTreeExpectedCount } from '@/utils/taskOpenProjectId';
 import { useAiApiFunction } from "@/composable/aiHelper";
 import taskClass from "@/utils/TaskOperations"
 import { useI18n } from "vue-i18n";
@@ -406,14 +406,17 @@ const props = defineProps({
 
 const sprintSid = computed(() => firstId(props.sprint?.id, props.sprint?._id));
 const sprintPid = computed(() => firstId(project.value?._id, project.value?.id));
-const localPainted = computed(() => {
-    const bucket = sprintTasksBucket(getters['projectData/tasks'], sprintPid.value, sprintSid.value);
-    return countPaintedSprintTasks(props.sprint?.items, bucket && bucket.tasks);
-});
+const localStored = computed(() => countSprintBoardTasks(
+    getters['projectData/tasks'],
+    sprintPid.value,
+    sprintSid.value,
+));
+const localPainted = computed(() => countPaintedTaskRows(props.sprint?.items));
 const localExpected = computed(() => Math.max(
     sprintExpectedCount(props.sprint),
     sprintTreeExpectedCount(project.value, sprintSid.value),
     Number(unref(boardExpectedCount)) || 0,
+    localStored.value,
 ));
 
 const sprintHours = ref({ plannedMinutes: 0, loggedMinutes: 0, overdueMinutes: 0 });
@@ -423,6 +426,7 @@ const surfaceKind = computed(() => sprintSurfaceKind({
     injected: unref(boardSurfaceKind),
     paintedCount: localPainted.value,
     sidebarCount: localExpected.value,
+    storedCount: localStored.value,
 }));
 const surfaceExpected = computed(() => {
     const n = localExpected.value;

@@ -396,12 +396,12 @@ export function boardEmptyKind({ loading, sprintsBound, boardCount, expectedCoun
     return 'empty';
 }
 
-export function sprintSurfaceKind({ loading, injected, paintedCount, sidebarCount } = {}) {
+export function sprintSurfaceKind({ loading, injected, paintedCount, sidebarCount, storedCount } = {}) {
     if (loading || injected === 'loading') return 'loading';
     const painted = Number(paintedCount) || 0;
     if (painted > 0) return 'ready';
-    const sidebar = Number(sidebarCount) || 0;
-    if (sidebar > 0) return 'failed';
+    const expected = Math.max(Number(sidebarCount) || 0, Number(storedCount) || 0);
+    if (expected > 0) return 'failed';
     if (injected === 'failed') return 'failed';
     return 'empty';
 }

@@ -50,7 +50,7 @@ import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPla
 import isEqual from 'lodash/isEqual';
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { useTaskSelection } from '@/composable/useTaskSelection.js';
-import { boardEmptyKind, countPaintedSprintTasks, countSprintBoardTasks, firstId, paintSprintGroups, sprintExpectedCount, sprintTasksBucket, sprintTreeExpectedCount } from '@/utils/taskOpenProjectId';
+import { boardEmptyKind, countPaintedTaskRows, countSprintBoardTasks, firstId, paintSprintGroups, sprintExpectedCount, sprintTasksBucket, sprintTreeExpectedCount } from '@/utils/taskOpenProjectId';
 
 // UTILS
 const {getters, commit} = useStore();
@@ -127,8 +127,7 @@ const emptyKind = computed(() => {
     const sid = firstId(sprint && (sprint.id || sprint._id));
     const groups = sprint && Array.isArray(sprint.items) ? sprint.items : [];
     const stored = countSprintBoardTasks(allProjectTasks.value, pid, sid);
-    const bucket = sprintTasksBucket(allProjectTasks.value, pid, sid);
-    const shown = countPaintedSprintTasks(groups, bucket && bucket.tasks);
+    const shown = countPaintedTaskRows(groups);
     return boardEmptyKind({
         loading: retrying.value || isLoading.value || props.sprintLoading,
         sprintsBound: Boolean(props.sprints && props.sprints.length),
@@ -141,6 +140,18 @@ const emptyKind = computed(() => {
 });
 provide('boardSurfaceKind', emptyKind);
 provide('boardExpectedCount', boardExpectedCount);
+function bindPaintedSprints(resp) {
+    const pid = firstId(project.value && project.value._id);
+    const rows = Array.isArray(resp) ? resp : [];
+    groupedTasks.value = rows.map((sprint) => {
+        const bucket = sprintTasksBucket(allProjectTasks.value, pid, firstId(sprint && (sprint.id || sprint._id)));
+        return {
+            ...sprint,
+            items: paintSprintGroups(sprint && sprint.items, bucket && bucket.tasks),
+        };
+    });
+}
+
 function onEmptyAction() {
     if (retrying.value) return;
     if (emptyKind.value !== 'failed') {
@@ -155,14 +166,7 @@ function onEmptyAction() {
     commit('projectData/resetSprintTaskBucket', { pid, sprintId: sid });
     const bindGroups = () => new Promise((resolve) => {
         groupBy(props.grouped, false, project.value, props.sprints, groupedTasks, false, 'list', false, true, (resp) => {
-            const next = Array.isArray(resp) ? resp : [];
-            groupedTasks.value = next.map((sprint) => {
-                const bucket = sprintTasksBucket(allProjectTasks.value, pid, firstId(sprint && (sprint.id || sprint._id)));
-                return {
-                    ...sprint,
-                    items: paintSprintGroups(sprint && sprint.items, bucket && bucket.tasks),
-                };
-            });
+            bindPaintedSprints(resp);
             resolve();
         });
     });
@@ -204,7 +208,7 @@ function init (group,refetch,projects,sprints,groupedTasksData,isBoard,isInitial
     }
     debouncer(1000).then(() => {
         groupBy(group,refetch,projects,sprints,groupedTasksData,isBoard,'list',false,true,(resp)=>{
-            groupedTasks.value = resp;
+            bindPaintedSprints(resp);
             if(!props.sprintLoading){
                 isLoading.value = false;
             }

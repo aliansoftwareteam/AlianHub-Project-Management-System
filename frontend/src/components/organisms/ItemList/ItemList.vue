@@ -355,9 +355,15 @@ const sprintBucket = computed(() => sprintTasksBucket(
     firstId(props.sprintId, props.sprintObject && (props.sprintObject.id || props.sprintObject._id)),
 ));
 const searchMode = computed(() => Boolean(unref(searchedTask)));
-const visibleTaskRows = computed(() => {
-    if (searchMode.value && filteredTasksGetter.value.length) return filteredTasksGetter.value;
-    return items.value;
+const visibleTaskRows = computed({
+    get() {
+        if (searchMode.value && filteredTasksGetter.value.length) return filteredTasksGetter.value;
+        return items.value;
+    },
+    set(next) {
+        if (searchMode.value) return;
+        items.value = Array.isArray(next) ? next : [];
+    },
 });
 
 
@@ -532,38 +538,61 @@ const pointsTotal = computed(() => {
 });
 
 const tasksGetter = ref([])
-watch(() => sprintBucket.value && sprintBucket.value.tasks, () => {
+function cloneTaskRows(rows) {
+    try {
+        return JSON.parse(JSON.stringify(rows || []));
+    } catch (_error) {
+        return (rows || []).map((row) => ({ ...row }));
+    }
+}
+function idBearingTaskRows(rows) {
+    return (Array.isArray(rows) ? rows : []).filter((row) => (
+        row && !row.deletedStatusKey && firstId(row._id, row.id)
+    ));
+}
+function bindListRows() {
+    const grouped = idBearingTaskRows(props.item && props.item.tasksArray);
+    if (grouped.length) {
+        tasksGetter.value = cloneTaskRows(grouped);
+        return;
+    }
     if(sprintBucket.value) {
-        const store = JSON.parse(JSON.stringify(sprintBucket.value))
+        let store;
+        try {
+            store = JSON.parse(JSON.stringify(sprintBucket.value))
+        } catch (_error) {
+            store = sprintBucket.value;
+        }
+        const storeTasks = Array.isArray(store && store.tasks) ? store.tasks : [];
         let tmp = [];
         if(props.item.searchKey === "DueDate") {
-            tmp = store.tasks.filter((x) => {
+            tmp = storeTasks.filter((x) => {
                 return (x.DueDate ? checkCase(props.item.operation, props.item.searchValue, (new Date(x?.[props.item.searchKey]).getTime() / 1000)) : props.item.operation === "non") && !x?.deletedStatusKey
             })?.sort((a,b)=> a?.groupByDueDateIndex - b?.groupByDueDateIndex);
         } else if(props.item.searchKey === "AssigneeUserId") {
-            tmp = store.tasks.filter((x) => {
+            tmp = storeTasks.filter((x) => {
                 return x.AssigneeUserId.sort((a,b) => a > b ? 1 : -1).join("_") === props.item.value && !x?.deletedStatusKey;
             })?.sort((a,b)=> a.groupByAssigneeIndex - b.groupByAssigneeIndex);
         } else {
             if (props.item.searchKey === "statusKey") {
-                tmp = store.tasks.filter((x) => sameGroupValue(x.statusKey, props.item.searchValue) && !x?.deletedStatusKey)?.sort((a,b)=> a?.groupByStatusIndex - b?.groupByStatusIndex);
+                tmp = storeTasks.filter((x) => sameGroupValue(x.statusKey, props.item.searchValue) && !x?.deletedStatusKey)?.sort((a,b)=> a?.groupByStatusIndex - b?.groupByStatusIndex);
                 if (Number(props.statusIndex) === 0) {
                     const siblings = (props.sprintObject && Array.isArray(props.sprintObject.items))
                         ? props.sprintObject.items
                         : [props.item];
                     const mapped = siblings.map((group) => ({
-                        tasksArray: store.tasks.filter((x) => sameGroupValue(x.statusKey, group.searchValue) && !x?.deletedStatusKey),
+                        tasksArray: storeTasks.filter((x) => sameGroupValue(x.statusKey, group.searchValue) && !x?.deletedStatusKey),
                     }));
-                    const extra = unmatchedBoardTasks(mapped, store.tasks);
+                    const extra = unmatchedBoardTasks(mapped, storeTasks);
                     extra.forEach((row) => {
                         const id = firstId(row && (row._id || row.id));
                         if (id && !tmp.some((have) => firstId(have && (have._id || have.id)) === id)) tmp.push(row);
                     });
                 }
             } else if (props.item.searchKey === "Task_Priority") {
-                tmp = store.tasks.filter((x) => x[props.item.searchKey] === props.item.searchValue && !x?.deletedStatusKey)?.sort((a,b)=> a.groupByPriorityIndex - b.groupByPriorityIndex);
+                tmp = storeTasks.filter((x) => x[props.item.searchKey] === props.item.searchValue && !x?.deletedStatusKey)?.sort((a,b)=> a.groupByPriorityIndex - b.groupByPriorityIndex);
             } else {
-                tmp = store.tasks.filter((x) => x[props.item.searchKey] === props.item.searchValue && !x?.deletedStatusKey)
+                tmp = storeTasks.filter((x) => x[props.item.searchKey] === props.item.searchValue && !x?.deletedStatusKey)
             }
         }
 
@@ -574,11 +603,15 @@ watch(() => sprintBucket.value && sprintBucket.value.tasks, () => {
             return x;
         })
 
-        tasksGetter.value = tmp;
+        tasksGetter.value = idBearingTaskRows(tmp);
     } else {
         tasksGetter.value = [];
     }
-}, {immediate: true, deep: true})
+}
+watch([
+    () => props.item && props.item.tasksArray,
+    () => sprintBucket.value && sprintBucket.value.tasks,
+], bindListRows, {immediate: true, deep: true})
 const filteredTasksGetter = computed(() => {
     if(getters['projectData/searchedTasks']?.length && props.sprintId) {
         if(props.item.searchKey === "DueDate") {
@@ -638,9 +671,11 @@ watch([taskCollapsed], ([newVal], [oldVal]) => {
 })
 
 const items = ref([]);
-watch(() => unref(tasksGetter), (newVal) => {       
-    items.value = newVal.map((x) => {
-        let index = items.value.findIndex((y) => x._id === y._id);        
+watch(() => unref(tasksGetter), (newVal) => {
+    const rows = Array.isArray(newVal) ? newVal : [];
+    items.value = rows.map((x) => {
+        const id = firstId(x && (x._id || x.id));
+        let index = items.value.findIndex((y) => id && id === firstId(y && (y._id || y.id)));
         if(index !== -1) {
             x.isExpanded = items.value[index].isExpanded;
         }
