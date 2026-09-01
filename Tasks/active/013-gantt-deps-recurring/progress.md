@@ -10,7 +10,7 @@
 - [x] Jest + i18n; existing tests green
 
 ## Last step
-Kiln pass: collision is a copper line on the arrow only — no overlap banner. dhtmlx lightbox/blue bars/cyan-red links overridden.
+Live 360 FAIL fix: copper today-line re-paints after `clearAll`, No dates is a slim stack, empty overlay paints when 0 scheduled.
 
 ## Blockers
 None.
@@ -24,3 +24,8 @@ None.
 - Gantt: cream rail, pine bars, copper today-line and collision hint. No dates stack. Drag does not cascade. RecurringTasks cron left in place. Due-date week/month spawns the next task on complete only.
 - GitHub CI green on PR 523 (title, branch name, commitlint, CodeRabbit). Stacked on PR 522.
 - Kiln pass: dropped the overlap banner. Collision copy lives on the copper FS arrow (“Dates overlap. Blocked task stayed put.”). Quiet pine arrows otherwise. Lightbox disabled. Empty stays “No scheduled tasks yet…”.
+
+### 2026-09-01
+- Live 360 FAIL on 636b4398: today-line missing on Day (02 Sep visible) and Week #36; No dates was a horizontal Schedule-chip shelf; empty copy did not overlay the chart.
+- Cause: `renderData()` `clearAll()` wiped the one-shot marker and never re-added it; `.gantt_today` cell class was never assigned; No dates list was `display: flex` row of pills; empty sat as a flex sibling of the chart instead of an overlay.
+- Fix in `GanttView.vue` only: re-paint copper today overlay + marker after every parse/render/scroll; `timeline_cell_class` / `scale_cell_class` mark today; No dates is a slim vertical stack; empty is an absolute pine overlay gated on `scheduled.length === 0`. Board/list files untouched.

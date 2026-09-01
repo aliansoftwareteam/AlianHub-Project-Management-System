@@ -202,6 +202,82 @@ function toGanttData() {
     return { data, links };
 }
 
+function startOfLocalDay(value) {
+    const d = value instanceof Date ? new Date(value.getTime()) : new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+}
+function sameLocalDay(a, b) {
+    const left = a instanceof Date ? a : new Date(a);
+    const right = b instanceof Date ? b : new Date(b);
+    return left.getFullYear() === right.getFullYear()
+        && left.getMonth() === right.getMonth()
+        && left.getDate() === right.getDate();
+}
+function todayCellClass(date) {
+    if (!sameLocalDay(date, new Date())) return '';
+    if (zoom.value === 'Day' && date instanceof Date && date.getHours() !== 0) return '';
+    return 'gantt_today';
+}
+function todayOverlayHost() {
+    if (!gantt) return null;
+    return gantt.$task || (ganttEl.value && ganttEl.value.querySelector('.gantt_task')) || null;
+}
+function todayLineLeft() {
+    if (!gantt || typeof gantt.posFromDate !== 'function') return null;
+    let pos;
+    try {
+        pos = gantt.posFromDate(startOfLocalDay());
+    } catch (e) {
+        return null;
+    }
+    if (pos == null || pos === false || Number.isNaN(Number(pos))) return null;
+    const scrollX = (gantt.getScrollState && gantt.getScrollState().x) || 0;
+    return Number(pos) - scrollX;
+}
+function paintTodayOverlay() {
+    const host = todayOverlayHost();
+    if (!host) return;
+    let line = host.querySelector('.gantt-today-overlay');
+    if (!line) {
+        line = document.createElement('div');
+        line.className = 'gantt-today-overlay';
+        line.setAttribute('aria-hidden', 'true');
+        host.appendChild(line);
+    }
+    const left = todayLineLeft();
+    const hostWidth = host.clientWidth || 0;
+    if (left == null || left < -1 || (hostWidth && left > hostWidth)) {
+        line.style.display = 'none';
+        return;
+    }
+    line.style.display = 'block';
+    line.style.left = `${left}px`;
+}
+function syncTodayMarker() {
+    if (!gantt || typeof gantt.addMarker !== 'function') return;
+    try {
+        if (todayMarker != null && typeof gantt.deleteMarker === 'function') {
+            try { gantt.deleteMarker(todayMarker); } catch (e) { /* ignore */ }
+            todayMarker = null;
+        }
+        todayMarker = gantt.addMarker({ start_date: startOfLocalDay(), css: 'gantt-today-line', text: '' });
+    } catch (e) {
+        todayMarker = null;
+    }
+}
+let paintingToday = false;
+function paintTodayLine() {
+    if (!ready || !gantt || paintingToday) return;
+    paintingToday = true;
+    try {
+        syncTodayMarker();
+        paintTodayOverlay();
+    } finally {
+        paintingToday = false;
+    }
+}
+
 function renderData() {
     if (!ready || !gantt) return;
     suppress = true;
@@ -211,6 +287,7 @@ function renderData() {
     } finally {
         suppress = false;
     }
+    paintTodayLine();
 }
 
 function persistDates(id) {
@@ -316,7 +393,10 @@ function applyScales(level) {
 function setZoom(level) {
     zoom.value = level;
     applyScales(level);
-    if (ready && gantt) gantt.render();
+    if (ready && gantt) {
+        gantt.render();
+        paintTodayLine();
+    }
 }
 
 function ensureTasksLoaded() {
@@ -349,6 +429,8 @@ function applyKilnSkin() {
     ];
     gantt.templates.task_class = () => 'gantt-bar--kiln';
     gantt.templates.link_class = (link) => (collidingLinkIds().has(String(link.id)) ? 'gantt-link--collision' : 'gantt-link--fs');
+    gantt.templates.timeline_cell_class = (task, date) => todayCellClass(date);
+    gantt.templates.scale_cell_class = (date) => todayCellClass(date);
     gantt.showLightbox = function () {};
 }
 
@@ -387,14 +469,11 @@ onMounted(async () => {
         eventIds.push(gantt.attachEvent('onAfterTaskDrag', (id) => persistDates(id)));
         eventIds.push(gantt.attachEvent('onAfterLinkAdd', (id, link) => persistLinkAdd(id, link)));
         eventIds.push(gantt.attachEvent('onAfterLinkDelete', (id, link) => persistLinkDelete(link)));
+        eventIds.push(gantt.attachEvent('onGanttRender', () => paintTodayLine()));
+        eventIds.push(gantt.attachEvent('onGanttScroll', () => paintTodayOverlay()));
 
         ready = true;
         renderData();
-        try {
-            if (typeof gantt.addMarker === 'function') {
-                todayMarker = gantt.addMarker({ start_date: new Date(), css: 'gantt-today-line', text: '' });
-            }
-        } catch (e) { /* today cell css fallback */ }
     } catch (e) {
         console.error('Gantt: init failed', e);
         loadError.value = true;
@@ -435,6 +514,9 @@ onBeforeUnmount(() => {
             if (todayMarker != null && typeof gantt.deleteMarker === 'function') {
                 try { gantt.deleteMarker(todayMarker); } catch (e) { /* ignore */ }
             }
+            const host = todayOverlayHost();
+            const line = host && host.querySelector('.gantt-today-overlay');
+            if (line) line.remove();
             gantt.clearAll();
         }
     } catch (e) { /* ignore */ }
@@ -454,7 +536,6 @@ onBeforeUnmount(() => {
     color: #1b2f28;
 }
 .gantt-view__pick,
-.gantt-view__empty,
 .gantt-view__msg {
     padding: 28px 16px;
     text-align: center;
@@ -497,13 +578,15 @@ onBeforeUnmount(() => {
 .gantt-view__count { margin-left: auto; font-size: 12px; color: #1b2f28; }
 .gantt-view__nodates {
     display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 6px 12px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    padding: 6px 12px 8px;
     border-bottom: 1px solid #d8cbb3;
     background: #f4ead8;
-    min-height: 36px;
-    overflow-x: auto;
+    max-height: 168px;
+    overflow-x: hidden;
+    overflow-y: auto;
 }
 .gantt-view__nodates-label {
     flex: 0 0 auto;
@@ -515,7 +598,8 @@ onBeforeUnmount(() => {
 }
 .gantt-view__nodates-list {
     display: flex;
-    gap: 8px;
+    flex-direction: column;
+    gap: 2px;
     list-style: none;
     margin: 0;
     padding: 0;
@@ -523,12 +607,12 @@ onBeforeUnmount(() => {
 .gantt-view__nodates-item {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 3px 8px;
-    border: 1px solid #1b2f28;
-    border-radius: 999px;
-    background: #f4ead8;
-    max-width: 220px;
+    gap: 8px;
+    padding: 2px 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    max-width: none;
 }
 .gantt-view__nodates-name {
     font-size: 12px;
@@ -541,14 +625,29 @@ onBeforeUnmount(() => {
     border: none;
     background: #c45c26;
     color: #f4ead8;
-    border-radius: 999px;
+    border-radius: 4px;
     font-size: 11px;
     padding: 2px 8px;
     cursor: pointer;
     white-space: nowrap;
+    margin-left: auto;
 }
 .gantt-view__main { position: relative; flex: 1 1 auto; display: flex; min-height: 360px; }
 .gantt-view__chart { flex: 1 1 auto; height: 100%; min-height: 360px; background: #fbf6ec; }
+.gantt-view__empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 28px 16px;
+    text-align: center;
+    color: #1b2f28;
+    font-size: 14px;
+    pointer-events: none;
+    z-index: 3;
+    background: transparent;
+}
 .gantt-view__msg code { background: #f4ead8; padding: 2px 6px; border-radius: 4px; pointer-events: auto; }
 </style>
 
@@ -637,11 +736,27 @@ onBeforeUnmount(() => {
     padding: 0 4px;
     line-height: 1.2;
 }
+.gantt-view .gantt_task {
+    position: relative;
+}
 .gantt-view .gantt_now,
 .gantt-view .gantt_current,
-.gantt-view .gantt-today-line {
+.gantt-view .gantt_marker,
+.gantt-view .gantt_marker.gantt-today-line,
+.gantt-view .gantt-today-line,
+.gantt-view .gantt-today-overlay {
     background-color: #c45c26 !important;
+    background: #c45c26 !important;
+    width: 2px !important;
+    border: none;
+}
+.gantt-view .gantt-today-overlay {
+    position: absolute;
+    top: 0;
+    bottom: 0;
     width: 2px;
+    pointer-events: none;
+    z-index: 4;
 }
 .gantt-view .gantt_task_cell.gantt_today,
 .gantt-view .gantt_scale_cell.gantt_today {
