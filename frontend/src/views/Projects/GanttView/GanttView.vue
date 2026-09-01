@@ -221,13 +221,11 @@ function todayCellClass(date) {
 }
 function todayOverlayHost() {
     if (!gantt) return null;
-    return gantt.$task_data
-        || (ganttEl.value && ganttEl.value.querySelector('.gantt_data_area'))
-        || gantt.$task
+    return gantt.$task
         || (ganttEl.value && ganttEl.value.querySelector('.gantt_task'))
         || null;
 }
-function todayContentLeft() {
+function todayViewportLeft() {
     if (!gantt || typeof gantt.posFromDate !== 'function') return null;
     let pos;
     try {
@@ -236,29 +234,22 @@ function todayContentLeft() {
         return null;
     }
     if (pos == null || pos === false || Number.isNaN(Number(pos))) return null;
-    return Number(pos);
-}
-function todayIsInView(left) {
-    const scrollX = (gantt && gantt.getScrollState && gantt.getScrollState().x) || 0;
-    const view = (gantt && gantt.$task && gantt.$task.clientWidth)
-        || (todayOverlayHost() && todayOverlayHost().clientWidth)
-        || 0;
-    const visible = left - scrollX;
-    if (view && (visible < -1 || visible > view)) return false;
-    return true;
+    const scrollX = (gantt.getScrollState && gantt.getScrollState().x) || 0;
+    return Number(pos) - scrollX;
 }
 function paintTodayOverlay() {
     const host = todayOverlayHost();
     if (!host) return;
-    let line = host.querySelector('.gantt-today-overlay');
+    let line = host.querySelector(':scope > .gantt-today-overlay');
     if (!line) {
         line = document.createElement('div');
         line.className = 'gantt-today-overlay';
         line.setAttribute('aria-hidden', 'true');
         host.appendChild(line);
     }
-    const left = todayContentLeft();
-    if (left == null || !todayIsInView(left)) {
+    const left = todayViewportLeft();
+    const view = host.clientWidth || 0;
+    if (left == null || left < -1 || (view && left > view)) {
         line.style.display = 'none';
         return;
     }
@@ -590,7 +581,7 @@ onBeforeUnmount(() => {
 .gantt-view__nodates {
     display: flex;
     flex-direction: column;
-    align-items: stretch;
+    align-items: flex-start;
     gap: 4px;
     padding: 6px 12px 8px;
     border-bottom: 1px solid #d8cbb3;
@@ -614,6 +605,7 @@ onBeforeUnmount(() => {
     list-style: none;
     margin: 0;
     padding: 0;
+    width: min(100%, 320px);
 }
 .gantt-view__nodates-item {
     display: flex;
@@ -769,7 +761,7 @@ onBeforeUnmount(() => {
     bottom: 0;
     width: 2px;
     pointer-events: none;
-    z-index: 4;
+    z-index: 20;
 }
 .gantt-view .gantt_task_cell.gantt_today,
 .gantt-view .gantt_scale_cell.gantt_today {
