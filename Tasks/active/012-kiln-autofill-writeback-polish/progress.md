@@ -15,7 +15,7 @@
 - [x] Comments pane lists existing Alian comments for the open taskId (no empty pane with badge 1)
 
 ## Last step
-049ba54e still showed 3 empty item_wrappers as ready (00h, no fail card). paintedForKind is labeled tasksArray only. ItemList is v-if ready && labeledPainted > 0 so empty groups are not in the DOM. Fail card when sidebar 7 and labeled painted is 0.
+8b057580 still counted tasksArray as painted so ready+00h mounted 3 empty wrappers. paintedForKind is now countBoundPaintedRows (same bind ItemList uses: store + group, unmatched onto first status). Fail card when that count is 0 and sidebar is 7. ItemList only emits a wrapper when that group has labeled bound rows.
 
 ## Blockers
 None. Live Local Smoke is not in this VM (no Mongo), so Retry / Autofill / pages were not browser-verified here.
@@ -23,6 +23,7 @@ None. Live Local Smoke is not in this VM (no Mongo), so Retry / Autofill / pages
 ## Log
 
 ### 2026-09-01
+- 8b057580 still REGRESSED the fail card: `labeledPainted` counted `group.tasksArray` while ItemList paints `items` from a filtered store path, so `v-if ready && labeledPainted > 0` was true and 3 empty status wrappers mounted (00h, no RETRY). paintedForKind is now `countBoundPaintedRows` (store + group, same `bindListGroupRows` ItemList uses). Wrappers only if that group has labeled bound rows. TaskKey shows when `viewColumn` is missing. Fail-card copy / 4s / EmptyState / Autofill untouched.
 - 049ba54e still showed 3 empty `.item_wrapper` groups as ready (00h, no fail card). `v-show` left them in the tree; `listVisible` could flip ready without labeled SMOKE rows. `paintedForKind` is now labeled `tasksArray` (TaskKey/TaskName) only. The list is `v-if` ready so failed first paint has zero wrappers. Task.vue no longer throws on missing `taskStatusData`. Null `viewColumn` mount stays. After RETRY bind, store rows with keys make labeled count 7 and the list mounts. Fail-card copy / 4s / EmptyState / Autofill untouched.
 - dda2ba25 REGRESSION: ItemList mounted (viewColumn crash gone) but empty groups were `v-show` ready/loading, so hours painted 00h and the fail card vanished. Store still had 7; `bindListRows` preferred empty/other `tasksArray` over the bucket. Keep the null-`viewColumn` mount. Count only rows with TaskKey/TaskName as painted. Union bucket.tasks into groups. ItemList `v-show` ready only. Fail card when sidebar 7 and painted 0. No flushSync / Gantt / Autofill / copy changes.
 - Live diagnose of ecfb248e: store already has 7 after find+search. ItemList setup threw on null `viewColumn` (`headers.value.filter`) and `setHeader` TDZ (`We` before initialization), so 0 `.item_wrapper` and visibleCount stayed 0. Headers now coerce missing `viewColumn` to `[]`; `setHeader` is a function declared after that coerce; the viewColumn watch runs after `setHeader`. Fail-card copy / 4s floor / EmptyState / Autofill / Gantt untouched. No flushSync.

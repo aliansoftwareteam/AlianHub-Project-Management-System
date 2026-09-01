@@ -221,7 +221,7 @@
                     </span>
 
                     <!-- TASK KEY -->
-                    <span class="key-new task_right" v-if="projectData.viewColumn?.find((x)=> x.key === 'TaskKey')?.show">
+                    <span class="key-new task_right" v-if="showTaskKey">
                         {{task.TaskKey}}
                     </span>
 
@@ -417,6 +417,12 @@ const projectTaskType = computed(() => (
 ));
 const taskStatus = computed(() => projectStatus.value.find((x) => x.key === (task.value && task.value.statusKey)));
 const taskType = computed(() => projectTaskType.value.find((x) => x.key === (task.value && task.value.TaskTypeKey)));
+const showTaskKey = computed(() => {
+    const cols = projectData.value && projectData.value.viewColumn;
+    if (!Array.isArray(cols)) return true;
+    const col = cols.find((x) => x && x.key === 'TaskKey');
+    return !col || col.show !== false;
+});
 
 // Subtask completion (AHE-3776) for the list-row badge shown after the subtask
 // count. When the row is expanded its subtasks are loaded into `subtaskArray`

@@ -411,6 +411,47 @@ export function countPaintedTaskRows(groups) {
     }, 0);
 }
 
+export function idBearingTaskRows(rows) {
+    return (Array.isArray(rows) ? rows : []).filter((row) => (
+        row && !row.deletedStatusKey && firstId(row._id, row.id)
+    ));
+}
+
+export function bindListGroupRows({
+    group,
+    groups,
+    statusIndex,
+    storeTasks,
+    groupedTasks,
+} = {}) {
+    const grouped = idBearingTaskRows(groupedTasks || (group && group.tasksArray));
+    const store = idBearingTaskRows(storeTasks);
+    const boardRows = uniqueTaskRows(store, grouped);
+    if (!group) return boardRows;
+    const matched = boardRows.filter((row) => taskMatchesGroup(row, group));
+    if (Number(statusIndex) === 0) {
+        const siblings = Array.isArray(groups) && groups.length ? groups : [group];
+        const mapped = siblings.map((g) => ({
+            tasksArray: boardRows.filter((row) => taskMatchesGroup(row, g)),
+        }));
+        return uniqueTaskRows(matched, unmatchedBoardTasks(mapped, boardRows));
+    }
+    return uniqueTaskRows(matched);
+}
+
+export function countBoundPaintedRows(groups, storeTasks) {
+    const cols = Array.isArray(groups) ? groups : [];
+    const store = idBearingTaskRows(storeTasks);
+    return cols.reduce((n, group, index) => (
+        n + bindListGroupRows({
+            group,
+            groups: cols,
+            statusIndex: index,
+            storeTasks: store,
+        }).filter(rowHasPaintedLabel).length
+    ), 0);
+}
+
 export function pageOpenRoute({ companyId, projectId, pageId } = {}) {
     const cid = injectedId(companyId);
     const pid = firstId(projectId);

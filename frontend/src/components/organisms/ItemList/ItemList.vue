@@ -1,6 +1,6 @@
 <template>
     <Transition>
-        <div v-if="groupType === 1 ? ((searchMode ? filteredTasksGetter.length : items?.length) || !item?.users?.length) : true" class="item_wrapper" @scroll="checkScroll">
+        <div v-if="boundPaintedCount > 0" class="item_wrapper" @scroll="checkScroll">
             <div class="new-row item_head">
                 <div class="new-col1" :style="`${clientWidth > sideScrollWidth ? 'border:0px' : ''};`">
                     <div class="common-section head" @click="() => {emit('toggle', item); $forceUpdate();}">
@@ -332,7 +332,7 @@ const {isCustomFields} = customField();
 import * as env from '@/config/env';
 import { useI18n } from "vue-i18n";
 import { apiRequest } from "../../../services";
-import { firstId, rowHasPaintedLabel, sameGroupValue, sprintTasksBucket, taskMatchesBoard, uniqueTaskRows, unmatchedBoardTasks } from '@/utils/taskOpenProjectId';
+import { bindListGroupRows, collectSprintBoardTasks, firstId, rowHasPaintedLabel, sameGroupValue, sprintTasksBucket } from '@/utils/taskOpenProjectId';
 import Skelaton from "@/components/atom/Skelaton/AiSkelaton.vue"
 const { t } = useI18n();
 // UTILS
@@ -356,12 +356,16 @@ const sprintBucket = computed(() => sprintTasksBucket(
 const searchMode = computed(() => Boolean(unref(searchedTask)));
 const visibleTaskRows = computed({
     get() {
-        if (searchMode.value && filteredTasksGetter.value.length) return filteredTasksGetter.value;
+        if (searchMode.value && paintedVisibleRows(filteredTasksGetter.value).length) {
+            return filteredTasksGetter.value;
+        }
         return items.value;
     },
     set(next) {
         if (searchMode.value) return;
-        items.value = Array.isArray(next) ? next : [];
+        const rows = Array.isArray(next) ? next : [];
+        if (!rows.length && paintedVisibleRows(items.value).length) return;
+        items.value = rows;
     },
 });
 
@@ -548,69 +552,33 @@ function cloneTaskRows(rows) {
         return (rows || []).map((row) => ({ ...row }));
     }
 }
-function idBearingTaskRows(rows) {
-    return (Array.isArray(rows) ? rows : []).filter((row) => (
-        row && !row.deletedStatusKey && firstId(row._id, row.id)
-    ));
-}
 function paintedVisibleRows(rows) {
-    return idBearingTaskRows(rows).filter(rowHasPaintedLabel);
+    return (Array.isArray(rows) ? rows : []).filter(rowHasPaintedLabel);
 }
-function bindListRows() {
+function listStoreTasks() {
     const pid = firstId(props.projectId, props.project && (props.project._id || props.project.id));
     const sid = firstId(props.sprintId, props.sprintObject && (props.sprintObject.id || props.sprintObject._id));
-    const grouped = idBearingTaskRows(props.item && props.item.tasksArray)
-        .filter((row) => taskMatchesBoard(row, { sprintId: sid, projectId: pid }) || (!sid && !pid));
-    let store;
-    try {
-        store = sprintBucket.value ? JSON.parse(JSON.stringify(sprintBucket.value)) : null;
-    } catch (_error) {
-        store = sprintBucket.value;
-    }
-    const storeTasks = Array.isArray(store && store.tasks) ? store.tasks : [];
-    let tmp = [];
-    if (props.item.searchKey === "DueDate") {
-        tmp = storeTasks.filter((x) => {
-            return (x.DueDate ? checkCase(props.item.operation, props.item.searchValue, (new Date(x?.[props.item.searchKey]).getTime() / 1000)) : props.item.operation === "non") && !x?.deletedStatusKey
-        })?.sort((a,b)=> a?.groupByDueDateIndex - b?.groupByDueDateIndex);
-    } else if(props.item.searchKey === "AssigneeUserId") {
-        tmp = storeTasks.filter((x) => {
-            const ids = Array.isArray(x.AssigneeUserId) ? x.AssigneeUserId.slice().sort((a,b) => a > b ? 1 : -1) : [];
-            return ids.join("_") === props.item.value && !x?.deletedStatusKey;
-        })?.sort((a,b)=> a.groupByAssigneeIndex - b.groupByAssigneeIndex);
-    } else if (props.item.searchKey === "statusKey") {
-        tmp = storeTasks.filter((x) => sameGroupValue(x.statusKey, props.item.searchValue) && !x?.deletedStatusKey)?.sort((a,b)=> a?.groupByStatusIndex - b?.groupByStatusIndex);
-        if (Number(props.statusIndex) === 0) {
-            const siblings = (props.sprintObject && Array.isArray(props.sprintObject.items))
-                ? props.sprintObject.items
-                : [props.item];
-            const mapped = siblings.map((group) => ({
-                tasksArray: storeTasks.filter((x) => sameGroupValue(x.statusKey, group.searchValue) && !x?.deletedStatusKey),
-            }));
-            const extra = unmatchedBoardTasks(mapped, storeTasks);
-            extra.forEach((row) => {
-                const id = firstId(row && (row._id || row.id));
-                if (id && !tmp.some((have) => firstId(have && (have._id || have.id)) === id)) tmp.push(row);
-            });
-        }
-    } else if (props.item.searchKey === "Task_Priority") {
-        tmp = storeTasks.filter((x) => x[props.item.searchKey] === props.item.searchValue && !x?.deletedStatusKey)?.sort((a,b)=> a.groupByPriorityIndex - b.groupByPriorityIndex);
-    } else if (props.item.searchKey) {
-        tmp = storeTasks.filter((x) => x[props.item.searchKey] === props.item.searchValue && !x?.deletedStatusKey)
-    } else {
-        tmp = storeTasks.filter((x) => !x?.deletedStatusKey);
-    }
-    tmp = tmp.map((x) => {
-        if(x?.subtaskArray) {
-            x.subtaskArray = x.subtaskArray.filter((y) => !y?.deletedStatusKey);
-        }
-        return x;
-    });
-    tasksGetter.value = uniqueTaskRows(grouped, tmp);
+    return collectSprintBoardTasks(getters['projectData/tasks'], pid, sid);
+}
+function bindGroupArgs() {
+    return {
+        group: props.item,
+        groups: props.sprintObject && Array.isArray(props.sprintObject.items)
+            ? props.sprintObject.items
+            : (props.item ? [props.item] : []),
+        statusIndex: props.statusIndex,
+        storeTasks: listStoreTasks(),
+        groupedTasks: props.item && props.item.tasksArray,
+    };
+}
+const boundRows = computed(() => bindListGroupRows(bindGroupArgs()));
+const boundPaintedCount = computed(() => paintedVisibleRows(boundRows.value).length);
+function bindListRows() {
+    tasksGetter.value = bindListGroupRows(bindGroupArgs());
 }
 watch([
     () => props.item && props.item.tasksArray,
-    () => sprintBucket.value && sprintBucket.value.tasks,
+    () => listStoreTasks(),
 ], bindListRows, {immediate: true, deep: true})
 const filteredTasksGetter = computed(() => {
     if(getters['projectData/searchedTasks']?.length && props.sprintId) {

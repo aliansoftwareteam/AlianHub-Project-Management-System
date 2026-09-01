@@ -250,7 +250,7 @@
                     @action="retrySurface"
                 />
                 <div
-                    v-if="surfaceKind === 'ready' && labeledPainted > 0"
+                    v-if="surfaceKind === 'ready' && listPainted > 0"
                     class="itemSprintWrapper style-scroll-6-px"
                     id="tasklist_driver"
                 >
@@ -346,7 +346,7 @@ import * as env from '@/config/env';
 import { useStore } from 'vuex';
 import { useRoute } from 'vue-router';
 import { apiRequest } from '../../../services'
-import { boardHoursVisible, countPaintedTaskRows, countSprintBoardTasks, firstId, sprintCountFromSprintBags, sprintExpectedCount, sprintSurfaceKind, sprintTasksBucket, sprintTreeExpectedCount } from '@/utils/taskOpenProjectId';
+import { boardHoursVisible, collectSprintBoardTasks, countBoundPaintedRows, countSprintBoardTasks, firstId, sprintCountFromSprintBags, sprintExpectedCount, sprintSurfaceKind, sprintTasksBucket, sprintTreeExpectedCount } from '@/utils/taskOpenProjectId';
 import { useAiApiFunction } from "@/composable/aiHelper";
 import taskClass from "@/utils/TaskOperations"
 import { useI18n } from "vue-i18n";
@@ -432,8 +432,16 @@ const reportedVisible = ref({});
 function onItemVisible(key, count) {
     reportedVisible.value = { ...reportedVisible.value, [String(key)]: Number(count) || 0 };
 }
-const labeledPainted = computed(() => countPaintedTaskRows(props.sprint && props.sprint.items));
-const paintedForKind = computed(() => labeledPainted.value);
+const storeRows = computed(() => collectSprintBoardTasks(
+    getters['projectData/tasks'],
+    sprintPid.value,
+    sprintSid.value,
+));
+const listPainted = computed(() => countBoundPaintedRows(
+    props.sprint && props.sprint.items,
+    storeRows.value,
+));
+const paintedForKind = computed(() => listPainted.value);
 const BOARD_RETRY_HOLD_MS = 4000;
 const loadStripEl = ref(null);
 let retryHoldTimer = null;

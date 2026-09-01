@@ -51,7 +51,7 @@ import isEqual from 'lodash/isEqual';
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { useTaskSelection } from '@/composable/useTaskSelection.js';
 import { apiRequest } from '@/services';
-import { boardEmptyKind, bindSprintTaskSource, collectRetryTaskRows, collectSprintBoardTasks, countPaintedTaskRows, countSprintBoardTasks, firstId, paintSprintGroups, searchTasksFromResponse, sprintCountFromSprintBags, sprintExpectedCount, sprintTreeExpectedCount, taskMatchesBoard, uniqueTaskRows } from '@/utils/taskOpenProjectId';
+import { boardEmptyKind, bindSprintTaskSource, collectRetryTaskRows, collectSprintBoardTasks, countBoundPaintedRows, countSprintBoardTasks, firstId, paintSprintGroups, searchTasksFromResponse, sprintCountFromSprintBags, sprintExpectedCount, sprintTreeExpectedCount, taskMatchesBoard, uniqueTaskRows } from '@/utils/taskOpenProjectId';
 import { lastSearchTasks, rememberSearchTasks } from '@/utils/openGlobalSearch';
 
 // UTILS
@@ -132,7 +132,7 @@ const emptyKind = computed(() => {
     const sid = firstId(sprint && (sprint.id || sprint._id));
     const groups = sprint && Array.isArray(sprint.items) ? sprint.items : [];
     const stored = countSprintBoardTasks(allProjectTasks.value, pid, sid);
-    const shown = countPaintedTaskRows(groups);
+    const shown = countBoundPaintedRows(groups, collectSprintBoardTasks(allProjectTasks.value, pid, sid));
     return boardEmptyKind({
         loading: retrying.value || isLoading.value || props.sprintLoading,
         sprintsBound: Boolean(props.sprints && props.sprints.length),
