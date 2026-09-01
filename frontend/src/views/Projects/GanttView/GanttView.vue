@@ -221,9 +221,13 @@ function todayCellClass(date) {
 }
 function todayOverlayHost() {
     if (!gantt) return null;
-    return gantt.$task || (ganttEl.value && ganttEl.value.querySelector('.gantt_task')) || null;
+    return gantt.$task_data
+        || (ganttEl.value && ganttEl.value.querySelector('.gantt_data_area'))
+        || gantt.$task
+        || (ganttEl.value && ganttEl.value.querySelector('.gantt_task'))
+        || null;
 }
-function todayLineLeft() {
+function todayContentLeft() {
     if (!gantt || typeof gantt.posFromDate !== 'function') return null;
     let pos;
     try {
@@ -232,8 +236,16 @@ function todayLineLeft() {
         return null;
     }
     if (pos == null || pos === false || Number.isNaN(Number(pos))) return null;
-    const scrollX = (gantt.getScrollState && gantt.getScrollState().x) || 0;
-    return Number(pos) - scrollX;
+    return Number(pos);
+}
+function todayIsInView(left) {
+    const scrollX = (gantt && gantt.getScrollState && gantt.getScrollState().x) || 0;
+    const view = (gantt && gantt.$task && gantt.$task.clientWidth)
+        || (todayOverlayHost() && todayOverlayHost().clientWidth)
+        || 0;
+    const visible = left - scrollX;
+    if (view && (visible < -1 || visible > view)) return false;
+    return true;
 }
 function paintTodayOverlay() {
     const host = todayOverlayHost();
@@ -245,9 +257,8 @@ function paintTodayOverlay() {
         line.setAttribute('aria-hidden', 'true');
         host.appendChild(line);
     }
-    const left = todayLineLeft();
-    const hostWidth = host.clientWidth || 0;
-    if (left == null || left < -1 || (hostWidth && left > hostWidth)) {
+    const left = todayContentLeft();
+    if (left == null || !todayIsInView(left)) {
         line.style.display = 'none';
         return;
     }
@@ -736,7 +747,9 @@ onBeforeUnmount(() => {
     padding: 0 4px;
     line-height: 1.2;
 }
-.gantt-view .gantt_task {
+.gantt-view .gantt_task,
+.gantt-view .gantt_data_area,
+.gantt-view .gantt_task_bg {
     position: relative;
 }
 .gantt-view .gantt_now,
