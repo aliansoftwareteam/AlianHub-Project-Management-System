@@ -595,6 +595,24 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(rowHasPaintedLabel({ _id: 'a' })).toBe(false);
         expect(rowHasPaintedLabel({ _id: 'a', TaskKey: 'SMOKE-1' })).toBe(true);
         expect(rowHasPaintedLabel({ _id: 'a', TaskName: 'Do it' })).toBe(true);
+        expect(countPaintedTaskRows([
+            { tasksArray: [] },
+            { tasksArray: [] },
+            { tasksArray: [] },
+        ])).toBe(0);
+        expect(countPaintedTaskRows([
+            { tasksArray: [{ _id: 'ghost' }] },
+            { tasksArray: [] },
+            { tasksArray: [] },
+        ])).toBe(0);
+        expect(boardHoursVisible(sprintSurfaceKind({
+            paintedCount: countPaintedTaskRows([{ tasksArray: [] }, { tasksArray: [] }, { tasksArray: [] }]),
+            sidebarCount: 7,
+        }))).toBe(false);
+        expect(paintSprintGroups(
+            [{ key: 'todo', searchKey: 'statusKey', searchValue: '1', isExpanded: false, tasksArray: [] }],
+            [{ _id: 'a', TaskKey: 'SMOKE-1', statusKey: '1' }],
+        )[0].isExpanded).toBe(true);
         expect(paintSprintGroups(
             [{ key: 'todo', searchKey: 'statusKey', searchValue: 'done', tasksArray: [] }],
             [{ _id: 'named', TaskKey: 'SMOKE-1', statusKey: 'other' }],
@@ -670,6 +688,11 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(itemList).toContain('paintedVisibleRows');
         expect(itemList).toContain('rowHasPaintedLabel');
         expect(itemList).toContain('taskMatchesBoard');
+        expect(itemList).toContain("groupType === 1 ? ((searchMode ? filteredTasksGetter.length : items?.length) || !item?.users?.length) : true");
+        const taskRow = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'organisms', 'Task', 'Task.vue'), 'utf8');
+        expect(taskRow).toContain('Array.isArray(projectData.value && projectData.value.taskStatusData)');
+        expect(taskRow).not.toContain('projectData.value.taskStatusData.filter');
+        expect(taskRow).not.toContain('projectData.value.taskStatusData.find((x) => x.key === task.value.statusKey)');
         expect(board).toContain('hasGroups');
         expect(board).toContain('sprintExpectedCount');
         expect(board).toContain('sameGroupValue');
@@ -727,16 +750,18 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(sprintsList).toContain('localStored');
         expect(sprintsList).toContain('storedCount: localStored.value');
         expect(sprintsList).toContain('paintedForKind');
-        expect(sprintsList).toContain('listVisible');
-        expect(sprintsList).toContain("paintedForKind = computed(() => listVisible.value)");
+        expect(sprintsList).toContain('labeledPainted');
+        expect(sprintsList).toContain("paintedForKind = computed(() => labeledPainted.value)");
+        expect(sprintsList).toContain('countPaintedTaskRows(props.sprint && props.sprint.items)');
+        expect(sprintsList).not.toContain("paintedForKind = computed(() => listVisible.value)");
         expect(sprintsList).not.toContain('attachedPainted');
         expect(sprintsList).not.toContain('Math.max(listVisible.value, attachedPainted.value)');
         expect(sprintsList).not.toContain('groupsReported.value ? listVisible.value : localPainted.value');
-        expect(sprintsList).not.toContain('countPaintedTaskRows(props.sprint');
         expect(sprintsList).toContain('onItemVisible');
         expect(sprintsList).toContain('sprintTreeExpectedCount');
         expect(sprintsList).toContain('sprintCountFromSprintBags');
-        expect(sprintsList).toContain("v-show=\"surfaceKind === 'ready'\"");
+        expect(sprintsList).toContain("v-if=\"surfaceKind === 'ready' && labeledPainted > 0\"");
+        expect(sprintsList).not.toContain("v-show=\"surfaceKind === 'ready'\"");
         expect(sprintsList).toContain("v-show=\"surfaceKind === 'loading'\"");
         expect(sprintsList).not.toContain("v-show=\"surfaceKind === 'ready' || surfaceKind === 'loading'\"");
         expect(sprintsList).toContain('itemSprintWrapper--hold');

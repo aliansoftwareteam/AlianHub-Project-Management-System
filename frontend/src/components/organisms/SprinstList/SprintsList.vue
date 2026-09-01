@@ -250,9 +250,8 @@
                     @action="retrySurface"
                 />
                 <div
-                    v-show="surfaceKind === 'ready'"
+                    v-if="surfaceKind === 'ready' && labeledPainted > 0"
                     class="itemSprintWrapper style-scroll-6-px"
-                    :class="{ 'itemSprintWrapper--hold': surfaceKind === 'loading' }"
                     id="tasklist_driver"
                 >
                         <template v-if="$route?.query?.tab !== 'Calendar'">
@@ -347,7 +346,7 @@ import * as env from '@/config/env';
 import { useStore } from 'vuex';
 import { useRoute } from 'vue-router';
 import { apiRequest } from '../../../services'
-import { boardHoursVisible, countSprintBoardTasks, firstId, sprintCountFromSprintBags, sprintExpectedCount, sprintSurfaceKind, sprintTasksBucket, sprintTreeExpectedCount } from '@/utils/taskOpenProjectId';
+import { boardHoursVisible, countPaintedTaskRows, countSprintBoardTasks, firstId, sprintCountFromSprintBags, sprintExpectedCount, sprintSurfaceKind, sprintTasksBucket, sprintTreeExpectedCount } from '@/utils/taskOpenProjectId';
 import { useAiApiFunction } from "@/composable/aiHelper";
 import taskClass from "@/utils/TaskOperations"
 import { useI18n } from "vue-i18n";
@@ -433,8 +432,8 @@ const reportedVisible = ref({});
 function onItemVisible(key, count) {
     reportedVisible.value = { ...reportedVisible.value, [String(key)]: Number(count) || 0 };
 }
-const listVisible = computed(() => Object.values(reportedVisible.value).reduce((sum, n) => sum + (Number(n) || 0), 0));
-const paintedForKind = computed(() => listVisible.value);
+const labeledPainted = computed(() => countPaintedTaskRows(props.sprint && props.sprint.items));
+const paintedForKind = computed(() => labeledPainted.value);
 const BOARD_RETRY_HOLD_MS = 4000;
 const loadStripEl = ref(null);
 let retryHoldTimer = null;

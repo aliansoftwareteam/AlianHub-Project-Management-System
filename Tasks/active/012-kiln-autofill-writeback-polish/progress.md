@@ -15,7 +15,7 @@
 - [x] Comments pane lists existing Alian comments for the open taskId (no empty pane with badge 1)
 
 ## Last step
-dda2ba25 restored ItemList mount but empty groups looked ready (00h, no fail card). Keep the viewColumn guard. Fail card when sidebar 7 and labeled painted rows are 0. After RETRY 4s hold, copy store bucket tasks into the groups as SMOKE rows.
+049ba54e still showed 3 empty item_wrappers as ready (00h, no fail card). paintedForKind is labeled tasksArray only. ItemList is v-if ready && labeledPainted > 0 so empty groups are not in the DOM. Fail card when sidebar 7 and labeled painted is 0.
 
 ## Blockers
 None. Live Local Smoke is not in this VM (no Mongo), so Retry / Autofill / pages were not browser-verified here.
@@ -23,6 +23,7 @@ None. Live Local Smoke is not in this VM (no Mongo), so Retry / Autofill / pages
 ## Log
 
 ### 2026-09-01
+- 049ba54e still showed 3 empty `.item_wrapper` groups as ready (00h, no fail card). `v-show` left them in the tree; `listVisible` could flip ready without labeled SMOKE rows. `paintedForKind` is now labeled `tasksArray` (TaskKey/TaskName) only. The list is `v-if` ready so failed first paint has zero wrappers. Task.vue no longer throws on missing `taskStatusData`. Null `viewColumn` mount stays. After RETRY bind, store rows with keys make labeled count 7 and the list mounts. Fail-card copy / 4s / EmptyState / Autofill untouched.
 - dda2ba25 REGRESSION: ItemList mounted (viewColumn crash gone) but empty groups were `v-show` ready/loading, so hours painted 00h and the fail card vanished. Store still had 7; `bindListRows` preferred empty/other `tasksArray` over the bucket. Keep the null-`viewColumn` mount. Count only rows with TaskKey/TaskName as painted. Union bucket.tasks into groups. ItemList `v-show` ready only. Fail card when sidebar 7 and painted 0. No flushSync / Gantt / Autofill / copy changes.
 - Live diagnose of ecfb248e: store already has 7 after find+search. ItemList setup threw on null `viewColumn` (`headers.value.filter`) and `setHeader` TDZ (`We` before initialization), so 0 `.item_wrapper` and visibleCount stayed 0. Headers now coerce missing `viewColumn` to `[]`; `setHeader` is a function declared after that coerce; the viewColumn watch runs after `setHeader`. Fail-card copy / 4s floor / EmptyState / Autofill / Gantt untouched. No flushSync.
 - Bind leftover after 46ffb34c: `visibleCount` stayed 0 because retry skipped `/api/v2/search` when any in-memory source existed, `bindPaintedSprints` ignored Ctrl+K `lastSearchTasks` unless board search mode was on, and SprintsList wiped `reportedVisible` on every loading kind. Retry now always unions store / grouped `tasksArray` / Ctrl+K / `/api/v2/search` (defensive body parse), bind always takes matching search hits, ItemList stays mounted (clipped) during the 4s hold so it can emit `visibleCount`, and the loading watch no longer clears that count. `paintedForKind` is still ItemList visible only. Fail-card copy / 4s floor / EmptyState click / Autofill / Gantt untouched. No flushSync.

@@ -538,6 +538,7 @@ function paintSprintGroups(groups, tasks) {
     const cols = Array.isArray(groups) ? groups : [];
     const mapped = cols.map((group) => ({
         ...group,
+        isExpanded: true,
         tasksArray: source.filter((task) => taskMatchesGroup(task, group)),
     }));
     if (!mapped.length) {
