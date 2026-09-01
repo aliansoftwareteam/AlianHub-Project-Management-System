@@ -77,16 +77,18 @@ describe('Gantt collision copper hint', () => {
         expect(EMPTY_LINE).not.toMatch(/give a task dates/);
     });
 
-    test('week today-line uses noon on the local calendar day so UTC does not snap to week-start', () => {
-        const istWed = new Date(2026, 8, 2, 0, 30, 0, 0);
-        const week = todayLineDate(istWed, 'Week');
-        const day = todayLineDate(istWed, 'Day');
+    test('today-line uses Asia/Kolkata when the host instant is still UTC Tuesday', () => {
+        const utcTue = new Date(Date.UTC(2026, 8, 1, 20, 0, 0));
+        const week = todayLineDate(utcTue, 'Week', 'Asia/Kolkata');
+        const day = todayLineDate(utcTue, 'Day', 'Asia/Kolkata');
         expect(week.getFullYear()).toBe(2026);
         expect(week.getMonth()).toBe(8);
         expect(week.getDate()).toBe(2);
         expect(week.getHours()).toBe(12);
         expect(day.getHours()).toBe(0);
         expect(day.getDate()).toBe(2);
+        const hostTue = todayLineDate(utcTue, 'Week', 'UTC');
+        expect(hostTue.getDate()).toBe(1);
     });
 
     test('non-overlapping FS arrows have no hint', () => {

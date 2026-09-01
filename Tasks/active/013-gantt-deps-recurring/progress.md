@@ -10,7 +10,7 @@
 - [x] Jest + i18n; existing tests green
 
 ## Last step
-Live 360 on 9e6e5ace: Week today-line uses local noon so IST Wed is not Monday; No dates is a left slim stack; all board tasks bind; empty copy is only “No scheduled tasks yet…”.
+Week today-line uses the user/company timezone (Asia/Kolkata default), not the host UTC calendar day.
 
 ## Blockers
 None.

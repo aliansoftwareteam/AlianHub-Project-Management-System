@@ -2,15 +2,31 @@ const { RELATION_TYPES } = require('./relationRules');
 
 const COLLISION_LINE = 'Dates overlap. Blocked task stayed put.';
 const EMPTY_LINE = 'No scheduled tasks yet…';
+const DEFAULT_TZ = 'Asia/Kolkata';
 
-const localCalendarDay = (value = new Date()) => {
+const calendarDayInZone = (value = new Date(), timeZone = DEFAULT_TZ) => {
     const d = value instanceof Date ? value : new Date(value);
     if (!Number.isFinite(d.getTime())) return null;
-    return { y: d.getFullYear(), m: d.getMonth(), day: d.getDate() };
+    try {
+        const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone: timeZone || DEFAULT_TZ,
+            year: 'numeric',
+            month: 'numeric',
+            day: 'numeric',
+        }).formatToParts(d);
+        const num = (type) => Number((parts.find((p) => p.type === type) || {}).value);
+        const y = num('year');
+        const m = num('month');
+        const day = num('day');
+        if (!y || !m || !day) return null;
+        return { y, m: m - 1, day };
+    } catch (e) {
+        return { y: d.getFullYear(), m: d.getMonth(), day: d.getDate() };
+    }
 };
 
-const todayLineDate = (value = new Date(), scale = 'Week') => {
-    const parts = localCalendarDay(value);
+const todayLineDate = (value = new Date(), scale = 'Week', timeZone = DEFAULT_TZ) => {
+    const parts = calendarDayInZone(value, timeZone);
     if (!parts) return null;
     if (scale === 'Day') return new Date(parts.y, parts.m, parts.day, 0, 0, 0, 0);
     return new Date(parts.y, parts.m, parts.day, 12, 0, 0, 0);
@@ -71,7 +87,8 @@ const collisionHints = (tasks = [], relationsByTaskId = {}) => {
 module.exports = {
     COLLISION_LINE,
     EMPTY_LINE,
-    localCalendarDay,
+    DEFAULT_TZ,
+    calendarDayInZone,
     todayLineDate,
     planBarMove,
     fsCollision,

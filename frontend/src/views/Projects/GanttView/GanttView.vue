@@ -246,28 +246,43 @@ function toGanttData() {
     return { data, links };
 }
 
-function localCalendarDay(value) {
+function tenantTimeZone() {
+    const uid = localStorage.getItem('userId');
+    const me = (getters['users/users'] || []).find((u) => String(u._id) === String(uid)) || {};
+    return me.Time_Zone || me.timeZone || 'Asia/Kolkata';
+}
+function calendarDayInZone(value, timeZone) {
     const d = value instanceof Date ? value : new Date();
-    return { y: d.getFullYear(), m: d.getMonth(), day: d.getDate() };
+    try {
+        const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone: timeZone || 'Asia/Kolkata',
+            year: 'numeric',
+            month: 'numeric',
+            day: 'numeric',
+        }).formatToParts(d);
+        const num = (type) => Number((parts.find((p) => p.type === type) || {}).value);
+        return { y: num('year'), m: num('month') - 1, day: num('day') };
+    } catch (e) {
+        return { y: d.getFullYear(), m: d.getMonth(), day: d.getDate() };
+    }
 }
-function startOfLocalDay(value) {
-    const { y, m, day } = localCalendarDay(value instanceof Date ? value : new Date());
-    return new Date(y, m, day, 0, 0, 0, 0);
+function tenantToday() {
+    return calendarDayInZone(new Date(), tenantTimeZone());
 }
-function todayForScale(value) {
-    const { y, m, day } = localCalendarDay(value instanceof Date ? value : new Date());
+function todayForScale() {
+    const { y, m, day } = tenantToday();
     if (zoom.value === 'Day') return new Date(y, m, day, 0, 0, 0, 0);
     return new Date(y, m, day, 12, 0, 0, 0);
 }
-function sameLocalDay(a, b) {
-    const left = a instanceof Date ? a : new Date(a);
-    const right = b instanceof Date ? b : new Date(b);
-    return left.getFullYear() === right.getFullYear()
-        && left.getMonth() === right.getMonth()
-        && left.getDate() === right.getDate();
+function sameTenantDay(date) {
+    const cell = date instanceof Date ? date : new Date(date);
+    const today = tenantToday();
+    return cell.getFullYear() === today.y
+        && cell.getMonth() === today.m
+        && cell.getDate() === today.day;
 }
 function todayCellClass(date) {
-    if (!sameLocalDay(date, new Date())) return '';
+    if (!sameTenantDay(date)) return '';
     if (zoom.value === 'Day' && date instanceof Date && date.getHours() !== 0) return '';
     return 'gantt_today';
 }
