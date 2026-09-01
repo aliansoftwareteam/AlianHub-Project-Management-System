@@ -8,7 +8,11 @@
             type="button"
             class="cursor-pointer font-roboto-sans empty-state__btn"
             :class="tone ? 'empty-state__btn--tone' : 'blue_btn'"
-            @click.stop.prevent="onActionClick"
+            :data-board-retry="tone === 'copper' ? '1' : undefined"
+            @click.stop="onActionActivate"
+            @pointerup.stop="onActionActivate"
+            @keydown.enter.prevent.stop="onActionActivate"
+            @keydown.space.prevent.stop="onActionActivate"
         >{{ actionLabel }}</button>
         <a
             v-if="resolvedHelpHref"
@@ -25,7 +29,7 @@ import { computed, defineProps, defineEmits } from 'vue';
 import { useStore } from 'vuex';
 
 const emit = defineEmits(['action']);
-function onActionClick() {
+function onActionActivate() {
     emit('action');
 }
 

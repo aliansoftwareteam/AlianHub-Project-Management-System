@@ -560,7 +560,8 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(list).toContain('bindSprintTaskSource');
         expect(list).toContain('setSprintBoardTasks');
         expect(list).toContain('BOARD_RETRY_HOLD_MS');
-        expect(list).toContain('BOARD_RETRY_HOLD_MS = 800');
+        expect(list).toContain('BOARD_RETRY_HOLD_MS = 2000');
+        expect(list).toContain('flushSync');
         expect(list).toContain('fromGroups');
         expect(list).toContain('lastSearchTasks');
         expect(list).toContain('paintRetryFrame');
@@ -650,6 +651,12 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(sprintsList).toContain("v-show=\"surfaceKind === 'loading'\"");
         expect(sprintsList).toContain('releaseRetryHold');
         expect(sprintsList).toContain('BOARD_RETRY_HOLD_MS');
+        expect(sprintsList).toContain('BOARD_RETRY_HOLD_MS = 2000');
+        expect(sprintsList).toContain('flushSync');
+        expect(sprintsList).toContain('eventHitsRetry');
+        expect(sprintsList).toContain('onRetryPointer');
+        expect(sprintsList).toContain('getBoundingClientRect');
+        expect(sprintsList).toContain('data-board-loading');
         expect(sprintsList).toContain('paintRetryFrame');
         expect(sprintsList).toContain('kiln-dismiss-dropdown');
         expect(sprintsList).toContain('projectData/allProjects');
@@ -658,7 +665,13 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(empty).not.toContain('@mousedown.stop.prevent="onActionPointer"');
         expect(empty).not.toContain('skipClick');
         expect(empty).not.toContain('onActionPointer');
-        expect(empty).toContain('@click.stop.prevent="onActionClick"');
+        expect(empty).not.toContain('onActionClick');
+        expect(empty).toContain('type="button"');
+        expect(empty).toContain('data-board-retry');
+        expect(empty).toContain('@click.stop="onActionActivate"');
+        expect(empty).toContain('@pointerup.stop="onActionActivate"');
+        expect(empty).toContain('@keydown.enter.prevent.stop="onActionActivate"');
+        expect(empty).toContain('@keydown.space.prevent.stop="onActionActivate"');
         expect(empty).toContain("emit('action')");
         expect(empty).toContain('pointer-events: auto');
         const dropCss = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components', 'molecules', 'DropDown', 'style.css'), 'utf8');

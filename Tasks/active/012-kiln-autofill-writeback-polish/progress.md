@@ -15,7 +15,7 @@
 - [x] Comments pane lists existing Alian comments for the open taskId (no empty pane with badge 1)
 
 ## Last step
-RETRY is a normal click (no mousedown-only). Dropdown backdrop does not swallow it. Pine “Loading this board…” holds at least 800ms after a painted frame, then SMOKE-1..7 bind from store/search/`tasksArray`/Ctrl+K hits. Fail-card copy and Autofill stay locked.
+RETRY paints pine Loading synchronously (`flushSync`) and holds it 2s so an after-click still cannot miss it. Click, pointerup, and Enter/Space all fire retry; a capture hit-test still fires if a backdrop is the event target. Then SMOKE-1..7 bind from store/search/`tasksArray`/Ctrl+K. Fail-card copy and Autofill stay locked.
 
 ## Blockers
 None. Live Local Smoke is not in this VM (no Mongo), so Retry / Autofill / pages were not browser-verified here.
@@ -23,6 +23,7 @@ None. Live Local Smoke is not in this VM (no Mongo), so Retry / Autofill / pages
 ## Log
 
 ### 2026-09-01
+- Bot 3 360 on 221fb146 (Ctrl+Shift+R, same :4000): our 10fps loop caught Loading ~800ms (8 frames); their after-click still and two-click 360 were the same fail card. Cause: Vue painted Loading on the next tick, so a CDP still taken when `click()` resolved still showed the fail card; CDP `Input.dispatchMouseEvent` / pointerup also may not emit Vue `@click`, and a teleported overlay can be the hit target. RETRY now `flushSync`s Loading before the handler returns, holds 2000ms, listens click+pointerup+Enter/Space on a native button, and capture-phase hit-tests `[data-board-retry]`. Then bind store/search/Ctrl+K rows. Fail-card copy / Autofill untouched. Gantt / Pages not touched.
 - Bot 3 360 on 4563eec1: two RETRY clicks, 40 frames at 10fps, all fail-card, zero Loading, zero rows. Cause: EmptyState fired on `mousedown.stop.prevent` and skipped `click` (Playwright click() starts the 400ms hold on mousedown, so after-click 10fps never saw Loading); teleported `dropdown-back-drop` (z-index 7) could swallow the hit. RETRY is click-only; backdrop is `pointer-events: none` (dismiss via `kiln-dismiss-dropdown` + document listener); hold is 800ms after two animation frames; retry also binds Ctrl+K `lastSearchTasks` / grouped `tasksArray`. Fail-card copy / Autofill untouched. Gantt / Pages not touched.
 - Bot 3 360 on 91eb8fd5: RETRY is not a dead click, but Loading lasted ~31ms then the same fail card (no SMOKE-1..7). Cause: `resetSprintTaskBucket` wiped in-memory rows, unfiltered fetch wrote `[]` over the bucket, and loading cleared before a compositor frame. Retry now snapshots store/search rows, does not reset/wipe on empty fetch, paints `requestAnimationFrame`×2 then holds pine Loading 400ms, then binds the kept 7 or the same fail card. Fail-card copy / Autofill untouched. Gantt / Pages not touched.
 - Bot 3 360 on 47820681: fail-card copy PASS, Autofill Assignee PASS (neither touched). RETRY was a dead click because ListView `onEmptyAction` no-op'd unless `emptyKind === 'failed'`, while SprintsList owned the fail card (`emptyKind` stayed ready from tasksArray). RETRY now passes `'retry'` and always refetches unfiltered `$skip` 0. SprintsList sets `surfaceRetrying` so pine “Loading this board…” shows even if inject never goes loading, then rows or the same fail card. Hours-off / fail copy / Autofill unchanged. Gantt / Pages not touched.

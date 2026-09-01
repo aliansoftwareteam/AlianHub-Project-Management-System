@@ -39,7 +39,7 @@
 <script setup>
 // PACKAGES
 import { ref, defineProps, defineEmits, nextTick, inject, watch, 
-    onMounted, computed, provide
+    onMounted, computed, provide, flushSync
 } from 'vue';
 import { useStore } from 'vuex';
 import { useRoute } from 'vue-router';
@@ -144,7 +144,7 @@ const emptyKind = computed(() => {
 });
 provide('boardSurfaceKind', emptyKind);
 provide('boardExpectedCount', boardExpectedCount);
-const BOARD_RETRY_HOLD_MS = 800;
+const BOARD_RETRY_HOLD_MS = 2000;
 function preferredTaskRows(...groups) {
     let best = [];
     for (const group of groups) {
@@ -204,11 +204,13 @@ function onEmptyAction(mode) {
             row && !row.deletedStatusKey && firstId(row.sprintId, row.SprintId) === sid
         )),
     );
-    retrying.value = true;
-    isLoading.value = true;
-    let paintedAt = 0;
+    flushSync(() => {
+        retrying.value = true;
+        isLoading.value = true;
+    });
+    const paintedAt = Date.now();
     const holdAfterPaint = () => {
-        const wait = Math.max(0, BOARD_RETRY_HOLD_MS - (Date.now() - (paintedAt || Date.now())));
+        const wait = Math.max(0, BOARD_RETRY_HOLD_MS - (Date.now() - paintedAt));
         return new Promise((resolve) => setTimeout(resolve, wait));
     };
     const bindGroups = (fallbackRows) => new Promise((resolve) => {
@@ -219,10 +221,7 @@ function onEmptyAction(mode) {
     });
     Promise.resolve()
         .then(() => paintRetryFrame())
-        .then(() => {
-            paintedAt = Date.now();
-            return refetchSprintBoardTasks({ projectId: pid, sprintId: sid, projectData: project.value });
-        })
+        .then(() => refetchSprintBoardTasks({ projectId: pid, sprintId: sid, projectData: project.value }))
         .catch((error) => {
             console.error('ERROR retrying sprint tasks: ', error);
             return null;

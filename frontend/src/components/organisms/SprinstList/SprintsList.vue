@@ -233,7 +233,11 @@
                     <Skelaton v-for="i in 5" :key="i" class="border-radius-5-px skelaton__option m-5px border-bottom"/>
                 </div>
                 <span v-if="isError" class="red">{{$t('Toast.something_went_wrong')}}</span>
-                <div v-show="surfaceKind === 'loading'" class="board-load-strip">
+                <div
+                    v-show="surfaceKind === 'loading'"
+                    class="board-load-strip"
+                    :data-board-loading="surfaceKind === 'loading' ? '1' : undefined"
+                >
                     <p class="board-load-strip__line">{{ $t('EmptyState.board_loading') }}</p>
                 </div>
                 <EmptyState
@@ -315,7 +319,7 @@
 
 <script setup>
 // PACKAGES
-import { computed, defineComponent, defineEmits, defineProps, inject, onMounted, onUnmounted, ref, unref, watch} from 'vue';
+import { computed, defineComponent, defineEmits, defineProps, flushSync, inject, onMounted, onUnmounted, ref, unref, watch} from 'vue';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { useToast } from 'vue-toast-notification';
 
@@ -429,7 +433,7 @@ function onItemVisible(key, count) {
 }
 const listVisible = computed(() => Object.values(reportedVisible.value).reduce((sum, n) => sum + (Number(n) || 0), 0));
 const paintedForKind = computed(() => listVisible.value);
-const BOARD_RETRY_HOLD_MS = 800;
+const BOARD_RETRY_HOLD_MS = 2000;
 let retryHoldTimer = null;
 const retryStartedAt = ref(0);
 function paintRetryFrame() {
@@ -467,21 +471,41 @@ const surfaceKind = computed(() => sprintSurfaceKind({
     sidebarCount: localExpected.value,
     storedCount: localStored.value,
 }));
+function eventHitsRetry(event) {
+    if (surfaceKind.value !== 'failed' || surfaceRetrying.value) return false;
+    const t = event && event.target;
+    if (t && t.closest && t.closest('.drop-down-menu')) return false;
+    if (t && t.closest && t.closest('[data-board-retry]')) return true;
+    const btn = typeof document === 'undefined' ? null : document.querySelector('[data-board-retry]');
+    if (!btn || event == null) return false;
+    const x = event.clientX;
+    const y = event.clientY;
+    if (typeof x !== 'number' || typeof y !== 'number') return false;
+    const r = btn.getBoundingClientRect();
+    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+}
+function onRetryPointer(event) {
+    if (!eventHitsRetry(event)) return;
+    retrySurface();
+}
 function retrySurface() {
     if (surfaceRetrying.value) return;
     if (surfaceKind.value === 'failed') {
         if (typeof document !== 'undefined' && document.dispatchEvent) {
             document.dispatchEvent(new CustomEvent('kiln-dismiss-dropdown'));
         }
-        surfaceRetrying.value = true;
-        reportedVisible.value = {};
+        flushSync(() => {
+            surfaceRetrying.value = true;
+            reportedVisible.value = {};
+        });
+        retryStartedAt.value = Date.now();
         if (typeof onBoardSurfaceAction === 'function') onBoardSurfaceAction('retry');
         paintRetryFrame().then(() => {
-            retryStartedAt.value = Date.now();
+            const wait = Math.max(0, BOARD_RETRY_HOLD_MS - (Date.now() - retryStartedAt.value));
             clearTimeout(retryHoldTimer);
             retryHoldTimer = setTimeout(() => {
                 if (unref(boardSurfaceKind) !== 'loading') surfaceRetrying.value = false;
-            }, BOARD_RETRY_HOLD_MS);
+            }, wait);
         });
         return;
     }
@@ -535,6 +559,8 @@ watch(showSprintHours, (show) => {
 onUnmounted(() => {
     clearTimeout(hoursTimer);
     clearTimeout(retryHoldTimer);
+    document.removeEventListener('click', onRetryPointer, true);
+    document.removeEventListener('pointerup', onRetryPointer, true);
 });
 
 watch(route, () => {
@@ -912,6 +938,8 @@ function updateSprintAPICALL(updateData = null,historyObj, oldFolderId = undefin
 // WATCHERS
 onMounted(() => {
     handleWatcherList();
+    document.addEventListener('click', onRetryPointer, true);
+    document.addEventListener('pointerup', onRetryPointer, true);
 })
 function handleWatcherList() {
     watcherUsers.value = [];
