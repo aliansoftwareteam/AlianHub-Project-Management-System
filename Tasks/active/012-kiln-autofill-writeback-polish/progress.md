@@ -15,7 +15,7 @@
 - [x] Comments pane lists existing Alian comments for the open taskId (no empty pane with badge 1)
 
 ## Last step
-RETRY must not throw. vue-cli's `vue` alias does not export `flushSync`; Loading paints via a direct write of `.board-load-strip` plus the Vue ref, then holds 2s, then SMOKE-1..7 bind. Fail-card copy and Autofill stay locked.
+Do not ship a 2s hold. Pine Loading stays until bind settles and at least 4 seconds so a ~2s after-click still shows the banner. Then SMOKE-1..7 bind from store / tasksArray / search. Fail-card copy and Autofill stay locked.
 
 ## Blockers
 None. Live Local Smoke is not in this VM (no Mongo), so Retry / Autofill / pages were not browser-verified here.
@@ -23,6 +23,7 @@ None. Live Local Smoke is not in this VM (no Mongo), so Retry / Autofill / pages
 ## Log
 
 ### 2026-09-01
+- Bot 3 scored 6cb2d3bd FAIL: their after-click still lands at ~2s, which is when the 2s banner expires, so they photographed the fail card again. Hold is now until bind settles and at least 4s. Bind unions store/search/Ctrl+K/`/api/v2/search`, dumps unmatched onto the first group, and counts attached `tasksArray` ids so paintedForKind is not 0 after retry. Fail-card copy / EmptyState click / Autofill untouched. Gantt not touched.
 - Live CDP on 07bd8f0d: immediate after-click still was the fail card; `.board-load-strip` stayed `display:none`; console `flushSync is not a function`. vue-cli vendors do not export `flushSync`, so `retrySurface` threw before `surfaceRetrying=true`. Removed every `flushSync` call. RETRY now sets the ref and writes the existing strip to `display:block` (hides the copper card) in the same turn, holds 2s, then binds store/search/Ctrl+K rows. Fail-card copy / Autofill untouched. Gantt / Pages not touched.
 - Bot 3 360 on 221fb146 (Ctrl+Shift+R, same :4000): our 10fps loop caught Loading ~800ms (8 frames); their after-click still and two-click 360 were the same fail card. Cause: Vue painted Loading on the next tick, so a CDP still taken when `click()` resolved still showed the fail card; CDP `Input.dispatchMouseEvent` / pointerup also may not emit Vue `@click`, and a teleported overlay can be the hit target. RETRY now `flushSync`s Loading before the handler returns, holds 2000ms, listens click+pointerup+Enter/Space on a native button, and capture-phase hit-tests `[data-board-retry]`. Then bind store/search/Ctrl+K rows. Fail-card copy / Autofill untouched. Gantt / Pages not touched.
 - Bot 3 360 on 4563eec1: two RETRY clicks, 40 frames at 10fps, all fail-card, zero Loading, zero rows. Cause: EmptyState fired on `mousedown.stop.prevent` and skipped `click` (Playwright click() starts the 400ms hold on mousedown, so after-click 10fps never saw Loading); teleported `dropdown-back-drop` (z-index 7) could swallow the hit. RETRY is click-only; backdrop is `pointer-events: none` (dismiss via `kiln-dismiss-dropdown` + document listener); hold is 800ms after two animation frames; retry also binds Ctrl+K `lastSearchTasks` / grouped `tasksArray`. Fail-card copy / Autofill untouched. Gantt / Pages not touched.

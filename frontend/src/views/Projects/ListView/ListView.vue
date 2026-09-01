@@ -50,8 +50,9 @@ import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPla
 import isEqual from 'lodash/isEqual';
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { useTaskSelection } from '@/composable/useTaskSelection.js';
-import { boardEmptyKind, bindSprintTaskSource, collectSprintBoardTasks, countPaintedTaskRows, countSprintBoardTasks, firstId, paintSprintGroups, sprintCountFromSprintBags, sprintExpectedCount, sprintTasksBucket, sprintTreeExpectedCount, uniqueTaskRows } from '@/utils/taskOpenProjectId';
-import { lastSearchTasks } from '@/utils/openGlobalSearch';
+import { apiRequest } from '@/services';
+import { boardEmptyKind, bindSprintTaskSource, collectRetryTaskRows, collectSprintBoardTasks, countPaintedTaskRows, countSprintBoardTasks, firstId, paintSprintGroups, sprintCountFromSprintBags, sprintExpectedCount, sprintTasksBucket, sprintTreeExpectedCount, taskMatchesBoard, uniqueTaskRows } from '@/utils/taskOpenProjectId';
+import { lastSearchTasks, rememberSearchTasks } from '@/utils/openGlobalSearch';
 
 // UTILS
 const {getters, commit} = useStore();
@@ -144,29 +145,48 @@ const emptyKind = computed(() => {
 });
 provide('boardSurfaceKind', emptyKind);
 provide('boardExpectedCount', boardExpectedCount);
-const BOARD_RETRY_HOLD_MS = 2000;
-function preferredTaskRows(...groups) {
-    let best = [];
-    for (const group of groups) {
-        const rows = uniqueTaskRows(group);
-        if (rows.length > best.length) best = rows;
-    }
-    return best;
+const BOARD_RETRY_HOLD_MS = 4000;
+function sprintSearchNeedle(sprint) {
+    const name = String((sprint && (sprint.name || sprint.SprintName || sprint.sprintName)) || '').trim();
+    const token = name.split(/[\s|/:_-]+/).find((part) => /[A-Za-z]{2,}/.test(part)) || '';
+    return token;
+}
+function searchBoardTasks(pid, sid, sprint) {
+    const needle = sprintSearchNeedle(sprint);
+    if (!needle) return Promise.resolve([]);
+    return apiRequest('post', '/api/v2/search', { query: needle })
+        .then((response) => {
+            const tasks = (response && response.data && response.data.status && response.data.data && response.data.data.tasks) || [];
+            rememberSearchTasks(tasks);
+            return uniqueTaskRows(tasks).filter((row) => taskMatchesBoard(row, { sprintId: sid, projectId: pid }));
+        })
+        .catch((error) => {
+            console.error('ERROR searching sprint tasks: ', error);
+            return [];
+        });
 }
 function bindPaintedSprints(resp, fallbackRows) {
     const pid = firstId(project.value && project.value._id);
-    const rows = Array.isArray(resp) ? resp : [];
+    const raw = Array.isArray(resp) && resp.length
+        ? resp
+        : ((groupedTasks.value && groupedTasks.value.length) ? groupedTasks.value : (props.sprints || []));
+    const rows = raw.filter((sprint) => sprint && (sprint.id || sprint._id));
     groupedTasks.value = rows.map((sprint) => {
         const sid = firstId(sprint && (sprint.id || sprint._id));
         const bucket = sprintTasksBucket(allProjectTasks.value, pid, sid);
-        const source = bindSprintTaskSource({
-            searched: true,
-            searchRows: uniqueTaskRows(searchedTasksData.value, lastSearchTasks.value),
-            storedRows: uniqueTaskRows((bucket && bucket.tasks) || [], fallbackRows),
-            sprintId: sid,
-        });
+        const source = uniqueTaskRows(
+            fallbackRows,
+            bindSprintTaskSource({
+                searched: true,
+                searchRows: uniqueTaskRows(searchedTasksData.value, lastSearchTasks.value),
+                storedRows: (bucket && bucket.tasks) || [],
+                sprintId: sid,
+                projectId: pid,
+            }),
+        );
         return {
             ...sprint,
+            isExpanded: true,
             items: paintSprintGroups(sprint && sprint.items, source),
         };
     });
@@ -191,19 +211,15 @@ function onEmptyAction(mode) {
     const pid = firstId(project.value && project.value._id);
     const sid = firstId(sprint && (sprint.id || sprint._id));
     const fromGroups = ((sprint && sprint.items) || []).flatMap((group) => (group && group.tasksArray) || []);
-    const kept = preferredTaskRows(
-        collectSprintBoardTasks(allProjectTasks.value, pid, sid),
-        fromGroups,
-        bindSprintTaskSource({
-            searched: true,
-            searchRows: uniqueTaskRows(searchedTasksData.value, lastSearchTasks.value),
-            storedRows: [],
-            sprintId: sid,
-        }),
-        (getters['projectData/alltasks'] || []).filter((row) => (
-            row && !row.deletedStatusKey && firstId(row.sprintId, row.SprintId) === sid
-        )),
-    );
+    const kept = collectRetryTaskRows({
+        store: allProjectTasks.value,
+        projectId: pid,
+        sprintId: sid,
+        groupRows: fromGroups,
+        searchRows: uniqueTaskRows(searchedTasksData.value, lastSearchTasks.value),
+        allTasks: getters['projectData/alltasks'] || [],
+        sprint,
+    });
     retrying.value = true;
     isLoading.value = true;
     const paintedAt = Date.now();
@@ -226,11 +242,16 @@ function onEmptyAction(mode) {
         })
         .then(() => {
             const fetched = collectSprintBoardTasks(allProjectTasks.value, pid, sid);
-            const source = preferredTaskRows(fetched, kept);
-            if (source.length) {
-                commit('projectData/setSprintBoardTasks', { pid, sprintId: sid, tasks: source });
-            }
-            return bindGroups(source);
+            const source = uniqueTaskRows(fetched, kept);
+            const finish = (rows) => {
+                const bound = uniqueTaskRows(rows);
+                if (bound.length) {
+                    commit('projectData/setSprintBoardTasks', { pid, sprintId: sid, tasks: bound });
+                }
+                return bindGroups(bound);
+            };
+            if (source.length) return finish(source);
+            return searchBoardTasks(pid, sid, sprint).then((hits) => finish(uniqueTaskRows(source, hits)));
         })
         .finally(() => {
             holdAfterPaint().then(() => {

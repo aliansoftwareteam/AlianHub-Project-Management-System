@@ -333,16 +333,44 @@ export function sprintCountFromSprintBags(bags, sprintId) {
     return max;
 }
 
-export function bindSprintTaskSource({ searched, searchRows, storedRows, sprintId } = {}) {
-    const stored = Array.isArray(storedRows) ? storedRows : [];
+export function taskMatchesBoard(row, { sprintId, projectId } = {}) {
+    if (!row || row.deletedStatusKey || !firstId(row._id, row.id)) return false;
+    const ids = resolveTaskOpenIds(row);
     const sid = firstId(sprintId);
+    const pid = firstId(projectId);
+    if (sid && ids.sprintId) return ids.sprintId === sid;
+    if (pid && ids.projectId) return ids.projectId === pid;
+    return Boolean(sid || pid);
+}
+
+export function bindSprintTaskSource({ searched, searchRows, storedRows, sprintId, projectId } = {}) {
+    const stored = uniqueTaskRows(storedRows);
     if (searched && Array.isArray(searchRows) && searchRows.length) {
-        const hits = sid
-            ? searchRows.filter((task) => firstId(task && (task.sprintId || task.SprintId)) === sid)
-            : searchRows.slice();
+        const hits = uniqueTaskRows(searchRows.filter((task) => taskMatchesBoard(task, { sprintId, projectId })));
         if (hits.length) return hits;
     }
     return stored;
+}
+
+export function collectRetryTaskRows({
+    store, projectId, sprintId, groupRows, searchRows, allTasks, sprint,
+} = {}) {
+    const fromSprint = Array.isArray(sprint && sprint.tasks)
+        ? sprint.tasks.filter((row) => row && typeof row === 'object' && firstId(row._id, row.id))
+        : [];
+    return uniqueTaskRows(
+        collectSprintBoardTasks(store, projectId, sprintId),
+        groupRows,
+        bindSprintTaskSource({
+            searched: true,
+            searchRows,
+            storedRows: [],
+            sprintId,
+            projectId,
+        }),
+        (Array.isArray(allTasks) ? allTasks : []).filter((row) => taskMatchesBoard(row, { sprintId, projectId })),
+        fromSprint,
+    );
 }
 
 export function countPaintedTaskRows(groups) {
@@ -454,15 +482,23 @@ export function taskMatchesGroup(task, group) {
 }
 
 export function paintSprintGroups(groups, tasks) {
-    const source = (tasks || []).filter((row) => row && !row.deletedStatusKey);
+    const source = (tasks || []).filter((row) => row && !row.deletedStatusKey && firstId(row._id, row.id));
     const cols = Array.isArray(groups) ? groups : [];
     const mapped = cols.map((group) => ({
         ...group,
         tasksArray: source.filter((task) => taskMatchesGroup(task, group)),
     }));
-    if (!mapped.length) return mapped;
-    const statusMode = cols.some((group) => group && group.searchKey === 'statusKey');
-    if (!statusMode) return mapped;
+    if (!mapped.length) {
+        if (!source.length) return mapped;
+        return [{
+            key: 'bound',
+            name: 'Tasks',
+            searchKey: 'statusKey',
+            searchValue: '',
+            isExpanded: true,
+            tasksArray: source,
+        }];
+    }
     return appendUnmatchedToFirstGroup(mapped, unmatchedBoardTasks(mapped, source));
 }
 

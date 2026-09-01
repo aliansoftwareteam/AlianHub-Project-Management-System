@@ -34,9 +34,12 @@ const {
     sprintTreeExpectedCount,
     sprintCountFromSprintBags,
     bindSprintTaskSource,
+    collectRetryTaskRows,
     collectSprintBoardTasks,
     uniqueTaskRows,
     countPaintedTaskRows,
+    paintSprintGroups,
+    taskMatchesBoard,
     boardHoursVisible,
     sprintSurfaceKind,
     coerceAssigneeChipId,
@@ -527,6 +530,35 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
             storedRows: [{ _id: 't1' }],
             sprintId: SPRINT,
         }).map((row) => row._id)).toEqual(['hit']);
+        expect(bindSprintTaskSource({
+            searched: true,
+            searchRows: [{ _id: 'nested', sprint: { id: SPRINT }, ProjectID: PROJECT }],
+            storedRows: [],
+            sprintId: SPRINT,
+            projectId: PROJECT,
+        }).map((row) => row._id)).toEqual(['nested']);
+        expect(bindSprintTaskSource({
+            searched: true,
+            searchRows: [{ _id: 'proj', ProjectID: PROJECT }],
+            storedRows: [],
+            sprintId: SPRINT,
+            projectId: PROJECT,
+        }).map((row) => row._id)).toEqual(['proj']);
+        expect(taskMatchesBoard({ _id: 'a', ProjectID: PROJECT }, { sprintId: SPRINT, projectId: PROJECT })).toBe(true);
+        expect(collectRetryTaskRows({
+            store: {},
+            projectId: PROJECT,
+            sprintId: SPRINT,
+            groupRows: [],
+            searchRows: [{ _id: 's1', ProjectID: PROJECT, TaskKey: 'SMOKE-1' }],
+            allTasks: [],
+            sprint: { tasks: 7 },
+        }).map((row) => row._id)).toEqual(['s1']);
+        expect(paintSprintGroups([], [{ _id: 'a' }, { _id: 'b' }]).map((group) => group.tasksArray.map((row) => row._id))).toEqual([['a', 'b']]);
+        expect(paintSprintGroups(
+            [{ key: 'todo', searchKey: 'statusKey', searchValue: 'done', tasksArray: [] }],
+            [{ _id: 'loose', statusKey: 'other' }],
+        )[0].tasksArray.map((row) => row._id)).toEqual(['loose']);
         expect(countPaintedTaskRows([{ tasksArray: [{ _id: 'a' }, { TaskName: 'ghost' }] }])).toBe(1);
         const store = {
             [PROJECT]: {
@@ -560,10 +592,13 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(list).toContain('bindSprintTaskSource');
         expect(list).toContain('setSprintBoardTasks');
         expect(list).toContain('BOARD_RETRY_HOLD_MS');
-        expect(list).toContain('BOARD_RETRY_HOLD_MS = 2000');
+        expect(list).toContain('BOARD_RETRY_HOLD_MS = 4000');
         expect(list).not.toContain('flushSync');
         expect(list).toContain('fromGroups');
         expect(list).toContain('lastSearchTasks');
+        expect(list).toContain('collectRetryTaskRows');
+        expect(list).toContain('searchBoardTasks');
+        expect(list).toContain('/api/v2/search');
         expect(list).toContain('paintRetryFrame');
         expect(list).toContain('requestAnimationFrame');
         expect(list).toContain('refetchSprintBoardTasks');
@@ -641,7 +676,8 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(sprintsList).toContain('storedCount: localStored.value');
         expect(sprintsList).toContain('paintedForKind');
         expect(sprintsList).toContain('listVisible');
-        expect(sprintsList).toContain("paintedForKind = computed(() => listVisible.value)");
+        expect(sprintsList).toContain('attachedPainted');
+        expect(sprintsList).toContain('Math.max(listVisible.value, attachedPainted.value)');
         expect(sprintsList).not.toContain('groupsReported.value ? listVisible.value : localPainted.value');
         expect(sprintsList).not.toContain('countPaintedTaskRows(props.sprint');
         expect(sprintsList).toContain('onItemVisible');
@@ -651,7 +687,7 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(sprintsList).toContain("v-show=\"surfaceKind === 'loading'\"");
         expect(sprintsList).toContain('releaseRetryHold');
         expect(sprintsList).toContain('BOARD_RETRY_HOLD_MS');
-        expect(sprintsList).toContain('BOARD_RETRY_HOLD_MS = 2000');
+        expect(sprintsList).toContain('BOARD_RETRY_HOLD_MS = 4000');
         expect(sprintsList).not.toContain('flushSync');
         expect(sprintsList).toContain('paintLoadingNow');
         expect(sprintsList).toContain("strip.style.display = 'block'");
