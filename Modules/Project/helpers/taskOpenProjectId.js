@@ -52,7 +52,13 @@ function resolveTaskOpenIds(row) {
     const sprint = row.sprintArray || row.sprint || {};
     return {
         projectId: firstId(row.ProjectID, row.projectId, row.ProjectId, sprint.projectId),
-        sprintId: firstId(row.sprintId, row.SprintId, sprint.id, sprint._id),
+        sprintId: firstId(
+            row.sprintId,
+            row.SprintId,
+            row.sprintID,
+            sprint.id,
+            sprint._id,
+        ),
         taskId: firstId(row.taskId, row._id, row.id),
     };
 }
@@ -77,7 +83,15 @@ function shapeOpenTaskHit(row) {
         status: row.status || null,
         statusType: row.statusType || '',
         ProjectID: firstId(row.ProjectID, row.projectId, row.ProjectId),
-        sprintId: firstId(row.sprintId, row.SprintId),
+        sprintId: firstId(
+            row.sprintId,
+            row.SprintId,
+            row.sprintID,
+            row.sprint && row.sprint.id,
+            row.sprint && row.sprint._id,
+            row.sprintArray && row.sprintArray.id,
+            row.sprintArray && row.sprintArray._id,
+        ),
         folderObjId: firstId(row.folderObjId, row.folderId),
     };
 }
@@ -367,6 +381,24 @@ function bindSprintTaskSource({ searched, searchRows, storedRows, sprintId, proj
     return stored;
 }
 
+function asTaskRowList(value) {
+    if (Array.isArray(value)) return value.filter((row) => row && typeof row === 'object' && firstId(row._id, row.id));
+    if (!value || typeof value !== 'object') return [];
+    return Object.values(value).filter((row) => row && typeof row === 'object' && firstId(row._id, row.id));
+}
+
+function searchTasksFromResponse(response) {
+    if (!response || typeof response !== 'object') return [];
+    const body = response.data !== undefined && !Array.isArray(response.data) ? response.data : response;
+    const nested = body && body.data !== undefined && !Array.isArray(body.data) ? body.data : body;
+    const tasks = (nested && nested.tasks)
+        || (body && body.tasks)
+        || (Array.isArray(nested) ? nested : null)
+        || (Array.isArray(body) ? body : null)
+        || [];
+    return Array.isArray(tasks) ? asTaskRowList(tasks) : [];
+}
+
 function collectRetryTaskRows({
     store, projectId, sprintId, groupRows, searchRows, allTasks, sprint,
 } = {}) {
@@ -383,7 +415,7 @@ function collectRetryTaskRows({
             sprintId,
             projectId,
         }),
-        (Array.isArray(allTasks) ? allTasks : []).filter((row) => taskMatchesBoard(row, { sprintId, projectId })),
+        asTaskRowList(allTasks).filter((row) => taskMatchesBoard(row, { sprintId, projectId })),
         fromSprint,
     );
 }
@@ -604,6 +636,8 @@ module.exports = {
     countSprintBoardTasks,
     collectSprintBoardTasks,
     uniqueTaskRows,
+    asTaskRowList,
+    searchTasksFromResponse,
     sprintTreeExpectedCount,
     sprintCountFromSprintBags,
     taskMatchesBoard,

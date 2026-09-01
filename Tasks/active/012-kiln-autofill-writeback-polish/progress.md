@@ -15,7 +15,7 @@
 - [x] Comments pane lists existing Alian comments for the open taskId (no empty pane with badge 1)
 
 ## Last step
-5448e1b6 is rolled back on live. Restore locked fail card when sidebar is 7 and ItemList painted is 0 (no 00h). Keep a 4s Loading floor on RETRY, then rows or the same fail card. No flushSync, no TDZ. Fail-card copy and Autofill stay locked.
+46ffb34c is the handshake (PASS-pre-fail, PASS-still 4s, PASS-bind no). Bind leftover only: after the 4s hold, paint SMOKE-1..7 from store / tasksArray / search / Ctrl+K. Same fail card only if those 7 cannot bind. Do not paint off a timer. Fail-card copy / 4s floor / EmptyState / Autofill stay locked.
 
 ## Blockers
 None. Live Local Smoke is not in this VM (no Mongo), so Retry / Autofill / pages were not browser-verified here.
@@ -23,6 +23,7 @@ None. Live Local Smoke is not in this VM (no Mongo), so Retry / Autofill / pages
 ## Log
 
 ### 2026-09-01
+- Bind leftover after 46ffb34c: `visibleCount` stayed 0 because retry skipped `/api/v2/search` when any in-memory source existed, `bindPaintedSprints` ignored Ctrl+K `lastSearchTasks` unless board search mode was on, and SprintsList wiped `reportedVisible` on every loading kind. Retry now always unions store / grouped `tasksArray` / Ctrl+K / `/api/v2/search` (defensive body parse), bind always takes matching search hits, ItemList stays mounted (clipped) during the 4s hold so it can emit `visibleCount`, and the loading watch no longer clears that count. `paintedForKind` is still ItemList visible only. Fail-card copy / 4s floor / EmptyState click / Autofill / Gantt untouched. No flushSync.
 - 5448e1b6 REGRESSION: `paintedForKind` counted `tasksArray` so sidebar 7 became ready/00h/void (no fail card, no RETRY). Setup also threw (`We` before initialization / `.filter` on non-array `sprintData` in `groupBy`). Live rolled back to 6cb2d3bd. paintedForKind is ItemList `visibleCount` only again. `groupBy` clones only arrays. Search bind requires sprint id or project-only when the row has no sprint. RETRY still holds Loading ≥4s then rows or the same fail card. Fail-card copy / EmptyState click / Autofill untouched. Gantt not touched.
 - Live CDP on 07bd8f0d: immediate after-click still was the fail card; `.board-load-strip` stayed `display:none`; console `flushSync is not a function`. vue-cli vendors do not export `flushSync`, so `retrySurface` threw before `surfaceRetrying=true`. Removed every `flushSync` call. RETRY now sets the ref and writes the existing strip to `display:block` (hides the copper card) in the same turn, holds 2s, then binds store/search/Ctrl+K rows. Fail-card copy / Autofill untouched. Gantt / Pages not touched.
 - Bot 3 360 on 221fb146 (Ctrl+Shift+R, same :4000): our 10fps loop caught Loading ~800ms (8 frames); their after-click still and two-click 360 were the same fail card. Cause: Vue painted Loading on the next tick, so a CDP still taken when `click()` resolved still showed the fail card; CDP `Input.dispatchMouseEvent` / pointerup also may not emit Vue `@click`, and a teleported overlay can be the hit target. RETRY now `flushSync`s Loading before the handler returns, holds 2000ms, listens click+pointerup+Enter/Space on a native button, and capture-phase hit-tests `[data-board-retry]`. Then bind store/search/Ctrl+K rows. Fail-card copy / Autofill untouched. Gantt / Pages not touched.

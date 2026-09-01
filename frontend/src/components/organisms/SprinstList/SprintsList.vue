@@ -250,8 +250,9 @@
                     @action="retrySurface"
                 />
                 <div
-                    v-show="surfaceKind === 'ready'"
+                    v-show="surfaceKind === 'ready' || surfaceKind === 'loading'"
                     class="itemSprintWrapper style-scroll-6-px"
+                    :class="{ 'itemSprintWrapper--hold': surfaceKind === 'loading' }"
                     id="tasklist_driver"
                 >
                         <template v-if="$route?.query?.tab !== 'Calendar'">
@@ -470,8 +471,7 @@ function releaseRetryHold() {
     }, wait);
 }
 watch(() => unref(boardSurfaceKind), (kind) => {
-    if (kind === 'loading') reportedVisible.value = {};
-    else if (surfaceRetrying.value) releaseRetryHold();
+    if (kind !== 'loading' && surfaceRetrying.value) releaseRetryHold();
 });
 watch(sprintSid, () => {
     reportedVisible.value = {};
@@ -1272,6 +1272,15 @@ function startTaskTour(key) {
     font-size: 15px;
     font-weight: 600;
     color: var(--kiln-ink, #1b2f28);
+}
+.itemSprintWrapper--hold {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    visibility: hidden;
+    pointer-events: none;
 }
 
 </style>

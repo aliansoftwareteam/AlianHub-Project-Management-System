@@ -37,6 +37,8 @@ const {
     collectRetryTaskRows,
     collectSprintBoardTasks,
     uniqueTaskRows,
+    asTaskRowList,
+    searchTasksFromResponse,
     countPaintedTaskRows,
     paintSprintGroups,
     taskMatchesBoard,
@@ -555,6 +557,34 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
             allTasks: [],
             sprint: { tasks: 7 },
         }).map((row) => row._id)).toEqual(['s1']);
+        expect(asTaskRowList({
+            a: { _id: 'bag-1', ProjectID: PROJECT },
+            b: { TaskName: 'ghost' },
+        }).map((row) => row._id)).toEqual(['bag-1']);
+        expect(searchTasksFromResponse({
+            data: { status: true, data: { tasks: [{ _id: 'ax', ProjectID: PROJECT, TaskKey: 'SMOKE-1' }] } },
+        }).map((row) => row._id)).toEqual(['ax']);
+        expect(searchTasksFromResponse({
+            status: true,
+            data: { tasks: [{ _id: 'unwrapped', ProjectID: PROJECT }] },
+        }).map((row) => row._id)).toEqual(['unwrapped']);
+        expect(searchTasksFromResponse({
+            data: { tasks: [{ _id: 'no-status', ProjectID: PROJECT }] },
+        }).map((row) => row._id)).toEqual(['no-status']);
+        expect(collectRetryTaskRows({
+            store: {},
+            projectId: PROJECT,
+            sprintId: SPRINT,
+            groupRows: [],
+            searchRows: [],
+            allTasks: { t: { _id: 'from-all', ProjectID: PROJECT, TaskKey: 'SMOKE-2' } },
+            sprint: { tasks: 7 },
+        }).map((row) => row._id)).toEqual(['from-all']);
+        expect(shapeOpenTaskHit({
+            _id: 'nested-sprint',
+            ProjectID: PROJECT,
+            sprint: { _id: SPRINT },
+        }).sprintId).toBe(SPRINT);
         expect(paintSprintGroups([], [{ _id: 'a' }, { _id: 'b' }]).map((group) => group.tasksArray.map((row) => row._id))).toEqual([['a', 'b']]);
         expect(paintSprintGroups(
             [{ key: 'todo', searchKey: 'statusKey', searchValue: 'done', tasksArray: [] }],
@@ -599,6 +629,9 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(list).toContain('lastSearchTasks');
         expect(list).toContain('collectRetryTaskRows');
         expect(list).toContain('searchBoardTasks');
+        expect(list).toContain('searchTasksFromResponse');
+        expect(list).toContain('searched: true');
+        expect(list).not.toContain('if (source.length) return finish(source)');
         expect(list).toContain('/api/v2/search');
         expect(list).toContain('paintRetryFrame');
         expect(list).toContain('requestAnimationFrame');
@@ -686,8 +719,10 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(sprintsList).toContain('onItemVisible');
         expect(sprintsList).toContain('sprintTreeExpectedCount');
         expect(sprintsList).toContain('sprintCountFromSprintBags');
-        expect(sprintsList).toContain("v-show=\"surfaceKind === 'ready'\"");
+        expect(sprintsList).toContain("v-show=\"surfaceKind === 'ready' || surfaceKind === 'loading'\"");
         expect(sprintsList).toContain("v-show=\"surfaceKind === 'loading'\"");
+        expect(sprintsList).toContain('itemSprintWrapper--hold');
+        expect(sprintsList).not.toContain("if (kind === 'loading') reportedVisible.value = {}");
         expect(sprintsList).toContain('releaseRetryHold');
         expect(sprintsList).toContain('BOARD_RETRY_HOLD_MS');
         expect(sprintsList).toContain('BOARD_RETRY_HOLD_MS = 4000');

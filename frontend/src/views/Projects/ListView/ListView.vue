@@ -51,7 +51,7 @@ import isEqual from 'lodash/isEqual';
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { useTaskSelection } from '@/composable/useTaskSelection.js';
 import { apiRequest } from '@/services';
-import { boardEmptyKind, bindSprintTaskSource, collectRetryTaskRows, collectSprintBoardTasks, countPaintedTaskRows, countSprintBoardTasks, firstId, paintSprintGroups, sprintCountFromSprintBags, sprintExpectedCount, sprintTasksBucket, sprintTreeExpectedCount, taskMatchesBoard, uniqueTaskRows } from '@/utils/taskOpenProjectId';
+import { boardEmptyKind, bindSprintTaskSource, collectRetryTaskRows, collectSprintBoardTasks, countPaintedTaskRows, countSprintBoardTasks, firstId, paintSprintGroups, searchTasksFromResponse, sprintCountFromSprintBags, sprintExpectedCount, sprintTasksBucket, sprintTreeExpectedCount, taskMatchesBoard, uniqueTaskRows } from '@/utils/taskOpenProjectId';
 import { lastSearchTasks, rememberSearchTasks } from '@/utils/openGlobalSearch';
 
 // UTILS
@@ -156,7 +156,7 @@ function searchBoardTasks(pid, sid, sprint) {
     if (!needle) return Promise.resolve([]);
     return apiRequest('post', '/api/v2/search', { query: needle })
         .then((response) => {
-            const tasks = (response && response.data && response.data.status && response.data.data && response.data.data.tasks) || [];
+            const tasks = searchTasksFromResponse(response);
             rememberSearchTasks(tasks);
             return uniqueTaskRows(tasks).filter((row) => taskMatchesBoard(row, { sprintId: sid, projectId: pid }));
         })
@@ -179,7 +179,7 @@ function bindPaintedSprints(resp, fallbackRows) {
         const source = uniqueTaskRows(
             fallbackRows,
             bindSprintTaskSource({
-                searched: Boolean(searchedTask && searchedTask.value),
+                searched: true,
                 searchRows: uniqueTaskRows(searchedTasksData.value, lastSearchTasks.value),
                 storedRows: (bucket && bucket.tasks) || [],
                 sprintId: sid,
@@ -246,16 +246,13 @@ function onEmptyAction(mode) {
         })
         .then(() => {
             const fetched = collectSprintBoardTasks(allProjectTasks.value, pid, sid);
-            const source = uniqueTaskRows(fetched, kept);
-            const finish = (rows) => {
-                const bound = uniqueTaskRows(rows);
+            return searchBoardTasks(pid, sid, sprint).then((hits) => {
+                const bound = uniqueTaskRows(fetched, kept, hits);
                 if (bound.length) {
                     commit('projectData/setSprintBoardTasks', { pid, sprintId: sid, tasks: bound });
                 }
                 return bindGroups(bound);
-            };
-            if (source.length) return finish(source);
-            return searchBoardTasks(pid, sid, sprint).then((hits) => finish(uniqueTaskRows(source, hits)));
+            });
         })
         .finally(() => {
             holdAfterPaint().then(() => {

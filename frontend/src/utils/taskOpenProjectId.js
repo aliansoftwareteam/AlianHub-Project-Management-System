@@ -53,7 +53,13 @@ export function resolveTaskOpenIds(row) {
     const sprint = row.sprintArray || row.sprint || {};
     return {
         projectId: firstId(row.ProjectID, row.projectId, row.ProjectId, sprint.projectId),
-        sprintId: firstId(row.sprintId, row.SprintId, sprint.id, sprint._id),
+        sprintId: firstId(
+            row.sprintId,
+            row.SprintId,
+            row.sprintID,
+            sprint.id,
+            sprint._id,
+        ),
         taskId: firstId(row.taskId, row._id, row.id),
     };
 }
@@ -352,6 +358,24 @@ export function bindSprintTaskSource({ searched, searchRows, storedRows, sprintI
     return stored;
 }
 
+export function asTaskRowList(value) {
+    if (Array.isArray(value)) return value.filter((row) => row && typeof row === 'object' && firstId(row._id, row.id));
+    if (!value || typeof value !== 'object') return [];
+    return Object.values(value).filter((row) => row && typeof row === 'object' && firstId(row._id, row.id));
+}
+
+export function searchTasksFromResponse(response) {
+    if (!response || typeof response !== 'object') return [];
+    const body = response.data !== undefined && !Array.isArray(response.data) ? response.data : response;
+    const nested = body && body.data !== undefined && !Array.isArray(body.data) ? body.data : body;
+    const tasks = (nested && nested.tasks)
+        || (body && body.tasks)
+        || (Array.isArray(nested) ? nested : null)
+        || (Array.isArray(body) ? body : null)
+        || [];
+    return Array.isArray(tasks) ? asTaskRowList(tasks) : [];
+}
+
 export function collectRetryTaskRows({
     store, projectId, sprintId, groupRows, searchRows, allTasks, sprint,
 } = {}) {
@@ -368,7 +392,7 @@ export function collectRetryTaskRows({
             sprintId,
             projectId,
         }),
-        (Array.isArray(allTasks) ? allTasks : []).filter((row) => taskMatchesBoard(row, { sprintId, projectId })),
+        asTaskRowList(allTasks).filter((row) => taskMatchesBoard(row, { sprintId, projectId })),
         fromSprint,
     );
 }
