@@ -545,6 +545,7 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
             projectId: PROJECT,
         }).map((row) => row._id)).toEqual(['proj']);
         expect(taskMatchesBoard({ _id: 'a', ProjectID: PROJECT }, { sprintId: SPRINT, projectId: PROJECT })).toBe(true);
+        expect(taskMatchesBoard({ _id: 'x', sprintId: 'other', ProjectID: PROJECT }, { sprintId: SPRINT, projectId: PROJECT })).toBe(false);
         expect(collectRetryTaskRows({
             store: {},
             projectId: PROJECT,
@@ -645,6 +646,7 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(helper).toContain('resetCursor: true');
         expect(helper).toContain('showAllTasks: true');
         expect(helper).toContain("lView === 'list' || lView === 'board'");
+        expect(helper).toContain('Array.isArray(cloned)');
         const actions = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'store', 'ProjectData', 'actions.js'), 'utf8');
         expect(actions).toContain('sprintTasksBucket');
         expect(actions).toContain('unfiltered');
@@ -676,8 +678,9 @@ describe('BOARD EMPTY - three states, never No Data Found', () => {
         expect(sprintsList).toContain('storedCount: localStored.value');
         expect(sprintsList).toContain('paintedForKind');
         expect(sprintsList).toContain('listVisible');
-        expect(sprintsList).toContain('attachedPainted');
-        expect(sprintsList).toContain('Math.max(listVisible.value, attachedPainted.value)');
+        expect(sprintsList).toContain("paintedForKind = computed(() => listVisible.value)");
+        expect(sprintsList).not.toContain('attachedPainted');
+        expect(sprintsList).not.toContain('Math.max(listVisible.value, attachedPainted.value)');
         expect(sprintsList).not.toContain('groupsReported.value ? listVisible.value : localPainted.value');
         expect(sprintsList).not.toContain('countPaintedTaskRows(props.sprint');
         expect(sprintsList).toContain('onItemVisible');

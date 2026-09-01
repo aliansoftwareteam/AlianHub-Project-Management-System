@@ -872,7 +872,13 @@ export function taskListHelper() {
             let arr = [];
             let tasks = [];
 
-            let sprints = JSON.parse(JSON.stringify(sprintData)).filter((x) => x);
+            let cloned = [];
+            try {
+                cloned = sprintData == null ? [] : JSON.parse(JSON.stringify(sprintData));
+            } catch (_error) {
+                cloned = [];
+            }
+            let sprints = (Array.isArray(cloned) ? cloned : []).filter((x) => x);
 
             if(type === 0) {
                 arr = Array.isArray(project.taskStatusData) ? project.taskStatusData : [];

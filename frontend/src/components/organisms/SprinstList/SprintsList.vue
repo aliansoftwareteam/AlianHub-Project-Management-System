@@ -346,7 +346,7 @@ import * as env from '@/config/env';
 import { useStore } from 'vuex';
 import { useRoute } from 'vue-router';
 import { apiRequest } from '../../../services'
-import { boardHoursVisible, countPaintedTaskRows, countSprintBoardTasks, firstId, sprintCountFromSprintBags, sprintExpectedCount, sprintSurfaceKind, sprintTasksBucket, sprintTreeExpectedCount } from '@/utils/taskOpenProjectId';
+import { boardHoursVisible, countSprintBoardTasks, firstId, sprintCountFromSprintBags, sprintExpectedCount, sprintSurfaceKind, sprintTasksBucket, sprintTreeExpectedCount } from '@/utils/taskOpenProjectId';
 import { useAiApiFunction } from "@/composable/aiHelper";
 import taskClass from "@/utils/TaskOperations"
 import { useI18n } from "vue-i18n";
@@ -433,9 +433,7 @@ function onItemVisible(key, count) {
     reportedVisible.value = { ...reportedVisible.value, [String(key)]: Number(count) || 0 };
 }
 const listVisible = computed(() => Object.values(reportedVisible.value).reduce((sum, n) => sum + (Number(n) || 0), 0));
-const sprintGroups = computed(() => (props.sprint && Array.isArray(props.sprint.items) ? props.sprint.items : []));
-const attachedPainted = computed(() => countPaintedTaskRows(sprintGroups.value));
-const paintedForKind = computed(() => Math.max(listVisible.value, attachedPainted.value));
+const paintedForKind = computed(() => listVisible.value);
 const BOARD_RETRY_HOLD_MS = 4000;
 const loadStripEl = ref(null);
 let retryHoldTimer = null;

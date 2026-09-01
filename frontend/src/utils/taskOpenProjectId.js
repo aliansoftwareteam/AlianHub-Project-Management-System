@@ -339,8 +339,8 @@ export function taskMatchesBoard(row, { sprintId, projectId } = {}) {
     const sid = firstId(sprintId);
     const pid = firstId(projectId);
     if (sid && ids.sprintId) return ids.sprintId === sid;
-    if (pid && ids.projectId) return ids.projectId === pid;
-    return Boolean(sid || pid);
+    if (sid && !ids.sprintId && pid && ids.projectId) return ids.projectId === pid;
+    return false;
 }
 
 export function bindSprintTaskSource({ searched, searchRows, storedRows, sprintId, projectId } = {}) {
@@ -482,7 +482,7 @@ export function taskMatchesGroup(task, group) {
 }
 
 export function paintSprintGroups(groups, tasks) {
-    const source = (tasks || []).filter((row) => row && !row.deletedStatusKey && firstId(row._id, row.id));
+    const source = (Array.isArray(tasks) ? tasks : []).filter((row) => row && !row.deletedStatusKey && firstId(row._id, row.id));
     const cols = Array.isArray(groups) ? groups : [];
     const mapped = cols.map((group) => ({
         ...group,

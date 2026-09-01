@@ -169,7 +169,9 @@ function bindPaintedSprints(resp, fallbackRows) {
     const pid = firstId(project.value && project.value._id);
     const raw = Array.isArray(resp) && resp.length
         ? resp
-        : ((groupedTasks.value && groupedTasks.value.length) ? groupedTasks.value : (props.sprints || []));
+        : (Array.isArray(groupedTasks.value) && groupedTasks.value.length
+            ? groupedTasks.value
+            : (Array.isArray(props.sprints) ? props.sprints : []));
     const rows = raw.filter((sprint) => sprint && (sprint.id || sprint._id));
     groupedTasks.value = rows.map((sprint) => {
         const sid = firstId(sprint && (sprint.id || sprint._id));
@@ -177,7 +179,7 @@ function bindPaintedSprints(resp, fallbackRows) {
         const source = uniqueTaskRows(
             fallbackRows,
             bindSprintTaskSource({
-                searched: true,
+                searched: Boolean(searchedTask && searchedTask.value),
                 searchRows: uniqueTaskRows(searchedTasksData.value, lastSearchTasks.value),
                 storedRows: (bucket && bucket.tasks) || [],
                 sprintId: sid,
@@ -210,7 +212,9 @@ function onEmptyAction(mode) {
     const sprint = (headerSprints.value && headerSprints.value[0]) || (props.sprints && props.sprints[0]);
     const pid = firstId(project.value && project.value._id);
     const sid = firstId(sprint && (sprint.id || sprint._id));
-    const fromGroups = ((sprint && sprint.items) || []).flatMap((group) => (group && group.tasksArray) || []);
+    const fromGroups = ((sprint && sprint.items) || []).flatMap((group) => (
+        Array.isArray(group && group.tasksArray) ? group.tasksArray : []
+    ));
     const kept = collectRetryTaskRows({
         store: allProjectTasks.value,
         projectId: pid,
