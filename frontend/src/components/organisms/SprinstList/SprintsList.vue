@@ -429,10 +429,20 @@ function onItemVisible(key, count) {
 }
 const listVisible = computed(() => Object.values(reportedVisible.value).reduce((sum, n) => sum + (Number(n) || 0), 0));
 const paintedForKind = computed(() => listVisible.value);
+const BOARD_RETRY_HOLD_MS = 800;
 let retryHoldTimer = null;
 const retryStartedAt = ref(0);
+function paintRetryFrame() {
+    return new Promise((resolve) => {
+        if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(() => requestAnimationFrame(resolve));
+            return;
+        }
+        setTimeout(resolve, 32);
+    });
+}
 function releaseRetryHold() {
-    const wait = Math.max(0, 400 - (Date.now() - (retryStartedAt.value || 0)));
+    const wait = Math.max(0, BOARD_RETRY_HOLD_MS - (Date.now() - (retryStartedAt.value || 0)));
     clearTimeout(retryHoldTimer);
     retryHoldTimer = setTimeout(() => {
         surfaceRetrying.value = false;
@@ -460,14 +470,19 @@ const surfaceKind = computed(() => sprintSurfaceKind({
 function retrySurface() {
     if (surfaceRetrying.value) return;
     if (surfaceKind.value === 'failed') {
+        if (typeof document !== 'undefined' && document.dispatchEvent) {
+            document.dispatchEvent(new CustomEvent('kiln-dismiss-dropdown'));
+        }
         surfaceRetrying.value = true;
         reportedVisible.value = {};
-        retryStartedAt.value = Date.now();
         if (typeof onBoardSurfaceAction === 'function') onBoardSurfaceAction('retry');
-        clearTimeout(retryHoldTimer);
-        retryHoldTimer = setTimeout(() => {
-            if (unref(boardSurfaceKind) !== 'loading') surfaceRetrying.value = false;
-        }, 400);
+        paintRetryFrame().then(() => {
+            retryStartedAt.value = Date.now();
+            clearTimeout(retryHoldTimer);
+            retryHoldTimer = setTimeout(() => {
+                if (unref(boardSurfaceKind) !== 'loading') surfaceRetrying.value = false;
+            }, BOARD_RETRY_HOLD_MS);
+        });
         return;
     }
     if (typeof onBoardSurfaceAction === 'function') onBoardSurfaceAction('create');
@@ -1195,11 +1210,15 @@ function startTaskTour(key) {
     display: none !important;
 }
 .board-load-strip {
+    position: relative;
+    z-index: 40;
+    pointer-events: none;
     background: var(--kiln-paper, #f4ead8);
     border: 1px solid var(--kiln-line, #d8cbb3);
     border-radius: var(--kiln-radius-sm, 9px);
     padding: 12px 16px;
     margin: 8px 0 4px;
+    min-height: 48px;
 }
 .board-load-strip__line {
     margin: 0;

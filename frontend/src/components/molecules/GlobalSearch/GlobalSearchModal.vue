@@ -65,7 +65,7 @@ import { useRouter, useRoute } from "vue-router";
 import { apiRequest } from '@/services';
 import { useCustomComposable } from "@/composable";
 import { resolveTaskOpenIds, firstId, injectedId, taskOpenRoute } from '@/utils/taskOpenProjectId';
-import { closeGlobalSearch } from '@/utils/openGlobalSearch';
+import { closeGlobalSearch, rememberSearchTasks } from '@/utils/openGlobalSearch';
 
 const { debounce } = useCustomComposable();
 const router = useRouter();
@@ -127,6 +127,7 @@ const onInput = debounce(() => {
     .then((response) => {
         if (response.data?.status) {
             results.value = response.data.data;
+            rememberSearchTasks(response.data.data && response.data.data.tasks);
         }
         searched.value = true;
     })

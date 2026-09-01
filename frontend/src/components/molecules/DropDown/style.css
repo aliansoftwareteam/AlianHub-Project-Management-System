@@ -2,6 +2,7 @@
     height: 100dvh;
     width: 100%;
     background-color: transparent;
+    pointer-events: none;
     /* background-color: #00000022; */
     top: 0;
     left: 0;
@@ -19,6 +20,7 @@
 }
 .drop-down-menu {
     opacity: 1;
+    pointer-events: auto;
     /* transition: all 0.3s ease; */
     box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.15);
     border-radius: 12px!important;

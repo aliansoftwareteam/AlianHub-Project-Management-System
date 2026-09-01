@@ -8,7 +8,6 @@
             type="button"
             class="cursor-pointer font-roboto-sans empty-state__btn"
             :class="tone ? 'empty-state__btn--tone' : 'blue_btn'"
-            @mousedown.stop.prevent="onActionPointer"
             @click.stop.prevent="onActionClick"
         >{{ actionLabel }}</button>
         <a
@@ -22,20 +21,11 @@
 </template>
 
 <script setup>
-import { computed, defineProps, defineEmits, ref } from 'vue';
+import { computed, defineProps, defineEmits } from 'vue';
 import { useStore } from 'vuex';
 
 const emit = defineEmits(['action']);
-const skipClick = ref(false);
-function onActionPointer() {
-    skipClick.value = true;
-    emit('action');
-}
 function onActionClick() {
-    if (skipClick.value) {
-        skipClick.value = false;
-        return;
-    }
     emit('action');
 }
 
@@ -69,6 +59,9 @@ const resolvedHelpHref = computed(() => {
 <style scoped>
 .empty-state--pine,
 .empty-state--copper {
+    position: relative;
+    z-index: 40;
+    pointer-events: auto;
     background: var(--kiln-paper, #f4ead8);
     border: 1px solid var(--kiln-line, #d8cbb3);
     border-radius: var(--kiln-radius-sm, 9px);
@@ -98,6 +91,9 @@ const resolvedHelpHref = computed(() => {
 }
 .empty-state__btn {
     margin: 0;
+    pointer-events: auto;
+    position: relative;
+    z-index: 41;
 }
 .empty-state__btn--tone {
     min-height: 32px;

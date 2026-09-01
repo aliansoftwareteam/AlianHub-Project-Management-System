@@ -51,6 +51,7 @@ import isEqual from 'lodash/isEqual';
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { useTaskSelection } from '@/composable/useTaskSelection.js';
 import { boardEmptyKind, bindSprintTaskSource, collectSprintBoardTasks, countPaintedTaskRows, countSprintBoardTasks, firstId, paintSprintGroups, sprintCountFromSprintBags, sprintExpectedCount, sprintTasksBucket, sprintTreeExpectedCount, uniqueTaskRows } from '@/utils/taskOpenProjectId';
+import { lastSearchTasks } from '@/utils/openGlobalSearch';
 
 // UTILS
 const {getters, commit} = useStore();
@@ -143,7 +144,7 @@ const emptyKind = computed(() => {
 });
 provide('boardSurfaceKind', emptyKind);
 provide('boardExpectedCount', boardExpectedCount);
-const BOARD_RETRY_HOLD_MS = 400;
+const BOARD_RETRY_HOLD_MS = 800;
 function preferredTaskRows(...groups) {
     let best = [];
     for (const group of groups) {
@@ -160,7 +161,7 @@ function bindPaintedSprints(resp, fallbackRows) {
         const bucket = sprintTasksBucket(allProjectTasks.value, pid, sid);
         const source = bindSprintTaskSource({
             searched: true,
-            searchRows: searchedTasksData.value,
+            searchRows: uniqueTaskRows(searchedTasksData.value, lastSearchTasks.value),
             storedRows: uniqueTaskRows((bucket && bucket.tasks) || [], fallbackRows),
             sprintId: sid,
         });
@@ -189,11 +190,13 @@ function onEmptyAction(mode) {
     const sprint = (headerSprints.value && headerSprints.value[0]) || (props.sprints && props.sprints[0]);
     const pid = firstId(project.value && project.value._id);
     const sid = firstId(sprint && (sprint.id || sprint._id));
+    const fromGroups = ((sprint && sprint.items) || []).flatMap((group) => (group && group.tasksArray) || []);
     const kept = preferredTaskRows(
         collectSprintBoardTasks(allProjectTasks.value, pid, sid),
+        fromGroups,
         bindSprintTaskSource({
             searched: true,
-            searchRows: searchedTasksData.value,
+            searchRows: uniqueTaskRows(searchedTasksData.value, lastSearchTasks.value),
             storedRows: [],
             sprintId: sid,
         }),
@@ -203,9 +206,9 @@ function onEmptyAction(mode) {
     );
     retrying.value = true;
     isLoading.value = true;
-    const started = Date.now();
-    const holdLoading = () => {
-        const wait = Math.max(0, BOARD_RETRY_HOLD_MS - (Date.now() - started));
+    let paintedAt = 0;
+    const holdAfterPaint = () => {
+        const wait = Math.max(0, BOARD_RETRY_HOLD_MS - (Date.now() - (paintedAt || Date.now())));
         return new Promise((resolve) => setTimeout(resolve, wait));
     };
     const bindGroups = (fallbackRows) => new Promise((resolve) => {
@@ -216,7 +219,10 @@ function onEmptyAction(mode) {
     });
     Promise.resolve()
         .then(() => paintRetryFrame())
-        .then(() => refetchSprintBoardTasks({ projectId: pid, sprintId: sid, projectData: project.value }))
+        .then(() => {
+            paintedAt = Date.now();
+            return refetchSprintBoardTasks({ projectId: pid, sprintId: sid, projectData: project.value });
+        })
         .catch((error) => {
             console.error('ERROR retrying sprint tasks: ', error);
             return null;
@@ -230,7 +236,7 @@ function onEmptyAction(mode) {
             return bindGroups(source);
         })
         .finally(() => {
-            holdLoading().then(() => {
+            holdAfterPaint().then(() => {
                 retrying.value = false;
                 isLoading.value = false;
             });
