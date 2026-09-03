@@ -1,12 +1,14 @@
 export default [
     {
+        // No project id: the projects list (handoff 10a). With an id the route
+        // below opens the project shell.
         path: '/:cid/project',
         name: 'Projects',
         meta: {
             title: "Projects",
             requiresAuth: true
         },
-        component: () => import(/* webpackChunkName: "project" */ '@/views/Projects/Projects.vue'),
+        component: () => import(/* webpackChunkName: "projects-list" */ '@/views/Projects/ProjectsListing/ProjectsListPage.vue'),
     },
     {
         path: '/:cid/project/:id/p',
@@ -59,5 +61,14 @@ export default [
             requiresAuth: true
         },
         component: () => import(/* webpackChunkName: "project" */ '@/views/Projects/Projects'),
+    },
+    {
+        path: '/:cid/project/:id/recurring',
+        name: 'ProjectRecurringTasks',
+        meta: {
+            title: "Recurring tasks",
+            requiresAuth: true
+        },
+        component: () => import(/* webpackChunkName: "project" */ '@/views/Projects/RecurringTasks/RecurringTasksManager.vue'),
     }
 ]

@@ -10,8 +10,14 @@ const accounts = require('./accounts');
 const actions = require('./actions');
 const { resolveActor, isAgent } = require('./actor');
 const tools = require('../Automations/engine/tools');
+const team = require('./team');
+const scope = require('./scope');
+const shipping = require('./shipping');
 
 const companyOf = (req) => req.headers['companyid'] || (req.query && req.query.companyId) || '';
+// 'mention' is a run started by @naming the agent in a comment (13b); it is
+// recorded because "who asked for this" is the first question about any run.
+const TRIGGERS = ['manual', 'mention', 'schedule', 'rule', 'assignment'];
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 const fail = (res, statusText, code) => res.status(code || 200).send({ status: false, statusText, message: statusText });
@@ -179,7 +185,7 @@ exports.startRun = async (req, res) => {
     try {
         const companyId = companyOf(req);
         const { actor, human } = await humanActor(req);
-        const { agentId, taskId, skill, trigger } = req.body || {};
+        const { agentId, taskId, skill, trigger, note } = req.body || {};
         if (!companyId || !OBJECT_ID.test(String(agentId || ''))) return fail(res, 'companyId and a valid agentId are required.');
         const agent = await runs.getAgent(companyId, agentId);
         const check = runs.canStart(agent, { trigger: trigger || 'manual', viaAccount: isAgent(actor) ? actor.viaAccount : undefined });
@@ -191,7 +197,7 @@ exports.startRun = async (req, res) => {
             if (!task) return fail(res, 'Task not found.', 404);
             if (agent.projectIds && agent.projectIds.length && !agent.projectIds.includes(String(task.ProjectID))) return fail(res, 'This agent is not scoped to that project.', 403);
         }
-        const run = await runs.create(companyId, { agent, taskId, projectId: task && task.ProjectID, skill: skill || (agent.skills && agent.skills[0]) || 'qa-review', trigger: trigger || 'manual', startedBy: actor.userId, viaAccount: isAgent(actor) ? actor.viaAccount : agent.account });
+        const run = await runs.create(companyId, { agent, taskId, projectId: task && task.ProjectID, skill: skill || (agent.skills && agent.skills[0]) || 'qa-review', trigger: TRIGGERS.includes(trigger) ? trigger : 'manual', startedBy: actor.userId, viaAccount: isAgent(actor) ? actor.viaAccount : agent.account, note });
         if (task && registry.has('subtask.create')) {
             const runActor = { kind: 'agent', userId: actor.userId, agentId: String(agent._id), agentName: agent.name, runId: String(run._id), viaAccount: run.viaAccount, tokenId: null };
             setImmediate(() => runs.executeSkill(companyId, run, agent, task, { proposals, actions, actor: runActor }));
@@ -306,4 +312,58 @@ exports.setPolicy = async (req, res) => {
         if (out.error) return fail(res, out.error);
         return res.send({ status: true, statusText: 'Policy updated.', data: out.policy });
     } catch (e) { logger.error(`setPolicy: ${e.message}`); return fail(res, e.message); }
+};
+
+/* GET /api/v2/agents/team — the Team board (13h): people and agents, what each
+ * is on right now, load for the week, PTO, and a composed standup. */
+exports.teamBoard = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        if (!companyId) return fail(res, 'companyId is required.');
+        const hoursPerWeek = Number(req.query && req.query.hoursPerWeek) > 0 ? Number(req.query.hoursPerWeek) : 40;
+        const data = await team.board(companyId, { hoursPerWeek });
+        return res.send({ status: true, data: { ...data, standup: team.standup(data) } });
+    } catch (e) { logger.error(`teamBoard: ${e.message}`); return fail(res, e.message); }
+};
+
+/* GET /api/v2/agents/routable?projectId=&limit= — open tasks the caller can
+ * already see, for the bulk router (30b). Scoped through Agents/scope so routing
+ * can never surface a task the person could not open on their own. */
+exports.routableTasks = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        if (!companyId || !req.uid) return fail(res, 'Unauthorized.', 401);
+        const ids = await scope.visibleProjectIds(companyId, req.uid);
+        if (!ids.length) return res.send({ status: true, data: [] });
+        const q = req.query || {};
+        const wanted = q.projectId && ids.includes(String(q.projectId)) ? [String(q.projectId)] : ids;
+        const limit = Math.min(100, Math.max(1, Number(q.limit) || 40));
+        const rows = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS,
+            data: [{ deletedStatusKey: { $ne: 1 }, ProjectID: { $in: wanted }, statusType: { $nin: ['close', 'done', 'default_close'] } },
+                   'TaskName TaskKey status statusType Task_Priority ProjectID tagsArray AssigneeUserId totalEstimatedTime updatedAt',
+                   { sort: { updatedAt: -1 }, limit }],
+        }, 'find').catch(() => []);
+        return res.send({ status: true, data: rows || [] });
+    } catch (e) { logger.error(`routableTasks: ${e.message}`); return fail(res, e.message); }
+};
+
+/* GET /api/v2/agents/pipeline — tasks an agent has worked on (28a task picker). */
+exports.pipelineTasks = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        if (!companyId || !req.uid) return fail(res, 'Unauthorized.', 401);
+        const data = await shipping.pipelineTasks(companyId, req.uid, { limit: req.query && req.query.limit });
+        return res.send({ status: true, data });
+    } catch (e) { logger.error(`pipelineTasks: ${e.message}`); return fail(res, e.message); }
+};
+
+/* GET /api/v2/agents/release?since= — the release candidate (28c). */
+exports.releaseCandidate = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        if (!companyId || !req.uid) return fail(res, 'Unauthorized.', 401);
+        const data = await shipping.releaseCandidate(companyId, req.uid, { since: req.query && req.query.since });
+        return res.send({ status: true, data });
+    } catch (e) { logger.error(`releaseCandidate: ${e.message}`); return fail(res, e.message); }
 };

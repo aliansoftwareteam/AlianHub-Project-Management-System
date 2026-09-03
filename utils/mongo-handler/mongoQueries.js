@@ -95,7 +95,9 @@ const {
     integrationConnectionsSchema,
     cloudStorageConnectionsSchema,
     formsSchema,
-    formSubmissionsSchema
+    formSubmissionsSchema,
+    projectContractsSchema,
+    projectInvoicesSchema
 } = require('./createSchema');
 
 
@@ -291,6 +293,10 @@ exports.checkType = (type) => {
             return formsSchema
         case SCHEMA_TYPE.FORM_SUBMISSIONS:
             return formSubmissionsSchema
+        case SCHEMA_TYPE.PROJECT_CONTRACTS:
+            return projectContractsSchema
+        case SCHEMA_TYPE.PROJECT_INVOICES:
+            return projectInvoicesSchema
         default:
             return ""
     }
@@ -489,6 +495,10 @@ exports.tableType = (type) => {
                 return `${dbCollections.FORMS}`
         case SCHEMA_TYPE.FORM_SUBMISSIONS:
                 return `${dbCollections.FORM_SUBMISSIONS}`
+        case SCHEMA_TYPE.PROJECT_CONTRACTS:
+                return `${dbCollections.PROJECT_CONTRACTS}`
+        case SCHEMA_TYPE.PROJECT_INVOICES:
+                return `${dbCollections.PROJECT_INVOICES}`
         default:
             return ""
     }

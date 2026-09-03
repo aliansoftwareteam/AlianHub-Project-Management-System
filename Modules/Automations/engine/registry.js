@@ -28,6 +28,11 @@ const TRIGGERS = [
     { key: 'task.renamed', label: 'Task is renamed', entity: 'task', hasDiff: true },
     { key: 'task.sprint_changed', label: 'Task moves sprint', entity: 'task', hasDiff: true },
     { key: 'task.updated', label: 'Task is updated (any field)', entity: 'task', hasDiff: true },
+    // Published by Modules/Forms when a public submission is recorded. `actsOn`
+    // is the task the submission filed, which is why task actions are usable on
+    // a form rule at all — a submission that files no task carries no task, and
+    // a task action on one fails as a missing entity.
+    { key: 'form.submitted', label: 'Form is submitted', entity: 'form', actsOn: 'task', hasDiff: false },
 ];
 
 /* Fields a condition may read, with the operators that make sense for each — so
@@ -43,6 +48,16 @@ const CONDITION_FIELDS = [
     { field: 'isParentTask', label: 'Is a parent task', type: 'boolean', ops: ['eq'] },
 ];
 
+/* Fields a `form.submitted` condition may read. Kept out of CONDITION_FIELDS so
+ * the task builder is not offered a form id to compare against; `answers.<id>`
+ * is per-form, so the form screen supplies those from its own questions. */
+const FORM_CONDITION_FIELDS = [
+    { field: 'formId', label: 'Form', type: 'text', ops: ['eq', 'neq', 'in', 'notIn'] },
+    { field: 'formTitle', label: 'Form title', type: 'text', ops: ['eq', 'neq', 'contains'] },
+    { field: 'taskId', label: 'Filed a task', type: 'text', ops: ['empty', 'notEmpty'] },
+    { field: 'answers', label: 'Answer', type: 'answer_map', ops: ['eq', 'neq', 'contains', 'in', 'notIn', 'empty', 'notEmpty'] },
+];
+
 /* Strip the run function — the manifest is data for the client, and shipping a
  * function reference would only serialise as null anyway. */
 const describeAction = (action) => ({
@@ -56,6 +71,7 @@ const describeAction = (action) => ({
 const manifest = () => ({
     triggers: TRIGGERS,
     conditionFields: CONDITION_FIELDS,
+    conditionFieldsByEntity: { task: CONDITION_FIELDS, form: FORM_CONDITION_FIELDS },
     operators: { logical: LOGICAL_OPS, comparison: COMPARISON_OPS, change: CHANGE_OPS },
     actions: ACTIONS.map(describeAction),
 });
@@ -65,4 +81,4 @@ const hasAction = (key) => ACTIONS_BY_KEY.has(String(key));
 const actionKeys = () => ACTIONS.map((a) => a.key);
 const getTrigger = (key) => TRIGGERS.find((t) => t.key === String(key)) || null;
 
-module.exports = { manifest, getAction, hasAction, actionKeys, getTrigger, describeAction, TRIGGERS, CONDITION_FIELDS };
+module.exports = { manifest, getAction, hasAction, actionKeys, getTrigger, describeAction, TRIGGERS, CONDITION_FIELDS, FORM_CONDITION_FIELDS };

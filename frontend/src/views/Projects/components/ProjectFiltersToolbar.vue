@@ -54,11 +54,6 @@
             </div>
             <div v-if="['ProjectListView', 'ProjectKanban','TableView'].includes(activeTab)" class="d-flex align-items-center justify-content-end task-filter-assignee overflow-auto style-scroll" :style="`${showArchived ? 'width: 100%;' : ''}`" :class="clientWidth <= 767 ? 'justify-content-start' : ''">
                 <template v-if="!showArchived">
-                    <!-- AI Assist (AHE-3777): project-level AI task generation. Placed before "Write with AI". -->
-                    <button class="ai-assist-btn text-nowrap mr-1 cursor-pointer" @click="$emit('openAiAssist')" v-if="checkApps('AI',projectData) && checkPermission('task.task_create',projectData?.isGlobalPermission) === true">
-                        <span class="ai-assist-btn__spark" aria-hidden="true">✨</span>
-                        <span class="ai-assist-btn__label">AI Assist</span>
-                    </button>
                     <button class="text-nowrap btn ai_button mr-1 cursor-pointer" @click="$emit('openAi')" v-if="checkApps('AI',projectData) && checkPermission('artificial_intelligence',projectData?.isGlobalPermission) === true">
                         <img src="@/assets/images/svg/ai_image_white.svg" class="mr-10-px"/>
                         <span>{{ $t('AI.write_with_ai') }}</span>
@@ -345,6 +340,11 @@ defineEmits([
 ]);
 
 const currentActive = ref('');
+
+// ProjectHeader's Filter button opens the same TaskFilter dropdown that lives in
+// this toolbar, so there is only ever one filter surface.
+const openFilter = () => document.getElementById('projectviewfilter_driver')?.click();
+defineExpose({ openFilter });
 const horizontalDots = require('@/assets/images/svg/horizontalDots.svg');
 const activeUserIcon = require('@/assets/images/peopleBlue.png');
 const userIcon = require('@/assets/images/peopleGray.png');
@@ -353,44 +353,6 @@ const groupIcon = require('@/assets/images/peopleGray.png');
 </script>
 
 <style scoped>
-/* AI Assist — modern "AI" pill: gradient border + gradient text + soft glow,
-   distinct from the solid-purple "Write with AI" beside it. */
-.ai-assist-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 32px;
-    padding: 0 14px;
-    font-size: 12px;
-    font-weight: 600;
-    line-height: 1;
-    border-radius: 999px;
-    border: 1.5px solid transparent;
-    background:
-        linear-gradient(#fff, #fff) padding-box,
-        linear-gradient(120deg, #7C5CFF 0%, #4D7CFF 50%, #C44BFF 100%) border-box;
-    box-shadow: 0 2px 10px rgba(108, 99, 255, 0.18);
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-.ai-assist-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 6px 18px rgba(124, 92, 255, 0.32);
-}
-.ai-assist-btn:active {
-    transform: translateY(0);
-}
-.ai-assist-btn__label {
-    background: linear-gradient(120deg, #7C5CFF 0%, #4D7CFF 50%, #C44BFF 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    color: #6a5cff; /* fallback where background-clip:text is unsupported */
-}
-.ai-assist-btn__spark {
-    font-size: 13px;
-    line-height: 1;
-}
-
 /* Tighten the gaps between the desktop action buttons so the row is less
    crowded — the global .mr-1 gap is 16px (1rem); 8px reads better. This is
    spacing only: we deliberately do NOT force the row onto a single line. An
@@ -413,5 +375,45 @@ const groupIcon = require('@/assets/images/peopleGray.png');
     .task-fitler-search {
         flex: 0 0 auto;
     }
+}
+
+/* Filters row on the tokens — it sits directly under the project header. */
+.task-assigneesearch-groupbywrapper {
+    background: var(--canvas);
+    border-bottom: 1px solid var(--hairline);
+    padding: 8px 20px;
+    font-family: var(--font-ui);
+}
+
+.task-fitler-search .form-control {
+    height: 32px;
+    border-radius: var(--r-input);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--ink);
+    font: var(--text-small);
+}
+
+.task-fitler-search .form-control::placeholder { color: var(--ink-3); }
+
+.task-fitler-search .form-control:focus {
+    outline: none;
+    border-color: var(--brand);
+    box-shadow: var(--focus);
+}
+
+.task-filter-assignee :deep(.btn-white),
+.task-filter-assignee :deep(.border-groupBy) {
+    border-radius: var(--r-input);
+    border-color: var(--border);
+    background: var(--surface);
+    font: var(--text-small);
+}
+
+.archived-btn { font: var(--text-small); }
+
+@media (max-width: 767px) {
+    .task-assigneesearch-groupbywrapper { padding: 8px 12px; }
+    .task-filter-assignee :deep(button) { min-height: 44px; }
 }
 </style>

@@ -209,6 +209,16 @@ formsSchema.index({ ProjectID: 1, deletedStatusKey: 1 });
 const formSubmissionsSchema = new Schema(schema.form_submissions, {strict: true, timestamps: true});
 // The response table is always "this form's submissions, newest first".
 formSubmissionsSchema.index({ formId: 1, createdAt: -1 });
+const projectContractsSchema = new Schema(schema.projectContracts, {strict: true, timestamps: true});
+// One contract per project — unique so a double-tap on Save can't leave two
+// rows disagreeing about the tax rate.
+projectContractsSchema.index({ ProjectID: 1, deletedStatusKey: 1 }, { unique: true });
+const projectInvoicesSchema = new Schema(schema.projectInvoices, {strict: true, timestamps: true});
+projectInvoicesSchema.index({ ProjectID: 1, deletedStatusKey: 1, issuedDate: -1 });
+// The number series runs per project (invoiceSeq lives on the project's
+// contract), so uniqueness is per project too — a company-wide unique index
+// would collide the moment a second project raised its first invoice.
+projectInvoicesSchema.index({ ProjectID: 1, number: 1 }, { unique: true });
 
 // Global search: one combined text index per collection.
 taskSchema.index({ TaskName: 'text', rawDescription: 'text' });
@@ -322,6 +332,8 @@ module.exports = {
     cloudStorageConnectionsSchema,
     formsSchema,
     formSubmissionsSchema,
+    projectContractsSchema,
+    projectInvoicesSchema,
     historySchema,
     userIdSchema, 
     usersSchema,

@@ -327,6 +327,67 @@ async function renderReport(companyId, share) {
     return { title: report.name, body };
 }
 
+/* ── Client view (handoff 19d) ─────────────────────────────────────────────
+ *
+ * A login-free page for the client: milestone progress, what needs their
+ * sign-off, dated updates and invoices. Nothing else — the payload comes from
+ * Modules/Milestone's client projection, the same allow-list the in-app Guest
+ * view uses, so this page cannot show a field the projection does not build.
+ * It renders what it is given and looks nothing up on its own. */
+const CLIENT_STATE_LABEL = { done: 'Complete', in_progress: 'In progress', upcoming: 'Upcoming' };
+
+const clientMoney = (amount, currency) => {
+    const n = Number(amount) || 0;
+    const body = n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return `${escapeHtml(currency || '')} ${body}`.trim();
+};
+
+async function renderClientView(companyId, share) {
+    const { buildClientPayload } = require('../Milestone/controller/clientView');
+    const view = await buildClientPayload(companyId, String(share.entityId));
+    if (!view) return { title: 'Project', body: '<h1>This project is no longer available.</h1>' };
+
+    let body = `<h1>${escapeHtml(view.project.name)}</h1>`;
+    body += `<div class="muted">Shared by ${escapeHtml(view.project.sharedBy || 'the project team')} · client view</div>`;
+
+    body += `<div class="group"><h2>Progress · ${escapeHtml(view.progress.complete)} of ${escapeHtml(view.progress.total)} milestones complete</h2>`;
+    if (!view.progress.milestones.length) body += '<div class="task"><span class="name">No milestones yet.</span></div>';
+    view.progress.milestones.forEach((m) => {
+        const meta = m.state === 'done'
+            ? `Done ${escapeHtml(m.completedDate || '')}`
+            : `${escapeHtml(m.percent)}% · due ${escapeHtml(m.dueDate || 'TBC')}`;
+        body += `<div class="task"><span class="name">${escapeHtml(m.name)}</span><span class="pill">${escapeHtml(CLIENT_STATE_LABEL[m.state])} — ${meta}</span></div>`;
+    });
+    body += '</div>';
+
+    if (view.waitingOnYou.length) {
+        body += `<div class="group"><h2>Waiting on you (${escapeHtml(view.waitingOnYou.length)})</h2>`;
+        view.waitingOnYou.forEach((s) => {
+            const when = s.dueDate ? `needed by ${escapeHtml(s.dueDate)}` : 'no date set';
+            body += `<div class="task"><span class="name">${escapeHtml(s.title)}</span><span class="pill">${when}</span></div>`;
+        });
+        body += '</div>';
+    }
+
+    if (view.updates.length) {
+        body += '<div class="group"><h2>Recent updates</h2>';
+        view.updates.forEach((u) => {
+            body += `<div class="task"><span class="key">${escapeHtml(u.date)}</span><span class="name">${escapeHtml(u.text)}</span></div>`;
+        });
+        body += '</div>';
+    }
+
+    body += '<div class="group"><h2>Invoices</h2>';
+    if (!view.invoices.length) body += '<div class="task"><span class="name">No invoices issued yet.</span></div>';
+    view.invoices.forEach((inv) => {
+        const state = inv.status === 'paid' ? `paid` : `due ${escapeHtml(inv.dueDate || '')}`;
+        body += `<div class="task"><span class="key">${escapeHtml(inv.number)}</span><span class="name">${escapeHtml(inv.label)}</span><span class="pill">${clientMoney(inv.amount, inv.currency)} · ${state}</span></div>`;
+    });
+    body += '</div>';
+
+    return { title: view.project.name || 'Project', body };
+}
+
 /**
  * A shared doc — the document itself, read-only, for anyone with the link.
  *
@@ -626,6 +687,12 @@ exports.renderShare = async (req, res) => {
             if (!ok) {
                 return sendPage(res, 200, 'Protected', passwordForm(req.params.token, req.method === 'POST'));
             }
+        }
+
+        // A client view renders the guest-safe project summary (handoff 19d).
+        if (share.entityType === 'client_view') {
+            const rendered = await renderClientView(companyId, share);
+            return sendPage(res, 200, rendered.title, rendered.body);
         }
 
         // REP-09 — report shares render a read-only table instead of a task board.

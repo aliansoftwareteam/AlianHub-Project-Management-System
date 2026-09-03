@@ -24,9 +24,21 @@
             <template v-if="projects?.length && projectData && !isFilterHasData">
                 <template v-if="isRuleData === false ? checkPermission('task.task_list',projectData.isGlobalPermission) !== null && !projectData.isRestrict : !projectData.isRestrict">
                     <div class="section-right bg-white position-re">
-                        <div class="list-view-header">
-                            <div class="list-head-leftrightwrappper">
-                                <div class="list-head-left d-flex align-items-center">
+                        <ProjectHeader
+                            ref="projectHeader"
+                            :project="projectData"
+                            :sprint="headerSprint"
+                            :activeView="activeTab"
+                            :favourite="isProjectFavourite"
+                            :agentSummary="agentSummary"
+                            :showAiAssist="canAiAssist"
+                            :showAddTask="canAddTask"
+                            @toggle-favourite="markProjectFavourite()"
+                            @filter="$refs.filtersToolbar && $refs.filtersToolbar.openFilter()"
+                            @ai-assist="openAiTaskCreator()"
+                            @add-task="addTaskRequest++"
+                        >
+                            <template #title>
                                     <img :src="sidebarArrowIcon" alt="sidebarArrowIcon" class="cursor-pointer mr-10px" @click="$refs.projectList.toggleSidebar(true)" v-if="clientWidth <= responseWidth" :class="[{'z-index-5' : projectData?.deletedStatusKey === 2}]">
                                     <img :src="projectData?.favouriteTasks?.filter((x) => x.userId === userId)?.length ? projectStar : blankStar" alt="projectStar" class="cursor-pointer mark__project-favourite" @click="markProjectFavourite()"/>
                                     <div v-if="clientWidth > 767">
@@ -125,23 +137,9 @@
                                         </span>
                                     </div>
                                     <img :src="publicFolder" class="vertical-middle" alt="public-folder" v-if="clientWidth > 767 && !projectData.isPrivateSpace"/>
-                                </div>
-                            </div>
-                            <ProjectActionsBar
-                                :projectData="projectData"
-                                :clientWidth="clientWidth"
-                                :users="users"
-                                :teams="teams"
-                                @openSidebar="open"
-                                @openWatcher="openProjectWatcher = true"
-                                @changeAssignee="(type, $event) => changeAssignee(type, $event)"
-                                @openPermissionSidebar="openPermissionSidebar"
-                                @startEditName="projectName.value = projectData?.ProjectName; editProject = true"
-                                @openColorAvatar="showColorAvatar = true; assignAvatarData({id: projectData._id, name: projectData.ProjectName, icon: projectData?.projectIcon})"
-                                @archiveProject="(val) => { showSidebar = true; archive = val }"
-                            />
-                        </div>
-                        <div class="project-views-row" id="projectview_driver">
+                            </template>
+                            <template #views>
+                                <div class="project-views-row" id="projectview_driver">
                                     <template v-if="clientWidth > 765">
                                         <div class="d-flex align-items-center overflow-x-auto view_list_scroll h-100">
                                             <ViewsList
@@ -242,6 +240,23 @@
                                         </div>
                                     </template>
                                 </div>
+                            </template>
+                            <template #actions>
+                            <ProjectActionsBar
+                                :projectData="projectData"
+                                :clientWidth="clientWidth"
+                                :users="users"
+                                :teams="teams"
+                                @openSidebar="open"
+                                @openWatcher="openProjectWatcher = true"
+                                @changeAssignee="(type, $event) => changeAssignee(type, $event)"
+                                @openPermissionSidebar="openPermissionSidebar"
+                                @startEditName="projectName.value = projectData?.ProjectName; editProject = true"
+                                @openColorAvatar="showColorAvatar = true; assignAvatarData({id: projectData._id, name: projectData.ProjectName, icon: projectData?.projectIcon})"
+                                @archiveProject="(val) => { showSidebar = true; archive = val }"
+                            />
+                            </template>
+                        </ProjectHeader>
                         <div v-if="showLoader" class="d-flex box-shadow-6 position-fi z-index-10 right-22px bottom-22px bg-white p-10px border-radius-5-px align-items-center">
                             <div class="progress-container d-flex align-items-center position-re">
                                 <div class="progress-circle" :style="circleStyle">
@@ -273,9 +288,10 @@
                                 },
                                 {'board-veiw-main-parent': activeTab === 'ProjectKanban'}
                             ]"
-                            :style="{height: clientWidth > 767 ? 'calc(100% - 80px)' : 'calc(100% - 62px)'}"
+                            :style="{height: clientWidth > 767 ? 'calc(100% - var(--toolbar-h))' : 'calc(100% - 96px)'}"
                         >
                             <ProjectFiltersToolbar
+                                ref="filtersToolbar"
                                 :activeTab="activeTab"
                                 :projectData="projectData"
                                 :clientWidth="clientWidth"
@@ -425,8 +441,9 @@
         />
     </div>
     <AppState v-else kind="forbidden" />
-    <!-- Multi-select bulk action bar — renders only when tasks are selected -->
-    <BulkActionBar />
+    <!-- List and Table ship their own bulk bar (ListBulkBar); the legacy one would
+         otherwise mount on top of it. -->
+    <BulkActionBar v-if="!hasOwnBulkBar" />
 </template>
 
 <script setup>
@@ -480,7 +497,9 @@ import NotFound from '../NotFound.vue';
 
 // EXTRACTED PIECES
 import ProjectActionsBar from './components/ProjectActionsBar.vue';
+import ProjectHeader from './components/ProjectHeader.vue';
 import ProjectFiltersToolbar from './components/ProjectFiltersToolbar.vue';
+import { useProjectAgents } from './Kanban/useProjectAgents';
 import AiTaskCreator from '@/components/organisms/AiTaskCreator/AiTaskCreator.vue';
 import ProjectSidebars from './components/ProjectSidebars.vue';
 import ProjectBottomModals from './components/ProjectBottomModals.vue';
@@ -663,7 +682,7 @@ const viewDefaultActive = require('@/assets/images/svg/blue_tick.svg');
 const projectList = ref();
 
 const companyId = inject('$companyId');
-const { checkPermission, makeUniqueId } = useCustomComposable();
+const { checkPermission, checkApps, makeUniqueId } = useCustomComposable();
 const { getUser } = useGetterFunctions();
 
 // IMAGES
@@ -1026,6 +1045,25 @@ watch(route, () => {
 });
 
 const sprints = ref([]);
+
+// Header (10b): the sprint in view, the star, the agent chip and the "+ Task"
+// request the views listen for.
+const headerSprint = computed(() => (sprints.value.length === 1 && !sprints.value[0]?.isFolder ? sprints.value[0] : null));
+const isProjectFavourite = computed(() => Boolean((projectData.value?.favouriteTasks || []).find((x) => x.userId === userId.value)));
+const canAiAssist = computed(() => checkApps('AI', projectData.value) && checkPermission('task.task_create', projectData.value?.isGlobalPermission) === true);
+// Only shown where a view actually answers the request (the board injects
+// `addTaskRequest`); other views opt in by injecting it too.
+const OWN_BULK_BAR_VIEWS = ['ProjectListView', 'TableView'];
+const hasOwnBulkBar = computed(() => OWN_BULK_BAR_VIEWS.includes(activeTab.value));
+const ADD_TASK_VIEWS = ['ProjectKanban'];
+const canAddTask = computed(() => ADD_TASK_VIEWS.includes(activeTab.value) && checkPermission('task.task_create', projectData.value?.isGlobalPermission) === true);
+const addTaskRequest = ref(0);
+provide('addTaskRequest', addTaskRequest);
+
+const { start: startAgentWatch, stop: stopAgentWatch, summary: agentSummary } = useProjectAgents();
+watch(() => projectData.value?._id, (id) => { if (id) startAgentWatch(id); }, { immediate: true });
+onUnmounted(stopAgentWatch);
+
 
 // UPDATE/FILTER SPRINTS ARRAY FOR LISTING
 watch([projectData, route, () => getters['projectData/searchedTasks']], () => {

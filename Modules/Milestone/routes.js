@@ -427,4 +427,14 @@ exports.init = (app) => {
     app.get('/api/v1/milestone/:id', ctrl.getMilestone);
     app.post('/api/v1/milestone', ctrl.updateWeeklyRangeMilestone);
     app.post('/api/v1/milestoneReport', ctrl.getMilestoneReport);
+
+    // Billing (handoff 19a / 19b / 19d). `billing.*` is deliberately absent from
+    // Modules/Agents/registry.js — no agent path may reach these.
+    app.get('/api/v2/billing/contract', ctrl.getBillingContract);
+    app.put('/api/v2/billing/contract', ctrl.updateBillingContract);
+    app.post('/api/v2/billing/milestone', ctrl.createBillingMilestone);
+    app.patch('/api/v2/billing/milestone/:id', ctrl.updateBillingMilestone);
+    app.get('/api/v2/billing/hourly', ctrl.getHourlyBilling);
+    app.get('/api/v2/billing/client-view', ctrl.getClientView);
+    app.post('/api/v2/billing/client-view/message', ctrl.postClientMessage);
 };

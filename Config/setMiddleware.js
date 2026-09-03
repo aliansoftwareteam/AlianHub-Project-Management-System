@@ -190,6 +190,10 @@ const verifyJWTTokenWithCRoute = [
     '/api/v1/ai/transcribe',
     '/api/v1/ai/meeting-notes',
     '/api/v1/ai/task-summary',
+    '/api/v1/ai/task-category',
+    // Ask (handoff 13i) — retrieval is scoped to req.uid's own visible projects,
+    // so the handler is only correct when this populates req.uid.
+    '/api/v1/ai/ask',
     // Personal API tokens (Modules/ApiTokens). app.use prefix-matching
     // covers /:id, /:id/logs and /me too. Routes were previously
     // unauthenticated (trusted body userData) — now JWT-protected; the
@@ -220,6 +224,11 @@ const verifyJWTTokenWithCRoute = [
     // Time-off / PTO (Modules/Pto) — JWT+company; prefix-matches /pto, /pto/:id,
     // /pto/:id/status, /pto/capacity. Role checks are enforced in-controller.
     '/api/v1/pto',
+    // Agile reports (Modules/AgileReports) — JWT+company; prefix-matches
+    // /agile/burndown, /agile/velocity, /agile/cfd, /agile/sprint-insights and
+    // /agile/milestones. Without the prefix the company was taken from a header
+    // anyone can type, which is a cross-tenant read of every sprint.
+    '/api/v1/agile',
     // Cross-project Portfolio rollup (Modules/Portfolio, REP-01) — JWT+company;
     // prefix-matches /portfolio, /portfolio/:id, /portfolio/:id/rollup.
     '/api/v1/portfolio',
@@ -265,6 +274,13 @@ const verifyJWTTokenWithCRoute = [
     // is the entire point of them.
     '/api/v2/public-shares',
     '/api/v2/intake',
+    // Project billing (Modules/Milestone billing.* + Modules/Invoice project
+    // invoices). Every handler reads or writes contract money and takes the
+    // actor from req.uid — which only this middleware sets. The GUEST-facing
+    // client view is under this prefix too: a guest still logs in, and the
+    // login-free variant is the /share/:token page, not an open API.
+    '/api/v2/billing',
+    '/api/v2/invoices',
     // Outgoing webhooks (Modules/Webhooks). A webhook belongs to the member who created
     // it, and every route is scoped to req.uid — which only this middleware sets. These
     // were in neither list, so the owner was taken from the request body instead: with
@@ -317,6 +333,7 @@ const verifyJWTToken = [
     '/api/v1/root-members',
     '/api/v1/dashboard/:id',
     '/api/v1/dashboard',
+    '/api/v1/dashboards',
     '/api/v1/cardcomponent',
     '/api/v1/validateRefferalCode',
     '/api/v1/getreferralpercentage',

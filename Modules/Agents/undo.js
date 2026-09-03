@@ -47,6 +47,10 @@ const inverses = {
         await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: oid(u.taskId) }, { $pull: { links: { _id: oid(u.linkId) } } }] }, 'updateOne');
         return { taskId: u.taskId, removedLink: u.linkId };
     },
+    async task(companyId, u) {
+        await setTask(companyId, u.taskId, { deletedStatusKey: 1 });
+        return { taskId: u.taskId, deleted: true };
+    },
     async subtask(companyId, u) {
         await setTask(companyId, u.subtaskId, { deletedStatusKey: 1 });
         await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: oid(u.parentTaskId) }, { $inc: { subTasks: -1 } }] }, 'updateOne').catch(() => {});

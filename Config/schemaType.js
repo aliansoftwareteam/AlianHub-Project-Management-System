@@ -97,6 +97,8 @@ const SCHEMA_TYPE = {
     CLOUD_STORAGE_CONNECTIONS: "cloud_storage_connections",
     FORMS: "forms",
     FORM_SUBMISSIONS: "form_submissions",
+    PROJECT_CONTRACTS: "project_contracts",
+    PROJECT_INVOICES: "project_invoices",
 }
 
 module.exports = {

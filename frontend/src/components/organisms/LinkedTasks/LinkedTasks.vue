@@ -1,80 +1,72 @@
 <template>
-    <div class="overflow-auto style-scroll mobile__bg--withPadding mt-10px">
-        <div class="w-100 d-flex align-items-center justify-content-between">
-            <span :class="{'font-size-16 font-weight-600' : clientWidth <= 767 , 'font-size-14 font-weight-700' : clientWidth > 767 }" class="font-weight-700 font-size-14">{{$t('Projects.linked_tasks')}}</span>
-            <span v-if="!isAdding" @click="startAdding" class="blue font-size-14 font-weight-500 cursor-pointer pl-20px text-decoration-underline">+ {{$t('Projects.add_link')}}</span>
+    <section class="lt">
+        <header class="lt__head">
+            <span class="lt__title">{{ $t('MembersV2.relations') }}</span>
+            <span v-if="linkedItems.length" class="ah-mono lt__count">{{ linkedItems.length }}</span>
+            <button v-if="!isAdding" type="button" class="lt__link" @click="startAdding">+ {{ $t('MembersV2.add_link') }}</button>
+        </header>
+
+        <div v-if="openBlockers.length" class="lt__blocked">
+            <ShellIcon name="alert" :size="14" />
+            <span>{{ $t('MembersV2.blocked_warning', { count: openBlockers.length }) }} <strong class="ah-mono">{{ openBlockerKeys }}</strong></span>
         </div>
 
-        <!-- Blocked-by warning: this task can't proceed while open blockers remain -->
-        <div v-if="openBlockers.length > 0" class="linked-tasks__blocked-banner font-size-12 mt-5px">
-            <span class="linked-tasks__blocked-icon">&#9888;</span>
-            {{ $t('Projects.blocked_warning', { count: openBlockers.length }) }}
-            <span class="font-weight-700">{{ openBlockerKeys }}</span>
-        </div>
-
-        <!-- Existing links -->
-        <div v-if="linkedItems.length > 0" class="border-bottom linked-tasks__list">
-            <div
-                v-for="item in linkedItems"
-                :key="'linked-'+item.taskId"
-                class="d-flex align-items-center justify-content-between px-1 border-bottom linked-tasks__row"
-            >
-                <div class="d-flex align-items-center linked-tasks__row-main">
-                    <span class="font-size-11 font-weight-500 gray81 linked-tasks__type-label">{{ relationLabel(item.type) }}</span>
+        <div v-if="linkedItems.length" class="lt__list">
+            <div v-for="item in linkedItems" :key="'linked-' + item.taskId" class="lt__row">
+                <span class="lt__type" :class="typeClass(item.type)">{{ typeLabel(item.type) }}</span>
+                <span class="lt__name">
                     <template v-if="item.task">
-                        <span class="font-size-12 font-weight-600 blue mr-5px">{{ item.task.TaskKey }}</span>
-                        <span class="font-size-13 font-weight-400 linked-tasks__name" :class="{'linked-tasks__name--muted': item.task.deletedStatusKey === 1}">
-                            {{ item.task.TaskName }}<template v-if="item.task.deletedStatusKey === 1"> ({{$t('Projects.link_task_deleted')}})</template>
+                        <span class="ah-mono lt__key">{{ item.task.TaskKey }}</span>
+                        <span :class="{ 'lt__name--gone': item.task.deletedStatusKey === 1 }">
+                            {{ item.task.TaskName }}<template v-if="item.task.deletedStatusKey === 1"> ({{ $t('Projects.link_task_deleted') }})</template>
                         </span>
                     </template>
-                    <span v-else class="font-size-13 font-weight-400 linked-tasks__name--muted">{{$t('Projects.link_task_unavailable')}}</span>
-                </div>
-                <div class="d-flex align-items-center">
-                    <span v-if="item.task && item.task.status && item.task.status.text" class="font-size-11 font-weight-500 linked-tasks__status-chip">{{ item.task.status.text }}</span>
-                    <span
-                        class="font-size-14 cursor-pointer linked-tasks__remove"
-                        :class="{'pointer-event-none': isSaving}"
-                        :title="$t('Projects.remove_link')"
-                        @click="removeRelation(item)"
-                    >&#10005;</span>
-                </div>
+                    <span v-else class="lt__name--gone">{{ $t('Projects.link_task_unavailable') }}</span>
+                </span>
+                <span v-if="item.task && item.task.status && item.task.status.text" class="lt__status">{{ item.task.status.text }}</span>
+                <button
+                    type="button"
+                    class="lt__x"
+                    :disabled="isSaving"
+                    :title="$t('MembersV2.remove_link')"
+                    :aria-label="$t('MembersV2.remove_link')"
+                    @click="removeRelation(item)"
+                >×</button>
             </div>
         </div>
-        <div v-else-if="!isAdding && !isLoading" class="gray81 font-size-12 py-10px">
-            {{$t('Projects.no_linked_tasks')}}
-        </div>
+        <p v-else-if="!isAdding && !isLoading" class="lt__empty">{{ $t('MembersV2.no_relations') }}</p>
 
-        <!-- Add-link row -->
-        <div v-if="isAdding" class="linked-tasks__add-row">
-            <div class="d-flex align-items-center">
-                <select v-model="selectedType" class="linked-tasks__type-select font-size-13">
+        <div v-if="isAdding" class="lt__add">
+            <div class="lt__add-row">
+                <select v-model="selectedType" class="ah-input lt__add-type">
                     <option v-for="opt in relationTypeOptions" :key="opt.value" :value="opt.value">{{ $t(opt.labelKey) }}</option>
                 </select>
                 <input
                     v-model="searchQuery"
                     type="text"
-                    class="linked-tasks__search-input font-size-13"
-                    :placeholder="$t('Projects.search_task_to_link')"
+                    class="ah-input lt__add-search"
+                    :placeholder="$t('MembersV2.search_task_ph')"
                     @input="onSearchInput"
                 />
-                <span @click="cancelAdding" class="font-size-13 cursor-pointer gray81 pl-10px">{{$t('Projects.cancel')}}</span>
+                <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="cancelAdding">{{ $t('MembersV2.cancel') }}</button>
             </div>
-            <div v-if="isSearching" class="gray81 font-size-12 py-5px">{{$t('Projects.searching')}}</div>
-            <div v-else-if="searchResults.length > 0" class="linked-tasks__results border-bottom">
-                <div
+            <p v-if="isSearching" class="lt__empty">{{ $t('MembersV2.searching') }}</p>
+            <div v-else-if="searchResults.length" class="lt__results">
+                <button
                     v-for="result in searchResults"
-                    :key="'link-result-'+result._id"
-                    class="d-flex align-items-center px-1 border-bottom cursor-pointer linked-tasks__row linked-tasks__result"
-                    :class="{'pointer-event-none opacity-5': isSaving}"
+                    :key="'link-result-' + result._id"
+                    type="button"
+                    class="lt__result"
+                    :disabled="isSaving"
                     @click="addRelation(result)"
                 >
-                    <span class="font-size-12 font-weight-600 blue mr-5px">{{ result.TaskKey }}</span>
-                    <span class="font-size-13 font-weight-400 linked-tasks__name">{{ result.TaskName }}</span>
-                </div>
+                    <span class="ah-mono lt__key">{{ result.TaskKey }}</span>
+                    <span class="lt__name">{{ result.TaskName }}</span>
+                </button>
             </div>
-            <div v-else-if="searchQuery.trim().length > 0" class="gray81 font-size-12 py-5px">{{$t('Projects.no_task_found')}}</div>
+            <p v-else-if="searchQuery.trim().length" class="lt__empty">{{ $t('MembersV2.no_task_found') }}</p>
         </div>
-    </div>
+    </section>
 </template>
 
 <script setup>
@@ -83,6 +75,9 @@ import { computed, defineProps, inject, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useToast } from "vue-toast-notification";
 import { useI18n } from "vue-i18n";
+
+// COMPONENTS
+import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 
 // UTILS
 import { apiRequest } from '@/services';
@@ -103,7 +98,6 @@ const props = defineProps({
     }
 });
 
-const clientWidth = inject("$clientWidth");
 const userId = inject('$userId');
 
 const linkedItems = ref([]);
@@ -123,6 +117,14 @@ const relationTypeOptions = [
     { value: 'duplicated_by', labelKey: 'Projects.relation_duplicated_by' },
     { value: 'relates_to', labelKey: 'Projects.relation_relates_to' },
 ];
+
+const TYPE_TONE = {
+    blocks: 'lt__type--danger',
+    blocked_by: 'lt__type--warn',
+    duplicates: 'lt__type--brand',
+    duplicated_by: 'lt__type--brand',
+    relates_to: '',
+};
 
 // Open blockers: `blocked_by` links whose blocking task is still open (not
 // closed, not deleted). Mirrors selectOpenBlockers on the backend. The list
@@ -164,9 +166,14 @@ onMounted(() => {
     fetchRelations();
 });
 
-function relationLabel(type) {
-    const option = relationTypeOptions.find((opt) => opt.value === type);
-    return option ? t(option.labelKey) : type;
+function typeLabel(type) {
+    const key = `MembersV2.relation_${type}`;
+    const label = t(key);
+    return label === key ? String(type).replace(/_/g, ' ').toUpperCase() : label;
+}
+
+function typeClass(type) {
+    return TYPE_TONE[type] || '';
 }
 
 function buildUserData() {
@@ -294,74 +301,96 @@ function removeRelation(item) {
 </script>
 
 <style scoped>
-.linked-tasks__row {
-    min-height: 36px;
-    padding-top: 4px;
-    padding-bottom: 4px;
+.lt {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    padding: 12px 14px;
+    border: 1px solid var(--hairline);
+    border-radius: 11px;
+    background: var(--surface-2);
+    color: var(--ink);
+    font: 400 12.5px/1.4 var(--font-ui);
 }
-.linked-tasks__row-main {
-    min-width: 0;
-    flex: 1;
+.lt__head { display: flex; align-items: center; gap: 8px; }
+.lt__title { font-weight: 600; }
+.lt__count { color: var(--ink-3); }
+.lt__link {
+    margin-left: auto;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    color: var(--brand);
+    font: 600 11.5px/1 var(--font-ui);
+    cursor: pointer;
 }
-.linked-tasks__type-label {
-    min-width: 92px;
-    text-transform: capitalize;
+.lt__link:hover { text-decoration: underline; }
+
+.lt__blocked {
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    background: var(--warn-bg);
+    color: var(--warn-ink);
+    font-size: 11.5px;
 }
-.linked-tasks__name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.linked-tasks__name--muted {
-    color: #9a9a9a;
-    font-style: italic;
-}
-.linked-tasks__status-chip {
-    background: #f0f0f0;
-    border-radius: 10px;
-    padding: 2px 8px;
-    margin-right: 10px;
-    white-space: nowrap;
-}
-.linked-tasks__remove {
-    color: #9a9a9a;
-    padding: 0 4px;
-}
-.linked-tasks__remove:hover {
-    color: #e84a4a;
-}
-.linked-tasks__add-row {
-    padding: 8px 0;
-}
-.linked-tasks__type-select {
-    border: 1px solid #e0e0e0;
+
+.lt__list { display: flex; flex-direction: column; gap: 9px; }
+.lt__row { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.lt__type {
+    width: 74px;
+    flex: none;
+    text-align: center;
+    padding: 2px 6px;
     border-radius: 4px;
-    padding: 5px 6px;
-    margin-right: 8px;
-    background: #fff;
+    font: 600 9.5px/1.4 var(--font-mono);
+    letter-spacing: .04em;
+    background: rgba(0, 0, 0, .07);
+    color: var(--ink-label);
 }
-.linked-tasks__search-input {
-    border: 1px solid #e0e0e0;
-    border-radius: 4px;
-    padding: 5px 8px;
-    flex: 1;
-    min-width: 0;
+:root[data-theme="dark"] .lt__type { background: rgba(255, 255, 255, .1); }
+.lt__type--danger { background: var(--danger-bg); color: var(--danger-ink); }
+.lt__type--warn { background: var(--warn-bg); color: var(--warn-ink); }
+.lt__type--brand { background: var(--brand-tint); color: var(--brand); }
+.lt__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lt__key { color: var(--brand); margin-right: 5px; }
+.lt__name--gone { color: var(--ink-2); font-style: italic; }
+.lt__status { font-size: 11.5px; color: var(--ink-2); white-space: nowrap; }
+.lt__x {
+    border: 0;
+    background: transparent;
+    color: var(--ink-3);
+    font-size: 14px;
+    line-height: 1;
+    padding: 0 2px;
+    cursor: pointer;
+    transition: color var(--t-state) var(--ease);
 }
-.linked-tasks__results {
-    margin-top: 4px;
+.lt__x:hover:not(:disabled) { color: var(--danger); }
+.lt__x:disabled { cursor: not-allowed; }
+
+.lt__empty { margin: 0; color: var(--ink-2); font-size: 12px; }
+
+.lt__add { display: flex; flex-direction: column; gap: 7px; }
+.lt__add-row { display: flex; align-items: center; gap: 8px; }
+.lt__add-type { width: auto; min-width: 132px; height: 32px; font-size: 12.5px; }
+.lt__add-search { flex: 1; min-width: 0; height: 32px; font-size: 12.5px; }
+.lt__results { display: flex; flex-direction: column; border: 1px solid var(--hairline); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.lt__result {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border: 0;
+    border-bottom: 1px solid var(--hairline);
+    background: transparent;
+    color: var(--ink);
+    font: 400 12.5px/1.4 var(--font-ui);
+    text-align: left;
+    cursor: pointer;
 }
-.linked-tasks__result:hover {
-    background: #f7f9fc;
-}
-.linked-tasks__blocked-banner {
-    background: #fff5e6;
-    border: 1px solid #f0d8a8;
-    border-radius: 6px;
-    color: #b06a00;
-    padding: 6px 10px;
-    margin-bottom: 6px;
-}
-.linked-tasks__blocked-icon {
-    margin-right: 4px;
-}
+.lt__result:last-child { border-bottom: 0; }
+.lt__result:hover:not(:disabled) { background: var(--surface-hover); }
 </style>

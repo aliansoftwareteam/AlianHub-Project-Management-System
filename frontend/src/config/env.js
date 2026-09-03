@@ -49,6 +49,7 @@ module.exports.AI_WRITE_DESCRIPTION = "/api/v1/ai/description";
 module.exports.AI_TRANSCRIBE = "/api/v1/ai/transcribe";
 module.exports.AI_MEETING_NOTES = "/api/v1/ai/meeting-notes";
 module.exports.AI_TASK_SUMMARY = "/api/v1/ai/task-summary";
+module.exports.AI_TASK_CATEGORY = "/api/v1/ai/task-category";
 module.exports.WASABI_UPLOAD_FILE = "/api/v1/wasabi/uploadFile";
 module.exports.WASABI_UPLOAD64_FILE = "/api/v1/wasabi/uploadFile_64";
 module.exports.WASABI_RETRIVE_USER_PROFILE = "/api/v1/wasabi/retriveUserProfile";
@@ -202,13 +203,24 @@ module.exports.AUDIT_LOGS = '/api/v1/audit-logs';
 module.exports.AUDIT_UNDO = '/api/v1/audit-logs/:id/undo';
 module.exports.AGENTS = '/api/v2/agents';
 module.exports.AGENT_RUNS = '/api/v2/agents/runs';
+module.exports.TIMESHEET_HOURS_BY_SOURCE = '/api/v1/timesheet/hours-by-source';
 module.exports.AGENT_PROPOSALS = '/api/v2/agents/proposals';
 module.exports.AGENT_REGISTRY = '/api/v2/agents/registry';
 module.exports.AGENT_SPEND = '/api/v2/agents/spend';
 module.exports.AGENT_ACCOUNT = '/api/v2/agents/account';
 module.exports.AGENT_PAUSE_ALL = '/api/v2/agents/pause-all';
 module.exports.AGENT_POLICY = '/api/v2/agents/policy';
+module.exports.API_TOKENS = '/api/v2/api-tokens';
 module.exports.MCP_TOKENS = '/api/v2/api-tokens/mcp';
+module.exports.MCP_MANIFEST = '/mcp/manifest';
+module.exports.AGENT_TEAM = '/api/v2/agents/team';
+module.exports.AGENT_ROUTABLE = '/api/v2/agents/routable';
+module.exports.AGENT_PIPELINE = '/api/v2/agents/pipeline';
+module.exports.AGENT_RELEASE = '/api/v2/agents/release';
+module.exports.AUTOMATIONS_COMPILE = '/api/v2/automations/compile';
+module.exports.AUTOMATIONS_BACKTEST = '/api/v2/automations/backtest';
+module.exports.AI_ASK = '/api/v1/ai/ask';
+module.exports.AI_ASK_SOURCES = '/api/v1/ai/ask/sources';
 module.exports.TASK_COMPLETION = '/api/v2/tasks/completion';
 module.exports.SCIM_CONFIG = '/api/v2/scim/config';
 module.exports.SCIM_TOKEN = '/api/v2/scim/token';
@@ -217,6 +229,13 @@ module.exports.PORTFOLIO = '/api/v1/portfolio';
 module.exports.CUSTOM_REPORT = '/api/v1/reports/custom';
 module.exports.CUSTOM_REPORT_TEMPLATES = '/api/v1/reports/custom/templates';
 module.exports.REPORT_SCHEDULES = '/api/v1/reports/schedules';
+module.exports.AGILE_BURNDOWN = '/api/v1/agile/burndown';
+module.exports.AGILE_VELOCITY = '/api/v1/agile/velocity';
+module.exports.AGILE_CFD = '/api/v1/agile/cfd';
+module.exports.AGILE_SPRINT_INSIGHTS = '/api/v1/agile/sprint-insights';
+module.exports.AGILE_MILESTONES = '/api/v1/agile/milestones';
+module.exports.AGILE_PROVENANCE = '/api/v1/agile/provenance';
+module.exports.PORTFOLIO_SUMMARY = '/api/v1/portfolio/summary';
 module.exports.VARIANCE_REPORT = '/api/v1/reports/variance';
 module.exports.CAPACITY = '/api/v1/reports/capacity';
 module.exports.EMAIL_IN = '/api/v1/email-in';
@@ -256,6 +275,7 @@ module.exports.LOGOUT = '/api/v2/logout';
 module.exports.GENERATEMONGOID = '/api/v1/generateMongoId';
 module.exports.DASHBOARD= '/api/v1/dashboard'
 module.exports.CARDCOMPONENT= '/api/v1/cardcomponent'
+module.exports.DASHBOARDS = '/api/v1/dashboards'
 // Resource Utilization & Consumption dashboard cards.
 module.exports.PROJECT_UTILIZATION_SUMMARY = '/api/v1/dashboard/project-utilization-summary'
 module.exports.MILESTONE_SUMMARY = '/api/v1/dashboard/milestone-summary'
@@ -289,3 +309,25 @@ module.exports.TIMER_TRIM = '/api/v2/timetracker/trim';
 module.exports.TIMESHEET_APPROVAL_QUEUE = '/api/v2/timesheet-approval/queue';
 module.exports.CAPACITY_MONTHS = '/api/v1/reports/capacity/months';
 module.exports.VARIANCE_SUMMARY = '/api/v1/reports/variance/summary';
+
+// Project billing (handoff 19a–19d)
+module.exports.BILLING_CONTRACT = '/api/v2/billing/contract';
+module.exports.BILLING_MILESTONE = '/api/v2/billing/milestone';
+module.exports.BILLING_HOURLY = '/api/v2/billing/hourly';
+module.exports.BILLING_CLIENT_VIEW = '/api/v2/billing/client-view';
+module.exports.BILLING_CLIENT_MESSAGE = '/api/v2/billing/client-view/message';
+module.exports.PROJECT_INVOICES = '/api/v2/invoices';
+module.exports.EXPORT_PDF = '/api/v1/export/pdf';
+module.exports.PUBLIC_SHARES = '/api/v2/public-shares';
+
+// Custom fields — sandboxed formula/rollup evaluation (handoff 22a)
+module.exports.CUSTOM_FIELD_FORMULA_SCOPE = '/api/v2/custom-fields/formula/scope';
+module.exports.CUSTOM_FIELD_FORMULA_VALIDATE = '/api/v2/custom-fields/formula/validate';
+module.exports.CUSTOM_FIELD_COMPUTE = '/api/v2/custom-fields/compute';
+
+// CSV import (handoff 22b)
+module.exports.IMPORT_CSV = '/api/v2/imports/csv';
+module.exports.IMPORT_CSV_PREVIEW = '/api/v2/imports/csv/preview';
+
+// Per-status WIP limit on a project's board columns
+module.exports.PROJECT_WIP_LIMIT = '/api/v1/projectSetting/taskStatus/wipLimit';

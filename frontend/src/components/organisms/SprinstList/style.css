@@ -741,3 +741,61 @@ span.duedate-new .due-date span, span.key-new {
     text-align: center;
     right: -8px;
 }
+/* ── redesigned sprint header ───────────────────────────────────────────── */
+.spr__head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 11px 14px;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-card);
+    color: var(--ink);
+    font: var(--text-body);
+}
+.spr__head.is-open { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.spr__id { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; cursor: pointer; }
+.spr__caret { width: 6px; transition: transform var(--t-state) var(--ease); }
+.spr__icon { width: 16px; flex: none; }
+.spr__dot--active { background: var(--brand); }
+.spr__dot--overdue { background: var(--danger); }
+.spr__dot--planned { background: transparent; border: 1.5px solid var(--ink-3); }
+.spr__dot--closed { background: var(--ok); }
+.spr__dot--plain { background: rgba(0, 0, 0, .2); }
+.spr__title-wrap { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.spr__title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.spr__name { font-weight: 600; text-transform: capitalize; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spr__window { color: var(--ink-3); white-space: nowrap; }
+.spr__bar { height: 5px; max-width: 200px; border-radius: 99px; background: rgba(0, 0, 0, .07); overflow: hidden; }
+:root[data-theme="dark"] .spr__bar { background: rgba(255, 255, 255, .12); }
+.spr__bar-fill { height: 100%; border-radius: 99px; background: var(--brand); transition: width var(--t-state) var(--ease); }
+
+.spr__actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.spr__pts { color: var(--ink-2); }
+.spr__ai { border: 0; background: transparent; padding: 0; color: var(--agent); font: 600 12.5px/1 var(--font-ui); cursor: pointer; }
+.spr__ai:disabled { opacity: .55; cursor: not-allowed; }
+.spr__ai:hover:not(:disabled) { text-decoration: underline; }
+.spr__hours { display: flex; align-items: center; gap: 12px; }
+.spr__hour { display: flex; flex-direction: column; gap: 1px; }
+.spr__over { color: var(--danger-ink); }
+.spr__eye {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 26px;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-chip);
+    color: var(--ink-2);
+}
+.spr__eye img { width: 14px; }
+.spr__share { display: flex; align-items: center; gap: 7px; }
+.spr__share-label { font-size: 12px; color: var(--ink-2); text-transform: capitalize; }
+.spr__menu img { width: 16px; cursor: pointer; }
+
+@media (max-width: 767px) {
+    .spr__head { gap: 8px; }
+    .spr__id { flex: 1 1 100%; }
+    .spr__hours, .spr__share { display: none; }
+}

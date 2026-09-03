@@ -22,6 +22,15 @@ export default [
             
             ...CustomFieldRouter,
             {
+                path: "language",
+                name: "LanguageRegion",
+                meta: {
+                    title: "Language & Region",
+                    requiresAuth: true
+                },
+                component: () => import(/* webpackChunkName: LanguageRegion */ '@/views/Settings/Language/Language.vue')
+            },
+            {
                 path: "members",
                 name: "Members",
                 meta: {

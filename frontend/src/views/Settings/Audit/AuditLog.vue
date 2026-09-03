@@ -1,157 +1,239 @@
 <template>
-    <div class="audit-settings">
-        <div class="audit-card">
-            <div class="audit-head">
-                <h3 class="m-0">{{ $t('Audit.title') }}</h3>
-                <button class="audit-btn-ghost" :disabled="busy" @click="reload">{{ busy ? $t('Audit.loading') : $t('Audit.refresh') }}</button>
-            </div>
-            <p class="audit-sub">{{ $t('Audit.subtitle') }}</p>
+    <div class="ah-page al">
+        <div class="ah-toolbar">
+            <div class="ah-toolbar__title">{{ $t('AuditV2.title') }}</div>
+            <span class="ah-chip ah-chip--mono">{{ todayLabel }}</span>
+            <div class="ah-toolbar__spacer"></div>
+            <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="exportCsv">
+                <ShellIcon name="docs" :size="14" />{{ $t('AuditV2.export_csv') }}
+            </button>
+        </div>
 
-            <div class="audit-filters">
-                <div class="audit-f"><label>{{ $t('Audit.f_action') }}</label><input v-model="filters.action" class="form-control" :placeholder="$t('Audit.f_action_ph')" @keyup.enter="reload" /></div>
-                <div class="audit-f"><label>{{ $t('Audit.f_entity') }}</label><input v-model="filters.entityType" class="form-control" placeholder="member, sso, project…" @keyup.enter="reload" /></div>
-                <div class="audit-f"><label>{{ $t('Audit.f_from') }}</label><input v-model="filters.from" type="date" class="form-control" /></div>
-                <div class="audit-f"><label>{{ $t('Audit.f_to') }}</label><input v-model="filters.to" type="date" class="form-control" /></div>
-                <div class="audit-f audit-f-btns">
-                    <button class="audit-btn" :disabled="busy" @click="reload">{{ $t('Audit.apply') }}</button>
-                    <button class="audit-btn-ghost" :disabled="busy" @click="clearFilters">{{ $t('Audit.clear') }}</button>
-                </div>
+        <div class="al__bar">
+            <div class="ah-tabs">
+                <button v-for="tab in tabs" :key="tab.key" type="button" class="ah-tab" :class="{ 'is-active': scope === tab.key }" @click="setScope(tab.key)">
+                    {{ $t(tab.label) }}
+                </button>
             </div>
+            <div class="al__search">
+                <ShellIcon name="search" :size="14" />
+                <input v-model.trim="search" type="search" class="al__search-input" :placeholder="$t('AuditV2.search')" @keyup.enter="reload" />
+            </div>
+            <span v-if="projectFilter" class="ah-chip ah-chip--brand">
+                {{ projectFilter.name }}
+                <button type="button" class="al__chip-x" :aria-label="$t('AuditV2.clear_filter')" @click="clearProject">×</button>
+            </span>
+        </div>
 
-            <div class="audit-table-wrap">
-                <table class="audit-table">
-                    <thead>
-                        <tr>
-                            <th>{{ $t('Audit.col_time') }}</th>
-                            <th>{{ $t('Audit.col_actor') }}</th>
-                            <th>{{ $t('Audit.col_action') }}</th>
-                            <th>{{ $t('Audit.col_entity') }}</th>
-                            <th>{{ $t('Audit.col_ip') }}</th>
-                            <th>{{ $t('Audit.col_details') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="row in rows" :key="row._id">
-                            <td class="audit-nowrap">{{ fmtTime(row.createdAt) }}</td>
-                            <td>{{ row.actorName || row.actorId || '—' }}</td>
-                            <td><span class="audit-action">{{ row.action }}</span></td>
-                            <td>{{ entityLabel(row) }}</td>
-                            <td class="audit-nowrap">{{ row.ip || '—' }}</td>
-                            <td><code class="audit-meta" v-if="hasMeta(row.meta)">{{ fmtMeta(row.meta) }}</code><span v-else>—</span></td>
-                        </tr>
-                        <tr v-if="!rows.length && !busy"><td colspan="6" class="audit-empty">{{ $t('Audit.empty') }}</td></tr>
-                        <tr v-if="busy && !rows.length"><td colspan="6" class="audit-empty">{{ $t('Audit.loading') }}</td></tr>
-                    </tbody>
-                </table>
-            </div>
+        <div class="al__body ah-scroll">
+            <div v-if="error" class="ah-empty">{{ error }}</div>
+            <div v-else-if="busy && !rows.length" class="ah-empty">{{ $t('AuditV2.loading') }}</div>
+            <div v-else-if="!rows.length" class="ah-empty">{{ $t('AuditV2.none') }}</div>
 
-            <div class="audit-pager" v-if="total > 0">
-                <span class="audit-count">{{ $t('Audit.showing', { from: rangeFrom, to: rangeTo, total }) }}</span>
-                <div class="audit-pager-btns">
-                    <button class="audit-btn-ghost" :disabled="page <= 1 || busy" @click="go(page - 1)">‹ {{ $t('Audit.prev') }}</button>
-                    <span class="audit-page">{{ page }} / {{ totalPages }}</span>
-                    <button class="audit-btn-ghost" :disabled="page >= totalPages || busy" @click="go(page + 1)">{{ $t('Audit.next') }} ›</button>
-                </div>
+            <table v-else class="al__table">
+                <thead>
+                    <tr>
+                        <th>{{ $t('AuditV2.col_time') }}</th>
+                        <th>{{ $t('AuditV2.col_actor') }}</th>
+                        <th>{{ $t('AuditV2.col_event') }}</th>
+                        <th>{{ $t('AuditV2.col_reason') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="row in rows" :key="row._id" class="al__row" :class="{ 'al__row--undone': row.meta && row.meta.undoneAt, 'al__row--refused': row.action === 'agent.action_refused' }">
+                        <td class="ah-mono al__time">{{ time(row.createdAt) }}</td>
+                        <td>
+                            <span class="al__actor">
+                                <span class="ah-avatar ah-avatar--sm" :class="{ 'ah-avatar--agent': isAgent(row) }">{{ initial(row) }}</span>
+                                <span class="al__actor-name">{{ actorName(row) }}</span>
+                                <span v-if="isAgent(row)" class="ah-chip ah-chip--agent ah-chip--mono">{{ $t('AuditV2.agent') }}</span>
+                            </span>
+                        </td>
+                        <td>
+                            <div class="al__event">
+                                <span v-if="row.action === 'agent.action_refused'" class="al__blocked">{{ $t('AuditV2.blocked_by_policy') }}</span>
+                                <span class="ah-mono al__action">{{ eventAction(row) }}</span>
+                                <span v-if="row.entityName || row.entityId" class="al__entity">{{ row.entityName || row.entityId }}</span>
+                            </div>
+                            <div v-if="row.meta && row.meta.cost && (row.meta.cost.tokens || row.meta.cost.usd)" class="al__cost ah-mono">
+                                {{ $t('AuditV2.cost', { tokens: row.meta.cost.tokens || 0, usd: Number(row.meta.cost.usd || 0).toFixed(2) }) }}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="al__reason">{{ (row.meta && row.meta.reason) || '—' }}</div>
+                            <div class="al__meta">
+                                <span v-if="row.meta && row.meta.runId" class="ah-mono al__run">{{ $t('AuditV2.run_n', { n: String(row.meta.runId).slice(-4) }) }}</span>
+                                <span v-if="row.meta && row.meta.undoneAt" class="ah-chip ah-chip--warn">{{ $t('AuditV2.undone_at', { t: time(row.meta.undoneAt) }) }}</span>
+                                <button
+                                    v-else-if="row.meta && row.meta.undoable"
+                                    type="button"
+                                    class="ah-btn ah-btn--ghost ah-btn--sm"
+                                    :disabled="undoingId === row._id"
+                                    @click="undo(row)"
+                                >{{ undoingId === row._id ? $t('AuditV2.undoing') : $t('AuditV2.undo') }}</button>
+                                <span v-else-if="row.action === 'agent.action_refused'" class="ah-small">{{ $t('AuditV2.nothing_ran') }}</span>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div v-if="rows.length && page < totalPages" class="al__more">
+                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="loadMore">{{ $t('AuditV2.load_more') }}</button>
             </div>
+            <p v-if="rows.length" class="al__note ah-small">{{ $t('AuditV2.retention') }}</p>
         </div>
     </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue';
-import { apiRequest } from '@/services';
-import * as env from '@/config/env';
+import { computed, onMounted, ref } from "vue";
+import { useRoute } from "vue-router";
+import { useI18n } from "vue-i18n";
+import { useToast } from "vue-toast-notification";
+import moment from "moment";
+import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import { apiRequest } from "@/services";
+import { useGetterFunctions } from "@/composable";
+import * as env from "@/config/env";
 
-// SEC-04 — audit log viewer. Owner/admin only (enforced server-side in
-// Modules/Audit/controller.js — non-privileged callers get 403). A read-only
-// window onto the immutable audit_logs trail with action / entity / date
-// filters + server-side pagination ($facet, newest first).
-const busy = ref(false);
+defineOptions({ name: "AuditLogPage" });
+
+const { t } = useI18n();
+const $toast = useToast();
+const route = useRoute();
+const { getUser } = useGetterFunctions();
+
 const rows = ref([]);
-const total = ref(0);
-const totalPages = ref(1);
 const page = ref(1);
-const limit = 25;
-const filters = reactive({ action: '', entityType: '', from: '', to: '' });
+const totalPages = ref(1);
+const total = ref(0);
+const busy = ref(false);
+const error = ref("");
+const scope = ref("all");
+const search = ref("");
+const undoingId = ref("");
+const projectFilter = ref(route.query.projectId ? { id: route.query.projectId, name: route.query.projectName || t("AuditV2.this_project") } : null);
 
-const rangeFrom = computed(() => (total.value === 0 ? 0 : (page.value - 1) * limit + 1));
-const rangeTo = computed(() => Math.min(page.value * limit, total.value));
+const tabs = [
+    { key: "all", label: "AuditV2.tab_all" },
+    { key: "agent", label: "AuditV2.tab_agents" },
+    { key: "gated", label: "AuditV2.tab_gated" },
+    { key: "undone", label: "AuditV2.tab_undone" }
+];
 
-const fmtTime = (d) => {
-    if (!d) return '—';
-    try { return new Date(d).toLocaleString(); } catch (e) { return String(d); }
+const todayCount = computed(() => rows.value.filter((r) => moment(r.createdAt).isSame(moment(), "day")).length || total.value);
+const todayLabel = computed(() => t("AuditV2.today_events", {
+    n: todayCount.value,
+    unit: t(todayCount.value === 1 ? "AuditV2.event_one" : "AuditV2.event_other")
+}));
+
+const isAgent = (row) => row.meta && row.meta.actorType === "agent";
+const actorName = (row) => (isAgent(row) ? row.meta.agentName || t("AuditV2.an_agent") : row.actorName || getUser(row.actorId)?.Employee_Name || t("AuditV2.someone"));
+const initial = (row) => actorName(row).charAt(0).toUpperCase();
+const eventAction = (row) => (row.meta && row.meta.action) || row.action;
+const time = (at) => (at ? moment(at).format("HH:mm") : "");
+
+const query = (extra = {}) => {
+    const q = { page: page.value, limit: 25, ...extra };
+    if (scope.value === "agent") q.actorType = "agent";
+    if (scope.value === "gated") q.gated = "true";
+    if (scope.value === "undone") q.undone = "true";
+    if (search.value) q.q = search.value;
+    if (projectFilter.value) q.projectId = projectFilter.value.id;
+    return Object.entries(q).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
 };
-const entityLabel = (row) => {
-    const t = row.entityType || '';
-    const id = row.entityName || row.entityId || '';
-    if (t && id) return `${t}: ${id}`;
-    return t || id || '—';
-};
-const hasMeta = (m) => m && typeof m === 'object' && !Array.isArray(m) && Object.keys(m).length > 0;
-const fmtMeta = (m) => { try { return JSON.stringify(m); } catch (e) { return ''; } };
 
-const buildUrl = () => {
-    const p = new URLSearchParams();
-    p.set('page', String(page.value));
-    p.set('limit', String(limit));
-    if (filters.action) p.set('action', filters.action.trim());
-    if (filters.entityType) p.set('entityType', filters.entityType.trim());
-    if (filters.from) p.set('from', filters.from);
-    if (filters.to) p.set('to', filters.to);
-    return `${env.AUDIT_LOGS}?${p.toString()}`;
-};
-
-const load = async () => {
-    if (busy.value) return;
+const load = async ({ append = false } = {}) => {
     busy.value = true;
+    error.value = "";
     try {
-        const body = (await apiRequest('get', buildUrl()))?.data;
-        if (body && body.status) {
-            rows.value = body.data || [];
-            total.value = (body.metadata && body.metadata.total) || 0;
-            totalPages.value = (body.metadata && body.metadata.totalPages) || 1;
-        } else {
-            rows.value = []; total.value = 0; totalPages.value = 1;
+        const res = await apiRequest("get", `${env.AUDIT_LOGS}?${query()}`);
+        if (!res?.data?.status) {
+            error.value = res?.data?.statusText || t("AuditV2.failed");
+            return;
         }
+        rows.value = append ? [...rows.value, ...(res.data.data || [])] : res.data.data || [];
+        const meta = res.data.metadata || {};
+        totalPages.value = meta.totalPages || 1;
+        total.value = meta.total || rows.value.length;
     } catch (e) {
-        rows.value = []; total.value = 0; totalPages.value = 1;
+        error.value = e?.response?.data?.statusText || e.message;
     } finally {
         busy.value = false;
     }
 };
 
 const reload = () => { page.value = 1; load(); };
-const go = (p) => { if (p < 1 || p > totalPages.value || busy.value) return; page.value = p; load(); };
-const clearFilters = () => { filters.action = ''; filters.entityType = ''; filters.from = ''; filters.to = ''; reload(); };
+const setScope = (key) => { scope.value = key; reload(); };
+const clearProject = () => { projectFilter.value = null; reload(); };
+const loadMore = () => { page.value += 1; load({ append: true }); };
+
+const undo = async (row) => {
+    undoingId.value = row._id;
+    try {
+        const res = await apiRequest("post", `${env.AUDIT_LOGS}/${row._id}/undo`, {});
+        if (!res?.data?.status) throw new Error(res?.data?.statusText || t("AuditV2.undo_failed"));
+        $toast.success(t("AuditV2.undone_toast"), { position: "top-right" });
+        reload();
+    } catch (e) {
+        $toast.error(e.message, { position: "top-right" });
+    } finally {
+        undoingId.value = "";
+    }
+};
+
+const exportCsv = async () => {
+    busy.value = true;
+    try {
+        const res = await apiRequest("get", `${env.AUDIT_LOGS}/export?${query()}`, null, null, { responseType: "blob" });
+        const blob = new Blob([res.data], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `audit-${moment().format("YYYY-MM-DD")}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        $toast.error(t("AuditV2.export_failed"), { position: "top-right" });
+    } finally {
+        busy.value = false;
+    }
+};
 
 onMounted(load);
 </script>
 
 <style scoped>
-.audit-settings { padding: 20px; }
-.audit-card { background: #fff; border: 1px solid #e6e7ee; border-radius: 10px; padding: 20px; }
-.audit-head { display: flex; align-items: center; justify-content: space-between; }
-.audit-sub { color: #6b7280; font-size: 13px; margin: 6px 0 18px; }
-.audit-filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 16px; }
-.audit-f { display: flex; flex-direction: column; gap: 5px; }
-.audit-f > label { font-size: 12px; font-weight: 600; color: #3a3f52; }
-.audit-f .form-control { min-width: 160px; }
-.audit-f-btns { flex-direction: row; gap: 8px; }
-.audit-table-wrap { overflow-x: auto; border: 1px solid #e6e7ee; border-radius: 8px; }
-.audit-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.audit-table th { text-align: left; background: #f7f8fc; color: #3a3f52; font-weight: 700; padding: 10px 12px; border-bottom: 1px solid #e6e7ee; white-space: nowrap; }
-.audit-table td { padding: 9px 12px; border-bottom: 1px solid #f0f1f6; color: #3a3f52; vertical-align: top; }
-.audit-table tr:last-child td { border-bottom: none; }
-.audit-nowrap { white-space: nowrap; }
-.audit-action { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; background: #eef1fb; color: #2f3a8f; border-radius: 5px; padding: 2px 7px; }
-.audit-meta { font-size: 11.5px; color: #555; word-break: break-all; }
-.audit-empty { text-align: center; color: #9aa0b4; padding: 22px 12px; }
-.audit-pager { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; flex-wrap: wrap; gap: 10px; }
-.audit-count { font-size: 12px; color: #6b7280; }
-.audit-pager-btns { display: flex; align-items: center; gap: 10px; }
-.audit-page { font-size: 12px; color: #3a3f52; }
-.audit-btn { background: #2f3a8f; color: #fff; border: none; border-radius: 7px; padding: 8px 16px; font-size: 13px; cursor: pointer; }
-.audit-btn:disabled { opacity: .55; cursor: default; }
-.audit-btn-ghost { background: #fff; color: #2f3a8f; border: 1px solid #cdd2e6; border-radius: 7px; padding: 7px 14px; font-size: 13px; cursor: pointer; }
-.audit-btn-ghost:disabled { opacity: .5; cursor: default; }
+.al { background: var(--canvas); }
+.al__bar { display: flex; align-items: center; gap: 12px; padding: 12px 24px; border-bottom: 1px solid var(--hairline); background: var(--surface); flex-wrap: wrap; }
+.al__search { display: flex; align-items: center; gap: 7px; padding: 0 10px; height: 30px; border: 1px solid var(--border); border-radius: var(--r-input); background: var(--surface); color: var(--ink-3); flex: 1; max-width: 320px; }
+.al__search-input { border: 0; background: transparent; outline: none; flex: 1; font: var(--text-small); color: var(--ink); }
+.al__chip-x { border: 0; background: transparent; cursor: pointer; color: inherit; font-size: 14px; line-height: 1; padding: 0 0 0 4px; }
+.al__body { flex: 1; min-height: 0; overflow: auto; padding: 16px 24px 24px; }
+.al__table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-card); overflow: hidden; }
+.al__table th { text-align: left; font: var(--text-label); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); padding: 9px 12px; border-bottom: 1px solid var(--hairline); background: var(--surface-2); }
+.al__table td { padding: 11px 12px; border-bottom: 1px solid var(--hairline); vertical-align: top; font: var(--text-small); color: var(--ink); }
+.al__row:last-child td { border-bottom: 0; }
+.al__row--undone { opacity: .66; }
+.al__row--refused { background: var(--danger-bg); }
+.al__time { color: var(--ink-2); white-space: nowrap; }
+.al__actor { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+.al__actor-name { font-weight: 500; }
+.al__event { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.al__action { color: var(--ink); }
+.al__entity { color: var(--ink-2); }
+.al__blocked { color: var(--danger-ink); font-weight: 600; }
+.al__cost { color: var(--ink-3); margin-top: 3px; }
+.al__reason { color: var(--ink-2); }
+.al__meta { display: flex; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+.al__run { color: var(--ink-3); }
+.al__more { display: flex; justify-content: center; padding: 14px 0 4px; }
+.al__note { margin: 10px 0 0; color: var(--ink-3); }
+@media (max-width: 900px) {
+    .al__table thead { display: none; }
+    .al__table, .al__table tbody, .al__row, .al__table td { display: block; width: 100%; }
+    .al__row { border-bottom: 1px solid var(--hairline); padding: 6px 0; }
+    .al__table td { border-bottom: 0; padding: 4px 12px; }
+}
 </style>

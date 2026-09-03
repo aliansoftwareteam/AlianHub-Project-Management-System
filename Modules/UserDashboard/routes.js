@@ -35,4 +35,15 @@ exports.init = (app) => {
     // behind one status. Owner/Admin see the company; everyone else sees their own work
     // (resolved server-side from company_users, not from the body).
     app.post('/api/v1/dashboard/tasks-by-status', ctrl.getTasksByStatus);
+
+    // Shared dashboards (redesign 12d) — a dashboard is an owned object with a
+    // visibility, not a per-user blob. Same collection as above; the legacy
+    // per-user document is read as its owner's private dashboard.
+    app.get('/api/v1/dashboards', ctrl.listDashboards);
+    app.post('/api/v1/dashboards', ctrl.createSharedDashboard);
+    app.get('/api/v1/dashboards/:id', ctrl.getSharedDashboard);
+    app.put('/api/v1/dashboards/:id', ctrl.updateSharedDashboard);
+    app.put('/api/v1/dashboards/:id/cards', ctrl.updateSharedDashboardCards);
+    app.post('/api/v1/dashboards/:id/duplicate', ctrl.duplicateSharedDashboard);
+    app.delete('/api/v1/dashboards/:id', ctrl.deleteSharedDashboard);
 }

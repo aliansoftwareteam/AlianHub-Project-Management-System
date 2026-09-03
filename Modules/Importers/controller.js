@@ -5,7 +5,7 @@ const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { taskMongo } = require('../Tasks/helpers/task_class_Mongo');
 const { validateImportInput, transformJiraRows } = require('./helpers/jiraRules');
-const { validateCsvInput, transformCsvRows } = require('./helpers/csvRules');
+const { validateCsvInput, validateCsvRows, transformCsvRows, TARGETS } = require('./helpers/csvRules');
 const { validateTrelloInput, parseTrelloBoard } = require('./helpers/trelloRules');
 const { validateAsanaInput, parseAsanaExport } = require('./helpers/asanaRules');
 const { validateMondayInput, parseMondayExport } = require('./helpers/mondayRules');
@@ -255,10 +255,22 @@ exports.importFromCsv = async (req, res) => {
         const ctx = await loadImportContext(companyId, projectId);
         if (ctx.error) return res.send({ status: false, statusText: ctx.error });
 
-        const { tasks, skipped } = transformCsvRows({ rows, mapping, statusNames: ctx.statusArray.map((status) => status.name), leaderId: userId });
+        const directory = await loadUserDirectory(rows, mapping);
+        const options = req.body.options || {};
+        const statusArray = options.createMissingStatuses
+            ? await createMissingStatuses(companyId, ctx.project, ctx.statusArray, rows, mapping)
+            : ctx.statusArray;
+        const { tasks, skipped } = transformCsvRows({
+            rows,
+            mapping,
+            statusNames: statusArray.map((status) => status.name),
+            leaderId: userId,
+            users: directory,
+            options,
+        });
         if (!tasks.length) return res.send({ status: false, statusText: 'No importable rows found (a task-name column is required).' });
 
-        const out = await finishImport(companyId, { source: 'csv', project: ctx.project, sprintId, sprintName, folderId, folderName, userData, statusArray: ctx.statusArray, tasks, skipped });
+        const out = await finishImport(companyId, { source: 'csv', project: ctx.project, sprintId, sprintName, folderId, folderName, userData, statusArray, tasks, skipped });
         return res.send(out);
     } catch (error) {
         logger.error(`ERROR in csv import: ${error.message}`);
@@ -336,4 +348,98 @@ exports.importFromMonday = async (req, res) => {
         logger.error(`ERROR in monday import: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
+};
+
+/* The people a CSV names, resolved to real users so the mapping step can say
+ * which ones it could not match. Only the values actually present in the file
+ * are looked up. */
+const loadUserDirectory = async (rows, mapping) => {
+    const column = mapping && mapping.assignee;
+    const wanted = new Set();
+    (rows || []).forEach((row) => {
+        const raw = column ? row[column] : (row.Assignee || row.assignee || row['Assigned To']);
+        const value = raw === undefined || raw === null ? '' : String(raw).trim();
+        if (value) wanted.add(value.toLowerCase());
+    });
+    if (!wanted.size) return [];
+    try {
+        const users = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
+            type: SCHEMA_TYPE.USERS,
+            data: [{ $or: [{ Employee_Email: { $in: [...wanted] } }, { Employee_Name: { $in: [...wanted] } }] }, { _id: 1, Employee_Email: 1, Employee_Name: 1 }],
+        }, 'find');
+        return (users || []).map((user) => ({ id: String(user._id), email: user.Employee_Email || '', name: user.Employee_Name || '' }));
+    } catch (error) {
+        logger.error(`[importers] user directory lookup failed: ${error.message}`);
+        return [];
+    }
+};
+
+/* POST /api/v2/imports/csv/preview
+ * body: { rows, mapping?, projectId, options? }
+ * Step 3 of the wizard: per-row validation with nothing written. */
+exports.previewCsv = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'] || '';
+        const { rows, mapping, projectId, options } = req.body || {};
+        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        if (!Array.isArray(rows) || !rows.length) return res.send({ status: false, statusText: 'rows must be a non-empty array.' });
+
+        const ctx = await loadImportContext(companyId, projectId);
+        if (ctx.error) return res.send({ status: false, statusText: ctx.error });
+
+        const directory = await loadUserDirectory(rows, mapping);
+        const report = validateCsvRows({
+            rows,
+            mapping,
+            statusNames: ctx.statusArray.map((status) => status.name),
+            users: directory,
+            options: options || {},
+        });
+
+        return res.send({
+            status: true,
+            statusText: 'Preview ready.',
+            data: {
+                ...report,
+                targets: TARGETS.map((target) => ({ key: target.key, label: target.label, parse: target.parse, required: !!target.required })),
+                statuses: ctx.statusArray.map((status) => status.name),
+                matchedUsers: directory,
+            },
+        });
+    } catch (error) {
+        logger.error(`ERROR in csv preview: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+/* "Create missing" on the mapping step: any status the file uses that the
+ * project does not have is appended to the project's own status list before the
+ * tasks are created, so those rows keep their status instead of collapsing onto
+ * the first one. Returns the status list to import against. */
+const createMissingStatuses = async (companyId, project, statusArray, rows, mapping) => {
+    const column = mapping && mapping.status;
+    const known = new Set(statusArray.map((status) => String(status.name).trim().toLowerCase()));
+    const missing = [];
+    (rows || []).forEach((row) => {
+        const raw = column ? row[column] : (row.Status || row.status);
+        const value = raw === undefined || raw === null ? '' : String(raw).trim();
+        if (!value || known.has(value.toLowerCase())) return;
+        known.add(value.toLowerCase());
+        missing.push(value);
+    });
+    if (!missing.length) return statusArray;
+
+    let nextKey = statusArray.reduce((highest, status) => Math.max(highest, Number(status.key) || 0), 0);
+    const added = missing.map((name) => ({ name, key: ++nextKey, type: STATUS_FALLBACK_TYPE }));
+    const merged = statusArray.concat(added);
+    try {
+        await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.PROJECTS,
+            data: [{ _id: project._id }, { $set: { taskStatusData: merged } }],
+        }, 'updateOne');
+    } catch (error) {
+        logger.error(`[importers] could not add statuses to project ${project._id}: ${error.message}`);
+        return statusArray;
+    }
+    return merged;
 };

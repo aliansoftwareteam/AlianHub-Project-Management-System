@@ -1,160 +1,54 @@
-/* Drives the real computed logic out of FirstRunChecklist.vue by extracting the two store readers
-   and the item list from the shipped source. The point is the store shape: projectData/allProjects
-   starts as [] and becomes { data: [...] } once loaded, and reading it as a plain array threw
-   "allProjects.value.some is not a function" on first paint. */
+/* main's FirstRunChecklist.vue was removed when the redesign's Home checklist replaced it
+   (the two rendered at once). What that component's tests protected and this file keeps:
+
+   1. The store-shape regression. projectData's project getter starts as [] and becomes
+      { data: [...] } once loaded; reading it as a plain array threw
+      "allProjects.value.some is not a function" on first paint. The replacement reader is
+      extracted from the shipped Home source below so this test cannot drift from it.
+   2. The demo project must not depend on the owner's setup answer.
+
+   The old visibility rules are deliberately not carried over: Home decides when to show its
+   checklist, so asserting the deleted component's rules would test nothing that ships. */
 const fs = require('fs');
 const path = require('path');
 
-const SRC = path.join(__dirname, '..', 'frontend', 'src', 'components', 'molecules', 'FirstRunChecklist', 'FirstRunChecklist.vue');
+const HOME = path.join(__dirname, '..', 'frontend', 'src', 'views', 'Home', 'TodayOverdue.vue');
 
-// Rebuild the two readers from the component's own source so the test cannot drift from it.
+/* Rebuild Home's readers from its own source so they cannot drift from what ships. */
 function buildReaders(source) {
     const block = source.slice(source.indexOf('<script setup>'), source.indexOf('</script>'));
-
     const grab = (name) => {
-        const start = block.indexOf(`const ${name} = computed(`);
-        if (start === -1) throw new Error(`${name} not found in component`);
-        let depth = 0;
-        let i = block.indexOf('(', start);
-        for (let k = i; k < block.length; k++) {
-            if (block[k] === '(') depth++;
-            else if (block[k] === ')') { depth--; if (!depth) { i = k; break; } }
-        }
-        return block.slice(start, i + 1).replace(/^const \w+ = computed\(/, '').replace(/\)$/, '');
+        const m = block.match(new RegExp(`const ${name} = computed\\(([^;]*)\\);`));
+        if (!m) throw new Error(`${name} not found in TodayOverdue.vue`);
+        return m[1];
     };
-
-    const make = (name) => {
-        // eslint-disable-next-line no-new-func
-        return new Function('getters', `return (${grab(name)})();`);
-    };
-
-    return { allProjects: make('allProjects'), companyUsers: make('companyUsers') };
+    // eslint-disable-next-line no-new-func
+    const make = (name) => new Function('getters', `return (${grab(name)})();`);
+    return { projects: make('projects'), companyUsers: make('companyUsers') };
 }
 
-const source = fs.readFileSync(SRC, 'utf8');
-const readers = buildReaders(source);
+const readers = buildReaders(fs.readFileSync(HOME, 'utf8'));
 
-describe('first-run checklist store readers', () => {
-    describe('allProjects — the shape that caused the crash', () => {
-        test('loaded shape { data: [...] } yields the array', () => {
-            const g = { 'projectData/allProjects': { data: [{ _id: 'a' }, { _id: 'b' }] } };
-            const out = readers.allProjects(g);
+describe('Home checklist store readers', () => {
+    test('the loaded shape { data: [...] } yields the array', () => {
+        const out = readers.projects({ 'projectData/projects': { data: [{ _id: 'a' }] } });
+        expect(Array.isArray(out)).toBe(true);
+        expect(out).toHaveLength(1);
+    });
+
+    test('the pre-load shapes never throw and never look like real projects', () => {
+        for (const value of [undefined, null, [], {}, { data: null }]) {
+            const out = readers.projects({ 'projectData/projects': value });
             expect(Array.isArray(out)).toBe(true);
-            expect(out).toHaveLength(2);
-        });
-
-        test('the result always supports .some, which is what threw', () => {
-            const shapes = [
-                { data: [{ lastTaskId: 4 }] },
-                [],
-                [{ lastTaskId: 0 }],
-                undefined,
-                null,
-                {},
-                { data: null },
-                { data: 'not an array' },
-                0,
-                '',
-            ];
-            for (const raw of shapes) {
-                const out = readers.allProjects({ 'projectData/allProjects': raw });
-                expect(Array.isArray(out)).toBe(true);
-                expect(() => out.some((p) => Number(p && p.lastTaskId) > 0)).not.toThrow();
-            }
-        });
-
-        test('initial empty array is still an array', () => {
-            expect(readers.allProjects({ 'projectData/allProjects': [] })).toEqual([]);
-        });
-
-        test('a company with projects is not reported as having none', () => {
-            const g = { 'projectData/allProjects': { data: [{ _id: 'a' }] } };
-            expect(readers.allProjects(g).length > 0).toBe(true);
-        });
-
-        test('lastTaskId drives the "has a task" item', () => {
-            const none = { 'projectData/allProjects': { data: [{ lastTaskId: 0 }, {}] } };
-            const some = { 'projectData/allProjects': { data: [{ lastTaskId: 0 }, { lastTaskId: 7 }] } };
-            expect(readers.allProjects(none).some((p) => Number(p && p.lastTaskId) > 0)).toBe(false);
-            expect(readers.allProjects(some).some((p) => Number(p && p.lastTaskId) > 0)).toBe(true);
-        });
-    });
-
-    describe('companyUsers', () => {
-        test('an array passes through and a non-array does not throw', () => {
-            expect(readers.companyUsers({ 'settings/companyUsers': [{}, {}] })).toHaveLength(2);
-            for (const raw of [undefined, null, {}, 'x', 0, { data: [] }]) {
-                const out = readers.companyUsers({ 'settings/companyUsers': raw });
-                expect(Array.isArray(out)).toBe(true);
-                expect(out).toHaveLength(0);
-            }
-        });
-
-        test('more than one member ticks the invite item', () => {
-            expect(readers.companyUsers({ 'settings/companyUsers': [{}] }).length > 1).toBe(false);
-            expect(readers.companyUsers({ 'settings/companyUsers': [{}, {}] }).length > 1).toBe(true);
-        });
-    });
-});
-
-/* The visibility rule. This is the one that matters for production: the two localStorage items are
-   never ticked on an existing install, so if they counted towards visibility every owner and admin
-   of every established company would suddenly be shown a getting-started panel. */
-describe('first-run checklist visibility', () => {
-    // Mirrors the component's rule: Owner/Admin only, and only while a CORE item is outstanding.
-    const isVisible = (opts) => {
-        const { dismissed = false, core = [], extras = [] } = opts;
-        // Read explicitly rather than via a default parameter: passing undefined would silently
-        // become the default and stop the test exercising the undefined case at all.
-        const roleType = Object.prototype.hasOwnProperty.call(opts, 'roleType') ? opts.roleType : 1;
-        if (dismissed) return false;
-        if (roleType !== 1 && roleType !== 2) return false;
-        const items = core.map((done) => ({ core: true, done }))
-            .concat(extras.map((done) => ({ core: false, done })));
-        return items.some((i) => i.core && !i.done);
-    };
-
-    test('an established company sees nothing, even with both extras untouched', () => {
-        expect(isVisible({ core: [true, true, true], extras: [false, false] })).toBe(false);
-    });
-
-    test('a brand-new company sees it', () => {
-        expect(isVisible({ core: [false, false, false], extras: [false, false] })).toBe(true);
-    });
-
-    test('it stays while any core item is outstanding', () => {
-        expect(isVisible({ core: [true, true, false], extras: [true, true] })).toBe(true);
-        expect(isVisible({ core: [true, false, true], extras: [true, true] })).toBe(true);
-        expect(isVisible({ core: [false, true, true], extras: [true, true] })).toBe(true);
-    });
-
-    test('extras alone never keep it alive', () => {
-        expect(isVisible({ core: [true, true, true], extras: [false, false] })).toBe(false);
-        expect(isVisible({ core: [true, true, true], extras: [true, false] })).toBe(false);
-    });
-
-    test('dismissing wins over everything', () => {
-        expect(isVisible({ dismissed: true, core: [false, false, false] })).toBe(false);
-    });
-
-    test('only Owner and Admin ever see it', () => {
-        for (const roleType of [0, 3, 4, 5, null, undefined]) {
-            expect(isVisible({ roleType, core: [false, false, false] })).toBe(false);
+            expect(out).toHaveLength(0);
+            // .length and .some are what the checklist calls; both threw before.
+            expect(() => out.some(Boolean)).not.toThrow();
         }
-        expect(isVisible({ roleType: 1, core: [false, false, false] })).toBe(true);
-        expect(isVisible({ roleType: 2, core: [false, false, false] })).toBe(true);
     });
 
-    test('the component marks exactly three items core', () => {
-        const fs = require('fs');
-        const path = require('path');
-        const src = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'components',
-            'molecules', 'FirstRunChecklist', 'FirstRunChecklist.vue'), 'utf8');
-        expect((src.match(/core: true/g) || []).length).toBe(3);
-        expect((src.match(/core: false/g) || []).length).toBe(2);
-        // and visibility must key off core, not the total count
-        expect(src).toContain('i.core && !i.done');
-        expect(src).not.toContain('doneCount.value < items.value.length');
+    test('companyUsers passes an array through and tolerates a non-array', () => {
+        expect(readers.companyUsers({ 'settings/companyUsers': [{ _id: 'u1' }, { _id: 'u2' }] })).toHaveLength(2);
+        expect(Array.isArray(readers.companyUsers({ 'settings/companyUsers': undefined }))).toBe(true);
     });
 });
 

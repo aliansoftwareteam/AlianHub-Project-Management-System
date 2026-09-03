@@ -5,40 +5,12 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { taskMongo } = require('../Tasks/helpers/task_class_Mongo');
 const logger = require('../../Config/loggerConfig');
+const rules = require('./recurrenceRules');
 
 const COMPANY_CONCURRENCY = 5;
 const LOG_PREFIX = '[recurringTasks]';
 
-function atHour(year, month, day, hour) {
-    return new Date(year, month, day, hour, 0, 0, 0);
-}
-
-// The next run strictly after `fromDate`, per the definition's schedule.
-function computeNextRun(def, fromDate) {
-    const from = fromDate ? new Date(fromDate) : new Date();
-    const hour = Number.isFinite(Number(def.runHour)) ? Number(def.runHour) : 9;
-    const interval = Math.max(1, Number(def.interval) || 1);
-
-    if (def.freq === 'weekly') {
-        const days = (Array.isArray(def.byweekday) && def.byweekday.length) ? def.byweekday.map(Number) : [from.getDay()];
-        for (let i = 1; i <= 7 * interval + 7; i++) {
-            const c = atHour(from.getFullYear(), from.getMonth(), from.getDate() + i, hour);
-            if (days.includes(c.getDay())) return c;
-        }
-        return atHour(from.getFullYear(), from.getMonth(), from.getDate() + 7, hour);
-    }
-    if (def.freq === 'monthly') {
-        // cap at 28 so we never overflow into the next month on short months
-        const dom = Math.min(28, Math.max(1, Number(def.monthday) || from.getDate()));
-        let c = atHour(from.getFullYear(), from.getMonth(), dom, hour);
-        while (c <= from) {
-            c = atHour(c.getFullYear(), c.getMonth() + interval, dom, hour);
-        }
-        return c;
-    }
-    // daily (default)
-    return atHour(from.getFullYear(), from.getMonth(), from.getDate() + interval, hour);
-}
+const computeNextRun = rules.computeNextRun;
 
 // Clone the stored template into a fresh task `data` payload for taskMongo.create.
 function buildInstanceData(def, companyId) {
@@ -70,10 +42,30 @@ async function isPreviousInstanceOpen(companyId, taskId) {
     }
 }
 
-// Create one task instance from a definition. Returns { created, id, skipped }.
-async function instantiateOne(companyId, def) {
-    if (def.skipIfOpen && await isPreviousInstanceOpen(companyId, def.lastInstanceTaskId)) {
-        return { created: false, skipped: true };
+// Push an open instance's due date to this occurrence instead of stacking a
+// second copy of the same job on the assignee.
+async function rollPreviousInstance(companyId, taskId, dueDate) {
+    try {
+        await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS,
+            data: [{ _id: new mongoose.Types.ObjectId(taskId) }, { $set: { DueDate: dueDate } }],
+        }, 'updateOne');
+        return true;
+    } catch (e) {
+        logger.error(`${LOG_PREFIX} rolling ${taskId} forward failed: ${e.message}`);
+        return false;
+    }
+}
+
+// Create one task instance from a definition. Returns { created, id, skipped, rolled }.
+async function instantiateOne(companyId, def, occurrenceDate) {
+    const policy = rules.missedPolicyOf(def);
+    if (policy !== 'create' && await isPreviousInstanceOpen(companyId, def.lastInstanceTaskId)) {
+        if (rules.resolveOccurrence(policy, true) === 'roll') {
+            const rolled = await rollPreviousInstance(companyId, def.lastInstanceTaskId, occurrenceDate || new Date());
+            return { created: false, skipped: true, rolled };
+        }
+        return { created: false, skipped: true, rolled: false };
     }
     const data = buildInstanceData(def, companyId);
     const indexObj = { indexName: 'groupByStatusIndex', searchKey: 'statusKey', searchValue: String(data.statusKey || 1) };
@@ -83,7 +75,7 @@ async function instantiateOne(companyId, def) {
         projectData: def.projectSnapshot || { _id: data.ProjectID, CompanyId: companyId },
         indexObj,
     });
-    return { created: !!(result && result.status), id: result && result.id, skipped: false };
+    return { created: !!(result && result.status), id: result && result.id, skipped: false, rolled: false };
 }
 
 // updateOne $set on a definition.
@@ -114,7 +106,7 @@ async function processDueForCompany(companyId, now) {
                 await updateDef(companyId, def._id, { enabled: false });
                 continue;
             }
-            const out = await instantiateOne(companyId, def);
+            const out = await instantiateOne(companyId, def, ref);
             if (out.created) created++;
             const next = computeNextRun(def, ref);
             const patch = {
@@ -153,6 +145,7 @@ async function runRecurringForAllCompanies() {
 
 module.exports = {
     computeNextRun,
+    missedPolicyOf: rules.missedPolicyOf,
     buildInstanceData,
     instantiateOne,
     processDueForCompany,

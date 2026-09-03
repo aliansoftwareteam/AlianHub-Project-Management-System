@@ -20,6 +20,10 @@ const { emitListener } = require("../../../Company/eventController.js");
 const { createCustomFields } = require("../helper.js");
 const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
+const completionStore = require('../completionStore.js');
+
+const { recordCompletion } = require('./recordCompletion.js');
+
 module.exports = {
 
     /* -------------- UPDATE DUE DATE FUNCTION FOR TASK -----------------*/
@@ -267,6 +271,7 @@ module.exports = {
                     .then((result) => {
                         socketEmitter.emit('update', { type: "update", data: result , updatedFields: newStatus, module: 'task' });
                         resolve({status: true, statusText: "Status updated successfully"});
+                        recordCompletion({ companyId: projectData.CompanyId, taskId: prevStatus.taskId, task, newStatus, userData });
 
                         let obj = {
                             'ProjectName': projectData.ProjectName,

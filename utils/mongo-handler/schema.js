@@ -1005,6 +1005,75 @@ const schema = {
         taskKey: { type: String, default: '', required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // One billing contract per project — managed by Modules/Milestone (handoff 19a/19b).
+    // The milestones themselves stay in `milestone`; this holds the terms the
+    // money maths needs and that live nowhere else in the product: who the
+    // client is, whether the project is fixed-price or hourly, the tax rate, the
+    // monthly ceiling, and the blended cost rate profitability is measured
+    // against. Rates are stored in MINOR UNITS and tax in BASIS POINTS so no
+    // stored figure is ever a float.
+    projectContracts: {
+        ProjectID: { type: mongoose.Schema.Types.ObjectId, required: true },
+        // 'fixed' | 'hourly'
+        billingMode: { type: String, default: 'fixed', required: false },
+        clientName: { type: String, default: '', required: false },
+        vendorName: { type: String, default: '', required: false },
+        // Company users with the client's seat — they are who a sign-off task is
+        // assigned to and who the client view answers for.
+        clientContactIds: { type: Array, default: [], required: false },
+        currency: { type: String, default: 'USD', required: false },
+        currencySymbol: { type: String, default: '$', required: false },
+        taxLabel: { type: String, default: '', required: false },
+        taxRateBp: { type: Number, default: 0, required: false },
+        paymentTermsDays: { type: Number, default: 30, required: false },
+        // Null until somebody sets it. There is no honest default for a blended
+        // cost rate, so profitability stays unavailable rather than wrong.
+        blendedCostRateMinor: { type: Number, default: null, required: false },
+        monthlyCapMinor: { type: Number, default: null, required: false },
+        // Contract-level rule toggles shown on 19a.
+        requireTasksDoneToInvoice: { type: Boolean, default: true, required: false },
+        signOffIsTask: { type: Boolean, default: true, required: false },
+        warnWhenHoursExceedValue: { type: Boolean, default: false, required: false },
+        allowClientMessages: { type: Boolean, default: true, required: false },
+        invoicePrefix: { type: String, default: 'INV', required: false },
+        invoiceSeq: { type: Number, default: 0, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // Client invoices raised against a project (handoff 19c). Distinct from the
+    // global `invoices` collection, which is AlianHub's own subscription billing.
+    // Every line keeps the ids it was drafted from so a client question about a
+    // number can be answered by opening the tasks or the time logs behind it.
+    projectInvoices: {
+        ProjectID: { type: mongoose.Schema.Types.ObjectId, required: true },
+        number: { type: String, required: true },
+        clientName: { type: String, default: '', required: false },
+        // 'milestone' | 'month'
+        source: { type: String, default: 'milestone', required: false },
+        periodStart: { type: Date, required: false },
+        periodEnd: { type: Date, required: false },
+        issuedDate: { type: Date, required: false },
+        dueDate: { type: Date, required: false },
+        // [{ id, kind, label, detail, qtyMilli, unitMinor, amountMinor,
+        //    milestoneId, taskIds, timelogIds }]
+        lines: { type: Array, default: [], required: false },
+        currency: { type: String, default: 'USD', required: false },
+        currencySymbol: { type: String, default: '$', required: false },
+        taxLabel: { type: String, default: '', required: false },
+        taxRateBp: { type: Number, default: 0, required: false },
+        subtotalMinor: { type: Number, default: 0, required: false },
+        taxMinor: { type: Number, default: 0, required: false },
+        totalMinor: { type: Number, default: 0, required: false },
+        // 'draft' | 'sent' | 'paid'
+        status: { type: String, default: 'draft', required: false },
+        sentAt: { type: Date, required: false },
+        paidAt: { type: Date, required: false },
+        notes: { type: String, default: '', required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Submissions arriving through a public intake form
     intakeItems: {
         publicShareId: { type: mongoose.Schema.Types.ObjectId, required: true },
@@ -1776,6 +1845,13 @@ const schema = {
             type: String,
             required: false
         },
+        // The userId of this member's manager in the same company. Empty means no
+        // reporting line is recorded, which is the normal state for most workspaces.
+        managerId: {
+            type: String,
+            required: false,
+            default: ""
+        },
         isTrackerUser: {
             type: Boolean,
             required: false
@@ -2406,6 +2482,22 @@ const schema = {
         billingPeriod:{
             type:String,
             required:false
+        },
+        // Which tasks this milestone covers. Empty means "derive from the
+        // milestone's own date window" — see resolveMilestoneScope.
+        taskIds:{
+            type: Array,
+            default: [],
+            required: false
+        },
+        // Company user who signs the milestone off (the client contact).
+        signOffUserId:{
+            type: String,
+            required: false
+        },
+        signOffAt:{
+            type: Date,
+            required: false
         }
     },
     apps: {
@@ -3554,6 +3646,30 @@ const schema = {
         isDeleted: {
             type: Boolean,
             required: true
+        },
+        ownerId: {
+            type: String,
+            required: false
+        },
+        visibility: {
+            type: String,
+            required: false
+        },
+        projectId: {
+            type: String,
+            required: false
+        },
+        sharedWith: {
+            type: Array,
+            required: false
+        },
+        description: {
+            type: String,
+            required: false
+        },
+        updatedBy: {
+            type: String,
+            required: false
         }
     }
 }

@@ -44,6 +44,24 @@ exports.listAuditLogs = async (req, res) => {
         if (q.entityType) match.entityType = String(q.entityType);
         if (q.entityId) match.entityId = String(q.entityId);
         if (q.action) match.action = String(q.action);
+        // 11b filters. The stream is one collection, so these are meta lookups
+        // rather than a separate agent log.
+        if (q.actorType === 'agent') match['meta.actorType'] = 'agent';
+        if (q.actorType === 'human') match['meta.actorType'] = { $ne: 'agent' };
+        if (q.gated === 'true') match.action = 'agent.action_refused';
+        if (q.undone === 'true') match['meta.undoneAt'] = { $ne: null };
+        if (q.agentId) match['meta.agentId'] = String(q.agentId);
+        if (q.runId) match['meta.runId'] = String(q.runId);
+        if (q.projectId) match.$or = [{ 'meta.params.projectId': String(q.projectId) }, { projectId: String(q.projectId) }];
+        if (q.q) {
+            const term = String(q.q).slice(0, 120).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            match.$and = [...(match.$and || []), { $or: [
+                { entityName: { $regex: term, $options: 'i' } },
+                { actorName: { $regex: term, $options: 'i' } },
+                { 'meta.action': { $regex: term, $options: 'i' } },
+                { 'meta.reason': { $regex: term, $options: 'i' } },
+            ] }];
+        }
         if (q.from || q.to) {
             match.createdAt = {};
             if (q.from) match.createdAt.$gte = new Date(q.from);
@@ -61,5 +79,41 @@ exports.listAuditLogs = async (req, res) => {
     } catch (error) {
         logger.error(`listAuditLogs: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
+    }
+};
+
+/* GET /api/v1/audit-logs/export — the current filter as CSV. Owner/admin only,
+ * capped so a year of rows cannot be pulled into memory in one request. */
+exports.exportAuditCsv = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const roleType = await getRoleType(companyId, req.uid);
+        if (!isPrivileged(roleType)) return res.status(403).json({ status: false, statusText: 'Owner/admin only.' });
+
+        req.query = { ...(req.query || {}), page: 1, limit: 1000 };
+        const capture = { payload: null };
+        const fake = { send: (b) => { capture.payload = b; return fake; }, status: () => fake, json: (b) => { capture.payload = b; return fake; } };
+        await exports.listAuditLogs(req, fake);
+        const rows = (capture.payload && capture.payload.data) || [];
+
+        const cell = (v) => {
+            const s = v === undefined || v === null ? '' : String(v);
+            return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+        };
+        const header = ['time', 'actorType', 'actor', 'agent', 'run', 'event', 'entity', 'reason', 'cost_usd', 'undone_at'];
+        const lines = [header.join(',')].concat(rows.map((r) => {
+            const m = r.meta || {};
+            const at = r.createdAt ? new Date(r.createdAt).toISOString() : '';
+            return [at, m.actorType || 'human', r.actorName || '', m.agentName || '', m.runId || '',
+                    m.action || r.action, r.entityName || r.entityId || '', m.reason || '',
+                    (m.cost && m.cost.usd) || '', m.undoneAt ? new Date(m.undoneAt).toISOString() : ''].map(cell).join(',');
+        }));
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="audit-${new Date().toISOString().slice(0, 10)}.csv"`);
+        return res.send(lines.join('\n'));
+    } catch (error) {
+        logger.error(`exportAuditCsv: ${error.message}`);
+        return res.status(500).json({ status: false, statusText: error.message });
     }
 };

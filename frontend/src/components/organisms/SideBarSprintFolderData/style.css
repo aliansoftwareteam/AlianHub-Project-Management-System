@@ -1,102 +1,51 @@
-.scrollClass{
-    max-height: 231px;
-    overflow: auto;
+.sbf {
+    position: relative;
+    color: var(--ink);
+    font: var(--text-body);
 }
-.scrollClass::-webkit-scrollbar {
-    width: 5px;
-    height: 5px;
-    background: #fff;
-    border-radius: 12px;
+.sbf__row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 34px;
+    padding: 5px 10px 5px 4px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background var(--t-state) var(--ease);
 }
-.scrollClass::-webkit-scrollbar-thumb {
-    background: #DFE1E6;
-    border-radius: 12px;
+.sbf__row:hover { background: var(--surface-hover); }
+.sbf__row.is-target { background: var(--brand-tint); }
+.sbf__caret {
+    width: 14px;
+    height: 14px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
 }
-.selectedOProjectInsidebar{
-    line-height: 19px;
+.sbf__caret img { width: 6px; transition: transform var(--t-state) var(--ease); }
+.sbf__caret--empty { cursor: default; }
+.sbf__icon { width: 15px; flex: none; }
+.sbf__name {
+    flex: 1;
+    min-width: 0;
     font-size: 13px;
+    color: var(--ink-label);
+    text-transform: capitalize;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
+.sbf__row.is-folder .sbf__name { color: var(--ink); font-weight: 500; }
+.sbf__count { color: var(--ink-3); white-space: nowrap; }
 
+.sbf__children { padding-left: 16px; }
+.sbf__tasks { max-height: 231px; overflow: auto; padding-left: 16px; }
 
-
- .sidebar__sprint-task .project-sb-desc {
-    color: #3A3A3A;                                                                                         
-}
- .sidebar__sprint-task .project-sb-desc img 
-{ 
-    position: absolute;
-    left: 2px;
-    top: 13px;
-}
-.sidebar__sprint-task img.profile-sm-square {
-    margin-left: 0 !important;
-}
-
-.sidebar__sprint-task .project-item{
-    padding: 7.5px 10px 7.5px 0px !important;
-    border-radius: 5px;
-    margin-right: 0 !important;
-    margin-left: 24px !important;
-    height: 36px !important;
-}
-
-.sidebar__sprint-task .project-item:hover{
-    border-radius: 5px;
-    background: #F0F0F0;
-}
- .sidebar__sprint-task .project-item .subtask__down-arrow{
-    left: 2px !important;
-}
- .sidebar__sprint-task .project-item  .convert__subtask-foldericon{
-    margin-left: 8px !important;
-    margin-right: -3px !important;
-}
-.sidebar__sprint-task .ted__subtask-name {
-    font-size: 14px;
-    font-weight: 400;
-}
-.sidebar__sprint-task .converted__subtask-key {
-    color: #818181;
-    padding-top: 2px;
-
-}
-.sidebar__sprint-task .converted__subtask-image .asignee-profile{
-    border:2px solid #fff !important;
-}
- .sidebar__sprint-task .project-item {
-    margin-bottom: 0px !important;
-    margin-top: 0px !important;
-}
- .sidebar__sprint-task .project-item.convert__sprint--projectitem .project-sb-desc img{
-    left: 31px !important;
-}
-.sidebar__sprint-task .covert__folder-sprint .project-item{
-    margin-left: 41px !important;
-}
-.duplicate_task_hover{
-    background-color: #F0F0F0 !important;
-}
-.sidebar__sprint-task .covert__folder-sprint .project-item .project-sb-desc img{
-    left: 21px !important;
-}
-.subtask__down-arrow{
-   min-width: 10px; 
-   left: 10px;
-}
-@media(max-width: 1800px){
-.Project-name-sidebar {padding-left: 10px;max-width: 80%;}
-}
-@media(max-width: 767px){
-    .sidebar__sprint-task .project-item {padding: 14.5px 10px 14.5px 0px !important;height: 50px !important;}
-    .sidebar__sprint-task .project-sb-desc img {top: 20px;}
-    .sidebar__sprint-task .converted__subtask-name {max-width: 70%;}
-    .sidebar__sprint-task .project-item.convert__sprint--projectitem .project-sb-desc img{left: 11px !important;}
-    .sidebar__sprint-task .covert__folder-sprint .project-item{margin-left: 15px !important;}
-    .sidebar__sprint-task .covert__folder-sprint .project-item .project-sb-desc img{left: 0px !important;top: 21px !important;}
-    .sidebar__sprint-task .project-item{height: 50px !important;}
-    .sidebar__sprint-task .project-item .subtask__down-arrow{top: 17px !important;}
-    
-}
-@media(max-width: 576px){
-    .sidebar__sprint-task .converted__subtask-name {max-width: 50%;}
+@media (max-width: 767px) {
+    .sbf__row { min-height: 44px; }
+    .sbf__name { font-size: 15px; }
 }

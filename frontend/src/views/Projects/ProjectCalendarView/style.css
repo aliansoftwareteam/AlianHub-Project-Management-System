@@ -1,0 +1,163 @@
+.cv {
+    height: 100%;
+    min-height: 520px;
+    background: var(--canvas);
+    font: var(--text-small);
+}
+
+.cv__bar {
+    height: 40px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--hairline);
+}
+.cv__month { color: var(--ink-2); letter-spacing: .04em; }
+.cv__show { color: var(--ink-3); margin-right: 2px; }
+.cv__filter {
+    height: 26px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--ink-2);
+    font: var(--text-small);
+    cursor: pointer;
+    transition: border-color var(--t-state) var(--ease), color var(--t-state) var(--ease);
+}
+.cv__filter.is-on { border-color: var(--brand); color: var(--brand); background: var(--brand-tint); font-weight: 600; }
+
+.cv__body { flex: 1; display: flex; min-height: 0; }
+.cv__main { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 14px 16px; gap: 6px; }
+
+.cv__bands { position: relative; height: 22px; margin: 0 4px; flex: none; }
+.cv__band {
+    position: absolute; top: 2px; height: 18px;
+    display: flex; align-items: center;
+    padding: 0 8px;
+    border-radius: 5px;
+    background: rgba(0, 0, 0, .05);
+    color: var(--ink-2);
+    font: var(--text-label);
+    letter-spacing: .04em;
+    white-space: nowrap;
+    overflow: hidden;
+}
+.cv__band.is-current { background: var(--brand-tint); color: var(--brand); }
+
+.cv__grid { flex: 1; min-height: 0; }
+
+.cv__tray {
+    width: 230px;
+    flex: none;
+    background: var(--surface);
+    border-left: 1px solid var(--hairline);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow: auto;
+}
+.cv__tray-head { display: flex; align-items: center; }
+.cv__tray-title { font-weight: 600; color: var(--ink); }
+.cv__tray-count { margin-left: auto; color: var(--ink-2); }
+.cv__tray-empty { margin: 0; }
+.cv__card {
+    padding: 9px 10px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--surface);
+    cursor: pointer;
+    transition: box-shadow var(--t-state) var(--ease), border-color var(--t-state) var(--ease);
+}
+.cv__card:hover { border-color: var(--brand); }
+.cv__card.is-dragging { box-shadow: 0 6px 16px rgba(0, 0, 0, .12); transform: rotate(-2deg); }
+.cv__card-name { display: block; color: var(--ink); }
+.cv__card-meta { display: block; margin-top: 2px; }
+.cv__proposal {
+    margin-top: auto;
+    padding: 9px 10px;
+    border-radius: 9px;
+    background: var(--brand-tint);
+    color: var(--ink);
+    line-height: 1.45;
+}
+.cv__spark { color: var(--brand); font-weight: 600; }
+.cv__proposal-link { color: var(--brand); font-weight: 600; margin-left: 4px; }
+
+.cv__chip {
+    display: flex; align-items: center; gap: 4px;
+    width: 100%;
+    padding: 3px 7px;
+    border-radius: 5px;
+    background: var(--surface-2);
+    color: var(--ink);
+    font-size: 11.5px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cv__chip--done { text-decoration: line-through; color: var(--ink-2); }
+.cv__chip-icon { width: 11px; height: 11px; flex: none; }
+
+/* FullCalendar owns this DOM; the tokens are applied to its own class names. */
+.cv__grid :deep(.fc) { height: 100%; font-family: var(--font-ui); --fc-border-color: transparent; --fc-page-bg-color: transparent; }
+.cv__grid :deep(.fc-theme-standard td),
+.cv__grid :deep(.fc-theme-standard th) { border: 0; }
+.cv__grid :deep(.fc-scrollgrid) { border: 0; }
+.cv__grid :deep(.fc-col-header-cell) { padding-bottom: 6px; }
+.cv__grid :deep(.fc-col-header-cell-cushion) {
+    font: var(--text-label); letter-spacing: .06em; text-transform: uppercase;
+    color: var(--ink-3); text-decoration: none; padding: 0 4px;
+}
+.cv__grid :deep(.fc-day-sat .fc-col-header-cell-cushion),
+.cv__grid :deep(.fc-day-sun .fc-col-header-cell-cushion) { color: var(--ink-3); opacity: .65; }
+.cv__grid :deep(.fc-daygrid-day) {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+    transition: border-color var(--t-state) var(--ease);
+}
+.cv__grid :deep(.fc-daygrid-day-frame) { padding: 6px; min-height: 0; }
+.cv__grid :deep(.fc-day-sat), .cv__grid :deep(.fc-day-sun) { background: rgba(255, 255, 255, .5); }
+:root[data-theme="dark"] .cv__grid :deep(.fc-day-sat),
+:root[data-theme="dark"] .cv__grid :deep(.fc-day-sun) { background: var(--surface-2); }
+.cv__grid :deep(.fc-day-other) { opacity: .55; }
+.cv__grid :deep(.fc-day-today) { border: 1.5px solid var(--brand); background: var(--surface); }
+.cv__grid :deep(.fc-daygrid-day.cv-in-sprint) { box-shadow: inset 0 2px 0 var(--brand-tint); }
+.cv__grid :deep(.fc-daygrid-day.cv-drop) { border: 1px dashed var(--brand); }
+.cv__grid :deep(.fc-scrollgrid-sync-table td) { padding: 3px; }
+
+.cv__grid :deep(.fc-daygrid-day-top) { flex-direction: column !important; align-items: flex-start; }
+.cv__grid :deep(.fc-daygrid-day-number) { padding: 0; width: 100%; }
+.cv__grid :deep(.cv__daynum) { font: var(--text-data); color: var(--ink-3); }
+.cv__grid :deep(.fc-day-today .cv__daynum) { color: var(--brand); font-weight: 600; }
+.cv__grid :deep(.cv__pto) {
+    display: block; margin-top: 4px;
+    padding: 3px 7px; border-radius: 5px;
+    background: var(--warn-bg); color: var(--warn-ink);
+    font-size: 10.5px; font-weight: 600;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cv__grid :deep(.cv-drop-hint) {
+    padding: 3px 7px; margin-bottom: 3px;
+    border-radius: 5px;
+    background: var(--brand-tint); color: var(--brand);
+    font-size: 10.5px;
+}
+.cv__grid :deep(.fc-daygrid-event-harness) { margin-top: 3px; }
+.cv__grid :deep(.fc-daygrid-event) { border: 0; background: transparent; padding: 0; margin: 0; }
+.cv__grid :deep(.fc-daygrid-event:focus) { box-shadow: var(--focus); }
+.cv__grid :deep(.fc-daygrid-more-link) { font-size: 10.5px; color: var(--ink-3); padding: 0 7px; }
+.cv__grid :deep(.fc-popover) { border: 1px solid var(--hairline); border-radius: 10px; box-shadow: var(--shadow-pop); background: var(--surface); }
+.cv__grid :deep(.fc-popover-header) { background: var(--surface-2); color: var(--ink); font: var(--text-h3); }
+.cv__grid :deep(.fc-highlight) { background: var(--brand-tint); }
+
+@media (max-width: 1280px) {
+    .cv__tray { display: none; }
+}
+@media (max-width: 767px) {
+    .cv__main { padding: 10px; }
+    .cv__bands { display: none; }
+}

@@ -1,87 +1,60 @@
 <template>
-    <DropDown :title="task.TaskName" v-if="showArchiveVar ? task.deletedStatusKey === 2 : task.deletedStatusKey === 0">
+    <DropDown
+        :title="task.TaskName"
+        :bodyClass="{ 'tqm': true }"
+        v-if="showArchiveVar ? task.deletedStatusKey === 2 : task.deletedStatusKey === 0"
+    >
         <template #button>
             <img :ref="task._id+'options'" :src="horizontalDots" alt="horizontalDots" id="taskquickmenudriver">
         </template>
         <template #options>
-            <div id="taskquickmenu_driver">
+            <div id="taskquickmenu_driver" class="tqm__list">
+                <div class="ah-label tqm__label">{{ $t('MembersV2.quick_menu') }}</div>
                 <DropDownOption @click="closeAnd($emit('copyLink'))" v-if="!showArchiveVar">
-                    <div class="d-flex align-items-center task_desc_icon">
-                        <img :src="linkIcon" alt="inventoryIcon">
-                        <span>{{ $t('ProjectDetails.copy_task_link') }}</span>
-                    </div>
+                    <span class="tqm__item">{{ $t('ProjectDetails.copy_task_link') }}</span>
                 </DropDownOption>
                 <DropDownOption @click="closeAnd($emit('copyKey'))" v-if="!showArchiveVar">
-                    <div class="d-flex align-items-center task_desc_icon">
-                        <img :src="splitScreen" alt="inventoryIcon">
-                        <span>{{ $t('ProjectDetails.copy_task_key') }}</span>
-                    </div>
+                    <span class="tqm__item">{{ $t('ProjectDetails.copy_task_key') }}</span>
                 </DropDownOption>
                 <DropDownOption v-if="(task.queueListArray == undefined || (task.queueListArray && task.queueListArray.indexOf(userId) == -1)) && (task.AssigneeUserId && task.AssigneeUserId.indexOf(userId) !== -1) && !showArchiveVar && checkPermission('task.queue_list',projectData.isGlobalPermission) == true" @click="closeAnd($emit('queue', 'add'))">
-                    <div class="d-flex align-items-center task_desc_icon">
-                        <img :src="cancelIcon" alt="addIcon">
-                        <span>{{ $t('ProjectDetails.add_que_list') }}</span>
-                    </div>
+                    <span class="tqm__item">{{ $t('ProjectDetails.add_que_list') }}</span>
                 </DropDownOption>
                 <DropDownOption v-if="(task.queueListArray && task.queueListArray.indexOf(userId) !== -1) && (task.AssigneeUserId && task.AssigneeUserId.indexOf(userId) !== -1) && !showArchiveVar && checkPermission('task.queue_list',projectData.isGlobalPermission) == true" @click="closeAnd($emit('queue', 'remove'))">
-                    <div class="d-flex align-items-center task_desc_icon">
-                        <img :src="cancelIcon" alt="addIcon">
-                        <span>{{ $t('ProjectDetails.remove_from_queue_list') }}</span>
-                    </div>
-                </DropDownOption>
-                <DropDownOption v-if="(task.deletedStatusKey === undefined || task.deletedStatusKey === 0) && !showArchiveVar && checkPermission('task.task_archive',projectData.isGlobalPermission) == true" @click="closeAnd($emit('confirmArchive'))">
-                    <div class="d-flex align-items-center task_desc_icon">
-                        <img :src="inventoryIcon" alt="inventoryIcon">
-                        <span>{{ $t('Projects.archive') }}</span>
-                    </div>
-                </DropDownOption>
-                <DropDownOption v-if="task.deletedStatusKey === 2" @click="closeAnd($emit('restore'))">
-                    <div class="d-flex align-items-center task_desc_icon">
-                        <img :src="inventoryIcon" alt="restoreInventoryIcon">
-                        <span>{{ $t('Projects.restore') }}</span>
-                    </div>
-                </DropDownOption>
-                <DropDownOption @click="closeAnd($emit('confirmDelete'))" v-if="checkPermission('task.task_delete',projectData.isGlobalPermission) == true">
-                    <div class="d-flex align-items-center task_desc_icon">
-                        <img :src="deleteIcon" alt="deleteIcon">
-                        <span>{{ $t('Projects.delete') }}</span>
-                    </div>
+                    <span class="tqm__item">{{ $t('ProjectDetails.remove_from_queue_list') }}</span>
                 </DropDownOption>
                 <DropDownOption @click="closeAnd($emit('convertToSubTask'))" v-if="checkPermission('task.sub_task_create',projectData.isGlobalPermission) === true && !showArchiveVar && task.isParentTask && checkPermission('task.task_convert_to_subtask',projectData.isGlobalPermission) === true">
-                    <div class="d-flex align-items-center task_desc_icon">
-                        <img :src="subTaskIcon" alt="deleteIcon">
-                        <span>{{ $t('ProjectDetails.convert_subtask') }}</span>
-                    </div>
+                    <span class="tqm__item">{{ $t('ProjectDetails.convert_subtask') }}</span>
                 </DropDownOption>
                 <DropDownOption @click="closeAnd($emit('convertToList'))" v-if="checkPermission('project.project_sprint_create',projectData.isGlobalPermission) === true && !showArchiveVar && checkPermission('task.task_convert_to_list',projectData.isGlobalPermission) === true">
-                    <div class="d-flex align-items-center task_desc_icon">
-                        <img :src="combinedIcon"/>
-                        <span>{{ $t('ProjectDetails.convert_list') }}</span>
-                    </div>
-                </DropDownOption>
-                <DropDownOption @click="closeAnd($emit('duplicate'))" v-if="!showArchiveVar && checkPermission('task.task_duplicate',projectData.isGlobalPermission) === true">
-                    <div class="d-flex align-items-center task_desc_icon">
-                        <img :src="copyIcon" class="copyIcon"/>
-                        <span>{{ $t('Projects.duplicate') }}</span>
-                    </div>
-                </DropDownOption>
-                <DropDownOption @click="closeAnd($emit('move'))" v-if="!showArchiveVar && checkPermission('task.task_move',projectData.isGlobalPermission) == true">
-                    <div class="d-flex align-items-center task_desc_icon">
-                        <img :src="moveIcon"/>
-                        <span>{{ $t('ProjectDetails.move') }}</span>
-                    </div>
-                </DropDownOption>
-                <DropDownOption @click="closeAnd($emit('merge'))" v-if="!showArchiveVar && checkPermission('task.task_merge',projectData.isGlobalPermission) == true">
-                    <div class="d-flex align-items-center task_desc_icon">
-                        <img :src="mergeIcon"/>
-                        <span>{{ $t('ProjectDetails.merge') }}</span>
-                    </div>
+                    <span class="tqm__item">{{ $t('ProjectDetails.convert_list') }}</span>
                 </DropDownOption>
                 <DropDownOption @click="closeAnd($emit('convertToTask'))" v-if="task.isParentTask === false && checkPermission('task.task_create',projectData.isGlobalPermission) === true && checkPermission('task.convert_to_task',projectData.isGlobalPermission) === true && !showArchiveVar">
-                    <div class="d-flex align-items-center task_desc_icon">
-                        <img :src="mergeIcon"/>
-                        <span>{{ $t('ProjectDetails.convert_task') }}</span>
-                    </div>
+                    <span class="tqm__item">{{ $t('ProjectDetails.convert_task') }}</span>
+                </DropDownOption>
+                <DropDownOption @click="closeAnd($emit('duplicate'))" v-if="!showArchiveVar && checkPermission('task.task_duplicate',projectData.isGlobalPermission) === true">
+                    <span class="tqm__item">{{ $t('Projects.duplicate') }}</span>
+                </DropDownOption>
+                <DropDownOption @click="closeAnd($emit('move'))" v-if="!showArchiveVar && checkPermission('task.task_move',projectData.isGlobalPermission) == true">
+                    <span class="tqm__item">{{ $t('ProjectDetails.move') }}</span>
+                </DropDownOption>
+                <DropDownOption @click="closeAnd($emit('merge'))" v-if="!showArchiveVar && checkPermission('task.task_merge',projectData.isGlobalPermission) == true">
+                    <span class="tqm__item">{{ $t('ProjectDetails.merge') }}</span>
+                </DropDownOption>
+                <DropDownOption @click="closeAnd($emit('askAi'))" v-if="hasAiListener">
+                    <span class="tqm__item tqm__item--ai">✦ {{ $t('MembersV2.ask_ai') }}</span>
+                </DropDownOption>
+                <DropDownOption v-if="(task.deletedStatusKey === undefined || task.deletedStatusKey === 0) && !showArchiveVar && checkPermission('task.task_archive',projectData.isGlobalPermission) == true" @click="closeAnd($emit('confirmArchive'))">
+                    <span class="tqm__item">{{ $t('Projects.archive') }}</span>
+                </DropDownOption>
+                <DropDownOption v-if="task.deletedStatusKey === 2" @click="closeAnd($emit('restore'))">
+                    <span class="tqm__item">{{ $t('Projects.restore') }}</span>
+                </DropDownOption>
+                <div class="tqm__sep" v-if="checkPermission('task.task_delete',projectData.isGlobalPermission) == true"></div>
+                <DropDownOption @click="closeAnd($emit('confirmDelete'))" v-if="checkPermission('task.task_delete',projectData.isGlobalPermission) == true">
+                    <span class="tqm__item tqm__item--danger">
+                        {{ $t('Projects.delete') }}
+                        <span class="tqm__hint">{{ $t('MembersV2.admin_only') }}</span>
+                    </span>
                 </DropDownOption>
             </div>
         </template>
@@ -89,7 +62,7 @@
 </template>
 
 <script setup>
-import { getCurrentInstance, defineProps, defineEmits } from 'vue';
+import { computed, getCurrentInstance, defineProps, defineEmits } from 'vue';
 import DropDown from '@/components/molecules/DropDown/DropDown.vue';
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
 import { useCustomComposable } from '@/composable';
@@ -116,12 +89,16 @@ defineEmits([
     'move',
     'merge',
     'convertToTask',
+    'askAi',
 ]);
 
 const instance = getCurrentInstance();
 
+// The AI entry only appears where a parent actually wired it up; an item that
+// does nothing is worse than no item.
+const hasAiListener = computed(() => !!instance?.vnode?.props?.onAskAi);
+
 function closeAnd() {
-    // Close the menu by clicking the trigger ref (kept for parity with original `$refs[task._id+'options'].click()`)
     const ref = instance?.proxy?.$refs?.[props.task._id + 'options'];
     if (ref && typeof ref.click === 'function') {
         ref.click();
@@ -129,14 +106,21 @@ function closeAnd() {
 }
 
 const horizontalDots = require('@/assets/images/svg/horizontalDots.svg');
-const inventoryIcon = require('@/assets/images/inventory_2.png');
-const deleteIcon = require('@/assets/images/DeleteIcon.png');
-const linkIcon = require('@/assets/images/png/link.png');
-const splitScreen = require('@/assets/images/png/splitscreen.png');
-const subTaskIcon = require('@/assets/images/png/subTaskIcon.png');
-const moveIcon = require('@/assets/images/png/moveIcon.png');
-const mergeIcon = require('@/assets/images/png/mergeIcon.png');
-const combinedIcon = require('@/assets/images/png/Combined_shape.png');
-const copyIcon = require('@/assets/images/copy.png');
-const cancelIcon = require('@/assets/images/svg/arrow_circle_up.svg');
 </script>
+
+<style>
+.tqm .drop-down-options { padding: 0; }
+.tqm__list { display: flex; flex-direction: column; gap: 1px; min-width: 196px; }
+.tqm__label { padding: 5px 9px; }
+.tqm__list .drop-down-item {
+    padding: 7px 9px !important;
+    border-radius: 6px;
+    color: var(--ink);
+    font: 400 12.5px/1.2 var(--font-ui);
+}
+.tqm__item { display: flex; align-items: center; width: 100%; }
+.tqm__item--ai { color: var(--brand); font-weight: 600; }
+.tqm__item--danger { color: var(--danger); }
+.tqm__hint { margin-left: auto; font: 500 10px/1 var(--font-mono); color: var(--ink-3); }
+.tqm__sep { height: 1px; background: var(--hairline); margin: 3px 0; }
+</style>

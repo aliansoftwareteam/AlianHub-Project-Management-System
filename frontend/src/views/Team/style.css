@@ -1,0 +1,47 @@
+@import "@/views/Ai/parity.css";
+
+.team { background: var(--canvas); min-height: 100%; }
+.team__body { flex: 1; min-height: 0; overflow: auto; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }
+
+.team__table { background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-card); overflow: hidden; }
+.team__row {
+    display: grid;
+    grid-template-columns: 190px 1fr 150px 110px;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--hairline);
+    font: var(--text-body);
+}
+.team__row:last-child { border-bottom: 0; }
+.team__row--head { font: var(--text-label); color: var(--ink-label); text-transform: uppercase; letter-spacing: .06em; }
+.team__row--agent { background: var(--brand-tint); }
+.team__row--away { color: var(--ink-2); }
+.team__who { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.team__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team__now { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.team__now > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team__timer { display: inline-flex; align-items: center; gap: 5px; color: var(--ok-ink); flex: none; }
+.team__load { display: flex; align-items: center; gap: 8px; }
+.team__bar { flex: 1; height: 6px; border-radius: 99px; background: var(--surface-hover); overflow: hidden; }
+.team__bar-fill { display: block; height: 100%; border-radius: 99px; background: var(--brand); transition: width 180ms var(--ease); }
+.team__bar-fill--over { background: var(--danger); }
+.team__bar-fill--low { background: var(--ink-3); }
+.team__load-num { color: var(--ink-2); flex: none; }
+.team__spend { color: var(--ink-2); }
+.team__status { display: flex; align-items: center; gap: 6px; }
+.team__tag { height: 16px; padding: 0 5px; font-size: 9.5px; margin: 0 4px; }
+
+.team__standup-line { margin: 0 0 6px; font: var(--text-body); line-height: 1.55; color: var(--ink); }
+.team__activity { display: flex; gap: 10px; align-items: baseline; line-height: 1.5; font: var(--text-body); margin-bottom: 7px; }
+.team__activity:last-child { margin-bottom: 0; }
+.team__activity-at { width: 42px; flex: none; color: var(--ink-3); }
+
+@media (max-width: 1280px) {
+    .team__row { grid-template-columns: 160px 1fr 120px 100px; }
+}
+@media (max-width: 900px) {
+    .team__row { grid-template-columns: 1fr; gap: 5px; padding: 12px 14px; }
+    .team__row--head { display: none; }
+    .team__load { max-width: 200px; }
+}

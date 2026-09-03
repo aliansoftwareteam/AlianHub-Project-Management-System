@@ -10,6 +10,10 @@ exports.init = (app) => {
     // come before /:id so they are never swallowed by the param route.
     app.get('/api/v2/agents/registry', ctrl.getRegistry);
     app.get('/api/v2/agents/spend', ctrl.spend);
+    app.get('/api/v2/agents/team', ctrl.teamBoard);
+    app.get('/api/v2/agents/routable', ctrl.routableTasks);
+    app.get('/api/v2/agents/pipeline', ctrl.pipelineTasks);
+    app.get('/api/v2/agents/release', ctrl.releaseCandidate);
     app.post('/api/v2/agents/pause-all', ctrl.pauseAll);
 
     app.get('/api/v2/agents/runs/summary', ctrl.runSummary);

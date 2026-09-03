@@ -1,11 +1,15 @@
+/* Board view (handoff 10b desktop, 12e mobile). */
+
 .kanban-board {
     display: flex;
-    gap: 10px;
-    padding: 0 10px 10px 10px;
+    gap: 12px;
+    padding: 16px 20px;
     overflow-x: auto;
     align-items: flex-start;
-    background: #FFF;
+    background: var(--canvas);
     height: calc(100vh - 155px);
+    font-family: var(--font-ui);
+    color: var(--ink);
 }
 
 /* Card-level multi-select checkbox: top-left corner — always visible. */
@@ -20,8 +24,6 @@
     justify-content: center;
     width: 20px;
     height: 20px;
-    /* no background/border here — the native checkbox draws its own box; a
-       wrapper box just doubled up with it. */
     border-radius: 4px;
     cursor: pointer;
 }
@@ -29,7 +31,7 @@
     width: 14px;
     height: 14px;
     cursor: pointer;
-    accent-color: #8591F9;
+    accent-color: var(--brand);
     margin: 0;
 }
 /* Leading spacer where the task-type icon used to be: reserves the top-left
@@ -37,111 +39,190 @@
 .kanban-card-checkbox-space {
     display: inline-block;
     flex: 0 0 auto;
-    width: 20px;
+    width: 18px;
 }
 
 .kanban-board .kanban-column {
-    flex: 0 0 300px;
+    flex: 0 0 262px;
+    width: 262px;
     display: flex;
     flex-direction: column;
-    border-radius: 8px;
-    background-color: transparent;
+    gap: 8px;
+    background: none;
     min-height: auto;
-    transition: outline 0.2s ease;
     height: 100%;
 }
 
 .kanban-board .highlight-drop {
-    background-color: #e9e7e7;
+    background: var(--brand-tint);
+    border-radius: 10px;
     outline-offset: -4px;
 }
 
+.kanban-board .column-head {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 0 2px;
+    min-height: 24px;
+}
+
 .kanban-board .status-color-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
     display: inline-block;
-    margin-right: 8px;
+    flex: none;
 }
 
 .kanban-board .column-title {
-    font-size: 1rem;
-    font-weight: bold;
+    font-size: 12.5px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .kanban-board .task-count {
-    color: #818181;
-    border-radius: 3px;
-    font-size: 12px;
-    padding: 2px 5px;
-    margin-left: 8px;
-    font-family: Roboto;
-    font-weight: 400;
-    letter-spacing: 0;
-    border: 1px solid #cfcfcf;
-    background: #dfe1e6;
-} 
+    font: var(--text-label);
+    color: var(--ink-3);
+    border: 0;
+    background: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+}
+
+.kanban-board .column-head__spacer { flex: 1; }
+
+.kanban-board .wip-chip {
+    font: var(--text-label);
+    color: var(--ink-label);
+    white-space: nowrap;
+}
+
+.kanban-board .wip-chip--at { color: var(--warn-ink); }
+.kanban-board .wip-chip--over { color: var(--danger-ink); }
+
+.kanban-board .wip-pop {
+    position: absolute;
+    top: 26px;
+    left: 0;
+    z-index: 20;
+    min-width: 176px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.kanban-board .wip-pop input { width: 100%; }
+.kanban-board .wip-pop__note { margin: 0; color: var(--ink-label); }
+.kanban-board .column-head-wrap { position: relative; }
 
 .kanban-board .kanban-card-wrapper {
-    padding: 10px;
-    border-radius: 8px;
-    background-color: inherit;
-}
-
-.kanban-board .kanban-card-wrapper::-webkit-scrollbar {
-    width: 6px;
-}
-
-.kanban-board .kanban-card-wrapper::-webkit-scrollbar-thumb {
-    background-color: rgba(0, 0, 0, 0.2);
-    border-radius: 6px;
+    padding: 0;
+    border-radius: 10px;
+    background: none;
 }
 
 .kanban-board .kanban-cards {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    max-width: 310px;
-    min-width: 310px;
+    gap: 8px;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
 }
 
-.kanban-board .kanban-cards::-webkit-scrollbar {
-    display: none;
-}
+.kanban-board .kanban-cards::-webkit-scrollbar { width: 0; }
 
 .kanban-board .kanban-card {
-    background-color: white;
-    padding: 1rem;
-    border-radius: 6px;
-    font-size: 0.95rem;
-    border: 1px solid #ececec;
-    box-shadow: 0px 1px 6px 0px #4E4E4E1A;
-    font-size: 11px;
-    color: #818181;
+    background: var(--surface);
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--hairline);
+    box-shadow: var(--shadow-card);
+    font-size: 12.5px;
+    color: var(--ink);
+    transition: border-color var(--t-state) var(--ease), box-shadow var(--t-state) var(--ease);
 }
+.kanban-board .kanban-card:hover { border-color: var(--border); }
+
+/* Blocked columns tint their cards' border, as in the mock. */
+.kanban-board .kanban-column--danger .kanban-card { border-color: rgba(193, 18, 31, .3); }
+
+/* 28b — a card an agent is working on right now. */
+.kanban-board .kanban-card.is-agent-run {
+    border: 1.5px solid var(--ink);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .08);
+}
+
+.kanban-board .agent-strip {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 8px;
+    background: var(--rail);
+    border-radius: 7px;
+    margin-top: 7px;
+}
+.kanban-board .agent-strip__dot { width: 7px; height: 7px; border-radius: 50%; background: #3ad29f; flex: none; }
+.kanban-board .agent-strip__name { font: var(--text-label); color: #fff; flex: 1; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kanban-board .agent-strip__meta { font-size: 9px; color: rgba(255, 255, 255, .6); white-space: nowrap; }
+
+.kanban-board .agent-proposal {
+    margin-top: 7px;
+    padding: 6px 8px;
+    background: var(--brand-tint);
+    border-radius: 6px;
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--ink-label);
+}
+.kanban-board .agent-proposal__who { color: var(--brand); font-weight: 600; }
+.kanban-board .agent-proposal__review {
+    color: var(--brand);
+    background: none;
+    border: 0;
+    padding: 0 0 0 4px;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.kanban-board .card-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 7px;
+}
+.kanban-board .card-key { font: 600 9.5px/1 var(--font-mono); color: var(--ink-3); }
+.kanban-board .card-timer { font: 500 10px/1 var(--font-mono); color: var(--ok); white-space: nowrap; }
+.kanban-board .card-progress { height: 4px; border-radius: 99px; background: rgba(0, 0, 0, .07); margin-top: 7px; overflow: hidden; }
+.kanban-board .card-progress > span { display: block; height: 100%; border-radius: 99px; background: var(--brand); }
 
 .kanban-board .column-drop-area {
     margin-top: auto;
-    border-radius: 0 0 8px 8px;
+    min-height: 8px;
+    border-radius: 0 0 10px 10px;
 }
 
 .kanban-board .add-task-section {
-    min-height: 107px;
-    border-radius: 8px;
-    background: #FFFFFF;
-    box-shadow: 0px 2px 6px 0px #4E4E4E1A;
-    margin: 10px 0;
-    border: 1px solid #ececec;
+    min-height: 96px;
+    border-radius: 10px;
+    background: var(--surface);
+    box-shadow: var(--shadow-card);
+    margin: 0 0 8px;
+    border: 1px solid var(--hairline);
 }
 
 .kanban-board .add-task-icon {
-    padding: 5px;
-    background-color: #FFF;
-    left: 284px;
+    padding: 4px;
+    background: var(--surface);
     border-radius: 6px;
-    border: 1px solid #E0E0E0;
+    border: 1px solid var(--hairline);
+    margin-left: 6px;
+    flex: none;
 }
 
 .kanban-card .option-list {
@@ -156,55 +237,60 @@
 
 .kanban-board .sub-task-count {
     font-size: 10px;
-    background: transparent;
-    border: 1px solid #FF0000;
-    color: #FF0000;
-    padding: 0px 5px;
-    border-radius: 3px;
+    background: var(--danger-bg);
+    border: 0;
+    color: var(--danger-ink);
+    padding: 0 5px;
+    border-radius: 5px;
     margin-left: 4px;
-    min-width: 23px;
+    min-width: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
 .kanban-board .parent-task-count {
-    background: transparent;
-    border: 1px solid #FF0000;
+    background: var(--danger-bg);
+    border: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #FF0000;
-    min-width: 23px;
+    color: var(--danger-ink);
+    min-width: 20px;
     font-size: 10px;
-    border-radius: 3px;
+    border-radius: 5px;
     position: absolute;
-    top: -13px;
+    top: -12px;
     right: -10px;
     padding: 0 5px;
 }
 
 .kanban-board .date-picker {
-    border: 1px solid #F4F5F7;
+    border: 1px solid var(--hairline);
 }
 
 .kanban-board .task-count-section {
-    border: 1px solid #F4F5F7;
+    border: 1px solid var(--hairline);
     padding: 3px 6px;
     border-radius: 5px;
 }
 
+/* Priority reads as a chip on the card (10b), not a bare flag. */
 .kanban-board .priority__compo {
-    min-width: 22px;
-    border-radius: 50%;
-    border: 1px solid #F4F5F7;
+    border-radius: var(--r-chip);
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
     display: flex;
-    justify-content: center;
     align-items: center;
     overflow: hidden;
-    padding: 6px 6px;
-    font-size: 12px;
+    padding: 2px 7px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--ink-label);
+    max-width: 120px;
 }
+.kanban-board .priority__compo .ml-10px { margin-left: 4px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kanban-board .priority__compo .priority__image { width: 11px; height: 11px; }
 
 .kanban-board .board-task-comment-count img {
     width: 13px;
@@ -215,22 +301,21 @@
 
 .kanban-board-skeleton {
     display: flex;
-    gap: 10px;
-    padding: 1rem;
+    gap: 12px;
+    padding: 16px 20px;
     overflow-x: auto;
     align-items: flex-start;
-    background: #FFF;
+    background: var(--canvas);
     height: calc(100vh - 144px);
 }
 
 .kanban-column-skeleton {
-    flex: 0 0 300px;
+    flex: 0 0 262px;
     display: flex;
     flex-direction: column;
-    border-radius: 8px;
-    background-color: transparent;
+    border-radius: 10px;
+    background: none;
     min-height: auto;
-    transition: outline 0.2s ease;
     height: 100%;
 }
 
@@ -239,18 +324,61 @@
 }
 
 .kanban-card-skeleton {
-    background-color: white;
-    padding: 1rem;
-    border-radius: 6px;
-    font-size: 0.95rem;
-    border: 1px solid #DFE1E6;
-    box-shadow: 0px 1px 6px 0px #4E4E4E1A;
+    background: var(--surface);
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid var(--hairline);
+    box-shadow: var(--shadow-card);
 }
 
 @media (max-width: 1690px) {
     .kanban-board { height: calc(100vh - 195px); }
 }
 
-@media (max-width: 768px) {
-    .kanban-board { height: calc(100vh - 215px);}
+/* 12e — columns swipe one at a time; drag still works, targets stay ≥44px. */
+@media (max-width: 767px) {
+    .kanban-board {
+        height: calc(100vh - 215px);
+        gap: 10px;
+        padding: 12px 0 0 14px;
+        scroll-snap-type: x mandatory;
+        overscroll-behavior-x: contain;
+    }
+    .kanban-board .kanban-column {
+        flex: 0 0 min(236px, 78vw);
+        width: min(236px, 78vw);
+        scroll-snap-align: start;
+    }
+    .kanban-board .kanban-card {
+        border-radius: 12px;
+        padding: 12px;
+        font-size: 13px;
+        min-height: 44px;
+    }
+    .kanban-board .column-head { min-height: 44px; }
+    .kanban-board .add-task-icon { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+}
+
+.kanban-board .more-count {
+    font-size: 12px;
+    color: var(--ink-3);
+    padding: 4px 2px;
+}
+
+/* 28b — an agent is acting through this assignee: rounded-square corner badge. */
+.kanban-board .card-assignee { position: relative; display: inline-block; }
+.kanban-board .card-assignee__agent {
+    position: absolute;
+    right: -3px;
+    bottom: -3px;
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    background: var(--ink);
+    color: #fff;
+    display: grid;
+    place-items: center;
+    font-size: 7px;
+    border: 1.5px solid var(--surface);
+    z-index: 2;
 }

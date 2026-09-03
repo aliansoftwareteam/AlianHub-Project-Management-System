@@ -1,15 +1,30 @@
 <template>
-    <div class="kanban-board style-scroll-6-px">
-        <div v-for="(column, columnIndex) in columns" :key="column.key" class="kanban-column" @drop.prevent="onDrop(columnIndex)">
+    <div class="kanban-board style-scroll-6-px ah-scroll">
+        <div
+            v-for="(column, columnIndex) in columns"
+            :key="column.key"
+            class="kanban-column"
+            :class="{ 'kanban-column--danger': isBlockedColumn(column) }"
+            @drop.prevent="onDrop(columnIndex)"
+        >
             <!-- Card Area -->
-            <div class="kanban-card-wrapper" :style="{ backgroundColor: groupValue === 0 ? column.textColor + '14' : '#f4f5f7' }">
-                <!-- Add Task Section --> 
-                <div class="d-flex justify-content-between align-items-center" :class="{ 'mb-10px': column.tasksArray?.length }">
-                    <span class="d-flex justify-content-between align-items-center">
-                        <span class="status-color-dot" :style="`background-color: ${column.textColor || '#000'}`"></span>
-                        <span class="column-title">{{ column.name }}</span>
-                        <span class="task-count" v-if="column.tasksArray?.length">{{ tasksCount(column) }}</span>
-                    </span>
+            <div class="kanban-card-wrapper">
+                <div class="column-head column-head-wrap">
+                    <span class="status-color-dot" :style="`background-color: ${column.textColor || '#000'}`"></span>
+                    <span class="column-title" :title="column.name">{{ column.name }}</span>
+                    <button type="button" class="task-count" :title="$t('ProjectsV2.wip_set')" @click.stop="wipFor = wipFor === column.key ? '' : column.key">{{ tasksCount(column) }}</button>
+                    <span class="column-head__spacer"></span>
+                    <span
+                        v-if="wipLimit(column) > 0"
+                        class="wip-chip"
+                        :class="{ 'wip-chip--at': atWipLimit(column), 'wip-chip--over': overWipLimit(column) }"
+                        :title="overWipLimit(column) ? $t('GapsV2.wip_over', { limit: wipLimit(column) }) : ''"
+                    >{{ $t('ProjectsV2.wip_chip', { n: tasksCount(column), limit: wipLimit(column) }) }}</span>
+                    <div v-if="wipFor === column.key" class="ah-pop wip-pop" @click.stop>
+                        <div class="ah-label">{{ $t('ProjectsV2.wip_limit') }}</div>
+                        <input class="ah-input" type="number" min="0" :value="wipLimit(column) || ''" :placeholder="$t('ProjectsV2.wip_none')" @change="setWipLimit(column, $event.target.value)">
+                        <p class="ah-small wip-pop__note">{{ wipError || $t('GapsV2.wip_note') }}</p>
+                    </div>
                     <img class="cursor-pointer add-task-icon" src="@/assets/images/svg/pluss.svg" alt="addTask" @click="showAddInput(column.key)">
                 </div>
                 <div class="add-task-section" v-if="activeColumnId === column.key" :id="column.key">
@@ -27,17 +42,28 @@
                     @scroll="checkScroll($event, column)"
                     :style="`max-height: ${columnMaxHeight(column.key)};`"
                     :disabled="isDisabled"
+                    :delay="clientWidth <= 767 ? 250 : 0"
+                    :delayOnTouchOnly="true"
                 >
                     <template #item="{ element }">
-                        <div class="kanban-card hover-bg-light-lavender" draggable="true" @dragstart="(e) => onManualDragStart(cardData, e)">
+                        <div
+                            class="kanban-card hover-bg-light-lavender"
+                            :class="{ 'is-agent-run': !!runFor(element._id) }"
+                            draggable="true"
+                            @dragstart="(e) => onManualDragStart(cardData, e)"
+                        >
                             <BoardViewDisplayCardComponent
                                 :data="element"
                                 :groupValue="groupValue"
                                 :isSubTask="false"
+                                :agentRun="runFor(element._id)"
+                                :agentProposal="proposalFor(element._id)"
                             />
                         </div>
                     </template>
                 </Draggable>
+
+                <div v-if="moreCount(column) > 0" class="more-count">+ {{ $t('ProjectsV2.more_count', { n: moreCount(column) }) }}</div>
             </div>
 
             <!-- Drop Area -->
@@ -47,9 +73,10 @@
 </template>
 
 <script setup>
-import { ref, defineProps, nextTick, inject, watch, onMounted, computed } from 'vue'
+import { ref, defineProps, nextTick, inject, watch, onMounted, onUnmounted, computed } from 'vue'
 import Draggable from 'vuedraggable'
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import Cookies from "js-cookie";
 
 //Cmponents
@@ -62,6 +89,7 @@ import * as env from '@/config/env';
 import { apiRequest } from "../../../services";
 import { useCustomComposable } from "@/composable";
 import { useTaskSelection } from "@/composable/useTaskSelection.js";
+import { useProjectAgents } from "@/views/Projects/Kanban/useProjectAgents";
 
 //Props
 const props = defineProps({
@@ -90,8 +118,14 @@ const hoveredColumnIndex = ref(null)
 const isExternalDrop = ref(false)
 const timer = ref(null)
 const { dispatch, commit } = useStore()
+const { t } = useI18n()
 const { updateTaskByGroup } = useUpdateTasks()
 const { checkPermission } = useCustomComposable();
+
+// The watch is shared with the project header, which owns its lifetime; the
+// board only makes sure it is running for the project on screen.
+const { start: startAgentWatch, runFor, proposalFor } = useProjectAgents();
+watch(() => projectData.value?._id, (id) => { if (id) startAgentWatch(id); }, { immediate: true });
 
 const selection = useTaskSelection();
 const { setActiveView, setActiveProject } = selection;
@@ -102,14 +136,15 @@ watch(() => projectData.value?._id, (newId) => {
 
 // Computed properties
 const isDisabled = computed(() => {
-    const shouldDisableOnWidth = clientWidth.value <= 768;
+    // 12e keeps drag on the phone; the 250ms touch delay above lets a swipe
+    // scroll the column instead of picking a card up.
     const shouldDisableOnPermission = (checkPermission('task.task_list', projectData.value?.isGlobalPermission) !== true || checkPermission('task.task_status', projectData.value?.isGlobalPermission) !== true);
     const shouldDisableOnArchive = (showArchiveVar.value !== false);
     // Disable drag when multi-select is active (>=2 selected). Multi-move
     // happens via the BulkActionBar's "Move" action — keeps the drag
     // behavior unambiguous for the user.
     const shouldDisableOnMultiSelect = selection.count.value >= 2;
-    const finalDisabled = shouldDisableOnWidth || shouldDisableOnPermission || shouldDisableOnArchive || shouldDisableOnMultiSelect;
+    const finalDisabled = shouldDisableOnPermission || shouldDisableOnArchive || shouldDisableOnMultiSelect;
     return finalDisabled;
 });
 
@@ -378,5 +413,107 @@ const tasksCount = (column) => {
         ? countFromTotal
         : column?.tasksArray?.length || 0;
 };
+
+// The column header counts every task in the status; the list itself is paged.
+const moreCount = (column) => Math.max(0, tasksCount(column) - (column?.tasksArray?.length || 0));
+
+const isBlockedColumn = (column) => /block/i.test(String(column?.name || ''));
+
+// The limit lives on the status entry inside project.taskStatusData, which the
+// board columns are already built from — so `column.wipLimit` is the value once
+// one has been set. The per-viewer localStorage map is only a fallback: it still
+// answers for projects that never had a limit saved, and for the assignee /
+// priority / due-date groupings, which have no status document to hang one on.
+const WIP_KEY = 'ah.wip';
+const wipFor = ref('');
+const wipLimits = ref({});
+// A saved limit, held here as well as written back to the project, because the
+// board columns are rebuilt from a grouping snapshot taken before the save.
+const wipSaved = ref({});
+const wipError = ref('');
+
+const readWipLimits = () => {
+    try {
+        wipLimits.value = JSON.parse(localStorage.getItem(`${WIP_KEY}.${projectData.value?._id}`) || '{}');
+    } catch (error) {
+        wipLimits.value = {};
+    }
+};
+readWipLimits();
+watch(() => projectData.value?._id, () => { wipSaved.value = {}; readWipLimits(); });
+watch(wipFor, () => { wipError.value = ''; });
+
+const wipLimit = (column) => {
+    const key = column?.key;
+    const saved = Object.prototype.hasOwnProperty.call(wipSaved.value, key) ? wipSaved.value[key] : column?.wipLimit;
+    if (saved !== undefined && saved !== null && saved !== '') return Number(saved) || 0;
+    return Number(wipLimits.value[key] || 0);
+};
+const atWipLimit = (column) => {
+    const limit = wipLimit(column);
+    return limit > 0 && tasksCount(column) >= limit;
+};
+const overWipLimit = (column) => {
+    const limit = wipLimit(column);
+    return limit > 0 && tasksCount(column) > limit;
+};
+
+const rememberWipLocally = (column, limit) => {
+    wipLimits.value = { ...wipLimits.value, [column.key]: limit };
+    try {
+        localStorage.setItem(`${WIP_KEY}.${projectData.value?._id}`, JSON.stringify(wipLimits.value));
+    } catch (error) {
+        // Private-mode storage refuses writes; the in-memory map still answers.
+    }
+};
+
+const applyWipLimit = (column, limit) => {
+    wipSaved.value = { ...wipSaved.value, [column.key]: limit };
+    const statuses = projectData.value?.taskStatusData;
+    const entry = Array.isArray(statuses) ? statuses.find((s) => String(s.key) === String(column.key)) : null;
+    if (entry) entry.wipLimit = limit;
+};
+
+const setWipLimit = async (column, value) => {
+    const limit = Math.max(0, Number(value) || 0);
+    const projectId = projectData.value?._id;
+    if (Number(groupValue.value) !== 0 || !projectId) {
+        rememberWipLocally(column, limit);
+        wipFor.value = '';
+        return;
+    }
+    wipError.value = '';
+    try {
+        const body = (await apiRequest('post', env.PROJECT_WIP_LIMIT, {
+            companyId: companyId.value,
+            projectId: String(projectId),
+            statusKey: column.key,
+            wipLimit: limit || null,
+        }))?.data;
+        if (!body || body.status !== true) {
+            wipError.value = (body && body.statusText) || t('GapsV2.wip_save_failed');
+            return;
+        }
+        applyWipLimit(column, body.data?.wipLimit ?? null);
+        rememberWipLocally(column, limit);
+        wipFor.value = '';
+    } catch (error) {
+        wipError.value = t('GapsV2.wip_save_failed');
+    }
+};
+
+// "+ Task" in the project header (ProjectHeader) bumps this counter; the board
+// answers by opening the first column's create row.
+const addTaskRequest = inject('addTaskRequest', null);
+if (addTaskRequest) {
+    watch(addTaskRequest, () => {
+        const first = columns.value[0];
+        if (first) showAddInput(first.key);
+    });
+}
+
+const closeWipPop = () => { wipFor.value = ''; };
+document.addEventListener('click', closeWipPop);
+onUnmounted(() => document.removeEventListener('click', closeWipPop));
 </script>
 <style src="./new-style.css" scoped />

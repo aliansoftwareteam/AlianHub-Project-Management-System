@@ -1,54 +1,49 @@
 <template>
-    <div class="ds">
-        <CardSkeleton v-if="loading && !tasks.length" :rows="6" />
-        <template v-else>
-            <div v-if="!tasks.length" class="ds-msg">{{ $t('dashboardCard.due_soon_empty') }}</div>
-            <div v-else class="ds-list">
-                <div v-for="t in tasks" :key="t.taskId" class="ds-row" @click="openTaskDetail(t)">
-                    <span class="ds-due-chip" :class="dueClass(t)">{{ dueLabel(t) }}</span>
-                    <div class="ds-main">
-                        <div class="ds-title" :title="(t.taskKey ? t.taskKey + ' ' : '') + t.taskName">
-                            <b v-if="t.taskKey" class="ds-key">{{ t.taskKey }}</b>
-                            <span class="ds-name">{{ t.taskName }}</span>
-                        </div>
-                        <div class="ds-meta">
-                            <span v-if="t.projectName" class="ds-proj" :title="t.projectName">{{ t.projectName }}</span>
-                            <span v-if="t.priority" class="ds-pri" :class="'ds-pri-' + priorityRank(t.priority)">{{ t.priority }}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </template>
+    <div class="dc-body ds">
+        <div class="dc-metric">
+            <span class="dc-num" :class="{ 'dc-num--danger': counts.overdue > 0 }">{{ counts.overdue }}</span>
+            <span class="dc-sub">{{ $t('DashV2.due_summary', { today: counts.today, week: counts.week }) }}</span>
+        </div>
 
-        <TaskDetail
-            v-if="isTaskDetail"
-            :companyId="companyId"
-            :projectId="detailProjectId"
-            :sprintId="detailSprintId"
-            :taskId="detailTaskId"
-            :isTaskDetailSideBar="isTaskDetail"
-            @toggleTaskDetail="toggleTaskDetail"
-            :zIndex="7"
-        />
+        <div class="dc-spark" :aria-label="$t('DashV2.due_chart_label')">
+            <div
+                v-for="bucket in buckets"
+                :key="bucket.key"
+                class="dc-spark__bar"
+                :class="bucket.tone"
+                :style="{ height: barHeight(bucket.count) }"
+                :title="`${bucket.label}: ${bucket.count}`"
+            ></div>
+        </div>
+        <div class="dc-spark__labels">
+            <span v-for="bucket in buckets" :key="'l' + bucket.key">{{ bucket.label }}</span>
+        </div>
+
+        <div class="dc-list ds__list">
+            <div v-for="t in visibleTasks" :key="t.taskId" class="dc-item dc-item--click" @click="open(t)">
+                <span class="ds__due" :class="dueTone(t)">{{ dueLabel(t) }}</span>
+                <span class="dc-item__text" :title="t.taskName">
+                    <b v-if="t.taskKey" class="ds__key">{{ t.taskKey }}</b>{{ t.taskName }}
+                </span>
+                <span v-if="t.projectName" class="dc-item__meta ds__proj" :title="t.projectName">{{ t.projectName }}</span>
+            </div>
+        </div>
     </div>
 </template>
 
-<script>
-export default { name: 'DueSoonCard' };
-</script>
-
 <script setup>
-import { ref, watch, onMounted, inject, provide } from 'vue';
+import { ref, computed, watch, onMounted, inject } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { buildFilterQuery } from '@/composable/commonFunction';
-import CardSkeleton from '@/components/atom/CardSkeleton/CardSkeleton.vue';
-import TaskDetail from '@/views/TaskDetail/TaskDetail.vue';
-import { useI18n } from 'vue-i18n';
+import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
+import { useCardMeta } from '@/components/organisms/DashboardCard/useCardMeta';
 
-const { t: translate } = useI18n();
-// Member self-card — my open tasks due within the next N days, soonest first.
-// Self-scoped on the backend (caller = req.uid).
+defineOptions({ name: 'DueSoonCard' });
+
+// Member self-card — what is late, due today and due this week, then the tasks
+// themselves. Self-scoped on the backend (caller = req.uid).
 const props = defineProps({
     cardUID: { type: [String, Number], default: '' },
     componentId: { type: String, default: '' },
@@ -60,58 +55,94 @@ const props = defineProps({
     taskStatusArray: { type: [Array, Object], default: () => ({}) },
 });
 
+const { t } = useI18n();
+const meta = useCardMeta();
 const userId = inject('$userId', ref(''));
+const companyId = inject('$companyId', ref(''));
 const tasks = ref([]);
-const loading = ref(false);
 
-const PRIORITY_RANK = { urgent: 0, highest: 0, high: 1, medium: 2, normal: 2, low: 3, lowest: 3 };
-const priorityRank = (p) => PRIORITY_RANK[String(p || '').toLowerCase()] ?? 2;
+const counts = computed(() => {
+    const list = tasks.value;
+    return {
+        overdue: list.filter((x) => Number(x.daysUntil) < 0).length,
+        today: list.filter((x) => Number(x.daysUntil) === 0).length,
+        week: list.filter((x) => Number(x.daysUntil) >= 0 && Number(x.daysUntil) <= 6).length,
+    };
+});
 
-const dueLabel = (t) => {
-    if (t.daysUntil === null || t.daysUntil === undefined) return '—';
-    if (t.daysUntil === 0) return translate('dashboardCard.Today');
-    if (t.daysUntil === 1) return translate('dashboardCard.Tomorrow');
-    return `${t.daysUntil}d`;
+const buckets = computed(() => {
+    const dayLabels = t('DashV2.due_day_labels').split(',');
+    const rows = [{ key: 'ovr', label: dayLabels[0], count: counts.value.overdue, tone: 'dc-spark__bar--danger' }];
+    for (let d = 0; d <= 5; d += 1) {
+        rows.push({
+            key: `d${d}`,
+            label: d === 0 ? dayLabels[1] : shortDay(d),
+            count: tasks.value.filter((x) => Number(x.daysUntil) === d).length,
+            tone: d === 0 ? 'dc-spark__bar--strong' : '',
+        });
+    }
+    return rows;
+});
+const maxBucket = computed(() => Math.max(1, ...buckets.value.map((b) => b.count)));
+const barHeight = (n) => `${Math.max(6, Math.round((n / maxBucket.value) * 100))}%`;
+
+function shortDay(offset) {
+    const d = new Date();
+    d.setDate(d.getDate() + offset);
+    return d.toLocaleDateString(undefined, { weekday: 'short' }).slice(0, 3).toUpperCase();
+}
+
+const visibleTasks = computed(() => tasks.value.slice(0, 6));
+
+const dueLabel = (task) => {
+    const d = Number(task.daysUntil);
+    if (!Number.isFinite(d)) return '—';
+    if (d < 0) return t('DashV2.due_late', { n: Math.abs(d) });
+    if (d === 0) return t('DashV2.due_today');
+    if (d === 1) return t('DashV2.due_tomorrow');
+    return t('DashV2.due_in_days', { n: d });
 };
-const dueClass = (t) => (t.daysUntil <= 0 ? 'ds-due-now' : t.daysUntil <= 2 ? 'ds-due-soon' : 'ds-due-later');
+const dueTone = (task) => {
+    const d = Number(task.daysUntil);
+    if (d < 0) return 'ds__due--late';
+    if (d <= 1) return 'ds__due--now';
+    return 'ds__due--later';
+};
+
+const open = (task) => {
+    if (!task || !task.taskId || !task.projectId) return;
+    openTask({
+        companyId: companyId.value,
+        projectId: task.projectId,
+        sprintId: task.sprintId || '',
+        folderId: task.folderId || '',
+        taskId: task.taskId,
+    });
+};
 
 const load = async () => {
-    loading.value = true;
+    meta.state = tasks.value.length ? meta.state : 'loading';
     try {
         const fd = Array.isArray(props.filterData) ? props.filterData : Object.values(props.filterData || {});
         const taskMatch = fd.length ? buildFilterQuery(fd, userId && userId.value ? String(userId.value) : '') : null;
-        const res = await apiRequest('post', `${env.MY_DUE_SOON}`, { days: Number(props.cardData?.days) || 7, taskMatch, projectId: props.cardData?.projectId || [], projectMode: props.cardData?.projectMode || 'all' });
+        const res = await apiRequest('post', `${env.MY_DUE_SOON}`, {
+            days: Number(props.cardData?.days) || 7,
+            includeOverdue: true,
+            taskMatch,
+            projectId: props.cardData?.projectId || [],
+            projectMode: props.cardData?.projectMode || 'all',
+        });
         const d = res && res.data && res.data.status ? (res.data.data || {}) : {};
         tasks.value = d.tasks || [];
+        meta.note = tasks.value.length > visibleTasks.value.length
+            ? t('DashV2.due_note_more', { shown: visibleTasks.value.length, total: tasks.value.length })
+            : t('DashV2.due_note');
+        meta.state = tasks.value.length ? 'ready' : 'empty';
     } catch (e) {
-        console.error('DueSoonCard fetch error:', e);
+        meta.state = 'error';
         tasks.value = [];
-    } finally {
-        loading.value = false;
     }
 };
-
-// ─── Task-detail sidebar ───
-const companyId = inject('$companyId', ref(''));
-const isTaskDetail = ref(false);
-const detailProjectId = ref('');
-const detailSprintId = ref('');
-const detailTaskId = ref('');
-function openTaskDetail(r) {
-    if (!r || !r.taskId || !r.projectId) return;
-    detailProjectId.value = r.projectId;
-    detailSprintId.value = r.sprintId || '';
-    detailTaskId.value = r.taskId;
-    isTaskDetail.value = true;
-}
-function toggleTaskDetail(_task, close = false) {
-    isTaskDetail.value = false;
-    if (close === true) return;
-    detailProjectId.value = '';
-    detailSprintId.value = '';
-    detailTaskId.value = '';
-}
-provide('toggleTaskDetail', toggleTaskDetail);
 
 watch(() => props.refreshTrigger, load);
 watch(() => props.cardData, load, { deep: true });
@@ -119,25 +150,21 @@ watch(() => props.filterData, load, { deep: true });
 onMounted(load);
 </script>
 
+<style scoped src="@/components/organisms/DashboardCard/cardBody.css"></style>
 <style scoped>
-.ds { height: 100%; width: 100%; padding: 8px 10px; overflow: auto; }
-.ds-msg { color: #9aa0b4; font-size: 12px; padding: 10px 0; }
-.ds-list { display: flex; flex-direction: column; }
-.ds-row { display: flex; align-items: center; gap: 8px; padding: 7px 4px; border-bottom: 1px solid #f4f5f9; cursor: pointer; }
-.ds-row:hover { background: #f9fafc; }
-.ds-due-chip { flex: none; min-width: 44px; text-align: center; font-size: 10.5px; font-weight: 600; padding: 2px 6px; border-radius: 8px; }
-.ds-due-now { background: #fee2e2; color: #b91c1c; }
-.ds-due-soon { background: #ffedd5; color: #c2410c; }
-.ds-due-later { background: #eef2f7; color: #6b7280; }
-.ds-main { flex: 1; min-width: 0; }
-.ds-title { display: flex; align-items: center; gap: 5px; overflow: hidden; }
-.ds-key { color: #0e7490; font-size: 11px; flex: none; }
-.ds-name { font-size: 12.5px; color: #2f3546; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ds-meta { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
-.ds-proj { font-size: 10.5px; color: #9aa0b4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
-.ds-pri { font-size: 10px; padding: 0 6px; border-radius: 8px; text-transform: capitalize; }
-.ds-pri-0 { background: #fee2e2; color: #b91c1c; }
-.ds-pri-1 { background: #ffedd5; color: #c2410c; }
-.ds-pri-2 { background: #e0f2fe; color: #0369a1; }
-.ds-pri-3 { background: #f3f4f6; color: #6b7280; }
+.ds__list { margin-top: 2px; }
+.ds__due {
+    flex: none;
+    min-width: 46px;
+    text-align: center;
+    font: var(--text-data);
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: var(--r-chip);
+}
+.ds__due--late { background: var(--danger-bg); color: var(--danger-ink); }
+.ds__due--now { background: var(--warn-bg); color: var(--warn-ink); }
+.ds__due--later { background: var(--surface-2); color: var(--ink-label); }
+.ds__key { font: var(--text-data); color: var(--brand); margin-right: 5px; }
+.ds__proj { max-width: 34%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>

@@ -5,6 +5,7 @@ const { removeCache } = require('../../utils/commonFunctions');
 const logger = require('../../Config/loggerConfig');
 const { SendEmail } = require('../service');
 const reportRules = require('../CustomReports/helpers/reportRules'); // REP-02 whitelist engine
+const customReports = require('../CustomReports/controller');
 const R = require('./helpers/scheduleRules');
 
 // REP-08 — scheduled / emailed reports. A schedule emails a saved report
@@ -16,22 +17,23 @@ const R = require('./helpers/scheduleRules');
 const companyOf = (req) => req.headers['companyid'] || (req.body && req.body.companyId) || (req.query && req.query.companyId);
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 
-const DIM_LABELS = { status: 'Status', project: 'Project', sprint: 'Sprint' };
-const METRIC_LABELS = { count: 'Task count', points: 'Story points' };
+const DIM_LABELS = { status: 'Status', project: 'Project', sprint: 'Sprint', person: 'Person', month: 'Month' };
+const METRIC_LABELS = { count: 'Task count', points: 'Story points', hours: 'Hours', entries: 'Entries', revenue: 'Amount' };
 
 const sendOne = (subject, html, recipients) => new Promise((resolve) => {
     try { SendEmail(subject, html, recipients, true, (r) => resolve(!!(r && r.status))); }
     catch (e) { resolve(false); }
 });
 
-// Run a saved report's config → rows (reuses the REP-02 whitelist engine; never raw fields).
+// Run a saved report's config → rows. Delegates to the REP-02 engine so the
+// emailed table is the same query, the same units and the same labels as the
+// builder shows on screen.
 const runSavedReport = async (companyId, report) => {
     const check = reportRules.validateConfig(report);
     if (!check.valid) return { rows: [], total: 0, config: null };
-    const pipeline = reportRules.buildPipeline(check.value);
-    const raw = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [pipeline] }, 'aggregate');
-    const rows = (raw || []).map((r) => ({ label: (r._id === null || r._id === undefined || r._id === '') ? '(none)' : String(r._id), value: r.value || 0 }));
-    return { rows, total: rows.reduce((a, r) => a + (r.value || 0), 0), config: check.value };
+    const out = await customReports.runConfig(companyId, check.value);
+    const rows = out.rows.map((r) => ({ label: r.label, value: r.value }));
+    return { rows, total: Math.round(rows.reduce((a, r) => a + (r.value || 0), 0) * 100) / 100, config: check.value };
 };
 
 // Deliver one schedule now: load its report, run it, email recipients.

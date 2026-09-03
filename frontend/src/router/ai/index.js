@@ -22,5 +22,41 @@ export default [
         name: 'AiAgent',
         component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/AgentSettings.vue'),
         meta: { title: 'Agent settings', requiresAuth: true }
+    },
+    {
+        path: '/:cid/ai/teammates',
+        name: 'AgentTeammates',
+        component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/AgentTeammates.vue'),
+        meta: { title: 'Agents as teammates', requiresAuth: true }
+    },
+    {
+        path: '/:cid/ai/routing',
+        name: 'AgentRouting',
+        component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/AgentRouting.vue'),
+        meta: { title: 'Route tasks to agents', requiresAuth: true }
+    },
+    {
+        path: '/:cid/ai/ask',
+        name: 'AiAsk',
+        component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/AskPage.vue'),
+        meta: { title: 'Ask', requiresAuth: true }
+    },
+    {
+        path: '/:cid/ai/pipeline',
+        name: 'AiPipeline',
+        component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/AiPipeline.vue'),
+        meta: { title: 'Pipeline', requiresAuth: true }
+    },
+    {
+        path: '/:cid/ai/release',
+        name: 'AiRelease',
+        component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/AiRelease.vue'),
+        meta: { title: 'Release & deploy', requiresAuth: true }
+    },
+    {
+        path: '/:cid/ai/accounts',
+        name: 'AiAccounts',
+        component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/AiAccounts.vue'),
+        meta: { title: 'Coding accounts', requiresAuth: true }
     }
 ];

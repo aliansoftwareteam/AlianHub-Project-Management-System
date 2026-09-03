@@ -1,0 +1,82 @@
+@import "@/views/Ai/parity.css";
+
+.au { background: var(--surface); min-height: 100%; }
+.au__body { flex: 1; min-height: 0; overflow: auto; padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; }
+
+.au__sentence {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px;
+    border: 1.5px solid var(--brand);
+    box-shadow: var(--focus);
+    border-radius: var(--r-card);
+    background: var(--surface);
+}
+.au__spark { color: var(--brand); flex: none; }
+.au__sentence-input { flex: 1; border: 0; background: transparent; color: var(--ink); font: var(--text-body); padding: 0; }
+.au__sentence-input:focus { outline: none; }
+.au__sentence-input::placeholder { color: var(--ink-3); }
+.au__grammar { margin: 0; }
+
+.au__ambiguous { padding: 11px 13px; background: var(--warn-bg); border-radius: var(--r-card); display: flex; flex-direction: column; gap: 7px; }
+.au__ambiguous-q { margin: 0; font: var(--text-body); color: var(--warn-ink); }
+.au__ambiguous-opts { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.au__errors { margin: 0; padding: 10px 14px 10px 28px; background: var(--danger-bg); border-radius: var(--r-card); color: var(--danger-ink); font: var(--text-small); }
+
+.au__compiled {
+    padding: 12px 14px;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-card);
+    display: flex; flex-direction: column; gap: 10px;
+}
+.au__slots { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font: var(--text-body); }
+.au__kw { color: var(--ink-2); }
+.au__slot {
+    padding: 3px 8px; border-radius: var(--r-chip);
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--ink); font: var(--text-body);
+    cursor: pointer; max-width: 260px;
+}
+.au__slot:focus-visible { outline: none; box-shadow: var(--focus); }
+.au__slot--text { cursor: text; min-width: 140px; }
+.au__add { border: 1px dashed var(--border); color: var(--ink-2); background: none; border-radius: var(--r-chip); padding: 3px 10px; font: var(--text-small); cursor: pointer; }
+.au__add:hover { color: var(--ink); }
+.au__x { border: 0; background: none; color: var(--ink-3); font-size: 17px; line-height: 1; cursor: pointer; padding: 0 4px; }
+.au__x:hover { color: var(--danger-ink); }
+.au__warn { margin: 0; font: var(--text-small); color: var(--warn-ink); background: var(--warn-bg); border-radius: 6px; padding: 7px 10px; }
+.au__save { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+.au__rule {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px;
+    border: 1px solid var(--hairline);
+    border-radius: 9px;
+    background: var(--surface);
+    font: var(--text-body);
+}
+.au__rule--off { opacity: .62; }
+.au__rule-text { flex: 1; min-width: 0; }
+.au__rule-count { color: var(--ink-2); flex: none; }
+.au__delete { color: var(--danger-ink); }
+
+.au__toggle {
+    width: 30px; height: 18px; border-radius: 9px; flex: none;
+    border: 0; background: var(--border); position: relative; cursor: pointer; padding: 0;
+    transition: background var(--t-state) var(--ease);
+}
+.au__toggle.is-on { background: var(--brand); }
+.au__toggle:focus-visible { outline: none; box-shadow: var(--focus); }
+.au__knob {
+    position: absolute; top: 2px; left: 2px;
+    width: 14px; height: 14px; border-radius: 50%; background: #fff;
+    transition: transform var(--t-state) var(--ease);
+}
+.au__toggle.is-on .au__knob { transform: translateX(12px); }
+
+.au__empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 56px 20px; }
+
+@media (max-width: 767px) {
+    .au__rule { flex-wrap: wrap; }
+    .au__slot { max-width: 100%; }
+}

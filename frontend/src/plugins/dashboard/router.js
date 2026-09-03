@@ -19,9 +19,18 @@ const dashboardRouter = [{
 {
     path: "/:cid/dashboards",
     name: "Dashboards",
-    component: () => import(/* webpackChunkName: "home" */ './views/Home'),
+    component: () => import(/* webpackChunkName: "dashboards" */ '@/views/Dashboards/DashboardsHub.vue'),
     meta: {
         title: 'Dashboards',
+        requiresAuth: true,
+    }
+},
+{
+    path: "/:cid/dashboards/:dashboardId",
+    name: "DashboardView",
+    component: () => import(/* webpackChunkName: "dashboards" */ '@/views/Dashboards/DashboardView.vue'),
+    meta: {
+        title: 'Dashboard',
         requiresAuth: true,
     }
 }];

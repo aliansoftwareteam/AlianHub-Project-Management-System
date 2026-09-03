@@ -24,6 +24,7 @@ const logger = require('../../../../Config/loggerConfig');
 const socketEmitter = require('../../../../event/socketEventEmitter');
 const { HandleHistory } = require('../mongo_helper');
 const { HandleBothNotification } = require('../handleNotification');
+const { recordCompletion } = require('./recordCompletion.js');
 const {
     taskAssigneeAdd, taskAssigneeRemove, taskAssigneeReplace,
     taskStatusChange, taskPriorityChange,
@@ -242,6 +243,10 @@ module.exports = {
                                 changeData: notifContext,
                             }).catch((err) => logger.error(`bulkUpdateStatus notification ${task._id}: ${err.message}`));
                         }
+
+                        // Same provenance record the single-task path writes; without it a
+                        // bulk close left no closedBy and the task showed no badge.
+                        recordCompletion({ companyId, taskId: task._id, task, newStatus, userData });
 
                         emitTaskUpdate(task, { ...newStatus });
                     } catch (error) {

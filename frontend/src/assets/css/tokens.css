@@ -368,3 +368,32 @@ html, body, #app {
     --kiln-font-display: var(--font-ui); --kiln-font-body: var(--font-ui);
     --kiln-radius: var(--r-card); --kiln-radius-sm: var(--r-input); --kiln-shadow: var(--shadow-pop); --kiln-header-h: 0px;
 }
+
+/* ---------- RTL (handoff 22d) ----------
+   Layout mirrors from logical properties; only the few places that hard-code a
+   physical direction need a rule. What must NOT mirror — the timer, ids, code,
+   and any chart with a time axis — opts out with .ah-ltr. */
+[dir="rtl"] .ah-app { flex-direction: row-reverse; }
+[dir="rtl"] .ah-slide-right-enter-from,
+[dir="rtl"] .ah-slide-right-leave-to { transform: translateX(-24px); }
+[dir="rtl"] .ah-toolbar__spacer { flex: 1; }
+
+/* Time runs left to right in every language. */
+.ah-ltr,
+[dir="rtl"] .ah-kbd,
+[dir="rtl"] code,
+[dir="rtl"] pre,
+[dir="rtl"] .ah-timer,
+[dir="rtl"] .ah-code,
+[dir="rtl"] .ah-id {
+    direction: ltr;
+    unicode-bidi: isolate;
+}
+[dir="rtl"] pre, [dir="rtl"] .ah-code { text-align: left; }
+
+/* Chevrons and other directional glyphs point the other way. */
+[dir="rtl"] .ah-flip { transform: scaleX(-1); }
+
+/* A progress track laid out as a flex row fills from the inline start, so it
+   reverses on its own under dir="rtl" — no width/left overrides needed. */
+[dir="rtl"] .ah-progress, [dir="rtl"] [data-progress] { display: flex; }
