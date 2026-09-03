@@ -160,9 +160,7 @@
             <UpdateMemeberSubscription v-if="isUpdateShow" @spinnerValue="(val) => isSpinner = val" :userData="inviteUserData" :isRemove="false" @executeFurther="(email,designation,role) => sendMail(email,designation,role,false)" @hideModel="() => isUpdateShow = false" @closeModel="closeModelFunction"/>
             <MemberberTable v-if="checkPermission('settings.settings_member_list') !== null" :filteredList="filteredList" :filteredRemovedList="filteredRemovedList" :activeTab="activeTab" :page="page" :perPage="filteredList.length" @pageClick="(val)=>{page = val}" :listingArray="listingArray"  @inviteUserParent="(email,type,designation,flag,isFromRemove) => sendInvitation(email,type,designation,flag,isFromRemove)" @arrayCheck="(data) => listingArray = getCompanyUsers(data)"/>
         </div>
-        <div v-else class="text-center">
-            <img :src="accesDenied" />
-        </div>
+        <AppState v-else kind="forbidden" />
         <div v-if="showLoader" class="d-flex box-shadow-6 position-fi z-index-10 right-22px bottom-22px bg-white p-10px border-radius-5-px align-items-center">
             <div class="progress-container d-flex align-items-center position-re ">
                 <div class="progress-circle" :style="circleStyle">
@@ -177,6 +175,7 @@
 </template>
 
 <script setup>
+import AppState from '@/components/molecules/AppState/AppState.vue';
     import { defineComponent, computed, watch, ref, provide, onMounted, inject } from "vue";
     import { useStore } from 'vuex';
     import { useCustomComposable } from "@/composable";
@@ -236,7 +235,6 @@
     })
     const isSpinner = ref(false)
     const desSearch = ref('')
-    const accesDenied = require("@/assets/images/access_denied_img.png");
     const { getters, commit } = useStore();
     const {makeUniqueId, checkPermission,debounce} = useCustomComposable();
     const  { checkErrors } = useValidation();

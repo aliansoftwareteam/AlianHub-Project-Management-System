@@ -21,7 +21,7 @@ exports.globalSearch = async (req, res) => {
 
         const rx = { $regex: escapeRegex(String(query).trim()), $options: 'i' };
 
-        const [tasks, projects, comments] = await Promise.all([
+        const [tasks, projects, comments, pages] = await Promise.all([
             MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.TASKS,
                 data: [
@@ -46,6 +46,14 @@ exports.globalSearch = async (req, res) => {
                     { limit: RESULT_LIMIT_PER_TYPE, sort: { createdAt: -1 } },
                 ],
             }, 'find'),
+            MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.PAGES,
+                data: [
+                    { deletedStatusKey: { $ne: 1 }, title: rx },
+                    'title ProjectID updatedBy updatedAt',
+                    { limit: RESULT_LIMIT_PER_TYPE, sort: { updatedAt: -1 } },
+                ],
+            }, 'find').catch(() => []),
         ]);
 
         // Client project routes always carry a sprint segment, so attach each
@@ -92,6 +100,13 @@ exports.globalSearch = async (req, res) => {
                     taskId: comment.taskId,
                     projectId: comment.projectId,
                     sprintId: comment.sprintId,
+                })),
+                pages: (pages || []).map((page) => ({
+                    _id: page._id,
+                    title: page.title,
+                    ProjectID: page.ProjectID,
+                    updatedBy: page.updatedBy,
+                    updatedAt: page.updatedAt,
                 })),
             },
         });

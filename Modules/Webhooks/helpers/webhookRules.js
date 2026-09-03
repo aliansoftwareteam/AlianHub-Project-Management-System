@@ -2,6 +2,7 @@
 // the controller, the dispatcher, and the unit tests.
 
 const crypto = require('crypto');
+const { normalizeChangedFields } = require('../../../utils/entityEvents');
 
 // Task lifecycle events a webhook can subscribe to. '*' subscribes to all.
 const EVENT_TYPES = Object.freeze([
@@ -100,25 +101,6 @@ const assigneeValue = (task) => {
 // update paths are inconsistent — most emit a plain field map ({ Task_Priority },
 // { TaskName }, { status, statusType }), but the assignee path emits an operator
 // object ({ $addToSet: { AssigneeUserId } }) — so flatten one level into these.
-const MONGO_FIELD_OPS = ['$set', '$addToSet', '$pull', '$push', '$pullAll', '$inc', '$unset'];
-
-/* Reduce a raw updatedFields payload to the SET of top-level task field names it
- * touched — flattening Mongo operators and stripping dotted suffixes
- * (customField.x → customField). Pure. */
-const normalizeChangedFields = (updatedFields) => {
-    const touched = new Set();
-    const add = (k) => { if (k) touched.add(String(k).split('.')[0]); };
-    const fields = updatedFields || {};
-    Object.keys(fields).forEach((key) => {
-        if (MONGO_FIELD_OPS.includes(key) && fields[key] && typeof fields[key] === 'object') {
-            Object.keys(fields[key]).forEach(add);
-        } else if (!key.startsWith('$')) {
-            add(key);
-        }
-    });
-    return touched;
-};
-
 // What changed → how to announce it. Ordered: when exactly one category changed,
 // the first match drives the headline. `value(task)` returns the row to show
 // (null = headline only). Internal plumbing fields (TaskKey, groupBy*, subTasks…)

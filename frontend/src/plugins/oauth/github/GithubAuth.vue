@@ -1,7 +1,8 @@
 <template>
-    <button @click="loginWithGitHub" class="border-0 border-radius-6-px cursor-pointer p-15px" :disabled="isLoading" title="Github">
-        <div v-if="isLoading" class="oauth-spinner"></div>
-        <img v-else :src="GithubIcon" alt="github-icon"/>
+    <button type="button" class="auth__provider" :disabled="isLoading" :aria-busy="isLoading" @click="loginWithGitHub">
+        <span v-if="isLoading" class="oauth-spinner"></span>
+        <ShellIcon v-else name="github" :size="16" />
+        <span>{{ label || $t('Auth.continue_with', { provider: 'GitHub' }) }}</span>
     </button>
 </template>
 
@@ -13,13 +14,13 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from "vue-i18n";
 
 // Image
-import GithubIcon from "@/assets/images/svg/github_icon.svg";
 
 // Utilities
 import { apiRequestWithoutSecure, apiRequestWithoutCompnay, getAuth } from "@/services";
 import * as env from '@/config/env';
 
 const props = defineProps({
+    label: { type: String, default: "" },
     mode: {
         type: String,
         default: "login"

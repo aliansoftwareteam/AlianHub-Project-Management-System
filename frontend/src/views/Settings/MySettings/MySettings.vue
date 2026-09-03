@@ -1,436 +1,381 @@
 <template>
-    <div class="position-re mySettingsWrapper p-1">
+    <div class="ms" :class="{ 'ms--busy': isSpinner }">
         <SpinnerComp :is-spinner="isSpinner" />
-        <div class="my-settings-main">
-            <div class="row flex-row align-items-start">
-                <div class="col-md-2 settingprofile" :class="{'d-flex' : clientWidth > 480, 'd-block' : clientWidth <= 480}">
-                    <div class="col-md-2 settingprofile">
-                        <div class="userimg border-radius-50-per mysettings_profile">
-                            <img :src="formData.Employee_profileImageURL" alt="" class="userimg border-radius-50-per"
-                            @click="openCropperTool()"
-                            v-if="isTempPreview"/>
-                            <WasabiImage  v-if="!isTempPreview && formData.Employee_profileImageURL"
-                                class="mysettings__wasabi-img"
-                                :data="{url: formData.Employee_profileImageURL}"
-                                :thumbnail="'120x120'"
-                                :userImage="true"
-                                @click="openCropperTool()"
-                            />
-                            <span class="noimg-uploadImage cursor-pointer"  v-if="!isTempPreview && !formData.Employee_profileImageURL" @click="openCropperTool()">
-                                {{formData.firsName.value.charAt(0).toUpperCase()}}
-                            </span>
-                        </div>
-                    </div>
-                    <div class="col-md-10 settingprofileform">
-                        <div class="profileform">
-                            <form>
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="inputfield position-re">
-                                            <label for="fristname">
-                                                {{ $t('Auth.firstName') }}
-                                            </label>
-                                            <input class="logininput" v-model.trim="formData.firsName.value"
-                                                placeHolder="eg. Maria" type="text" @keyup="checkErrors({
-                                                    'field': formData.firsName,
-                                                    'name': formData.firsName.name,
-                                                    'validations': formData.firsName.rules,
-                                                    'type': formData.firsName.type,
-                                                    'event': $event.event
-                                                })" id="firstName" tabindex="1" />
-                                            <div class="invalid-feedback red position-ab">{{ formData.firsName.error }}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="inputfield position-re">
-                                            <label for="last name">
-                                                {{ $t('Auth.lastName') }}
-                                            </label>
-                                            <input class="logininput" v-model.trim="formData.lastName.value"
-                                                placeHolder="eg. Tailor" type="text"
-                                                @keyup="checkErrors({ 'field': formData.lastName, 'name': formData.lastName.name, 'validations': formData.lastName.rules, 'type': formData.lastName.type, 'event': $event.event })"
-                                                id="lastName" tabindex="2" />
-                                            <div class="invalid-feedback red position-ab">{{ formData.lastName.error }}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="inputfield position-re">
-                                            <label for="Email">
-                                                {{ $t('Auth.email') }}
-                                            </label>
-                                            <input type="text" class="logininput" disabled="true"
-                                                placeHolder="eg. mail@abc.com" v-model.trim="formData.email.value" tabindex="3"
-                                                :max-length="254" @keyup="checkErrors({
-                                                    'field': formData.email,
-                                                    'name': formData.email.name,
-                                                    'validations': formData.email.rules,
-                                                    'type': formData.email.type,
-                                                    'event': $event.event
-                                                })" />
-                                            <div class="invalid-feedback red position-ab">{{ formData.email.error }}</div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="radioBox">
-                                            <label for="Time Format">
-                                                {{ $t('Auth.time_format') }}
-                                            </label>
-                                            <div class="radio_wrapper d-flex">
-                                                <div class="radio">
-                                                    <input type="radio" name="radio-group-hours"
-                                                        v-model="formData.Time_Format" id="12hour" value="24"
-                                                        checked="checked">
-                                                    <label for="12hour" class="radio-label">24 hours</label>
-                                                </div>
-                                                <div class="radio">
-                                                    <input type="radio" name="radio-group-hours"
-                                                        v-model="formData.Time_Format" id="24hour" value="12"
-                                                        checked="checked">
-                                                    <label for="24hour" class="radio-label">12 hours</label>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="inputfield">
-                                            <label for="Timezone">
-                                                {{ $t('Auth.timezone') }}
-                                            </label>
-                                            <div class="con-select selectExample autocompletex">
-                                                <div class="input-select-con">
-                                                    <DropDown :id="timeZone">
-                                                        <template #button>
-                                                            <img src="../../../assets/images/dropdown-arrow.png"
-                                                                alt="dropdown-arrow" class="dropdown-arrow">
-                                                            <div class=" cursor-pointer text-capitalize" :ref="timeZone">
-                                                                {{ formData.Time_Zone }}
-                                                            </div>
-                                                        </template>
-                                                        <template #options>
-                                                            <DropDownOption
-                                                                @click="formData.Time_Zone = company, $refs[timeZone].click()"
-                                                                v-for="(company, index) in timezoneArray" :key="index"
-                                                                :item="{ label: company }">
-                                                            </DropDownOption>
-                                                        </template>
-                                                    </DropDown>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="inputfield">
-                                            <label for="languages">
-                                                <!-- Select Language -->
-                                                {{ $t('Auth.selectLanguage') }}
-                                            </label>
-                                            <div class="con-select selectExample autocompletex">
-                                                <div class="input-select-con">
-                                                    <DropDown :id="selectedLanguageTitle">
-                                                        <template #button>
-                                                            <img src="../../../assets/images/dropdown-arrow.png"
-                                                                alt="dropdown-arrow" class="dropdown-arrow">
-                                                            <div class=" cursor-pointer text-capitalize"
-                                                                :ref="selectedLanguageTitle">
-                                                                {{ selectedLanguageTitle }}
-                                                            </div>
-                                                        </template>
-                                                        <template #options>
-                                                            <DropDownOption
-                                                                @click="selectedLanguageCode = data.code, $refs[selectedLanguageTitle].click(), checkLang()"
-                                                                v-for="(data) in languageOptions" :key="data.code"
-                                                                :item="{ label: data.title }">
-                                                            </DropDownOption>
-                                                        </template>
-                                                    </DropDown>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="d-flex align-items-center justify-content-start mysetiing_save">
-                                    <button :disabled="isSpinner" @click.prevent="SaveChangeToDb()"
-                                        :class="[{ 'pointer-events-none': isSpinner }]"
-                                        class="btn_btn mysetting_save_btn ml-15px">{{ $t('Settings.save_changes')
-                                        }}</button>
-                                </div>
-                            </form>
 
-                        </div>
+        <section class="ah-card">
+            <div class="ah-card__body ms__profile">
+                <button type="button" class="ms__avatar" :aria-label="$t('SettingsV2.change_photo')" @click="openCropperTool()">
+                    <img v-if="previewUrl" :src="previewUrl" alt="" class="ms__avatar-img" />
+                    <WasabiImage v-else-if="formData.Employee_profileImageURL" class="ms__avatar-img" :data="{ url: formData.Employee_profileImageURL }" :thumbnail="'120x120'" :userImage="true" />
+                    <span v-else class="ms__avatar-initial">{{ initial }}</span>
+                </button>
+                <div class="ms__identity">
+                    <div class="ms__name">{{ fullName }}</div>
+                    <div class="ah-small">{{ formData.email }} · {{ roleName }}<template v-if="joined"> · {{ $t('SettingsV2.joined', { date: joined }) }}</template></div>
+                </div>
+                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="openCropperTool()">{{ $t('SettingsV2.change_photo') }}</button>
+            </div>
+            <div class="ah-card__body ms__grid">
+                <div class="ah-field">
+                    <label class="ah-field__label" for="ms-first">{{ $t('Auth.firstName') }}</label>
+                    <input id="ms-first" class="ah-input" :class="{ 'ah-input--error': errors.firstName }" v-model.trim="formData.firstName" type="text" autocomplete="given-name" @input="errors.firstName = ''" />
+                    <div v-if="errors.firstName" class="ah-field__error">{{ errors.firstName }}</div>
+                </div>
+                <div class="ah-field">
+                    <label class="ah-field__label" for="ms-last">{{ $t('Auth.lastName') }}</label>
+                    <input id="ms-last" class="ah-input" :class="{ 'ah-input--error': errors.lastName }" v-model.trim="formData.lastName" type="text" autocomplete="family-name" @input="errors.lastName = ''" />
+                    <div v-if="errors.lastName" class="ah-field__error">{{ errors.lastName }}</div>
+                </div>
+                <div class="ah-field">
+                    <label class="ah-field__label" for="ms-email">{{ $t('Auth.email') }}</label>
+                    <input id="ms-email" class="ah-input" :value="formData.email" type="email" disabled />
+                </div>
+                <div class="ah-field">
+                    <label class="ah-field__label" for="ms-title">{{ $t('SettingsV2.job_title') }}<span class="ah-small">{{ $t('SettingsV2.job_title_hint') }}</span></label>
+                    <input id="ms-title" class="ah-input" :value="designationName || $t('SettingsV2.job_title_none')" type="text" disabled />
+                </div>
+                <div class="ah-field">
+                    <label class="ah-field__label" for="ms-lang">{{ $t('Auth.selectLanguage') }}</label>
+                    <select id="ms-lang" class="ah-input" v-model="selectedLanguageCode">
+                        <option v-for="lang in languageOptions" :key="lang.code" :value="lang.code">{{ lang.title }}</option>
+                    </select>
+                </div>
+                <div class="ah-field">
+                    <span class="ah-field__label">{{ $t('Auth.time_format') }}</span>
+                    <div class="ah-tabs ms__tabs" role="radiogroup" :aria-label="$t('Auth.time_format')">
+                        <button type="button" class="ah-tab" :class="{ 'is-active': formData.Time_Format === '24' }" role="radio" :aria-checked="formData.Time_Format === '24'" @click="formData.Time_Format = '24'">{{ $t('SettingsV2.hours_24') }}</button>
+                        <button type="button" class="ah-tab" :class="{ 'is-active': formData.Time_Format === '12' }" role="radio" :aria-checked="formData.Time_Format === '12'" @click="formData.Time_Format = '12'">{{ $t('SettingsV2.hours_12') }}</button>
                     </div>
                 </div>
             </div>
+        </section>
+
+        <section class="ah-card">
+            <div class="ah-card__head">
+                <h2 class="ah-h3">{{ $t('SettingsV2.working_hours') }}</h2>
+                <span class="ah-small">{{ $t('SettingsV2.working_hours_hint') }}</span>
+            </div>
+            <div class="ah-card__body ms__wh">
+                <div class="ms__wh-row">
+                    <label class="ms__wh-label" for="ms-tz">{{ $t('Auth.timezone') }}</label>
+                    <select id="ms-tz" class="ah-input ms__wh-tz" v-model="formData.Time_Zone">
+                        <option v-for="tz in timezoneArray" :key="tz" :value="tz">{{ tz }}</option>
+                    </select>
+                </div>
+                <div class="ms__wh-row">
+                    <span class="ms__wh-label" id="ms-days-label">{{ $t('SettingsV2.days') }}</span>
+                    <div class="ms__days" role="group" aria-labelledby="ms-days-label">
+                        <button
+                            v-for="day in dayOptions"
+                            :key="day.value"
+                            type="button"
+                            class="ms__day"
+                            :class="{ 'is-on': workingHours.days.includes(day.value) }"
+                            :aria-pressed="workingHours.days.includes(day.value)"
+                            :aria-label="day.name"
+                            :title="day.name"
+                            @click="toggleDay(day.value)"
+                        >{{ day.letter }}</button>
+                    </div>
+                </div>
+                <div class="ms__wh-row ms__wh-row--hours">
+                    <label class="ms__wh-label" for="ms-start">{{ $t('SettingsV2.hours') }}</label>
+                    <input id="ms-start" class="ah-input ms__time" type="time" v-model="workingHours.start" />
+                    <span class="ms__arrow" aria-hidden="true">→</span>
+                    <input class="ah-input ms__time" type="time" v-model="workingHours.end" :aria-label="$t('SettingsV2.hours_end')" />
+                    <label class="ms__wh-label ms__wh-label--inline" for="ms-cap">{{ $t('SettingsV2.capacity') }}</label>
+                    <div class="ms__cap">
+                        <input id="ms-cap" class="ah-input ms__cap-input" type="number" min="0" max="24" step="0.5" v-model.number="workingHours.capacity" />
+                        <span class="ah-small">{{ $t('SettingsV2.capacity_unit') }}</span>
+                    </div>
+                </div>
+                <div v-if="errors.workingHours" class="ah-field__error">{{ errors.workingHours }}</div>
+            </div>
+        </section>
+
+        <section class="ah-card">
+            <div class="ah-card__body ms__theme">
+                <div>
+                    <h2 class="ah-h3">{{ $t('SettingsV2.theme') }}</h2>
+                    <div class="ah-small">{{ $t('SettingsV2.theme_hint') }}</div>
+                </div>
+                <div class="ms__theme-opts" role="radiogroup" :aria-label="$t('SettingsV2.theme')">
+                    <button
+                        v-for="opt in themeOptions"
+                        :key="opt.value"
+                        type="button"
+                        class="ms__theme-opt"
+                        :class="{ 'is-active': shellState.theme === opt.value }"
+                        role="radio"
+                        :aria-checked="shellState.theme === opt.value"
+                        @click="applyTheme(opt.value)"
+                    >
+                        <ShellIcon :name="opt.icon" :size="14" />{{ $t(opt.label) }}
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <section class="ah-card">
+            <div class="ah-card__head">
+                <h2 class="ah-h3">{{ $t('SettingsV2.sessions') }}</h2>
+                <span class="ah-small">{{ $t('SettingsV2.sessions_hint') }}</span>
+            </div>
+            <div class="ah-card__body ms__sessions">
+                <div v-if="sessionsError" class="ah-field__error">{{ sessionsError }}</div>
+                <div v-else-if="!sessions.length && !sessionsLoading" class="ah-empty">{{ $t('SettingsV2.no_sessions') }}</div>
+                <div v-for="s in sessions" :key="s._id" class="ms__session">
+                    <span class="ah-dot" :class="s.current ? 'ah-dot--ok' : 'ms__dot-idle'"></span>
+                    <ShellIcon :name="s.device ? 'phone' : 'monitor'" :size="15" class="ms__session-icon" />
+                    <span class="ms__session-text">
+                        {{ sessionLabel(s) }}
+                        <span v-if="s.current" class="ah-chip ah-chip--ok">{{ $t('SettingsV2.this_device') }}</span>
+                    </span>
+                    <span class="ah-mono ms__session-when">{{ s.current ? $t('SettingsV2.now') : whenLabel(s.lastActive) }}</span>
+                    <button v-if="!s.current" type="button" class="ms__signout" :disabled="signingOut === s._id" @click="signOutSession(s)">{{ $t('SettingsV2.sign_out') }}</button>
+                </div>
+            </div>
+        </section>
+
+        <div class="ms__actions">
+            <button type="button" class="ah-btn ah-btn--primary" :disabled="isSpinner" @click="saveChanges()">{{ $t('Settings.save_changes') }}</button>
+            <span v-if="savedAt" class="ah-small">{{ $t('SettingsV2.saved') }}</span>
         </div>
-        <CroppingTool :image="{ url: formData.Employee_profileImage, name: fileName }" :isVisible="isCropper"
-            title="Company Profile"
-            :stencilSize='stencilSize'
+
+        <CroppingTool
+            :image="{ url: formData.Employee_profileImage, name: fileName }"
+            :isVisible="isCropper"
+            :title="$t('SettingsV2.change_photo')"
+            :stencilSize="stencilSize"
             :stencilProps="stencilProps"
             @updateVisible="(val) => isCropper = val"
-            @getEditedImage="(val) => { formData.Employee_profileImage = val.url, fileName = val.fileName, base64Image = val.base64Image }" 
-            @fileSelect="(val) => {fileInputUser = val}"
+            @getEditedImage="(val) => { formData.Employee_profileImage = val.url; fileName = val.fileName; }"
         />
-</div>
+    </div>
 </template>
 
 <script setup>
-    import * as env from '@/config/env';
-    import timeZoneOption from "./timezoneArray.js";
-    import {useToast} from 'vue-toast-notification';
-    import { useGetterFunctions } from "@/composable";
-    import { useValidation } from "@/composable/Validation.js";
-    import { ref, inject, onMounted, defineComponent, nextTick, onUnmounted } from "vue";
-    import InputText from "@/components/atom/InputText/InputText.vue";
-    import DropDown from "@/components/molecules/DropDown/DropDown.vue";
-    import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
-    import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
-    import DropDownOption from "@/components/molecules/DropDownOption/DropDownOption.vue";
-    import { apiRequestWithoutCompnay } from "../../../services";
-    import {storageQueryBuilder,generateFileName} from '@/utils/storageQueryBuild.js';
-    import CroppingTool from "@/components/atom/CroppingTool/CroppingTool.vue";
-    import { useI18n } from 'vue-i18n';
-    import { languageTranslateHelper } from '../../../composable/index.js';
-    import languageOptions from '@/utils/languagesName.json';
-    import { useStore } from "vuex";
-    const {commit} = useStore();
-    const { selectedLanguageCode, changeLanguage } = languageTranslateHelper();
-    const { locale, setLocaleMessage } = useI18n();
-    const { t } = useI18n();
+import { ref, inject, computed, onMounted } from "vue";
+import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
+import { useToast } from "vue-toast-notification";
+import Cookies from "js-cookie";
+import * as env from "@/config/env";
+import timeZoneOption from "./timezoneArray.js";
+import languageOptions from "@/utils/languagesName.json";
+import { useGetterFunctions, languageTranslateHelper } from "@/composable";
+import { apiRequestWithoutCompnay } from "@/services";
+import { storageQueryBuilder, generateFileName } from "@/utils/storageQueryBuild.js";
+import { shellState, applyTheme } from "@/components/organisms/Shell/shellState.js";
+import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import SpinnerComp from "@/components/atom/SpinnerComp/SpinnerComp.vue";
+import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
+import CroppingTool from "@/components/atom/CroppingTool/CroppingTool.vue";
 
-    const $toast = useToast();
-    const { getUser } = useGetterFunctions();
-    const { checkErrors, checkAllFields } = useValidation();
-    defineComponent({ InputText,SpinnerComp });
-    // variable
-    const userId = inject("$userId");
-    const clientWidth = inject("$clientWidth");
-    const timeZone = ref("");
-    const highlightIndex = ref(0);
-    const formData = ref({
-        firsName: {
-            value: "",
-            rules:
-                "required",
-            name: "first name",
-            error: "",
-        },
-        lastName: {
-            value: "",
-            rules:
-                "required",
-            name: "last name",
-            error: "",
-        },
-        email: {
-            value: "",
-            rules:
-                "required | regex: ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+[.][a-zA-Z]{2,}$",
-            name: "Email",
-            error: "",
-        },
-        Employee_profileImage: "",
-        Time_Zone: '',
-        Time_Format: ''
-    })
-    const timezoneArray = ref(timeZoneOption);
-    const fileInputUser = ref();
-    const isImgeChange = ref(false);
-    const oldFileValue = ref();
-    const isSpinner = ref(false);
-    const isTempPreview = ref(false);
-    const preEmail = ref('');
-    const isCropper = ref(false);
-    const fileName = ref()
-    const base64Image = ref()
+defineOptions({ name: "MySettingsView" });
 
-    let selectedLanguageTitle = ref('')
-    const stencilSize = {
-        width: 180,
-        height: 180
-    }
+const { t, locale, setLocaleMessage } = useI18n();
+const $toast = useToast();
+const { getters, commit } = useStore();
+const { getUser } = useGetterFunctions();
+const { selectedLanguageCode, changeLanguage } = languageTranslateHelper();
+const userId = inject("$userId");
 
-    const stencilProps = {
-        handlers: {},
-        movable: false,
-        resizable: false,
-        aspectRatio: 1
-    }
+const DEFAULT_HOURS = { days: [1, 2, 3, 4, 5], start: "09:30", end: "18:00", capacity: 8 };
+const TOKEN_TAIL = 6;
 
-    function init() {
-        const user = getUser(userId.value, 1);
-        formData.value.firsName.value = user.Employee_FName;
-        formData.value.lastName.value = user.Employee_LName;
-        formData.value.Employee_profileImage = user.Employee_profileImage == undefined ? '' : user.Employee_profileImage;
-        formData.value.Employee_profileImageURL = user.Employee_profileImageURL == undefined ? '' : user.Employee_profileImageURL;
-        formData.value.email.value = user.Employee_Email;
-        formData.value.Time_Format = user.Time_Format || "12";
-        formData.value.Time_Zone = user.Time_Zone || "Asia/Kolkata";
-        oldFileValue.value = user.Employee_profileImage;
-        preEmail.value = user.Employee_Email;
-    }
-    const SaveChangeToDb = async () =>{
-        isSpinner.value = true;
-        const previosLanguage = localStorage.getItem('language');
-        const languageData = await changeLanguage(selectedLanguageCode.value);
-        if (languageData == null) {
-            $toast.error(t('Toast.Language_not_updated!'), { position: 'top-right' });
-            selectedLanguageCode.value = previosLanguage;
-        } else {
-            localStorage.setItem('language', selectedLanguageCode.value);
-            locale.value = selectedLanguageCode.value;
-            setLocaleMessage(selectedLanguageCode.value, languageData);
-        }
-        checkAllFields(formData.value).then(async(valid)=>{
-            if(valid){
-                const user = getUser(userId.value, 1);
-                if(formData.value.firsName.value == user.Employee_FName &&
-                    formData.value.lastName.value == user.Employee_LName && 
-                    formData.value.Employee_profileImage == user.Employee_profileImage &&
-                    formData.value.Employee_profileImageURL == user.Employee_profileImageURL &&
-                    formData.value.email.value == user.Employee_Email &&
-                    formData.value.Time_Format == user.Time_Format &&
-                    formData.value.Time_Zone == user.Time_Zone && 
-                    selectedLanguageCode.value == previosLanguage) 
-                {
-                    isSpinner.value = false;
-                    return $toast.error(t('Toast.Nothing_to_update'), { position: 'top-right' });
-                }
-                isSpinner.value = true;
-                if(fileName.value && !isImgeChange.value || isImgeChange.value && oldFileValue.value != formData.value.Employee_profileImage){
-                    let name = generateFileName(fileName.value,env.STORAGE_TYPE);
-                    let filePath = `${name}`;
+const isSpinner = ref(false);
+const savedAt = ref(0);
+const isCropper = ref(false);
+const fileName = ref("");
+const oldFileValue = ref("");
+const timezoneArray = ref(timeZoneOption);
+const errors = ref({ firstName: "", lastName: "", workingHours: "" });
+const formData = ref({ firstName: "", lastName: "", email: "", Employee_profileImage: "", Employee_profileImageURL: "", Time_Zone: "Asia/Kolkata", Time_Format: "12" });
+const workingHours = ref({ ...DEFAULT_HOURS, days: [...DEFAULT_HOURS.days] });
+const sessions = ref([]);
+const sessionsLoading = ref(false);
+const sessionsError = ref("");
+const signingOut = ref("");
 
-                    // <!-- Start Remove Section Storage -->
-                        if(env.STORAGE_TYPE && env.STORAGE_TYPE === 'server' && oldFileValue.value && oldFileValue.value !== '' && oldFileValue.value?.startsWith('data:') == false) {
-                            let axiosConfig = {
-                                method : 'delete',
-                                url : env.REMOVE_FILE + '/' + "USER_PROFILES" + '?filepath=' + oldFileValue.value + "&thubmkey=userProfile",
-                            }
-                            await apiRequestWithoutCompnay(axiosConfig.method, axiosConfig.url, axiosConfig.data).catch((e)=>{
-                                console.error(e)
-                            })
-                        }
-                    // <!-- End Remove Section Storage -->
+const stencilSize = { width: 180, height: 180 };
+const stencilProps = { handlers: {}, movable: false, resizable: false, aspectRatio: 1 };
 
-                    // Wasbai upload start
-                    const apiFormData = {
-                        "path": filePath,
-                        "key":"userProfile",
-                        "base64String": formData.value.Employee_profileImage,
-                        "isUserProfile": true
-                    }
-                    if(env.STORAGE_TYPE && env.STORAGE_TYPE === 'server') {
-                        apiFormData.companyId = "USER_PROFILES"
-                    }
-                await apiRequestWithoutCompnay("post", storageQueryBuilder('upload_64').route, apiFormData).then((res)=>{
-                        if(res.data.status){
-                            if(env.STORAGE_TYPE && env.STORAGE_TYPE === 'server') {
-                                formData.value.Employee_profileImage = res.data.statusText;
-                                formData.value.Employee_profileImageURL = res.data.statusText;
-                                oldFileValue.value = res.data.statusText
-                            } else {
-                                formData.value.Employee_profileImage = res.data.statusText[0];
-                                formData.value.Employee_profileImageURL = res.data.statusText[0];
-                            }
-                            isTempPreview.value = false;
-                        } else {
-                            formData.value.Employee_profileImage = "";
-                        }
-                    })
-                }
-                const updateObject =  {
-                    $set: {
-                        Employee_FName: formData.value.firsName.value,
-                        Employee_LName: formData.value.lastName.value,
-                        Employee_profileImage: formData.value.Employee_profileImage,
-                        Employee_profileImageURL: formData.value.Employee_profileImageURL,
-                        Time_Format: formData.value.Time_Format,
-                        Time_Zone: formData.value.Time_Zone,
-                        Employee_Name: `${formData.value.firsName.value} ${formData.value.lastName.value}` ,
-                        updatedAt:new Date(),
-                        languageCode: selectedLanguageCode.value
-                    }
-                }
-                const newObj = {
-                    returnDocument: 'after'
-                }
-                /* 
-                    - in global collection in that 'user' collection.
-                    - we are matching items based on their 'id' and updating the field.
-                */
-                apiRequestWithoutCompnay("put",env.USER_UPATE,{
-                    userId: userId.value,
-                    updateObject : updateObject,
-                    newObj
-                }).then((response)=>{
-                    if (response.data.data) {
-                        commit("users/mutateUsers", {data:response.data.data,op:"modified"})
-                    }
-                    formData.value.email.value = preEmail.value;
-                    isSpinner.value = false;
-                    $toast.success(t("Toast.Profile_updated_successfully"),{position: 'top-right'});
-                }).catch((error)=>{
-                    isSpinner.value = false;
-                    $toast.error(t('Toast.something_went_wrong'),{position: 'top-right'});
-                    console.error("ERROR in delete sprint: ", error);
-                });
-            }
-        })
-    }
-    onMounted(() => {
-        timeZone.value = 'user_timezone';
-        init();
-        startListener();
-        checkLang();
-    });
+const themeOptions = [
+    { value: "light", label: "SettingsV2.theme_light", icon: "sun" },
+    { value: "dark", label: "SettingsV2.theme_dark", icon: "moon" },
+    { value: "system", label: "SettingsV2.theme_system", icon: "monitor" }
+];
 
-    const checkLang = () => {
-        languageOptions.find((language) => {
-            if (language.code == selectedLanguageCode.value) {
-                selectedLanguageTitle.value = language.title;
-            }
-        });
+const dayOptions = computed(() => {
+    const letters = t("SettingsV2.days_letters").split(" ");
+    const names = t("SettingsV2.days_names").split(",");
+    return [1, 2, 3, 4, 5, 6, 0].map((value, i) => ({ value, letter: letters[i] || "", name: (names[i] || "").trim() }));
+});
+
+const companyUser = computed(() => getters["settings/companyUserDetail"] || {});
+const roleName = computed(() => {
+    const role = (getters["settings/roles"] || []).find((r) => r.key === companyUser.value.roleType);
+    return role?.name || "";
+});
+const designationName = computed(() => {
+    const d = (getters["settings/designations"] || []).find((x) => x.key === companyUser.value.designation);
+    return d?.name || "";
+});
+const joined = computed(() => {
+    const raw = companyUser.value.createdAt || companyUser.value.sendInvitationTime;
+    if (!raw) return "";
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString(undefined, { month: "short", year: "numeric" });
+});
+const fullName = computed(() => `${formData.value.firstName} ${formData.value.lastName}`.trim());
+const initial = computed(() => (formData.value.firstName || formData.value.email || "?").charAt(0).toUpperCase());
+const previewUrl = computed(() => (String(formData.value.Employee_profileImage || "").startsWith("data:") ? formData.value.Employee_profileImage : ""));
+
+function init() {
+    const user = getUser(userId.value, 1) || {};
+    formData.value.firstName = user.Employee_FName || "";
+    formData.value.lastName = user.Employee_LName || "";
+    formData.value.email = user.Employee_Email || "";
+    formData.value.Employee_profileImage = user.Employee_profileImage || "";
+    formData.value.Employee_profileImageURL = user.Employee_profileImageURL || "";
+    formData.value.Time_Format = String(user.Time_Format || "12");
+    formData.value.Time_Zone = user.Time_Zone || "Asia/Kolkata";
+    oldFileValue.value = user.Employee_profileImage || "";
+    const wh = user.workingHours || {};
+    workingHours.value = {
+        days: Array.isArray(wh.days) ? wh.days.map(Number) : [...DEFAULT_HOURS.days],
+        start: wh.start || DEFAULT_HOURS.start,
+        end: wh.end || DEFAULT_HOURS.end,
+        capacity: Number.isFinite(Number(wh.capacity)) ? Number(wh.capacity) : DEFAULT_HOURS.capacity
     };
-
-    function startListener() {
-        document.addEventListener("keydown", keyListener)
-    }
-
-    function stopListener() {
-        document.removeEventListener("keydown", keyListener)
-    }
-
-    onUnmounted(() => {
-        stopListener();
-    })
-
-    function keyListener(event) {
-        if(event.keyCode === 13) { // Enter
-            formData.value.Time_Zone = timezoneArray.value[highlightIndex.value];
-            let timeZoneInput = document.getElementById('item'+highlightIndex.value)
-            timeZoneInput.click();
-        } else if(event.keyCode === 38){ // UP
-            highlightIndex.value = highlightIndex.value > 0 ? highlightIndex.value-1 : 0;
-            nextTick(() => {
-                document.getElementById('item'+highlightIndex.value)?.scrollIntoView({behavior: "smooth", block: 'end'})
-            })
-        } else if (event.keyCode === 40){ // DOWN
-            highlightIndex.value = highlightIndex.value < timezoneArray.value.length-1 ? highlightIndex.value+1 : timezoneArray.value.length-1;
-            nextTick(() => {
-                document.getElementById('item'+highlightIndex.value)?.scrollIntoView({behavior: "smooth", block: 'nearest', inline: 'start'})
-            })
-        }
-    }
-
-    const openCropperTool = () => {
-    setTimeout(() => {
-        isCropper.value = true;
-        document.getElementById('cropping-input').click()
-    })
 }
+
+function toggleDay(value) {
+    const i = workingHours.value.days.indexOf(value);
+    if (i === -1) workingHours.value.days.push(value); else workingHours.value.days.splice(i, 1);
+}
+
+function validate() {
+    errors.value = { firstName: "", lastName: "", workingHours: "" };
+    if (!formData.value.firstName) errors.value.firstName = t("SettingsV2.required_field");
+    if (!formData.value.lastName) errors.value.lastName = t("SettingsV2.required_field");
+    if (!workingHours.value.start || !workingHours.value.end || workingHours.value.end <= workingHours.value.start) errors.value.workingHours = t("SettingsV2.hours_invalid");
+    else if (!workingHours.value.days.length) errors.value.workingHours = t("SettingsV2.days_required");
+    return !errors.value.firstName && !errors.value.lastName && !errors.value.workingHours;
+}
+
+async function uploadPhotoIfChanged() {
+    if (!previewUrl.value) return;
+    const filePath = generateFileName(fileName.value || "profile.png", env.STORAGE_TYPE);
+    const isServer = env.STORAGE_TYPE === "server";
+    if (isServer && oldFileValue.value && !oldFileValue.value.startsWith("data:")) {
+        await apiRequestWithoutCompnay("delete", `${env.REMOVE_FILE}/USER_PROFILES?filepath=${oldFileValue.value}&thubmkey=userProfile`).catch(() => {});
+    }
+    const payload = { path: filePath, key: "userProfile", base64String: formData.value.Employee_profileImage, isUserProfile: true };
+    if (isServer) payload.companyId = "USER_PROFILES";
+    const res = await apiRequestWithoutCompnay("post", storageQueryBuilder("upload_64").route, payload);
+    if (!res?.data?.status) throw new Error(t("Toast.something_went_wrong"));
+    const stored = isServer ? res.data.statusText : res.data.statusText[0];
+    formData.value.Employee_profileImage = stored;
+    formData.value.Employee_profileImageURL = stored;
+    oldFileValue.value = stored;
+}
+
+async function applyLanguage() {
+    const previous = localStorage.getItem("language");
+    if (selectedLanguageCode.value === previous) return;
+    const messages = await changeLanguage(selectedLanguageCode.value);
+    if (!messages) {
+        selectedLanguageCode.value = previous;
+        throw new Error(t("Toast.Language_not_updated!"));
+    }
+    localStorage.setItem("language", selectedLanguageCode.value);
+    locale.value = selectedLanguageCode.value;
+    setLocaleMessage(selectedLanguageCode.value, messages);
+}
+
+async function saveChanges() {
+    if (!validate()) return;
+    isSpinner.value = true;
+    try {
+        await applyLanguage();
+        await uploadPhotoIfChanged();
+        const $set = {
+            Employee_FName: formData.value.firstName,
+            Employee_LName: formData.value.lastName,
+            Employee_Name: fullName.value,
+            Employee_profileImage: formData.value.Employee_profileImage,
+            Employee_profileImageURL: formData.value.Employee_profileImageURL,
+            Time_Format: formData.value.Time_Format,
+            Time_Zone: formData.value.Time_Zone,
+            languageCode: selectedLanguageCode.value,
+            workingHours: { ...workingHours.value, days: [...workingHours.value.days].sort() },
+            updatedAt: new Date()
+        };
+        const response = await apiRequestWithoutCompnay("put", env.USER_UPATE, { userId: userId.value, updateObject: { $set }, newObj: { returnDocument: "after" } });
+        if (response?.data?.data) commit("users/mutateUsers", { data: response.data.data, op: "modified" });
+        savedAt.value = Date.now();
+        $toast.success(t("Toast.Profile_updated_successfully"), { position: "top-right" });
+    } catch (error) {
+        $toast.error(error?.message || t("Toast.something_went_wrong"), { position: "top-right" });
+    } finally {
+        isSpinner.value = false;
+    }
+}
+
+const myTokenTail = () => (Cookies.get("refreshToken") || "").slice(-TOKEN_TAIL);
+
+async function loadSessions() {
+    sessionsLoading.value = true;
+    sessionsError.value = "";
+    try {
+        const res = await apiRequestWithoutCompnay("get", env.USER_SESSIONS);
+        const tail = myTokenTail();
+        sessions.value = (res?.data?.data || []).map((s) => ({ ...s, current: !!tail && s.tokenTail === tail }));
+    } catch (error) {
+        sessionsError.value = error?.response?.data?.message || t("SettingsV2.sessions_error");
+    } finally {
+        sessionsLoading.value = false;
+    }
+}
+
+async function signOutSession(session) {
+    signingOut.value = session._id;
+    try {
+        await apiRequestWithoutCompnay("delete", `${env.USER_SESSIONS}/${session._id}`);
+        sessions.value = sessions.value.filter((s) => s._id !== session._id);
+    } catch (error) {
+        $toast.error(error?.response?.data?.message || t("Toast.something_went_wrong"), { position: "top-right" });
+    } finally {
+        signingOut.value = "";
+    }
+}
+
+const sessionLabel = (s) => [s.browser || s.device || t("SettingsV2.unknown_device"), s.os, s.ip].filter(Boolean).join(" · ");
+
+function whenLabel(date) {
+    const d = new Date(date);
+    if (Number.isNaN(d.getTime())) return "";
+    const mins = Math.max(0, Math.round((Date.now() - d.getTime()) / 60000));
+    if (mins < 1) return t("SettingsV2.now");
+    if (mins < 60) return `${mins}m`;
+    const hours = Math.round(mins / 60);
+    if (hours < 24) return `${hours}h`;
+    return `${Math.round(hours / 24)}d`;
+}
+
+function openCropperTool() {
+    isCropper.value = true;
+    setTimeout(() => document.getElementById("cropping-input")?.click());
+}
+
+onMounted(() => {
+    init();
+    loadSessions();
+});
 </script>
 
 <style scoped>
-@import '@/views/Settings/MySettings/style.css';
+@import "./style.css";
 </style>

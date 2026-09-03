@@ -1,13 +1,13 @@
 import { ref, inject } from 'vue';
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from 'vue-i18n';
-import { useRouter, useRoute } from 'vue-router';
+import { useRoute } from 'vue-router';
+import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import taskClass from '@/utils/TaskOperations';
 
 export function useTaskActions({ projectData, task, props }) {
     const $toast = useToast();
     const { t } = useI18n();
-    const router = useRouter();
     const route = useRoute();
 
     const userId = inject('$userId');
@@ -23,17 +23,13 @@ export function useTaskActions({ projectData, task, props }) {
     const openConvertToTask = ref(false);
 
     function changeRoute() {
-        const paramsObj = {
-            cid: companyId.value,
-            id: projectData.value._id,
+        openTask({
+            companyId: companyId.value,
+            projectId: projectData.value._id,
             sprintId: task.value.sprintId,
+            folderId: task.value.folderObjId || '',
             taskId: task.value._id,
-        };
-        if (task.value.folderObjId) paramsObj.folderId = task.value.folderObjId;
-        router.push({
-            name: task.value.folderObjId ? 'ProjectFolderSprintTask' : 'ProjectSprintTask',
-            params: paramsObj,
-            query: { ...route.query, detailTab: 'comment' },
+            tab: 'activity'
         });
     }
 

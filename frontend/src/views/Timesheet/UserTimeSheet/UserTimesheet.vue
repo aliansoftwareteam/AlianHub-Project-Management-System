@@ -8,1019 +8,403 @@
         :message="$t('Upgrades.the_feature_not_available')"
     />
 </div>
-<div v-else>
-    <div class="timesheet_view Usertimesheet_view timesheet_view_latest" v-if="error404">
-        <div class="row">
-            <div class="col-md-12">
-                <div class="page_title_row d-flex">
-                    <div class="page-title d-flex">
-                        <ul class="breadcrumb title_strip">
-                            <li @click="goHome()">
-                                <img class="cursor-pointer" src="@/assets/images/home_icon.png" alt="home_icon"/>
-                            </li>
-                            <li class="pro_route_link">
-                                <router-link :to="`/${CompanyDatabase}/project`" class="text-decoration-underline font-size-18 font-weight-700">{{$t('UserTimesheet.back_projects')}}</router-link>
-                            </li>
-                            <li>
-                                <span class="workload_title font-size-18 font-weight-700">{{$t('UserTimesheet.user_timesheet')}}</span>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="timesheet__wrapper page-content" :class="{'pointer-event-none': isSpinner}">
-            <div class="page_top_data ut-top d-flex align-items-center justify-content-between" :class="clientWidth <= 1200 ? 'flex-wrap flex-column align-items-start' : ''">
-                <div class="d-flex" :style="clientWidth <= 1200 ? {width:'100%'} : {flex:'1 1 auto', minWidth:'0'}" :class="clientWidth <=767 ? 'flex-column' : ''">
-                    <RangePickerComp 
-                        class="rangeComp"
-                        :class="{'disabled': isSpinner}"
-                        @SelectedDate="handleDate"
-                        :isValidate="false"
-                        preSelectType="week"
-                    />
-                    <div class="wf_filter" :class="{'disabled': isSpinner, 'cursor-pointer': !isSpinner}" @click.stop="$refs.filter_ut_click.click()">
-                        <span class="timesheet_user_filter">
-                            <DropDown id="" class="status_change_dropdown" :bodyClass="{'timesheetDropdown_wrapper' : true}">
-                                <template #button>
-                                    <button class="btn-white border dot-btn" ref="filter_ut_click">
-                                        <a href="#" class="link_disable_css">{{$t('Filters.filter_by')}}</a>
-                                    </button>
-                                </template>
-                                <template #options>
-                                <DropDownOption v-show="filterType=='' && isEveryOne" @click="handleFilterType('select','Users')">
-                                    {{$t('UserTimesheet.Users')}}
-                                </DropDownOption>
-                                <DropDownOption v-show="filterType=='' && isEveryOne" @click="handleFilterType('select','Teams')">
-                                    {{$t('UserTimesheet.Teams')}}
-                                </DropDownOption>
-                                <DropDownOption v-show="filterType==''" @click="handleFilterType('select','Projects')">
-                                    {{$t('UserTimesheet.Projects')}}
-                                </DropDownOption>
-                                <div v-if="filterType!=''">
-                                    <div class="wf_header">
-                                        <a @click="handleFilterType('back','')">
-                                            <img src="@/assets/images/svg/filter_back_icon.svg"/>&nbsp;
-                                            {{ $t('UserTimesheet.back') }}
-                                        </a>
-                                        <span>{{ $t(`UserTimesheet.${filterType}`) }}</span>
-                                    </div>
-                                    <span class="filter_search_block">
-                                        <input type="search" class="form-control" ref="filter_dd_search" :placeHolder="$t('PlaceHolder.search')" v-model="filterSearch"/>
-                                    </span>
-                                    <div class="wf_body filter_body_scroll checklist-main" :class="{'filter_body_scroll': optionFilter.length >= 5}">
-                                        <span
-                                        v-for="(item,index) in optionFilter"
-                                        class="wf_listItem users_filter_items"
-                                        :key="index"
-                                        v-show="filterType.toLowerCase()=='users' && isEveryOne">
-                                            <a class="vs-dropdown-users d-flex align-items-center">
-                                                <input type="checkbox" v-show="filterType.toLowerCase() == 'users'" @click="handleFilterItem(item,'checkEvent',true)" :value="item.id" v-model="checkedFilter">&nbsp;
-                                                <UserProfile
-                                                    v-if="filterType.toLowerCase() == 'users'"
-                                                    :showDot="false"
-                                                    class="timesheet_user_profile mr-10px"
-                                                    :data="{
-                                                        id: item.id,
-                                                        title: item.name,
-                                                        image: item.profile
-                                                    }"
-                                                    width="22px !important"
-                                                    :thumbnail="'22x22'"
-                                                    @click="handleFilterItem(item,'checkEvent',true)"
-                                                />
-                                                <!-- <img v-if="filterType.toLowerCase() == 'users'" :src="item.profile ? item.profile : defaultImage" :alt="item.name" class="timesheet_user_profile" @click="handleFilterItem(item,'checkEvent',true)"/> -->
-                                                <span class="filter_list_item cursor-pointer" @click="handleFilterItem(item,'checkEvent',true)">{{ item.name }}</span>
-                                            </a>
-                                        </span>
-                                        <span
-                                        v-for="item in optionFilter"
-                                        class="wf_listItem users_filter_items"
-                                        :key="item.id"
-                                        v-show="filterType.toLowerCase()=='teams' && isEveryOne">
-                                            <span class="filter_list_item cursor-pointer" @click="handleFilterItem(item,'add'),$refs.filter_ut_click.click()">&nbsp;&nbsp;{{ item.name }}</span>
-                                        </span>
-                                        <span
-                                        v-for="(item,index) in optionFilter"
-                                        class="wf_listItem users_filter_items"
-                                        :key="index"
-                                        v-show="filterType.toLowerCase()=='projects'">
-                                            <a class="vs-dropdown-users d-flex align-items-center">
-                                                <input type="checkbox" v-show="filterType.toLowerCase() == 'users'" @click="handleFilterItem(item,'checkEvent')" :value="item.id" v-model="checkedFilter">&nbsp;
-                                                <span v-if="item?.projectIcon && item?.projectIcon.type === 'color'" class="d-flex align-items-center justify-content-center inital-box" :style="[{'background-color': item?.projectIcon.data}]">{{ item?.name.charAt(0).toUpperCase()}}</span>
-                                                <img v-if="item?.projectIcon && item?.projectIcon.type === 'image' && validateURL(item?.projectIcon.data)" class="profile-sm-square inital-box" :src="item?.projectIcon.data" alt=""/>
-                                                <WasabiImage 
-                                                    v-if="item?.projectIcon && item?.projectIcon.type === 'image' && !validateURL(item?.projectIcon.data)"
-                                                    class="profile-sm-square inital-box"
-                                                    :data="{url: item?.projectIcon.data}"
-                                                />
-                                                <span class="filter_list_item cursor-pointer" @click="handleFilterItem(item,'add'),$refs.filter_ut_click.click()">{{ item.name }}</span>
-                                            </a>
-                                        </span>
-                                        <span v-if="!optionFilter || optionFilter.length == 0" class="invalid-feedback d-block p-5px">{{$t('UserTimesheet.no_records_found')}}.</span>
-                                    </div>
-                                </div>
-                                </template>
-                            </DropDown>
-                        </span>
-                        <div class="chipusername_main">
-                            <span class="chipusername_wrapper" v-for="(chip,chipKey) in selectedFilters" :key="chipKey">
-                                <span class="user_name" :title="chip.name" >
-                                        {{  `${$t(`general.${chip.type.slice(0,-1)}`)} : ${chip.name}` }}
-                                        <!-- {{ `${chip.type=='Users' ? 'User' : 'Teams' ? 'Team' : 'Projects' ? 'Projects' : 'Projects'}  ${chip.name}` }} -->
-                                    </span>
-                                    <button @click.stop.prevent="handleFilterItem(chip,'remove')" type="button" class="btn-close vs-chip--close cursor-pointer">
-                                        <img :src="close" alt="cancel"/>
-                                    </button>
-                            </span>
-                        </div>
-                    </div>
-                </div>
-                <div class="ut-toolbar d-flex align-items-center">
-                    <div class="ut-legends d-flex align-items-center">
-                        <span class="d-flex align-items-center">
-                            <div class="circlegreen mr-6px"></div>
-                            <span class="font-size-14 GunPowder font-weight-400">{{$t('UserTimesheet.tracked_time')}}</span>
-                        </span>
-                        <span class="d-flex align-items-center">
-                            <div class="circlePurple mr-6px"></div>
-                            <span class="font-size-14 GunPowder font-weight-400">{{ $t('UserTimesheet.manual_time') }}</span>
-                        </span>
-                    </div>
-                    <!-- <span class="ut-divider"></span> -->
-                    <BillableSummary
-                        :period-start="dateRange.startDate"
-                        :period-end="dateRange.endDate"
-                        :user-ids="billableUserIds"
-                    />
-                    <span class="ut-divider"></span>
-                    <TimesheetApproval
-                        :period-start="dateRange.startDate"
-                        :period-end="dateRange.endDate"
-                        :current-user-id="currentUserId"
-                        :current-user-name="currentUserRef?.Employee_Name || ''"
-                        :role-type="companyUserDetail?.roleType"
-                    />
-                    <span class="ut-divider"></span>
-                    <div class="ut-actions d-flex align-items-center">
-                        <TimesheetExport
-                            :period-start="dateRange.startDate"
-                            :period-end="dateRange.endDate"
-                            :user-ids="billableUserIds"
-                            :project-ids="exportProjectIds"
-                        />
-                        <TimesheetInvoice
-                            :period-start="dateRange.startDate"
-                            :period-end="dateRange.endDate"
-                            :user-ids="billableUserIds"
-                        />
-                    </div>
-                </div>
-            </div>
-            
-            <TimesheetView v-if="!isSpinner" :filterType="filterType" :checkedFilter="checkedFilter" v-model="dateColumns" :usersArray="usersArray" :activeWeekObj="activeWeekObj" :tableStyle="tableStyle" @update:getSubItemView="getProjectData" @update:getTaskData="getTaskDataFunction" :isNoRecordShow="(usersArray.length === 0 && !isSpinner) ? true : false"/>
-            <SpinnerComp :is-spinner="isSpinner || isSpinnerTask" v-if="isSpinner || isSpinnerTask"/>
+<NotFound v-else-if="!allowed" />
+<div v-else class="ah-page tv-page ut2">
+    <div class="tv-head">
+        <h1 class="tv-title">{{ $t('TimeV2.my_timesheet') }}</h1>
+        <span class="tv-range">
+            <button type="button" :aria-label="$t('TimeV2.prev_week')" @click="shiftWeek(-1)">‹</button>
+            <span>{{ rangeLabel }}</span>
+            <button type="button" :aria-label="$t('TimeV2.next_week')" @click="shiftWeek(1)">›</button>
+        </span>
+        <span class="ah-chip" :class="statusChip.cls" :title="statusChip.title">{{ statusChip.label }}</span>
+        <TimesheetTabs active="mine" />
+        <div class="tv-actions">
+            <span v-if="timer.running.value" class="ah-chip ah-chip--ok ut2-timer">
+                <span class="ah-dot ah-dot--ok"></span>
+                <span class="tv-mono">{{ formatClock(timer.elapsed.value, true) }}</span>
+                <span class="ut2-timer__task" :title="timer.active.value.taskName">{{ timer.active.value.taskName }}</span>
+                <button type="button" class="tv-link" :disabled="busy.timer" @click="stopTimer">{{ $t('TimeV2.stop') }}</button>
+            </span>
+            <span v-else-if="liveSession" class="ah-chip ah-chip--ok ut2-timer" :title="$t('TimeV2.running_desktop')">
+                <span class="ah-dot ah-dot--ok"></span>
+                <span class="ut2-timer__task">{{ liveSession.taskName }}</span>
+            </span>
+            <select v-if="isEveryone" v-model="personId" class="tv-select" :title="$t('TimeV2.me')">
+                <option value="">{{ $t('TimeV2.me') }}</option>
+                <option v-for="u in otherUsers" :key="u._id" :value="u._id">{{ u.Employee_Name }}</option>
+            </select>
+            <select v-model="projectId" class="tv-select" :title="$t('TimeV2.all_projects')">
+                <option value="">{{ $t('TimeV2.all_projects') }}</option>
+                <option v-for="p in projectList" :key="p._id" :value="String(p._id)">{{ p.ProjectName }}</option>
+            </select>
+            <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="openLog()">{{ $t('TimeV2.log_time') }}</button>
+            <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy.export" @click="exportCsv">
+                {{ busy.export ? $t('TimeV2.exporting') : $t('TimeV2.export') }}
+            </button>
+            <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="!canSubmit || busy.submit" @click="submitWeek">
+                {{ busy.submit ? $t('TimeV2.submitting') : (isRejected ? $t('TimeV2.resubmit_week') : $t('TimeV2.submit_week')) }}
+            </button>
         </div>
     </div>
-    <div v-else class="h-100">
-        <NotFound />
+
+    <p v-if="error" class="tv-error">{{ error }}</p>
+    <p v-else-if="notice" class="tv-ok">{{ notice }}</p>
+
+    <div class="ut2-scroll ah-scroll">
+        <div class="tv-card ut2-grid" :style="{ '--days': days.length || 7 }" :class="{ 'is-loading': loading }">
+            <div class="ut2-row ut2-row--head">
+                <span class="ut2-task">{{ $t('TimeV2.col_task') }}</span>
+                <span v-for="d in days" :key="d.date" :class="{ 'is-today': d.date === today, 'is-off': d.weekend || d.pto }" :title="d.pto ? $t('TimeV2.pto') : ''">{{ dayLabel(d) }}</span>
+                <span>{{ $t('TimeV2.col_total') }}</span>
+            </div>
+            <div v-if="!displayRows.length" class="ut2-empty">
+                <div v-if="loading" class="ah-small">{{ $t('TimeV2.loading') }}</div>
+                <div v-else class="tv-empty">
+                    <span>{{ $t('TimeV2.empty_week') }}</span>
+                    <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="openLog()">{{ $t('TimeV2.log_time') }}</button>
+                </div>
+            </div>
+            <div v-for="row in displayRows" :key="row.taskId" class="ut2-row">
+                <div class="ut2-task">
+                    <span class="tv-sq" :style="{ background: row.projectColor || 'var(--brand)' }"></span>
+                    <span class="ut2-task__name" :title="row.projectName || ''">{{ row.taskName || row.taskId }}</span>
+                    <button
+                        type="button"
+                        class="ut2-bill"
+                        :class="{ 'is-on': row.billable }"
+                        :title="$t('TimeV2.toggle_billable')"
+                        :disabled="busy.billable === row.taskId || !row.entryIds.length"
+                        @click="toggleBillable(row)"
+                    >{{ row.billable ? $t('TimeV2.billable') : $t('TimeV2.non_billable') }}</button>
+                </div>
+                <button
+                    v-for="d in days"
+                    :key="d.date"
+                    type="button"
+                    class="ut2-cell"
+                    :class="{ 'is-empty': !cellMinutes(row, d), 'is-off': d.weekend || d.pto, 'is-live': isLiveCell(row, d), 'is-today': d.date === today }"
+                    :disabled="!canEdit || d.date > today"
+                    @click="openLog(row, d)"
+                >{{ cellText(row, d) }}</button>
+                <span class="ut2-total">{{ formatMinutes(rowTotal(row)) }}</span>
+            </div>
+            <div class="ut2-row ut2-row--total">
+                <span class="ut2-task">{{ $t('TimeV2.total_capacity', { h: hoursPerDay }) }}</span>
+                <span v-for="d in days" :key="d.date" :class="{ 'is-today': d.date === today, 'is-empty': !dayTotal(d), 'is-off': d.weekend || d.pto }">{{ dayTotal(d) ? formatMinutes(dayTotal(d)) : '—' }}</span>
+                <span>{{ formatMinutes(weekTotal) }}</span>
+            </div>
+        </div>
     </div>
+
+    <div class="tv-note">
+        <div class="tv-card">
+            <span class="ah-dot" :class="previous.dot"></span>
+            <span class="ut2-prev">{{ $t('TimeV2.last_week') }} <strong>{{ previous.label }}</strong><span v-if="previous.detail">, {{ previous.detail }}</span><span v-if="previous.hours"> · {{ previous.hours }}</span></span>
+        </div>
+        <div v-if="underHint" class="tv-card">
+            <span class="tv-spark">✦</span>
+            <span class="ut2-hint">{{ underHint.text }}</span>
+            <button type="button" class="tv-link ut2-hint__cta" @click="openLog(null, underHint.day, underHint.minutes)">{{ $t('TimeV2.add_hours', { h: formatHm(underHint.minutes) }) }}</button>
+        </div>
+    </div>
+
+    <transition name="ah-slide-right">
+        <aside v-if="logOpen" class="ut2-panel">
+            <LogTimeSheet mode="panel" :prefill="logPrefill" :recentTasks="recentTasks" @close="logOpen = false" @logged="onLogged" />
+        </aside>
+    </transition>
 </div>
 </template>
 
 <script setup>
-    import { useCustomComposable ,useGetterFunctions } from '@/composable';
-    import { defineComponent , onMounted ,ref , computed , inject ,watch } from "vue";
-    import { useStore } from "vuex";
-    import RangePickerComp from '@/components/molecules/RangePickerComp/RangePickerComp.vue';
-    import moment from 'moment';
-    import '@vuepic/vue-datepicker/dist/main.css';
-    import { useRouter } from "vue-router"
-    import TimesheetView from '@/components/atom/TimesheetView/UserTimeSheetView/UserTimesheetView.vue'
-    import DropDown from '@/components/molecules/DropDown/DropDown.vue'
-    import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
-    import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
-    import * as helper from '@/views/Timesheet/helper';
-    import NotFound from '@/views/NotFound.vue';
-    import UserProfile from "@/components/atom/UserProfile/UserProfile.vue";
-    import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
-    import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
-    import { apiRequest } from '../../../services';
-    import * as env from '@/config/env';
-    import TimesheetApproval from '@/components/molecules/TimesheetApproval/TimesheetApproval.vue';
-    import BillableSummary from '@/components/molecules/BillableSummary/BillableSummary.vue';
-    import TimesheetExport from '@/components/molecules/TimesheetExport/TimesheetExport.vue';
-    import TimesheetInvoice from '@/components/molecules/TimesheetInvoice/TimesheetInvoice.vue';
+import { ref, computed, inject, onMounted, watch } from 'vue';
+import { useStore } from 'vuex';
+import { useRoute, useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
+import moment from 'moment';
+import { apiRequest } from '@/services';
+import * as env from '@/config/env';
+import { useCustomComposable, useGetterFunctions } from '@/composable';
+import { useTimer, formatClock, formatMinutes, formatHm } from '@/composable/useTimer';
+import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
+import NotFound from '@/views/NotFound.vue';
+import TimesheetTabs from '@/views/Timesheet/TimesheetTabs.vue';
+import LogTimeSheet from '@/views/TimeLog/LogTimeSheet.vue';
 
-    defineComponent({
-        name: "UserTimesheet",
-        components: {
-            DropDown,
-            DropDownOption,
-            RangePickerComp,
-        }
-    })
-    // const defaultImage = require("@/assets/images/default_user.png")
-    const close = require("@/assets/images/svg/close_timesheet.svg")
-    const router = useRouter()
-    const { getters , dispatch} = useStore();
-    const {getUser} = useGetterFunctions();
-    const {checkPermission,debouncerWithPromise} = useCustomComposable();
-    const filter_ut_click = ref(null);
-    const CompanyDatabase = inject("$companyId");
-    const selectedFilters = ref([]);
-    const clientWidth = inject("$clientWidth");
-    const isSpinner = ref(true);
-    const isSpinnerTask = ref(false);
-    const activeWeekObj = ref({
-        isWeeked: false,
-        isOneday: false,
-        isTwoday: false,
-        isThreeday: false,
-        isFourday: false,
-        isFiveday: false,
-        isSixday: false,
-    });
-    const tableStyle = ref({'colspanCount':  "35",'tableWidth': "4885px"});
-    const users = ref();
-    const currentUserId = inject("$userId");
-    const currentUserRef = ref(getUser(currentUserId.value, true));
-    const dateColumns = ref([]);
-    const dateRange = ref({});
-    const selectedDates = ref([]);
-    // let date = new Date();
-    const checkedFilter = ref([]);
-    const filterType = ref("");
-    const filterSearch = ref("");
-    const companyId = inject('$companyId');
-    const timesheetDocArray = ref([]);
-    const teams = computed(() => getters["settings/teams"]);
-    watch(() => getters["settings/teams"],(val) => {
-        teams.value = val;
-    })
-    const finalFilter = ref([]);
-    const companyUserDetail = computed(() => getters["settings/companyUserDetail"]);
-    const billableUserIds = computed(() => (users.value || []).map((u) => u._id).filter(Boolean));
-    const usersArray = ref([]);
-    // dateRange.value.startDate = new Date(date.getFullYear(), date.getMonth(), 1);
-    // dateRange.value.endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-    selectedDates.value = [dateRange.value.startDate,dateRange.value.endDate];
-    const projects = ref([]);
-    const exportProjectIds = computed(() => selectedFilters.value.filter((x) => x.type === 'Projects').map((x) => x.id).filter(Boolean));
-    const projectsGetter = computed(() => getters["projectData/allProjects"]);
-    const currentCompany = computed(() => getters["settings/selectedCompany"])
+defineOptions({ name: 'UserTimesheet' });
 
-    const getFinalProjectArray = ref([]);
-    const isEveryOne = ref(false);
-    const error404 = ref(true);
-    const loading = ref(true);
+const { getters } = useStore();
+const route = useRoute();
+const router = useRouter();
+const { t } = useI18n();
+const { checkPermission } = useCustomComposable();
+const { getUser } = useGetterFunctions();
+const companyId = inject('$companyId');
+const currentUserId = inject('$userId');
+const clientWidth = inject('$clientWidth');
+const timer = useTimer();
 
-    const {getTeamsData} = useGetterFunctions();
+const cid = computed(() => (companyId && companyId.value) || '');
+const uid = computed(() => (currentUserId && currentUserId.value) || localStorage.getItem('userId') || '');
+const currentCompany = computed(() => getters['settings/selectedCompany']);
+const companyUserDetail = computed(() => getters['settings/companyUserDetail'] || {});
+const isPrivileged = computed(() => [1, 2].includes(companyUserDetail.value.roleType));
+const permission = computed(() => checkPermission('sheet_settings.user_timesheet'));
+const allowed = computed(() => permission.value !== null && permission.value !== undefined);
+const isEveryone = computed(() => permission.value === true || permission.value === 2);
+const otherUsers = computed(() => (getters['users/users'] || []).filter((u) => u._id !== uid.value));
 
-    onMounted(async () => {
-        if(checkPermission('sheet_settings.user_timesheet') !== null){
-            if(!projectsGetter.value || !Object.keys(projectsGetter.value).length) {
-                getUserData();
-                getTeamsData().then((response) => {
-                    const uid = companyUserDetail.value.userId;
-                    const filterteam = response.filter((x) => x.assigneeUsersArray.indexOf(uid) !== -1);
-                    const teamIds = filterteam.map((x) => 'tId_'+x._id);
-                    let publicQuery = {
-                        isPrivateSpace:false
-                    }
-                    if(companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2 && !getters["settings/rules"].toggle.showAllProjects) {
-                        publicQuery.AssigneeUserId = {
-                            $in:[uid]
-                        }
-                        if (teamIds && teamIds.length) {
-                            publicQuery.AssigneeUserId.$in = [...publicQuery.AssigneeUserId.$in.concat(teamIds)]
-                        }
-                    }
-                    let privateQuery = {
-                        isPrivateSpace:true
-                    }
-                    if(companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2) {
-                        privateQuery.AssigneeUserId = {
-                            $in:[uid]
-                        }
-                        if (teamIds && teamIds.length) {
-                            privateQuery.AssigneeUserId.$in = [...privateQuery.AssigneeUserId.$in.concat(teamIds)]
-                        }
-                    }
-                    const roleType = companyUserDetail.value.roleType;
-                    if(checkPermission('project.project_list') !== null) {
-                        dispatch("projectData/setProjects", {
-                            ...(checkPermission("project.public_projects") === true ? publicQuery : {}),
-                            restrictPublic: checkPermission("project.public_projects") !== true,
-                            privateQuery,
-                            roleType
-                        }).then(()=>{
-                            projects.value = projectsGetter.value.data ? [...projectsGetter.value.data] : [];
-                            projects.value = projects.value.filter((x)=> !x.isRestrict)
-                            getFinalProjectArray.value = JSON.parse(JSON.stringify(projects.value));
-                            getUserData();
-                            initData(dateRange.value.startDate,dateRange.value.endDate);
-                            loading.value = false;
-                        })
-                        .catch((error) => {
-                            console.error("ERROR in setProjects: ", error);
-                            loading.value = false;
-                        })
-                    }
-                }).catch((error) => {
-                    console.error(error,"ERROR IN GET TEAMS DATA");
-                    loading.value = false;
-                });
-            } else {
-                projects.value = projectsGetter.value.data ? [...projectsGetter.value.data] : [];
-                projects.value = projects.value.filter((x)=> !x.isRestrict)
-                getFinalProjectArray.value = JSON.parse(JSON.stringify(projects.value));
-                getUserData();
-                initData(dateRange.value.startDate,dateRange.value.endDate);
-                loading.value = false;
-            }
-        }else{
-            error404.value = false;
-            loading.value = false;
-        }
-    })
-    const getUserData = async () => {
-        if (checkPermission('sheet_settings.user_timesheet') === true || checkPermission('sheet_settings.user_timesheet') === 2) {
-            isEveryOne.value = true;
-            const allUser = computed(() => getters["users/users"])
-            users.value = allUser.value;
-        } else {
-            isEveryOne.value = false;
-            users.value = [getUser(currentUserId.value,true)]
-        }
-    }
-    const handleDate = (modelData) => {
-        dateRange.value.startDate = modelData.dateVal[0]
-        dateRange.value.endDate = modelData.dateVal[1]
-        if((projects.value && projects.value.length) || (!loading.value)){
-            initData(modelData.dateVal[0] ? modelData.dateVal[0] : '',modelData.dateVal[1] ? modelData.dateVal[1]: '');
-        }
-    }
-    const getTaskDataFunction = (projectObject,cb) => {
-        isSpinnerTask.value = true;
-        helper.getTaskData(projectObject,timesheetDocArray,companyId).then((response)=>{
-            isSpinnerTask.value = false;
-            cb(response)
-        }).catch((error)=>{
-            isSpinnerTask.value = false;
-            console.error(error,"Error get task");
-        })
-    }
-    const getProjectData = (userObj, cb) => {
-        userObj.projectArray = [];
-        const tmpfullLoggedData = timesheetDocArray.value.filter(x => x.user.trim() === userObj.id.trim());
-        let userRecord = tmpfullLoggedData.map(item => item['data']).flat();
-        const countFunction = (row, cb) => {
-            if (count >= userRecord.length) {
-                cb({ 'status': true, 'data': userObj });
-                return;
-            }
-            let projectKey = userObj.projectArray.findIndex(item => item._id === row.projectId);
-            if (projectKey === -1) {
-                let proIndex = getFinalProjectArray.value.findIndex(ele => ele._id === row.projectId);
-                if (proIndex !== -1) {
-                    let projectData = { ...getFinalProjectArray.value[proIndex], 'activitiesArray': [], totalProjectTime: 0, 'projectManualTime': 0, 'projectTrackeTime': 0, 'projectFinalLogs': {}, 'dateWiseProjectType': {}, 'dateWiseManulTime': {}, 'dateWiseTrackTime': {}, 'selectedUserId': userObj.id }
-                    let tempESTDate = row.date ? moment(new Date(row.date)).format("YYYY-MM-DD") : "";
-                    projectData.totalProjectTime += row.logMinutes || 0;
-                    if (row.logType === 0 || row.logType === undefined) {
-                        projectData.projectManualTime += row.logMinutes || 0;
-                    } else if (row.logType === 1) {
-                        projectData.projectTrackeTime += row.logMinutes || 0;
-                    }
-                    let isExist = Object.keys(projectData.projectFinalLogs).includes(tempESTDate);
-                    if (isExist) {
-                        projectData.projectFinalLogs[tempESTDate] += row.logMinutes || 0;
-                        if (row.logType === 0 || row.logType === undefined) {
-                            projectData.dateWiseManulTime[tempESTDate] = projectData.dateWiseManulTime[tempESTDate] ?  projectData.dateWiseManulTime[tempESTDate] + (row.logMinutes || 0) : (row.logMinutes || 0);
-                        } else if (row.logType === 1) {
-                            projectData.dateWiseTrackTime[tempESTDate] = projectData.dateWiseTrackTime[tempESTDate] + row.logMinutes || 0;
-                        }
-                        if (projectData.dateWiseProjectType[tempESTDate] !== row.logType) {
-                            projectData.dateWiseProjectType[tempESTDate] = 2;
-                        }
-                    } else {
-                        projectData.projectFinalLogs[tempESTDate] = row.logMinutes || 0;
-                        projectData.dateWiseProjectType[tempESTDate] = row.logType;
-                        if (row.logType === 0 || row.logType === undefined) {
-                            projectData.dateWiseManulTime[tempESTDate] = row.logMinutes || 0;
-                        }  else if (row.logType === 1) {
-                            projectData.dateWiseTrackTime[tempESTDate] = row.logMinutes || 0;
-                        }
-                    }
-                    userObj.projectArray.push(projectData);
-                    count++;
-                    countFunction(userRecord[count], cb);
-                } else {
-                    count++;
-                    countFunction(userRecord[count], cb);
-                }
-            } else {
-                let tempESTDate = row.date ? moment(new Date(row.date)).format("YYYY-MM-DD") : "";
-                userObj.projectArray[projectKey].totalProjectTime += row.logMinutes || 0;
-                if (row.logType === 0 || row.logType === undefined) {
-                    userObj.projectArray[projectKey].projectManualTime += row.logMinutes || 0;
-                } else if (row.logType === 1) {
-                    userObj.projectArray[projectKey].projectTrackeTime += row.logMinutes || 0;
-                }
-                let isExist = Object.keys(userObj.projectArray[projectKey].projectFinalLogs).includes(tempESTDate);
-                if (isExist) {
-                    userObj.projectArray[projectKey].projectFinalLogs[tempESTDate] += row.logMinutes || 0;
-                    if (userObj.projectArray[projectKey].dateWiseProjectType[tempESTDate] !== row.logType) {
-                        userObj.projectArray[projectKey].dateWiseProjectType[tempESTDate] = 2;
-                    }
-                    if (row.logType === 0 || row.logType === undefined) {
-                        userObj.projectArray[projectKey].dateWiseManulTime[tempESTDate] = userObj.projectArray[projectKey].dateWiseManulTime[tempESTDate] ?  userObj.projectArray[projectKey].dateWiseManulTime[tempESTDate] + (row.logMinutes || 0) : (row.logMinutes || 0);
-                    } else if (row.logType === 1) {
-                        userObj.projectArray[projectKey].dateWiseTrackTime[tempESTDate] = userObj.projectArray[projectKey].dateWiseTrackTime[tempESTDate] + row.logMinutes || 0;
-                    }
-                } else {
-                    userObj.projectArray[projectKey].projectFinalLogs[tempESTDate] = row.logMinutes || 0;
-                    userObj.projectArray[projectKey].dateWiseProjectType[tempESTDate] = row.logType;
-                    if (row.logType === 0 || row.logType === undefined) {
-                        userObj.projectArray[projectKey].dateWiseManulTime[tempESTDate] = row.logMinutes || 0;
-                    } else if (row.logType === 1) {
-                        userObj.projectArray[projectKey].dateWiseTrackTime[tempESTDate] = row.logMinutes || 0;
-                    }
-                }
-                count++;
-                countFunction(userRecord[count], cb);
-            }
-        };
-        let count = 0;
-        countFunction(userRecord[count], cb);
-    }
-    const goHome = () => {
-        router.push({path: `/${companyId.value}`});
-    }
-    const getTimesheetData = (sdate, edate) => {
-        return new Promise((resolve, reject) => {
-            let start = sdate / 1000;
-            let end = edate / 1000;
-            let userArray = [];
-            let filterIds = selectedFilters.value.filter((x) => { return x.type == 'Users' });
-            if (filterIds.length) {
-                filterIds.forEach((element) => {
-                    userArray.push(element.id)
-                });
-            }
-            let teamsIds = selectedFilters.value.filter((x) => { return x.type == 'Teams' });
-            if (teamsIds.length) {
-                teamsIds.forEach((element) => {
-                    let ind = teams.value.findIndex((x) => { return x._id === element.id });
-                    teams.value[ind].assigneeUsersArray.forEach((dt) => {
-                        userArray.push(dt)
-                    })
-                })
-            }
-            if (filterIds.length === 0 && teamsIds.length === 0) {
-                users.value.forEach((element) => {
-                    userArray.push(element._id)
-                });
-            }
-            let filterProject = selectedFilters.value.filter((x) => { return x.type == "Projects" });
-            let projectArray = [];
-            if (filterProject.length) {
-                filterProject.forEach((element) => {
-                    projectArray.push(element.id)
-                })
-            }
-            const axiosObj = {
-                selectedFilter : selectedFilters.value,
-                projectArray: projectArray,
-                userArray: userArray,
-                start: start,
-                end: end,
-                companyUserDetail: companyUserDetail.value,
-                timeZone: currentUserRef.value.Time_Zone ? currentUserRef.value.Time_Zone : "Asia/Kolkata"
-            }
+const weekStart = ref(moment(route.query.week || undefined).startOf('isoWeek'));
+const personId = ref(String(route.query.userId || '') === uid.value ? '' : String(route.query.userId || ''));
+const projectId = ref('');
+const projectList = ref([]);
+const hoursPerDay = ref(8);
+const days = ref([]);
+const rows = ref([]);
+const totals = ref({ byDay: {}, weekMinutes: 0, billableMinutes: 0, capacityMinutes: 0 });
+const approval = ref({ current: null, previous: null });
+const underCapacity = ref([]);
+const loading = ref(false);
+const error = ref('');
+const notice = ref('');
+const busy = ref({ submit: false, export: false, billable: '', timer: false });
+const logOpen = ref(false);
+const logPrefill = ref({});
 
-            apiRequest("post", `${env.TIMESHEET}/user`,axiosObj)
-            .then((result) => {
-                const timeSheet = result.data;
-                let data = [];
-                timeSheet.map((row) => {
-                    data.push({ ...row, 'logType': row._id.logType ? row._id.logType : 0 });
-                })
-                timesheetDocArray.value = data;
-                if (filterProject.length) {
-                    timesheetDocArray.value.forEach((x) => {
-                        if(getUser(x.user).ghostUser){
-                            const index = users.value.findIndex((user) => user._id === x.user);
-                            if(index === -1){
-                                users.value.push(getUser(x.user));
-                            }
-                        }
-                    })
-                }
-                resolve(timeSheet)
-            })
-            .catch(() => {
-                timesheetDocArray.value = [];
-                reject([])
-            })
-        })
+const today = computed(() => moment().format('YYYY-MM-DD'));
+const startIso = computed(() => weekStart.value.format('YYYY-MM-DD'));
+const endIso = computed(() => weekStart.value.clone().add(6, 'days').format('YYYY-MM-DD'));
+const rangeLabel = computed(() => `${weekStart.value.format('MMM D')} – ${weekStart.value.clone().add(6, 'days').format('MMM D')}`);
+const targetUser = computed(() => personId.value || uid.value);
+const isMe = computed(() => targetUser.value === uid.value);
+const canEdit = computed(() => isMe.value && !(approval.value.current && approval.value.current.status === 'approved'));
+const timeZone = computed(() => (getUser(uid.value) || {}).timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+const liveSession = computed(() => (isMe.value ? timer.sessions.value.find((s) => s.live) : null) || null);
+const liveMinutes = computed(() => (timer.running.value ? Math.floor(timer.elapsed.value / 60) : 0));
+const liveTaskId = computed(() => (isMe.value ? (timer.active.value && timer.active.value.taskId) || (liveSession.value && liveSession.value.taskId) || '' : ''));
+
+const dayLabel = (d) => moment(d.date).format('ddd').toUpperCase();
+const displayRows = computed(() => {
+    const list = rows.value.map((r) => ({ ...r }));
+    const live = timer.active.value || liveSession.value;
+    if (liveTaskId.value && live && !list.some((r) => r.taskId === liveTaskId.value)) {
+        list.unshift({
+            taskId: live.taskId, taskName: live.taskName || '', projectId: live.projectId || '', projectName: live.projectName || '',
+            projectColor: live.projectColor || '', sprintId: live.sprintId || '', billable: live.billable !== false, byDay: {}, total: 0, entryIds: [],
+        });
     }
-    const initData = (startDate, EndDate) => {
-        try {
-            if(!(startDate) && !(EndDate)) {
-                isSpinner.value = false;
-                return;
-            }
-            isSpinner.value = true;
-            var sDate = startDate ? new Date(startDate).setHours(0,0,0,0) : new Date(dateRange.value.startDate).getTime();
-            var eDate = new Date(EndDate || dateRange.value.endDate);
-            eDate.setHours(23, 59, 59);
-            dateColumns.value = [];
-            usersArray.value = [];
-            for (let i = sDate; i < eDate.getTime(); i += 86400000) {
-                const momentDate = moment(new Date(i));
-                const DateColumn = {
-                    date: momentDate.format('DD'),
-                    day: momentDate.format('ddd'),
-                    fullDate: momentDate.format('YYYY-MM-DD'),
-                    currentDate: moment(new Date()).format('YYYY-MM-DD'),
-                    arabiDay: momentDate.format('Do').replace(/[0-9]/g, ''),
-                    arabiMonth: momentDate.format('MMM'),
-                    mainDate: new Date(i),
-                    weekNumber: (momentDate.weeks() - momentDate.startOf('month').weeks() + 1 + 52) % 52,
-                    weekName: ["1st", "2nd", "3rd", "4th", "5th"][(momentDate.weeks() - momentDate.startOf('month').weeks() + 1 + 52) % 52 - 1] || "",
-                    dateMonth: momentDate.format('MM'),
-                    totalUserEst: {},
-                    totalUserLogs: {},
-                    totalManualLogs:{},
-                    totalTrackedLogs:{},
-                    totalDayEst: 0,
-                    totalDayLogs: 0,
-                    totalLogsType: {},
-                };
-                dateColumns.value.push(DateColumn);
-                const dateColumnsLength = dateColumns.value.length;
-                activeWeekObj.value = {
-                    isOneday: dateColumnsLength === 1,
-                    isTwoday: dateColumnsLength === 2,
-                    isThreeday: dateColumnsLength === 3,
-                    isFourday: dateColumnsLength === 4,
-                    isFiveday: dateColumnsLength === 5,
-                    isSixday: dateColumnsLength === 6,
-                };
-                if (dateColumnsLength <= 20) {
-                    tableStyle.value.colspanCount = "27";
-                    tableStyle.value.tableWidth = "1888px";
-                    activeWeekObj.value.isWeeked = true;
-                }
-                if (dateColumnsLength > 7) {
-                    activeWeekObj.value.isWeeked = true;
-                    const noOfDays = dateColumnsLength;
-                    const tblWidth = noOfDays * 190 + 570;
-                    tableStyle.value.tableWidth = tblWidth + 'px';
-                    const tblColspan = 6 + 3 * noOfDays;
-                    tableStyle.value.colspanCount = tblColspan;
-                }
-            }
-            if(projects.value && projects.value.length){
-                getTimesheetData(sDate, eDate).then(() => {
-                    let promise = []
-                    getRemainingProject();
-                    displayUserArray().then((response) => {
-                        response.forEach((user) => {
-                            promise.push(userArrayPromise(user));
-                        })
-                    })
-                    Promise.allSettled(promise).then(() => {
-                        isSpinner.value = false;
-                    }).catch((error) => {
-                        isSpinner.value = false;
-                        console.error(error,"error");
-                    })
-                });   
-            }else{
-                isSpinner.value = false;
-            }
-        } catch (error) {
-            isSpinner.value = false;
-            console.error("Error",error)
-        }
+    return list;
+});
+const isLiveCell = (row, d) => d.date === today.value && !!liveTaskId.value && row.taskId === liveTaskId.value;
+const liveExtra = (row, d) => (isLiveCell(row, d) && timer.running.value ? liveMinutes.value : 0);
+const cellMinutes = (row, d) => (row.byDay[d.date] || 0) + liveExtra(row, d);
+const cellText = (row, d) => {
+    const m = cellMinutes(row, d);
+    if (!m) return isLiveCell(row, d) ? '● 0:00' : '—';
+    return `${isLiveCell(row, d) ? '● ' : ''}${formatMinutes(m)}`;
+};
+const rowTotal = (row) => row.total + (row.taskId === liveTaskId.value && timer.running.value ? liveMinutes.value : 0);
+const dayTotal = (d) => (totals.value.byDay[d.date] || 0) + (d.date === today.value && timer.running.value && liveTaskId.value ? liveMinutes.value : 0);
+const weekTotal = computed(() => totals.value.weekMinutes + (timer.running.value && liveTaskId.value ? liveMinutes.value : 0));
+
+const statusOf = (doc) => (doc && doc.status) || 'draft';
+const statusChip = computed(() => {
+    const doc = approval.value.current;
+    const status = statusOf(doc);
+    const cls = { submitted: 'ah-chip--warn', approved: 'ah-chip--ok', rejected: 'ah-chip--danger' }[status] || '';
+    const label = t(`TimeV2.status_${status}`);
+    const title = status === 'rejected' && doc.rejectionReason ? t('TimeV2.reason', { reason: doc.rejectionReason }) : '';
+    return { cls, label: title ? `${label} · ${doc.rejectionReason}` : label, title };
+});
+const isRejected = computed(() => statusOf(approval.value.current) === 'rejected');
+const canSubmit = computed(() => (isMe.value || isPrivileged.value) && ['draft', 'rejected'].includes(statusOf(approval.value.current)));
+const previous = computed(() => {
+    const doc = approval.value.previous;
+    const status = statusOf(doc);
+    const hours = doc ? formatHm(doc.totalMinutes) : '';
+    const who = doc && doc.reviewerName;
+    if (status === 'submitted') return { dot: 'ah-dot--warn', label: t('TimeV2.status_submitted').toLowerCase(), detail: who ? t('TimeV2.awaiting_named', { name: who }) : t('TimeV2.awaiting_approval'), hours };
+    if (status === 'approved') return { dot: 'ah-dot--ok', label: t('TimeV2.status_approved').toLowerCase(), detail: who ? t('TimeV2.approved_by', { name: who }) : '', hours };
+    if (status === 'rejected') return { dot: 'ah-dot--danger', label: t('TimeV2.status_rejected').toLowerCase(), detail: doc.rejectionReason ? t('TimeV2.reason', { reason: doc.rejectionReason }) : (who ? t('TimeV2.rejected_by', { name: who }) : ''), hours };
+    return { dot: 'ut2-dot--none', label: t('TimeV2.not_submitted'), detail: '', hours: '' };
+});
+const underHint = computed(() => {
+    if (!isMe.value || !underCapacity.value.length) return null;
+    const list = underCapacity.value;
+    const gap = list.reduce((s, d) => s + d.gapMinutes, 0);
+    const names = list.map((d) => moment(d.date).format('ddd'));
+    const text = list.length === 1
+        ? t('TimeV2.under_capacity_one', { day: names[0], h: formatHm(gap) })
+        : t('TimeV2.under_capacity_many', { days: `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`, h: formatHm(gap) });
+    return { text, day: list[list.length - 1].date, minutes: list[list.length - 1].gapMinutes };
+});
+const recentTasks = computed(() => rows.value.map((r) => ({ taskId: r.taskId, taskName: r.taskName, projectId: r.projectId, projectName: r.projectName, sprintId: r.sprintId, projectColor: r.projectColor })));
+
+const load = async () => {
+    loading.value = true;
+    error.value = '';
+    try {
+        const qs = new URLSearchParams({ start: startIso.value, end: endIso.value, userId: targetUser.value, projectId: projectId.value, hoursPerDay: String(hoursPerDay.value), timeZone: timeZone.value });
+        const body = ((await apiRequest('get', `${env.TIMESHEET_WEEK}?${qs.toString()}`)) || {}).data || {};
+        if (!body.status) throw new Error(body.statusText || 'load_failed');
+        const d = body.data;
+        days.value = d.days || [];
+        rows.value = d.rows || [];
+        totals.value = d.totals || { byDay: {}, weekMinutes: 0, billableMinutes: 0, capacityMinutes: 0 };
+        approval.value = d.approval || { current: null, previous: null };
+        underCapacity.value = d.underCapacity || [];
+        hoursPerDay.value = d.hoursPerDay || 8;
+    } catch (e) {
+        error.value = t('TimeV2.load_failed');
+    } finally {
+        loading.value = false;
     }
-    const displayUserArray = () => {
-        return new Promise((resolve, reject) => {
-            try {
-                let userArray = [];
-                const filterIds = selectedFilters.value.filter(x => x.type === 'Users');
-                const teamsIds = selectedFilters.value.filter(x => x.type === 'Teams');
-                const filterProject = selectedFilters.value.filter(x => x.type === 'Projects');
-                if (timesheetDocArray.value.length) {
-                    timesheetDocArray.value.forEach(ele => {
-                        const index = users.value.findIndex(x => x._id === ele.user);
-                        if (index !== -1) {
-                            userArray.push(users.value[index]);
-                        }
-                    });
-                }
-                teamsIds.forEach(element => {
-                    const ind = teams.value.findIndex(x => x._id === element.id);
-                    if (ind !== -1) {
-                        const userArr = teams.value[ind].assigneeUsersArray;
-                        userArr.forEach(data => {
-                            const index = users.value.findIndex(x => x._id === data);
-                            if (index !== -1) {
-                                userArray.push(users.value[index]);
-                            }
-                        });
-                    }
-                });
-                filterIds.forEach(element => {
-                    const ind = users.value.findIndex(x => x._id === element.id);
-                    if (ind !== -1) {
-                        userArray.push(users.value[ind]);
-                    }
-                })
-                if (filterProject.length === 0 && filterIds.length === 0 && teamsIds.length === 0) {
-                    userArray = [...users.value];
-                }
-                const uniqueArray = [...new Set(userArray)];
-                resolve(uniqueArray);
-            } catch (error) {
-                reject(error);
-            }
-        })
+};
+const loadProjects = async () => {
+    try {
+        const b = ((await apiRequest('get', env.PROJECT)) || {}).data;
+        const list = Array.isArray(b) ? b : (b && b.data) || [];
+        projectList.value = list.filter((p) => p && p.status !== 'close' && p.deletedStatusKey !== 1 && p.deletedStatusKey !== 2);
+    } catch (e) {
+        projectList.value = [];
     }
-    const getRemainingProject = () => {
-        if (timesheetDocArray.value.length && getFinalProjectArray.value.length) {
-            let tmpfullLoggedData = timesheetDocArray.value.map(item => item['data']).flat() || [];
-            let uniqueProject = [...new Set(tmpfullLoggedData.map((x)=>{return x.projectId}))]
-            let projectId = getFinalProjectArray.value.map((x)=>{return x._id});
-            let remainProject = uniqueProject.filter(item => !projectId.includes(item));
-            if (!isEveryOne.value || companyUserDetail.value.roleType === 1 || companyUserDetail.value.roleType === 2) {
-                const params = { dataIds: remainProject }
-                apiRequest("post", `${env.API_GET_REMAINING_PROJECTS}`, params).then((response) => {
-                    const results = response.data.data;
-                    if (results.length > 0) {
-                        results.forEach((res) => {
-                            getFinalProjectArray.value.push({ ...res, isShow: false });
-                            getFinalProjectArray.value = getFinalProjectArray.value.filter((x)=> !x.isRestrict)
-                        })
-                    }
-                })
-            }
-        }
-    } 
-    const userArrayPromise = (userData) => {
-        return new Promise((resolve, reject) => {
-            try {
-                var totalLoghrs = 0;
-                userData.manuallyLog = {'name' : 'Manually Time',time : 0};
-                userData.trackdLog = {'name' : 'Track Time',time : 0};
-                let tmpfinalMongoData = timesheetDocArray.value.filter((x)=>{return x.user.trim() == userData._id.trim()});
-                let finalMongoData = tmpfinalMongoData.map(item => item['data']).flat();
-                if(finalMongoData.length){
-                    let count = 0;
-                    let countFunction = (element) => {
-                        if (count >= finalMongoData.length) {
-                            let fIndex = usersArray.value.findIndex((e)=>{return e.id == userData._id})
-                            if(fIndex == -1) {
-                                usersArray.value.push({
-                                    'id': userData._id,
-                                    'name': userData.Employee_Name,
-                                    'profileImage': userData.Employee_profileImageURL,
-                                    'activitiesArray': [],
-                                    'totalLoggedHours': totalLoghrs,
-                                    'projectArray' : [],
-                                    'manuallyLog' : userData.manuallyLog,
-                                    'trackdLog' : userData.trackdLog
-                                })
-                            } else {
-                                usersArray.value[fIndex] = {...usersArray.value[fIndex],...{
-                                    'id': userData._id,
-                                    'name': userData.Employee_Name,
-                                    'profileImage': userData.Employee_profileImageURL,
-                                    'activitiesArray': [],
-                                    'totalLoggedHours': totalLoghrs,
-                                    'projectArray' : [],
-                                    'manuallyLog' : userData.manuallyLog,
-                                    'trackdLog' : userData.trackdLog
-                                }}
-                            }
-                            resolve();
-                        } else {
-                            let isOkProject = getFinalProjectArray.value.find((x)=> x._id == element.projectId)
-                            if (isOkProject) {
-                                let totalMin = element.logMinutes ? parseInt(element.logMinutes) : 0;
-                                let tempDate = element.date ? moment(new Date(element.date)).format("YYYY-MM-DD") : '';
-                                let searchInd = dateColumns.value.findIndex((x) => {
-                                    return x.fullDate == tempDate
-                                });
-                                if(element.userId.toString().trim() === userData._id.trim()){
-                                    userData.totalLoggedHours += totalMin;
-                                    totalLoghrs += totalMin;
-                                    if(element.logType == 0){
-                                        userData.manuallyLog.time += totalMin; 
-                                    }
-                                    else if(element.logType == 1){
-                                        userData.trackdLog.time += totalMin; 
-                                    }
-                                    else if(element.logType == undefined){
-                                        userData.manuallyLog.time += totalMin; 
-                                    }
-                                    if(searchInd !== -1){
-                                        dateColumns.value[searchInd].totalDayLogs += totalMin;
-                                        let getUserKey = Object.keys(dateColumns.value[searchInd].totalUserLogs).includes(element.userId.toString().trim());
-                                        if(!getUserKey){
-                                            dateColumns.value[searchInd].totalUserLogs[`${element.userId.toString()}`] = totalMin;
-                                            dateColumns.value[searchInd].totalLogsType[`${element.userId.toString()}`] = element.logType;
-                                            if (element.logType === 0 || element.logType === undefined) {
-                                                dateColumns.value[searchInd].totalManualLogs[`${element.userId.toString()}`] = totalMin
-                                            } else {
-                                                dateColumns.value[searchInd].totalTrackedLogs[`${element.userId.toString()}`] = totalMin
-                                            }
-                                            count++;
-                                            countFunction(finalMongoData[count]);
-                                        }
-                                        else{
-                                            dateColumns.value[searchInd].totalUserLogs[`${element.userId.toString()}`] = totalMin + parseInt(dateColumns.value[searchInd].totalUserLogs[`${element.userId.toString()}`] ? dateColumns.value[searchInd].totalUserLogs[`${element.userId.toString()}`] : 0);
-                                            if(dateColumns.value[searchInd].totalLogsType[`${element.userId.toString()}`] != element.logType){
-                                                dateColumns.value[searchInd].totalLogsType[`${element.userId.toString()}`] = 2;
-                                            }
-                                            if (element.logType === 0 || element.logType === undefined) {
-                                                dateColumns.value[searchInd].totalManualLogs[`${element.userId.toString()}`] = totalMin + parseInt(dateColumns.value[searchInd].totalManualLogs[`${element.userId.toString()}`] ? dateColumns.value[searchInd].totalManualLogs[`${element.userId.toString()}`] : 0)
-                                            } else {
-                                                dateColumns.value[searchInd].totalTrackedLogs[`${element.userId.toString()}`] = totalMin + parseInt(dateColumns.value[searchInd].totalTrackedLogs[`${element.userId.toString()}`] ? dateColumns.value[searchInd].totalTrackedLogs[`${element.userId.toString()}`] : 0)
-                                            }
-                                            count++;
-                                            countFunction(finalMongoData[count]);
-                                        }
-                                    } else {
-                                        count++;
-                                        countFunction(finalMongoData[count]);
-                                    }
-                                } else {
-                                    count++;
-                                    countFunction(finalMongoData[count]);
-                                }
-                            } else {
-                                count++;
-                                countFunction(finalMongoData[count]);
-                            }
-                        }
-                    }
-                    countFunction(finalMongoData[count]);
-                } else {
-                    let fIndex = usersArray.value.findIndex((e)=>{return e.id == userData._id})
-                    if(fIndex == -1) {
-                        usersArray.value.push({
-                            'id': userData._id,
-                            'name': userData.Employee_Name,
-                            'profileImage': userData.Employee_profileImageURL,
-                            'activitiesArray': [],
-                            'totalLoggedHours': totalLoghrs,
-                            'projectArray' : [],
-                            'manuallyLog' : userData.manuallyLog,
-                            'trackdLog' : userData.trackdLog
-                        })
-                    } else {
-                        usersArray.value[fIndex] = {...usersArray.value[fIndex],...{
-                            'id': userData._id,
-                            'name': userData.Employee_Name,
-                            'profileImage': userData.Employee_profileImageURL,
-                            'activitiesArray': [],
-                            'totalLoggedHours': totalLoghrs,
-                            'projectArray' : [],
-                            'manuallyLog' : userData.manuallyLog,
-                            'trackdLog' : userData.trackdLog
-                        }}
-                    }
-                    resolve(); 
-                }
-            } catch (error) {
-                reject(error)
-            }
-        })
+};
+const shiftWeek = (n) => { weekStart.value = weekStart.value.clone().add(n, 'weeks'); };
+const flash = (msg) => { notice.value = msg; setTimeout(() => { if (notice.value === msg) notice.value = ''; }, 4000); };
+
+const submitWeek = async () => {
+    if (!canSubmit.value || busy.value.submit) return;
+    busy.value.submit = true;
+    error.value = '';
+    try {
+        const me = getUser(uid.value) || {};
+        const body = ((await apiRequest('post', `${env.TIMESHEET_APPROVAL}/submit`, {
+            periodStart: startIso.value, periodEnd: endIso.value, periodType: 'week',
+            userId: targetUser.value, userData: { id: uid.value, name: me.Employee_Name || '' },
+        })) || {}).data || {};
+        if (!body.status) throw new Error(body.statusText || 'submit_failed');
+        approval.value = { ...approval.value, current: body.data };
+        flash(t('TimeV2.submitted_ok'));
+    } catch (e) {
+        error.value = e.message || t('TimeV2.action_failed');
+    } finally {
+        busy.value.submit = false;
     }
-    function handleFilterType(type,item){
-        if(type != 'back'){
-            setTimeout(()=>{ filterType.value =item;openFilterMenu() },100);
-        }else{
-            setTimeout(()=>{ filterType.value ='' },100);
-        }
+};
+const exportCsv = async () => {
+    if (busy.value.export) return;
+    busy.value.export = true;
+    try {
+        const s = new Date(`${startIso.value}T00:00:00`);
+        const e = new Date(`${endIso.value}T23:59:59`);
+        const res = await apiRequest('post', `${env.TIMESHEET}/export-csv`, {
+            userArray: [targetUser.value], projectArray: projectId.value ? [projectId.value] : [],
+            start: Math.floor(s.getTime() / 1000), end: Math.floor(e.getTime() / 1000),
+        });
+        const csv = typeof (res && res.data) === 'string' ? res.data : '';
+        const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `timesheet-${startIso.value}_${endIso.value}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        error.value = t('TimeV2.action_failed');
+    } finally {
+        busy.value.export = false;
     }
-    function openFilterMenu(){
-        try{
-            filterSearch.value ='';
-            helper.getFinalFilter(filterType.value,users.value,teams.value,projects.value).then((filterRes)=>{
-                if(filterRes.status){
-                    finalFilter.value = filterRes.data.finalFilter;
-                }
-            })
-        }catch(error){
-            console.error(error);
-        }
+};
+const toggleBillable = async (row) => {
+    if (busy.value.billable) return;
+    busy.value.billable = row.taskId;
+    try {
+        const body = ((await apiRequest('put', env.TIMESHEET_BILLABLE_ENTRIES, { entryIds: row.entryIds, billable: !row.billable })) || {}).data || {};
+        if (!body.status) throw new Error(body.statusText);
+        const target = rows.value.find((r) => r.taskId === row.taskId);
+        if (target) target.billable = !row.billable;
+        totals.value.billableMinutes = rows.value.reduce((s, r) => s + (r.billable ? r.total : 0), 0);
+    } catch (e) {
+        error.value = t('TimeV2.action_failed');
+    } finally {
+        busy.value.billable = '';
     }
-    function handleFilterItem(selectedItem, type ,isUser=false){
-        debouncerWithPromise(400).then(()=>{
-            helper.handleFilterItem(selectedItem,type,selectedFilters.value, checkedFilter.value, filterType.value).then((filterRes)=>{
-                if(filterRes.status){
-                    let userFilter = filterRes.data.selectedFilters.filter((x) => x.type == "Users");
-                    if (isUser && userFilter.length == 0) {
-                        filter_ut_click.value.click()
-                    }
-                    selectedFilters.value = filterRes.data.selectedFilters;
-                    checkedFilter.value = filterRes.data.checkedFilter;
-                    initData(dateRange.value.startDate,dateRange.value.endDate);
-                }
-            })
-        })
+};
+const stopTimer = async () => {
+    if (busy.value.timer) return;
+    busy.value.timer = true;
+    try {
+        const stopped = await timer.stop();
+        if (stopped) flash(t('TimeV2.logged_ok', { h: formatHm(stopped.minutes), task: stopped.taskName }));
+        await load();
+    } catch (e) {
+        error.value = t('TimeV2.log_failed');
+    } finally {
+        busy.value.timer = false;
     }
-    const optionFilter = computed(()=>{
-        const searchArray = [];
-        if (filterSearch.value && filterSearch.value.length > 0) {
-            const filterTypeLower = filterType.value.toLowerCase();
-            if (filterTypeLower === "users") {
-                users.value.forEach(rawData => {
-                if (rawData.Employee_Name.trim().toLowerCase().includes(filterSearch.value.trim().toLowerCase())) {
-                    searchArray.push({
-                    "id": rawData._id,
-                    'name': rawData.Employee_Name,
-                    'profile': rawData.Employee_profileImageURL || ''
-                    });
-                }
-                });
-            } else if (filterTypeLower === "teams") {
-                    teams.value.forEach(val => {
-                    if (val.name.trim().toLowerCase().includes(filterSearch.value.trim().toLowerCase())) {
-                        searchArray.push({
-                        "id": val._id,
-                        'name': val.name
-                        });
-                    }
-                    });
-            } else if (filterTypeLower === "projects") {
-                projects.value.forEach(ele => {
-                if (ele.ProjectName.trim().toLowerCase().includes(filterSearch.value.trim().toLowerCase())) {
-                    searchArray.push({
-                    "id": ele._id,
-                    'name': ele.ProjectName,
-                    'AssigneeUserId': ele.AssigneeUserId,
-                    'ProjectCode': ele.ProjectCode,
-                    "projectIcon": ele.projectIcon
-                    });
-                }
-                });
-            }
-        }
-        return filterSearch.value ? searchArray : finalFilter.value;
-    })
-    const validateURL = (str) => {
-        var tarea = str;
-        if (tarea.indexOf("http://") == 0 || tarea.indexOf("https://") == 0) {
-            return true;
-        }
+};
+const openLog = (row, day, minutes) => {
+    const date = day && day.date ? day.date : (typeof day === 'string' ? day : '');
+    const task = row ? { taskId: row.taskId, taskName: row.taskName, projectId: row.projectId, projectName: row.projectName, sprintId: row.sprintId, projectColor: row.projectColor } : null;
+    if (clientWidth && clientWidth.value < 768) {
+        router.push({ name: 'LogTime', params: { cid: cid.value }, query: { taskId: task ? task.taskId : undefined, date: date || undefined, minutes: minutes || undefined } });
+        return;
     }
+    logPrefill.value = { task, date, minutes: minutes || 0, key: Date.now() };
+    logOpen.value = true;
+};
+const onLogged = (info) => {
+    if (info && info.message) flash(info.message);
+    load();
+};
+
+watch([personId, projectId, weekStart], load);
+onMounted(() => {
+    if (!allowed.value) return;
+    load();
+    loadProjects();
+    timer.reconcile();
+});
 </script>
-<style src="../style.css"></style>
+
+<style src="../timeV2.css"></style>
 <style scoped>
-.disabled{
-    pointer-events: none;
-}
-.page-content {
-    padding: 15px;
-}
-.page-title {
-    width: 100%;
-}
-ul.breadcrumb.title_strip {
-    margin: 0;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    height: 61px;
-    background-color: #fff;
-    border-bottom: 1px solid #DAE1E7;
-    width: 100%;
-    padding-left: 15px;
-}
-ul.breadcrumb.title_strip li:first-child {
-    border-left: 0;
-    padding-left: 0px;
-}
-ul.breadcrumb.title_strip li {
-    list-style: none;
-    padding-right:15px;
-    border-left: 1px solid #b7b7b7;
-    font-family: 'Roboto', sans-serif;
-    font-weight:700;
-    padding-left: 15px;
-}
-.dp__main.dp__theme_light {
-    max-width: 100%;
-    width: 260px;
-    margin-right: 15px;
-}
-span.chipusername_wrapper {
-    display: flex;
-    background-color: #f1efef;
-    border-radius: 10px;
-    margin-right: 10px;
-    padding: 2px 4px 2px 8px;
-    font-family: 'Roboto', sans-serif;
-    font-weight: 500;
-    align-items: center;
-    min-width: fit-content;
-}
-a.link_disable_css {
-    color: #000;
-    text-decoration: none;
-    font-size: 16px;
-}
-
-span.chipusername_wrapper button {
-    padding: 0;
-    border: 0;
-    margin-left: 4px;
-    min-width: 17px;
-    width: 17px;
-    height: 17px;
-    background: transparent !important;
-}
-span.timesheet_user_filter {
-    position: sticky;
-    left: 0;
-    background-color: #fff;
-    padding: 3px 10px 3px 10px;
-    min-width: 69px;
-}
-
-.wf_filter::-webkit-scrollbar-thumb {
-    border-radius: 10px;
-    -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,.3);
-    background-color: #C1C1C1;
-}
-.wf_filter::-webkit-scrollbar {
-    width: 5px;
-    height: 5px;
-    background-color: #F5F5F5;
-}
-.chipusername_main {
-    display: flex;
-}
-span.chipusername_wrapper span.user_name {
-    font-size: 13px;
-    min-width: max-content;
-}
-.circlegreen {
-  width: 10px;
-  height: 10px;
-  background-color: #1CB303;
-  border-radius: 50%;
-}
-.circlePurple {
-  width: 10px;
-  height: 10px;
-  background-color: #7367F0;
-  border-radius: 50%;
-}
-/* ── User-timesheet header toolbar ──────────────────────────────────────
-   The right side accumulated several controls (tracked/manual legend,
-   billable totals, approval, export, invoice) and got crammed into a narrow
-   fixed column. Lay them out as a wrapping, evenly-spaced toolbar with
-   subtle dividers between the logical groups, and let it drop to its own
-   row when space is tight. */
-.ut-top { flex-wrap: wrap; row-gap: 10px; }
-.ut-toolbar {
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px 14px;
-}
-.ut-legends { gap: 14px; }
-.ut-actions { gap: 10px; }
-.ut-divider {
-  flex: 0 0 auto;
-  align-self: center;
-  width: 1px;
-  height: 22px;
-  background: #e3e6ec;
-}
-span.timesheet_user_filter button.dot-btn {
-  min-width: 60px;
-}
-
-
-@media(max-width: 1599px){
-    span.timesheet_user_filter{
-        min-width: 85px;
-    }
-}
-@media(max-width: 767px){
-    .pro_route_link a, ul.breadcrumb.title_strip li span{
-        font-size: 14px !important;
-    }
-    ul.breadcrumb.title_strip li{
-        padding-right: 10px;
-        padding-left: 10px;
-    }
+.ut2-timer { height: 26px; gap: 8px; max-width: 320px; }
+.ut2-timer__task { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; max-width: 160px; }
+.ut2-scroll { overflow-x: auto; }
+.ut2-grid { min-width: calc(220px + var(--days) * 70px + 98px); font-size: 12.5px; overflow: hidden; transition: opacity var(--t-state) var(--ease); }
+.ut2-grid.is-loading { opacity: .6; }
+.ut2-row { display: grid; grid-template-columns: minmax(220px, 1fr) repeat(var(--days), 64px) 70px; gap: 6px; padding: 10px 14px; align-items: center; text-align: center; font: 500 12px/1.2 var(--font-mono); border-bottom: 1px solid var(--hairline); }
+.ut2-row:last-child { border-bottom: 0; }
+.ut2-row--head { padding: 9px 14px; font: var(--text-label); letter-spacing: .06em; color: var(--ink-3); }
+.ut2-row--head .is-today { color: var(--brand); }
+.ut2-row--total { background: var(--surface-2); font-weight: 600; border-bottom: 0; }
+.ut2-row--total .ut2-task { font: 600 12.5px/1.2 var(--font-ui); }
+.ut2-row--total .is-today { color: var(--brand); }
+.ut2-row .is-empty { color: var(--ink-3); }
+.ut2-row .is-off { opacity: .7; }
+.ut2-task { text-align: left; font: 400 12.5px/1.3 var(--font-ui); display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ut2-task__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ut2-bill { margin-left: auto; flex: none; height: 20px; padding: 0 7px; border-radius: var(--r-chip); border: 1px solid var(--border); background: transparent; color: var(--ink-2); font: 600 10.5px/1 var(--font-ui); cursor: pointer; transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease); }
+.ut2-bill.is-on { background: var(--brand-tint); border-color: transparent; color: var(--brand); }
+.ut2-bill:disabled { opacity: .5; cursor: default; }
+.ut2-cell { height: 30px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--ink); font: inherit; cursor: pointer; transition: background var(--t-state) var(--ease), border-color var(--t-state) var(--ease); }
+.ut2-cell:hover:not(:disabled) { background: var(--surface-hover); border-color: var(--hairline); }
+.ut2-cell:disabled { cursor: default; }
+.ut2-cell.is-empty { color: var(--ink-3); }
+.ut2-cell.is-live { color: var(--ok); font-weight: 600; }
+.ut2-cell.is-today:not(.is-live):not(.is-empty) { color: var(--brand); }
+.ut2-total { font-weight: 600; }
+.ut2-empty { padding: 14px; }
+.ut2-dot--none { background: var(--border); }
+.ut2-prev strong { font-weight: 600; }
+.ut2-hint { flex: 1; min-width: 0; }
+.ut2-hint__cta { margin-left: auto; }
+.ut2-panel { position: fixed; top: 0; right: 0; bottom: 0; width: var(--panel-w); z-index: 45; background: var(--surface); border-left: 1px solid var(--hairline); box-shadow: var(--shadow-pop); display: flex; flex-direction: column; }
+@media (max-width: 767px) {
+    .ut2-panel { width: 100%; }
+    .ut2-row { grid-template-columns: minmax(160px, 1fr) repeat(var(--days), 56px) 64px; }
 }
 </style>

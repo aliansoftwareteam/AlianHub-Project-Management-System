@@ -176,6 +176,8 @@ function initializeControllers() {
     require('./Modules/Auth/init').init(app);
     require('./Modules/SSO/init').init(app);
     require('./Modules/Audit/init').init(app);
+    require('./Modules/Agents/init').init(app);
+    require('./Modules/Mcp/init').init(app);
     require('./Modules/Scim/init').init(app);
     require('./Modules/Pto/init').init(app);
     require('./Modules/Portfolio/init').init(app);
@@ -229,6 +231,7 @@ function initializeControllers() {
     require('./Modules/AIProjectGenerator/init').init(app);
     require('./Modules/Users/init').init(app);
     require('./Modules/Project/init').init(app);
+    require('./Modules/PersonalList/init').init(app);
     require('./Modules/Teams/init').init(app);
     require('./Modules/tours/init').init(app);
     require('./Modules/AdvancedGlobalFilter/init.js').init(app);

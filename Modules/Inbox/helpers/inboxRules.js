@@ -17,7 +17,30 @@
 //   notifications — what the bell shows  (its `filter=unread` list)
 //   mentions      — what the @ dropdown shows
 //   archive       — what the bell's "View Archive" toggle shows (already read)
-const TABS = Object.freeze(['all', 'notifications', 'mentions', 'archive']);
+//   primary       — unread, minus the rows the reader has put aside for later
+//   later         — the rows the reader put aside (ids are held by the client)
+//   done          — read rows, both sources; the Archive tab under its new name
+const TABS = Object.freeze(['all', 'notifications', 'mentions', 'archive', 'primary', 'later', 'done']);
+
+// Row kinds the client can filter on. A reminder is a notification the reminder
+// scheduler wrote on its due date; everything else from that source is an update.
+const KINDS = Object.freeze(['all', 'mention', 'reminder', 'update', 'approval']);
+const REMINDER_KEY = 'general_reminder';
+const normalizeKind = (kind) => (KINDS.includes(String(kind)) ? String(kind) : 'all');
+const kindOf = (item = {}) => {
+    if (item.sourceType === 'approval') return 'approval';
+    if (item.sourceType === 'mention') return 'mention';
+    return item.key === REMINDER_KEY ? 'reminder' : 'update';
+};
+
+// A comma-separated list of ObjectIds from the query string, capped so a URL
+// cannot carry an unbounded $in.
+const MAX_ID_LIST = 200;
+const parseIdList = (raw) => String(raw || '')
+    .split(',')
+    .map((x) => x.trim())
+    .filter((x) => /^[a-f0-9]{24}$/i.test(x))
+    .slice(0, MAX_ID_LIST);
 
 // The two sidebars both page 10 at a time; matching that keeps the feel identical.
 const PAGE_SIZE = 10;
@@ -185,23 +208,37 @@ const normalizeSkip = (raw) => {
  * elsewhere: Notifications and Mentions are already one source each, and narrowing them
  * further could only ever return nothing.
  */
-const planFor = (tab, source = 'all') => {
+const planFor = (tab, source = 'all', kind = 'all') => {
+    const byKind = (plan) => {
+        if (kind === 'mention') return { ...plan, notifications: false, mentions: true };
+        if (kind === 'reminder') return { ...plan, notifications: true, mentions: false, keyOnly: REMINDER_KEY };
+        if (kind === 'update') return { ...plan, notifications: true, mentions: false, keyNot: REMINDER_KEY };
+        return plan;
+    };
     if (tab === 'notifications') return { notifications: true, mentions: false, read: false };
     if (tab === 'mentions') return { notifications: false, mentions: true, read: false };
     // The bell's archive is its already-read notifications.
-    if (tab === 'archive') {
+    if (tab === 'archive' || tab === 'done') {
         const want = normalizeSource(source);
-        return {
+        return byKind({
             notifications: want !== 'mentions',
             mentions: want !== 'notifications',
             read: true,
-        };
+        });
     }
-    return { notifications: true, mentions: true, read: false };
+    // Later is read by id, whatever its read state: a row put aside stays put aside.
+    if (tab === 'later') return byKind({ notifications: true, mentions: true, read: null });
+    return byKind({ notifications: true, mentions: true, read: false });
 };
 
 module.exports = {
     TABS,
+    KINDS,
+    REMINDER_KEY,
+    normalizeKind,
+    kindOf,
+    parseIdList,
+    MAX_ID_LIST,
     SORTS,
     normalizeSort,
     sortDirection,

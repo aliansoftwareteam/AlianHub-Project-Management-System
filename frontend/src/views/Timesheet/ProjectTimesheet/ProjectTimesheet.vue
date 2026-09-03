@@ -25,6 +25,7 @@
                                 <span class="workload_title font-size-18 font-weight-700">{{$t('UserTimesheet.project_timesheet')}}</span>
                             </li>
                         </ul>
+                        <TimesheetTabs active="project" class="ts-legacy-tabs" />
                     </div>
                 </div>
             </div>
@@ -169,6 +170,8 @@
 </div>
 </template>
 <script setup>
+    import TimesheetTabs from '@/views/Timesheet/TimesheetTabs.vue';
+    import '@/views/Timesheet/timeV2.css';
     import { useCustomComposable, useGetterFunctions } from '@/composable';
     import { useStore } from "vuex";
     import { ref, inject, watch, computed, defineComponent, onMounted } from "vue";

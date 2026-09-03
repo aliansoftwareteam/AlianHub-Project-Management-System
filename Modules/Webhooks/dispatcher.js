@@ -4,6 +4,7 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
 const socketEmitter = require('../../event/socketEventEmitter');
+const { createSnapshotStore } = require('../../utils/entityEvents');
 const { subscribesTo, classifyTaskEvent, shouldDeliverTask, normalizeChangedFields, trimTaskForDelivery, signPayload, formatForTarget } = require('./helpers/webhookRules');
 
 // Webhook dispatcher. Piggybacks on the namespaced socketEmitter events that
@@ -31,17 +32,8 @@ const hookCache = new Map();
 const pending = new Map();
 
 // taskId -> the last delivered snapshot (trimmed + name-enriched `data`). Lets a
-// delivery diff against the prior state to render "from → to". Bounded FIFO so a
-// long-lived process can't grow it without limit.
-const taskSnapshots = new Map();
-const MAX_SNAPSHOTS = 5000;
-function rememberSnapshot(taskId, data) {
-    taskSnapshots.delete(taskId); // re-insert to move it to the newest position
-    taskSnapshots.set(taskId, data);
-    if (taskSnapshots.size > MAX_SNAPSHOTS) {
-        taskSnapshots.delete(taskSnapshots.keys().next().value);
-    }
-}
+// delivery diff against the prior state to render "from → to".
+const taskSnapshots = createSnapshotStore({ max: 5000 });
 
 let started = false;
 
@@ -198,7 +190,7 @@ async function flush(companyId, event, doc, changedKeys) {
 
     // before→after: diff against the last state we delivered for this task.
     const taskId = String(fullDoc._id);
-    const previous = taskSnapshots.get(taskId) || null;
+    const previous = taskSnapshots.get(taskId);
 
     const body = {
         event,
@@ -209,7 +201,7 @@ async function flush(companyId, event, doc, changedKeys) {
     };
     if (previous) body.previous = previous;
 
-    rememberSnapshot(taskId, data);
+    taskSnapshots.remember(taskId, data);
     targets.forEach((hook) => { deliverToHook(companyId, hook, body, 1); });
 }
 

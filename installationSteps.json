@@ -47,8 +47,8 @@
         }
     ],
     "envVar": {
-        "JWT_SECRET": "e4298c901e6423d77881dd5772baaaf4",
-        "PRECOMPANYKEY": "d48a5ed1",
+        "JWT_SECRET": "f7169d35ad14a5735f82caee23946fec",
+        "PRECOMPANYKEY": "34ac8dcf",
         "WEBURL": "http://localhost:4000"
     }
 }

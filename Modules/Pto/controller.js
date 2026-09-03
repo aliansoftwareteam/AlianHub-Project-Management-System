@@ -161,7 +161,7 @@ exports.updatePtoStatus = async (req, res) => {
         const id = req.params.id;
         const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PTO_ENTRIES,
-            data: [{ _id: new mongoose.Types.ObjectId(String(id)) }, { $set: { status, approvedBy: String(req.uid || '') } }, { returnDocument: 'after' }],
+            data: [{ _id: new mongoose.Types.ObjectId(String(id)) }, { $set: { status, approvedBy: String(req.uid || ''), decisionReason: String(req.body.reason || '').slice(0, 500) } }, { returnDocument: 'after' }],
         }, 'findOneAndUpdate');
         if (!updated) return res.status(404).json({ status: false, statusText: 'Not found.' });
         removeCache(`pto:${companyId}`);

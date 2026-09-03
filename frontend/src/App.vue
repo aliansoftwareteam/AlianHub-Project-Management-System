@@ -7,25 +7,54 @@
                 <!-- Mounted at the root so an incoming call rings wherever the user is,
                      not only when the conversation that called them is on screen. -->
                 <CallOverlay />
-                <HeaderComponent v-if="!$route.meta.hideHeader" @change="changeCompany($event)" @filter="handleFilter"/>
-                <div :style="`height: calc(100dvh - ${$route.meta.hideHeader ? '0' : '46'}px);`" class="billing__history-wrapper style-scroll overflow-auto">
-                    <AdvanceSearchModal
-                        v-if="!$route.meta.preventAdvanceSearch"
-                        headerClasses="border-0"
-                        :modelValue="isAdvanceSearch"
-                        :header="false"
-                        :footer="false"
-                        :showCloseIcon="false"
-                        :className="`advance_search_modal advanced__model-css`"
-                        @removeListners="removeKeyListner"
-                    >
-                        <template #body>
-                            <MainSearchComponent @closeModel="removeKeyListner"/>
-                        </template>
-                    </AdvanceSearchModal>
-                    <router-view/>
-                    <TourCom ref="mainTour"/>
-                    <FirstRunChecklist/>
+                <template v-if="legacyNav">
+                    <HeaderComponent v-if="!$route.meta.hideHeader" @change="changeCompany($event)" @filter="handleFilter"/>
+                    <div :style="`height: calc(100dvh - ${$route.meta.hideHeader ? '0' : '46'}px);`" class="billing__history-wrapper style-scroll overflow-auto">
+                        <AdvanceSearchModal
+                            v-if="!$route.meta.preventAdvanceSearch"
+                            headerClasses="border-0"
+                            :modelValue="isAdvanceSearch"
+                            :header="false"
+                            :footer="false"
+                            :showCloseIcon="false"
+                            :className="`advance_search_modal advanced__model-css`"
+                            @removeListners="removeKeyListner"
+                        >
+                            <template #body>
+                                <MainSearchComponent @closeModel="removeKeyListner"/>
+                            </template>
+                        </AdvanceSearchModal>
+                        <router-view/>
+                        <TourCom ref="mainTour"/>
+                        <FirstRunChecklist/>
+                    </div>
+                </template>
+                <div v-else class="ah-app">
+                    <GlobalRail v-if="!$route.meta.hideHeader" @change="changeCompany($event)" />
+                    <main class="ah-app__main" id="ah-main">
+                        <AdvanceSearchModal
+                            v-if="!$route.meta.preventAdvanceSearch"
+                            headerClasses="border-0"
+                            :modelValue="isAdvanceSearch"
+                            :header="false"
+                            :footer="false"
+                            :showCloseIcon="false"
+                            :className="`advance_search_modal advanced__model-css`"
+                            @removeListners="removeKeyListner"
+                        >
+                            <template #body>
+                                <MainSearchComponent @closeModel="removeKeyListner"/>
+                            </template>
+                        </AdvanceSearchModal>
+                        <div class="ah-app__view billing__history-wrapper style-scroll">
+                            <router-view/>
+                        </div>
+                        <TourCom ref="mainTour"/>
+                        <TaskDetailOverlay />
+                        <FirstRunChecklist/>
+                    </main>
+                    <MobileTabBar v-if="!$route.meta.hideHeader" />
+                    <ShellPanels v-if="!$route.meta.hideHeader" />
                 </div>
 			</template>
 			<div v-else-if="!companyId?.length && $route.name === 'Create_Company'" class="d-flex align-items-center justify-content-center lds-roller h-100dvh">
@@ -79,6 +108,11 @@ import { computed, defineComponent, onMounted, provide, ref, watch, inject} from
 import TourCom from "@/components/organisms/Tour/TourComponet.vue"
 import FirstRunChecklist from "@/components/molecules/FirstRunChecklist/FirstRunChecklist.vue"
 import HeaderComponent from '@/components/organisms/Header/Header.vue'
+import GlobalRail from '@/components/organisms/Shell/GlobalRail.vue'
+import MobileTabBar from '@/components/organisms/Shell/MobileTabBar.vue'
+import ShellPanels from '@/components/organisms/Shell/ShellPanels.vue'
+import TaskDetailOverlay from '@/components/organisms/TaskDetailOverlay/TaskDetailOverlay.vue'
+import '@/components/organisms/Shell/style.css'
 import CallOverlay from '@/components/organisms/CallOverlay/CallOverlay.vue'
 import AdvanceSearchModal from '@/components/atom/Modal/Modal.vue'
 import Modal from "@/components/atom/Modal/Modal.vue"
@@ -126,6 +160,8 @@ const { locale, setLocaleMessage } = useI18n();
 const { checkPermission } = useCustomComposable();
 
 const companyId = ref(localStorage.getItem('selectedCompany') !== null ? localStorage.getItem('selectedCompany') : "")
+// Escape hatch for one release: the old top bar stays reachable behind a flag.
+const legacyNav = ref(localStorage.getItem('ah.legacyNav') === '1');
 const underMaintainance = ref(false);
 const logged = ref(false);
 const requestPermission = ref(false);

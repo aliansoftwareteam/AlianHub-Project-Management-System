@@ -1,230 +1,306 @@
 <template>
-    <div class="position-re mySettingsWrapper p-1">
+    <div class="tfa" :class="{ 'tfa--busy': isSpinner }">
         <SpinnerComp :is-spinner="isSpinner" />
-        <div class="my-settings-main" :class="[{ 'pointer-events-none': isSpinner }]">
-            <div class="row">
-                <div class="col-md-2 settingprofile">
-                    <div class="col-md-10 settingprofileform setting_profile_mobile_responsive">
-                        <div class="profileform">
-                            <div class="twofa-head">
-                                <h3 class="twofa-title">{{ $t('Settings.two_factor_auth') }}</h3>
-                                <p class="twofa-desc">{{ $t('Settings.two_factor_desc') }}</p>
-                            </div>
 
-                            <!-- IDLE: show current state + primary action -->
-                            <div v-if="step === 'idle'" class="twofa-block">
-                                <div class="twofa-status" :class="enabled ? 'is-on' : 'is-off'">
-                                    <span class="twofa-dot"></span>
-                                    <span>{{ enabled ? $t('Settings.two_factor_status_enabled') : $t('Settings.two_factor_status_disabled') }}</span>
-                                </div>
-
-                                <!-- Enable -->
-                                <div v-if="!enabled" class="mysetiing_save">
-                                    <button :disabled="isSpinner" @click.prevent="startEnroll()" class="btn_btn mysetting_save_btn">{{ $t('Settings.two_factor_enable') }}</button>
-                                </div>
-
-                                <!-- Disable (needs a current code or a recovery code) -->
-                                <form v-else class="form_wrapper" @submit.prevent="disable2fa()">
-                                    <div class="inputfield position-re">
-                                        <label>{{ $t('Settings.two_factor_disable_label') }} *</label>
-                                        <input type="text" class="logininput" placeHolder="123456" v-model.trim="disableCode" maxlength="20" autocomplete="off" />
-                                        <div class="invalid-feedback red pt-5px">{{ disableError }}</div>
-                                    </div>
-                                    <div class="mysetiing_save">
-                                        <button :disabled="isSpinner" class="btn_btn twofa-danger-btn" type="submit">{{ $t('Settings.two_factor_disable') }}</button>
-                                    </div>
-                                </form>
-                            </div>
-
-                            <!-- ENROLLING: QR + manual key + confirm code -->
-                            <div v-else-if="step === 'enrolling'" class="twofa-block">
-                                <p class="twofa-step-hint">{{ $t('Settings.two_factor_scan') }}</p>
-                                <div class="twofa-qr-wrap">
-                                    <img v-if="setupData.qrDataUrl" :src="setupData.qrDataUrl" alt="2FA QR code" class="twofa-qr" />
-                                </div>
-                                <p class="twofa-manual">{{ $t('Settings.two_factor_manual_key') }}</p>
-                                <code class="twofa-key">{{ setupData.secret }}</code>
-
-                                <form class="form_wrapper" @submit.prevent="verifyEnroll()">
-                                    <div class="inputfield position-re mt-2">
-                                        <label>{{ $t('Settings.two_factor_enter_code_enable') }} *</label>
-                                        <input type="text" class="logininput" placeHolder="123456" v-model.trim="enrollCode" maxlength="6" autocomplete="off" />
-                                        <div class="invalid-feedback red pt-5px">{{ enrollError }}</div>
-                                    </div>
-                                    <div class="mysetiing_save d-flex" style="gap:10px;">
-                                        <button :disabled="isSpinner" class="btn_btn mysetting_save_btn" type="submit">{{ $t('Settings.two_factor_verify_enable') }}</button>
-                                        <button :disabled="isSpinner" class="btn_btn twofa-ghost-btn" type="button" @click="cancelEnroll()">{{ $t('Settings.two_factor_cancel') }}</button>
-                                    </div>
-                                </form>
-                            </div>
-
-                            <!-- SHOW CODES: one-time recovery codes -->
-                            <div v-else-if="step === 'showCodes'" class="twofa-block">
-                                <h4 class="twofa-recovery-title">{{ $t('Settings.two_factor_recovery_title') }}</h4>
-                                <p class="twofa-desc">{{ $t('Settings.two_factor_recovery_desc') }}</p>
-                                <ul class="twofa-recovery-list">
-                                    <li v-for="(code, i) in recoveryCodes" :key="i">{{ code }}</li>
-                                </ul>
-                                <div class="mysetiing_save d-flex" style="gap:10px;">
-                                    <button class="btn_btn twofa-ghost-btn" type="button" @click="copyCodes()">{{ $t('Settings.two_factor_copy') }}</button>
-                                    <button class="btn_btn twofa-ghost-btn" type="button" @click="downloadCodes()">{{ $t('Settings.two_factor_download') }}</button>
-                                    <button class="btn_btn mysetting_save_btn" type="button" @click="finishEnroll()">{{ $t('Settings.two_factor_done') }}</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+        <section class="ah-card tfa__card">
+            <div class="ah-card__body tfa__body">
+                <div>
+                    <h2 class="ah-h3 tfa__title">{{ $t('SettingsV2.tfa_title') }}</h2>
+                    <div class="ah-small">{{ $t('SettingsV2.tfa_subtitle') }}</div>
                 </div>
+
+                <template v-if="step === 'idle'">
+                    <div class="tfa__status">
+                        <span class="ah-chip" :class="enabled ? 'ah-chip--ok' : ''">{{ enabled ? $t('SettingsV2.tfa_on') : $t('SettingsV2.tfa_off') }}</span>
+                        <span class="ah-small">{{ enabled ? $t('SettingsV2.tfa_on_hint') : $t('SettingsV2.tfa_off_hint') }}</span>
+                    </div>
+                    <div v-if="!enabled" class="tfa__actions">
+                        <button type="button" class="ah-btn ah-btn--primary" :disabled="isSpinner" @click="startEnroll()">{{ $t('SettingsV2.tfa_set_up') }}</button>
+                    </div>
+                    <form v-else class="tfa__disable" @submit.prevent="disable2fa()">
+                        <div class="ah-field">
+                            <label class="ah-field__label" for="tfa-disable-code">{{ $t('Settings.two_factor_disable_label') }}</label>
+                            <input id="tfa-disable-code" class="ah-input ah-mono tfa__code-input" :class="{ 'ah-input--error': disableError }" v-model.trim="disableCode" maxlength="20" autocomplete="one-time-code" inputmode="numeric" @input="disableError = ''" />
+                            <div v-if="disableError" class="ah-field__error">{{ disableError }}</div>
+                        </div>
+                        <div class="tfa__actions">
+                            <button type="submit" class="ah-btn ah-btn--danger" :disabled="isSpinner">{{ $t('SettingsV2.tfa_turn_off') }}</button>
+                        </div>
+                    </form>
+                </template>
+
+                <template v-else-if="step === 'enrolling'">
+                    <div class="tfa__setup">
+                        <div class="tfa__qr">
+                            <img v-if="setupData.qrDataUrl" :src="setupData.qrDataUrl" :alt="$t('SettingsV2.tfa_qr_alt')" />
+                            <div v-else class="ah-empty tfa__qr-empty">{{ $t('SettingsV2.tfa_qr_missing') }}</div>
+                        </div>
+                        <ol class="tfa__steps">
+                            <li><strong>1.</strong> {{ $t('SettingsV2.tfa_step_scan') }}</li>
+                            <li>
+                                <strong>2.</strong> {{ $t('SettingsV2.tfa_step_key') }}
+                                <div class="tfa__key">
+                                    <span class="ah-mono">{{ groupedSecret }}</span>
+                                    <button type="button" class="tfa__copy" @click="copyText(setupData.secret, 'SettingsV2.tfa_key_copied')">{{ $t('SettingsV2.copy') }}</button>
+                                </div>
+                            </li>
+                        </ol>
+                    </div>
+                    <form @submit.prevent="verifyEnroll()">
+                        <div class="ah-field">
+                            <span class="ah-field__label" id="tfa-digits-label">3. {{ $t('Settings.two_factor_enter_code_enable') }}</span>
+                            <div class="tfa__digits" role="group" aria-labelledby="tfa-digits-label">
+                                <input
+                                    v-for="(d, i) in digits"
+                                    :key="i"
+                                    :ref="(el) => setDigitRef(el, i)"
+                                    class="tfa__digit"
+                                    :class="{ 'is-filled': d !== '', 'is-error': enrollError }"
+                                    type="text"
+                                    inputmode="numeric"
+                                    maxlength="1"
+                                    autocomplete="one-time-code"
+                                    :aria-label="$t('SettingsV2.tfa_digit', { n: i + 1 })"
+                                    :value="d"
+                                    @input="onDigitInput(i, $event)"
+                                    @keydown="onDigitKey(i, $event)"
+                                    @paste.prevent="onPaste($event)"
+                                />
+                            </div>
+                            <div v-if="enrollError" class="ah-field__error">{{ enrollError }}</div>
+                        </div>
+                        <div class="tfa__warn">
+                            <strong>{{ $t('SettingsV2.tfa_recovery_warn_title') }}</strong> {{ $t('SettingsV2.tfa_recovery_warn') }}
+                        </div>
+                        <div class="tfa__actions">
+                            <button type="submit" class="ah-btn ah-btn--primary" :disabled="isSpinner || code.length < 6">{{ $t('SettingsV2.tfa_turn_on') }}</button>
+                            <button type="button" class="ah-btn ah-btn--secondary" :disabled="isSpinner" @click="cancelEnroll()">{{ $t('Settings.two_factor_cancel') }}</button>
+                            <span class="ah-small tfa__fallback">{{ $t('SettingsV2.tfa_owner_fallback') }}</span>
+                        </div>
+                    </form>
+                </template>
+
+                <template v-else-if="step === 'showCodes'">
+                    <div class="tfa__warn">
+                        <strong>{{ $t('SettingsV2.tfa_recovery_warn_title') }}</strong> {{ $t('SettingsV2.tfa_recovery_warn') }}
+                    </div>
+                    <ul class="tfa__codes">
+                        <li v-for="(c, i) in recoveryCodes" :key="i" class="ah-mono">{{ c }}</li>
+                    </ul>
+                    <div class="tfa__actions">
+                        <button type="button" class="ah-btn ah-btn--secondary" @click="copyText(recoveryCodes.join('\n'), 'Toast.two_factor_codes_copied')"><ShellIcon name="copy" :size="14" />{{ $t('SettingsV2.copy_codes') }}</button>
+                        <button type="button" class="ah-btn ah-btn--secondary" @click="downloadCodes()"><ShellIcon name="download" :size="14" />{{ $t('SettingsV2.download_codes') }}</button>
+                        <button type="button" class="ah-btn ah-btn--primary" @click="finishEnroll()">{{ $t('SettingsV2.tfa_saved_them') }}</button>
+                    </div>
+                </template>
             </div>
-        </div>
+        </section>
+
+        <section class="ah-card tfa__card">
+            <div class="ah-card__head">
+                <h2 class="ah-h3">{{ $t('SettingsV2.tfa_lost_title') }}</h2>
+            </div>
+            <div class="ah-card__body tfa__lost">
+                <p>{{ $t('SettingsV2.tfa_lost_1') }}</p>
+                <p>{{ $t('SettingsV2.tfa_lost_2') }}</p>
+                <p>{{ $t('SettingsV2.tfa_lost_3') }}</p>
+                <router-link class="ah-btn ah-btn--secondary ah-btn--sm tfa__pw" :to="{ name: 'changePassword', params: { cid: companyId } }">
+                    <ShellIcon name="key" :size="14" />{{ $t('settingslider.Change Password') }}
+                </router-link>
+            </div>
+        </section>
     </div>
 </template>
 
 <script setup>
-import * as env from '@/config/env';
-import { useToast } from 'vue-toast-notification';
-import { ref, onMounted } from 'vue';
-import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
-import { apiRequest } from '../../../services';
-import { useI18n } from 'vue-i18n';
+import { ref, computed, inject, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
+import { useToast } from "vue-toast-notification";
+import * as env from "@/config/env";
+import { apiRequest } from "@/services";
+import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import SpinnerComp from "@/components/atom/SpinnerComp/SpinnerComp.vue";
+
+defineOptions({ name: "TwoFactorAuthView" });
 
 const { t } = useI18n();
 const $toast = useToast();
+const companyId = inject("$companyId");
 
+const CODE_LENGTH = 6;
 const isSpinner = ref(false);
 const enabled = ref(false);
-const step = ref('idle'); // 'idle' | 'enrolling' | 'showCodes'
-const setupData = ref({ otpauthUrl: '', qrDataUrl: '', secret: '' });
-const enrollCode = ref('');
-const enrollError = ref('');
-const disableCode = ref('');
-const disableError = ref('');
+const step = ref("idle");
+const setupData = ref({ otpauthUrl: "", qrDataUrl: "", secret: "" });
+const digits = ref(Array(CODE_LENGTH).fill(""));
+const digitRefs = [];
+const enrollError = ref("");
+const disableCode = ref("");
+const disableError = ref("");
 const recoveryCodes = ref([]);
 
-const fetchStatus = async () => {
+const code = computed(() => digits.value.join(""));
+const groupedSecret = computed(() => String(setupData.value.secret || "").replace(/(.{4})/g, "$1 ").trim());
+
+const setDigitRef = (el, i) => { if (el) digitRefs[i] = el; };
+const focusDigit = (i) => digitRefs[Math.max(0, Math.min(CODE_LENGTH - 1, i))]?.focus();
+
+function onDigitInput(i, event) {
+    const v = String(event.target.value || "").replace(/\D/g, "");
+    digits.value[i] = v.slice(-1);
+    event.target.value = digits.value[i];
+    enrollError.value = "";
+    if (digits.value[i] && i < CODE_LENGTH - 1) focusDigit(i + 1);
+}
+
+function onDigitKey(i, event) {
+    if (event.key === "Backspace" && !digits.value[i] && i > 0) { digits.value[i - 1] = ""; focusDigit(i - 1); }
+    if (event.key === "ArrowLeft") focusDigit(i - 1);
+    if (event.key === "ArrowRight") focusDigit(i + 1);
+}
+
+function onPaste(event) {
+    const text = (event.clipboardData?.getData("text") || "").replace(/\D/g, "").slice(0, CODE_LENGTH);
+    if (!text) return;
+    digits.value = Array.from({ length: CODE_LENGTH }, (_, i) => text[i] || "");
+    focusDigit(text.length);
+}
+
+const resetDigits = () => { digits.value = Array(CODE_LENGTH).fill(""); };
+
+async function fetchStatus() {
+    isSpinner.value = true;
     try {
-        isSpinner.value = true;
-        const res = await apiRequest('get', env.TWO_FA_STATUS);
+        const res = await apiRequest("get", env.TWO_FA_STATUS);
         enabled.value = !!res?.data?.data?.enabled;
     } catch (error) {
-        console.error('2FA status error', error);
+        $toast.error(error?.response?.data?.message || t("Toast.something_went_wrong"), { position: "top-right" });
     } finally {
         isSpinner.value = false;
     }
-};
+}
 
-const startEnroll = async () => {
+async function startEnroll() {
+    isSpinner.value = true;
+    enrollError.value = "";
+    resetDigits();
     try {
-        isSpinner.value = true;
-        enrollError.value = '';
-        enrollCode.value = '';
-        const res = await apiRequest('post', env.TWO_FA_SETUP, {});
-        setupData.value = res?.data?.data || { otpauthUrl: '', qrDataUrl: '', secret: '' };
-        step.value = 'enrolling';
+        const res = await apiRequest("post", env.TWO_FA_SETUP, {});
+        setupData.value = res?.data?.data || { otpauthUrl: "", qrDataUrl: "", secret: "" };
+        step.value = "enrolling";
+        setTimeout(() => focusDigit(0));
     } catch (error) {
-        console.error('2FA setup error', error);
-        $toast.error(error?.response?.data?.message || t('Toast.something_went_wrong'), { position: 'top-right' });
+        $toast.error(error?.response?.data?.message || t("Toast.something_went_wrong"), { position: "top-right" });
     } finally {
         isSpinner.value = false;
     }
-};
+}
 
-const verifyEnroll = async () => {
-    if (!enrollCode.value || !enrollCode.value.trim()) {
-        enrollError.value = t('Auth.two_factor_enter_code');
-        return;
-    }
+async function verifyEnroll() {
+    if (code.value.length < CODE_LENGTH) { enrollError.value = t("Auth.two_factor_enter_code"); return; }
+    isSpinner.value = true;
+    enrollError.value = "";
     try {
-        isSpinner.value = true;
-        enrollError.value = '';
-        const res = await apiRequest('post', env.TWO_FA_VERIFY, { code: enrollCode.value.trim() });
+        const res = await apiRequest("post", env.TWO_FA_VERIFY, { code: code.value });
         recoveryCodes.value = res?.data?.data?.recoveryCodes || [];
         enabled.value = true;
-        step.value = 'showCodes';
-        $toast.success(t('Toast.two_factor_enabled'), { position: 'top-right' });
+        step.value = "showCodes";
     } catch (error) {
-        enrollError.value = error?.response?.data?.message || t('Toast.two_factor_invalid');
+        enrollError.value = error?.response?.data?.message || t("Toast.two_factor_invalid");
     } finally {
         isSpinner.value = false;
     }
-};
+}
 
-const cancelEnroll = () => {
-    step.value = 'idle';
-    enrollCode.value = '';
-    enrollError.value = '';
-    setupData.value = { otpauthUrl: '', qrDataUrl: '', secret: '' };
-};
+function cancelEnroll() {
+    step.value = "idle";
+    resetDigits();
+    enrollError.value = "";
+    setupData.value = { otpauthUrl: "", qrDataUrl: "", secret: "" };
+}
 
-const finishEnroll = () => {
-    step.value = 'idle';
+function finishEnroll() {
+    step.value = "idle";
     recoveryCodes.value = [];
-    enrollCode.value = '';
-    setupData.value = { otpauthUrl: '', qrDataUrl: '', secret: '' };
-};
+    resetDigits();
+    setupData.value = { otpauthUrl: "", qrDataUrl: "", secret: "" };
+}
 
-const disable2fa = async () => {
-    if (!disableCode.value || !disableCode.value.trim()) {
-        disableError.value = t('Auth.two_factor_enter_code');
-        return;
-    }
+async function disable2fa() {
+    if (!disableCode.value) { disableError.value = t("Auth.two_factor_enter_code"); return; }
+    isSpinner.value = true;
+    disableError.value = "";
     try {
-        isSpinner.value = true;
-        disableError.value = '';
-        await apiRequest('post', env.TWO_FA_DISABLE, { code: disableCode.value.trim() });
+        await apiRequest("post", env.TWO_FA_DISABLE, { code: disableCode.value });
         enabled.value = false;
-        disableCode.value = '';
-        $toast.success(t('Toast.two_factor_disabled'), { position: 'top-right' });
+        disableCode.value = "";
+        $toast.success(t("Toast.two_factor_disabled"), { position: "top-right" });
     } catch (error) {
-        disableError.value = error?.response?.data?.message || t('Toast.two_factor_invalid');
+        disableError.value = error?.response?.data?.message || t("Toast.two_factor_invalid");
     } finally {
         isSpinner.value = false;
     }
-};
+}
 
-const copyCodes = async () => {
+async function copyText(text, toastKey) {
     try {
-        await navigator.clipboard.writeText(recoveryCodes.value.join('\n'));
-        $toast.success(t('Toast.two_factor_codes_copied'), { position: 'top-right' });
+        await navigator.clipboard.writeText(text);
+        $toast.success(t(toastKey), { position: "top-right" });
     } catch (error) {
-        console.error('copy failed', error);
+        $toast.error(t("Toast.something_went_wrong"), { position: "top-right" });
     }
-};
+}
 
-const downloadCodes = () => {
-    const blob = new Blob([recoveryCodes.value.join('\n')], { type: 'text/plain' });
+function downloadCodes() {
+    const blob = new Blob([recoveryCodes.value.join("\n")], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = 'alianhub-recovery-codes.txt';
+    a.download = "alianhub-recovery-codes.txt";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-};
+}
 
 onMounted(fetchStatus);
 </script>
 
 <style scoped>
-@import '../MySettings/style.css';
-.twofa-head { margin-bottom: 18px; }
-.twofa-title { font-size: 18px; font-weight: 600; color: #1F212A; margin: 0 0 4px; }
-.twofa-desc { font-size: 13px; color: #6B7280; margin: 0; max-width: 520px; line-height: 1.5; }
-.twofa-block { max-width: 420px; }
-.twofa-status { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 500; margin-bottom: 16px; }
-.twofa-status.is-on { background: #E7F7EC; color: #1B7F3B; }
-.twofa-status.is-off { background: #F1F3F7; color: #6B7280; }
-.twofa-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
-.twofa-step-hint { font-size: 13px; color: #374151; margin-bottom: 12px; line-height: 1.5; }
-.twofa-qr-wrap { display: flex; justify-content: center; padding: 8px; background: #fff; border: 1px solid #EDF0F7; border-radius: 8px; width: 200px; }
-.twofa-qr { width: 180px; height: 180px; image-rendering: pixelated; }
-.twofa-manual { font-size: 12px; color: #6B7280; margin: 14px 0 4px; }
-.twofa-key { display: inline-block; font-family: monospace; font-size: 14px; letter-spacing: 1px; background: #F1F3F7; padding: 6px 10px; border-radius: 6px; color: #1F212A; word-break: break-all; }
-.twofa-recovery-title { font-size: 15px; font-weight: 600; color: #1F212A; margin: 0 0 4px; }
-.twofa-recovery-list { list-style: none; padding: 12px 16px; margin: 12px 0; background: #FBFCFF; border: 1px dashed #C9D0F8; border-radius: 8px; columns: 2; column-gap: 24px; }
-.twofa-recovery-list li { font-family: monospace; font-size: 14px; letter-spacing: 1px; color: #1F212A; padding: 3px 0; }
-/* .btn_btn forces a navy background (!important), so secondary buttons just
-   need readable white text to match the primary buttons. */
-.twofa-ghost-btn { color: #fff; }
-.twofa-danger-btn { background: #E5484D; color: #fff; }
+.tfa { display: flex; flex-direction: column; gap: 12px; max-width: 552px; position: relative; }
+.tfa--busy { pointer-events: none; }
+.tfa__body { display: flex; flex-direction: column; gap: 14px; }
+.tfa__title { font-size: 15px; }
+.tfa__status { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tfa__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tfa__fallback { margin-left: auto; }
+.tfa__disable { display: flex; flex-direction: column; gap: 12px; max-width: 320px; }
+.tfa__code-input { letter-spacing: .12em; }
+.tfa__setup { display: flex; gap: 16px; }
+.tfa__qr { width: 120px; height: 120px; flex: none; border: 1px solid var(--border); border-radius: 10px; padding: 8px; background: #fff; }
+.tfa__qr img { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+.tfa__qr-empty { padding: 8px; font-size: 11px; height: 100%; box-sizing: border-box; }
+.tfa__steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; font: var(--text-small); color: var(--ink); line-height: 1.5; }
+.tfa__key { margin-top: 4px; padding: 6px 9px; background: var(--surface-2); border-radius: 7px; display: flex; align-items: center; gap: 8px; }
+.tfa__copy { margin-left: auto; border: 0; background: transparent; color: var(--brand); font: 600 12px/1 var(--font-ui); cursor: pointer; padding: 4px; }
+.tfa__copy:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 4px; }
+.tfa__digits { display: grid; grid-template-columns: repeat(6, 1fr); gap: 7px; max-width: 300px; }
+.tfa__digit {
+    height: 44px; width: 100%; box-sizing: border-box; text-align: center; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--surface); color: var(--ink); font: 600 17px/1 var(--font-mono);
+    transition: border-color var(--t-state) var(--ease), box-shadow var(--t-state) var(--ease);
+}
+.tfa__digit.is-filled { border: 1.5px solid var(--brand); }
+.tfa__digit:focus { outline: none; border: 1.5px solid var(--brand); box-shadow: var(--focus); }
+.tfa__digit.is-error { border-color: var(--danger); }
+.tfa__warn { padding: 12px 14px; background: var(--warn-bg); border-radius: 10px; font: var(--text-small); line-height: 1.55; color: var(--warn-ink); }
+.tfa__codes { list-style: none; margin: 0; padding: 12px 16px; background: var(--surface-2); border: 1px dashed var(--border); border-radius: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px; }
+.tfa__codes li { font-size: 13px; letter-spacing: .06em; color: var(--ink); }
+.tfa__lost { display: flex; flex-direction: column; gap: 8px; font: var(--text-small); color: var(--ink-label); }
+.tfa__lost p { margin: 0; line-height: 1.55; }
+.tfa__pw { align-self: flex-start; text-decoration: none; }
+@media (max-width: 767px) {
+    .tfa__setup { flex-direction: column; }
+    .tfa__fallback { margin-left: 0; }
+}
 </style>

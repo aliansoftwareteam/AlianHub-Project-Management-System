@@ -1,584 +1,423 @@
 <template>
-	<AuthTemplate v-if="isShowResend === false && twoFactor.show === false">
-		<div class="ah-rightside" :class="[{'disableInputField':submitted}]">
-			<div class="sinup-login-title-wrapper">
-                <h3>{{$t('Auth.login_statement')}}</h3>
-                <p>{{$t('Auth.login_descriptioon')}}</p>
-            </div>
-            <!-- Login with auth -->
-            <form action="#" @submit.prevent="handleSubmit">
-            <div class="form-group">
-                <label for="email">{{$t('Auth.email_id')}}<span class="invalid-feedback red">*</span></label>
-                <InputText
-                    id="email"
-                    class="login-input"
-                    placeHolder="Enter your email"
-                    v-model.trim="formData.email.value"
-                    height="56px"
-                    width="100%"
-                    @keyup="checkErrors({'field':formData.email,
-                    'name':formData.email.name,
-                    'validations':formData.email.rules,
-                    'type':formData.email.type,
-                    'event':$event.event})"
-                    @input="formData.email.value = formData.email.value.toLowerCase()"
-                    maxlength="254"
-                    ref="useremail"
-                    type="text"
-                    @enter="handleSubmit"
-                 />
-                <div class="invalid-feedback red">{{formData.email.error}}</div>
+    <AuthShell :proof="step === 'login'">
+        <template #top-right>
+            <span v-if="step === 'login' && showRegister">{{ $t('Auth.new_here') }} <router-link to="/signup">{{ $t('Auth.create_account') }}</router-link></span>
+        </template>
+
+        <!-- 5a: login -->
+        <form v-if="step === 'login'" novalidate @submit.prevent="handleSubmit">
+            <h1 class="auth__title">{{ $t('Auth.welcome_back') }}</h1>
+            <p class="auth__lead">{{ $t('Auth.login_to_workspace') }}</p>
+
+            <div v-if="banner" class="auth__banner" :class="`auth__banner--${banner.kind}`">
+                <ShellIcon :name="banner.kind === 'ok' ? 'check' : 'alert'" :size="15" />
+                <span>{{ banner.text }}</span>
             </div>
 
-            <div class="form-group">
-                <label for="password">{{ $t('Auth.Password') }}<span class="invalid-feedback red">*</span></label>
-                <InputText
-                    id="password"
-                    class="login-input pwd_login pwd__input"
-                    placeHolder="*****"
-                    v-model="formData.password.value"
-                    height="56px"
-                    width="100%"
-                    @keyup="checkErrors({'field':formData.password,
-                    'name':formData.password.name,
-                    'validations':formData.password.rules,
-                    'type':formData.password.type,
-                    'event':$event.event})"
-                    maxlength="150"
-                    ref="useremail"
-                    :type="inputType"
-                    @enter="handleSubmit"
-                 />
-                <div class="invalid-feedback red">{{formData.password.error}}</div>
-                <span @click="togglePasswordInput" class="cursor-pointer position-ab d-flex align-items-center eye">
-                    <img v-if="inputType === 'password'" src="@/assets/images/password_view_hide.png" class="password-view"/>
-                    <img v-else src="@/assets/images/password_view_show.png" class="password-view"/>
-                </span>
+            <div v-if="providers.length" class="auth__providers">
+                <ProviderButton v-for="p in providers" :key="p" :provider="p" mode="login" />
             </div>
+            <button v-if="ssoAvailable" type="button" class="ah-btn ah-btn--outline ah-btn--block" @click="$router.push({ name: 'Sso_Login' })">
+                {{ $t('Auth.continue_with_sso') }}
+            </button>
+            <div v-if="providers.length || ssoAvailable" class="auth__or">{{ $t('Auth.or_with_email') }}</div>
 
-            <div class="form-group d-flex checkbox-label login-checkbox">
-                <div class="login-check-box-wrpper">
-                    <input type="checkbox" class="styled-checkbox position-ab opacity-none" id="chk-remember-me" v-model="rememberMe" :disabled="isSpinner">
-                    <label for="chk-remember-me" class="chk-label d-flex align-items-center">
-                    <span class="gray"> {{ $t('Auth.RememberMeL') }}</span>
-                    </label>
+            <div class="auth__fields">
+                <div class="ah-field">
+                    <label class="ah-field__label" for="email">{{ $t('Auth.email') }}</label>
+                    <input
+                        id="email"
+                        ref="emailInput"
+                        v-model.trim="form.email"
+                        type="email"
+                        autocomplete="username"
+                        maxlength="254"
+                        class="ah-input"
+                        :class="{ 'ah-input--error': errors.email }"
+                        :placeholder="$t('Auth.email_placeholder')"
+                        :aria-invalid="!!errors.email"
+                        aria-describedby="email-error"
+                        @input="form.email = form.email.toLowerCase(); errors.email = ''"
+                    />
+                    <div v-if="errors.email" id="email-error" class="ah-field__error"><ShellIcon name="x" :size="12" />{{ errors.email }}</div>
                 </div>
-                <router-link @click="handleForgotPassword" :style="[{'pointer-events' : isSpinner ? 'none' : ''}]" to="/forgot-password">{{ $t('Auth.Forgot_Password') }}?</router-link>
+                <div class="ah-field">
+                    <label class="ah-field__label" for="password">
+                        <span>{{ $t('Auth.password') }}</span>
+                        <router-link class="auth__field-link" to="/forgot-password" @click="rememberEmail">{{ $t('Auth.Forgot_Password') }}?</router-link>
+                    </label>
+                    <div class="auth__pw">
+                        <input
+                            id="password"
+                            v-model="form.password"
+                            :type="showPassword ? 'text' : 'password'"
+                            autocomplete="current-password"
+                            maxlength="150"
+                            class="ah-input"
+                            :class="{ 'ah-input--error': errors.password }"
+                            placeholder="••••••••"
+                            :aria-invalid="!!errors.password"
+                            aria-describedby="password-error"
+                            @input="errors.password = ''"
+                        />
+                        <button type="button" class="auth__pw-eye" :aria-label="showPassword ? 'Hide password' : 'Show password'" @click="showPassword = !showPassword">
+                            <ShellIcon :name="showPassword ? 'eyeOff' : 'eye'" :size="15" />
+                        </button>
+                    </div>
+                    <div v-if="errors.password" id="password-error" class="ah-field__error"><ShellIcon name="x" :size="12" />{{ errors.password }}</div>
+                </div>
             </div>
 
-            <div class="form-group">
-                <p v-if="errorMessage" class="login-info-message">{{ errorMessage }}</p>
-                <button v-if="!isSpinner && !errorMessage" type="submit" class="btn btn-blue btn-login font-roboto-sans bg-blue white cursor-pointer font-weight-500" tabindex="3">{{$t(`Auth.loging`)}}</button>
-                <button v-if="isSpinner && !errorMessage" type="button" class="btn btn-blue btn-login font-roboto-sans bg-blue white cursor-pointer font-weight-500" tabindex="3" disabled>
-                    {{ $t('Auth.loading') }}
-                    <div class="load">
-                        <div class="progress"></div>
-                        <div class="progress"></div>
-                        <div class="progress"></div>
-                    </div>
+            <div class="auth__actions">
+                <button type="submit" class="ah-btn ah-btn--primary" :disabled="busy">
+                    <span v-if="busy" class="ah-spin"></span>{{ busy ? $t('Auth.loading') : $t('Auth.log_in') }}
+                </button>
+                <button type="button" class="ah-btn ah-btn--secondary" :disabled="busy" @click="sendMagicLink">{{ $t('Auth.email_me_link') }}</button>
+            </div>
+
+            <div class="auth__remember">
+                <label><input v-model="rememberMe" type="checkbox" class="ah-check" :disabled="busy" />{{ $t('Auth.keep_signed_in') }}</label>
+                <span class="ah-small">{{ $t('Auth.keep_signed_in_hint') }}</span>
+            </div>
+        </form>
+
+        <!-- 5b: two-factor -->
+        <form v-else-if="step === 'twofa'" novalidate @submit.prevent="submit2fa">
+            <span class="ah-chip ah-chip--mono auth__step">{{ $t('Auth.step_of', { a: 2, b: 2 }) }}</span>
+            <h2 class="auth__h">{{ $t('Auth.two_factor_code_title') }}</h2>
+            <p class="auth__p">{{ twoFactor.isRecovery ? $t('Auth.two_factor_recovery_enter', { email: form.email }) : $t('Auth.two_factor_open_app', { email: form.email }) }}</p>
+
+            <div v-if="!twoFactor.isRecovery" class="auth__code" :class="{ 'is-error': twoFactor.error }">
+                <input
+                    v-for="i in 6"
+                    :key="i"
+                    :ref="(el) => (codeInputs[i - 1] = el)"
+                    v-model="twoFactor.digits[i - 1]"
+                    type="text"
+                    inputmode="numeric"
+                    maxlength="1"
+                    autocomplete="one-time-code"
+                    @input="onDigit(i - 1, $event)"
+                    @keydown.backspace="onDigitBack(i - 1, $event)"
+                    @paste.prevent="onDigitPaste"
+                />
+            </div>
+            <div v-else class="ah-field" style="margin-bottom:16px">
+                <input v-model.trim="twoFactor.code" type="text" class="ah-input" :class="{ 'ah-input--error': twoFactor.error }" placeholder="xxxxx-xxxxx" maxlength="20" />
+            </div>
+            <div v-if="twoFactor.error" class="ah-field__error" style="margin:-8px 0 14px"><ShellIcon name="x" :size="12" />{{ twoFactor.error }}</div>
+
+            <button type="submit" class="ah-btn ah-btn--primary ah-btn--block ah-btn--lg" :disabled="busy">{{ busy ? $t('Auth.loading') : $t('Auth.two_factor_verify') }}</button>
+            <div class="auth__links">
+                <button type="button" @click="toggleRecoveryMode">{{ twoFactor.isRecovery ? $t('Auth.two_factor_use_app') : $t('Auth.two_factor_use_recovery') }}</button>
+                <button type="button" class="auth__link-muted" @click="backToLogin">{{ $t('Auth.back') }}</button>
+            </div>
+            <p class="auth__hint ah-mono">{{ $t('Auth.code_expires_in', { t: countdown(twoFactor.expiresAt) }) }}</p>
+        </form>
+
+        <!-- 5b: verify email -->
+        <div v-else-if="step === 'verify'">
+            <div class="auth__glyph auth__glyph--warn">!</div>
+            <h2 class="auth__h">{{ $t('Auth.verify_first_title') }}</h2>
+            <i18n-t keypath="Auth.verify_first_body" tag="p" class="auth__p"><template #email><strong>{{ form.email }}</strong></template></i18n-t>
+            <button type="button" class="ah-btn ah-btn--secondary ah-btn--block ah-btn--lg" :disabled="busy || resendWait > 0" @click="handleSubmitResend">{{ $t('Auth.resend_email') }}</button>
+            <p class="auth__hint ah-mono" v-if="resendWait > 0">{{ $t('Auth.resend_in', { t: fmtSeconds(resendWait) }) }}</p>
+            <div class="auth__links" style="margin-top:28px">
+                <span class="ah-small">{{ $t('Auth.wrong_address') }} <button type="button" @click="backToLogin">{{ $t('Auth.backlogin') }}</button></span>
+            </div>
+        </div>
+
+        <!-- 5b: magic link sent -->
+        <div v-else-if="step === 'magic'">
+            <div class="auth__glyph auth__glyph--brand">✉</div>
+            <h2 class="auth__h">{{ $t('Auth.magic_sent_title') }}</h2>
+            <i18n-t keypath="Auth.magic_sent_body" tag="p" class="auth__p"><template #email><strong>{{ form.email }}</strong></template></i18n-t>
+            <div class="auth__note">
+                {{ $t('Auth.magic_nothing_yet') }}
+                <button type="button" class="auth__field-link" style="background:none;border:0;padding:0;cursor:pointer" :disabled="resendWait > 0" @click="sendMagicLink">{{ $t('Auth.send_again') }}</button>
+                <span v-if="resendWait > 0" class="ah-mono"> {{ fmtSeconds(resendWait) }}</span>
+            </div>
+            <div class="auth__links" style="margin-top:28px">
+                <button type="button" @click="backToLogin">{{ $t('Auth.use_password_instead') }}</button>
+            </div>
+        </div>
+
+        <!-- 5b: workspace switcher -->
+        <div v-else-if="step === 'workspace'">
+            <h2 class="auth__h">{{ $t('Auth.choose_workspace') }}</h2>
+            <p class="auth__p">{{ $t('Auth.belong_to', { n: workspaces.length }) }}</p>
+            <div class="auth__ws">
+                <button v-for="w in workspaces" :key="w._id" type="button" class="auth__ws-item" :disabled="w.isDisable || busy" @click="chooseWorkspace(w)">
+                    <span class="ah-avatar">{{ (w.Cst_CompanyName || '?').charAt(0).toUpperCase() }}</span>
+                    <span>
+                        <strong>{{ w.Cst_CompanyName }}</strong>
+                        <span>{{ w.isDisable ? $t('Auth.workspace_disabled') : (w.roleName || '') }}</span>
+                    </span>
+                    <ShellIcon name="chevron" :size="15" class="auth__ws-go" />
                 </button>
             </div>
-            <RegisterViewComponent @handleChange="handleChange" :isSpinner="isSpinner" />
-            <!-- <div class="create-accountlink text-center">
-                <span class="font-roboto-sans font-weight-normal font-weight-400 gray">{{$t('Auth.NotR')}}? <router-link :style="[{'pointer-events' : isSpinner ? 'none' : ''}]" to="/signup" class="light-purple font-weight-500">{{$t('Auth.createAcc')}}</router-link></span>
-            </div> -->
-            </form>
-            <div class="custom-divider my-1" v-if="isDevider">
-                <div class="custom-divider-text">Or Continue With</div>
-            </div>
-            <!-- oAuth -->
-            <oAuthProviders mode="login"/>
-		</div>
-	</AuthTemplate>
-    <AuthTemplate v-if="twoFactor.show === true">
-        <div class="ah-rightside" :class="[{'disableInputField':submitted}]">
-            <div class="sinup-login-title-wrapper">
-                <h3>{{ $t('Auth.two_factor_title') }}</h3>
-                <p>{{ twoFactor.isRecovery ? $t('Auth.two_factor_recovery_hint') : $t('Auth.two_factor_hint') }}</p>
-            </div>
-            <form action="#" @submit.prevent="submit2fa">
-                <div class="form-group">
-                    <label for="twofa-code">{{ twoFactor.isRecovery ? $t('Auth.two_factor_recovery_label') : $t('Auth.two_factor_code_label') }}<span class="invalid-feedback red">*</span></label>
-                    <InputText
-                        id="twofa-code"
-                        class="login-input"
-                        :placeHolder="twoFactor.isRecovery ? 'xxxxx-xxxxx' : '123456'"
-                        v-model.trim="twoFactor.code"
-                        height="56px"
-                        width="100%"
-                        maxlength="20"
-                        type="text"
-                        @enter="submit2fa"
-                    />
-                    <div class="invalid-feedback red">{{ twoFactor.error }}</div>
-                </div>
-                <div class="form-group">
-                    <button v-if="!isSpinner" type="submit" class="btn btn-blue btn-login font-roboto-sans bg-blue white cursor-pointer font-weight-500">{{ $t('Auth.two_factor_verify') }}</button>
-                    <button v-else type="button" class="btn btn-blue btn-login font-roboto-sans bg-blue white cursor-pointer font-weight-500" disabled>
-                        {{ $t('Auth.loading') }}
-                        <div class="load">
-                            <div class="progress"></div>
-                            <div class="progress"></div>
-                            <div class="progress"></div>
-                        </div>
-                    </button>
-                </div>
-                <div class="create-accountlink text-center">
-                    <span class="font-roboto-sans light-purple font-weight-500 cursor-pointer" @click="toggleRecoveryMode">
-                        {{ twoFactor.isRecovery ? $t('Auth.two_factor_use_app') : $t('Auth.two_factor_use_recovery') }}
-                    </span>
-                </div>
-                <div class="create-accountlink text-center mt-2">
-                    <span class="font-roboto-sans gray cursor-pointer" @click="backToLoginFrom2fa">{{ $t('Auth.backlogin') }}</span>
-                </div>
-            </form>
+            <router-link to="/business" class="auth__field-link">+ {{ $t('Auth.create_workspace') }}</router-link>
         </div>
-    </AuthTemplate>
-    <Template v-if="isShowResend === true">
-        <div class="ah-rightside">
-            <div>
-                <h3 class="title-login dark-gray">{{$t('Auth.ResendEmail')}}</h3>
-                <p class="GunPowder">{{$t('Auth.pleasecheck')}}</p>
-            </div>
-            <form action="#" @submit.prevent="handleSubmitResend">
-                <div class="form-group">
-                    <button  v-if="!isSpinner" class="btn btn-blue btn-login font-roboto-sans bg-blue white font-weight-500 cursor-pointer" type="submit">{{$t('Auth.ResendEmail')}}</button>
-                    <button v-else type="button" class="btn btn-blue btn-login btn-disabled opacity-7 white bg-blue font-weight-500 font-roboto-sans" disabled><span id="btn-spinner"></span>{{ $t('Auth.loading') }}...</button>
-                </div>
-            </form>
-            <div class="create-accountlink text-center">
-                <span class="font-roboto-sans font-weight-normal font-weight-400 gray cursor-pointer" @click="backToLogin">{{$t('Auth.backlogin')}}? <span class="light-purple font-weight-500">{{$t('Auth.loging')}}</span></span>
-            </div>
-        </div>
-    </Template>
+
+        <template #foot-right>
+            <a v-if="step === 'login' && brand.helpLink" :href="brand.helpLink" target="_blank" rel="noopener">{{ $t('Auth.locked_out') }}</a>
+        </template>
+    </AuthShell>
 </template>
 
 <script setup>
-// PACKAGES
-import Cookies from 'js-cookie';
-import {  defineComponent, inject } from "vue";
+import Cookies from "js-cookie";
 
-// COMPONENTS
-import AuthTemplate from "@/components/templates/Authentication/index.vue";
-import InputText from "@/components/atom/InputText/InputText.vue";
-import { useRouter , useRoute} from 'vue-router'
-import { useValidation } from "@/composable/Validation.js";
-import { isAuthDeviderShow } from "@/composable/commonFunction.js";
-import { ref , onMounted} from 'vue';
-import {useToast} from 'vue-toast-notification';
-import Template from "@/components/templates/Authentication/index.vue";
-import { apiRequestWithoutCompnay, apiRequestWithoutSecure, getAuth } from '../../../services';
+defineOptions({ name: "LoginPage" });
+import { computed, inject, onMounted, onUnmounted, reactive, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
+import { useToast } from "vue-toast-notification";
+import AuthShell from "@/components/templates/AuthShell/AuthShell.vue";
+import ProviderButton from "@/plugins/oauth/ProviderButton.vue";
+import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import { apiRequestWithoutCompnay, apiRequestWithoutSecure, getAuth } from "@/services";
+import * as env from "@/config/env";
+
 const { t } = useI18n();
 const $toast = useToast();
-const errorMessage = ref("");
-const rememberMe = ref(false)   
-const submitted = ref(false)
-const isSpinner = ref(false)
-const isShowResend = ref(false);
-// 2FA second-step state. When login returns twoFactorRequired we hide the
-// password form and show this; submit2fa() exchanges tempToken + code at
-// /api/v2/auth/2fa/validate for the real session.
-const twoFactor = ref({ show: false, tempToken: '', code: '', error: '', isRecovery: false });
-const userData = ref();
-const router = useRouter()
-const route = useRoute()
-const  { checkErrors , checkAllFields } = useValidation();
-import * as env from '@/config/env';
+const router = useRouter();
+const route = useRoute();
+const { getters } = useStore();
 const axios = inject("$axios");
-const isDevider = ref(isAuthDeviderShow());
 
-defineComponent({
-	name: "Login-Page",
+const brand = computed(() => getters["brandSettingTab/brandSettings"] || {});
+const showRegister = computed(() => router.hasRoute("Sign-up") || router.hasRoute("Signup") || router.hasRoute("Register"));
+const providers = [
+    process.env.VUE_APP_IS_GOOGLE_LOGIN === "true" && "google",
+    process.env.VUE_APP_IS_GITHUB_LOGIN === "true" && "github",
+    process.env.VUE_APP_IS_GITLAB_LOGIN === "true" && "gitlab"
+].filter(Boolean);
+const ssoAvailable = computed(() => process.env.VUE_APP_IS_SSO_LOGIN !== "false");
 
-	components: {
-		AuthTemplate
-	}
+const step = ref("login");
+const busy = ref(false);
+const showPassword = ref(false);
+const rememberMe = ref(false);
+const banner = ref(null);
+const emailInput = ref(null);
+const form = reactive({ email: localStorage.getItem("ForgotEmail") || "", password: "" });
+const errors = reactive({ email: "", password: "" });
+const userData = ref(null);
+const workspaces = ref([]);
+const pendingUserId = ref("");
+
+const EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+[.][a-zA-Z]{2,}$/;
+const validate = ({ password = true } = {}) => {
+    errors.email = !form.email ? t("Auth.email_required") : !EMAIL_RE.test(form.email) ? t("Auth.email_invalid") : "";
+    errors.password = password && !form.password ? t("Auth.password_required") : "";
+    return !errors.email && !errors.password;
+};
+
+const clearSession = () => {
+    localStorage.removeItem("updateToken");
+    Cookies.remove("refreshToken");
+    Cookies.remove("accessToken");
+};
+const rememberEmail = () => localStorage.setItem("ForgotEmail", form.email);
+const encode = (str) => Array.from(str).map((c) => c.charCodeAt(0)).join(", ");
+const decode = (src) => String.fromCharCode.apply(null, src.split(","));
+
+onMounted(() => {
+    try {
+        const rem = JSON.parse(localStorage.getItem("remember") || "null");
+        if (rem) { form.email = rem.email; form.password = decode(rem.password); rememberMe.value = true; }
+    } catch { /* ignore */ }
+    if (route.query.reason === "expired") banner.value = { kind: "warn", text: t("Auth.two_factor_session_expired") };
+    if (route.query.magic === "invalid") banner.value = { kind: "danger", text: t("Auth.magic_invalid") };
+    if (route.query.magic === "disabled") banner.value = { kind: "warn", text: t("Auth.magic_unavailable") };
+    if (route.query.ssoError) banner.value = { kind: "danger", text: t("Auth.sso_failed") };
+    if (route.query.magic === "ok" && route.query.uid) {
+        busy.value = true;
+        proceedAfterAuth(String(route.query.uid)).catch(() => {
+            busy.value = false;
+            banner.value = { kind: "danger", text: t("Auth.magic_invalid") };
+        });
+        return;
+    }
+    emailInput.value?.focus();
 });
 
-    const email = localStorage.getItem('ForgotEmail');
+let tick = null;
+const now = ref(Date.now());
+onMounted(() => { tick = setInterval(() => { now.value = Date.now(); if (resendWait.value > 0) resendWait.value -= 1; }, 1000); });
+onUnmounted(() => clearInterval(tick));
+const countdown = (at) => fmtSeconds(Math.max(0, Math.round((at - now.value) / 1000)));
+const fmtSeconds = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+const resendWait = ref(0);
 
-    const formData = ref({
-        email: {
-            value: email ? email : "",
-            rules:
-            "required | regex: ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+[.][a-zA-Z]{2,}$",
-            name: "Email",
-            error: "",
-        },
-        password: {
-            value: "",
-            rules:
-            "required",
-            name: "Password",
-            error: "",
-        },
-    })
-    const inputType = ref("password")
+const updateUserStatus = (uid) => apiRequestWithoutCompnay("put", env.USER_UPATE, { userId: uid, updateObject: { isOnline: true, lastActive: new Date() } }).catch(() => {});
+const userCompanyStatusCheck = (uid) => apiRequestWithoutCompnay("post", env.USER_AND_COMAPNY_CHECK, { userId: uid });
 
-    const togglePasswordInput = () => {
-        inputType.value = (inputType.value === "password") ? "text" : "password";
-    }
-    onMounted(() => {
-        // Check remember me functionality
-        var rem_data = localStorage.getItem("remember");
-        var rem_array = JSON.parse(rem_data);
-        if (rem_array) {
-            var rem_email = rem_array.email;
-            var rem_password = decode(rem_array.password);
-            formData.value.email.value = rem_email;
-            formData.value.password.value = rem_password;
-            rememberMe.value = true;
+const handleSubmit = async () => {
+    if (!validate()) return;
+    banner.value = null;
+    busy.value = true;
+    if (rememberMe.value) localStorage.setItem("remember", JSON.stringify({ email: form.email, password: encode(form.password) }));
+    else localStorage.removeItem("remember");
+    try {
+        const user = await apiRequestWithoutSecure("post", env.LOGIN, { email: form.email, password: form.password, isLoginType: "frontend" });
+        if (user.status !== 200) throw new Error("server");
+        if (user?.data?.isResetPassword === true) {
+            clearSession();
+            banner.value = { kind: "warn", text: t("Auth.reset_required") };
+            return;
         }
-    })
-    const handleForgotPassword = () => {
-        localStorage.setItem("ForgotEmail", formData.value.email.value);
-    }
-    const encode = (source) => {
-        var str = source;
-        var length = str.length;
-        var encodedStr = str.charCodeAt(0);
-        var position = 1;
-        while(position<length) {
-            var n = str.charCodeAt(position++);
-            encodedStr = encodedStr + ", " + n;
+        if (user?.data?.twoFactorRequired === true && user?.data?.tempToken) {
+            twoFactor.tempToken = user.data.tempToken;
+            twoFactor.expiresAt = Date.now() + 5 * 60 * 1000;
+            step.value = "twofa";
+            setTimeout(() => codeInputs.value[0]?.focus(), 50);
+            return;
         }
-        return encodedStr;
-    }
-
-    // //Decode user password
-    const decode = (source) => {
-        var source_array = source.split(','); // Convert string (CSV) to array.
-        var decodedStr = String.fromCharCode.apply(null, source_array);
-        return decodedStr;
-    }
-
-    //Update user status
-    const updateUserStatus = (uid) => {
-        return new Promise((resolve, reject) => {
-                const updateObject = { 
-                    'isOnline': true, 
-                    'lastActive': new Date() 
-                }
-
-                apiRequestWithoutCompnay("put",env.USER_UPATE,{
-                userId: uid,
-                updateObject: updateObject,
-            }).then(()=>{
-                resolve(true)
-            }).catch((err)=>{
-                console.error(err);
-                reject(false)
-            })
-        })
-    }
-    //Update user comapny check
-    const userCompanyStatusCheck = (uid) => {
-        return new Promise((resolve, reject) => {
-            apiRequestWithoutCompnay("post",env.USER_AND_COMAPNY_CHECK,{userId:uid}).then((res)=>{
-                resolve(res)
-            }).catch((err)=>{
-                console.error(err);
-                reject(false)
-            })
-        })
-    }
-    //Hanlde login v4
-    const handleSubmit = async () => {
-        try {
-            
-            const valid = await checkAllFields(formData.value);
-            if (!valid) return;
-
-            document.getElementById('password').blur();
-            document.getElementById('email').blur();
-            submitted.value = true;
-
-            const { email, password } = formData.value;
-            const encodedPassword = encode(password.value);
-
-            if (rememberMe.value) {
-                localStorage.setItem("remember", JSON.stringify({
-                    email: email.value,
-                    password: encodedPassword,
-                }));
-            } else {
-                localStorage.removeItem("remember");
-            }
-
-            isSpinner.value = true;
-
-            const object = {
-                email:email.value, 
-                password:password.value,
-                isLoginType: "frontend"
-            }
-            const user = await apiRequestWithoutSecure("post",env.LOGIN,object);
-            
-            if (user.status !== 200) {
-                isSpinner.value = false;
-                submitted.value = false;
-                Cookies.remove('refreshToken');
-                Cookies.remove('accessToken');
-                $toast.error(t("Toast.something_went_wrong"), { position: 'top-right' });
-                return; // Exit early
-            }
-            if(user?.data?.isResetPassword === true){
-                isSpinner.value = false;
-                submitted.value = false;
-                Cookies.remove('refreshToken');
-                Cookies.remove('accessToken');
-                errorMessage.value = t("Toast.Password_reset_link");
-                // $toast.warning(t("Toast.Password_reset_link"),{position: 'top-right'});
-                return;
-            }
-            // 2FA second-step: the backend returns this (HTTP 200) instead of a
-            // session when the account has TOTP enabled. Show the code form and
-            // stop here; submit2fa() completes the login via /2fa/validate.
-            if (user?.data?.twoFactorRequired === true && user?.data?.tempToken) {
-                twoFactor.value.tempToken = user.data.tempToken;
-                twoFactor.value.show = true;
-                isSpinner.value = false;
-                submitted.value = false;
-                return;
-            }
-            const userId = user.data.uid;
-            await proceedAfterAuth(userId);
-
-        } catch (error) {
-            console.error(error);
-            isSpinner.value = false;
-            submitted.value = false;
-            localStorage.removeItem("updateToken");
-            Cookies.remove('refreshToken');
-            Cookies.remove('accessToken');
-            if(error?.response?.data?.isEmailVerified === false && error?.response?.data?.userData) {
-                userData.value = error?.response?.data?.userData;
-            }
-
-            if (error?.response?.data?.isEmailVerified === false) {
-                $toast.error(t('Auth.verify_email_and_try_again'), { position: 'top-right' });
-                isShowResend.value = true;
-            } else if(error?.response?.data?.message === "Your email is invalid. Please check and try again" || error?.response?.data?.message === 'User not found' ){
-                $toast.error(t("Toast.Invalid_email"), { position: 'top-right' });
-            } else if(error?.response?.data?.message === "Your password is invalid. Please check and try again"){
-                $toast.error(t("Toast.Invalid_password"), { position: 'top-right' });
-            } else if(error?.response?.data?.message === "Auth.too_many_request"){
-                $toast.error(t("Toast.Too_many_request"), { position: 'top-right' });
-            } else if (error.error === 'invalid username/password' || error.error_code === 'InvalidPassword') {
-                $toast.error(t("Toast.Invalid_username_or_password"), { position: 'top-right' });
-            } else if (error.message === "Email Not Verified") {
-                $toast.error(t("Toast.Email_Not_Verified"), { position: 'top-right' });
-                isShowResend.value = true;
-            } else {
-                $toast.error(t("Toast.something_went_wrong"), { position: 'top-right' });
-            }
-
-            localStorage.removeItem("userId");
-            localStorage.removeItem("isLogging");
-            localStorage.removeItem("remember");
-        }
-    };
-
-    // Shared post-authentication flow: company-status check, token refresh,
-    // email-verification gate, company selection, and redirect. Runs for both
-    // password login and the 2FA second-step so they behave identically.
-    const proceedAfterAuth = async (userId) => {
-        localStorage.setItem("userId", userId);
-        const [userResponse] = await Promise.all([
-            userCompanyStatusCheck(userId),
-            getAuth(userId, true)
-        ]);
-
-        userData.value = userResponse?.data?.data.userData;
-        if(userResponse.data.status == false) {
-            isSpinner.value = false;
-            submitted.value = false;
-            localStorage.removeItem("updateToken");
-            Cookies.remove('refreshToken');
-            Cookies.remove('accessToken');
-            throw new Error('MongoDB Error from Api')
-        }
-
-        const {userData: uData, companyId: companyID, isCompanyFind} = userResponse.data.data;
-        let cid = localStorage.getItem("selectedCompany") ?? companyID;
-        if (!uData.isEmailVerified) {
-            isSpinner.value = false;
-            submitted.value = false;
-            localStorage.removeItem("updateToken");
-            Cookies.remove('refreshToken');
-            Cookies.remove('accessToken');
-            throw new Error("Verify your email and try again");
-        }
-
-        localStorage.setItem('SubmenuScreen', 'project');
-
-        if (uData.AssignCompany && uData.AssignCompany.length) {
-            updateUserStatus(userId);
-            if (cid && isCompanyFind === false) {
-                router.push({ name: "Create_Company" });
-                return;
-            } else {
-                localStorage.setItem('selectedCompany', cid);
-            }
+        await proceedAfterAuth(user.data.uid);
+    } catch (error) {
+        clearSession();
+        localStorage.removeItem("userId");
+        localStorage.removeItem("isLogging");
+        localStorage.removeItem("remember");
+        const data = error?.response?.data || {};
+        const msg = data.message || error.message;
+        if (data.isEmailVerified === false) {
+            userData.value = data.userData || null;
+            step.value = "verify";
+        } else if (msg === "Your email is invalid. Please check and try again" || msg === "User not found") {
+            errors.email = t("Auth.account_unknown");
+        } else if (msg === "Your password is invalid. Please check and try again" || error.error_code === "InvalidPassword" || error.error === "invalid username/password") {
+            errors.password = t("Auth.password_mismatch") + (Number.isFinite(data.attemptsLeft) ? " " + t("Auth.attempts_left", { n: data.attemptsLeft }) : "");
+        } else if (msg === "Auth.too_many_request" || error?.response?.status === 429) {
+            errors.password = t("Auth.too_many_attempts");
+        } else if (msg === "Email Not Verified") {
+            step.value = "verify";
         } else {
-            updateUserStatus(userId);
-            router.push({ name: "Create_Company" });
-            return;
+            banner.value = { kind: "danger", text: t("Auth.server_error") };
         }
-
-        localStorage.setItem("isLogging", "true");
-
-        if (route.query.redirect_url && route.query.redirect_url !== '/login') {
-            if(route.query.redirect_url === "/") {
-                await router.replace(`${route.query.redirect_url}${cid}`);
-            } else {
-                const tmpcid = route.query.redirect_url?.split("/")[1];
-                if ((tmpcid && uData.AssignCompany.includes(tmpcid)) || tmpcid === 'oauth2') {
-                    await router.replace(route.query.redirect_url );
-                } else {
-                    await router.replace(`/${cid}`);
-                }
-            }
-            localStorage.removeItem('ForgotEmail');
-            window.location.reload();
-        } else {
-            localStorage.removeItem('ForgotEmail');
-            window.location.reload();
-        }
-        submitted.value = false;
-        localStorage.removeItem('ForgotEmail');
-    };
-
-    // 2FA second-step submit: exchange tempToken + code (TOTP or recovery) for a
-    // real session, then run the same post-auth flow as a password login.
-    const submit2fa = async () => {
-        try {
-            if (!twoFactor.value.code || !twoFactor.value.code.trim()) {
-                twoFactor.value.error = t('Auth.two_factor_enter_code');
-                return;
-            }
-            twoFactor.value.error = '';
-            isSpinner.value = true;
-            submitted.value = true;
-            const res = await apiRequestWithoutSecure("post", env.TWO_FA_VALIDATE, {
-                tempToken: twoFactor.value.tempToken,
-                code: twoFactor.value.code.trim(),
-            });
-            if (res.status !== 200 || !res?.data?.uid) {
-                isSpinner.value = false;
-                submitted.value = false;
-                twoFactor.value.error = t('Auth.two_factor_invalid_code');
-                return;
-            }
-            await proceedAfterAuth(res.data.uid);
-        } catch (error) {
-            console.error(error);
-            isSpinner.value = false;
-            submitted.value = false;
-            const msg = error?.response?.data?.message;
-            if (msg === 'Auth.too_many_request') {
-                twoFactor.value.error = t('Toast.Too_many_request');
-            } else if (typeof msg === 'string' && /expired/i.test(msg)) {
-                // tempToken expired — send the user back to the password step.
-                twoFactor.value.error = '';
-                backToLoginFrom2fa();
-                $toast.error(t('Auth.two_factor_session_expired'), { position: 'top-right' });
-            } else {
-                twoFactor.value.error = t('Auth.two_factor_invalid_code');
-            }
-        }
-    };
-
-    const toggleRecoveryMode = () => {
-        twoFactor.value.isRecovery = !twoFactor.value.isRecovery;
-        twoFactor.value.code = '';
-        twoFactor.value.error = '';
-    };
-    const backToLoginFrom2fa = () => {
-        twoFactor.value = { show: false, tempToken: '', code: '', error: '', isRecovery: false };
-    };
-
-    const handleSubmitResend = () => {
-        if (!(userData.value && Object.keys(userData.value).length)) {
-            $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
-            return;
-        }
-
-        const cTime = Date.now();
-        const duration = 1 * 60 * 1000;
-        const lastResendTime = localStorage.getItem("lastResendTime");
-
-        if (lastResendTime && cTime - lastResendTime < duration) {
-            $toast.error(t(`authErrorMessage.please_wait_before_resending_email`), { position: 'top-right' });
-            return;
-        }
-        const axiosData = {
-            "uid": userData.value._id,
-            "email": userData.value.Employee_Email
-        };
-        isSpinner.value = true;
-        axios.post(env.API_URI + env.SEND_VARIFICATION_EMAIL, axiosData).then((result) => {
-            if(result.data.status === true) {
-                $toast.success(t("Toast.Verification_mail_has_been_send_successfully"),{position: 'top-right'});
-                localStorage.setItem("lastResendTime", cTime.toString());
-                isSpinner.value = false;
-            } else {
-                isSpinner.value = false;
-                $toast.error(result.data.statusText,{position: 'top-right'});
-            }
-        }).catch((error) => {
-            isSpinner.value = false;
-            console.error(error,"Error");
-            $toast.error(t("Toast.something_went_wrong"), { position: 'top-right' });
-        })
+    } finally {
+        busy.value = false;
     }
+};
 
-    const backToLogin = () => {
-        localStorage.removeItem("lastResendTime");
-        isShowResend.value = false;
+const proceedAfterAuth = async (userId) => {
+    localStorage.setItem("userId", userId);
+    const [userResponse] = await Promise.all([userCompanyStatusCheck(userId), getAuth(userId, true)]);
+    if (userResponse?.data?.status === false) { clearSession(); throw new Error("server"); }
+    const { userData: uData, companyId: companyID, isCompanyFind, companies } = userResponse.data.data;
+    userData.value = uData;
+    if (!uData.isEmailVerified) { clearSession(); step.value = "verify"; return; }
+    localStorage.setItem("SubmenuScreen", "project");
+    updateUserStatus(userId);
+
+    if (!uData.AssignCompany?.length) { router.push({ name: "Create_Company" }); return; }
+    const cid = localStorage.getItem("selectedCompany") ?? companyID;
+    if (cid && isCompanyFind === false) { router.push({ name: "Create_Company" }); return; }
+
+    if (!localStorage.getItem("selectedCompany") && Array.isArray(companies) && companies.length > 1) {
+        workspaces.value = companies;
+        pendingUserId.value = userId;
+        step.value = "workspace";
+        return;
     }
-    const handleChange = () => {
-        localStorage.setItem("ForgotEmail", formData.value.email.value);
+    finishLogin(cid);
+};
+
+const finishLogin = async (cid) => {
+    localStorage.setItem("selectedCompany", cid);
+    localStorage.setItem("isLogging", "true");
+    localStorage.removeItem("ForgotEmail");
+    const redirect = route.query.redirect_url;
+    if (redirect && redirect !== "/login") {
+        if (redirect === "/") await router.replace(`/${cid}`);
+        else {
+            const tmpcid = redirect.split("/")[1];
+            const ok = (tmpcid && userData.value?.AssignCompany?.includes(tmpcid)) || tmpcid === "oauth2";
+            await router.replace(ok ? redirect : `/${cid}`);
+        }
     }
+    window.location.reload();
+};
+const chooseWorkspace = (w) => { busy.value = true; finishLogin(w._id); };
+
+/* 2FA */
+const twoFactor = reactive({ tempToken: "", code: "", digits: ["", "", "", "", "", ""], error: "", isRecovery: false, expiresAt: 0 });
+const codeInputs = ref([]);
+const onDigit = (i, e) => {
+    const v = (e.target.value || "").replace(/\D/g, "").slice(-1);
+    twoFactor.digits[i] = v;
+    twoFactor.error = "";
+    if (v && i < 5) codeInputs.value[i + 1]?.focus();
+    if (twoFactor.digits.every((d) => d)) submit2fa();
+};
+const onDigitBack = (i, e) => { if (!e.target.value && i > 0) codeInputs.value[i - 1]?.focus(); };
+const onDigitPaste = (e) => {
+    const txt = (e.clipboardData.getData("text") || "").replace(/\D/g, "").slice(0, 6);
+    txt.split("").forEach((c, i) => (twoFactor.digits[i] = c));
+    codeInputs.value[Math.min(txt.length, 5)]?.focus();
+    if (txt.length === 6) submit2fa();
+};
+const submit2fa = async () => {
+    const code = twoFactor.isRecovery ? twoFactor.code.trim() : twoFactor.digits.join("");
+    if (!code || (!twoFactor.isRecovery && code.length < 6)) { twoFactor.error = t("Auth.two_factor_enter_code"); return; }
+    if (busy.value) return;
+    twoFactor.error = "";
+    busy.value = true;
+    try {
+        const res = await apiRequestWithoutSecure("post", env.TWO_FA_VALIDATE, { tempToken: twoFactor.tempToken, code });
+        if (res.status !== 200 || !res?.data?.uid) { twoFactor.error = t("Auth.two_factor_invalid_code"); return; }
+        await proceedAfterAuth(res.data.uid);
+    } catch (error) {
+        const msg = error?.response?.data?.message;
+        if (msg === "Auth.too_many_request") twoFactor.error = t("Toast.Too_many_request");
+        else if (typeof msg === "string" && /expired/i.test(msg)) { backToLogin(); banner.value = { kind: "warn", text: t("Auth.two_factor_session_expired") }; }
+        else twoFactor.error = t("Auth.two_factor_invalid_code");
+    } finally {
+        busy.value = false;
+    }
+};
+const toggleRecoveryMode = () => { twoFactor.isRecovery = !twoFactor.isRecovery; twoFactor.code = ""; twoFactor.digits = ["", "", "", "", "", ""]; twoFactor.error = ""; };
+const backToLogin = () => {
+    Object.assign(twoFactor, { tempToken: "", code: "", digits: ["", "", "", "", "", ""], error: "", isRecovery: false });
+    localStorage.removeItem("lastResendTime");
+    step.value = "login";
+    form.password = "";
+};
+
+/* verify email */
+const handleSubmitResend = () => {
+    if (!userData.value?._id) { $toast.error(t("Toast.something_went_wrong"), { position: "top-right" }); return; }
+    busy.value = true;
+    axios.post(env.API_URI + env.SEND_VARIFICATION_EMAIL, { uid: userData.value._id, email: userData.value.Employee_Email || form.email }).then((result) => {
+        if (result.data.status === true) { resendWait.value = 60; $toast.success(t("Toast.Verification_mail_has_been_send_successfully"), { position: "top-right" }); }
+        else $toast.error(result.data.statusText, { position: "top-right" });
+    }).catch(() => $toast.error(t("Toast.something_went_wrong"), { position: "top-right" })).finally(() => { busy.value = false; });
+};
+
+/* magic link */
+const sendMagicLink = async () => {
+    if (!validate({ password: false })) return;
+    if (resendWait.value > 0) return;
+    busy.value = true;
+    try {
+        const res = await apiRequestWithoutSecure("post", env.MAGIC_LINK, { email: form.email, redirect_url: route.query.redirect_url || "" });
+        if (res?.data?.status === false && res?.data?.statusText === "disabled") { banner.value = { kind: "warn", text: t("Auth.magic_unavailable") }; return; }
+        step.value = "magic";
+        resendWait.value = 60;
+    } catch (error) {
+        const status = error?.response?.status;
+        if (status === 404 || status === 501) banner.value = { kind: "warn", text: t("Auth.magic_unavailable") };
+        else if (status === 429) errors.email = t("Auth.too_many_attempts");
+        else banner.value = { kind: "danger", text: t("Auth.server_error") };
+    } finally {
+        busy.value = false;
+    }
+};
 </script>
+
 <style>
-.login-info-message {
-    background: #ffa500;
-    font-weight: 500 !important;
-    padding: 5px;
-    color: #2c2c2c !important;
-}
-.load {
-  display: flex;
-  border-radius: 50%;
-  flex-direction: row;
-}
-
-.progress {
-  width: 0.6em;
-  height: 0.6em;
-  margin: 0.2em;
-  scale: 0;
-  border-radius: 50%;
-  background: rgb(255, 255, 255);
-  animation: loading_492 0.9s ease infinite;
-  animation-delay: 0s;
-}
-
-@keyframes loading_492 {
-  50% {
-    scale: 1;
-  }
-}
-
-.progress:nth-child(2) {
-  animation-delay: 0.3s;
-}
-
-.progress:nth-child(3) {
-  animation-delay: 0.6s;
-}
-</style>
-<style src="./style.css">
+.ah-spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; animation: auth-spin .8s linear infinite; }
 </style>

@@ -33,13 +33,12 @@
             </div>
         </div>
     </div>
-    <div v-else class="text-center">
-        <img :src="accesDenied" />
-    </div>
+    <AppState v-else kind="forbidden" />
 </div>
 </template>
 
 <script setup>
+import AppState from '@/components/molecules/AppState/AppState.vue';
 import SettingCompanyDetailsVue from "@/components/molecules/Setting/SettingCompanyDetails.vue";
 import SettingTaskPriorityVue from "@/components/molecules/Setting/SettingTaskPriority.vue";
 import SettingMilestoneWeeklyRange from "@/components/molecules/Setting/SettingMilestoneWeeklyRange.vue";
@@ -52,7 +51,6 @@ import SettingAutoCloseProjects from "@/components/molecules/Setting/SettingAuto
 import SettingTimeReminder from "@/components/molecules/Setting/SettingTimeReminder.vue";
 import { defineComponent} from "vue";
 import { useCustomComposable } from '@/composable';
-const accesDenied = require("@/assets/images/access_denied_img.png");
 const { checkPermission } = useCustomComposable();
 defineComponent({
     name: "SettingComponent",

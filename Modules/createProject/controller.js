@@ -10,6 +10,14 @@ const { getCachedGlobalTemplateData } = require("../../utils/enterpriseHelper");
 const { removeCache } = require('../../utils/commonFunctions');
 const { updateCompanyFun } = require("../Company/controller/updateCompany");
 const projectTemplate = require("../../utils/projectTemplates.json");
+const blankTemplate = require("./blankTemplate");
+const { focusForTemplate, normaliseFocus, sampleTaskNamesFor, SAMPLE_TASK_COUNT } = require("./sampleTasks");
+
+const pickGlobalTemplate = (templateId) => {
+    if (String(templateId) === blankTemplate._id) return blankTemplate;
+    return projectTemplate.find((tpl) => String(tpl._id) === String(templateId)) || projectTemplate[0];
+};
+
 const { seedSampleTasks, sampleTasksForTemplate } = require("../../utils/sampleTasks");
 
 // A project created from a template arrives with columns but nothing in them, which teaches a
@@ -284,7 +292,7 @@ exports.createProject = async (req) => {
                                         reject({status: false, statusText: 'error in getting template with category'});
                                         return;
                                     }
-                                    let projectTemplateData = projectTemplate[0];
+                                    let projectTemplateData = pickGlobalTemplate(createProjectObject.TemplateId);
                                     let incrementProjectStatus = projectStatusData[0].totalStatus;
                                     let incrementTask = taskStatusData[0]?.totalStatus;
                                     let incrementTaskType = taskTypeData[0]?.totalStatus;
@@ -511,9 +519,18 @@ exports.createProject = async (req) => {
                     ] 
                     let customFieldVal = JSON.parse(JSON.stringify(createProjectObject.customFiedlsValue)) || [];
                     createProjectObject._id = new mongoose.Types.ObjectId(createProjectObject?._id);
+                    // "Include the sample tasks" plus the team's setup answer become rows for
+                    // seedTemplateSamples, which is the single seeding path.
+                    if (createProjectObject.includeSampleTasks === true && !createProjectObject.sampleTaskRows) {
+                        const focus = normaliseFocus(createProjectObject.sampleFocus || focusForTemplate(pickGlobalTemplate(createProjectObject.TemplateId)));
+                        createProjectObject.sampleTaskRows = sampleTaskNamesFor(focus)
+                            .map((name) => [name, 'An example task. Open it, try the controls, then delete it.']);
+                    }
                     delete createProjectObject?.isTemplate;
                     delete createProjectObject?.useTemplateProj;
                     delete createProjectObject?.customFiedlsValue;
+                    delete createProjectObject?.includeSampleTasks;
+                    delete createProjectObject?.sampleFocus;
                     let finalObj = {
                         type: dbCollections.PROJECTS,
                         data: createProjectObject
@@ -775,10 +792,26 @@ exports.removeProjectCount = (companyId,isPrivateSpace) => {
     }
 }
 
+exports.decorateGlobalTemplates = (templates, teamFocus) => {
+    const focus = teamFocus ? normaliseFocus(teamFocus) : '';
+    const list = (Array.isArray(templates) ? templates : []).map((tpl) => {
+        const plain = JSON.parse(JSON.stringify(tpl));
+        plain.focus = focusForTemplate(plain);
+        plain.sampleTaskCount = SAMPLE_TASK_COUNT;
+        plain.sampleTaskNames = sampleTaskNamesFor(plain.focus);
+        return plain;
+    });
+    if(!focus) return list;
+    return list
+        .map((tpl, index) => ({ tpl, index }))
+        .sort((a, b) => (a.tpl.focus === focus ? 0 : 1) - (b.tpl.focus === focus ? 0 : 1) || a.index - b.index)
+        .map((x) => x.tpl);
+};
+
 exports.getGlobalTemplate = (req,res) => {
     try {
         getCachedGlobalTemplateData().then((resp) => {
-            res.send(resp);
+            res.send({ status: true, statusText: exports.decorateGlobalTemplates(resp.statusText, req.body?.teamFocus) });
         }).catch((error) => {
             res.send({status: false,statusText: error});
         })

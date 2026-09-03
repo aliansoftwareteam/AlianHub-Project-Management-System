@@ -159,6 +159,44 @@ calendarFeedsSchema.index({ token: 1 });
 calendarFeedsSchema.index({ companyId: 1, deletedStatusKey: 1 });
 const automationRulesSchema = new Schema(schema.automationRules, {strict: true, timestamps: true});
 automationRulesSchema.index({ deletedStatusKey: 1 });
+
+const automationEventLogSchema = new Schema(schema.automationEventLog, {strict: true, timestamps: true});
+automationEventLogSchema.index({ eventId: 1 }, { unique: true });
+automationEventLogSchema.index({ type: 1, occurredAt: -1 });
+// Diagnostic only — 14 days is long enough to read a week of traffic twice.
+automationEventLogSchema.index({ createdAt: 1 }, { expireAfterSeconds: 1209600 });
+
+const automationRunsSchema = new Schema(schema.automationRuns, {strict: true, timestamps: true});
+// The single most important index in the engine: it is what makes a duplicate
+// delivery a no-op instead of a second execution of the same rule.
+automationRunsSchema.index({ ruleId: 1, eventId: 1 }, { unique: true });
+automationRunsSchema.index({ startedAt: -1 });
+automationRunsSchema.index({ status: 1, startedAt: -1 });
+automationRunsSchema.index({ createdAt: 1 }, { expireAfterSeconds: 7776000 });
+
+const agentFindingsSchema = new Schema(schema.agentFindings, {strict: true, timestamps: true});
+// The dedup key. Unique, so a concurrent second run cannot race in a duplicate.
+agentFindingsSchema.index({ taskId: 1, factId: 1 }, { unique: true });
+agentFindingsSchema.index({ projectId: 1, status: 1 });
+
+const agentsSchema = new Schema(schema.agents, {strict: true, timestamps: true});
+agentsSchema.index({ paused: 1 });
+agentsSchema.index({ ownerId: 1 });
+
+const agentRunsSchema = new Schema(schema.agentRuns, {strict: true, timestamps: true});
+agentRunsSchema.index({ agentId: 1, startedAt: -1 });
+agentRunsSchema.index({ status: 1, startedAt: -1 });
+agentRunsSchema.index({ taskId: 1, startedAt: -1 });
+agentRunsSchema.index({ projectId: 1, status: 1 });
+agentRunsSchema.index({ createdAt: 1 }, { expireAfterSeconds: 15552000 });
+
+const agentProposalsSchema = new Schema(schema.agentProposals, {strict: true, timestamps: true});
+agentProposalsSchema.index({ status: 1, createdAt: -1 });
+agentProposalsSchema.index({ agentId: 1, createdAt: -1 });
+agentProposalsSchema.index({ taskId: 1 });
+const callsSchema = new Schema(schema.calls, {strict: true, timestamps: true});
+callsSchema.index({ callId: 1 }, { unique: true });
+callsSchema.index({ chatId: 1, createdAt: -1 });
 const integrationConnectionsSchema = new Schema(schema.integrationConnections, {strict: true, timestamps: true});
 integrationConnectionsSchema.index({ type: 1, deletedStatusKey: 1 });
 const cloudStorageConnectionsSchema = new Schema(schema.cloudStorageConnections, {strict: true, timestamps: true});
@@ -273,6 +311,13 @@ module.exports = {
     emailInboxesSchema,
     calendarFeedsSchema,
     automationRulesSchema,
+    automationEventLogSchema,
+    automationRunsSchema,
+    agentFindingsSchema,
+    agentsSchema,
+    agentRunsSchema,
+    agentProposalsSchema,
+    callsSchema,
     integrationConnectionsSchema,
     cloudStorageConnectionsSchema,
     formsSchema,

@@ -216,3 +216,64 @@ exports.reviewTimesheet = async (req, res) => {
         return res.send({ status: false, statusText: error.message });
     }
 };
+
+const { dbCollections } = require('../../Config/collections');
+const { summarize: billableSplit } = require('../TimeSheet/helpers/billableRules');
+const pto = require('../Pto/helpers/ptoRules');
+
+/* GET /api/v2/timesheet-approval/queue?hoursPerDay= — the review queue with the
+ * context a manager needs on one card: who, the period, billable/internal split
+ * and how far over capacity (working hours − approved PTO) the week landed. */
+exports.listQueue = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        const { ok } = await callerCanReview(req);
+        if (!ok) return res.send({ status: false, statusText: 'Only an owner or admin can review timesheets.' });
+        const hoursPerDay = Number(req.query && req.query.hoursPerDay) > 0 ? Number(req.query.hoursPerDay) : 8;
+        const docs = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TIMESHEET_APPROVAL,
+            data: [{ status: 'submitted', deletedStatusKey: 0 }, null, { sort: { submittedAt: 1 } }],
+        }, 'find') || [];
+        const userIds = [...new Set(docs.map((d) => String(d.userId)))];
+        const users = userIds.length ? await MongoDbCrudOpration(dbCollections.GLOBAL, {
+            type: SCHEMA_TYPE.USERS,
+            data: [{ _id: { $in: userIds.filter(isObjectIdString).map((id) => new mongoose.Types.ObjectId(id)) } }, { Employee_Name: 1, Employee_Email: 1, Employee_profileImageURL: 1 }],
+        }, 'find').catch(() => []) : [];
+        const userById = {};
+        (users || []).forEach((u) => { userById[String(u._id)] = u; });
+
+        const data = await Promise.all(docs.map(async (doc) => {
+            const start = new Date(doc.periodStart); start.setHours(0, 0, 0, 0);
+            const end = new Date(doc.periodEnd); end.setHours(23, 59, 59, 999);
+            const [entries, ptoRows] = await Promise.all([
+                MongoDbCrudOpration(companyId, {
+                    type: SCHEMA_TYPE.TIMESHEET,
+                    data: [{ Loggeduser: String(doc.userId), LogStartTime: { $gte: Math.floor(start.getTime() / 1000), $lte: Math.floor(end.getTime() / 1000) } }, { billable: 1, LogTimeDuration: 1 }],
+                }, 'find').catch(() => []),
+                MongoDbCrudOpration(companyId, {
+                    type: SCHEMA_TYPE.PTO_ENTRIES,
+                    data: [{ userId: String(doc.userId), status: 'approved', deletedStatusKey: { $ne: 1 }, startDate: { $lte: end }, endDate: { $gte: start } }],
+                }, 'find').catch(() => []),
+            ]);
+            const split = billableSplit(entries || []);
+            const cap = pto.computeAvailableCapacity({ rangeStart: start, rangeEnd: end, ptoEntries: ptoRows || [], workingHoursPerDay: hoursPerDay });
+            const capacityMinutes = Math.round(cap.availableHours * 60);
+            const u = userById[String(doc.userId)];
+            const o = typeof doc.toObject === 'function' ? doc.toObject() : doc;
+            return {
+                ...o,
+                userName: u ? u.Employee_Name || u.Employee_Email || '' : '',
+                userAvatar: u ? u.Employee_profileImageURL || '' : '',
+                billableMinutes: split.billableMinutes,
+                nonBillableMinutes: split.nonBillableMinutes,
+                capacityMinutes,
+                overMinutes: Math.max(0, split.totalMinutes - capacityMinutes),
+            };
+        }));
+        return res.send({ status: true, statusText: 'OK', data });
+    } catch (error) {
+        logger.error(`ERROR in timesheet queue: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};

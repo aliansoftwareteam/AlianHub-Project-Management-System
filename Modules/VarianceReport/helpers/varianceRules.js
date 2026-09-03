@@ -1,5 +1,5 @@
 // REP-04 — pure estimate-vs-actual variance math (everything in MINUTES).
-// Unit-tested in tests/variance-rules.test.js.
+// Unit-tested in tests/variance-rules.test.js and tests/variance-summary-rules.test.js.
 
 const round = (n) => Math.round(n);
 
@@ -33,4 +33,33 @@ const rollup = (rows = []) => {
     return t;
 };
 
-module.exports = { taskVariance, rollup };
+/* Group task rows by a key (projectId / userId), largest absolute delta first. */
+const groupVariance = (rows = [], keyOf, nameOf = () => '') => {
+    const map = {};
+    rows.forEach((r) => {
+        const key = String(keyOf(r) || '');
+        if (!key) return;
+        const g = map[key] || (map[key] = { key, name: nameOf(r, key), estimatedMinutes: 0, actualMinutes: 0, tasks: 0 });
+        g.estimatedMinutes += r.estimatedMinutes || 0;
+        g.actualMinutes += r.actualMinutes || 0;
+        g.tasks += 1;
+    });
+    return Object.values(map)
+        .map((g) => ({ ...g, ...taskVariance(g.estimatedMinutes, g.actualMinutes) }))
+        .sort((a, b) => Math.abs(b.variance) - Math.abs(a.variance));
+};
+
+/* Average drift (%) for tasks matching each named predicate — "where estimates drift most". */
+const driftDrivers = (rows = [], drivers = []) => drivers.map((d) => {
+    const hit = rows.filter((r) => r.estimatedMinutes > 0 && d.test(r));
+    const est = hit.reduce((s, r) => s + r.estimatedMinutes, 0);
+    const act = hit.reduce((s, r) => s + r.actualMinutes, 0);
+    return { key: d.key, tasks: hit.length, driftPct: est > 0 ? round(((act - est) / est) * 100) : 0 };
+}).sort((a, b) => b.driftPct - a.driftPct);
+
+/* The single task that explains the most over-run: the takeaway line's subject. */
+const biggestOverrun = (rows = []) => rows
+    .filter((r) => r.variance > 0)
+    .sort((a, b) => b.variance - a.variance)[0] || null;
+
+module.exports = { taskVariance, rollup, groupVariance, driftDrivers, biggestOverrun };

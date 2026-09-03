@@ -40,10 +40,11 @@ describe('🌐 PUBLIC SHARES - Rules', () => {
 
     describe('validateCreateShare', () => {
 
-        test('sprint + report shares pass; unknown entity types fail', () => {
-            expect(validateCreateShare({ companyId: COMPANY, entityType: 'sprint', entityId: SPRINT }).valid).toBe(true);
-            expect(validateCreateShare({ companyId: COMPANY, entityType: 'report', entityId: SPRINT }).valid).toBe(true);
-            expect(validateCreateShare({ companyId: COMPANY, entityType: 'page', entityId: SPRINT }).valid).toBe(false);
+        test('the four shareable entity types pass; anything else fails', () => {
+            for (const entityType of ['sprint', 'report', 'page', 'form']) {
+                expect(validateCreateShare({ companyId: COMPANY, entityType, entityId: SPRINT }).valid).toBe(true);
+            }
+            expect(validateCreateShare({ companyId: COMPANY, entityType: 'task', entityId: SPRINT }).valid).toBe(false);
         });
 
         test('missing companyId or bad entityId fail', () => {

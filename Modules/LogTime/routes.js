@@ -540,6 +540,8 @@ exports.init = (app) => {
      *              description: status:true/false, statusText:message
      */
     app.post('/api/v2/timetracker/timelog', ctrlV2.getTimelog)
+    app.get('/api/v2/timetracker/running', ctrlV2.listRunningTimers);
+    app.post('/api/v2/timetracker/trim', ctrlV2.trimTimer);
 
 
 }

@@ -1,109 +1,21 @@
-.title-team-user{
-    margin-bottom: 6px;
-}
-.title-team-user span {
-    color: #818181;
-    font-size: 16px;
-    line-height: 23.6px;
-    padding: 0px 20px;
-    width: 165px;
-    display: flex;
-    justify-content: flex-start;
-}
-.title-team-user span:last-child{
-    display: flex;
-    justify-content: flex-start;
-    width: 160px;
-}
-
-.team_name {
-    font-size: 14px;
-    line-height: 20.72px;
-}
-.team-section{
-    border: 1px solid #CFCFCF;
-    border-radius: 4px;
-    margin-bottom: 10px;
-    padding: 15px 20px;
-}
-.team_icon_span {
-    width: 30px;
-    min-width: 30px;
-    height: 30px;
-    padding: 0px!important;
-    line-height: 30px;
-    border-radius: 5px;
-    margin-right: 20px;
-    flex-direction: column;
-}
-.team-section .Assignee-component{
-    display: flex;
-    justify-content: flex-start;
-    width: 115px;
-}
-.team-management-settings .error-text {
-    max-width: 460px;
-    margin: 0 auto;
-    margin-top: 50px;
-}
-.team-management-settings .errorWrapper {
-    max-width: 677px;
-    margin: 0 auto;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-}
-.team-management-settings ul.ul-colors.ul-color-sidebar-popup li {
-    height: 7px;
-    width: 7px;
-    margin: 6px;
-}
-ul.ul-colors.ul-color-sidebar-popup {
-    list-style-type: none;
-    z-index: 9999;
-    top: 100%;
-    padding: 10px;
-    width: 186px!important;
-    border-radius: 7px;
-    box-shadow: rgb(60 64 67 / 30%) 0px 1px 2px 0px, rgb(60 64 67 / 15%) 0px 2px 6px 2px;
-}
-.team-management-settings .profile-image{
-    margin-left: -5px;
-}
-.setting-section-right:has(.team-management-settings) {
-    background-color: #f4f5f7!important;
-}
-.team-name-icon{
-    width:165px !important;
-}
-.assginee__comp-wrappper{
-    min-width: 30px;
-}
-@media (max-width: 1199px){
-    .setting-section-right:has(.team-management-settings){
-        width: 100%;
-        overflow: auto;
-    }
-    /* .title-team-user span:last-child {
-        margin-right: 45px;
-    } */
-}
-
-@media (max-width:412px) {
-    .d-flex.align-items-center.team-name-icon {
-        margin-right: auto;
-        position: relative;
-    }
-    .team-section{
-        flex-direction: column !important;
-        justify-content: flex-start !important;
-    }
-    .Assignee-component{
-        margin-left: 5px !important;
-        margin-right: auto;
-        margin-top: 10px;
-    }
-    .title-team-user span:last-child{
-        display: none;
-    }
-}
+.tm { display: flex; flex-direction: column; gap: 12px; max-width: 860px; }
+.tm__head { display: flex; align-items: center; gap: 10px; }
+.tm__title { font-size: 15px; }
+.tm__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tm__card { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.tm__card-head { display: flex; align-items: center; gap: 8px; }
+.tm__mark-wrap { position: relative; outline: none; }
+.tm__mark { width: 26px; height: 26px; border-radius: 7px; border: 0; display: grid; place-items: center; font: 600 11px/1 var(--font-ui); cursor: pointer; padding: 0; }
+.tm__mark:disabled { cursor: default; }
+.tm__mark:focus-visible { box-shadow: var(--focus); }
+.tm__colors { position: absolute; top: 30px; left: 0; z-index: 5; display: grid; grid-template-columns: repeat(6, 22px); gap: 6px; min-width: 0; }
+.tm__swatch { width: 22px; height: 22px; border-radius: 6px; border: 2px solid transparent; cursor: pointer; padding: 0; }
+.tm__swatch.is-active { border-color: var(--ink); }
+.tm__name-wrap { flex: 1; min-width: 0; }
+.tm__name { border: 0; background: transparent; padding: 0; color: var(--ink); font: 600 13px/1.3 var(--font-ui); cursor: pointer; text-align: left; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tm__name:disabled { cursor: default; }
+.tm__name:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 4px; }
+.tm__name-input { height: 30px; font-size: 13px; }
+.tm__assignee { align-self: flex-start; }
+.tm__note { padding: 11px 13px; font: 400 12px/1.5 var(--font-ui); color: var(--ink-label); }
+@media (max-width: 767px) { .tm__grid { grid-template-columns: 1fr; } }

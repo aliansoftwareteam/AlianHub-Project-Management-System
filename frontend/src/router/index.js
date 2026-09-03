@@ -12,6 +12,10 @@ import varianceReport from './varianceReport';
 import capacityPlanning from './capacityPlanning';
 import integrations from './integrations';
 import inbox from './inbox';
+import pages from './pages';
+import home from './home';
+import ai from './ai';
+import automations from './automations';
 
 import { useCustomComposable } from '@/composable'
 import dashboard from "../plugins/dashboard/router";
@@ -22,6 +26,9 @@ import Cookies from 'js-cookie'
 
 const routes = [
 	...auth,
+
+	// AUTOMATIONS
+	...automations,
 
 	// PROJECT ROUTES
 	...projects,
@@ -60,6 +67,11 @@ const routes = [
 	// INTEGRATIONS & AUTOMATION HUB (AUTO-01..07)
 	...integrations,
 	...inbox,
+	...pages,
+	...home,
+
+	// AI AGENT SYSTEM
+	...ai,
 
 	// CHANGELOG / WHAT'S NEW ROUTE
 	{

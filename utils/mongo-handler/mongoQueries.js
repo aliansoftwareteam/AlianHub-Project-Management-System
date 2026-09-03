@@ -85,6 +85,13 @@ const {
     emailInboxesSchema,
     calendarFeedsSchema,
     automationRulesSchema,
+    automationEventLogSchema,
+    automationRunsSchema,
+    agentFindingsSchema,
+    agentsSchema,
+    agentRunsSchema,
+    agentProposalsSchema,
+    callsSchema,
     integrationConnectionsSchema,
     cloudStorageConnectionsSchema,
     formsSchema,
@@ -262,6 +269,20 @@ exports.checkType = (type) => {
             return calendarFeedsSchema
         case SCHEMA_TYPE.AUTOMATION_RULES:
             return automationRulesSchema
+        case SCHEMA_TYPE.AUTOMATION_EVENT_LOG:
+            return automationEventLogSchema
+        case SCHEMA_TYPE.AUTOMATION_RUNS:
+            return automationRunsSchema
+        case SCHEMA_TYPE.AGENT_FINDINGS:
+            return agentFindingsSchema
+        case SCHEMA_TYPE.AGENTS:
+            return agentsSchema
+        case SCHEMA_TYPE.AGENT_RUNS:
+            return agentRunsSchema
+        case SCHEMA_TYPE.AGENT_PROPOSALS:
+            return agentProposalsSchema
+        case SCHEMA_TYPE.CALLS:
+            return callsSchema
         case SCHEMA_TYPE.INTEGRATION_CONNECTIONS:
             return integrationConnectionsSchema
         case SCHEMA_TYPE.CLOUD_STORAGE_CONNECTIONS:
@@ -446,6 +467,20 @@ exports.tableType = (type) => {
                 return `${dbCollections.CALENDAR_FEEDS}`
         case SCHEMA_TYPE.AUTOMATION_RULES:
                 return `${dbCollections.AUTOMATION_RULES}`
+        case SCHEMA_TYPE.AUTOMATION_EVENT_LOG:
+                return `${dbCollections.AUTOMATION_EVENT_LOG}`
+        case SCHEMA_TYPE.AUTOMATION_RUNS:
+                return `${dbCollections.AUTOMATION_RUNS}`
+        case SCHEMA_TYPE.AGENT_FINDINGS:
+                return `${dbCollections.AGENT_FINDINGS}`
+        case SCHEMA_TYPE.AGENTS:
+                return `${dbCollections.AGENTS}`
+        case SCHEMA_TYPE.AGENT_RUNS:
+                return `${dbCollections.AGENT_RUNS}`
+        case SCHEMA_TYPE.AGENT_PROPOSALS:
+                return `${dbCollections.AGENT_PROPOSALS}`
+        case SCHEMA_TYPE.CALLS:
+                return `${dbCollections.CALLS}`
         case SCHEMA_TYPE.INTEGRATION_CONNECTIONS:
                 return `${dbCollections.INTEGRATION_CONNECTIONS}`
         case SCHEMA_TYPE.CLOUD_STORAGE_CONNECTIONS:

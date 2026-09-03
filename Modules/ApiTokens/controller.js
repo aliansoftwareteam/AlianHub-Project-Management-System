@@ -67,6 +67,45 @@ exports.createToken = async (req, res) => {
     }
 };
 
+/* POST /api/v2/api-tokens/mcp  body: { name, mode?, provider?, projectIds?, expiresInDays? }
+ * Mints a token for a CLI/coding agent: kind 'agent', read+write scopes, and the
+ * account mode the run is attributed to. Returns the MCP URL to paste. */
+exports.createMcpToken = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'] || '';
+        const userId = actingUserId(req);
+        const { name, mode, provider, projectIds, expiresInDays, label } = req.body || {};
+        if (!companyId || !userId) return res.send({ status: false, statusText: 'companyId and userId are required.' });
+        if (req.apiToken) return res.status(403).send({ status: false, statusText: 'API tokens cannot mint tokens.' });
+        const check = validateCreateInput({ name: name || 'CLI agent', scopes: ['read', 'write'], expiresInDays });
+        if (!check.valid) return res.send({ status: false, statusText: check.reason });
+        const accounts = require('../Agents/accounts');
+        const policy = await accounts.getPolicy(companyId);
+        const wanted = accounts.MODES.includes(mode) ? mode : 'personal';
+        if (!policy.allowedModes.includes(wanted)) {
+            return res.status(403).send({ status: false, statusText: `This workspace requires ${policy.allowedModes.join(' or ')} accounts — ${wanted} is not allowed by your admin.` });
+        }
+        const rawToken = generateToken();
+        const doc = {
+            name: String(name || 'CLI agent').trim(), tokenHash: hashToken(rawToken), prefix: tokenPrefixOf(rawToken),
+            scopes: ['read', 'write'], userId, active: true, kind: 'agent',
+            agentAccount: { mode: wanted, provider: accounts.PROVIDERS.includes(provider) ? provider : 'claude-code', linkedAt: new Date(), label: String(label || name || '').slice(0, 80) },
+            projectIds: Array.isArray(projectIds) ? projectIds.filter((id) => /^[0-9a-fA-F]{24}$/.test(String(id))).map(String) : [],
+        };
+        if (expiresInDays) doc.expiresAt = new Date(Date.now() + Number(expiresInDays) * 24 * 60 * 60 * 1000);
+        const created = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.API_TOKENS, data: doc }, 'save');
+        const base = String(process.env.APIURL || '').replace(/\/$/, '');
+        return res.send({
+            status: true, statusText: 'Token created. Copy it now — it is not shown again.',
+            data: { ...maskToken(created), kind: 'agent', agentAccount: doc.agentAccount, projectIds: doc.projectIds, token: rawToken,
+                    mcpUrl: `${base}/mcp?companyId=${companyId}`, tools: require('../Mcp/tools').names() },
+        });
+    } catch (error) {
+        logger.error(`ERROR in create mcp token: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
 /* GET /api/v2/api-tokens */
 exports.listTokens = async (req, res) => {
     try {

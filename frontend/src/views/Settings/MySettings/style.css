@@ -1,485 +1,55 @@
-.settingprofileform form.form_wrapper {
-    padding-left: 0px;
+.ms { display: flex; flex-direction: column; gap: 12px; max-width: 860px; position: relative; }
+.ms--busy { pointer-events: none; }
+.ms__profile { display: flex; align-items: center; gap: 12px; }
+.ms__avatar {
+    width: 52px; height: 52px; border-radius: 50%; border: 0; padding: 0; overflow: hidden;
+    background: var(--brand); color: #fff; display: grid; place-items: center; cursor: pointer; flex: none;
 }
-.form_wrapper .inputfield .logininput {
-    width: 100%;
-    max-width:100%;
+.ms__avatar:focus-visible { outline: none; box-shadow: var(--focus); }
+.ms__avatar-img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.ms__avatar-initial { font: 600 18px/1 var(--font-ui); }
+.ms__identity { flex: 1; min-width: 0; }
+.ms__name { font: 600 15px/1.3 var(--font-ui); color: var(--ink); }
+.ms__profile > .ah-btn { margin-left: auto; }
+.ms__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 10px; border-top: 1px solid var(--hairline); }
+.ms__tabs { align-self: flex-start; }
+.ms__wh { display: flex; flex-direction: column; gap: 10px; }
+.ms__wh-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ms__wh-label { width: 72px; flex: none; color: var(--ink-label); font: 500 12.5px/1.3 var(--font-ui); }
+.ms__wh-label--inline { width: auto; margin-left: 8px; }
+.ms__wh-tz { max-width: 320px; height: 34px; }
+.ms__days { display: flex; gap: 4px; }
+.ms__day {
+    width: 30px; height: 28px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface);
+    color: var(--ink-label); font: 600 11px/1 var(--font-ui); cursor: pointer;
+    transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease), border-color var(--t-state) var(--ease);
 }
-.my-settings-main {
-    background: #FFFFFF;
-    box-shadow: 0px 2px 12px rgb(0 0 0 / 15%);
-    border-radius: 5px;
-    padding: 30px;
+.ms__day.is-on { background: var(--brand); border-color: var(--brand); color: #fff; }
+.ms__day:focus-visible { outline: none; box-shadow: var(--focus); }
+.ms__time { width: 110px; height: 34px; padding: 0 10px; }
+.ms__arrow { color: var(--ink-3); }
+.ms__cap { display: flex; align-items: center; gap: 6px; }
+.ms__cap-input { width: 72px; height: 34px; padding: 0 10px; }
+.ms__theme { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ms__theme-opts { display: flex; gap: 5px; margin-left: auto; }
+.ms__theme-opt {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 7px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--ink); font: 500 12.5px/1 var(--font-ui); cursor: pointer;
+    transition: border-color var(--t-state) var(--ease), color var(--t-state) var(--ease);
 }
-
-.my-settings-main .flex-row {
-    display: flex;
-    width: 100%;
-    max-width: 100%;
-}
-
-.col-md-2 .settingprofile {
-    width: 120px;
-}
-
-.userimg {
-    font-size: 14px;
-    font-weight: 500;
-    display: block;
-    width: 120px;
-    height: 120px;
-    cursor: pointer;
-    background-size: cover;
-    background-position: center center;
-    max-width: 121px;
-    object-position: center center;
-    object-fit: cover;
-}
-
-.fileinput {
-    display: none;
-    max-width: 180px;
-    height: 180px;
-    width: 100%;
-}
-
-.col-md-10 .settingprofileform {
-    width: 89.4%;
-    padding-left: 15px;
-}
-
-.settingprofileform .profileform .row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    width: 100%;
-}
-
-img.dropdown-arrow {
-    position: absolute;
-    left: 95%;
-    right: 5.49%;
-    top: 27%;
-    bottom: 15.87%;
-    height: 6px;
-}
-
-.settingprofileform .profileform .col-md-6 {
-    flex-basis: auto;
-    max-width: 100%;
-    width: 47%;
-    padding: 0px;
-}
-
-.inputfield {
-    padding-bottom: 19px;
-    width: 100%;
-}
-
-.inputfield label {
-    display: block;
-    margin-bottom: 12px;
-}
-
-.profileform label {
-    font-family: 'Roboto';
-    font-style: normal;
-    font-weight: 500;
-    font-size: 14px;
-    line-height: 21px;
-    color: #000000;
-}
-
-.invalid-feedback {
-    color: #ff0000;
-    font-size: 12px;
-}
-
-.inputfield .logininput {
-    border: 1px solid #DFE1E6;
-    font-family: 'Roboto';
-    font-style: normal;
-    font-weight: 400;
-    font-size: 13px;
-    line-height: 19px;
-    color: #818181;
-    max-width: 465px;
-    width: 278px;
-    padding: 0px 10px;
-    border-radius: 0.25rem;
-}
-
-.inputfield input {
-    border: 1px solid #DFE1E6;
-    font-family: 'Roboto';
-    font-style: normal;
-    font-weight: 400;
-    font-size: 13px;
-    line-height: 19px;
-    color: #818181;
-    max-width: 465px;
-    width: 100%;
-    padding: 0px 10px;
-    border-radius: 0.25rem;
-    height: 30px;
-}
-
-.inputfield .radio_wrapper .d-flex {
-    padding: 16px 0 15px;
-    display: flex;
-}
-
-.radio_wrapper .radio:first-child {
-    margin-bottom: 2px;
-}
-
-.radio {
-    padding-right: 20px;
-}
-
-.radio_wrapper.d-flex {
-    padding: 16px 0 15px;
-}
-
-.settingprofileform form {
-    padding-left: 30px;
-    width: 680px;
-}
-
-.settingprofileform form .inputfield .con-select.selectExample {
-    height: 30px;
-    align-items: center;
-    display: flex;
-    width: 278px;
-    border: 1px solid #DFE1E6;
-    font-family: 'Roboto';
-    font-style: normal;
-    font-weight: 400;
-    font-size: 13px;
-    line-height: 19px;
-    color: #818181;
-    max-width: 100%;
-    padding: 0px 10px;
-    border-radius: 0.25rem;
-}
-
-.con-select {
-    width: 200px;
-    clear: both;
-}
-
-.con-select,
-.input-select-con {
-    position: relative;
-    width: 100%;
-}
-
-.btn_btn {
-    font-size: 16px;
-    background: #2f3990 !important;
-    padding: 7px 10px;
-    border-radius: 4px;
-    border: 0;
-    color: #fff;
-    cursor: pointer;
-}
-
-.radio_wrapper .radio label {
-    position: relative !important;
-    font-family: 'Roboto', sans-serif !important;
-    font-style: normal !important;
-    font-weight: 400 !important;
-    font-size: 13px !important;
-    line-height: 19px !important;
-    padding-left: 0px !important;
-    color: #818181 !important;
-}
-
-.my-settings-main [type="radio"]:checked+label:after {
-    content: "";
-    width: 10px;
-    height: 10px;
-    background: #2F3990;
-    position: absolute;
-    top: 0px;
-    left: 3px;
-    border-radius: 100%;
-    -webkit-transition: all 0.2s ease;
-    transition: all 0.2s ease;
-    border: 1px solid #D8DBE2;
-    cursor: pointer;
-}
-
-.my-settings-main input[type="radio"] {
-    display: none;
-}
-
-.my-settings-main .radio input[type=radio]+.radio-label:before {
-    content: "";
-    background: #fff;
-    border-radius: 100%;
-    border: 1px solid #D8DBE2;
-    display: inline-block;
-    width: 16px;
-    height: 16px;
-    position: relative;
-    top: 0em;
-    margin-right: 1em;
-    vertical-align: top;
-    cursor: pointer;
-    text-align: center;
-    -webkit-transition: all 250ms ease;
-    transition: all 250ms ease;
-}
-
-.my-settings-main [type="radio"]:checked {
-    position: absolute;
-    left: 0;
-    opacity: 0;
-}
-
-.setting-section-right:has(.my-settings-main) {
-    /* height: calc(100vh - 100px); */
-    overflow: auto;
-    background: #f4f5f7;
-}
-.change_password{
-    text-decoration-line: underline;
-    font-family: 'Roboto';
-    font-style: normal;
-    font-weight: 400;
-    font-size: 16px;
-    line-height: 24px;
-    padding-left: 20px;
-}
-.my-settings-main .noimg-uploadImage {
-    width: 121px;
-    height: 121px;
-    display: inline-block;
-    background-color: #2f3990;
-    color: #fff;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-color: #2F3990;
-    font-size: 50px;
-}
-.mysettings__wasabi-img{
-    width:120px;height:120px;border-radius: 50%;
-}
-button.btn_btn.mysetting_save_btn{
-    margin-left: 0 !important;
-}
-
-.mysettings_profile img {
-    border: 2px solid #102A83;
-}
-.eye_hide_show {top: 26px!important;right: 5px!important;height: 45px!important;width: 31px!important;}
-.inputfield .logininput.password_input {
-    padding: 0px 45px 0px 10px !important;
-}
-.mySettingsWrapper .totalCount span {
-    font-size: 14px;
-    color: #000;
-    font-family: 'Roboto';
-    line-height: 20.72px;
-    display: block;
-}
-.mySettingsWrapper .activeTab {
-    color: #2f3990 !important;
-    font-family: 'Roboto', sans-serif !important;
-    background: #FFFFFF;
-    box-shadow: 0px 2px 12px rgb(0 0 0 / 0%);
-    font-weight: 700;
-}
-.mySettingsWrapper .tab-option{
-    z-index: 1;
-    cursor: pointer;
-    margin-bottom: 0px;
-    padding: 10px;
-    border-radius: 5px 5px 0px 0px;
-}
-.mySettingsWrapper .totalCount {
-    border-bottom: 1px solid #CFCFCF;
-}
-.error-capitalize {
-    text-transform: lowercase;
-}
-.error-capitalize:first-letter {
-    text-transform: capitalize;
-}
-@media (max-width: 1199px) {
-    .form_wrapper .inputfield {
-        width: 100%;
-    }
-    .settingprofileform form {
-        padding-left: 25px;
-        width: 100%;
-    }
-
-    .settingprofileform .profileform .row {
-        width: 100%;
-    }
-    button.btn_btn.mysetting_save_btn{
-        margin-left: 15px !important;
-    }
-    .settingprofileform .profileform .col-md-6 {
-        padding: 0px 15px!important;
-    }
-    .settingprofileform .profileform .row .inputfield input {
-        border: 1px solid #DFE1E6;
-        font-family: 'Roboto';
-        font-style: normal;
-        font-weight: 400;
-        font-size: 13px;
-        line-height: 19px;
-        color: #818181;
-        max-width: 100%;
-        width: 100%;
-        padding: 0px 10px;
-        border-radius: 0.25rem;
-        height: 30px;
-        overflow: scroll;
-    }
-
-    .settingprofileform form .inputfield .con-select.selectExample {
-        height: 30px;
-        align-items: center;
-        display: flex;
-        width: 100%;
-        border: 1px solid #DFE1E6;
-        font-family: 'Roboto';
-        font-style: normal;
-        font-weight: 400;
-        font-size: 13px;
-        line-height: 19px;
-        color: #818181;
-        max-width: 465px;
-        padding: 0px 10px;
-        border-radius: 0.25rem;
-    }
-}
-
-@media (max-width: 991px) {
-    .form_wrapper .inputfield .logininput {
-        width: 100%;
-        max-width: 100%;
-    }
-    .settingprofileform .profileform .row {
-        flex-direction: column;
-        width: 100%;
-    }
-    button.btn_btn.mysetting_save_btn{
-        margin-left: 0px !important;
-    }
-    .settingprofileform form .inputfield .con-select.selectExample{
-        max-width: 100%;
-    }
-    .settingprofileform .profileform .col-md-6 {
-        width: 100%;
-        padding: 0px !important;
-    }
-    .my-settings-main .flex-row{
-        display:block ;
-    }
-    .settingprofile .userimg {
-        margin: 0 auto;
-    }
-    
-    .btn_btn{
-        margin-left: 0px !important;
-    }
-}
-
-@media (max-width: 1024px) {
-
-    .settingprofileform {
-        width: 100%;
-    }
-}
-
-@media (max-width: 765px) {
-    .setting-section-right:has(.my-settings-main) {
-        width: 100%;
-        overflow: auto;
-    }
-    .settingprofileform form .inputfield .con-select.selectExample{
-        max-width: 100%;
-    }
-}
-
-@media (max-width: 480px) {
-    .my-settings-main .flex-row {
-        display: block;
-           }
-    .col-md-10 .settingprofileform {
-        width: 100%;
-    }
-
-    .userimg {
-        margin: 0 auto;
-    }
-    .settingprofileform.setting_profile_mobile_responsive {
-        padding: 0;
-    }
-    .settingprofileform {
-        width: 100%;
-        margin: 0 auto;
-        padding: 50px 0 0 0;
-    }
-
-    .my-settings-main .flex-row {
-        display: block;
-        flex-direction: inherit;
-    }
-
-    .settingprofileform .profileform .row {
-        display: block;
-    }
-
-    .settingprofileform .profileform .col-md-6 {
-        width: 100%;
-        padding: 0px;
-    }
-
-    .settingprofileform form {
-        width: 100%;
-        padding-left: 0;
-        margin: 0 auto;
-    }
-
-    .settingprofileform .profileform .row .inputfield input,
-    .settingprofileform form .inputfield .con-select.selectExample {
-        max-width: 100%;
-        width: 100%;
-        padding: 5px 15px;
-    }
-
-    .userimg {
-        margin: 0 auto;
-    }
-
-    .btn_btn {
-        margin: 0 auto;
-    }
-    .change_password{
-        margin: 0 auto !important;
-    }
-}
-@media (max-width:412px) {
-    .mysetiing_save{
-        flex-direction: column-reverse;
-        justify-content: flex-start;
-        align-items: flex-start;
-    }
-    .change_password{
-        margin: 0px !important;
-        padding: 5px;
-    }
-}
-@media (max-width:375px) {
-    .radio_wrapper {
-        display: block;
-    }
+.ms__theme-opt.is-active { border: 1.5px solid var(--brand); color: var(--brand); font-weight: 600; }
+.ms__theme-opt:focus-visible { outline: none; box-shadow: var(--focus); }
+.ms__sessions { display: flex; flex-direction: column; gap: 8px; }
+.ms__session { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+.ms__dot-idle { background: var(--border); }
+.ms__session-icon { color: var(--ink-2); flex: none; }
+.ms__session-text { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ms__session-when { color: var(--ink-2); font-size: 10.5px; }
+.ms__signout { border: 0; background: transparent; color: var(--danger-ink); font: 600 11.5px/1 var(--font-ui); cursor: pointer; padding: 6px 4px; }
+.ms__signout:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 4px; }
+.ms__actions { display: flex; align-items: center; gap: 12px; }
+@media (max-width: 767px) {
+    .ms__grid { grid-template-columns: 1fr; }
+    .ms__theme-opts { margin-left: 0; }
+    .ms__day, .ms__signout { min-height: 44px; min-width: 44px; }
 }

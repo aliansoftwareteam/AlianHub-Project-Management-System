@@ -75,6 +75,15 @@ export const queueDelete = async (id) => {
     } catch (e) { /* best-effort */ }
 };
 
+export const queueUpdate = async (id, patch) => {
+    const db = await open(); if (!db) return;
+    try {
+        const store = db.transaction(STORE_QUEUE, 'readwrite').objectStore(STORE_QUEUE);
+        const current = await reqToPromise(store.get(id));
+        if (current) store.put({ ...current, ...patch });
+    } catch (e) { /* best-effort */ }
+};
+
 export const queueCount = async () => (await queueAll()).length;
 
 export const clearAll = async () => {

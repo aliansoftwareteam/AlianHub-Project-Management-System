@@ -8,1260 +8,317 @@
         message="That feature isn’t available on your current plan"
     />
 </div>
-<div v-else>
-    <div class="timesheet_view Usertimesheet_view workload_view timesheet_workload_view" v-if="error404">
-        <div class="row">
-            <div class="col-md-12">
-                <div class="page_title_row d-flex">
-                    <div class="page-title d-flex">
-                        <ul class="breadcrumb title_strip">
-                            <li @click="goHome()">
-                                <img class="cursor-pointer" src="@/assets/images/home_icon.png" alt="home_icon"/>
-                            </li>
-                            <li class="pro_route_link">
-                                <router-link :to="`/${CompanyDatabase}/project`" class="text-decoration-underline font-size-18 font-weight-700">{{$t('UserTimesheet.back_projects')}}</router-link>
-                            </li>
-                            <li>
-                                <span class="workload_title font-size-18 font-weight-700">{{$t('UserTimesheet.workload_timesheet')}}</span>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="timesheet__wrapper page-content" :class="{'pointer-event-none': isSpinner}">
-            <div class="page_top_data d-flex align-items-center justify-content-between" :class="clientWidth <= 1200 ? 'flex-wrap flex-column align-items-start' : ''">
-                <div class="d-flex" :style="[{width : clientWidth <=1200 ? '100%' : 'calc(100% - 253px)'}]" :class="clientWidth <=767 ? 'flex-column' : ''"> 
-                    <RangePickerComp 
-                        class="rangeComp"
-                        @SelectedDate="handleDate"
-                        :class="{'disabled': isSpinner}"
-                        :isValidate="false"
-                        preSelectType="week"
-                    />
-                    <div class="wf_filter" :class="{'disabled': isSpinner, 'cursor-pointer': !isSpinner}" @click.stop="$refs.filter_wt_click.click()">
-                        <span class="timesheet_user_filter">
-                            <DropDown id="" class="status_change_dropdown" :bodyClass="{'timesheetDropdown_wrapper' : true}">
-                                <template #button>
-                                    <button class="btn-white border dot-btn" ref="filter_wt_click">
-                                        <a href="#" class="link_disable_css">{{$t('Filters.filter_by')}}</a>
-                                    </button>
-                                </template>
-                                <template #options>
-                                <DropDownOption v-show="filterType=='' && isEveryOne" @click="handleFilterType('select','Users')">
-                                    {{$t('UserTimesheet.Users')}}
-                                </DropDownOption>
-                                <DropDownOption v-show="filterType=='' && isEveryOne" @click="handleFilterType('select','Teams')">
-                                    {{$t('UserTimesheet.Teams')}}
-                                </DropDownOption>
-                                <DropDownOption v-show="filterType==''" @click="handleFilterType('select','Projects')">
-                                    {{$t('UserTimesheet.Projects')}}
-                                </DropDownOption>
-                                <div v-if="filterType!=''">
-                                    <div class="wf_header">
-                                        <a @click="handleFilterType('back','')">
-                                            <img src="@/assets/images/svg/filter_back_icon.svg"/>&nbsp;
-                                            {{ $t('UserTimesheet.back') }}
-                                        </a>
-                                        <span>{{ $t(`UserTimesheet.${filterType}`) }}</span>
-                                    </div>
-                                    <span class="filter_search_block">
-                                        <input type="search" class="form-control" ref="filter_dd_search" :placeHolder="$t('PlaceHolder.search')" v-model="filterSearch"/>
-                                    </span>
-                                    <div class="wf_body filter_body_scroll checklist-main no__borders" :class="{'filter_body_scroll': optionFilter.length >= 5}">
-                                        <span
-                                        v-for="(item,index) in optionFilter"
-                                        class="wf_listItem users_filter_items"
-                                        :key="index"
-                                        v-show="filterType.toLowerCase()=='users' && isEveryOne">
-                                            <a class="vs-dropdown-users d-flex align-items-center">
-                                                <input type="checkbox" v-show="filterType.toLowerCase() == 'users'" @click="handleFilterItem(item,'checkEvent',true)" :value="item.id" v-model="checkedFilter">&nbsp;
-                                                <UserProfile
-                                                    v-if="filterType.toLowerCase() == 'users'"
-                                                    :showDot="false"
-                                                    class="timesheet_user_profile mr-10px"
-                                                    :data="{
-                                                        id: item.id,
-                                                        title: item.name,
-                                                        image: item.profile
-                                                    }"
-                                                    width="22px !important"
-                                                    :thumbnail="'22x22'"
-                                                    @click="handleFilterItem(item,'checkEvent',true)"
-                                                />
-                                                <span class="filter_list_item cursor-pointer" @click="handleFilterItem(item,'checkEvent',true)">{{ item.name }}</span>
-                                            </a>
-                                        </span>
-                                        <span
-                                        v-for="item in optionFilter"
-                                        class="wf_listItem users_filter_items"
-                                        :key="item.id"
-                                        v-show="filterType.toLowerCase()=='teams' && isEveryOne">
-                                            <span class="filter_list_item cursor-pointer" @click="handleFilterItem(item,'add'),$refs.filter_wt_click.click()">&nbsp;&nbsp;{{ item.name }}</span>
-                                        </span>
-                                        <span
-                                        v-for="(item,index) in optionFilter"
-                                        class="wf_listItem users_filter_items"
-                                        :key="index"
-                                        v-show="filterType.toLowerCase()=='projects'">
-                                            <a class="vs-dropdown-users d-flex align-items-center">
-                                                <input type="checkbox" v-show="filterType.toLowerCase() == 'users'" @click="handleFilterItem(item,'checkEvent')" :value="item.id" v-model="checkedFilter">&nbsp;
-                                                <span v-if="item?.projectIcon && item?.projectIcon.type === 'color'" class="d-flex align-items-center justify-content-center inital-box" :style="[{'background-color': item?.projectIcon.data}]">{{ item?.name.charAt(0).toUpperCase()}}</span>
-                                                <img v-if="item?.projectIcon && item?.projectIcon.type === 'image' && validateURL(item?.projectIcon.data)" class="profile-sm-square inital-box" :src="item?.projectIcon.data" alt=""/>
-                                                <WasabiImage 
-                                                    v-if="item?.projectIcon && item?.projectIcon.type === 'image' && !validateURL(item?.projectIcon.data)"
-                                                    class="profile-sm-square inital-box"
-                                                    :data="{url: item?.projectIcon.data}"
-                                                />
-                                                <span class="filter_list_item cursor-pointer" @click="handleFilterItem(item,'add'),$refs.filter_wt_click.click()">{{ item.name }}</span>
-                                            </a>
-                                        </span>
-                                        <span v-if="!optionFilter || optionFilter.length == 0" class="invalid-feedback d-block p-5px">{{$t('UserTimesheet.no_records_found')}}.</span>
-                                    </div>
-                                </div>
-                                </template>
-                            </DropDown>
-                        </span>
-                        <div class="chipusername_main">
-                            <span class="chipusername_wrapper" v-for="(chip,chipKey) in selectedFilters" :key="chipKey">
-                                <span class="user_name" :title="chip.name" >
-                                        {{  `${$t(`general.${chip.type.slice(0,-1)}`)} :  ${chip.name}` }}
-                                    </span>
-                                    <button @click.stop.prevent="handleFilterItem(chip,'remove')" type="button" class="btn-close vs-chip--close cursor-pointer">
-                                        <img :src="close" alt="cancel"/>
-                                    </button>
-                            </span>
-                        </div>
-                    </div>
-                </div>
-                <div class="d-flex align-items-center">
-                    <span class="d-flex align-items-center" :class=" clientWidth <= 1200 ? 'm-0 pt-10px' : 'ml-1 '">
-                        <div class="circlegreen mr-6px"></div>
-                        <span class="font-size-14 GunPowder font-weight-400">{{$t('UserTimesheet.tracked_time')}}</span>
-                    </span>
-                    <span class="d-flex align-items-center" :class=" clientWidth <=1200 ? 'm-0 pt-10px ml-1' : 'ml-1'">
-                        <div class="circlePurple mr-6px"></div>
-                        <span class="font-size-14 GunPowder font-weight-400">{{ $t('UserTimesheet.manual_time') }}</span>
-                    </span>
-                </div>
-            </div>
-            
-            <WorkloadTimesheetView 
-                v-if="!isSpinner"
-                v-model="dateColumns"
-                :usersArray="usersArray"
-                :activeWeekObj="activeWeekObj"
-                :tableStyle="tableStyle"
-                @update:getSubItemView="getProjectData"
-                @update:getTaskData="getTaskDataFunction"
-                :isNoRecordShow="(usersArray.length === 0 && !isSpinner) ? true : false"
-                :filterType="filterType"
-                :checkedFilter="checkedFilter"
-            />
-            <SpinnerComp :is-spinner="isSpinner || isSpinnerTask" v-if="isSpinner || isSpinnerTask"/>
-        </div>
+<NotFound v-else-if="!allowed" />
+<div v-else-if="isMobile" class="ah-page tv-page"><div class="tv-empty"><span>{{ $t('TimeV2.desktop_only') }}</span></div></div>
+<div v-else class="wl">
+    <div class="ah-toolbar wl__bar">
+        <span class="tv-sq" :style="{ background: activeProject && activeProject.color ? activeProject.color : 'var(--brand)' }"></span>
+        <select v-model="projectId" class="tv-select wl__project">
+            <option value="">{{ $t('TimeV2.all_projects') }}</option>
+            <option v-for="p in projectList" :key="p._id" :value="String(p._id)">{{ p.ProjectName }}</option>
+        </select>
+        <TimesheetTabs active="workload" />
+        <span class="tv-range wl__range">
+            <button type="button" :aria-label="$t('TimeV2.prev_week')" @click="shift(-7)">‹</button>
+            <span>{{ rangeLabel }}</span>
+            <button type="button" :aria-label="$t('TimeV2.next_week')" @click="shift(7)">›</button>
+        </span>
+        <div class="ah-toolbar__spacer"></div>
+        <select v-model="mode" class="tv-select">
+            <option value="estimate">{{ $t('TimeV2.by_estimate') }}</option>
+            <option value="logged">{{ $t('TimeV2.by_logged') }}</option>
+        </select>
+        <button type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="suggestBalance">{{ $t('TimeV2.balance') }}</button>
     </div>
-    <div v-else class="h-100">
-        <NotFound />
+
+    <div class="wl__body">
+        <p v-if="error" class="tv-error">{{ error }}</p>
+        <p v-else-if="notice" class="tv-ok">{{ notice }}</p>
+        <div class="wl__grid" :style="{ '--days': visibleDays.length || 10 }">
+            <div class="wl__row wl__row--head">
+                <span></span>
+                <span v-for="d in visibleDays" :key="d" :class="{ 'is-today': d === today }">{{ dayHead(d) }}</span>
+                <span>{{ $t('TimeV2.col_total') }}</span>
+            </div>
+            <div v-for="u in users" :key="u.userId" class="wl__row">
+                <div class="wl__person">
+                    <span class="ah-avatar" :style="{ background: colorFor(u.userId) }">
+                        <img v-if="u.avatar" :src="u.avatar" :alt="u.name" />
+                        <template v-else>{{ initial(u.name) }}</template>
+                    </span>
+                    <div class="wl__person-text">
+                        <div class="wl__name">{{ u.name }}</div>
+                        <div class="wl__sub" :class="{ 'is-over': u.utilizationPct > 100 }">{{ subLabel(u) }}</div>
+                    </div>
+                </div>
+                <div
+                    v-for="d in u.days.filter((x) => visibleDays.includes(x.date))"
+                    :key="d.date"
+                    class="wl__cell"
+                    :class="{ 'is-pto': d.pto, 'is-today': d.date === today, 'is-drop': dropKey === `${u.userId}|${d.date}`, 'tv-hatch': d.pto }"
+                    @dragover.prevent="onDragOver(u, d)"
+                    @dragleave="onDragLeave(u, d)"
+                    @drop.prevent="onDrop(u, d)"
+                >
+                    <template v-if="d.pto"><span class="wl__pto">{{ $t('TimeV2.pto') }}</span></template>
+                    <template v-else>
+                        <div class="wl__fill" :class="{ 'is-over': isOver(d), 'is-tentative': isTentative(d.date) }" :style="{ height: `${fillPct(d)}%` }">
+                            <span v-if="value(d)">{{ hLabel(value(d)) }}</span>
+                        </div>
+                        <div v-if="mode === 'estimate' && d.chips.length" class="wl__chips">
+                            <span
+                                v-for="c in d.chips.slice(0, 2)"
+                                :key="c.estimateId"
+                                class="wl__chip"
+                                draggable="true"
+                                :title="`${c.name} · ${formatHm(c.minutes)}`"
+                                @dragstart="onDragStart($event, u, d, c)"
+                                @dragend="onDragEnd"
+                            >{{ c.name || c.taskId }}</span>
+                            <span v-if="d.chips.length > 2" class="wl__chip wl__chip--more" :title="d.chips.slice(2).map((c) => c.name).join(', ')">+{{ d.chips.length - 2 }}</span>
+                        </div>
+                    </template>
+                </div>
+                <div class="wl__total" :class="{ 'is-over': u.utilizationPct > 100 }">
+                    {{ hLabel(mode === 'estimate' ? u.totalEstimated : u.totalLogged) }}<small>/{{ Math.round(u.capacityMinutes / 60) }}</small>
+                </div>
+            </div>
+            <div v-if="!users.length" class="tv-empty wl__empty"><span>{{ loading ? $t('TimeV2.loading') : $t('TimeV2.workload_empty') }}</span></div>
+        </div>
+
+        <div class="wl__foot">
+            <div class="tv-legend">
+                <span><i style="background: var(--brand)"></i>{{ mode === 'estimate' ? $t('TimeV2.legend_estimated') : $t('TimeV2.legend_logged') }}</span>
+                <span><i style="background: var(--brand); opacity: .5"></i>{{ $t('TimeV2.legend_tentative') }}</span>
+                <span><i style="background: var(--danger)"></i>{{ $t('TimeV2.legend_over') }}</span>
+                <span v-if="!hint" class="ah-muted">{{ $t('TimeV2.drag_hint') }}</span>
+            </div>
+            <div v-if="hint" class="wl__hint">
+                <span class="tv-spark">✦</span>
+                <span>{{ hint.text }}</span>
+                <button v-if="hint.apply" type="button" class="tv-link" :disabled="busy" @click="applyHint">{{ $t('TimeV2.apply') }}</button>
+            </div>
+        </div>
     </div>
 </div>
 </template>
 
 <script setup>
-    import { useCustomComposable ,useGetterFunctions } from '@/composable';
-    import { defineComponent , onMounted ,ref , computed , inject ,watch } from "vue";
-    import { useStore } from "vuex";
-    import RangePickerComp from '@/components/molecules/RangePickerComp/RangePickerComp.vue';
-    import UserProfile from "@/components/atom/UserProfile/UserProfile.vue";
-    import moment from 'moment';
-    import '@vuepic/vue-datepicker/dist/main.css';
-    import { useRouter } from "vue-router"
-    import WorkloadTimesheetView from '@/components/atom/TimesheetView/WorkloadTImeSheetView/WorkloadTimesheetView.vue'
-    import DropDown from '@/components/molecules/DropDown/DropDown.vue'
-    import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
-    import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
-    import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
-    import * as helper from '@/views/Timesheet/helper';
-    import NotFound from '@/views/NotFound.vue';
-    import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
-    import { apiRequest } from '../../../services';
-    import * as env from '@/config/env';
-    defineComponent({
-        name: "UserTimesheet",
-        components: {
-            DropDown,
-            DropDownOption,
-            RangePickerComp,
-        }
-    })
-    const close = require("@/assets/images/svg/close_timesheet.svg")
-    const router = useRouter()
-    const { getters , dispatch} = useStore();
-    const {getUser} = useGetterFunctions();
-    const {checkPermission,debouncerWithPromise} = useCustomComposable();
-    const clientWidth = inject("$clientWidth");
-    const CompanyDatabase = inject("$companyId");
-    const selectedFilters = ref([]);
-    const isSpinner = ref(true);
-    const isSpinnerTask = ref(false);
-    const activeWeekObj = ref({
-        isWeeked: false,
-        isOneday: false,
-        isTwoday: false,
-        isThreeday: false,
-        isFourday: false,
-        isFiveday: false,
-        isSixday: false,
+import { ref, computed, inject, onMounted, watch } from 'vue';
+import { useStore } from 'vuex';
+import { useI18n } from 'vue-i18n';
+import moment from 'moment';
+import { apiRequest } from '@/services';
+import * as env from '@/config/env';
+import { useCustomComposable, useGetterFunctions } from '@/composable';
+import { formatHm } from '@/composable/useTimer';
+import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
+import NotFound from '@/views/NotFound.vue';
+import TimesheetTabs from '@/views/Timesheet/TimesheetTabs.vue';
+
+defineOptions({ name: 'WorkloadTimesheet' });
+
+const { getters } = useStore();
+const { t } = useI18n();
+const { checkPermission } = useCustomComposable();
+const { getUser } = useGetterFunctions();
+const currentUserId = inject('$userId');
+const clientWidth = inject('$clientWidth');
+
+const uid = computed(() => (currentUserId && currentUserId.value) || localStorage.getItem('userId') || '');
+const currentCompany = computed(() => getters['settings/selectedCompany']);
+const allowed = computed(() => checkPermission('sheet_settings.workload_timesheet') !== null);
+const isMobile = computed(() => !!(clientWidth && clientWidth.value < 768));
+
+const start = ref(moment().startOf('isoWeek'));
+const projectId = ref('');
+const projectList = ref([]);
+const mode = ref('estimate');
+const users = ref([]);
+const days = ref([]);
+const loading = ref(false);
+const error = ref('');
+const notice = ref('');
+const busy = ref(false);
+const drag = ref(null);
+const dropKey = ref('');
+const hint = ref(null);
+
+const today = computed(() => moment().format('YYYY-MM-DD'));
+const endDate = computed(() => start.value.clone().add(11, 'days'));
+const startIso = computed(() => start.value.format('YYYY-MM-DD'));
+const endIso = computed(() => endDate.value.format('YYYY-MM-DD'));
+const rangeLabel = computed(() => `${start.value.format('MMM D')} – ${endDate.value.format(start.value.isSame(endDate.value, 'month') ? 'D' : 'MMM D')}`);
+const visibleDays = computed(() => days.value.filter((d) => ![0, 6].includes(moment(d).day())));
+const activeProject = computed(() => {
+    const p = projectList.value.find((x) => String(x._id) === projectId.value);
+    return p ? { color: p.projectIcon && p.projectIcon.type === 'color' ? p.projectIcon.data : '' } : null;
+});
+const timeZone = computed(() => (getUser(uid.value) || {}).timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+
+const PALETTE = ['var(--brand)', 'var(--ok)', 'var(--warn)', 'var(--agent)'];
+const colorFor = (id) => PALETTE[String(id || '').split('').reduce((s, c) => s + c.charCodeAt(0), 0) % PALETTE.length];
+const initial = (name) => (name || '?').trim().charAt(0).toUpperCase();
+const dayHead = (d) => `${moment(d).format('dd').charAt(0)}${moment(d).format('D')}`;
+const hLabel = (m) => {
+    const h = (Number(m) || 0) / 60;
+    return `${h >= 10 || Number.isInteger(h) ? Math.round(h) : Math.round(h * 10) / 10}h`;
+};
+const value = (d) => (mode.value === 'estimate' ? d.estimated : d.logged);
+const isOver = (d) => (d.capacityMinutes > 0 ? value(d) > d.capacityMinutes : value(d) > 0);
+const fillPct = (d) => (d.capacityMinutes > 0 ? Math.min(100, (value(d) / d.capacityMinutes) * 100) : (value(d) ? 100 : 0));
+const isTentative = (date) => moment(date).isAfter(moment().endOf('isoWeek'));
+const subLabel = (u) => {
+    if (u.utilizationPct > 100) return t('TimeV2.pct_period', { pct: u.utilizationPct });
+    const pto = u.days.filter((d) => d.pto && visibleDays.value.includes(d.date));
+    if (pto.length) return t('TimeV2.pto_range', { range: pto.length === 1 ? moment(pto[0].date).format('ddd') : `${moment(pto[0].date).format('ddd')}–${moment(pto[pto.length - 1].date).format('ddd')}` });
+    return t('TimeV2.per_day', { h: u.hoursPerDay });
+};
+const pctAfter = (u, delta) => (u.capacityMinutes > 0 ? Math.round(((u.totalEstimated + delta) / u.capacityMinutes) * 100) : 0);
+
+const load = async () => {
+    loading.value = true;
+    error.value = '';
+    try {
+        const body = ((await apiRequest('post', env.WORKLOAD_GRID, {
+            start: startIso.value, end: endIso.value, projectIds: projectId.value ? [projectId.value] : [], hoursPerDay: 8, timeZone: timeZone.value,
+        })) || {}).data || {};
+        if (!body.status) throw new Error(body.statusText || 'load_failed');
+        users.value = body.data.users || [];
+        days.value = body.data.days || [];
+    } catch (e) {
+        error.value = t('TimeV2.load_failed');
+    } finally {
+        loading.value = false;
+    }
+};
+const loadProjects = async () => {
+    try {
+        const b = ((await apiRequest('get', env.PROJECT)) || {}).data;
+        const list = Array.isArray(b) ? b : (b && b.data) || [];
+        projectList.value = list.filter((p) => p && p.status !== 'close' && p.deletedStatusKey !== 1 && p.deletedStatusKey !== 2);
+    } catch (e) {
+        projectList.value = [];
+    }
+};
+const shift = (n) => { start.value = start.value.clone().add(n, 'days'); };
+const flash = (msg) => { notice.value = msg; setTimeout(() => { if (notice.value === msg) notice.value = ''; }, 4000); };
+
+const move = async ({ chip, fromUser, fromDay, toUser, toDay }) => {
+    busy.value = true;
+    error.value = '';
+    try {
+        const body = ((await apiRequest('post', env.WORKLOAD_MOVE, {
+            taskId: chip.taskId, estimateId: chip.estimateId, fromUserId: fromUser.userId, toUserId: toUser.userId, fromDate: fromDay.date, toDate: toDay.date,
+        })) || {}).data || {};
+        if (!body.status) throw new Error(body.statusText || 'move_failed');
+        flash(t('TimeV2.moved', { task: chip.name, name: toUser.name, day: moment(toDay.date).format('ddd D') }));
+        hint.value = null;
+        await load();
+    } catch (e) {
+        error.value = t('TimeV2.move_failed');
+    } finally {
+        busy.value = false;
+    }
+};
+
+const onDragStart = (e, u, d, c) => {
+    drag.value = { chip: c, fromUser: u, fromDay: d };
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', c.taskId);
+};
+const onDragOver = (u, d) => {
+    if (!drag.value || d.pto) return;
+    const key = `${u.userId}|${d.date}`;
+    if (dropKey.value === key) return;
+    dropKey.value = key;
+    const { chip, fromUser } = drag.value;
+    const same = fromUser.userId === u.userId;
+    hint.value = {
+        text: t('TimeV2.dragging', {
+            task: chip.name, h: formatHm(chip.minutes), name: u.name, day: moment(d.date).format('ddd'),
+            from: fromUser.name, fromPct: pctAfter(fromUser, same ? 0 : -chip.minutes), toPct: pctAfter(u, same ? 0 : chip.minutes),
+        }),
+    };
+};
+const onDragLeave = (u, d) => { if (dropKey.value === `${u.userId}|${d.date}`) dropKey.value = ''; };
+const onDragEnd = () => { drag.value = null; dropKey.value = ''; if (hint.value && !hint.value.apply) hint.value = null; };
+const onDrop = (u, d) => {
+    const current = drag.value;
+    dropKey.value = '';
+    drag.value = null;
+    if (!current || d.pto) return;
+    if (current.fromUser.userId === u.userId && current.fromDay.date === d.date) { hint.value = null; return; }
+    move({ ...current, toUser: u, toDay: d });
+};
+
+const suggestBalance = () => {
+    let worst = null;
+    users.value.forEach((u) => u.days.forEach((d) => {
+        if (!d.pto && d.chips.length && d.capacityMinutes > 0 && d.estimated > d.capacityMinutes && (!worst || d.estimated - d.capacityMinutes > worst.d.estimated - worst.d.capacityMinutes)) worst = { u, d };
+    }));
+    if (!worst) { hint.value = { text: t('TimeV2.balance_none') }; return; }
+    const chip = [...worst.d.chips].sort((a, b) => b.minutes - a.minutes)[0];
+    let target = null;
+    users.value.forEach((u) => {
+        if (u.userId === worst.u.userId) return;
+        const d = u.days.find((x) => x.date === worst.d.date);
+        if (!d || d.pto || d.capacityMinutes <= 0) return;
+        const room = d.capacityMinutes - d.estimated;
+        if (room >= chip.minutes && (!target || room > target.room)) target = { u, d, room };
     });
-    const tableStyle = ref({'colspanCount':  "35",'tableWidth': "4885px"});
-    const users = ref();
-    const dateColumns = ref([]);
-    const filter_wt_click = ref(null);
-    const dateRange = ref({});
-    const selectedDates = ref([]);
-    const checkedFilter = ref([]);
-    const filterType = ref("");
-    const filterSearch = ref("");
-    const companyId = inject('$companyId');
-    const currentUserId = inject('$userId');
-    const timesheetDocArray = ref([]);
-    const estimateDocArray = ref([]);
-    const teams = computed(() => getters["settings/teams"]);
-    const currentCompany = computed(() => getters["settings/selectedCompany"])
-    watch(() => getters["settings/teams"],(val) => {
-        teams.value = val;
-    })
-    const finalFilter = ref([]);
-    const companyUserDetail = computed(() => getters["settings/companyUserDetail"]);
-    const usersArray = ref([]);
-    selectedDates.value = [dateRange.value.startDate,dateRange.value.endDate];
-    const projects = ref([]);
-    const projectsGetter = computed(() => getters["projectData/allProjects"]);
-    const getFinalProjectArray = ref([]);
-    const isEveryOne = ref(false);
-    const error404 = ref(true);
-    const loading = ref(true);
+    if (!target) { hint.value = { text: t('TimeV2.balance_none') }; return; }
+    hint.value = {
+        text: t('TimeV2.balance_hint', {
+            task: chip.name, h: formatHm(chip.minutes), from: worst.u.name, day: moment(worst.d.date).format('ddd'), to: target.u.name,
+            fromPct: pctAfter(worst.u, -chip.minutes), toPct: pctAfter(target.u, chip.minutes),
+        }),
+        apply: { chip, fromUser: worst.u, fromDay: worst.d, toUser: target.u, toDay: target.d },
+    };
+};
+const applyHint = () => { if (hint.value && hint.value.apply && !busy.value) move(hint.value.apply); };
 
-    const {getTeamsData} = useGetterFunctions();
-
-    onMounted(async () => {
-        if(checkPermission('sheet_settings.workload_timesheet') !== null){
-            if(!projectsGetter.value || !Object.keys(projectsGetter.value).length) {
-                getUserData();
-                getTeamsData().then((response) => {
-                    const uid = companyUserDetail.value.userId;
-                    const filterteam = response.filter((x) => x.assigneeUsersArray.indexOf(uid) !== -1);
-                    const teamIds = filterteam.map((x) => 'tId_'+x._id);
-                    let publicQuery = {
-                        isPrivateSpace:false
-                    }
-                    if(companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2 && !getters["settings/rules"].toggle.showAllProjects) {
-                        publicQuery.AssigneeUserId = {
-                            $in:[uid]
-                        }
-                        if (teamIds && teamIds.length) {
-                            publicQuery.AssigneeUserId.$in = [...publicQuery.AssigneeUserId.$in.concat(teamIds)]
-                        }
-                    }
-                    let privateQuery = {
-                        isPrivateSpace:true
-                    }
-                    if(companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2) {
-                        privateQuery.AssigneeUserId = {
-                            $in:[uid]
-                        }
-                        if (teamIds && teamIds.length) {
-                            privateQuery.AssigneeUserId.$in = [...privateQuery.AssigneeUserId.$in.concat(teamIds)]
-                        }
-                    }
-                    const roleType = companyUserDetail.value.roleType;
-                    if(checkPermission('project.project_list') !== null) {
-                        dispatch("projectData/setProjects", {
-                            ...(checkPermission("project.public_projects") === true ? publicQuery : {}),
-                            restrictPublic: checkPermission("project.public_projects") !== true,
-                            privateQuery,
-                            roleType,
-                            uid
-                        }).then(()=>{
-                            projects.value = projectsGetter.value.data ? [...projectsGetter.value.data] : [];
-                            projects.value = projects.value.filter((x)=> !x.isRestrict)
-                            getFinalProjectArray.value = JSON.parse(JSON.stringify(projects.value));
-                            getUserData();
-                            initData(dateRange.value.startDate,dateRange.value.endDate);
-                            loading.value = false;
-                        })
-                        .catch((error) => {
-                            console.error("ERROR in setProjects: ", error);
-                            loading.value = false;
-                        })
-                    }
-                }).catch((error) => {
-                    console.error(error,"ERROR IN GET TEAMS DATA");
-                    loading.value = false;
-                });
-            } else {
-                projects.value = projectsGetter.value.data ? [...projectsGetter.value.data] : [];
-                projects.value = projects.value.filter((x)=> !x.isRestrict)
-                getFinalProjectArray.value = JSON.parse(JSON.stringify(projects.value));
-                getUserData();
-                initData(dateRange.value.startDate,dateRange.value.endDate);
-                loading.value = false;
-            }
-        }else{
-            error404.value = false;
-            loading.value = false;
-        }
-    })
-    const getUserData = async () => {
-        if (checkPermission('sheet_settings.workload_timesheet') === true || checkPermission('sheet_settings.workload_timesheet') === 2) {
-            isEveryOne.value = true;
-            const allUser = computed(() => JSON.parse(JSON.stringify(getters["users/users"])))
-            users.value = allUser.value;
-        } else {
-            isEveryOne.value = false;
-            users.value = [getUser(currentUserId.value,true)]
-        }
-    }
-    const handleDate = (modelData) => {
-        dateRange.value.startDate = modelData.dateVal[0]
-        dateRange.value.endDate = modelData.dateVal[1]
-        if((projects.value && projects.value.length) || (!loading.value)){
-            initData(modelData.dateVal[0] ? modelData.dateVal[0] : '',modelData.dateVal[1] ? modelData.dateVal[1]: '');
-        }
-    }
-    const getRemainingProject = () => {
-        if (timesheetDocArray.value.length && getFinalProjectArray.value.length) {
-            let tmpfullLoggedData = timesheetDocArray.value.map(item => item['data']).flat() || [];
-            let uniqueProjecttimeSheet = [...new Set(tmpfullLoggedData.map((x)=>{return x.projectId}))]
-            let tmpfullETAData = estimateDocArray.value.map(item => item['data']).flat();
-            let uniqueProjectEstimate = [...new Set(tmpfullETAData.map((x) => {return x.projectId}))]
-            let uniqueProject = [...new Set(uniqueProjecttimeSheet.concat(uniqueProjectEstimate))];
-            let projectId = getFinalProjectArray.value.map((x)=>{return x._id});
-            let remainProject = uniqueProject.filter(item => !projectId.includes(item));
-            if (!isEveryOne.value || companyUserDetail.value.roleType === 1 || companyUserDetail.value.roleType === 2) {     
-                const params = { dataIds: remainProject }
-                apiRequest("post", `${env.API_GET_REMAINING_PROJECTS}`, params).then((response) => {
-                    const results = response.data.data;
-                    if (results.length > 0) {
-                        results.forEach((res) => {
-                            getFinalProjectArray.value.push({ ...res, isShow: false });
-                            getFinalProjectArray.value = getFinalProjectArray.value.filter((x)=> !x.isRestrict)
-                        })
-                    }
-                })
-            }
-        }
-    } 
-    const getTaskDataFunction = (projectObject,cb) => {
-        isSpinnerTask.value = true;
-        Promise.allSettled([helper.getTaskData(projectObject,timesheetDocArray,companyId),helper.getTaskEstimateData(projectObject._id,projectObject.selectedUserId,estimateDocArray,companyId)]).then((result)=>{
-            let proResu = result.filter((x) => x.status === 'fulfilled').map((x) => x.value);
-            let logArray = proResu.filter((x) => x.key === "logtime")[0]
-            let esti =  proResu.filter((x) => x.key === "estimate")[0]
-            let count = 0;
-            let countFunction = (ele) => {
-                if (count >= logArray.data.activitiesArray.length) {
-                    esti.data.forEach((dt)=>{
-                        let ind = logArray.data.activitiesArray.findIndex((x)=> x._id === dt._id);
-                        if (ind === -1) {
-                            logArray.data.activitiesArray.push(dt);
-                        }
-                    })
-                    isSpinnerTask.value = false;
-                    cb(logArray)
-                    return;
-                } else {
-                    let estiInd = esti.data.findIndex((x)=> x._id === ele._id)
-                    if (estiInd !== -1) {
-                        ele.totalTaskEstMin = esti.data[estiInd].totalTaskEstMin
-                        ele.taskFinalEstimate = esti.data[estiInd].taskFinalEstimate
-                        count++;
-                        countFunction(logArray.data.activitiesArray[count]);
-                    }
-                    count++;
-                    countFunction(logArray.data.activitiesArray[count]);
-                }
-            }
-            countFunction(logArray.data.activitiesArray[count]);
-            logArray.data.activitiesArray.forEach((ele)=>{
-                let estiInd = esti.data.findIndex((x)=> x._id === ele._id)
-                if (estiInd !== -1) {
-                    ele.totalTaskEstMin = esti.data[estiInd].totalTaskEstMin
-                    ele.taskFinalEstimate = esti.data[estiInd].taskFinalEstimate
-                }
-            })
-        })
-    }
-    const getProjectData = (userObj,cb) => {
-        userObj.projectArray = [];
-        try {
-            Promise.allSettled([getTimeLogProject(userObj.id),getEstimateProject(userObj.id)]).then((result)=>{
-                let proResu = result.filter((x) => x.status === 'fulfilled').map((x) => x.value);
-                let logArray = proResu.filter((x) => x.key === "logtime")[0].projectArray
-                let esti =  proResu.filter((x) => x.key === "estimate")[0].projectArray
-                let count = 0
-                let countFunction = (ele) => {
-                    if (count >= logArray.length) {
-                        esti.forEach((dt)=>{
-                            let ind = logArray.findIndex((x)=> x._id === dt.projectId);
-                            if (ind === -1) {
-                                logArray.push(dt);
-                            }
-                        })
-                        userObj.projectArray = logArray
-                        cb({ 'status': true, 'data': userObj });
-                        return;
-                    } else {
-                        let estiInd = esti.findIndex((x)=> x.projectId === ele._id)
-                        if (estiInd != -1) {
-                            ele.totalProjectEstimate = esti[estiInd].totalProjectEstimate
-                            ele.projectFInalEstimate = esti[estiInd].projectFInalEstimate
-                            count++;
-                            countFunction(logArray[count]);
-                        } else {
-                            count++;
-                            countFunction(logArray[count]);
-                        }
-                    }
-                }
-                countFunction(logArray[count]);
-            }).catch(()=>{
-                cb({ 'status': false})
-            })
-        } catch (error) {
-            console.error(error);
-        }
-    }
-    const getTimeLogProject = (userId) => {
-        return new Promise((resolve, reject) => {
-            try {
-                let projectArray = [];
-                const tmpfullLoggedData = timesheetDocArray.value.filter(x => x.user.trim() === userId.trim());
-                let userRecord = tmpfullLoggedData.map(item => item['data']).flat();
-                let count = 0;
-                const countFunction = (row) => {
-                    if (count >= userRecord.length) {
-                        resolve({key: 'logtime',projectArray: projectArray})
-                        return;
-                    }
-                    let projectKey = projectArray.findIndex(item => item._id === row.projectId);
-                    try {
-                        if (projectKey === -1) {
-                            let proIndex = getFinalProjectArray.value.findIndex(ele => ele._id === row.projectId);
-                            if (proIndex !== -1) {
-                                let projectData = {...getFinalProjectArray.value[proIndex], 'activitiesArray': [], totalProjectTime: 0, 'projectManualTime': 0, 'projectTrackeTime': 0, 'projectFinalLogs': {}, 'dateWiseProjectType': {},'dateWiseManulTime': {}, 'dateWiseTrackTime': {}, 'selectedUserId': userId ,'projectId': getFinalProjectArray.value[proIndex]._id, 'totalProjectEstimate': 0 , projectFInalEstimate: {}}
-                                let tempESTDate = row.date ? moment(new Date(row.date)).format("YYYY-MM-DD") : "";
-                                projectData.totalProjectTime = row.logMinutes || 0;
-                                if (row.logType === 0 || row.logType === undefined) {
-                                    projectData.projectManualTime = row.logMinutes || 0;
-                                } else if (row.logType === 1) {
-                                    projectData.projectTrackeTime = row.logMinutes || 0;
-                                }
-                                let isExist = Object.keys(projectData.projectFinalLogs).includes(tempESTDate);
-                                if (isExist) {
-                                    if (row.logType === 0 || row.logType === undefined) {
-                                        projectData.dateWiseManulTime[tempESTDate] = projectData.dateWiseManulTime[tempESTDate] ?  projectData.dateWiseManulTime[tempESTDate] + (row.logMinutes || 0) : (row.logMinutes || 0);
-                                    } else if (row.logType === 1) {
-                                        projectData.dateWiseTrackTime[tempESTDate] += row.logMinutes || 0;
-                                    }
-                                    projectData.projectFinalLogs[tempESTDate] += row.logMinutes || 0;
-                                    if (projectData.dateWiseProjectType[tempESTDate] !== row.logType) {
-                                        projectData.dateWiseProjectType[tempESTDate] = 2;
-                                    }
-                                } 
-                                else {
-                                    projectData.projectFinalLogs[tempESTDate] = row.logMinutes || 0;
-                                    projectData.dateWiseProjectType[tempESTDate] = row.logType;
-                                    if (row.logType === 0 || row.logType === undefined) {
-                                        projectData.dateWiseManulTime[tempESTDate] = row.logMinutes || 0;
-                                    }  else if (row.logType === 1) {
-                                        projectData.dateWiseTrackTime[tempESTDate] = row.logMinutes || 0;
-                                    }
-                                }
-                                projectArray.push(projectData);
-                                count++;
-                                countFunction(userRecord[count]);
-                            } else {
-                                count++;
-                                countFunction(userRecord[count]);
-                            }
-                        } else {
-                            let tempESTDate = row.date ? moment(new Date(row.date)).format("YYYY-MM-DD") : "";
-                            projectArray[projectKey].totalProjectTime += row.logMinutes || 0;
-                            if (row.logType === 0 || row.logType === undefined) {
-                                projectArray[projectKey].projectManualTime += row.logMinutes || 0;
-                            } else if (row.logType === 1) {
-                                projectArray[projectKey].projectTrackeTime += row.logMinutes || 0;
-                            }
-                            let isExist = Object.keys(projectArray[projectKey].projectFinalLogs).includes(tempESTDate);
-                            if (isExist) {
-                                if (row.logType === 0 || row.logType === undefined) {
-                                    projectArray[projectKey].dateWiseManulTime[tempESTDate] = projectArray[projectKey].dateWiseManulTime[tempESTDate] ?  projectArray[projectKey].dateWiseManulTime[tempESTDate] + (row.logMinutes || 0) : (row.logMinutes || 0);
-                                } else if (row.logType === 1) {
-                                    projectArray[projectKey].dateWiseTrackTime[tempESTDate] += row.logMinutes || 0;
-                                }
-                                projectArray[projectKey].projectFinalLogs[tempESTDate] += row.logMinutes || 0;
-                                if (projectArray[projectKey].dateWiseProjectType[tempESTDate] !== row.logType) {
-                                    projectArray[projectKey].dateWiseProjectType[tempESTDate] = 2;
-                                }
-                            } else {
-                                projectArray[projectKey].projectFinalLogs[tempESTDate] = row.logMinutes || 0;
-                                projectArray[projectKey].dateWiseProjectType[tempESTDate] = row.logType;
-                                if (row.logType === 0 || row.logType === undefined) {
-                                    projectArray[projectKey].dateWiseManulTime[tempESTDate] = row.logMinutes || 0;
-                                } else if (row.logType === 1) {
-                                    projectArray[projectKey].dateWiseTrackTime[tempESTDate] = row.logMinutes || 0;
-                                }
-                            }
-                            count++;
-                            countFunction(userRecord[count]);
-                        }
-                    } catch (error) {
-                        console.error(error)
-                    }
-                };
-                countFunction(userRecord[count]);
-            } catch (error) {
-                reject(error);
-            }
-        })
-    }
-    const getEstimateProject = (userId) => {
-        return new Promise((resolve, reject) => {
-            try {
-                let projectArray = [];
-                const tmpfullETAData = estimateDocArray.value.filter(x => x.user.trim() === userId.trim());
-                let userRecord = tmpfullETAData.map(item => item['data']).flat();
-                const countFunction = (row) => {
-                    if (count >= userRecord.length) {
-                        resolve({key: 'estimate',projectArray: projectArray})
-                        return;
-                    }
-                    let projectKey = projectArray.findIndex(item => item._id === row.projectId);
-                    if (projectKey === -1) {
-                        let proIndex = getFinalProjectArray.value.findIndex(ele => ele._id === row.projectId);
-                        if (proIndex !== -1) {
-                            let projectData = {...getFinalProjectArray.value[proIndex],'projectId': getFinalProjectArray.value[proIndex]._id, 'dateWiseManulTime': {}, 'dateWiseTrackTime': {}, 'totalProjectEstimate': 0 , projectFInalEstimate: {} , 'activitiesArray': [], totalProjectTime: 0, 'projectManualTime': 0, 'projectTrackeTime': 0, 'projectFinalLogs': {}, 'dateWiseProjectType': {} , 'selectedUserId': userId}
-                            let tempESTDate = row.date ? moment(new Date(row.date)).format("YYYY-MM-DD") : '';
-                            projectData.totalProjectEstimate += row.logMinutes || 0;
-                            let isExist = Object.keys(projectData.projectFInalEstimate).includes(tempESTDate);
-                            if (isExist) {
-                                projectData.projectFInalEstimate[tempESTDate] += row.logMinutes || 0;
-                            } else {
-                                projectData.projectFInalEstimate[tempESTDate] = row.logMinutes || 0;
-                            }
-                            projectArray.push(projectData);
-                            count++;
-                            countFunction(userRecord[count]);
-                        } else {
-                            count++;
-                            countFunction(userRecord[count]);
-                        }
-                    } else {
-                            let tempESTDate = row.date ? moment(new Date(row.date)).format("YYYY-MM-DD") : '';
-                            projectArray[projectKey].totalProjectEstimate += row.logMinutes || 0;
-                            let isExist = Object.keys(projectArray[projectKey].projectFInalEstimate).includes(tempESTDate);
-                            if (isExist) {
-                                projectArray[projectKey].projectFInalEstimate[tempESTDate] += row.logMinutes || 0;
-                            } else {
-                                projectArray[projectKey].projectFInalEstimate[tempESTDate] = row.logMinutes || 0;
-                            }
-                            count++;
-                            countFunction(userRecord[count]);
-                    }
-                };
-                let count = 0;
-                countFunction(userRecord[count]);
-            } catch (error) {
-                reject(error);
-            }
-        })
-    }
-    const goHome = () => {
-        router.push({path: `/${companyId.value}`});
-    }
-    const getTimesheetMongo = (sdate,edate) => {
-        return new Promise((resolve, reject) => {
-            let start = sdate / 1000
-            let end = edate / 1000
-            let userArray = [];
-            let filterIds = selectedFilters.value.filter((x)=>{return x.type == 'Users'});
-            if (filterIds.length) {
-                filterIds.forEach((element) => {
-                    userArray.push(element.id)
-                });
-            }
-            let teamsIds = selectedFilters.value.filter((x)=>{return x.type == 'Teams'});
-            if (teamsIds.length) {
-                teamsIds.forEach((element)=>{
-                    let ind = teams.value.findIndex((x)=>{return x._id == element.id});
-                    teams.value[ind].assigneeUsersArray.forEach((dt)=>{
-                        userArray.push(dt)
-                    })
-                })
-            }
-            // if (filterIds.length === 0 && teamsIds.length === 0) {
-            //     users.value.forEach((element) => {
-            //         userArray.push(element._id)
-            //     });
-            // }
-            let filterProject = selectedFilters.value.filter((x)=>{return x.type == "Projects"});
-            let mongo_search_eta_parameters = [];
-            let projectArray = [];
-            if (filterProject.length) {
-                filterProject.forEach((element) => {
-                    projectArray.push(element.id)
-                })
-
-                mongo_search_eta_parameters = [{
-                    ...(userArray.length ?
-                        {
-                            UserId: { 
-                                $in: userArray 
-                            }
-                        }
-                        :
-                        {}
-                    ),
-                    ProjectId: {
-                        $in: projectArray
-                    },
-                    Date: {
-                        dbDate: {
-                            $gte: (start * 1000),
-                            $lte: (end * 1000)
-                        }
-                    }
-                }]
-
-                if (filterIds.length === 0 && teamsIds.length === 0 && (companyUserDetail.value.roleType === 1 || companyUserDetail.value.roleType === 2)) {
-                    mongo_search_eta_parameters = [{
-                        ProjectId: {
-                            $in: projectArray
-                        },
-                        Date: {
-                            dbDate: {
-                                $gte: (start * 1000),
-                                $lte: (end * 1000)
-                            }
-                        }
-                    }]
-                }
-            } else {
-
-                mongo_search_eta_parameters = [{
-                    ...(userArray.length ?
-                        {
-                            UserId: { 
-                                $in: userArray 
-                            }
-                        }
-                        :
-                        {}
-                    ),
-                    Date: {
-                        dbDate: {
-                            $gte: (start * 1000),
-                            $lte: (end * 1000)
-                        }
-                    }
-                }]
-                if (filterIds.length === 0 && teamsIds.length === 0 && (companyUserDetail.value.roleType === 1 || companyUserDetail.value.roleType === 2)) {
-                    mongo_search_eta_parameters = [{
-                        Date: {
-                            dbDate: {
-                                $gte: (start * 1000),
-                                $lte: (end * 1000)
-                            }
-                        }
-                    }]
-                }
-            }
-            const axiosObj = {
-                selectedFilter : selectedFilters.value,
-                projectArray: projectArray,
-                userArray: userArray,
-                start: start,
-                end: end,
-                companyUserDetail: companyUserDetail.value,
-                timeZone: currentUserId.value.Time_Zone ? currentUserId.value.Time_Zone : "Asia/Kolkata"
-            }
-            let queryeta = [
-                {
-                    $match: {
-                        // This $and is not strictly necessary as MongoDB implicitly treats multiple fields in $match as an AND operation.
-                        $and: mongo_search_eta_parameters
-                    }
-                },
-                {
-                    $group: {
-                        _id: {
-                            date: "$Date",
-                            user: "$UserId",
-                            // projectId: "$ProjectId"
-                        },
-                        data: {
-                            $push: {
-                                projectId: "$ProjectId",
-                                taskId: "$TaskId",
-                                logMinutes: "$EstimatedTime",
-                                userId: "$UserId",
-                                date: "$Date",
-                            }
-                        },
-                        user: {
-                            $first: "$UserId" // Getting the first user in each group
-                        },
-                        totalCount: {
-                            $sum: "$EstimatedTime" // Calculate sum of all LogTimeDuration for each group
-                        }
-                    }
-                }
-            ]
-            apiRequest("post", `${env.TIMESHEET}/workload`,axiosObj)
-                .then((result) => {
-                    let tempTypesSenseDocs = [];
-                    result.data.map((vals) => {
-                        let docTemp = vals;
-                        tempTypesSenseDocs.push({...docTemp,'logType':docTemp._id.logType ? docTemp._id.logType : 0});
-                    })
-                    timesheetDocArray.value = tempTypesSenseDocs;
-                    timesheetDocArray.value.forEach((x) => {
-                        if (getUser(x.user).ghostUser) {
-                            const index = users.value.findIndex((user) => user._id === x.user);
-                            if(index === -1){
-                                users.value.push(getUser(x.user));
-                            }
-                        }
-                    });
-                    apiRequest("post", `${env.ESTIMATED_TIME}`,{queryeta: queryeta})
-                    .then((estimated) => {
-                        estimateDocArray.value = estimated.data;
-                        resolve()
-                    }).catch((error)=>{
-                        console.error(error)
-                        estimateDocArray.value = [];
-                        reject([])
-                    })
-                }).catch((error)=>{
-                    console.error(error)
-                    timesheetDocArray.value = [];
-                    reject([])
-                })
-        })
-    }
-    const initData = (startDate,EndDate) => {
-        try {
-            if(!(startDate) && !(EndDate)) {
-                isSpinner.value = false;
-                return;
-            }
-            isSpinner.value = true;
-            var sDate = startDate ? new Date(startDate).setHours(0,0,0,0) : new Date(dateRange.value.startDate).getTime();
-            var eDate = new Date(EndDate || dateRange.value.endDate);
-            eDate.setHours(23, 59, 59);
-            dateColumns.value = [];
-            usersArray.value = [];
-            for (let i = sDate; i < eDate.getTime(); i += 86400000) {
-                const momentDate = moment(new Date(i));
-                const DateColumn = {
-                    date: momentDate.format('DD'),
-                    day: momentDate.format('ddd'),
-                    fullDate: momentDate.format('YYYY-MM-DD'),
-                    currentDate: moment(new Date()).format('YYYY-MM-DD'),
-                    arabiDay: momentDate.format('Do').replace(/[0-9]/g, ''),
-                    arabiMonth: momentDate.format('MMM'),
-                    mainDate: new Date(i),
-                    weekNumber: (momentDate.weeks() - momentDate.startOf('month').weeks() + 1 + 52) % 52,
-                    weekName: ["1st", "2nd", "3rd", "4th", "5th"][(momentDate.weeks() - momentDate.startOf('month').weeks() + 1 + 52) % 52 - 1] || "",
-                    dateMonth: momentDate.format('MM'),
-                    totalUserEst: {},
-                    totalUserLogs: {},
-                    totalManualLogs:{},
-                    totalTrackedLogs:{},
-                    totalDayEst: 0,
-                    totalDayLogs: 0,
-                    totalLogsType: {},
-                };
-                dateColumns.value.push(DateColumn);
-                const dateColumnsLength = dateColumns.value.length;
-                activeWeekObj.value = {
-                    isOneday: dateColumnsLength === 1,
-                    isTwoday: dateColumnsLength === 2,
-                    isThreeday: dateColumnsLength === 3,
-                    isFourday: dateColumnsLength === 4,
-                    isFiveday: dateColumnsLength === 5,
-                    isSixday: dateColumnsLength === 6,
-                };
-                if (dateColumnsLength <= 20) {
-                    tableStyle.value.colspanCount = "27";
-                    tableStyle.value.tableWidth = "1888px";
-                    activeWeekObj.value.isWeeked = true;
-                }
-                if (dateColumnsLength > 7) {
-                    activeWeekObj.value.isWeeked = true;
-                    const noOfDays = dateColumnsLength;
-                    const tblWidth = noOfDays * 190 + 570;
-                    tableStyle.value.tableWidth = tblWidth + 'px';
-                    const tblColspan = 6 + 3 * noOfDays;
-                    tableStyle.value.colspanCount = tblColspan;
-                }
-            }
-            if(projects.value && projects.value.length){
-                getTimesheetMongo(sDate,eDate.getTime()).then(()=>{
-                    getRemainingProject();
-                    let promise = []
-                    displayUserArray().then((response)=>{
-                        response.forEach((user)=>{
-                            promise.push(userArrayPromise(user));
-                        })
-                    })
-                    Promise.allSettled(promise).then(()=>{
-                        isSpinner.value = false;
-                    }).catch((error)=>{
-                        isSpinner.value = false;
-                        console.error(error,"error");
-                    })
-                })   
-            }else{
-                isSpinner.value = false;
-            }
-        } catch (error) {
-            console.error('Error',error)
-            isSpinner.value = false;
-        }        
-    }
-    const displayUserArray = () => {
-        return new Promise((resolve, reject) => {
-        try {
-            let userArray = [];
-            const filterIds = selectedFilters.value.filter(x => x.type === 'Users');
-            const teamsIds = selectedFilters.value.filter(x => x.type === 'Teams');
-            const filterProject = selectedFilters.value.filter(x => x.type === 'Projects');
-            if (timesheetDocArray.value.length) {
-                timesheetDocArray.value.forEach(ele => {
-                    const index = users.value.findIndex(x => x._id === ele.user);
-                    if (index !== -1) {
-                        userArray.push(users.value[index]);
-                    }
-                });
-            }
-            if (estimateDocArray.value.length) {
-                estimateDocArray.value.forEach(ele => {
-                    const index = users.value.findIndex(x => x._id === ele.user);
-                    if (index !== -1) {
-                        userArray.push(users.value[index]);
-                    }
-                });
-            }
-            teamsIds.forEach(element => {
-                const ind = teams.value.findIndex(x => x._id === element.id);
-                if (ind !== -1) {
-                const userArr = teams.value[ind].assigneeUsersArray;
-                userArr.forEach(data => {
-                    const index = users.value.findIndex(x => x._id === data);
-                    if (index !== -1) {
-                    userArray.push(users.value[index]);
-                    }
-                });
-                }
-            });
-            filterIds.forEach(element => {
-                const ind = users.value.findIndex(x => x._id === element.id);
-                if (ind !== -1) {
-                userArray.push(users.value[ind]);
-                }
-            })
-            if (filterProject.length === 0 && filterIds.length === 0 && teamsIds.length === 0) {
-                userArray = [...users.value];
-            }
-            const uniqueArray = Array.from(new Set(userArray.map(item => item._id))).map(_id => userArray.find(item => item._id === _id));
-            resolve(uniqueArray);
-        } catch (error) {
-            reject(error);
-        }
-        })
-    }
-    const userArrayPromise = (userData) => {
-        return new Promise((resolve, reject) => {
-            try {
-                let finalMongoData = timesheetDocArray.value.filter((x)=>{return x.user.trim() == userData._id.trim()});
-                let finalEstimateData = estimateDocArray.value.filter((x)=>{return x.user.trim() === userData._id.trim()});
-                Promise.allSettled([manageLoggTime(finalMongoData,userData._id),manageEstimate(finalEstimateData,userData._id)]).then((result)=>{
-                    let proResu = result.filter((x) => x.status === 'fulfilled').map((x) => x.value);
-                    let fIndex = usersArray.value.findIndex((e)=>{return e.id == userData._id})
-                    if(fIndex === -1) {
-                        usersArray.value.push({
-                            'id': userData._id,
-                            'name': userData.Employee_Name,
-                            'profileImage': userData.Employee_profileImageURL,
-                            'activitiesArray': [],
-                            'totalLoggedHours': proResu.filter((x) => x.key === "logtime")[0].totalLogedHours,
-                            'estMin': proResu.filter((x) => x.key === "estimate")[0].estiMateTime,
-                            'projectArray' : [],
-                            'manuallyLog' : {'name' : 'Manually Time',time : proResu.filter((x) => x.key === "logtime")[0].manuallyLogtime},
-                            'trackdLog' : userData.trackdLog = {'name' : 'Track Time',time : proResu.filter((x) => x.key === "logtime")[0].trackedLogtime}
-                        })
-                    } else {
-                        usersArray.value[fIndex] = {...usersArray.value[fIndex],...{
-                            'id': userData._id,
-                            'name': userData.Employee_Name,
-                            'profileImage': userData.Employee_profileImageURL,
-                            'activitiesArray': [],
-                            'totalLoggedHours': proResu.filter((x) => x.key === "logtime")[0].totalLogedHours,
-                            'estMin': proResu.filter((x) => x.key === "estimate")[0].estiMateTime,
-                            'projectArray' : [],
-                            'manuallyLog' : {'name' : 'Manually Time',time : proResu.filter((x) => x.key === "logtime")[0].manuallyLogtime},
-                            'trackdLog' : userData.trackdLog = {'name' : 'Track Time',time : proResu.filter((x) => x.key === "logtime")[0].trackedLogtime}
-                        }}
-                    }
-                    resolve();
-                }).catch((error)=>{
-                    reject(error);
-                })
-            } catch (error) {
-                reject(error)
-            }
-        })
-    }
-    const manageEstimate = (finalEstimateData,userId) => {
-        return new Promise((resolve, reject) => {
-            try {
-                let estMin = 0;
-                let count = 0;
-                let countFunction = (element) => {
-                    if (count >= finalEstimateData.length) {
-                        resolve({key: 'estimate', estiMateTime: estMin});
-                    } else {
-                        element.data.forEach((x)=>{
-                            let project = getFinalProjectArray.value.find((y)=> y._id === x.projectId)
-                            if (!project) {
-                                element.totalCount = element.totalCount - x.logMinutes
-                            }
-                        })
-                        let estimate = element.totalCount ? element.totalCount : 0;
-                        let tempDate = element._id.date ? moment(new Date(element._id.date)).format("YYYY-MM-DD") : '';
-                        let searchInd = dateColumns.value.findIndex((x) => {
-                            return x.fullDate == tempDate
-                        });
-                        if(element.user.toString().trim() === userId.trim()){
-                            estMin += estimate;
-                            if(searchInd !== -1){
-                                dateColumns.value[searchInd].totalDayEst += estimate;
-                                let getUserKey = Object.keys(dateColumns.value[searchInd].totalUserEst).includes(element.user.toString().trim());
-                                if(!getUserKey){
-                                    dateColumns.value[searchInd].totalUserEst[`${element.user.toString()}`] = estimate;
-                                    count++;
-                                    countFunction(finalEstimateData[count]);
-                                }
-                                else{
-                                    dateColumns.value[searchInd].totalUserEst[`${element.user.toString()}`] = estimate + parseInt(dateColumns.value[searchInd].totalUserEst[`${element.user.toString()}`] ? dateColumns.value[searchInd].totalUserEst[`${element.user.toString()}`] : 0);
-                                    count++;
-                                    countFunction(finalEstimateData[count]);
-                                }
-                            } else {
-                                count++;
-                                countFunction(finalEstimateData[count]);
-                            }
-                        } else {
-                            count++;
-                            countFunction(finalEstimateData[count]);
-                        }
-                    }
-                }   
-                countFunction(finalEstimateData[count]);
-            } catch (error) {
-                reject(error);
-            }
-        })
-    }
-    const manageLoggTime = (finalMongoData,userId) => {
-        return new Promise((resolve, reject) => {
-            try {
-                let count = 0;
-                let manuallyLog = 0;
-                let totalLoghrs = 0;
-                let trackdLog = 0;
-                let tmpAllRecord = finalMongoData.map(item => item['data']).flat();
-                let countFunction = (element) => {
-                    if (count >= tmpAllRecord.length) {
-                        resolve({key: 'logtime', manuallyLogtime : manuallyLog , trackedLogtime : trackdLog, totalLogedHours: totalLoghrs});
-                    } else {
-                        let isOkProject = getFinalProjectArray.value.find((x)=> x._id == element.projectId)
-                        if (isOkProject) {
-                            let totalMin = element.logMinutes ? parseInt(element.logMinutes) : 0;
-                            let tempDate = element.date ? moment(new Date(element.date)).format("YYYY-MM-DD") : '';
-                            let searchInd = dateColumns.value.findIndex((x) => {
-                                return x.fullDate == tempDate
-                            });
-                            if(element.userId.toString().trim() === userId.trim()){
-                                totalLoghrs += totalMin;
-                                // totalLoghrs += totalMin;
-                                if(element.logType == 0){
-                                    manuallyLog += totalMin; 
-                                }
-                                else if(element.logType == 1){
-                                    trackdLog += totalMin; 
-                                }
-                                else if(element.logType == undefined){
-                                    manuallyLog += totalMin; 
-                                }
-                                if(searchInd !== -1){
-                                    dateColumns.value[searchInd].totalDayLogs += totalMin;
-                                    let getUserKey = Object.keys(dateColumns.value[searchInd].totalUserLogs).includes(element.userId.toString().trim());
-                                    if(!getUserKey){
-                                        dateColumns.value[searchInd].totalUserLogs[`${element.userId.toString()}`] = totalMin;
-                                        dateColumns.value[searchInd].totalLogsType[`${element.userId.toString()}`] = element.logType;
-                                        if (element.logType === 0 || element.logType === undefined) {
-                                            dateColumns.value[searchInd].totalManualLogs[`${element.userId.toString()}`] = totalMin
-                                        } else {
-                                            dateColumns.value[searchInd].totalTrackedLogs[`${element.userId.toString()}`] = totalMin
-                                        }
-                                        count++;
-                                        countFunction(tmpAllRecord[count]);
-                                    }
-                                    else{
-                                        dateColumns.value[searchInd].totalUserLogs[`${element.userId.toString()}`] = totalMin + parseInt(dateColumns.value[searchInd].totalUserLogs[`${element.userId.toString()}`] ? dateColumns.value[searchInd].totalUserLogs[`${element.userId.toString()}`] : 0);
-                                        if(dateColumns.value[searchInd].totalLogsType[`${element.userId.toString()}`] != element.logType){
-                                            dateColumns.value[searchInd].totalLogsType[`${element.userId.toString()}`] = 2;
-                                        }
-                                        if (element.logType === 0 || element.logType === undefined) {
-                                            dateColumns.value[searchInd].totalManualLogs[`${element.userId.toString()}`] = totalMin + parseInt(dateColumns.value[searchInd].totalManualLogs[`${element.userId.toString()}`] ? dateColumns.value[searchInd].totalManualLogs[`${element.userId.toString()}`] : 0)
-                                        } else {
-                                            dateColumns.value[searchInd].totalTrackedLogs[`${element.userId.toString()}`] = totalMin + parseInt(dateColumns.value[searchInd].totalTrackedLogs[`${element.userId.toString()}`] ? dateColumns.value[searchInd].totalTrackedLogs[`${element.userId.toString()}`] : 0)
-                                        }
-                                        count++;
-                                        countFunction(tmpAllRecord[count]);
-                                    }
-                                } else {
-                                    count++;
-                                    countFunction(tmpAllRecord[count]);
-                                }
-                            } else {
-                                count++;
-                                countFunction(tmpAllRecord[count]);
-                            }
-                        } else {
-                            count++;
-                            countFunction(tmpAllRecord[count]);
-                        }
-                    }
-                }
-                countFunction(tmpAllRecord[count]);
-            } catch (error) {
-                reject(error);
-            }
-        })
-    }
-    function handleFilterType(type,item){
-        if(type != 'back'){
-            setTimeout(()=>{ filterType.value =item;openFilterMenu() },100);
-        }else{
-            setTimeout(()=>{ filterType.value ='' },100);
-        }
-    }
-    function openFilterMenu(){
-        try{
-            filterSearch.value ='';
-            helper.getFinalFilter(filterType.value,users.value,teams.value,projects.value).then((filterRes)=>{
-                if(filterRes.status){
-                    finalFilter.value = filterRes.data.finalFilter;
-                }
-            })
-        }catch(error){
-            console.error(error);
-        }
-    }
-    function handleFilterItem(selectedItem, type, isUser=false){
-        debouncerWithPromise(400).then(()=>{
-            helper.handleFilterItem(selectedItem,type,selectedFilters.value, checkedFilter.value, filterType.value).then((filterRes)=>{
-                if(filterRes.status){
-                    let userFilter = filterRes.data.selectedFilters.filter((x) => x.type == "Users");
-                    if (isUser && userFilter.length == 0) {
-                        filter_wt_click.value.click()
-                    }
-                    selectedFilters.value = filterRes.data.selectedFilters;
-                    checkedFilter.value = filterRes.data.checkedFilter;
-                    initData(dateRange.value.startDate,dateRange.value.endDate);
-                }
-            })
-        })
-    }
-    const optionFilter = computed(()=>{
-        const searchArray = [];
-        if (filterSearch.value && filterSearch.value.length > 0) {
-            const filterTypeLower = filterType.value.toLowerCase();
-            if (filterTypeLower === "users") {
-                users.value.forEach(rawData => {
-                if (rawData.Employee_Name.trim().toLowerCase().includes(filterSearch.value.trim().toLowerCase())) {
-                    searchArray.push({
-                    "id": rawData._id,
-                    'name': rawData.Employee_Name,
-                    'profile': rawData.Employee_profileImageURL || ''
-                    });
-                }
-                });
-            } else if (filterTypeLower === "teams") {
-                teams.value.forEach(val => {
-                if (val.name.trim().toLowerCase().includes(filterSearch.value.trim().toLowerCase())) {
-                    searchArray.push({
-                    "id": val._id,
-                    'name': val.name
-                    });
-                }
-                });
-            } else if (filterTypeLower === "projects") {
-                projects.value.forEach(ele => {
-                if (ele.ProjectName.trim().toLowerCase().includes(filterSearch.value.trim().toLowerCase())) {
-                    searchArray.push({
-                    "id": ele._id,
-                    'name': ele.ProjectName,
-                    'AssigneeUserId': ele.AssigneeUserId,
-                    'ProjectCode': ele.ProjectCode,
-                    "projectIcon": ele.projectIcon
-                    });
-                }
-                });
-            }
-        }
-        return filterSearch.value ? searchArray : finalFilter.value;
-    })
-    const validateURL = (str) => {
-        var tarea = str;
-        if (tarea.indexOf("http://") == 0 || tarea.indexOf("https://") == 0) {
-            return true;
-        }
-    }
+watch([start, projectId], load);
+onMounted(() => {
+    if (!allowed.value || isMobile.value) return;
+    load();
+    loadProjects();
+});
 </script>
-<style src="../style.css"></style>
+
+<style src="../timeV2.css"></style>
 <style scoped>
-.disabled{
-    pointer-events: none;
-}
-.page-content {
-    padding: 15px;
-}
-.page-title {
-    width: 100%;
-}
-ul.breadcrumb.title_strip {
-    margin: 0;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    height: 61px;
-    background-color: #fff;
-    border-bottom: 1px solid #DAE1E7;
-    width: 100%;
-    padding-left: 15px;
-}
-ul.breadcrumb.title_strip li:first-child {
-    border-left: 0;
-    padding-left: 0px;
-}
-ul.breadcrumb.title_strip li {
-    list-style: none;
-    padding-right:15px;
-    border-left: 1px solid #b7b7b7;
-    font-family: 'Roboto', sans-serif;
-    font-weight:700;
-    padding-left: 15px;
-}
-.dp__main.dp__theme_light {
-    max-width: 100%;
-    width: 260px;
-    margin-right: 15px;
-}
-span.chipusername_wrapper {
-    display: flex;
-    background-color: #f1efef;
-    border-radius: 10px;
-    margin-right: 10px;
-    padding: 2px 4px 2px 8px;
-    font-family: 'Roboto', sans-serif;
-    font-weight: 500;
-    align-items: center;
-    min-width: fit-content;
-}
-a.link_disable_css {
-    color: #000;
-    text-decoration: none;
-    font-size: 16px;
-}
-
-span.chipusername_wrapper button {
-    padding: 0;
-    border: 0;
-    margin-left: 4px;
-    min-width: 17px;
-    width: 17px;
-    height: 17px;
-    background: transparent !important;
-}
-span.timesheet_user_filter {
-    position: sticky;
-    left: 0;
-    background-color: #fff;
-    padding: 3px 10px 3px 10px;
-    min-width: 69px;
-}
-
-.wf_filter::-webkit-scrollbar-thumb {
-    border-radius: 10px;
-    -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,.3);
-    background-color: #C1C1C1;
-}
-.wf_filter::-webkit-scrollbar {
-    width: 5px;
-    height: 5px;
-    background-color: #F5F5F5;
-}
-.chipusername_main {
-    display: flex;
-}
-span.chipusername_wrapper span.user_name {
-    font-size: 13px;
-    min-width: max-content;
-}
-.circlegreen {
-  width: 10px;
-  height: 10px;
-  background-color: #1CB303;
-  border-radius: 50%;
-}
-.circlePurple {
-  width: 10px;
-  height: 10px;
-  background-color: #7367F0;
-  border-radius: 50%;
-}
-span.timesheet_user_filter button.dot-btn {
-  min-width: 60px;
-}
-.timesheetDropdown_wrapper {
-    border: 0;
-    margin-top: 9px;
-    margin-left: -11px;
-    min-width: 98px;
-    width: 98px;
-}
-.no__borders{
-    border: none !important;
-}
-.timesheetDropdown_wrapper .search-project-filter.dropdown_option{
-    min-width: 98px !important;
-}
-@media(max-width: 1850px){
-    span.timesheet_user_filter{min-width: 75px;}
-}
-@media(max-width: 767px){
-    .pro_route_link a, ul.breadcrumb.title_strip li span{
-        font-size: 14px!important;
-    }
-    ul.breadcrumb.title_strip li{
-        padding-right: 10px;
-        padding-left: 10px;
-    }
-    .timesheetDropdown_wrapper{margin-top: 0;margin-left: 0;}
-}
+.wl { display: flex; flex-direction: column; min-height: 100%; color: var(--ink); font: var(--text-small); }
+.wl__bar { gap: 12px; }
+.wl__project { font-weight: 600; font-size: 14px; max-width: 240px; border-color: transparent; padding-left: 4px; }
+.wl__range { margin-left: 6px; }
+.wl__body { flex: 1; padding: 16px 20px; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.wl__grid { display: flex; flex-direction: column; gap: 8px; overflow-x: auto; }
+.wl__row { display: grid; grid-template-columns: 150px repeat(var(--days), minmax(48px, 1fr)) 70px; gap: 5px; align-items: stretch; height: 74px; }
+.wl__row--head { height: auto; font: var(--text-label); letter-spacing: .06em; color: var(--ink-3); text-align: center; }
+.wl__row--head .is-today { color: var(--brand); }
+.wl__person { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.wl__person .ah-avatar { width: 26px; height: 26px; font-size: 10px; }
+.wl__person-text { min-width: 0; }
+.wl__name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wl__sub { font-size: 11px; color: var(--ink-2); }
+.wl__sub.is-over { color: var(--danger); }
+.wl__cell { position: relative; background: var(--surface); border: 1px solid var(--hairline); border-radius: 8px; padding: 4px; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; transition: border-color var(--t-state) var(--ease), box-shadow var(--t-state) var(--ease); }
+.wl__cell.is-today { border: 1.5px solid var(--brand); }
+.wl__cell.is-drop { border: 1px dashed var(--brand); box-shadow: var(--focus); }
+.wl__cell.is-pto { display: grid; place-items: center; border-color: var(--hairline); }
+.wl__pto { font: 500 9.5px/1 var(--font-mono); color: var(--ink-3); }
+.wl__fill { background: var(--brand); border-radius: 4px; display: grid; place-items: center; color: #fff; font: 600 10px/1 var(--font-mono); min-height: 0; transition: height var(--t-state) var(--ease); }
+.wl__fill.is-tentative { opacity: .5; }
+.wl__fill.is-over { background: var(--danger); }
+.wl__chips { position: absolute; top: 4px; left: 4px; right: 4px; display: flex; flex-direction: column; gap: 2px; pointer-events: none; }
+.wl__chip { pointer-events: auto; cursor: grab; font: 500 9.5px/1.2 var(--font-ui); background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 4px; padding: 2px 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wl__chip:active { cursor: grabbing; }
+.wl__chip--more { color: var(--ink-2); font-family: var(--font-mono); }
+.wl__total { display: grid; place-items: center; font: 600 12px/1 var(--font-mono); }
+.wl__total small { font: 400 10px/1 var(--font-mono); color: var(--ink-3); }
+.wl__total.is-over { color: var(--danger); }
+.wl__empty { grid-column: 1 / -1; }
+.wl__foot { margin-top: auto; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
+.wl__hint { display: flex; align-items: center; gap: 6px; color: var(--brand); font-weight: 600; font-size: 11.5px; }
 </style>

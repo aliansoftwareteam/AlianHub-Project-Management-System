@@ -1,7 +1,7 @@
 <template>
     <SpinnerComp :is-spinner="isSpinner || isSpinnerProject" v-if="isSpinner || isSpinnerProject"/>
-    <div v-if="loading" :class="[{'position-re':props?.from ? '' :!currentCompany?.planFeature?.globalPermison}]">
-        <div v-if="props?.from ? !currentCompany?.planFeature?.projectWisePermisson :!currentCompany?.planFeature?.globalPermison">
+    <div v-if="loading" class="sp" :class="{ 'sp--locked': !planAllowed }">
+        <div v-if="!planAllowed">
             <UpgradePlan
                 :buttonText="$t('Upgrades.upgrade_your_plan')"
                 :lastTitle="$t('Upgrades.to_unlock_security')"
@@ -10,38 +10,48 @@
                 :message="$t('Upgrades.the_feature_not_available')"
             />
         </div>
-        <div :class="[{'pointer-event-none opacity-5 blur-3-px':props?.from ? !currentCompany?.planFeature?.projectWisePermisson :!currentCompany?.planFeature?.globalPermison}]" v-if="loading" class="position-re">
-            <div :class="[{'Settings-pointer-event-none':isSpinner || isSpinnerProject}]" class="projectSecurityAndPermissionWrapper p-1" v-if="(companyUser && (companyUser.roleType === 1 || companyUser.roleType === 2)) || checkPermission('settings.settings_security_permissions') !== null">
-                <div class="advancePermission">
-                    <div class="d-flex align-items-center justify-content-between headerclass pb-1">
-                        <h3 class="font-roboto-sans black font-weight-500">{{$t('Permissions.advanced_permission')}}</h3>
-                        <!-- <a href="#" class="cls-import blue font-roboto-sans" @click.prevent="importRules">Import Default Rules</a> -->
+        <template v-if="(companyUser && (companyUser.roleType === 1 || companyUser.roleType === 2)) || checkPermission('settings.settings_security_permissions') !== null">
+            <div class="sp__body" :class="{ 'sp__body--locked': !planAllowed }">
+                <div class="sp__head">
+                    <div>
+                        <h1 class="ah-h1">{{ props.from ? $t('Permissions.advanced_permission') : $t('SettingsV2.security_title') }}</h1>
+                        <div class="ah-small">{{ $t('SettingsV2.security_subtitle', { permissions: totalRules, objects: totalObjects }) }}</div>
                     </div>
-                    <div class="white_box bg-white box-shadow-2">
-                        <div class="advancePermissionContent">
-                            <div :class="[{'justify-content-end':props?.from ? !currentCompany?.planFeature?.projectWisePermisson :!currentCompany?.planFeature?.globalPermison,'justify-content-between':props?.from ? currentCompany?.planFeature?.projectWisePermisson : currentCompany?.planFeature?.globalPermison}]" class="permissionSearch d-flex align-items-center">
-                                <input v-if="props?.from ? currentCompany?.planFeature?.projectWisePermisson : currentCompany?.planFeature?.globalPermison" type="search" v-model="searchValue" :placeHolder="$t('PlaceHolder.search')" class="form-control search__input">
-                                <button v-if="checkPermission('settings.settings_security_permissions') === true" class="blue_btn bg-blue white border-0" :class="[{'opacity-5 pointer-event-none':props?.from ? !currentCompany?.planFeature?.projectWisePermisson :!currentCompany?.planFeature?.globalPermison,'cursor-pointer':props?.from ? !currentCompany?.planFeature?.projectWisePermisson :!currentCompany?.planFeature?.globalPermison,'justify-content-between':props?.from ? currentCompany?.planFeature?.projectWisePermisson : currentCompany?.planFeature?.globalPermison}]" @click="updateRules">{{$t('Projects.save')}}</button>
-                            </div>
-                            <div class="permissionMode d-flex align-items-center justify-content-between">
-                                <span class="permissionMode__note">{{ showAllPermissions ? '' : $t('PermissionMode.common_note') }}</span>
-                                <a href="#" class="blue font-roboto-sans permissionMode__link" @click.prevent="showAllPermissions = !showAllPermissions">
-                                    {{ showAllPermissions ? $t('PermissionMode.show_common') : $t('PermissionMode.show_all') }}
-                                </a>
-                            </div>
-                            <SecurityandPermissionTable :searchValue="searchValue" :withoutOwnerRoles="withoutOwnerRoles"
-                                :advancedPermissionBody="advancedPermissionBody" :changeRule="changeRule" :from="from"
-                                :planCondition="props?.from ? currentCompany?.planFeature?.projectWisePermisson : currentCompany?.planFeature?.globalPermison"
-                                :showAll="showAllPermissions"
-                            />
-                        </div>
+                    <div class="ah-tabs sp__mode" role="tablist">
+                        <button type="button" class="ah-tab" :class="{ 'is-active': mode === 'simple' }" role="tab" :aria-selected="mode === 'simple'" @click="mode = 'simple'">{{ $t('SettingsV2.mode_simple') }} · <span class="ah-mono">{{ simpleCount }}</span></button>
+                        <button type="button" class="ah-tab" :class="{ 'is-active': mode === 'advanced' }" role="tab" :aria-selected="mode === 'advanced'" @click="mode = 'advanced'">{{ $t('SettingsV2.mode_advanced') }} · <span class="ah-mono">{{ totalRules }}</span></button>
                     </div>
                 </div>
+
+                <div v-if="!props.from" class="sp__roles">
+                    <div v-for="card in roleCards" :key="card.key" class="ah-card sp__role" :class="{ 'is-highlight': card.key === 3 }">
+                        <div class="sp__role-name">{{ card.name }}</div>
+                        <div class="ah-small sp__role-desc">{{ card.desc }} {{ $t('SettingsV2.people_count', { n: card.count }) }}</div>
+                    </div>
+                </div>
+
+                <div class="sp__tools">
+                    <input type="search" class="ah-input sp__search" v-model="searchValue" :placeholder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')" :disabled="!planAllowed" />
+                </div>
+
+                <PermissionMatrix
+                    :searchValue="searchValue"
+                    :withoutOwnerRoles="withoutOwnerRoles"
+                    :advancedPermissionBody="advancedPermissionBody"
+                    :changeRule="changeRule"
+                    :from="from"
+                    :planCondition="planAllowed"
+                    :mode="mode"
+                    :simpleKeys="SIMPLE_KEYS"
+                />
+
+                <div class="sp__foot">
+                    <span class="ah-small">{{ $t('SettingsV2.destructive_note') }}</span>
+                    <button v-if="checkPermission('settings.settings_security_permissions') === true || props.from" type="button" class="ah-btn ah-btn--primary" :disabled="!planAllowed || isSpinner" @click="updateRules">{{ $t('SettingsV2.save_changes') }}</button>
+                </div>
             </div>
-            <div v-else class="text-center">
-                <img :src="accesDenied" />
-            </div>
-        </div>
+        </template>
+        <div v-else class="ah-empty">{{ $t('SettingsV2.access_denied') }}</div>
     </div>
 </template>
 
@@ -52,18 +62,19 @@
     import { ref, computed, watch, onMounted } from "vue";
     import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
     import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
-    import SecurityandPermissionTable from '@/components/molecules/SecurityandPermissionTable/SecurityandPermissionTable.vue'
+    import PermissionMatrix from '@/components/molecules/Setting/PermissionMatrix.vue';
     import { useI18n } from "vue-i18n";
     const { t } = useI18n();
     import { apiRequest } from "../../../services/index";
     import * as env from '@/config/env';
-    //variable
+    defineOptions({ name: "SecurityPermissionsView" });
+    const SIMPLE_KEYS = ["project_list", "public_projects", "project_create", "task_create", "task_status", "task_assignee", "task_comment", "task_delete", "project_delete", "user_timesheet", "settings_invite_member"];
+    const mode = ref("simple");
     const oldRules = ref([]);
     const loading = ref(true);
     const searchValue = ref("");
     // Opens on the full list, as it always has. The shortlist is one click away for anyone who
     // wants it, but changing what an existing admin sees on load is not worth the surprise.
-    const showAllPermissions = ref(true);
     const isSpinner = ref(false);
     const showAllTasks = ref(true);
     const showAllProjects = ref(true);
@@ -108,7 +119,6 @@
     });
     const currentCompany = computed(() => getters["settings/selectedCompany"])
     const companyUser = ref(getters['settings/companyUserDetail']);
-    const accesDenied = require("@/assets/images/access_denied_img.png");
     //watch
     watch(() => rawRules.value, (val) => {
         if (val.length) {
@@ -386,25 +396,6 @@
     }
 </script>
 
-<style src="./style.css"></style>
 <style scoped>
-.permissionMode {
-    padding: 8px 0 12px;
-    gap: 16px;
-}
-.permissionMode__note {
-    font-family: Roboto, sans-serif;
-    font-size: 12.5px;
-    color: #8c8c8c;
-    line-height: 1.4;
-}
-.permissionMode__link {
-    font-size: 13px;
-    white-space: nowrap;
-    text-decoration: none;
-    cursor: pointer;
-}
-.permissionMode__link:hover {
-    text-decoration: underline;
-}
+@import "./style.css";
 </style>

@@ -31,7 +31,7 @@ export function tourHepler() {
 
         // startProjectTour()
         let currentTour = {
-            popoverClass: 'driverjs-theme custome_projects_driver',
+            popoverClass: 'ah-tour ah-tour--legacy',
             showProgress: false,
             overlayColor: 'black',
             showButtons: ['next', 'previous','close'],

@@ -9,4 +9,5 @@ module.exports = {
     ...require('./controller/loginSession'),
     ...require('./controller/password'),
     ...require('./controller/twoFactor'),
+    ...require('./controller/magicLink'),
 };
