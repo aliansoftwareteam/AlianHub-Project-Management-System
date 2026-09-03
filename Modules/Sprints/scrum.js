@@ -618,8 +618,10 @@ exports.completeSprint = async (req, res) => {
             // module load would hand back a half-built export.
             const { taskMongo } = require('../Tasks/helpers/task_class_Mongo');
 
-            // isSubTask: true so a moved parent takes its subtasks with it —
-            // otherwise they orphan in the sprint that just closed.
+            // bulkMove carries a parent's subtasks with it, so nothing orphans in
+            // the sprint that just closed. It used to need isSubTask: true here;
+            // bulk move now does it unconditionally, because a subtask in a
+            // different sprint from its parent renders in neither.
             const result = await taskMongo.bulkMove({
                 companyId,
                 userData: actor,
@@ -635,7 +637,6 @@ exports.completeSprint = async (req, res) => {
                     ProjectName: plan.project.ProjectName || '',
                     ProjectCode: plan.project.ProjectCode || '',
                 },
-                isSubTask: true,
             });
 
             moveSummary = (result && result.totals) || moveSummary;

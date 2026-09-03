@@ -1368,6 +1368,13 @@ const schema = {
             type: String,
             required: true
         },
+        // What the team mainly does, answered once during setup. Decides which sample content the
+        // company starts with, and which templates are worth showing first. Blank for every company
+        // created before the question existed, which the code treats as "no preference".
+        teamFocus: {
+            type: String,
+            default: ''
+        },
         Cst_DialCode: {
             type: Map,
             required: true

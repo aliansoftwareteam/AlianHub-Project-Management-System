@@ -326,6 +326,13 @@
         stepDesc.value.step5Desc[0].status = "inprogress";
         startCallingSteps(stepData.value.data[4], data);
     }
+    // Firebase, the AI key and mail are the three steps a non-technical person cannot answer, and
+    // none of them is needed to run AlianHub for a first look. Skipping moves the wizard on without
+    // calling that step's verification, so the service simply stays unconfigured — the same state a
+    // company is in before anyone sets it up, and each is configurable later from Settings.
+    //
+    // Mail is the one with a real consequence: without it, invitations and password resets cannot be
+    // sent. The step says so before offering the skip.
     function smtpVerifySubmit() {
         mainStep.value = 7;
         stepDesc.value.step7Desc[0].subStep = 2;

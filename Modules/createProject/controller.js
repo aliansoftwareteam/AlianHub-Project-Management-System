@@ -11,7 +11,6 @@ const { removeCache } = require('../../utils/commonFunctions');
 const { updateCompanyFun } = require("../Company/controller/updateCompany");
 const projectTemplate = require("../../utils/projectTemplates.json");
 const blankTemplate = require("./blankTemplate");
-const { seedSampleTasks } = require("./sampleProject");
 const { focusForTemplate, normaliseFocus, sampleTaskNamesFor, SAMPLE_TASK_COUNT } = require("./sampleTasks");
 
 const pickGlobalTemplate = (templateId) => {
@@ -19,24 +18,37 @@ const pickGlobalTemplate = (templateId) => {
     return projectTemplate.find((tpl) => String(tpl._id) === String(templateId)) || projectTemplate[0];
 };
 
-const createDefaultSprint = (req, project, projectName, sample) => {
-    const addObj = {
-        body: {
-            companyId: req.body.CompanyId,
-            projectId: project._id,
-            sprintName: 'List',
-            userData:{},
-            projectName
+const { seedSampleTasks, sampleTasksForTemplate } = require("../../utils/sampleTasks");
+
+// A project created from a template arrives with columns but nothing in them, which teaches a
+// first-time user nothing. Runs after the sprint exists because a task needs a sprintId, and never
+// throws: sample content is not worth failing a project creation over.
+function seedTemplateSamples (project, createObject, sprintRes) {
+    try {
+        // The demo project composes its own list from the team's answer during setup, so it hands
+        // the rows over directly rather than being looked up by template name.
+        let rows = (createObject && Array.isArray(createObject.sampleTaskRows) && createObject.sampleTaskRows.length)
+            ? createObject.sampleTaskRows
+            : null;
+
+        if (!rows) {
+            const name = (createObject && createObject.TemplateName) || (project && project.TemplateName);
+            // Matched against the BUILT-IN templates only. A company can save its own template under
+            // any name, and one that happened to be called "Support" should not inherit our examples.
+            const isBuiltIn = !!name && Object.values(projectTemplate)
+                .some((t) => t && String(t.TemplateName).trim() === String(name).trim());
+            rows = isBuiltIn ? sampleTasksForTemplate(name) : null;
         }
+        // The whole sprint document, not just its id: a real task stores the sprint inline in
+        // sprintArray, and the owner id in Task_Leader.
+        const sprint = sprintRes && sprintRes.data;
+        if (!rows || !sprint || !sprint._id) return;
+        const ownerId = (createObject && createObject.projectCreatedBy) || (project && project.projectCreatedBy);
+        return seedSampleTasks(project, sprint, rows, ownerId);
+    } catch (error) {
+        logger.error(`seedTemplateSamples: ${error.message}`);
     }
-    addSprintFun(addObj).then((sprintRes) => {
-        if(!sample.focus || !sprintRes?.data?._id) return;
-        seedSampleTasks({ companyId: req.body.CompanyId, projectDoc: project, sprintDoc: sprintRes.data, uid: sample.uid, focus: sample.focus })
-            .catch((err) => logger.error(`sample tasks for ${project._id}: ${err?.message || err}`));
-    }).catch((err)=>{
-        logger.error('Create Sprint Error',err)
-    });
-};
+}
 const { resolveProjectSkills } = require("../settings/ProjectSkills/helper");
 const { normaliseSource, cleanProposalId, numericProposalId, validateProposalId } = require("../Project/helpers/projectSourceRules");
 
@@ -507,12 +519,13 @@ exports.createProject = async (req) => {
                     ] 
                     let customFieldVal = JSON.parse(JSON.stringify(createProjectObject.customFiedlsValue)) || [];
                     createProjectObject._id = new mongoose.Types.ObjectId(createProjectObject?._id);
-                    const sample = {
-                        focus: createProjectObject.includeSampleTasks === true
-                            ? normaliseFocus(createProjectObject.sampleFocus || focusForTemplate(pickGlobalTemplate(createProjectObject.TemplateId)))
-                            : '',
-                        uid: createProjectObject.projectCreatedBy,
-                    };
+                    // "Include the sample tasks" plus the team's setup answer become rows for
+                    // seedTemplateSamples, which is the single seeding path.
+                    if (createProjectObject.includeSampleTasks === true && !createProjectObject.sampleTaskRows) {
+                        const focus = normaliseFocus(createProjectObject.sampleFocus || focusForTemplate(pickGlobalTemplate(createProjectObject.TemplateId)));
+                        createProjectObject.sampleTaskRows = sampleTaskNamesFor(focus)
+                            .map((name) => [name, 'An example task. Open it, try the controls, then delete it.']);
+                    }
                     delete createProjectObject?.isTemplate;
                     delete createProjectObject?.useTemplateProj;
                     delete createProjectObject?.customFiedlsValue;
@@ -602,7 +615,20 @@ exports.createProject = async (req) => {
                             MongoDbCrudOpration(req.body.CompanyId,finalObjCostom,"insertMany").then((customResponce)=>{   
                                 removeCache(`customField:${req.body.CompanyId}`);
                                 resolve({status: true, statusText: 'createProject added successfully', data: respone,customFieldVal: customResponce})
-                                createDefaultSprint(req, respone, createProjectObject.ProjectName, sample);
+                                const addObj = {
+                                    body: {
+                                        companyId: req.body.CompanyId,
+                                        projectId: respone._id,
+                                        sprintName: 'List',
+                                        userData:{},
+                                        projectName: createProjectObject.ProjectName
+                                    }
+                                }
+                                addSprintFun(addObj)
+                                .then((sprintRes) => seedTemplateSamples(respone, createProjectObject, sprintRes))
+                                .catch((err)=>{
+                                    logger.error('Create Sprint Error',err)
+                                });
                             }).catch((e)=>{
                                 logger.error(`error in add create project: ${e}`);
                                 exports.deleteProject(respone,req.body.CompanyId);
@@ -610,7 +636,20 @@ exports.createProject = async (req) => {
                             })
                         } else {
                             resolve({status: true, statusText: 'createProject added successfully', data: respone});
-                            createDefaultSprint(req, respone, createProjectObject.ProjectName, sample);
+                            const addObj = {
+                                body: {
+                                    companyId: req.body.CompanyId,
+                                    projectId: respone._id,
+                                    sprintName: 'List',
+                                    userData:{},
+                                    projectName: createProjectObject.ProjectName
+                                }
+                            }
+                            addSprintFun(addObj)
+                            .then((sprintRes) => seedTemplateSamples(respone, createProjectObject, sprintRes))
+                            .catch((err)=>{
+                                logger.error('Create Sprint Error',err)
+                            });
                         }
                     }).catch((err)=>{
                         reject({status: false, statusText: err});

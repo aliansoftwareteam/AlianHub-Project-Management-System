@@ -38,17 +38,17 @@ export function estimateStatusFromTask(task, limitEnabled = true) {
   const hasEstimate = estimate > 0;
 
   if (limitEnabled === false) {
+    // The estimate is still reported with the switch off, because reaching it is worth
+    // saying either way — the alert fires from these numbers. What the switch governs is
+    // the auto-stop, and that reads `limitEnabled`; a session is never capped by the mere
+    // presence of a number here.
     return {
-      // FALSE even when the task does have an estimate. Every call site uses this as
-      // `est.hasEstimate ? est.remainingMinutes : null` — the one decision it drives is
-      // whether to arm the auto-stop for the session about to start. Reporting the task's
-      // real state here would leave the deep-link path (which passes a real task rather
-      // than going through fetchEstimateStatus) still capping the session with the setting
-      // off. Nothing else reads it.
-      hasEstimate: false,
+      hasEstimate,
       estimateMinutes: estimate,
-      remainingMinutes: null,
-      reached: false,
+      remainingMinutes: hasEstimate ? Math.max(remaining, 0) : null,
+      reached: hasEstimate && remaining <= 0,
+      // Nothing is ever refused with the switch off: not a task without an estimate, and
+      // not one already over it.
       blockStart: false,
       blockReason: null,
       blockMessage: null,
@@ -82,23 +82,21 @@ export async function fetchEstimateStatus(companyId, taskId) {
   // four call sites keep the signature they already have.
   const limitEnabled = isEstimateLimitEnabled(store.getState()?.company?.currentCompany);
 
-  // Nothing to check when the company has the cap off: the task read exists only to find
-  // out how much estimate is left, and no answer to that can block anything now. Skipping
-  // it also means turning the setting off removes a request from every tracker start.
-  if (!limitEnabled) return { ...estimateStatusFromTask(null, false), ok: true };
-
+  // The task is read whether or not the cap is on. With it off nothing can be blocked, but
+  // the estimate is still what the alert is measured against, so skipping the read would
+  // leave the alert with nothing to fire from.
   try {
-    if (!companyId || !taskId) return { ...estimateStatusFromTask(null), ok: false };
+    if (!companyId || !taskId) return { ...estimateStatusFromTask(null, limitEnabled), ok: false };
     const res = await apiRequest('post', `/api/v1/task/find`, {
       findQuery: [
         { $match: { objId: { _id: taskId, CompanyId: companyId } } },
       ],
     });
     const task = res && res.data && res.data[0];
-    if (!task) return { ...estimateStatusFromTask(null), ok: false };
-    return { ...estimateStatusFromTask(task), ok: true };
+    if (!task) return { ...estimateStatusFromTask(null, limitEnabled), ok: false };
+    return { ...estimateStatusFromTask(task, limitEnabled), ok: true };
   } catch (e) {
     console.error('fetchEstimateStatus error', e);
-    return { ...estimateStatusFromTask(null), ok: false };
+    return { ...estimateStatusFromTask(null, limitEnabled), ok: false };
   }
 }

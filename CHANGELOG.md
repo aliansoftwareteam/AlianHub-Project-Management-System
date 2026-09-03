@@ -16,6 +16,41 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.35.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.34.0...v14.35.0) (2026-08-26)
+
+
+### 🚀 Features
+
+* carry subtasks through bulk move, and add both convert actions in bulk ([92b0098](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/92b0098cf9cb0316be0c3b255abcacdf4f86ef29))
+* **tracker:** tell people the estimate was passed, even when tracking is not capped ([8abb21c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8abb21c0ee799bc8b33dad2cf075834bb6039bd0))
+
+
+### 🐛 Bug Fixes
+
+* show a dragged-in subtask straight away instead of after a reload ([1fe8323](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1fe8323c540be6b2c81b01bee34aca57e262ff22))
+* **tracker:** the task type icon was invisible on the running-tracker header ([e43b962](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e43b9624318bef999405d17b59495caccd94a6dc))
+
+## [14.34.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.33.0...v14.34.0) (2026-08-26)
+
+
+### 🚀 Features
+
+* close the 13 first-run experience gaps ([b883526](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b883526ccff03c981e30891401733642b445179c))
+* the demo project is split across three sprints with subtasks under them ([bf31fc7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bf31fc778d0ee1665d4f2a9e9f0591a85d0c2b54))
+* the demo project now looks worked-in instead of empty ([85857e8](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/85857e8a2218811288479f90743dbda8281881cd))
+
+
+### 🐛 Bug Fixes
+
+* demo project views lost their names, and its tasks now teach properly ([f6d04f4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f6d04f49e4304bf24a291e038efa4d425f0cfbdd))
+* leave MONGODB_URL empty in .env.example so the wizard's answer wins ([4bcdc6e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4bcdc6e7ffb6ffb61826b70441fd8daac15c3fa4))
+* new tasks could not be created in the demo project ([a6843a7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a6843a7822960d94ea9401ce14572d8a71f76c22))
+* read the real project and task requirements instead of copying payload shapes ([c9eac49](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c9eac495b99ed5610755e742a1f23eafbdde9204))
+* the demo project was never created, and the wizard skip bypassed the backend ([2c352ba](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2c352ba9b28a68aeaefce00535beb66293684481))
+* the demo project was only populated when no setup answer was given ([a4b9365](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a4b9365abf160e1cf6b0b75151a9b766ec3dcf13))
+* the installer's database answer was recorded and then ignored ([b710f7c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b710f7c61b747b259248e930c6a4d1e2c35526ba))
+* the permission catalogue repair no longer runs on a live company by default ([c8ede23](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c8ede2324f5af7ed272b292c0a7c3f56a0c372a4))
+
 ## [14.33.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.32.0...v14.33.0) (2026-08-24)
 
 

@@ -88,6 +88,7 @@ import { apiRequest } from "@/services";
 import AhSwitch from "@/components/molecules/Setting/AhSwitch.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import SpinnerComp from "@/components/atom/SpinnerComp/SpinnerComp.vue";
+import { markFirstRunStep, FIRST_RUN_STEPS } from "@/composable/firstRunProgress";
 
 defineOptions({ name: "NotificationSettings" });
 
@@ -173,6 +174,7 @@ async function savePrefs() {
 }
 
 onMounted(async () => {
+    markFirstRunStep(FIRST_RUN_STEPS.NOTIFICATIONS);
     isSpinner.value = true;
     try {
         if (!rulesGetter.value || !Object.keys(rulesGetter.value).length) {

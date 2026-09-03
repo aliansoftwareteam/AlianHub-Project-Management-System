@@ -73,6 +73,8 @@
     const oldRules = ref([]);
     const loading = ref(true);
     const searchValue = ref("");
+    // Opens on the full list, as it always has. The shortlist is one click away for anyone who
+    // wants it, but changing what an existing admin sees on load is not worth the surprise.
     const isSpinner = ref(false);
     const showAllTasks = ref(true);
     const showAllProjects = ref(true);
