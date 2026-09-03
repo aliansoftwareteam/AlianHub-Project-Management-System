@@ -3,6 +3,7 @@
 // feature be exercised in dev). Definitions and instances are company-scoped.
 const mongoose = require('mongoose');
 const helper = require('./helper');
+const rules = require('./recurrenceRules');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
@@ -55,6 +56,7 @@ exports.createDefinition = async (req, res) => {
             monthday: b.monthday ? Number(b.monthday) : undefined,
             runHour: Number.isFinite(Number(b.runHour)) ? Number(b.runHour) : 9,
             skipIfOpen: !!b.skipIfOpen,
+            missedPolicy: rules.MISSED_POLICIES.includes(b.missedPolicy) ? b.missedPolicy : (b.skipIfOpen ? 'skip' : 'create'),
             until: b.until ? new Date(b.until) : undefined,
             runCount: 0,
             templateSnapshot: buildTemplateFromBody(b),
@@ -106,6 +108,7 @@ exports.updateDefinition = async (req, res) => {
         ['name', 'enabled', 'freq', 'interval', 'byweekday', 'monthday', 'runHour', 'skipIfOpen'].forEach((k) => {
             if (b[k] !== undefined) patch[k] = b[k];
         });
+        if (b.missedPolicy !== undefined && rules.MISSED_POLICIES.includes(b.missedPolicy)) patch.missedPolicy = b.missedPolicy;
         if (b.until !== undefined) patch.until = b.until ? new Date(b.until) : null;
 
         // If the schedule changed, recompute nextRunAt from the merged definition.

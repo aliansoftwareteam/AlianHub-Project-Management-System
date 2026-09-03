@@ -7,6 +7,8 @@ const R = require('./helpers/automationRules');
 const registry = require('./engine/registry');
 const matcher = require('./engine/matcher');
 const V2 = require('./helpers/ruleSchemaV2');
+const { escapeRegex } = require('../../utils/escapeRegex');
+const sentences = require('./helpers/sentenceRules');
 
 // AUTO-03 — automation rules. companyId-scoped. Apply is on-demand (a safe bulk
 // update of matching tasks); event-triggered execution is stored on the rule but
@@ -143,7 +145,7 @@ exports.getRegistry = async (req, res) => {
 
 const v2Summary = (r) => {
     const raw = r.toObject ? r.toObject() : r;
-    return { ...raw, summary: V2.describeV2(raw) };
+    return { ...raw, summary: V2.describeV2(raw), sentence: sentences.describeRule(raw) };
 };
 
 // GET /api/v2/automations
@@ -155,7 +157,21 @@ exports.listRulesV2 = async (req, res) => {
             type: SCHEMA_TYPE.AUTOMATION_RULES,
             data: [{ deletedStatusKey: { $ne: 1 }, version: 2 }, {}, { sort: { updatedAt: -1 } }],
         }, 'find');
-        return res.send({ status: true, data: (rows || []).map(v2Summary) });
+        // The list shows how often each rule actually fired; a rule with a run
+        // count is one the reader can trust without opening it.
+        const fired = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.AUTOMATION_RUNS,
+            data: [[{ $group: { _id: '$ruleId', runs: { $sum: 1 }, lastAt: { $max: '$startedAt' } } }]],
+        }, 'aggregate').catch(() => []);
+        const byRule = {};
+        (fired || []).forEach((f) => { byRule[String(f._id)] = f; });
+        return res.send({
+            status: true,
+            data: (rows || []).map((r) => {
+                const stats = byRule[String(r._id)] || {};
+                return { ...v2Summary(r), firedCount: Number(stats.runs || 0), lastFiredAt: stats.lastAt || null };
+            }),
+        });
     } catch (e) { logger.error(`listRulesV2: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
 
@@ -230,4 +246,95 @@ exports.listRuns = async (req, res) => {
         }, 'find');
         return res.send({ status: true, data: rows || [] });
     } catch (e) { logger.error(`listRuns: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
+};
+
+// POST /api/v2/automations/compile  body: { sentence?, rule?, name? }
+//
+// The sentence field on the builder (handoff 13d) and the compiled rule beside
+// it are the same object viewed twice, so one endpoint answers in both
+// directions: a sentence compiles to a rule and a rule renders back to the
+// sentence that produced it. Deterministic — no model call, so what the user
+// reads is what the engine will run.
+exports.compileSentence = async (req, res) => {
+    try {
+        const { sentence, rule, name } = req.body || {};
+        if (rule && !sentence) {
+            const check = V2.validateRuleV2({ name: name || 'Automation', ...rule });
+            return res.send({
+                status: true,
+                data: { sentence: sentences.describeRule(rule), rule, errors: check.errors, ambiguities: [], grammar: sentences.grammar() },
+            });
+        }
+        if (!String(sentence || '').trim()) return res.send({ status: false, statusText: 'A sentence is required.' });
+        const parsed = sentences.parseSentence(sentence, { name });
+        const check = parsed.rule ? V2.validateRuleV2(parsed.rule) : { valid: false, errors: [] };
+        return res.send({
+            status: true,
+            data: {
+                sentence: parsed.rule ? sentences.describeRule(parsed.rule) : String(sentence),
+                rule: parsed.rule,
+                errors: parsed.errors.concat(check.errors || []),
+                ambiguities: parsed.ambiguities,
+                grammar: sentences.grammar(),
+            },
+        });
+    } catch (e) { logger.error(`compileSentence: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
+};
+
+const WINDOW_DAYS = 30;
+
+/* Everything a condition tree can be checked against server-side without
+ * replaying the event log. Change operators are skipped deliberately: a
+ * "changed to" clause needs a before/after that no longer exists on the task, and
+ * counting it as matched would overstate the number. */
+const backtestMatch = (node) => {
+    if (!node || !node.op) return {};
+    if (node.op === 'and') return { $and: (node.args || []).map(backtestMatch).filter((m) => Object.keys(m).length) };
+    if (node.op === 'or') return { $or: (node.args || []).map(backtestMatch).filter((m) => Object.keys(m).length) };
+    const field = String(node.field || '').split('.').pop();
+    if (!field) return {};
+    switch (node.op) {
+        case 'eq': case 'changedTo': return { [field]: node.value };
+        case 'neq': return { [field]: { $ne: node.value } };
+        case 'in': return { [field]: { $in: [].concat(node.value) } };
+        case 'notIn': return { [field]: { $nin: [].concat(node.value) } };
+        case 'contains': return { [field]: { $regex: escapeRegex(String(node.value || '')), $options: 'i' } };
+        case 'empty': return { $or: [{ [field]: { $exists: false } }, { [field]: null }, { [field]: '' }, { [field]: [] }] };
+        case 'notEmpty': return { [field]: { $nin: [null, '', []] } };
+        default: return {};
+    }
+};
+
+// POST /api/v2/automations/backtest  body: { rule }
+//
+// "Test on last 30 days" (handoff 13d). It counts the tasks in the window that
+// this rule's conditions match today — it does not replay the event stream, and
+// says so in `basis`, because a number labelled "would fire" that is actually
+// something else is worse than no number.
+exports.backtest = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        const rule = (req.body && req.body.rule) || {};
+        const since = new Date(Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000);
+        const conditionMatch = backtestMatch(rule.conditions);
+        const match = { deletedStatusKey: { $ne: 1 }, updatedAt: { $gte: since } };
+        if (Object.keys(conditionMatch).length) Object.assign(match, conditionMatch);
+        if (rule.scope && rule.scope.allProjects === false && (rule.scope.projectIds || []).length) {
+            match.ProjectID = { $in: rule.scope.projectIds.map(String) };
+        }
+        const [count, sample] = await Promise.all([
+            MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [match] }, 'countDocuments').catch(() => 0),
+            MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [match, 'TaskName TaskKey', { limit: 5, sort: { updatedAt: -1 } }] }, 'find').catch(() => []),
+        ]);
+        return res.send({
+            status: true,
+            data: {
+                windowDays: WINDOW_DAYS,
+                matched: Number(count) || 0,
+                sample: (sample || []).map((t) => ({ id: String(t._id), key: t.TaskKey || '', name: t.TaskName || '' })),
+                basis: `tasks touched in the last ${WINDOW_DAYS} days whose current state matches these conditions`,
+            },
+        });
+    } catch (e) { logger.error(`backtest: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };

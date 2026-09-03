@@ -1,0 +1,50 @@
+@import "@/views/Ai/parity.css";
+
+.conn { background: var(--canvas); min-height: 100%; }
+.conn__body { flex: 1; min-height: 0; overflow: auto; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px; }
+.conn__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
+
+.conn__card { padding: 12px 14px; display: flex; flex-direction: column; gap: 7px; }
+.conn__top { display: flex; align-items: center; gap: 8px; }
+.conn__mark {
+    width: 26px; height: 26px; border-radius: 7px; flex: none;
+    display: grid; place-items: center;
+    font: 600 10px/1 var(--font-mono);
+    background: var(--surface-hover); color: var(--ink-label);
+}
+.conn__mark--dark { background: var(--rail); color: #fff; }
+.conn__mark--orange { background: #e2683c; color: #fff; }
+.conn__mark--purple { background: #4a154b; color: #fff; }
+.conn__mark--brand { background: var(--brand); color: #fff; }
+.conn__id { flex: 1; min-width: 0; }
+.conn__name { display: flex; align-items: center; gap: 7px; }
+.conn__name strong { font: 600 13px/1.2 var(--font-ui); }
+.conn__badge { height: 16px; padding: 0 5px; font-size: 9.5px; }
+.conn__sub { font: var(--text-small); color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conn__grants { margin: 0; font: var(--text-small); color: var(--ink-label); line-height: 1.45; }
+
+.conn__setup { display: flex; flex-direction: column; gap: 7px; padding-top: 8px; border-top: 1px solid var(--hairline); }
+.conn__code {
+    display: block; padding: 8px 10px;
+    background: var(--surface-2); border: 1px solid var(--hairline); border-radius: 8px;
+    font: 500 11px/1.5 var(--font-mono); color: var(--ink);
+    overflow-x: auto; white-space: pre; word-break: normal;
+}
+.conn__actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.conn__token { display: flex; flex-direction: column; gap: 6px; padding: 9px 10px; background: var(--warn-bg); border-radius: 8px; }
+.conn__token .ah-small { color: var(--warn-ink); }
+
+.conn__more {
+    border: 1.5px dashed var(--brand);
+    border-radius: var(--r-card);
+    padding: 12px 14px;
+    display: flex; flex-direction: column; justify-content: center; gap: 4px;
+}
+.conn__more-title { font: 600 13px/1.35 var(--font-ui); color: var(--brand); }
+.conn__more-sub { font: var(--text-small); color: var(--ink-2); line-height: 1.45; }
+
+.conn__never-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+@media (max-width: 900px) {
+    .conn__grid { grid-template-columns: 1fr; }
+}

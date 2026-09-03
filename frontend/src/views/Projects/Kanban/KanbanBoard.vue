@@ -1,15 +1,24 @@
 <template>
-    <div class="kanban-board style-scroll-6-px">
-        <div v-for="(column, columnIndex) in columns" :key="column.key" class="kanban-column" @drop.prevent="onDrop(columnIndex)">
+    <div class="kanban-board style-scroll-6-px ah-scroll">
+        <div
+            v-for="(column, columnIndex) in columns"
+            :key="column.key"
+            class="kanban-column"
+            :class="{ 'kanban-column--danger': isBlockedColumn(column) }"
+            @drop.prevent="onDrop(columnIndex)"
+        >
             <!-- Card Area -->
-            <div class="kanban-card-wrapper" :style="{ backgroundColor: groupValue === 0 ? column.textColor + '14' : '#f4f5f7' }">
-                <!-- Add Task Section --> 
-                <div class="d-flex justify-content-between align-items-center" :class="{ 'mb-10px': column.tasksArray?.length }">
-                    <span class="d-flex justify-content-between align-items-center">
-                        <span class="status-color-dot" :style="`background-color: ${column.textColor || '#000'}`"></span>
-                        <span class="column-title">{{ column.name }}</span>
-                        <span class="task-count" v-if="column.tasksArray?.length">{{ tasksCount(column) }}</span>
-                    </span>
+            <div class="kanban-card-wrapper">
+                <div class="column-head column-head-wrap">
+                    <span class="status-color-dot" :style="`background-color: ${column.textColor || '#000'}`"></span>
+                    <span class="column-title" :title="column.name">{{ column.name }}</span>
+                    <button type="button" class="task-count" :title="$t('ProjectsV2.wip_set')" @click.stop="wipFor = wipFor === column.key ? '' : column.key">{{ tasksCount(column) }}</button>
+                    <span class="column-head__spacer"></span>
+                    <span v-if="atWipLimit(column)" class="wip-chip">{{ $t('ProjectsV2.wip_chip', { n: tasksCount(column), limit: wipLimit(column) }) }}</span>
+                    <div v-if="wipFor === column.key" class="ah-pop wip-pop" @click.stop>
+                        <div class="ah-label">{{ $t('ProjectsV2.wip_limit') }}</div>
+                        <input class="ah-input" type="number" min="0" :value="wipLimit(column) || ''" :placeholder="$t('ProjectsV2.wip_none')" @change="setWipLimit(column, $event.target.value)">
+                    </div>
                     <img class="cursor-pointer add-task-icon" src="@/assets/images/svg/pluss.svg" alt="addTask" @click="showAddInput(column.key)">
                 </div>
                 <div class="add-task-section" v-if="activeColumnId === column.key" :id="column.key">
@@ -27,17 +36,28 @@
                     @scroll="checkScroll($event, column)"
                     :style="`max-height: ${columnMaxHeight(column.key)};`"
                     :disabled="isDisabled"
+                    :delay="clientWidth <= 767 ? 250 : 0"
+                    :delayOnTouchOnly="true"
                 >
                     <template #item="{ element }">
-                        <div class="kanban-card hover-bg-light-lavender" draggable="true" @dragstart="(e) => onManualDragStart(cardData, e)">
+                        <div
+                            class="kanban-card hover-bg-light-lavender"
+                            :class="{ 'is-agent-run': !!runFor(element._id) }"
+                            draggable="true"
+                            @dragstart="(e) => onManualDragStart(cardData, e)"
+                        >
                             <BoardViewDisplayCardComponent
                                 :data="element"
                                 :groupValue="groupValue"
                                 :isSubTask="false"
+                                :agentRun="runFor(element._id)"
+                                :agentProposal="proposalFor(element._id)"
                             />
                         </div>
                     </template>
                 </Draggable>
+
+                <div v-if="moreCount(column) > 0" class="more-count">+ {{ $t('ProjectsV2.more_count', { n: moreCount(column) }) }}</div>
             </div>
 
             <!-- Drop Area -->
@@ -47,7 +67,7 @@
 </template>
 
 <script setup>
-import { ref, defineProps, nextTick, inject, watch, onMounted, computed } from 'vue'
+import { ref, defineProps, nextTick, inject, watch, onMounted, onUnmounted, computed } from 'vue'
 import Draggable from 'vuedraggable'
 import { useStore } from "vuex";
 import Cookies from "js-cookie";
@@ -62,6 +82,7 @@ import * as env from '@/config/env';
 import { apiRequest } from "../../../services";
 import { useCustomComposable } from "@/composable";
 import { useTaskSelection } from "@/composable/useTaskSelection.js";
+import { useProjectAgents } from "@/views/Projects/Kanban/useProjectAgents";
 
 //Props
 const props = defineProps({
@@ -93,6 +114,11 @@ const { dispatch, commit } = useStore()
 const { updateTaskByGroup } = useUpdateTasks()
 const { checkPermission } = useCustomComposable();
 
+// The watch is shared with the project header, which owns its lifetime; the
+// board only makes sure it is running for the project on screen.
+const { start: startAgentWatch, runFor, proposalFor } = useProjectAgents();
+watch(() => projectData.value?._id, (id) => { if (id) startAgentWatch(id); }, { immediate: true });
+
 const selection = useTaskSelection();
 const { setActiveView, setActiveProject } = selection;
 setActiveView('kanban');
@@ -102,14 +128,15 @@ watch(() => projectData.value?._id, (newId) => {
 
 // Computed properties
 const isDisabled = computed(() => {
-    const shouldDisableOnWidth = clientWidth.value <= 768;
+    // 12e keeps drag on the phone; the 250ms touch delay above lets a swipe
+    // scroll the column instead of picking a card up.
     const shouldDisableOnPermission = (checkPermission('task.task_list', projectData.value?.isGlobalPermission) !== true || checkPermission('task.task_status', projectData.value?.isGlobalPermission) !== true);
     const shouldDisableOnArchive = (showArchiveVar.value !== false);
     // Disable drag when multi-select is active (>=2 selected). Multi-move
     // happens via the BulkActionBar's "Move" action — keeps the drag
     // behavior unambiguous for the user.
     const shouldDisableOnMultiSelect = selection.count.value >= 2;
-    const finalDisabled = shouldDisableOnWidth || shouldDisableOnPermission || shouldDisableOnArchive || shouldDisableOnMultiSelect;
+    const finalDisabled = shouldDisableOnPermission || shouldDisableOnArchive || shouldDisableOnMultiSelect;
     return finalDisabled;
 });
 
@@ -378,5 +405,53 @@ const tasksCount = (column) => {
         ? countFromTotal
         : column?.tasksArray?.length || 0;
 };
+
+// The column header counts every task in the status; the list itself is paged.
+const moreCount = (column) => Math.max(0, tasksCount(column) - (column?.tasksArray?.length || 0));
+
+const isBlockedColumn = (column) => /block/i.test(String(column?.name || ''));
+
+// WIP limits have no field on the status document yet, so they are the viewer's
+// own setting until one exists; `column.wipLimit` is read first so a future
+// per-status limit takes over without touching this component.
+const WIP_KEY = 'ah.wip';
+const wipFor = ref('');
+const wipLimits = ref({});
+
+const readWipLimits = () => {
+    try {
+        wipLimits.value = JSON.parse(localStorage.getItem(`${WIP_KEY}.${projectData.value?._id}`) || '{}');
+    } catch (error) {
+        wipLimits.value = {};
+    }
+};
+readWipLimits();
+watch(() => projectData.value?._id, readWipLimits);
+
+const wipLimit = (column) => Number(column?.wipLimit || wipLimits.value[column?.key] || 0);
+const atWipLimit = (column) => {
+    const limit = wipLimit(column);
+    return limit > 0 && tasksCount(column) >= limit;
+};
+const setWipLimit = (column, value) => {
+    const limit = Math.max(0, Number(value) || 0);
+    wipLimits.value = { ...wipLimits.value, [column.key]: limit };
+    localStorage.setItem(`${WIP_KEY}.${projectData.value?._id}`, JSON.stringify(wipLimits.value));
+    wipFor.value = '';
+};
+
+// "+ Task" in the project header (ProjectHeader) bumps this counter; the board
+// answers by opening the first column's create row.
+const addTaskRequest = inject('addTaskRequest', null);
+if (addTaskRequest) {
+    watch(addTaskRequest, () => {
+        const first = columns.value[0];
+        if (first) showAddInput(first.key);
+    });
+}
+
+const closeWipPop = () => { wipFor.value = ''; };
+document.addEventListener('click', closeWipPop);
+onUnmounted(() => document.removeEventListener('click', closeWipPop));
 </script>
 <style src="./new-style.css" scoped />

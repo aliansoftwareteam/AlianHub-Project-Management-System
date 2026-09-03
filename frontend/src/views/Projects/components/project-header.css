@@ -1,0 +1,205 @@
+/* Project header + views bar (handoff 10b). */
+
+.ph2 {
+    background: var(--surface);
+    border-bottom: 1px solid var(--hairline);
+    flex: none;
+}
+
+.ph2__bar {
+    min-height: var(--toolbar-h);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 20px;
+    font: var(--text-small);
+    color: var(--ink);
+}
+
+.ph2__back {
+    border: 0;
+    background: none;
+    color: var(--ink-2);
+    cursor: pointer;
+    padding: 4px;
+    line-height: 0;
+    transform: rotate(90deg);
+}
+
+.ph2__swatch {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    flex: none;
+}
+
+.ph2__crumb {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.ph2__project {
+    font: 600 14px/1.2 var(--font-ui);
+    letter-spacing: -.2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 240px;
+}
+
+.ph2__sep { color: var(--ink-3); }
+.ph2__sprint { white-space: nowrap; }
+
+.ph2__range {
+    font: var(--text-label);
+    letter-spacing: .06em;
+    color: var(--ink-3);
+    white-space: nowrap;
+}
+
+.ph2__star {
+    border: 0;
+    background: none;
+    padding: 3px;
+    line-height: 0;
+    cursor: pointer;
+    color: var(--ink-3);
+    border-radius: 5px;
+    flex: none;
+}
+.ph2__star:hover { color: var(--warn); }
+.ph2__star.is-on { color: var(--warn); }
+.ph2__star.is-on svg { fill: var(--warn); }
+
+.ph2__code {
+    font: var(--text-data);
+    color: var(--ink-3);
+    text-transform: uppercase;
+    padding-left: 10px;
+    border-left: 1px solid var(--hairline);
+    white-space: nowrap;
+}
+
+.ph2__views {
+    margin-left: 2px;
+    display: flex;
+    align-items: stretch;
+    gap: 2px;
+    min-width: 0;
+    overflow-x: auto;
+    height: var(--toolbar-h);
+}
+.ph2__views::-webkit-scrollbar { height: 0; }
+
+.ph2__tab {
+    border: 0;
+    background: none;
+    padding: 6px 10px;
+    font: var(--text-small);
+    color: var(--ink-2);
+    cursor: pointer;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    transition: color var(--t-state) var(--ease), border-color var(--t-state) var(--ease);
+}
+.ph2__tab:hover { color: var(--ink); }
+.ph2__tab.is-active { color: var(--ink); font-weight: 600; border-bottom-color: var(--brand); }
+.ph2__tab--add { color: var(--brand); }
+
+/* The existing ViewsList row, when Projects.vue passes it through the `views`
+   slot: strip its legacy chrome so it reads as the mock's underline tabs. */
+.ph2__views .wrapper { height: auto; border-radius: 0; }
+.ph2__views .wrapper.bg-light-gray { background: none; }
+.ph2__views .view-list {
+    border: 0 !important;
+    padding: 6px 10px;
+    height: auto !important;
+    border-bottom: 2px solid transparent;
+}
+.ph2__views .wrapper.bg-light-gray .view-list { border-bottom: 2px solid var(--brand) !important; }
+.ph2__views .wrapper.bg-light-gray .view-list .gray81 { color: var(--ink); font-weight: 600; }
+.ph2__views .view-list .gray81 { color: var(--ink-2); font-size: 12.5px; }
+
+.ph2__actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+}
+
+.ph2__ai {
+    border-color: rgba(47, 57, 144, .35);
+    color: var(--brand);
+    background: var(--surface);
+    font-weight: 600;
+}
+.ph2__ai:hover { background: var(--brand-tint); }
+
+.ph2__agents {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 10px;
+    background: var(--rail);
+    color: #fff;
+    border-radius: 8px;
+    font-size: 11.5px;
+    white-space: nowrap;
+}
+.ph2__agents-dot { width: 7px; height: 7px; border-radius: 50%; background: #3ad29f; }
+.ph2__agents-label { font-weight: 600; }
+.ph2__agents-meta { font: var(--text-data); color: rgba(255, 255, 255, .5); }
+
+@media (max-width: 1279px) {
+    .ph2__code { display: none; }
+}
+
+@media (max-width: 767px) {
+    .ph2__bar {
+        flex-wrap: wrap;
+        padding: 8px 14px;
+        row-gap: 6px;
+        min-height: 0;
+    }
+    .ph2__views {
+        order: 3;
+        width: 100%;
+        height: auto;
+        margin-left: 0;
+    }
+    .ph2__tab { min-height: 44px; }
+    .ph2__actions { margin-left: auto; }
+    .ph2__project { max-width: 46vw; }
+}
+
+/* Host-supplied title block (Projects.vue keeps its icon, inline rename and the
+   mobile view picker); the legacy classes inside are pulled onto the tokens. */
+.ph2__title-slot {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 2px;
+}
+.ph2__title-slot .list-view-header-title {
+    font: 600 14px/1.2 var(--font-ui);
+    letter-spacing: -.2px;
+    color: var(--ink);
+    max-width: 240px;
+}
+.ph2__title-slot .key-wapper .key-text {
+    font: var(--text-data);
+    color: var(--ink-3);
+    border-left: 1px solid var(--hairline);
+}
+.ph2__title-slot .inital-box {
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+    color: #fff;
+    font: 600 11px/1 var(--font-ui);
+    flex: none;
+}
+.ph2__title-slot .mark__project-favourite { width: 14px; height: 14px; }

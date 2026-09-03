@@ -8,196 +8,163 @@
             :message="$t('Upgrades.the_feature_not_available')"
         />
     </div>
-    <template v-else>
-    <button
-        v-if="!searchedTask && checkPermission('task.task_create',project?.isGlobalPermission) === true && checkPermission('task.task_list',project?.isGlobalPermission) == true && showArchiveVar === false && createTask == false "
-        class="outline-secondary-bg-gray mb-1 ml-20px bg-white"
-        @click.stop="createTask = !createTask">
-        + {{$t('Projects.new_task')}}
-        </button>
-        <div class="bg-white m0px-20px">
+    <div v-else class="w-100 ah-page tv2">
+        <ListBulkBar v-if="project" :project="project" />
+        <div class="tv2__bar">
+            <button
+                v-if="!searchedTask && canCreate && showArchiveVar === false && createTask === false"
+                type="button"
+                class="tv2__add"
+                @click.stop="createTask = true"
+            >+ {{ $t('Projects.new_task') }}</button>
+            <span class="tv2__note">{{ $t('ListV2.ai_fields_note') }}</span>
+        </div>
+        <div v-if="createTask" class="tv2__bar">
             <CreateTask
-                v-if="createTask"
                 :sprint="sprints[0]"
-                @cancel="createTask = false"
                 :assigneeOptions="project.AssigneeUserId"
                 :groupBy="grouped"
+                :considerWidth="false"
+                @cancel="createTask = false"
             />
         </div>
-    <div class="list_view-table-wrapper style-scroll" id="tableview_scroll">
-        <table class="table__view">
-            <thead class="w-100 table__userstatus-thead d-table"> 
-            <tr class="header">
-                <!-- Spacer header for the multi-select checkbox column added in TableViewRow -->
-                <th class="header-item table-row-select-header" aria-label="Select"></th>
-                <th class="header-item"><span class="dark-gray font-weight-500 font-size-12" >#</span></th>
-                <th class="header-item"><span class="dark-gray font-weight-500 font-size-12" > {{$t('ProjectDetails.type')}} <img class="ml-1 cursor-pointer" @click="sortByColumns(globalSortKey == `TaskTypeKey: ${1}` ? `TaskTypeKey: ${-1}` : `TaskTypeKey: ${1}`)" :style="[{rotate: globalSortKey === `TaskTypeKey: ${1}` ? '0deg' : '180deg'}]" :src="arrow" alt=""></span></th>
-                <th class="header-item"><span class="dark-gray font-weight-500 font-size-12" >{{$t('Projects.tasks')}}<img class="ml-1 cursor-pointer" @click="sortByColumns(globalSortKey == `TaskName: ${1}` ? `TaskName: ${-1}` : `TaskName: ${1}`)" :style="[{rotate: globalSortKey === `TaskName: ${1}` ? '0deg' : '180deg'}]" :src="arrow" alt=""></span></th>
-                <th class="header-item"><span class="dark-gray font-weight-500 font-size-12" >{{$t('Header.Chat')}}</span></th>
-                <th class="header-item"  v-if="checkPermission('task.task_status',project?.isGlobalPermission) !== null" ><span class="dark-gray font-weight-500 font-size-12" >{{$t('Projects.status')}}<img class="ml-1 cursor-pointer"  v-if="grouped !== 0" @click="sortByColumns(globalSortKey == `statusKey: ${1}` ? `statusKey: ${-1}` : `statusKey: ${1}`)" :style="[{rotate: globalSortKey === `statusKey: ${1}` ? '0deg' : '180deg'}]" :src="arrow" alt=""></span></th>
-                <th class="header-item" v-if="checkPermission('task.task_assignee',project?.isGlobalPermission) !== null"><span class="dark-gray font-weight-500 font-size-12" >{{$t('ProjectDetails.assignee')}}</span></th>
-                <th class="header-item" v-if="checkPermission('task.task_due_date',project?.isGlobalPermission) !== null"><span class="dark-gray font-weight-500 font-size-12" >{{$t('Projects.due_date')}}<img class="ml-1 cursor-pointer"  v-if="grouped !== 3"  @click="sortByColumns(globalSortKey == `DueDate:${1}` ? `DueDate:${-1}` : `DueDate:${1}`)" :style="[{rotate: globalSortKey === `DueDate:${1}` ? '0deg' : '180deg'}]" :src="arrow" alt=""></span></th>
-                <th class="header-item" v-if="checkPermission('task.task_priority',project?.isGlobalPermission) !== null && checkApps('Priority')"><span class="dark-gray font-weight-500 font-size-12" >{{$t('Projects.priority')}}<img class="ml-1 cursor-pointer" v-if="grouped !== 2" @click="sortByColumns(globalSortKey == `Task_Priority: ${1}` ? `Task_Priority: ${-1}` : `Task_Priority: ${1}`)" :style="[{rotate: globalSortKey === `Task_Priority: ${1}` ? '0deg' : '180deg'}]" :src="arrow" alt=""></span></th>
-                <th class="header-item"><span class="dark-gray font-weight-500 font-size-12" >{{$t('ProjectDetails.key')}}<img class="ml-1 cursor-pointer" @click="sortByColumns(globalSortKey == `TaskKey: ${1}` ? `TaskKey: ${-1}` : `TaskKey: ${1}`)" :style="[{rotate: globalSortKey === `TaskKey: ${1}` ? '0deg' : '180deg'}]" :src="arrow" alt=""></span></th>
-            </tr>
-            </thead>
-            <div class="d-content">
-                <div v-for="(item) in groupedTasks[0]?.items" class="style-scroll" :key="item?.key">
-                    <TableViewTable :data="item" :sprintId="sprints[0]?.id ? sprints[0]?.id : sprints[0]?._id"  :group="grouped" :globalSortKey="globalSortKey" :keys="`${item.key}`"/>  
+
+        <div class="tv2__scroll ah-scroll" id="tableview_scroll">
+            <div class="tv2__grid">
+                <div class="tv2__head">
+                    <span></span>
+                    <button type="button" class="tv2__sort" @click="sortByColumns(globalSortKey === `TaskName: ${1}` ? `TaskName: ${-1}` : `TaskName: ${1}`)">{{ $t('Projects.tasks') }}</button>
+                    <button type="button" class="tv2__sort" @click="sortByColumns(globalSortKey === `statusKey: ${1}` ? `statusKey: ${-1}` : `statusKey: ${1}`)">{{ $t('Projects.status') }}</button>
+                    <span>{{ $t('ListV2.col_owner') }}</span>
+                    <span class="tv2__head-ai">✦ {{ $t('ListV2.col_summary') }}</span>
+                    <span class="tv2__head-ai">✦ {{ $t('ListV2.col_risk') }}</span>
+                    <span class="tv2__head-ai">✦ {{ $t('ListV2.col_area') }}</span>
+                </div>
+
+                <TableViewTable
+                    v-for="item in groupItems"
+                    :key="item.key"
+                    :data="item"
+                    :sprintId="firstSprintId"
+                    :group="grouped"
+                    :globalSortKey="globalSortKey"
+                    :keys="`${item.key}`"
+                    @open="openRow"
+                />
+
+                <div class="d-flex align-items-center justify-content-center flex-column" v-if="!totalTaskInFirstSprint.length">
+                    <EmptyState
+                        v-if="project?.deletedStatusKey !== 2"
+                        :title="!project?.lastTaskId ? $t('EmptyState.no_tasks_title') : $t('EmptyState.no_match_title')"
+                        :message="!project?.lastTaskId ? $t('EmptyState.no_tasks_msg') : $t('EmptyState.no_match_msg')"
+                        helpPath="tasks"
+                    />
                 </div>
             </div>
-            <div class="d-flex align-items-center justify-content-center flex-column" v-if="totalTaskInFirstSprint.length === 0">
-                <EmptyState
-                    v-if="project?.deletedStatusKey !== 2"
-                    :title="!project?.lastTaskId ? $t('EmptyState.no_tasks_title') : $t('EmptyState.no_match_title')"
-                    :message="!project?.lastTaskId ? $t('EmptyState.no_tasks_msg') : $t('EmptyState.no_match_msg')"
-                    helpPath="tasks"
-                />
+
+            <div class="tv2__foot">
+                <span>{{ $t('ListV2.ai_source_hint') }}</span>
+                <span>{{ $t('ListV2.risk_formula') }}</span>
             </div>
-        </table>
+        </div>
     </div>
-    </template>
 </template>
+
 <script setup>
 // COMPONENTS
-import CreateTask from "@/components/atom/CreateTask/CreateTask.vue"
-import TableViewTable from './TableViewTable.vue'
+import CreateTask from "@/components/atom/CreateTask/CreateTask.vue";
+import TableViewTable from './TableViewTable.vue';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
+import ListBulkBar from '@/views/Projects/ListView/ListBulkBar.vue';
 
 // UTILS
-import { useCustomComposable  } from "@/composable";
+import { useCustomComposable } from "@/composable";
 import isEqual from 'lodash/isEqual';
 import { taskListHelper } from '@/views/Projects/helper.js';
+import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 
 // PACKAGES
-import {useStore} from 'vuex'
-import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
-import { ref,
-    inject,
-    onMounted,computed,watch
-} from "vue"
+import { useStore } from 'vuex';
+import { computed, inject, onMounted, ref, watch } from "vue";
 
-const {groupBy} = taskListHelper();
-const createTask = ref(false)
-const arrow = require('@/assets/images/svg/up-down-arrow.svg')
-const {getters}  = useStore()
-const {checkPermission, checkApps} = useCustomComposable();
-const emit = defineEmits(["openSeeAllProject"])
+defineOptions({ name: "ProjectTableView" });
+
+const { groupBy } = taskListHelper();
+const { getters } = useStore();
+const { checkPermission } = useCustomComposable();
+
 const props = defineProps({
-    grouped: {
-        type: Number,
-        default: 0
-    },
-    projectData:{
-        type : Object
-    },
-    commonDateFormatForDate: {
-        type: String,
-        default: "DD/MM/YYYY"
-    },
-    sprints: {
-        type: Array,
-        default: () => []
-    },
-    calendarDate: {
-        type: [String,Number],
-        default: ""
-    },
-    billingPeriod:{
-        type:String,
-        default:''
-    },
-    data:{
-        type:String,
-        default:''
-    },
-    userIds:{
-        type:Array,
-        default:() => []
-    },
-    startDate:{
-        type:Object,
-        default:() => {}
-    },
-    watchers:{
-        type:Object,
-        default:() => {}
-    },
-    checklistArray:{
-        type:Array,
-        default:() => []
-    },
-    isvisible:{
-        type:Boolean,
-        default:true
-    },
-    title:{
-        type:String,
-        default:''
-    },
-    class:{
-        type:String,
-        default:''
-    },
-    // calendarDateChange: {
-    //     type: Function,
-    //     default: () => false
-    // }
-})
-const project = inject('selectedProject')
+    grouped: { type: Number, default: 0 },
+    projectData: { type: Object, default: () => ({}) },
+    commonDateFormatForDate: { type: String, default: "DD/MM/YYYY" },
+    sprints: { type: Array, default: () => [] },
+    calendarDate: { type: [String, Number], default: "" },
+    billingPeriod: { type: String, default: '' },
+    data: { type: String, default: '' },
+    userIds: { type: Array, default: () => [] },
+    startDate: { type: Object, default: () => ({}) },
+    watchers: { type: Object, default: () => ({}) },
+    checklistArray: { type: Array, default: () => [] },
+    isvisible: { type: Boolean, default: true },
+    title: { type: String, default: '' },
+    class: { type: String, default: '' }
+});
+defineEmits(["openSeeAllProject"]);
+
+const project = inject('selectedProject');
+const companyId = inject('$companyId');
 const searchedTask = inject('searchedTask');
 const showArchiveVar = inject("showArchived");
-const globalSortKey = ref('')
+
+const createTask = ref(false);
+const globalSortKey = ref('');
 const groupedTasks = ref([]);
-// computed
-const taskData = computed(() => getters["projectData/tableTasks"])
-const currentCompany = computed(() => getters["settings/selectedCompany"])
-//watch
 
-watch([() => props.grouped, () => props.sprints,taskData], ([newGroup, newSprints], [oldGroup, oldSprints]) => {
-    if(project.value && Object.keys(project.value).length) {
-        groupBy(props.grouped, !isEqual(newGroup,oldGroup) || JSON.stringify(newSprints) !== JSON.stringify(oldSprints),project.value,props.sprints,groupedTasks,true,'table',null, true, (resp)=>{
-            groupedTasks.value = resp;
-        });
-    }
-    // globalSortKey.value = ''
-});
+const taskData = computed(() => getters["projectData/tableTasks"]);
+const currentCompany = computed(() => getters["settings/selectedCompany"]);
+const canCreate = computed(() => checkPermission('task.task_create', project.value?.isGlobalPermission) === true
+    && checkPermission('task.task_list', project.value?.isGlobalPermission) === true);
+
+const firstSprintId = computed(() => props.sprints[0]?.id || props.sprints[0]?._id || "");
+const groupItems = computed(() => groupedTasks.value[0]?.items || []);
+
 const totalTaskInFirstSprint = computed(() => {
-    if(getters['projectData/tableTasks'][props.projectData._id] && getters['projectData/tableTasks'][props.projectData._id][props.sprints[0]?.id]) {
-        let tmp = [];
-        tmp = JSON.parse(JSON.stringify(getters['projectData/tableTasks'][props.projectData._id][props.sprints[0]?.id])).tasks || [];
-        return tmp;
-    } else {
-        return [];
-    }
+    const sprintTasks = getters['projectData/tableTasks']?.[props.projectData?._id]?.[firstSprintId.value];
+    return sprintTasks?.tasks || [];
 });
-function openSeeAll(data) {
-    if(data === 'project'){
-        emit("openSeeAllProject" )
-    }
+
+function load(refetch) {
+    if (!project.value || !Object.keys(project.value).length) return;
+    groupBy(props.grouped, refetch, project.value, props.sprints, groupedTasks, true, 'table', null, true, (resp) => {
+        groupedTasks.value = resp;
+    });
 }
-openSeeAll('')
 
+watch([() => props.grouped, () => props.sprints, taskData], ([newGroup, newSprints], [oldGroup, oldSprints]) => {
+    load(!isEqual(newGroup, oldGroup) || JSON.stringify(newSprints) !== JSON.stringify(oldSprints));
+});
+
+/* Projects.vue mounts the legacy bottom bulk bar for every view; the redesigned
+   views carry their own, so the old one is hidden while they are on screen. */
 onMounted(() => {
-    if(project.value && Object.keys(project.value).length) {
-		if (!taskData.value || !Object.keys(taskData.value).length) {
-			groupBy(props.grouped,true,project.value,props.sprints,groupedTasks,true,'table',true, true, (resp)=>{
-                groupedTasks.value = resp;
-            });
-		} else {
-			groupBy(props.grouped,true,project.value,props.sprints,groupedTasks,true,'table',true, true, (resp)=>{
-                groupedTasks.value = resp;
-            });
-		}
-    }
-})
+    load(true);
+});
 
+function openRow(task) {
+    openTask({
+        companyId: companyId.value,
+        projectId: project.value?._id,
+        sprintId: task.sprintId,
+        folderId: task.folderObjId || '',
+        taskId: task._id
+    });
+}
 
 const sortByColumns = (sortKey = "") => {
-    globalSortKey.value = sortKey
-}
-
+    globalSortKey.value = sortKey;
+};
 </script>
-<style scoped>
-@import './style.css'
+<style>
+@import './style.css';
 </style>

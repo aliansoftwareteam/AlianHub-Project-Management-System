@@ -1,383 +1,154 @@
-
-.projectPeopleMain input#inputId{
-    min-height: 28px !important;
-    width: 506px !important;
-    max-width: 528px !important;
-    font-size: 16px;
-}
-.projectPeopleMain input::placeholder {
-    font-size: 16px!important;
-    text-transform: math-auto!important;
-}
-.projectPeopleMain .invireByEmail{
-    border-right: 0px!important;
-    border-top-right-radius: 0px !important;
-    border-bottom-right-radius: 0px !important;
-}
-.projectPeopleMain .dropdownMember{
-    border: 1px solid #E0E0E0;
-    margin-bottom: 0px;
-    line-height: 27.68px;
-    padding: 0px 27px ;
-    background-color: rgba(255, 255, 255, 1);
-    min-height: 30px;
-    min-width: fit-content;
-}
-.projectPeopleMain .blue_btn{
-    margin-left: 0px;
-    font-size: 16px;
-    background: #2f3990 !important;
-    padding: 5px 15px !important;
-    border-radius: 4px;
-    border: 0;
-    color: #fff;
-    border-top-left-radius: 0px;
-    border-bottom-left-radius: 0px;
-    height: auto;
-}
-.projectPeopleMain .roleName{
-    margin-left: 10px; 
-    max-width:250px
-}
-.projectPeopleMain .addNewRole{
-    color: rgb(47, 57, 144);
-}
-.projectPeopleMain form {
-    margin-bottom: 20px;
-}
-.projectPeopleMain .tab-option{
-    z-index: 1;
-    cursor: pointer;
-    margin-bottom: 0px;
-    padding: 10px;
-    border-radius: 5px 5px 0px 0px;
-}
-.projectPeopleMain .totalCount span {
-    font-size: 14px;
-    color: #000;
-    font-family: 'Roboto';
-    line-height: 20.72px;
-    display: block;
-}
-.projectPeopleMain .activeTab {
-    color: #2f3990 !important;
-    font-family: 'Roboto', sans-serif !important;
-    background: #FFFFFF;
-    font-weight: 700;
-}
-.projectPeopleMain .invalid-feedback{
-    top: 40px;
-    font-size: 12px;
-}
-.projectPeopleMain .totalCount.d-flex.justify-content-between.position-re {
-    border-bottom: 1px solid #CFCFCF;
-}
-.projectPeopleMain .currencies_wrapper {
-    top: 10px;
-    position: relative;
-    height: calc(100vh - 235px);
-   
-}
-.members-dropdown{
-    min-width: 303px;
-    margin-top: 5px;
-    width: 303px;
-}
-.member__rol-one {
-    width: 207px !important; 
-    min-width: 207px !important;
-    padding: 0 20px !important;
-}
-.members-dropdown-roll{
-    width:160px;
-    border: 0;
-    margin-top: 6px;
-    min-width: 160px;
-}
-.members-dropdown-load {
-    width: 120px !important;
-    min-width: 120px !important;
-    padding: 0 10px !important;
-}
-.members-dropdown .search-project-filter {
-    padding: 10px !important;
-    min-width: 160px !important;
-}
-
-.members-dropdown-roll .search-project-filter {
-    padding: 10px !important
-}
-.members-dropdown .search-box-member {
-    width: 100%;
-    padding: 10px 0px;
-    border-bottom: 1px solid #ececec;
-}
-.members-dropdown .search-box-member input.search_box{
-    height: 30px;
-    border: 1px solid #E0E0E0;
-    border-radius: 6px;
-    font-family: 'Roboto', sans-serif;
-    font-weight: 400;
-    color: #949DA8;
-    margin: 0px!important;
-    padding: 0px 0px 0px 10px;
-    width: 90%;
-    margin: 0 auto!important;
-    display: block;
-}
-.members-dropdown .no-data{
-    padding: 7px;
-    color: rgb(129, 129, 129);
+.mbv {
     display: flex;
-    justify-content: center;
-}
-.roleName span{
-    font-family: Roboto;
-    font-size: 14px;
-    font-weight: 400;
-    line-height: 16px;
-    letter-spacing: 0px;
-    text-align: left;
-    color: #535358;
-    display: inline-block;
-    max-width: 20%;
-
-}
-.roleName .edit{
-    display: none;
-}
-.members-dropdown .AddNow_designation{
-         margin: 0px !important;
-}
-.members-dropdown-roll .AddNow_roll{
-    margin: 0px !important;
-}
-.members-dropdown .main_roleName:hover .edit{
-    display: block;
-}
-.addNewRole{
-font-family: Roboto;
-font-size: 14px;
-font-weight: 500;
-line-height: 21px;
-letter-spacing: 0px;
-text-align: left;
-
-}
-.erp_app {
-    width: 12px;
-    height: 12px;
-}
-.update__wrapper{
-    right: 2px;
-    top: 3px;
-}
-.green__icon{
-    right: 8px; 
-    height: 10px; 
-    width: 15px;
-}
-.green__icon-img{
-    right: 4px;
-    height: 10px; 
-    width: 15px;
-}
-.close__icon{
-    height: 10px;
-    width: 10px;
-    right: -5px;
-}
-.green__close-wrapper{
-   right: 2px;
-   min-width: 45px;
-   top: 2px;
-}
-.progress-container {
-    width: 75px;
-    height: 75px;
-}
-.progress-circle {
-    width: 90%;
-    height: 90%;
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    position: relative;
-}
-.progress-circle::before {
-    content: "";
-    width: 85%;
-    height: 85%;
-    background-color: #fff;
-    border-radius: 50%;
-    position: absolute;
-}
-.progress-text {
-    position: absolute;
-    font-size: 1.3em;
-}
-.else__invite{
-    background: dimgray !important;
-}
-    @media (max-width: 1880px){
-        .projectPeopleMain input#inputId 
-        {
-            max-width: 528px;
-            width: 400px !important;
-        }
-    }
-    @media (max-width: 1566px){
-        .projectPeopleMain input#inputId {
-            width: 340px !important;
-        }
-    }
-    @media (max-width: 1500px){
-        .projectPeopleMain form {
-            flex-wrap: wrap;
-            flex-direction: column;
-            align-items: start;
-        }
-        .projectPeopleMain input#inputId {
-            width: 400px !important;
-            max-width: 400px !important;
-        }
-        .searchByEmail {
-            margin-bottom: 5px;
-        }
-    }
-@media (max-width: 1366px){
-    .setting-section-right:has(.member-management-settings) {
-        overflow: auto;
-    }
-    .manufacture_create_content.currencies_table {
-        padding: 0px;
-    }
-    .projectPeopleMain .dropdownMember {
-        width: auto;
-    }
-}
-@media (max-width: 1199px){
-.projectPeopleMain form {
-    flex-wrap: wrap;
     flex-direction: column;
-    align-items: start;
+    gap: 14px;
+    color: var(--ink);
+    font: var(--text-body);
 }
-.projectPeopleMain input#inputId {
-    width: 400px !important;
-    max-width: 400px !important;
+.mbv__seats { color: var(--ink-3); }
+
+.mbv__invite {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+    border: 1px solid rgba(47, 57, 144, .3);
+    border-radius: var(--r-card);
+    background: var(--brand-tint);
 }
-.searchByEmail {
-    margin-bottom: 5px;
+:root[data-theme="dark"] .mbv__invite { border-color: var(--brand); }
+.mbv__invite-row { display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap; }
+.mbv__chips {
+    flex: 1 1 260px;
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 5px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 9px;
+    background: var(--surface);
+    cursor: text;
 }
+.mbv__chips.is-error { border-color: var(--danger); }
+.mbv__chip-x {
+    border: 0;
+    background: transparent;
+    color: var(--ink-2);
+    cursor: pointer;
+    padding: 0;
+    font-size: 13px;
+    line-height: 1;
 }
-@media (max-width:1024px){
-    .projectPeopleMain {
-        padding: 21px 10px;
-    }
-    .manufacture_create_content.memebertableClass {
-        padding: 0px;
-        overflow: auto;
-    }
-    .form-mianDiv.d-flex.align-items-center {
-        width: auto;
-        border-radius: 6px;
-    }
-    .invite-blue-top {
-        margin-left: 2px ;
-    }
-    
+.mbv__chip-input {
+    flex: 1;
+    min-width: 140px;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: var(--ink);
+    font: 400 13px/1 var(--font-ui);
+    height: 30px;
+}
+.mbv__chip-input::placeholder { color: var(--ink-3); }
+.mbv__select { width: auto; min-width: 140px; height: 42px; }
+
+.mbv__meaning {
+    margin: 0;
+    font: var(--text-small);
+    color: var(--ink-2);
+}
+.mbv__meaning strong { font-weight: 600; color: var(--ink); }
+.mbv__link-wrap { margin-left: 4px; }
+.mbv__link {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    color: var(--brand);
+    font: 600 12.5px/1.4 var(--font-ui);
+    cursor: pointer;
+}
+.mbv__link:hover { text-decoration: underline; }
+.mbv__muted { color: var(--ink-2); }
+
+.mbv__bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.mbv__tab-n { margin-left: 6px; color: var(--ink-3); }
+.mbv__search {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 32px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-input);
+    background: var(--surface);
+    color: var(--ink-2);
+}
+.mbv__search-input {
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: var(--ink);
+    font: 400 12.5px/1 var(--font-ui);
+    width: 190px;
 }
 
-@media(max-width:991px){
-    .projectPeopleMain form{
-        display: block;
-        text-align: right;
-    }
-    .projectPeopleMain .invalid-feedback{
-        top: 35px;
-    }
-    .projectPeopleMain .searchByEmail{
-        margin-bottom: 0;
-    }
-    .projectPeopleMain .invireByEmail{
-        border-right: 1px solid #E0E0E0 !important;
-        border-radius: 6px;
-    }
-    .projectPeopleMain .form-mianDiv {
-        display: block;
-    }
-    .projectPeopleMain input#inputId {
-        width: 100% !important;
-        margin-bottom: 14px;
-        max-width: 100% !important;
-        box-sizing: border-box;
-    }
-    .projectPeopleMain .dropdownMember {
-        height: auto;
-        width: auto;
-        border-radius: 6px;
-        margin-bottom: 14px;
-        padding: 0px
+.mbv__table { overflow: visible; }
+.mbv__row {
+    display: grid;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--hairline);
+    font-size: 12.5px;
+    position: relative;
+}
+.mbv__row:last-child { border-bottom: 0; }
+.mbv__row--head { padding: 8px 14px; }
+.mbv__row.is-pending { color: var(--ink-2); }
 
-    }
-    .projectPeopleMain .dropdownMember .cursor-pointer{
-        padding: 3px 10px;
-    }
-    .member__rol-one, .members-dropdown-load  {
- 
-        padding: 0px !important;
-    }
-    .members-dropdown-roll{
-        width:160px;
-        border: 0;
-        margin-top: 6px;
-        min-width: 160px;
-    }
-    .invite-blue-top{
-        margin-top: 14px;
-    }
-    .member-management-settings .form-control {
-        padding: 1px 5px;
-    }
-    .member-management-settings .blue_btn {
-        margin-left: auto !important;
-    }
-    .projectPeopleMain .blue_btn{
-        border-top-left-radius: 4px;
-        border-bottom-left-radius: 4px;
-        margin-top: 0px;
-    }
-    .projectPeopleMain .invireByEmail{
-        border-top-right-radius: 6px !important;
-        border-bottom-right-radius: 6px !important;
-    }
-    .projectPeopleMain input#inputId{height: 35px!important;padding-left: 10px!important;}
-    .projectPeopleMain .searchByEmail{
-        width:100% !important;
-            margin-bottom: 5px;
-    }
-    .member__rol-one {
-        width: 100% !important; 
-        min-width: 100% !important;
-    }
-  
-    .members-dropdown-load {
-        width: 100% !important; 
-        min-width: 100% !important;
-    }
+.mbv__person { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.mbv__person-text { min-width: 0; }
+.mbv__name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mbv__mail { font-size: 11px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mbv__avatar-pending {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 1.5px dashed var(--ink-3);
+    flex: none;
 }
 
-@media(max-width:991px){
-    .setting-section-right:has(.member-management-settings) {
-        width: 100%;
-    }
+.mbv__role-select {
+    max-width: 100%;
+    height: 28px;
+    padding: 0 6px;
+    border: 1px solid transparent;
+    border-radius: var(--r-chip);
+    background: transparent;
+    color: var(--ink);
+    font: 400 12.5px/1 var(--font-ui);
+    cursor: pointer;
 }
+.mbv__role-select:hover { border-color: var(--border); background: var(--surface); }
+.mbv__role-select:focus { outline: none; border-color: var(--brand); box-shadow: var(--focus); }
 
-@media(max-width:767px){
-    .members-dropdown .search-box-member {width: 100%;padding: 0;border-bottom: 0;}
-    .members-dropdown .search-box-member input.search_box{width: 100%;}
-    .members-dropdown .search-project-filter ,.members-dropdown-roll .search-project-filter{padding: 20px !important; }
-    .members-dropdown .search-project-filter input.form-control , .members-dropdown-roll .search-project-filter input.form-control  {height: 39px !important;}
-    .members-dropdown .search-project-filter .drop-down-item, .members-dropdown-roll .drop-down-item{height: 50px;}
+.mbv__signin { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.mbv__seen { color: var(--ink-2); }
+
+.mbv__actions { position: relative; display: flex; justify-content: flex-end; }
+.mbv__dots { padding: 0 4px; height: 26px; }
+.mbv__pop { position: absolute; top: 26px; right: 0; z-index: 20; min-width: 168px; }
+.mbv__danger { color: var(--danger-ink); }
+
+.mbv__empty { margin: 14px; }
+
+@media (max-width: 900px) {
+    .mbv__row { grid-template-columns: 1fr auto !important; row-gap: 6px; }
+    .mbv__row--head { display: none; }
+    .mbv__signin, .mbv__seen { grid-column: 1 / -1; }
+    .mbv__search { margin-left: 0; width: 100%; }
+    .mbv__search-input { width: 100%; }
 }

@@ -1,6 +1,8 @@
 const { getSprintBurndown } = require('../Sprints/burndown');
 const velocity = require('./velocity');
 const cfd = require('./cfd');
+const sprintInsights = require('./sprintInsights');
+const milestones = require('./milestones');
 
 exports.init = (app) => {
     // Unified agile-reports read API (S4). Burndown reuses the existing Sprints
@@ -9,4 +11,6 @@ exports.init = (app) => {
     app.get('/api/v1/agile/burndown', getSprintBurndown);
     app.get('/api/v1/agile/velocity', velocity.getVelocity);
     app.get('/api/v1/agile/cfd', cfd.getCFD);
+    app.get('/api/v1/agile/sprint-insights', sprintInsights.getSprintInsights);
+    app.get('/api/v1/agile/milestones', milestones.getMilestones);
 };

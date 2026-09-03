@@ -14,8 +14,11 @@ import integrations from './integrations';
 import inbox from './inbox';
 import pages from './pages';
 import home from './home';
+import people from './people';
 import ai from './ai';
 import automations from './automations';
+import billing from './billing';
+import team from './team';
 
 import { useCustomComposable } from '@/composable'
 import dashboard from "../plugins/dashboard/router";
@@ -69,9 +72,16 @@ const routes = [
 	...inbox,
 	...pages,
 	...home,
+	...people,
+
+	// PROJECT BILLING (handoff 19a-19d)
+	...billing,
 
 	// AI AGENT SYSTEM
 	...ai,
+
+	// TEAM BOARD (handoff 13h)
+	...team,
 
 	// CHANGELOG / WHAT'S NEW ROUTE
 	{

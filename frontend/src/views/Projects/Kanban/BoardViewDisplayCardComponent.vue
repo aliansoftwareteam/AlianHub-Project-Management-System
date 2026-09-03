@@ -117,9 +117,23 @@
                         <CreateTagPopup :task="element" @send:tagChipArray="(val)=>tagChipArray = val" @send:ids="(val)=>ids = val" :project="projectData" :chipCount="chipCount" :isTaskList="false" />
                     </div>
                 </div>
+                <div v-if="agentRun" class="agent-strip">
+                    <span class="agent-strip__dot"></span>
+                    <span class="agent-strip__name">{{ agentRun.agentName }} · {{ runClock }}</span>
+                    <span v-if="agentRun.skill" class="agent-strip__meta">{{ agentRun.skill }}</span>
+                </div>
+                <div v-else-if="agentProposal" class="agent-proposal">
+                    <span class="agent-proposal__who">✦ {{ agentProposal.agentName }}:</span> {{ agentProposal.what }}
+                    <button type="button" class="agent-proposal__review" @click.stop="openAiInbox()">{{ $t('ProjectsV2.review') }}</button>
+                </div>
+                <div v-if="showCardMeta" class="card-meta">
+                    <span v-if="taskKey" class="card-key">{{ taskKey }}</span>
+                    <span v-if="isTiming" class="card-timer">● {{ timerClock }}</span>
+                </div>
                 <div class="d-flex justify-content-between mt-10px" :class="{'ml-5px': element.AssigneeUserId.length > 0}">
                     <!-- Assignee -->
-                    <div v-if="checkPermission('task.task_assignee',projectData?.isGlobalPermission) !== null && (groupValue !== 1 || isSubTask)">
+                    <div class="card-assignee" :class="{ 'card-assignee--agent': !!agentRun }" v-if="checkPermission('task.task_assignee',projectData?.isGlobalPermission) !== null && (groupValue !== 1 || isSubTask)">
+                        <span v-if="agentRun" class="card-assignee__agent" :title="agentRun.agentName" aria-hidden="true">◉</span>
                         <Assignee
                             v-if="checkPermission('task.task_assignee',projectData?.isGlobalPermission) === true && checkPermission('task.task_list',projectData?.isGlobalPermission) == true"
                             :users="element.AssigneeUserId"
@@ -173,7 +187,7 @@
                                     :priorityVal="element.Task_Priority"
                                     @select="updatePriority"
                                     :permission="!showArchiveVar && checkPermission('task.task_priority',projectData?.isGlobalPermission) === true"
-                                    :showName="false"
+                                    :showName="true"
                                 />
                             </div>
                         </span>
@@ -222,10 +236,10 @@
     </div>
 </template>
 <script setup>
-    import {ref,inject,computed,watch,onMounted} from "vue";
+    import {ref,inject,computed,watch,onMounted,onUnmounted} from "vue";
     import { useStore } from "vuex";
     import { useToast } from "vue-toast-notification";
-    import { useRoute } from "vue-router"
+    import { useRoute, useRouter } from "vue-router"
     import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
     import { useUpdateTasks } from "@/views/Projects/helper"
     import TagChip from '@/components/atom/TagChip/TagChip.vue'
@@ -243,13 +257,18 @@
     import ConvertToList from '@/components/molecules/ConvertToList/ConvertToList.vue';
     import DueDateCompo from '@/components/molecules/DueDateCompo/DueDateCompo.vue';
     import { useI18n } from "vue-i18n";
+    import { useTimer } from "@/components/molecules/Home/useTimer";
     const { t } = useI18n();
     const props = defineProps({
         data: Object,
         groupValue: Number,
         itemData: Object,
         isSubTask: Boolean,
-        parentAssignee: Array
+        parentAssignee: Array,
+        // 28b: the open run / pending proposal for THIS task, resolved once per
+        // board by KanbanBoard so every card does not poll on its own.
+        agentRun: { type: Object, default: null },
+        agentProposal: { type: Object, default: null }
     })
 
     const {checkPermission,checkApps} = useCustomComposable();
@@ -304,6 +323,39 @@
     const duplicateTaskSidebar = ref(false);
     const openSubTaskSideabr = ref(false)
     const dueDate = computed(() => element.value.DueDate)
+
+    const router = useRouter();
+    const { timer, elapsedMs, isTracking } = useTimer();
+    const now = ref(Date.now());
+    let runTicker = null;
+
+    const taskKey = computed(() => (element.value?.TaskKey && element.value.TaskKey !== '--' ? element.value.TaskKey : ''));
+    const isTiming = computed(() => Boolean(timer.active?.running) && isTracking(element.value?._id));
+    const showCardMeta = computed(() => Boolean(taskKey.value) || isTiming.value);
+
+    const clock = (ms) => {
+        const total = Math.floor(Math.max(0, ms) / 1000);
+        const h = Math.floor(total / 3600);
+        const m = Math.floor((total % 3600) / 60);
+        const sec = total % 60;
+        return h > 0
+            ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
+            : `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+    };
+
+    const timerClock = computed(() => clock(elapsedMs.value));
+    const runClock = computed(() => clock(now.value - new Date(props.agentRun?.startedAt || now.value).getTime()));
+
+    watch(() => props.agentRun, (run) => {
+        if (runTicker) { clearInterval(runTicker); runTicker = null; }
+        if (run) runTicker = setInterval(() => { now.value = Date.now(); }, 1000);
+    }, { immediate: true });
+
+    onUnmounted(() => { if (runTicker) clearInterval(runTicker); });
+
+    function openAiInbox() {
+        router.push({ name: 'AiInbox', params: { cid: companyId.value } }).catch(() => {});
+    }
 
     const myCounts = computed(() => {
         let total = 0;

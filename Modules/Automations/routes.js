@@ -5,6 +5,8 @@ exports.init = (app) => {
     // /api/v2/automations prefixes. /registry and /preview come before /:id so a
     // literal path is never swallowed by the param route.
     app.get('/api/v2/automations/registry', ctrl.getRegistry);
+    app.post('/api/v2/automations/compile', ctrl.compileSentence);
+    app.post('/api/v2/automations/backtest', ctrl.backtest);
     app.get('/api/v2/automations', ctrl.listRulesV2);
     app.post('/api/v2/automations', ctrl.createRuleV2);
     app.put('/api/v2/automations/:id', ctrl.updateRuleV2);

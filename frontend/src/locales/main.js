@@ -12,6 +12,12 @@ import fr from "./fr";
 import ja from "./ja";
 import ko from "./ko";
 import ptBr from "./ptBr";
+import ar from "./ar";
+import { bootLocaleDirection } from "@/views/Settings/Language/localePrefs";
+
+// Text direction has to be on <html> before the first paint, not after a page
+// mounts, or the shell renders left-to-right and then jumps.
+bootLocaleDirection();
 
 export const i18n = createI18n({
     legacy: false,
@@ -31,6 +37,7 @@ export const i18n = createI18n({
         fr,
         ja,
         ko,
-        ptBr
+        ptBr,
+        ar
     },
 });

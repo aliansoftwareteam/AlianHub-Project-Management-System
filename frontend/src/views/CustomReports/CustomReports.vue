@@ -1,337 +1,440 @@
 <template>
-    <div class="cr-wrap">
-        <div class="cr-topbar">
-            <router-link :to="{ name: 'Home', params: { cid: cid } }" class="cr-home" title="Home">
-                <img src="@/assets/images/svg/Home.svg" alt="Home" />
-            </router-link>
-            <h1 class="cr-title">{{ $t('Header.Custom_Report') }}</h1>
+    <div class="ah-page rp-page rp-page--flush">
+        <div class="rp-desktop-only rp-empty">
+            <strong>{{ $t('ReportsV2.desktop_only_title') }}</strong>
+            <span>{{ $t('ReportsV2.desktop_only_body') }}</span>
         </div>
 
-        <div class="cr-body">
-            <!-- Builder -->
-            <div class="cr-builder">
-                <div class="cr-field">
-                    <label>{{ $t('CustomReport.group_by') }}</label>
-                    <select v-model="cfg.dimension" class="form-control" @change="runPreview">
-                        <option value="status">{{ $t('CustomReport.d_status') }}</option>
-                        <option value="project">{{ $t('CustomReport.d_project') }}</option>
-                        <option value="sprint">{{ $t('CustomReport.d_sprint') }}</option>
-                    </select>
-                </div>
-                <div class="cr-field">
-                    <label>{{ $t('CustomReport.measure') }}</label>
-                    <select v-model="cfg.metric" class="form-control" @change="runPreview">
-                        <option value="count">{{ $t('CustomReport.m_count') }}</option>
-                        <option value="points">{{ $t('CustomReport.m_points') }}</option>
-                    </select>
-                </div>
-                <div class="cr-field">
-                    <label>{{ $t('CustomReport.chart') }}</label>
-                    <select v-model="cfg.chartType" class="form-control">
-                        <option value="bar">{{ $t('CustomReport.c_bar') }}</option>
-                        <option value="pie">{{ $t('CustomReport.c_pie') }}</option>
-                        <option value="table">{{ $t('CustomReport.c_table') }}</option>
-                    </select>
-                </div>
-                <div class="cr-field">
-                    <label>{{ $t('CustomReport.project') }}</label>
-                    <select v-model="cfg.filters.project" class="form-control" @change="runPreview">
-                        <option value="">{{ $t('CustomReport.all_projects') }}</option>
-                        <option v-for="p in projects" :key="p._id" :value="String(p._id)">{{ p.ProjectName || '(untitled)' }}</option>
-                    </select>
-                </div>
-                <div class="cr-save">
-                    <input v-model="reportName" class="form-control" :placeholder="$t('CustomReport.name_ph')" />
-                    <button class="cr-btn" :disabled="busy || !reportName.trim()" @click="save">{{ busy ? $t('CustomReport.saving') : $t('CustomReport.save') }}</button>
-                    <button class="cr-btn" :disabled="!result.length" @click="exportReport('csv')">{{ $t('CustomReport.export_csv') }}</button>
-                    <button class="cr-btn" :disabled="!result.length" @click="exportReport('xlsx')">{{ $t('CustomReport.export_excel') }}</button>
-                </div>
-            </div>
+        <div class="rp-split rp-builder">
+            <aside class="rp-side">
+                <div class="rp-card__head">{{ $t('ReportsV2.new_report') }}</div>
 
-            <!-- Preview -->
-            <div class="cr-preview">
-                <div v-if="!result.length" class="cr-empty">{{ $t('CustomReport.no_data') }}</div>
+                <div class="rp-side__group">
+                    <span class="rp-side__label">{{ $t('ReportsV2.source') }}</span>
+                    <select v-model="cfg.source" class="rp-select" style="max-width: none" @change="onSourceChange">
+                        <option value="tasks">{{ $t('ReportsV2.src_tasks') }}</option>
+                        <option value="timelogs">{{ $t('ReportsV2.src_timelogs') }}</option>
+                    </select>
+                </div>
 
-                <table v-else-if="cfg.chartType === 'table'" class="cr-table">
-                    <thead><tr><th>{{ dimLabel }}</th><th>{{ metricLabel }}</th></tr></thead>
-                    <tbody>
-                        <tr v-for="row in result" :key="row.label"><td>{{ row.label }}</td><td>{{ row.value }}</td></tr>
-                        <tr class="cr-total"><td>{{ $t('CustomReport.total') }}</td><td>{{ total }}</td></tr>
-                    </tbody>
-                </table>
-
-                <div v-else class="cr-bars">
-                    <div v-for="row in result" :key="row.label" class="cr-bar-row">
-                        <span class="cr-bar-label" :title="row.label">{{ row.label }}</span>
-                        <div class="cr-bar-track"><div class="cr-bar-fill" :style="{ width: pct(row.value) + '%' }"></div></div>
-                        <span class="cr-bar-val">{{ row.value }}<template v-if="cfg.chartType === 'pie'"> ({{ share(row.value) }}%)</template></span>
+                <div class="rp-side__group">
+                    <span class="rp-side__label">{{ $t('ReportsV2.filters') }}</span>
+                    <div v-for="f in activeFilters" :key="f.key" class="rp-filter">
+                        <span>{{ f.label }}</span>
+                        <button type="button" class="rp-filter__x" :aria-label="$t('ReportsV2.remove_filter')" @click="clearFilter(f.key)">×</button>
                     </div>
-                </div>
-            </div>
-
-            <!-- Saved reports -->
-            <div class="cr-saved">
-                <div v-if="templates.length" class="cr-tpl">
-                    <label>{{ $t('CustomReport.start_from_template') }}</label>
-                    <select v-model="tplPick" class="form-control" @change="applyTemplate">
-                        <option value="">{{ $t('CustomReport.choose_template') }}</option>
-                        <option v-for="t in templates" :key="t.key" :value="t.key">{{ t.name }}</option>
+                    <select v-model="filterDraft" class="rp-select" style="max-width: none" @change="addFilter">
+                        <option value="">{{ $t('ReportsV2.add_filter') }}</option>
+                        <option v-for="opt in filterOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                     </select>
                 </div>
-                <h3 class="m-0">{{ $t('CustomReport.saved_list') }}</h3>
-                <div v-if="!saved.length" class="cr-empty">{{ $t('CustomReport.none_saved') }}</div>
-                <div v-for="s in saved" :key="s._id" class="cr-saved-block">
-                    <div class="cr-saved-item">
-                        <button class="cr-saved-name" @click="loadSaved(s)">{{ s.name }}</button>
-                        <button class="cr-mini" @click="openShare(s)">{{ $t('CustomReport.share') }}</button>
-                        <button class="cr-mini" :title="$t('CustomReport.duplicate')" @click="duplicateSaved(s)">{{ $t('CustomReport.duplicate') }}</button>
-                        <button class="cr-mini del" @click="removeSaved(s)">{{ $t('CustomReport.delete') }}</button>
-                    </div>
-                    <div v-if="shareState.id === s._id" class="cr-share">
-                        <input class="form-control cr-share-url" :value="shareState.url" readonly @focus="$event.target.select()" :placeholder="$t('CustomReport.generating')" />
-                        <button class="cr-mini" :disabled="!shareState.url" @click="copyShareUrl">{{ $t('CustomReport.copy') }}</button>
-                        <button class="cr-mini del" @click="revokeReportShare">{{ $t('CustomReport.revoke') }}</button>
+
+                <div class="rp-side__group">
+                    <span class="rp-side__label">{{ $t('ReportsV2.group_by') }}</span>
+                    <div class="rp-seg">
+                        <button
+                            v-for="d in dimensions" :key="d.key" type="button"
+                            class="rp-seg__btn" :class="{ 'is-active': cfg.dimension === d.key }"
+                            @click="setDimension(d.key)"
+                        >{{ d.label }}</button>
                     </div>
                 </div>
 
-                <!-- Scheduled email deliveries (REP-08) -->
-                <div class="cr-sched">
-                    <h3 class="m-0">{{ $t('CustomReport.schedules') }}</h3>
-                    <div class="cr-sched-form">
-                        <select v-model="sched.savedReportId" class="form-control">
-                            <option value="">{{ $t('CustomReport.pick_report') }}</option>
-                            <option v-for="s in saved" :key="s._id" :value="String(s._id)">{{ s.name }}</option>
+                <div class="rp-side__group">
+                    <span class="rp-side__label">{{ $t('ReportsV2.measure') }}</span>
+                    <select v-model="cfg.metric" class="rp-select" style="max-width: none" @change="runPreview">
+                        <option v-for="m in metrics" :key="m.key" :value="m.key">{{ m.label }}</option>
+                    </select>
+                </div>
+
+                <div class="rp-side__group">
+                    <span class="rp-side__label">{{ $t('ReportsV2.chart') }}</span>
+                    <div class="rp-seg">
+                        <button
+                            v-for="c in CHARTS" :key="c" type="button"
+                            class="rp-seg__btn" :class="{ 'is-active': cfg.chartType === c }"
+                            @click="cfg.chartType = c"
+                        >{{ $t(`ReportsV2.chart_${c}`) }}</button>
+                    </div>
+                </div>
+
+                <div class="rp-side__group">
+                    <span class="rp-side__label">{{ $t('ReportsV2.saved') }}</span>
+                    <select v-model="savedPick" class="rp-select" style="max-width: none" @change="loadSaved">
+                        <option value="">{{ $t('ReportsV2.saved_pick') }}</option>
+                        <option v-for="s in saved" :key="s._id" :value="String(s._id)">{{ s.name }}</option>
+                    </select>
+                    <select v-model="tplPick" class="rp-select" style="max-width: none" @change="applyTemplate">
+                        <option value="">{{ $t('ReportsV2.template_pick') }}</option>
+                        <option v-for="tp in templates" :key="tp.key" :value="tp.key">{{ tp.name }}</option>
+                    </select>
+                </div>
+            </aside>
+
+            <main class="rp-split__main">
+                <div class="rp-head">
+                    <input v-model="reportName" class="rp-name" :placeholder="$t('ReportsV2.name_ph')" />
+                    <span class="rp-meta">{{ previewMeta }}</span>
+                    <ReportsTabs />
+                    <div class="rp-actions">
+                        <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="!currentSavedId" @click="showSchedule = !showSchedule">
+                            {{ $t('ReportsV2.schedule_email') }}
+                        </button>
+                        <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy || !reportName.trim()" @click="save">
+                            {{ busy ? $t('ReportsV2.saving') : $t('ReportsV2.save') }}
+                        </button>
+                    </div>
+                </div>
+
+                <p v-if="message" class="rp-note">{{ message }}</p>
+
+                <div v-if="showSchedule" class="rp-card">
+                    <div class="rp-card__head">{{ $t('ReportsV2.schedule_email') }}</div>
+                    <div class="rp-sched">
+                        <select v-model="sched.cadence" class="rp-select">
+                            <option value="daily">{{ $t('ReportsV2.daily') }}</option>
+                            <option value="weekly">{{ $t('ReportsV2.weekly') }}</option>
+                            <option value="monthly">{{ $t('ReportsV2.monthly') }}</option>
                         </select>
-                        <select v-model="sched.cadence" class="form-control">
-                            <option value="daily">{{ $t('CustomReport.daily') }}</option>
-                            <option value="weekly">{{ $t('CustomReport.weekly') }}</option>
-                            <option value="monthly">{{ $t('CustomReport.monthly') }}</option>
-                        </select>
-                        <input v-model="sched.recipients" class="form-control" :placeholder="$t('CustomReport.recipients_ph')" />
-                        <button class="cr-btn" :disabled="!sched.savedReportId || !sched.recipients.trim()" @click="createSchedule">{{ $t('CustomReport.schedule_it') }}</button>
+                        <input v-model="sched.recipients" class="ah-input" :class="{ 'ah-input--error': scheduleError }" :placeholder="$t('ReportsV2.recipients_ph')" />
+                        <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="!sched.recipients.trim()" @click="createSchedule">
+                            {{ $t('ReportsV2.schedule_it') }}
+                        </button>
                     </div>
-                    <div v-if="!schedules.length" class="cr-empty">{{ $t('CustomReport.no_schedules') }}</div>
-                    <div v-for="sc in schedules" :key="sc._id" class="cr-sched-item">
-                        <div class="cr-sched-meta">
-                            <span class="cr-sched-name" :title="sc.reportName">{{ sc.reportName }}</span>
-                            <span class="cr-sched-sub">{{ $t('CustomReport.' + sc.cadence) }} · {{ (sc.recipients || []).length }} {{ $t('CustomReport.recipients_short') }}</span>
+                    <span v-if="scheduleError" class="ah-field__error">{{ scheduleError }}</span>
+                    <div v-for="sc in schedules" :key="sc._id" class="rp-row">
+                        <span class="rp-row__name">{{ sc.reportName || reportName }}</span>
+                        <span class="rp-row__data">{{ $t(`ReportsV2.${sc.cadence}`) }} · {{ (sc.recipients || []).length }}</span>
+                        <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="removeSchedule(sc)">{{ $t('ReportsV2.remove') }}</button>
+                    </div>
+                </div>
+
+                <div class="rp-card rp-preview">
+                    <div v-if="rows.length" class="rp-totals">
+                        <div>
+                            <span class="rp-stat__label">{{ $t('ReportsV2.total') }}</span>
+                            <span class="rp-stat__value">{{ formatValue(total) }}</span>
                         </div>
-                        <button class="cr-mini" @click="runScheduleNow(sc)">{{ $t('CustomReport.send_now') }}</button>
-                        <button class="cr-mini del" @click="removeSchedule(sc)">{{ $t('CustomReport.delete') }}</button>
+                        <div>
+                            <span class="rp-stat__label">{{ $t('ReportsV2.groups') }}</span>
+                            <span class="rp-stat__value">{{ rows.length }}</span>
+                        </div>
+                        <div>
+                            <span class="rp-stat__label">{{ $t('ReportsV2.largest') }}</span>
+                            <span class="rp-stat__value">{{ formatValue(rows[0].value) }}</span>
+                        </div>
+                    </div>
+
+                    <div v-if="!rows.length" class="rp-empty">
+                        <strong>{{ $t('ReportsV2.no_data_title') }}</strong>
+                        <span>{{ $t('ReportsV2.no_data_body') }}</span>
+                    </div>
+
+                    <div v-else-if="cfg.chartType === 'table'" class="rp-table">
+                        <div class="rp-thead rp-thead--2">
+                            <span>{{ dimensionLabel }}</span>
+                            <span>{{ metricLabel }}</span>
+                        </div>
+                        <button v-for="row in rows" :key="row.key" type="button" class="rp-tr rp-tr--2" @click="drill(row)">
+                            <span class="rp-tr__name">{{ row.label }}</span>
+                            <span class="rp-num">{{ formatValue(row.value) }}</span>
+                        </button>
+                    </div>
+
+                    <ApexChart
+                        v-else
+                        :key="cfg.chartType"
+                        :type="cfg.chartType"
+                        height="300"
+                        :options="chartOptions"
+                        :series="chartSeries"
+                    />
+
+                    <div class="rp-preview__foot">
+                        <span>{{ drillHint }}</span>
+                        <span class="ah-small">{{ $t('ReportsV2.preview_source', { source: sourceLabel }) }}</span>
                     </div>
                 </div>
-            </div>
+            </main>
         </div>
     </div>
 </template>
 
-<script>
-export default { name: 'CustomReportBuilder' };
-</script>
-
 <script setup>
-import { ref, reactive, computed, onMounted, inject } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
-import { downloadExport } from '@/composable/exportDownload';
+import ReportsTabs from '@/views/Projects/Reports/ReportsTabs.vue';
 
-// REP-02 — custom report builder. Pick a dimension + metric + project filter +
-// chart type, preview live, save, and reload a saved report. The backend
-// resolves the config via a whitelisted query engine (no arbitrary fields).
-const companyIdRef = inject('$companyId');
-const cid = computed(() => (companyIdRef && companyIdRef.value) || companyIdRef || '');
+defineOptions({ name: 'CustomReportBuilder' });
 
-const cfg = reactive({ dimension: 'status', metric: 'count', chartType: 'bar', filters: { project: '' } });
+const { t } = useI18n();
+
+const CHARTS = ['table', 'bar', 'line', 'pie'];
+const DIMENSIONS = {
+    tasks: ['status', 'project', 'sprint'],
+    timelogs: ['project', 'person', 'month'],
+};
+const METRICS = {
+    tasks: ['count', 'points'],
+    timelogs: ['hours', 'entries', 'revenue'],
+};
+const RANGES = ['1m', '3m', '6m', '12m'];
+
+const cfg = reactive({ source: 'tasks', dimension: 'status', metric: 'count', chartType: 'bar', filters: {} });
 const reportName = ref('');
+const rows = ref([]);
+const unit = ref('count');
 const projects = ref([]);
-const result = ref([]);
 const saved = ref([]);
+const savedPick = ref('');
 const templates = ref([]);
 const tplPick = ref('');
 const schedules = ref([]);
-const sched = reactive({ savedReportId: '', cadence: 'weekly', recipients: '' });
-const shareState = reactive({ id: '', shareId: '', url: '' });
+const sched = reactive({ cadence: 'weekly', recipients: '' });
+const showSchedule = ref(false);
+const scheduleError = ref('');
+const message = ref('');
 const busy = ref(false);
+const currentSavedId = ref('');
 
-const DIM_LABELS = { status: 'Status', project: 'Project', sprint: 'Sprint' };
-const METRIC_LABELS = { count: 'Task count', points: 'Story points' };
-const dimLabel = computed(() => DIM_LABELS[cfg.dimension] || cfg.dimension);
-const metricLabel = computed(() => METRIC_LABELS[cfg.metric] || cfg.metric);
-const total = computed(() => result.value.reduce((a, r) => a + (r.value || 0), 0));
-const maxVal = computed(() => result.value.reduce((m, r) => Math.max(m, r.value || 0), 0) || 1);
-const pct = (v) => Math.round(((v || 0) / maxVal.value) * 100);
-const share = (v) => (total.value ? Math.round(((v || 0) / total.value) * 100) : 0);
+const projectLabel = (id) => {
+    const found = projects.value.find((p) => String(p._id) === String(id));
+    return found ? (found.ProjectName || '') : String(id);
+};
+
+const dimensions = computed(() => DIMENSIONS[cfg.source].map((key) => ({ key, label: t(`ReportsV2.dim_${key}`) })));
+const metrics = computed(() => METRICS[cfg.source].map((key) => ({ key, label: t(`ReportsV2.metric_${key}`) })));
+const dimensionLabel = computed(() => t(`ReportsV2.dim_${cfg.dimension}`));
+const metricLabel = computed(() => t(`ReportsV2.metric_${cfg.metric}`));
+const sourceLabel = computed(() => t(`ReportsV2.src_${cfg.source}`));
+
+const filterOptions = computed(() => {
+    const options = projects.value.map((p) => ({ value: `project:${p._id}`, label: `${t('ReportsV2.dim_project')} = ${p.ProjectName || ''}` }));
+    if (cfg.source === 'timelogs') {
+        RANGES.forEach((r) => options.push({ value: `range:${r}`, label: `${t('ReportsV2.f_date')} = ${t(`ReportsV2.range_${r}`)}` }));
+        options.push({ value: 'billable:yes', label: `${t('ReportsV2.f_billable')} = ${t('ReportsV2.yes')}` });
+        options.push({ value: 'billable:no', label: `${t('ReportsV2.f_billable')} = ${t('ReportsV2.no')}` });
+    }
+    return options;
+});
+
+const activeFilters = computed(() => Object.keys(cfg.filters).map((key) => {
+    const value = cfg.filters[key];
+    if (key === 'project') return { key, label: `${t('ReportsV2.dim_project')} = ${projectLabel(value)}` };
+    if (key === 'range') return { key, label: `${t('ReportsV2.f_date')} = ${t(`ReportsV2.range_${value}`)}` };
+    if (key === 'billable') return { key, label: `${t('ReportsV2.f_billable')} = ${t(value === 'yes' ? 'ReportsV2.yes' : 'ReportsV2.no')}` };
+    return { key, label: `${key} = ${value}` };
+}));
+
+const filterDraft = ref('');
+const addFilter = () => {
+    const raw = filterDraft.value;
+    filterDraft.value = '';
+    if (!raw) return;
+    const at = raw.indexOf(':');
+    cfg.filters[raw.slice(0, at)] = raw.slice(at + 1);
+    runPreview();
+};
+const clearFilter = (key) => { delete cfg.filters[key]; runPreview(); };
+
+const total = computed(() => rows.value.reduce((a, r) => a + (r.value || 0), 0));
+const formatValue = (value) => {
+    const n = Number(value) || 0;
+    if (unit.value === 'currency') return `${Math.round(n).toLocaleString()}`;
+    if (unit.value === 'hours') return `${Math.round(n * 10) / 10}h`;
+    return `${Math.round(n * 10) / 10}`;
+};
+
+const previewMeta = computed(() => {
+    if (!rows.value.length) return '';
+    return t('ReportsV2.preview_meta', { groups: rows.value.length, metric: metricLabel.value }).toUpperCase();
+});
+
+const drillHint = computed(() => (cfg.dimension === 'project'
+    ? t('ReportsV2.drill_hint')
+    : t('ReportsV2.drill_hint_none')));
+
+const chartSeries = computed(() => (cfg.chartType === 'pie'
+    ? rows.value.map((r) => Math.round((r.value || 0) * 100) / 100)
+    : [{ name: metricLabel.value, data: rows.value.map((r) => Math.round((r.value || 0) * 100) / 100) }]));
+
+const chartOptions = computed(() => ({
+    chart: {
+        id: 'custom-report',
+        toolbar: { show: false },
+        animations: { enabled: false },
+        fontFamily: 'Inter Tight, sans-serif',
+        events: { dataPointSelection: (event, ctx, opts) => drill(rows.value[opts.dataPointIndex]) },
+    },
+    colors: ['#2F3990', '#2f9e7e', '#d98324', '#6b5ce7', '#c1121f', '#9aa0b4'],
+    labels: rows.value.map((r) => r.label),
+    dataLabels: { enabled: cfg.chartType === 'pie' },
+    plotOptions: { bar: { columnWidth: '52%', borderRadius: 4 } },
+    stroke: { width: cfg.chartType === 'line' ? 3 : 0, curve: 'straight' },
+    legend: { position: 'bottom', fontSize: '11px' },
+    grid: { borderColor: 'rgba(0,0,0,.07)' },
+    xaxis: { categories: rows.value.map((r) => r.label), labels: { style: { fontSize: '11px' }, hideOverlappingLabels: true } },
+    yaxis: { labels: { style: { fontSize: '10px' } } },
+}));
 
 const payload = () => ({
-    source: 'tasks', dimension: cfg.dimension, metric: cfg.metric, chartType: cfg.chartType,
-    filters: cfg.filters.project ? { project: cfg.filters.project } : {},
+    source: cfg.source,
+    dimension: cfg.dimension,
+    metric: cfg.metric,
+    chartType: cfg.chartType,
+    filters: { ...cfg.filters },
 });
 
 const runPreview = async () => {
     try {
         const body = (await apiRequest('post', `${env.CUSTOM_REPORT}/run`, payload()))?.data;
-        result.value = (body && body.data && body.data.result) || [];
-    } catch (e) { result.value = []; }
+        rows.value = (body && body.data && body.data.result) || [];
+        unit.value = (body && body.data && body.data.unit) || 'count';
+    } catch (e) { rows.value = []; }
 };
+
+const setDimension = (key) => { cfg.dimension = key; runPreview(); };
+
+const onSourceChange = () => {
+    cfg.dimension = DIMENSIONS[cfg.source][0];
+    cfg.metric = METRICS[cfg.source][0];
+    cfg.filters = {};
+    runPreview();
+};
+
+// Clicking a group narrows to it and regroups one level finer, so the number on
+// screen leads to the rows behind it.
+const drill = (row) => {
+    if (!row || cfg.dimension !== 'project' || !row.key) return;
+    cfg.filters.project = row.key;
+    cfg.dimension = cfg.source === 'timelogs' ? 'person' : 'status';
+    runPreview();
+};
+
 const loadProjects = async () => {
     try {
         const body = (await apiRequest('get', env.PROJECT))?.data;
         const list = Array.isArray(body) ? body : (body && body.data) || [];
-        // Active projects only — hide closed / deleted / archived from the picker.
         projects.value = list.filter((p) => p && p.status !== 'close' && p.deletedStatusKey !== 1 && p.deletedStatusKey !== 2);
     } catch (e) { projects.value = []; }
 };
-const loadSaved = async (s) => {
-    try {
-        const body = (await apiRequest('get', `${env.CUSTOM_REPORT}/${s._id}/run`))?.data;
-        if (body && body.status) {
-            const c = body.data.config || {};
-            cfg.dimension = c.dimension || 'status';
-            cfg.metric = c.metric || 'count';
-            cfg.chartType = c.chartType || 'bar';
-            cfg.filters.project = (c.filters && c.filters.project) || '';
-            reportName.value = body.data.report ? body.data.report.name : '';
-            result.value = body.data.result || [];
-        }
-    } catch (e) { /* surfaced via empty preview */ }
-};
+
 const listSaved = async () => {
     try {
         const body = (await apiRequest('get', env.CUSTOM_REPORT))?.data;
         saved.value = (body && body.data) || [];
     } catch (e) { saved.value = []; }
 };
-const save = async () => {
-    if (busy.value || !reportName.value.trim()) return;
-    busy.value = true;
+
+const loadSaved = async () => {
+    const id = savedPick.value;
+    if (!id) return;
     try {
-        await apiRequest('post', env.CUSTOM_REPORT, { name: reportName.value.trim(), ...payload() });
-        await listSaved();
-    } catch (e) { /* surfaced via reload */ } finally { busy.value = false; }
+        const body = (await apiRequest('get', `${env.CUSTOM_REPORT}/${id}/run`))?.data;
+        if (!body || !body.status) return;
+        const c = body.data.config || {};
+        cfg.source = c.source || 'tasks';
+        cfg.dimension = c.dimension || DIMENSIONS[cfg.source][0];
+        cfg.metric = c.metric || METRICS[cfg.source][0];
+        cfg.chartType = c.chartType || 'bar';
+        cfg.filters = { ...(c.filters || {}) };
+        reportName.value = body.data.report ? body.data.report.name : '';
+        currentSavedId.value = String(id);
+        rows.value = body.data.result || [];
+        unit.value = body.data.unit || 'count';
+    } catch (e) { message.value = t('ReportsV2.load_failed'); }
 };
-const removeSaved = async (s) => {
-    try { await apiRequest('delete', `${env.CUSTOM_REPORT}/${s._id}`); await listSaved(); } catch (e) { /* noop */ }
-};
-// REP-07 — built-in reusable templates.
+
 const loadTemplates = async () => {
     try {
         const body = (await apiRequest('get', env.CUSTOM_REPORT_TEMPLATES))?.data;
         templates.value = (body && body.data) || [];
     } catch (e) { templates.value = []; }
 };
+
 const applyTemplate = () => {
-    const t = templates.value.find((x) => x.key === tplPick.value);
+    const tpl = templates.value.find((x) => x.key === tplPick.value);
     tplPick.value = '';
-    if (!t) return;
-    const c = t.config || {};
-    cfg.dimension = c.dimension || 'status';
-    cfg.metric = c.metric || 'count';
+    if (!tpl) return;
+    const c = tpl.config || {};
+    cfg.source = c.source || 'tasks';
+    cfg.dimension = c.dimension || DIMENSIONS[cfg.source][0];
+    cfg.metric = c.metric || METRICS[cfg.source][0];
     cfg.chartType = c.chartType || 'bar';
-    cfg.filters.project = (c.filters && c.filters.project) || '';
-    reportName.value = t.name;
+    cfg.filters = { ...(c.filters || {}) };
+    reportName.value = tpl.name;
+    currentSavedId.value = '';
     runPreview();
 };
-const duplicateSaved = async (s) => {
-    try { await apiRequest('post', `${env.CUSTOM_REPORT}/${s._id}/duplicate`, {}); await listSaved(); } catch (e) { /* noop */ }
+
+const save = async () => {
+    if (busy.value || !reportName.value.trim()) return;
+    busy.value = true;
+    message.value = '';
+    try {
+        const body = currentSavedId.value
+            ? (await apiRequest('put', `${env.CUSTOM_REPORT}/${currentSavedId.value}`, { name: reportName.value.trim(), ...payload() }))?.data
+            : (await apiRequest('post', env.CUSTOM_REPORT, { name: reportName.value.trim(), ...payload() }))?.data;
+        if (body && body.status && body.data && body.data._id) currentSavedId.value = String(body.data._id);
+        message.value = t('ReportsV2.saved_ok');
+        await listSaved();
+    } catch (e) {
+        message.value = t('ReportsV2.save_failed');
+    } finally { busy.value = false; }
 };
-// REP-08 — scheduled email deliveries of a saved report.
+
 const loadSchedules = async () => {
     try {
         const body = (await apiRequest('get', env.REPORT_SCHEDULES))?.data;
         schedules.value = (body && body.data) || [];
     } catch (e) { schedules.value = []; }
 };
+
 const createSchedule = async () => {
-    if (!sched.savedReportId || !sched.recipients.trim()) return;
+    scheduleError.value = '';
+    if (!currentSavedId.value) { scheduleError.value = t('ReportsV2.save_first'); return; }
     try {
-        await apiRequest('post', env.REPORT_SCHEDULES, { savedReportId: sched.savedReportId, cadence: sched.cadence, recipients: sched.recipients });
-        sched.savedReportId = ''; sched.recipients = ''; sched.cadence = 'weekly';
+        const body = (await apiRequest('post', env.REPORT_SCHEDULES, {
+            savedReportId: currentSavedId.value,
+            cadence: sched.cadence,
+            recipients: sched.recipients,
+        }))?.data;
+        if (body && body.status === false) { scheduleError.value = body.statusText || t('ReportsV2.save_failed'); return; }
+        sched.recipients = '';
         await loadSchedules();
-    } catch (e) { /* surfaced via reload */ }
-};
-const runScheduleNow = async (sc) => {
-    try { await apiRequest('post', `${env.REPORT_SCHEDULES}/${sc._id}/run-now`, {}); } catch (e) { /* noop */ }
-};
-const removeSchedule = async (sc) => {
-    try { await apiRequest('delete', `${env.REPORT_SCHEDULES}/${sc._id}`); await loadSchedules(); } catch (e) { /* noop */ }
-};
-// REP-09 — public read-only share link for a saved report (reuses /api/v2/public-shares).
-const openShare = async (s) => {
-    if (shareState.id === s._id) { shareState.id = ''; return; }
-    shareState.id = s._id; shareState.shareId = ''; shareState.url = '';
-    try {
-        const ex = (await apiRequest('get', `/api/v2/public-shares?entityId=${s._id}`))?.data;
-        if (ex && ex.status && ex.data && ex.data.token) {
-            shareState.shareId = ex.data._id; shareState.url = `${window.location.origin}/share/${ex.data.token}`; return;
-        }
-        const cr = (await apiRequest('post', '/api/v2/public-shares', { entityType: 'report', entityId: s._id }))?.data;
-        if (cr && cr.status && cr.data && cr.data.token) {
-            shareState.shareId = cr.data._id; shareState.url = `${window.location.origin}/share/${cr.data.token}`;
-        }
-    } catch (e) { /* surfaced via empty url */ }
-};
-const copyShareUrl = () => { if (shareState.url) navigator.clipboard.writeText(shareState.url); };
-const revokeReportShare = async () => {
-    if (shareState.shareId) { try { await apiRequest('delete', `/api/v2/public-shares/${shareState.shareId}`); } catch (e) { /* noop */ } }
-    shareState.id = ''; shareState.shareId = ''; shareState.url = '';
-};
-const exportReport = (format) => {
-    if (!result.value.length) return;
-    downloadExport(format, {
-        filename: 'custom-report',
-        sheetName: 'Custom Report',
-        tableHead: [dimLabel.value, metricLabel.value],
-        tableRows: result.value.map((r) => [r.label, r.value]),
-        totalRow: ['Total', total.value],
-    });
+    } catch (e) { scheduleError.value = t('ReportsV2.save_failed'); }
 };
 
-onMounted(() => { loadProjects(); listSaved(); loadTemplates(); loadSchedules(); runPreview(); });
+const removeSchedule = async (sc) => {
+    try { await apiRequest('delete', `${env.REPORT_SCHEDULES}/${sc._id}`); await loadSchedules(); } catch (e) { /* reload shows the truth */ }
+};
+
+onMounted(() => {
+    loadProjects();
+    listSaved();
+    loadTemplates();
+    loadSchedules();
+    runPreview();
+});
 </script>
 
-<style scoped>
-.cr-wrap { display: flex; flex-direction: column; height: calc(100dvh - 46px); }
-.cr-topbar { display: flex; align-items: center; gap: 14px; padding: 12px 20px; border-bottom: 1px solid #e6e7ee; }
-.cr-home img { width: 20px; height: 20px; }
-.cr-title { font-size: 18px; margin: 0; }
-.cr-body { flex: 1; overflow-y: auto; padding: 18px 22px; display: grid; grid-template-columns: 1fr 280px; grid-template-areas: "builder saved" "preview saved"; gap: 18px; align-content: start; }
-@media (max-width: 860px) { .cr-body { grid-template-columns: 1fr; grid-template-areas: "builder" "preview" "saved"; } }
-.cr-builder { grid-area: builder; display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; background: #f7f8fc; border: 1px solid #e6e7ee; border-radius: 10px; padding: 14px 16px; }
-.cr-field { display: flex; flex-direction: column; gap: 5px; }
-.cr-field > label { font-size: 12px; font-weight: 600; color: #3a3f52; }
-.cr-field .form-control { min-width: 150px; }
-.cr-save { display: flex; gap: 8px; align-items: center; margin-left: auto; }
-.cr-preview { grid-area: preview; background: #fff; border: 1px solid #e6e7ee; border-radius: 10px; padding: 16px; min-height: 200px; }
-.cr-empty { color: #9aa0b4; font-size: 13px; padding: 18px 4px; }
-.cr-bars { display: flex; flex-direction: column; gap: 9px; }
-.cr-bar-row { display: flex; align-items: center; gap: 10px; }
-.cr-bar-label { width: 150px; font-size: 12.5px; color: #3a3f52; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cr-bar-track { flex: 1; height: 16px; background: #eef0f6; border-radius: 4px; overflow: hidden; }
-.cr-bar-fill { height: 100%; background: #2f3a8f; }
-.cr-bar-val { width: 90px; text-align: right; font-size: 12.5px; color: #3a3f52; }
-.cr-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.cr-table th { text-align: left; background: #f7f8fc; padding: 8px 12px; border-bottom: 1px solid #e6e7ee; color: #3a3f52; }
-.cr-table td { padding: 8px 12px; border-bottom: 1px solid #f0f1f6; color: #3a3f52; }
-.cr-table .cr-total td { font-weight: 700; background: #fafbff; }
-.cr-saved { grid-area: saved; background: #fff; border: 1px solid #e6e7ee; border-radius: 10px; padding: 14px; height: fit-content; }
-.cr-saved h3 { font-size: 14px; margin-bottom: 10px; }
-.cr-tpl { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid #f0f1f6; }
-.cr-tpl > label { font-size: 12px; font-weight: 600; color: #3a3f52; }
-.cr-sched { margin-top: 16px; padding-top: 14px; border-top: 1px solid #f0f1f6; }
-.cr-sched h3 { font-size: 14px; margin-bottom: 10px; }
-.cr-sched-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-.cr-sched-item { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #f0f1f6; }
-.cr-sched-meta { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.cr-sched-name { font-size: 13px; color: #3a3f52; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cr-sched-sub { font-size: 11px; color: #9aa0b4; }
-.cr-saved-block { border-bottom: 1px solid #f0f1f6; }
-.cr-saved-block .cr-saved-item { border-bottom: none; flex-wrap: wrap; }
-.cr-share { display: flex; align-items: center; gap: 6px; padding: 0 0 9px; }
-.cr-share-url { flex: 1; min-width: 0; font-size: 11px !important; background: #fafbff; }
-.cr-saved-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 0; border-bottom: 1px solid #f0f1f6; }
-.cr-saved-name { background: none; border: none; color: #2f3a8f; font-size: 13px; cursor: pointer; text-align: left; flex: 1; }
-.cr-mini { border: none; border-radius: 5px; padding: 3px 8px; font-size: 11.5px; cursor: pointer; }
-.cr-mini.del { background: #eef0f6; color: #c0392b; }
-.cr-btn { background: #2f3a8f; color: #fff; border: none; border-radius: 7px; padding: 8px 15px; font-size: 13px; cursor: pointer; }
-.cr-btn:disabled { opacity: .55; cursor: default; }
+<style src="@/views/Projects/Reports/reportsV2.css"></style>
+<style>
+.rp-page--flush { padding: 0; }
+.rp-builder { flex: 1; min-height: 0; }
+.rp-name { border: 0; background: transparent; font: 600 18px/1.2 var(--font-ui); letter-spacing: -.3px; color: var(--ink); padding: 0; min-width: 220px; }
+.rp-name:focus { outline: none; border-bottom: 1.5px solid var(--brand); }
+.rp-name::placeholder { color: var(--ink-3); }
+.rp-preview { flex: 1; min-height: 0; }
+.rp-totals { display: flex; gap: 24px; }
+.rp-preview__foot { display: flex; align-items: center; gap: 14px; border-top: 1px solid var(--hairline); padding-top: 10px; margin-top: auto; font-size: 11.5px; color: var(--ink-2); }
+.rp-preview__foot .ah-small { margin-left: auto; }
+.rp-sched { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.rp-sched .ah-input { flex: 1; min-width: 220px; }
+.rp-thead--2, .rp-tr--2 { grid-template-columns: minmax(0, 1fr) 120px; }
+@media (max-width: 767px) {
+    .rp-builder { display: none; }
+}
 </style>

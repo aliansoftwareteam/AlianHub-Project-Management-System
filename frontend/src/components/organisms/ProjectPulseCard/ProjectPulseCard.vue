@@ -1,59 +1,57 @@
 <template>
-    <div class="ppc">
-        <CardSkeleton v-if="loading" :counters="2" :rows="4" />
-        <template v-else>
-            <div class="ppc-counters">
-                <div class="ppc-counter ppc-clickable" role="button" :title="$t('dashboardCard.plm_click_hint')" @click="openDrill('active')">
-                    <div class="ppc-num">{{ data.activeProjects }}</div>
-                    <div class="ppc-num-label">{{ $t('dashboardCard.active_projects') }}</div>
-                </div>
-                <div class="ppc-counter ppc-clickable" role="button" :title="$t('dashboardCard.plm_click_hint')" @click="openDrill('working')">
-                    <div class="ppc-num ppc-num-accent">{{ data.workingProjects }}</div>
-                    <div class="ppc-num-label">{{ $t('dashboardCard.working_projects') }}</div>
-                </div>
+    <div class="dc-body ppc">
+        <div class="dc-stats">
+            <button type="button" class="ppc__stat" @click="openDrill('active')">
+                <span class="dc-stat__num">{{ data.activeProjects }}</span>
+                <span class="dc-stat__label">{{ $t('DashV2.pulse_active') }}</span>
+            </button>
+            <button type="button" class="ppc__stat" @click="openDrill('working')">
+                <span class="dc-stat__num dc-stat__num--ok">{{ data.workingProjects }}</span>
+                <span class="dc-stat__label">{{ $t('DashV2.pulse_working') }}</span>
+            </button>
+            <div class="ppc__stat ppc__stat--static">
+                <span class="dc-stat__num">{{ idleProjects }}</span>
+                <span class="dc-stat__label">{{ $t('DashV2.pulse_idle') }}</span>
             </div>
+        </div>
 
-            <div class="ppc-mix">
-                <div class="ppc-mix-title">{{ $t('dashboardCard.project_type_mix') }}</div>
-                <div v-if="!data.typeMix.length" class="ppc-msg">{{ $t('dashboardCard.no_data_available') }}</div>
-                <div v-else class="ppc-bars">
-                    <div v-for="row in data.typeMix" :key="row.type" class="ppc-bar-row ppc-clickable" role="button" :title="$t('dashboardCard.plm_click_hint')" @click="openDrill(row.type)">
-                        <span class="ppc-label" :title="row.type">{{ row.type }}</span>
-                        <div class="ppc-track"><div class="ppc-fill" :style="{ width: pct(row.count) + '%' }"></div></div>
-                        <span class="ppc-val">{{ row.count }}</span>
-                    </div>
-                </div>
+        <div class="ppc__mix">
+            <div class="ah-label ppc__mix-title">{{ $t('DashV2.pulse_mix') }}</div>
+            <div v-if="!data.typeMix.length" class="dc-sub">{{ $t('DashV2.pulse_no_types') }}</div>
+            <div v-else class="ppc__bars">
+                <button v-for="row in data.typeMix" :key="row.type" type="button" class="dc-row ppc__bar-row" @click="openDrill(row.type)">
+                    <span class="dc-row__name" :title="row.type">{{ row.type }}</span>
+                    <span class="dc-track"><span class="dc-fill" :style="{ width: pct(row.count) + '%' }"></span></span>
+                    <span class="dc-row__val">{{ row.count }}</span>
+                </button>
             </div>
+        </div>
 
-            <ProjectListModal
-                :modelValue="drillOpen"
-                :title="drillTitle"
-                :projects="drillProjects"
-                :loading="drillLoading"
-                :showWorked="true"
-                @close="drillOpen = false"
-            />
-        </template>
+        <ProjectListModal
+            :modelValue="drillOpen"
+            :title="drillTitle"
+            :projects="drillProjects"
+            :loading="drillLoading"
+            :showWorked="true"
+            @close="drillOpen = false"
+        />
     </div>
 </template>
-
-<script>
-export default { name: 'ProjectPulseCard' };
-</script>
 
 <script setup>
 import { ref, computed, watch, onMounted, inject } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import { resolveCardRange } from '@/composable/useResourceWorkload';
 import ProjectListModal from '@/components/molecules/ProjectListModal/ProjectListModal.vue';
-import CardSkeleton from '@/components/atom/CardSkeleton/CardSkeleton.vue';
+import { useCardMeta } from '@/components/organisms/DashboardCard/useCardMeta';
 
-// Resource Utilization card #1-3. Self-fetching from
-// POST /api/v1/dashboard/project-utilization-summary. The `timerange`
-// config drives ONLY the "working projects" window; active count and
-// type mix are point-in-time company state. Clicking a counter or a
-// type bar opens a drill-down modal listing the projects behind it.
+defineOptions({ name: 'ProjectPulseCard' });
+
+// How the work is going: how many projects are live, how many were actually
+// worked on in the window, and the mix of what they are. Clicking any figure
+// opens the projects behind it.
 const props = defineProps({
     cardUID: { type: [String, Number], default: '' },
     componentId: { type: String, default: '' },
@@ -66,106 +64,53 @@ const props = defineProps({
 });
 
 const { t } = useI18n();
+const meta = useCardMeta();
 const globalRange = inject('dashboardGlobalRange', null);
 
 const data = ref({ activeProjects: 0, workingProjects: 0, typeMix: [] });
-const loading = ref(false);
 
 const maxVal = computed(() => data.value.typeMix.reduce((m, r) => Math.max(m, r.count || 0), 0) || 1);
 const pct = (v) => Math.round(((v || 0) / maxVal.value) * 100);
+const idleProjects = computed(() => Math.max(0, data.value.activeProjects - data.value.workingProjects));
 
-// 0 = Auto → follow the dashboard's global date range (period lives in the
-// card-header dropdown now; the old in-card label is gone).
 const timerange = computed(() => {
     const v = Number(props.cardData?.timerange);
     return Number.isFinite(v) && v >= 0 && v <= 8 ? v : 1;
 });
-
-// Project scope to send: mode (all/include/exclude) + selected ids.
-const projectIds = computed(() => Array.isArray(props.cardData?.projectId) ? props.cardData.projectId : []);
+const projectIds = computed(() => (Array.isArray(props.cardData?.projectId) ? props.cardData.projectId : []));
 const projectMode = computed(() => props.cardData?.projectMode || 'all');
 
-// Compact date-range resolver (ids match the card catalog convention).
-function resolveDateRange(value) {
-    if (Number(value) === 0 && globalRange && globalRange.value && globalRange.value.dateFrom) {
-        return { dateFrom: globalRange.value.dateFrom, dateTo: globalRange.value.dateTo };
-    }
-    const now = new Date();
-    const start = new Date(now);
-    const end = new Date(now);
-    end.setHours(23, 59, 59, 999);
-    switch (Number(value)) {
-        case 2: { // yesterday
-            start.setDate(start.getDate() - 1); start.setHours(0, 0, 0, 0);
-            const yEnd = new Date(start); yEnd.setHours(23, 59, 59, 999);
-            return { dateFrom: start.toISOString(), dateTo: yEnd.toISOString() };
-        }
-        case 3: { // this_week (Mon-based)
-            const day = start.getDay() === 0 ? 6 : start.getDay() - 1;
-            start.setDate(start.getDate() - day); start.setHours(0, 0, 0, 0);
-            return { dateFrom: start.toISOString(), dateTo: end.toISOString() };
-        }
-        case 4: { // last_week
-            const day = start.getDay() === 0 ? 6 : start.getDay() - 1;
-            start.setDate(start.getDate() - day - 7); start.setHours(0, 0, 0, 0);
-            const wEnd = new Date(start); wEnd.setDate(wEnd.getDate() + 6); wEnd.setHours(23, 59, 59, 999);
-            return { dateFrom: start.toISOString(), dateTo: wEnd.toISOString() };
-        }
-        case 5: { // this_month
-            start.setDate(1); start.setHours(0, 0, 0, 0);
-            return { dateFrom: start.toISOString(), dateTo: end.toISOString() };
-        }
-        case 6: { // last_month
-            start.setMonth(start.getMonth() - 1, 1); start.setHours(0, 0, 0, 0);
-            const mEnd = new Date(start.getFullYear(), start.getMonth() + 1, 0, 23, 59, 59, 999);
-            return { dateFrom: start.toISOString(), dateTo: mEnd.toISOString() };
-        }
-        case 7: { // this_year
-            start.setMonth(0, 1); start.setHours(0, 0, 0, 0);
-            return { dateFrom: start.toISOString(), dateTo: end.toISOString() };
-        }
-        case 8: { // last_30_days
-            start.setDate(start.getDate() - 30); start.setHours(0, 0, 0, 0);
-            return { dateFrom: start.toISOString(), dateTo: end.toISOString() };
-        }
-        case 1:
-        default: { // today
-            start.setHours(0, 0, 0, 0);
-            return { dateFrom: start.toISOString(), dateTo: end.toISOString() };
-        }
-    }
-}
-
 const load = async () => {
-    loading.value = true;
+    meta.state = 'loading';
     try {
-        const { dateFrom, dateTo } = resolveDateRange(timerange.value);
-        const res = await apiRequest('post', `${env.PROJECT_UTILIZATION_SUMMARY}`, { dateFrom, dateTo, projectId: projectIds.value, projectMode: projectMode.value });
-        const body = res && res.data;
-        if (body && body.status) {
+        const { dateFrom, dateTo } = resolveCardRange(timerange.value, globalRange && globalRange.value);
+        const res = await apiRequest('post', `${env.PROJECT_UTILIZATION_SUMMARY}`, {
+            dateFrom, dateTo, projectId: projectIds.value, projectMode: projectMode.value,
+        });
+        const bodyData = res && res.data;
+        if (bodyData && bodyData.status) {
             data.value = {
-                activeProjects: body.data.activeProjects || 0,
-                workingProjects: body.data.workingProjects || 0,
-                typeMix: body.data.typeMix || [],
+                activeProjects: bodyData.data.activeProjects || 0,
+                workingProjects: bodyData.data.workingProjects || 0,
+                typeMix: bodyData.data.typeMix || [],
             };
         }
+        meta.note = t('DashV2.pulse_note');
+        meta.state = data.value.activeProjects ? 'ready' : 'empty';
     } catch (e) {
-        console.error('ProjectPulseCard fetch error:', e);
-    } finally {
-        loading.value = false;
+        meta.state = 'error';
     }
 };
 
-// ─── Drill-down modal (which projects make up a clicked number) ───
 const drillOpen = ref(false);
 const drillLoading = ref(false);
-const drillFilter = ref('active'); // 'active' | 'working' | a type-mix label
+const drillFilter = ref('active');
 const allDrillProjects = ref([]);
 
 const drillTitle = computed(() => {
-    if (drillFilter.value === 'active') return t('dashboardCard.active_projects');
-    if (drillFilter.value === 'working') return t('dashboardCard.working_projects');
-    return `${t('dashboardCard.project_type_mix')} · ${drillFilter.value}`;
+    if (drillFilter.value === 'active') return t('DashV2.pulse_active');
+    if (drillFilter.value === 'working') return t('DashV2.pulse_working');
+    return drillFilter.value;
 });
 const drillProjects = computed(() => {
     if (drillFilter.value === 'active') return allDrillProjects.value;
@@ -178,12 +123,13 @@ const openDrill = async (filter) => {
     drillOpen.value = true;
     drillLoading.value = true;
     try {
-        const { dateFrom, dateTo } = resolveDateRange(timerange.value);
-        const res = await apiRequest('post', `${env.PROJECT_UTILIZATION_SUMMARY}`, { dateFrom, dateTo, includeProjects: true, projectId: projectIds.value, projectMode: projectMode.value });
-        const body = res && res.data;
-        allDrillProjects.value = (body && body.status && body.data.projects) || [];
+        const { dateFrom, dateTo } = resolveCardRange(timerange.value, globalRange && globalRange.value);
+        const res = await apiRequest('post', `${env.PROJECT_UTILIZATION_SUMMARY}`, {
+            dateFrom, dateTo, includeProjects: true, projectId: projectIds.value, projectMode: projectMode.value,
+        });
+        const bodyData = res && res.data;
+        allDrillProjects.value = (bodyData && bodyData.status && bodyData.data.projects) || [];
     } catch (e) {
-        console.error('ProjectPulseCard drill-down fetch error:', e);
         allDrillProjects.value = [];
     } finally {
         drillLoading.value = false;
@@ -192,28 +138,38 @@ const openDrill = async (filter) => {
 
 watch(() => props.refreshTrigger, load);
 watch(() => props.cardData, load, { deep: true });
-// Auto mode — track the dashboard-level range.
 watch(() => globalRange && globalRange.value, () => { if (timerange.value === 0) load(); }, { deep: true });
 onMounted(load);
 </script>
 
+<style scoped src="@/components/organisms/DashboardCard/cardBody.css"></style>
 <style scoped>
-.ppc { height: 100%; width: 100%; padding: 10px 12px; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
-.ppc-msg { color: #9aa0b4; font-size: 12px; padding: 8px 0; }
-.ppc-counters { display: flex; gap: 12px; }
-.ppc-counter { flex: 1; background: #f5f7fb; border-radius: 8px; padding: 10px; text-align: center; }
-.ppc-clickable { cursor: pointer; transition: box-shadow 0.15s ease, background-color 0.15s ease; }
-.ppc-counter.ppc-clickable:hover { background: #eef2fb; box-shadow: 0 0 0 1px #dbe2f5 inset; }
-.ppc-bar-row.ppc-clickable { border-radius: 4px; }
-.ppc-bar-row.ppc-clickable:hover { background: #f5f7fb; }
-.ppc-num { font-size: 32px; font-weight: 700; color: #0f766e; line-height: 1.1; }
-.ppc-num-accent { color: #0d9488; }
-.ppc-num-label { font-size: 11px; color: #6b7280; margin-top: 2px; }
-.ppc-mix-title { font-size: 12px; font-weight: 600; color: #3a3f52; margin-bottom: 6px; }
-.ppc-bars { display: flex; flex-direction: column; gap: 6px; }
-.ppc-bar-row { display: flex; align-items: center; gap: 8px; }
-.ppc-label { width: 38%; font-size: 12px; color: #3a3f52; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: capitalize; }
-.ppc-track { flex: 1; height: 12px; background: #eef0f6; border-radius: 4px; overflow: hidden; }
-.ppc-fill { height: 100%; background: #0d9488; }
-.ppc-val { width: 34px; text-align: right; font-size: 12px; color: #3a3f52; }
+.ppc__stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0;
+    border: 0;
+    background: none;
+    text-align: left;
+    cursor: pointer;
+    border-radius: var(--r-chip);
+}
+.ppc__stat--static { cursor: default; }
+.ppc__stat:not(.ppc__stat--static):hover .dc-stat__label { color: var(--brand); }
+.ppc__stat:focus-visible { outline: none; box-shadow: var(--focus); }
+.ppc__mix { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+.ppc__mix-title { color: var(--ink-label); }
+.ppc__bars { display: flex; flex-direction: column; gap: 6px; }
+.ppc__bar-row {
+    width: 100%;
+    padding: 2px 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    border-radius: var(--r-chip);
+    text-transform: capitalize;
+}
+.ppc__bar-row:hover .dc-fill { background: var(--brand-deep); }
+.ppc__bar-row:focus-visible { outline: none; box-shadow: var(--focus); }
 </style>

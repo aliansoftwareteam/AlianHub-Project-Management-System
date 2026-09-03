@@ -2295,7 +2295,10 @@ exports.getMyDueSoon = async (req, res) => {
             mainChat: { $ne: true }, // exclude chat threads (stored as tasks)
             statusType: { $ne: "close" },
             $or: [{ AssigneeUserId: uid }, { Task_Leader: uid }],
-            DueDate: { $gte: start, $lte: end },
+            // Overdue work is off by default so the existing card is unchanged; the
+            // redesigned My work card asks for it, because "what is late" is the first
+            // thing that card answers.
+            DueDate: req.body && req.body.includeOverdue === true ? { $lte: end } : { $gte: start, $lte: end },
             ...(projClause ? { ProjectID: projClause } : {}),
         }, bodyTaskMatch(req.body));
 
@@ -2440,7 +2443,7 @@ exports.getTasksByStatus = async (req, res) => {
         }
         const uid = String(req.uid || "");
         const emptyPayload = (scope) => ({
-            statuses: [], total: 0, users: [], usersCapped: false,
+            statuses: [], projects: [], total: 0, users: [], usersCapped: false,
             rows: [], rowsHasMore: false, rowsNextSkip: 0,
             scope, period: null,
         });
@@ -2544,6 +2547,49 @@ exports.getTasksByStatus = async (req, res) => {
             .filter((g) => g && g._id !== null && g._id !== undefined)
             .map((g) => ({ statusKey: Number(g._id), count: Number(g.n) || 0 }));
         const total = statuses.reduce((a, s) => a + s.count, 0);
+
+        // Stacked bars per project (redesign 20d). One extra grouping over the same
+        // scope, only when the card asks for it — the matrix below is per person and
+        // cannot answer "which project is the blocked work in?".
+        let projects = [];
+        if (body.byProject === true) {
+            const perProject = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.TASKS,
+                data: [[
+                    { $match: baseFilter },
+                    { $group: { _id: { p: "$ProjectID", s: "$statusKey" }, n: { $sum: 1 } } },
+                ]],
+            }, "aggregate").catch((e) => {
+                logger.error(`getTasksByStatus per-project failed: ${e && e.message ? e.message : e}`);
+                return [];
+            });
+            const byProject = new Map();
+            (perProject || []).forEach((g) => {
+                const pid = String((g && g._id && g._id.p) || "");
+                const sKey = Number(g && g._id && g._id.s);
+                if (!pid || !Number.isFinite(sKey)) return;
+                if (!byProject.has(pid)) byProject.set(pid, { projectId: pid, name: "", total: 0, counts: {} });
+                const rec = byProject.get(pid);
+                const n = Number(g.n) || 0;
+                rec.counts[sKey] = (rec.counts[sKey] || 0) + n;
+                rec.total += n;
+            });
+            const pids = Array.from(byProject.keys()).filter((id) => mongoose.Types.ObjectId.isValid(id));
+            if (pids.length) {
+                const projectRows = await MongoDbCrudOpration(companyId, {
+                    type: SCHEMA_TYPE.PROJECTS,
+                    data: [{ _id: { $in: pids.map((id) => new mongoose.Types.ObjectId(id)) } }, { ProjectName: 1 }],
+                }, "find").catch(() => []);
+                (projectRows || []).forEach((p) => {
+                    const rec = byProject.get(String(p._id));
+                    if (rec) rec.name = p.ProjectName || "";
+                });
+            }
+            projects = Array.from(byProject.values())
+                .filter((p) => p.name)
+                .sort((a, b) => b.total - a.total)
+                .slice(0, 8);
+        }
 
         // The per-person matrix: one row per assignee, one number per status.
         //
@@ -2874,6 +2920,7 @@ exports.getTasksByStatus = async (req, res) => {
             status: true,
             data: {
                 statuses,
+                projects,
                 total,
                 users,
                 usersCapped: allUsers.length > USER_LIMIT,
@@ -2891,5 +2938,322 @@ exports.getTasksByStatus = async (req, res) => {
             message: "An error occurred while building the task status summary.",
             error: error && error.message ? error.message : String(error),
         });
+    }
+};
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Shared dashboards (redesign 12d).
+ *
+ * The same `userDashboard` collection, with an owner and a visibility. A
+ * document written before this existed has neither, so it is read as
+ * { ownerId: userId, visibility: 'private' } — the pre-existing personal
+ * dashboard keeps working and shows up in the hub as its owner's own.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+const DASHBOARD_VISIBILITY = ["private", "workspace", "project"];
+const MAX_DASHBOARD_CARDS = 60;
+
+const dashboardOwner = (doc) => String((doc && (doc.ownerId || doc.userId)) || "");
+const dashboardVisibility = (doc) => {
+    const v = String((doc && doc.visibility) || "");
+    return DASHBOARD_VISIBILITY.includes(v) ? v : "private";
+};
+
+function sanitizeDashboardCards(cards) {
+    if (!Array.isArray(cards)) return [];
+    return cards.slice(0, MAX_DASHBOARD_CARDS).map((c) => {
+        const pos = (c && c.config && c.config.position) || {};
+        const num = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
+        return {
+            componentId: String((c && c.componentId) || ""),
+            cardId: String((c && c.cardId) || ""),
+            uid: String((c && c.uid) || ""),
+            config: {
+                cardData: (c && c.config && typeof c.config.cardData === "object" && c.config.cardData) || {},
+                filterData: Array.isArray(c && c.config && c.config.filterData) ? c.config.filterData : [],
+                position: {
+                    x: num(pos.x, 0), y: num(pos.y, 0),
+                    w: num(pos.w, 3), h: num(pos.h, 5),
+                    minW: num(pos.minW, 3), maxW: num(pos.maxW, 12),
+                    minH: num(pos.minH, 4), maxH: num(pos.maxH, 22),
+                },
+            },
+        };
+    }).filter((c) => c.componentId && c.uid);
+}
+
+// Project ids the caller may see, for the 'project' visibility. Owner/admin get
+// every project; everyone else gets the same set the project list would give them.
+async function visibleProjectIds(companyId, uid) {
+    const filter = await resolveVisibleProjectFilter(companyId, uid);
+    const rows = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.PROJECTS,
+        data: [{ isDelete: { $ne: true }, ...(filter || {}) }, { _id: 1 }],
+    }, "find").catch(() => []);
+    return (rows || []).map((p) => String(p._id));
+}
+
+function canViewDashboard(doc, uid, projectIds) {
+    if (!doc || doc.isDeleted === true) return false;
+    if (dashboardOwner(doc) === uid) return true;
+    const vis = dashboardVisibility(doc);
+    if (vis === "workspace") return true;
+    if (vis === "project") return projectIds.includes(String(doc.projectId || ""));
+    return (Array.isArray(doc.sharedWith) ? doc.sharedWith.map(String) : []).includes(uid);
+}
+
+const canEditDashboard = (doc, uid) => dashboardOwner(doc) === uid;
+
+async function findDashboardById(companyId, id) {
+    if (!mongoose.Types.ObjectId.isValid(String(id || ""))) return null;
+    return MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.USERDASHBOARD,
+        data: [{ _id: new mongoose.Types.ObjectId(String(id)) }],
+    }, "findOne").catch(() => null);
+}
+
+function dashboardSummary(doc, uid, nameMap) {
+    const owner = dashboardOwner(doc);
+    return {
+        _id: String(doc._id),
+        title: doc.title || "Untitled dashboard",
+        description: doc.description || "",
+        ownerId: owner,
+        ownerName: (nameMap && nameMap[owner]) || "",
+        isMine: owner === uid,
+        visibility: dashboardVisibility(doc),
+        projectId: String(doc.projectId || ""),
+        cardCount: Array.isArray(doc.cards) ? doc.cards.length : 0,
+        // Enough to draw the hub's layout thumbnail, without the card configs.
+        preview: (Array.isArray(doc.cards) ? doc.cards : []).slice(0, 12).map((c) => ({
+            componentId: c.componentId,
+            ...((c.config && c.config.position) || {}),
+        })),
+        canEdit: canEditDashboard(doc, uid),
+        updatedAt: doc.updatedAt || doc.createdAt || null,
+    };
+}
+
+const dropDashboardCaches = (userId) => {
+    if (userId) myCache.del(`dashboard_${userId}`);
+};
+
+exports.listDashboards = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        const uid = String(req.uid || "");
+        if (!companyId || !uid) {
+            return res.status(400).json({ status: false, message: "companyId header and an authenticated user are required." });
+        }
+        const projectIds = await visibleProjectIds(companyId, uid);
+        const docs = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.USERDASHBOARD,
+            data: [{
+                isDeleted: { $ne: true },
+                $or: [
+                    { ownerId: uid },
+                    { userId: uid },
+                    { visibility: "workspace" },
+                    { sharedWith: uid },
+                    ...(projectIds.length ? [{ visibility: "project", projectId: { $in: projectIds } }] : []),
+                ],
+            }],
+        }, "find").catch(() => []);
+
+        const visible = (docs || []).filter((d) => canViewDashboard(d, uid, projectIds));
+        const nameMap = await getUserNameMap(visible.map(dashboardOwner)).catch(() => ({}));
+        const data = visible
+            .map((d) => dashboardSummary(d, uid, nameMap))
+            .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+        return res.status(200).json({ status: true, statusText: "Dashboards fetched.", data });
+    } catch (error) {
+        logger.error(`listDashboards error: ${error && error.message ? error.message : error}`);
+        return res.status(400).json({ status: false, message: "An error occurred while listing dashboards." });
+    }
+};
+
+exports.getSharedDashboard = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        const uid = String(req.uid || "");
+        const doc = await findDashboardById(companyId, req.params.id);
+        if (!doc) return res.status(404).json({ status: false, message: "Dashboard not found." });
+        const projectIds = await visibleProjectIds(companyId, uid);
+        if (!canViewDashboard(doc, uid, projectIds)) {
+            return res.status(403).json({ status: false, message: "You do not have access to this dashboard." });
+        }
+        const nameMap = await getUserNameMap([dashboardOwner(doc)]).catch(() => ({}));
+        return res.status(200).json({
+            status: true,
+            statusText: "Dashboard fetched.",
+            data: { ...dashboardSummary(doc, uid, nameMap), cards: Array.isArray(doc.cards) ? doc.cards : [] },
+        });
+    } catch (error) {
+        logger.error(`getSharedDashboard error: ${error && error.message ? error.message : error}`);
+        return res.status(400).json({ status: false, message: "An error occurred while fetching the dashboard." });
+    }
+};
+
+exports.createSharedDashboard = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        const uid = String(req.uid || "");
+        if (!companyId || !uid) {
+            return res.status(400).json({ status: false, message: "companyId header and an authenticated user are required." });
+        }
+        const body = req.body || {};
+        const title = String(body.title || "").trim().slice(0, 120);
+        if (!title) return res.status(400).json({ status: false, message: "A dashboard needs a name." });
+        const visibility = DASHBOARD_VISIBILITY.includes(String(body.visibility)) ? String(body.visibility) : "private";
+        const projectId = visibility === "project" ? String(body.projectId || "") : "";
+        if (visibility === "project" && !projectId) {
+            return res.status(400).json({ status: false, message: "A project dashboard needs a project." });
+        }
+        const saved = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.USERDASHBOARD,
+            data: {
+                userId: uid,
+                ownerId: uid,
+                updatedBy: uid,
+                visibility,
+                projectId,
+                sharedWith: [],
+                title,
+                description: String(body.description || "").slice(0, 240),
+                cards: sanitizeDashboardCards(body.cards),
+                isDeleted: false,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            },
+        }, "save");
+        dropDashboardCaches(uid);
+        return res.status(200).json({ status: true, statusText: "Dashboard created.", data: dashboardSummary(saved, uid, {}) });
+    } catch (error) {
+        logger.error(`createSharedDashboard error: ${error && error.message ? error.message : error}`);
+        return res.status(400).json({ status: false, message: "An error occurred while creating the dashboard." });
+    }
+};
+
+exports.updateSharedDashboard = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        const uid = String(req.uid || "");
+        const doc = await findDashboardById(companyId, req.params.id);
+        if (!doc) return res.status(404).json({ status: false, message: "Dashboard not found." });
+        if (!canEditDashboard(doc, uid)) {
+            return res.status(403).json({ status: false, message: "Only the owner can change this dashboard." });
+        }
+        const body = req.body || {};
+        const set = { updatedBy: uid, updatedAt: new Date() };
+        if (body.title !== undefined) {
+            const title = String(body.title).trim().slice(0, 120);
+            if (!title) return res.status(400).json({ status: false, message: "A dashboard needs a name." });
+            set.title = title;
+        }
+        if (body.visibility !== undefined) {
+            if (!DASHBOARD_VISIBILITY.includes(String(body.visibility))) {
+                return res.status(400).json({ status: false, message: "Unknown visibility." });
+            }
+            set.visibility = String(body.visibility);
+            set.projectId = set.visibility === "project" ? String(body.projectId || doc.projectId || "") : "";
+            if (set.visibility === "project" && !set.projectId) {
+                return res.status(400).json({ status: false, message: "A project dashboard needs a project." });
+            }
+        }
+        if (Array.isArray(body.sharedWith)) {
+            set.sharedWith = body.sharedWith.map(String).filter((v) => mongoose.Types.ObjectId.isValid(v)).slice(0, 200);
+        }
+        const updated = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.USERDASHBOARD,
+            data: [{ _id: doc._id }, { $set: set }, { new: true, useFindAndModify: false }],
+        }, "findOneAndUpdate");
+        dropDashboardCaches(dashboardOwner(doc));
+        return res.status(200).json({ status: true, statusText: "Dashboard updated.", data: dashboardSummary(updated || doc, uid, {}) });
+    } catch (error) {
+        logger.error(`updateSharedDashboard error: ${error && error.message ? error.message : error}`);
+        return res.status(400).json({ status: false, message: "An error occurred while updating the dashboard." });
+    }
+};
+
+exports.updateSharedDashboardCards = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        const uid = String(req.uid || "");
+        const doc = await findDashboardById(companyId, req.params.id);
+        if (!doc) return res.status(404).json({ status: false, message: "Dashboard not found." });
+        if (!canEditDashboard(doc, uid)) {
+            return res.status(403).json({ status: false, message: "Only the owner can change this dashboard." });
+        }
+        const cards = sanitizeDashboardCards((req.body || {}).cards);
+        const updated = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.USERDASHBOARD,
+            data: [{ _id: doc._id }, { $set: { cards, updatedBy: uid, updatedAt: new Date() } }, { new: true, useFindAndModify: false }],
+        }, "findOneAndUpdate");
+        dropDashboardCaches(dashboardOwner(doc));
+        return res.status(200).json({ status: true, statusText: "Dashboard saved.", data: { cards: (updated && updated.cards) || cards } });
+    } catch (error) {
+        logger.error(`updateSharedDashboardCards error: ${error && error.message ? error.message : error}`);
+        return res.status(400).json({ status: false, message: "An error occurred while saving the dashboard." });
+    }
+};
+
+exports.duplicateSharedDashboard = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        const uid = String(req.uid || "");
+        const doc = await findDashboardById(companyId, req.params.id);
+        if (!doc) return res.status(404).json({ status: false, message: "Dashboard not found." });
+        const projectIds = await visibleProjectIds(companyId, uid);
+        if (!canViewDashboard(doc, uid, projectIds)) {
+            return res.status(403).json({ status: false, message: "You do not have access to this dashboard." });
+        }
+        // A copy is always the copier's own and always private: sharing is a
+        // decision about the new dashboard, not something inherited silently.
+        const saved = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.USERDASHBOARD,
+            data: {
+                userId: uid,
+                ownerId: uid,
+                updatedBy: uid,
+                visibility: "private",
+                projectId: "",
+                sharedWith: [],
+                title: `${doc.title || "Dashboard"} (copy)`.slice(0, 120),
+                description: doc.description || "",
+                cards: sanitizeDashboardCards(doc.cards).map((c) => ({
+                    ...c,
+                    uid: String(Math.floor(100000000 + Math.random() * 900000000)),
+                })),
+                isDeleted: false,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            },
+        }, "save");
+        dropDashboardCaches(uid);
+        return res.status(200).json({ status: true, statusText: "Dashboard duplicated.", data: dashboardSummary(saved, uid, {}) });
+    } catch (error) {
+        logger.error(`duplicateSharedDashboard error: ${error && error.message ? error.message : error}`);
+        return res.status(400).json({ status: false, message: "An error occurred while duplicating the dashboard." });
+    }
+};
+
+exports.deleteSharedDashboard = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        const uid = String(req.uid || "");
+        const doc = await findDashboardById(companyId, req.params.id);
+        if (!doc) return res.status(404).json({ status: false, message: "Dashboard not found." });
+        if (!canEditDashboard(doc, uid)) {
+            return res.status(403).json({ status: false, message: "Only the owner can delete this dashboard." });
+        }
+        await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.USERDASHBOARD,
+            data: [{ _id: doc._id }, { $set: { isDeleted: true, updatedBy: uid, updatedAt: new Date() } }, { new: true, useFindAndModify: false }],
+        }, "findOneAndUpdate");
+        dropDashboardCaches(dashboardOwner(doc));
+        return res.status(200).json({ status: true, statusText: "Dashboard deleted.", data: { _id: String(doc._id) } });
+    } catch (error) {
+        logger.error(`deleteSharedDashboard error: ${error && error.message ? error.message : error}`);
+        return res.status(400).json({ status: false, message: "An error occurred while deleting the dashboard." });
     }
 };

@@ -1,0 +1,62 @@
+.lang {
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 760px;
+}
+
+.lang__intro { font-size: 12px; color: var(--ink-label); margin: 2px 0 0; }
+
+.lang__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.lang__option {
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--ink);
+    font: var(--text-body);
+    text-align: start;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: border-color var(--t-state) var(--ease);
+}
+.lang__option:hover { border-color: var(--brand); }
+.lang__option.is-active { border: 1.5px solid var(--brand); color: var(--brand); font-weight: 600; }
+.lang__rtl-tag { font: 500 9.5px var(--font-mono); color: var(--brand); text-transform: uppercase; }
+
+.lang__row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding-top: 4px; }
+.lang__row-label { color: var(--ink-label); min-width: 88px; font-size: 12.5px; }
+.lang__row select { height: 30px; padding: 0 8px; width: auto; font: var(--text-small); }
+
+.lang__previews { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.lang__preview { display: flex; flex-direction: column; gap: 9px; }
+.lang__preview--rtl { border: 1.5px solid rgba(47, 57, 144, .3); }
+.lang__task {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 11px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+}
+.lang__task-box { width: 14px; height: 14px; border: 1.5px solid var(--ink-3); border-radius: 4px; flex: none; }
+.lang__task-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lang__meta { display: flex; align-items: center; gap: 9px; font: var(--text-data); color: var(--ink-label); }
+.lang__meta-end { margin-inline-start: auto; }
+.lang__chips { display: flex; gap: 5px; }
+
+.lang__rules { line-height: 1.5; color: var(--ink-label); font-size: 12.5px; }
+.lang__rules strong { font-weight: 600; color: var(--ink); }
+
+.lang__actions { display: flex; gap: 8px; align-items: center; }
+.lang__saved { font: var(--text-data); color: var(--ok-ink); }
+
+@media (max-width: 767px) {
+    .lang { padding: 16px; }
+    .lang__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .lang__previews { grid-template-columns: minmax(0, 1fr); }
+    .lang__option { min-height: 44px; }
+}

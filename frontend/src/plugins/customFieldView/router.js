@@ -6,6 +6,6 @@ export default [
             title: "Custom Field Manager",
             requiresAuth: true
         },
-        component: () => import(/* webpackChunkName: Custom-Fields */ './component/molecules/settingCustomField/settingCustomFieldComponent.vue')
+        component: () => import(/* webpackChunkName: Custom-Fields */ './component/organisms/FieldBuilder/FieldBuilder.vue')
     },
 ];

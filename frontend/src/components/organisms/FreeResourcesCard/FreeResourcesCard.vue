@@ -1,56 +1,40 @@
 <template>
-    <div class="frc">
-        <CardSkeleton v-if="loading && !freeRows.length" :rows="5" />
-        <template v-else>
-            <div class="frc-head">
-                <span class="frc-count">{{ freeRows.length }} free / under-utilised</span>
-                <span class="frc-sub">planned &lt; {{ thresholdHours }}h and logged &le; {{ loggedThresholdHours }}h today</span>
+    <div class="dc-body frc">
+        <div class="dc-metric">
+            <span class="dc-num">{{ formatMinutes(totalFreeMinutes) }}</span>
+            <span class="dc-sub">{{ $t('DashV2.free_headline', { n: freeRows.length }) }}</span>
+        </div>
+
+        <div class="frc__rows">
+            <div v-for="row in freeRows" :key="row._id" class="dc-row">
+                <span class="dc-row__name" :title="row.name">{{ row.name }}</span>
+                <span class="dc-track">
+                    <span class="dc-fill" :style="{ width: barWidth(row) }"></span>
+                </span>
+                <span class="dc-row__val">{{ formatMinutes(row.free) }}</span>
             </div>
-            <div v-if="!freeRows.length" class="frc-msg">{{ $t('dashboardCard.no_free_resources') }}</div>
-            <div v-else class="frc-table-wrap">
-                <table class="frc-table">
-                    <thead>
-                        <tr>
-                            <th>{{ $t('dashboardCard.lwt_user') }}</th>
-                            <th class="frc-num">{{ $t('dashboardCard.show_planned_hours') }}</th>
-                            <th class="frc-num">{{ $t('dashboardCard.show_logged_hours') }}</th>
-                            <th>{{ $t('dashboardCard.frc_reason') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="r in freeRows" :key="r._id">
-                            <td class="frc-user">{{ r.name }}</td>
-                            <td class="frc-num">{{ formatMinutes(r.planned) }}</td>
-                            <td class="frc-num">{{ formatMinutes(r.logged) }}</td>
-                            <td><span class="frc-tag">{{ r.reason }}</span></td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </template>
+        </div>
+
+        <p class="dc-note frc__note">{{ $t('DashV2.free_rule', { planned: thresholdHours, logged: loggedThresholdHours }) }}</p>
     </div>
 </template>
-
-<script>
-export default { name: 'FreeResourcesCard' };
-</script>
 
 <script setup>
 import { ref, computed, watch, onMounted, inject } from 'vue';
 import { useStore } from 'vuex';
+import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { teamIdToUserId, buildFilterQuery } from '@/composable/commonFunction';
 import { resolveIsoRange, formatMinutes } from '@/composable/useResourceWorkload';
 import { ASSIGNEE_FIELD, resolveAssigneeFilter, passesAssigneeFilter, isFree } from '@/composable/freeResourceRules';
-import CardSkeleton from '@/components/atom/CardSkeleton/CardSkeleton.vue';
+import { useCardMeta } from '@/components/organisms/DashboardCard/useCardMeta';
 
-// Resource Utilization card #7 — "Free or in-training resources".
-// Reuses employee-workload for TODAY, then flags a user free when they are
-// NOT on approved leave and BOTH planned < the planned threshold (default 3h)
-// AND logged <= the logged threshold (default 0h = nothing logged) — i.e. the
-// user has neither meaningful planned nor logged work. Both thresholds are
-// configurable per card.
+defineOptions({ name: 'FreeResourcesCard' });
+
+// Who has room today, and how much. A person is free when they are not on
+// approved leave and have neither a meaningful plan nor logged time; the hours
+// shown are what is left of their working day after both.
 const props = defineProps({
     cardUID: { type: [String, Number], default: '' },
     componentId: { type: String, default: '' },
@@ -62,11 +46,12 @@ const props = defineProps({
     taskStatusArray: { type: [Array, Object], default: () => ({}) },
 });
 
+const { t } = useI18n();
+const meta = useCardMeta();
 const userId = inject('$userId');
 const { getters } = useStore();
 
 const employees = ref([]);
-const loading = ref(false);
 
 const filterRows = () => (Array.isArray(props.filterData) ? props.filterData : Object.values(props.filterData || {}))
     .filter((r) => r && r.name && r.comparisonsData && r.comparisonsData.length);
@@ -77,17 +62,14 @@ const isAssigneeRow = (r) => r.name.value === ASSIGNEE_FIELD;
 const assigneeUserFilter = computed(() =>
     resolveAssigneeFilter(filterRows(), (ids) => teamIdToUserId(ids, getters['settings/teams'] || [])));
 
-// Planned threshold: free when planned hours fall UNDER this (default 3h).
 const thresholdHours = computed(() => {
-    // Explicit 0 is a valid threshold — only fall back to 3 when it's unset.
     const v = props.cardData?.freeThresholdHours;
     return v === undefined || v === null || v === '' ? 3 : Number(v);
 });
 const thresholdMin = computed(() => thresholdHours.value * 60);
-// Logged threshold: free when logged hours are AT OR BELOW this (default 0h,
-// i.e. nothing logged). Number(...)||0 keeps 0 as a valid configured value.
 const loggedThresholdHours = computed(() => Number(props.cardData?.loggedThresholdHours) || 0);
 const loggedThresholdMin = computed(() => loggedThresholdHours.value * 60);
+const dayMinutes = computed(() => (Number(props.cardData?.capacityHours) || 8) * 60);
 
 const freeRows = computed(() => {
     const filter = assigneeUserFilter.value;
@@ -97,43 +79,40 @@ const freeRows = computed(() => {
         .map((e) => {
             const planned = Number(e.plannedMinutes) || 0;
             const logged = Number(e.loggedMinutes) || 0;
-            const free = isFree(planned, logged, thresholdMin.value, loggedThresholdMin.value);
-            const plannedPart = planned === 0 ? 'no plan' : `under ${thresholdHours.value}h planned`;
-            const loggedPart = loggedThresholdMin.value === 0 ? 'nothing logged' : `≤ ${loggedThresholdHours.value}h logged`;
-            const reason = free ? `${plannedPart} · ${loggedPart}` : '';
-            return { _id: e._id, name: e.name || '—', planned, logged, free, reason };
+            return {
+                _id: e._id,
+                name: e.name || '—',
+                free: Math.max(0, dayMinutes.value - planned - logged),
+                isFree: isFree(planned, logged, thresholdMin.value, loggedThresholdMin.value),
+            };
         })
-        .filter((r) => r.free)
-        .sort((a, b) => a.planned - b.planned);
+        .filter((r) => r.isFree)
+        .sort((a, b) => b.free - a.free);
 });
+const totalFreeMinutes = computed(() => freeRows.value.reduce((a, r) => a + r.free, 0));
+const barWidth = (row) => `${Math.min(100, Math.round((row.free / dayMinutes.value) * 100))}%`;
 
 const load = async () => {
-    loading.value = true;
+    meta.state = 'loading';
     try {
-        const { dateFrom, dateTo } = resolveIsoRange(1); // today
-        // Assignable pool from the Settings store — the source of truth for company
-        // membership. Drop removed members (isDelete) and owner/admin (roleType 1/2)
-        // so Free Resources only lists real assignable staff.
+        const { dateFrom, dateTo } = resolveIsoRange(1);
         const assignablePool = (getters['settings/companyUsers'] || [])
             .filter((u) => u && u.isDelete === false && u.roleType !== 1 && u.roleType !== 2)
             .map((u) => String(u.userId));
-        // Honour a team/assignee selection when present, but always drop
-        // deleted/admin; otherwise use the whole assignable pool.
         const selectedIds = teamIdToUserId(props.cardData?.AssigneeUserId || [], getters['settings/teams'] || []);
         const poolSet = new Set(assignablePool);
         const employeeIds = (Array.isArray(selectedIds) && selectedIds.length)
             ? selectedIds.filter((id) => poolSet.has(String(id)))
             : assignablePool;
-        // Empty pool means either the store hasn't loaded yet (the companyUsers
-        // watcher will reload) or every selected user is ineligible. Either way,
-        // DON'T send [] — the backend treats that as "no filter" and would fetch
-        // all users, bypassing the deleted/admin exclusions. Show empty instead.
+        // An empty pool means the store has not loaded yet, or every selected user is
+        // ineligible. Never send [] — the backend reads that as "no filter" and would
+        // fetch every user, past the deleted/admin exclusions above.
         if (!employeeIds.length) {
             employees.value = [];
-            loading.value = false;
+            meta.state = 'empty';
             return;
         }
-        const payload = {
+        const res = await apiRequest('post', `${env.DASHBOARD}/employee-workload`, {
             employeeIds,
             projectIds: props.cardData?.projectId || [],
             projectMode: props.cardData?.projectMode || 'all',
@@ -143,44 +122,30 @@ const load = async () => {
             currentOnly: false,
             callerUserId: userId && userId.value ? String(userId.value) : '',
             callerRoleType: props.companyUserDetail?.roleType || 3,
-            // Assignee rows are handled at the person level, so exclude them here.
             taskMatch: (() => {
                 const fd = filterRows().filter((r) => !isAssigneeRow(r));
                 return fd.length ? buildFilterQuery(fd, userId && userId.value ? String(userId.value) : '') : null;
             })(),
-        };
-        const res = await apiRequest('post', `${env.DASHBOARD}/employee-workload`, payload);
+        });
         const d = res && res.data && res.data.status ? (res.data.data || {}) : {};
         employees.value = d.employees || [];
+        meta.note = t('DashV2.free_note');
+        meta.state = freeRows.value.length ? 'ready' : 'empty';
     } catch (e) {
-        console.error('FreeResourcesCard fetch error:', e);
         employees.value = [];
-    } finally {
-        loading.value = false;
+        meta.state = 'error';
     }
 };
 
 watch(() => props.refreshTrigger, load);
 watch(() => props.cardData, load, { deep: true });
 watch(() => props.filterData, load, { deep: true });
-// The store's companyUsers may populate after this card mounts — reload so the
-// assignable pool (and thus the query) isn't built from an empty list.
 watch(() => (getters['settings/companyUsers'] || []).length, load);
 onMounted(load);
 </script>
 
+<style scoped src="@/components/organisms/DashboardCard/cardBody.css"></style>
 <style scoped>
-.frc { height: 100%; width: 100%; padding: 8px 10px; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
-.frc-msg { color: #9aa0b4; font-size: 12px; padding: 10px 0; }
-.frc-head { display: flex; flex-direction: column; }
-.frc-count { font-size: 12px; font-weight: 600; color: #0d9488; }
-.frc-sub { font-size: 10px; color: #9aa0b4; }
-.frc-table-wrap { overflow: auto; }
-.frc-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.frc-table th { text-align: left; color: #6b7280; font-weight: 600; padding: 4px 6px; border-bottom: 1px solid #eef0f6; position: sticky; top: 0; background: #fff; }
-.frc-table th.frc-num { text-align: right; }
-.frc-table td { padding: 5px 6px; border-bottom: 1px solid #f4f5f9; color: #3a3f52; }
-.frc-num { text-align: right; }
-.frc-user { font-weight: 600; white-space: nowrap; }
-.frc-tag { font-size: 11px; color: #b45309; background: #fef3c7; border-radius: 4px; padding: 1px 6px; white-space: nowrap; }
+.frc__rows { display: flex; flex-direction: column; gap: 7px; }
+.frc__note { margin: auto 0 0; }
 </style>

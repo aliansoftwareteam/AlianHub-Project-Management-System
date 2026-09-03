@@ -1,224 +1,309 @@
 <template>
-    <div class="pf-wrap">
-        <div class="pf-topbar">
-            <router-link :to="{ name: 'Home', params: { cid: cid } }" class="pf-home" title="Home">
-                <img src="@/assets/images/svg/Home.svg" alt="Home" />
-            </router-link>
-            <h1 class="pf-title">{{ $t('Header.Portfolio') }}</h1>
-            <button class="pf-btn" @click="openCreate">+ {{ $t('Portfolio.new') }}</button>
+    <div class="ah-page rp-page">
+        <div class="rp-head">
+            <h1 class="rp-title">{{ $t('ReportsV2.portfolio_title') }}</h1>
+            <span class="rp-meta">{{ headline }}</span>
+            <ReportsTabs />
+            <div class="rp-actions">
+                <select v-model="selectedId" class="rp-select" :aria-label="$t('ReportsV2.portfolio_pick')">
+                    <option v-for="p in portfolios" :key="p._id" :value="String(p._id)">{{ p.name }}</option>
+                </select>
+                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="!selected" @click="openEdit">{{ $t('ReportsV2.edit') }}</button>
+                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="openCreate">{{ $t('ReportsV2.new_portfolio') }}</button>
+            </div>
         </div>
 
-        <div class="pf-body">
-            <!-- Left: portfolio list -->
-            <aside class="pf-side">
-                <div v-if="!portfolios.length && !loading" class="pf-empty">{{ $t('Portfolio.none') }}</div>
-                <button
-                    v-for="p in portfolios" :key="p._id"
-                    class="pf-side-item" :class="{ active: selected && selected._id === p._id }"
-                    @click="select(p)"
-                >
-                    <span class="pf-side-name">{{ p.name }}</span>
-                    <span class="pf-side-count">{{ (p.projectIds || []).length }}</span>
-                </button>
-            </aside>
-
-            <!-- Right: rollup -->
-            <section class="pf-main">
-                <div v-if="!selected" class="pf-placeholder">{{ $t('Portfolio.pick') }}</div>
-
-                <template v-else>
-                    <div class="pf-main-head">
-                        <h2 class="m-0">{{ selected.name }}</h2>
-                        <div class="pf-main-actions">
-                            <button class="pf-btn-ghost" @click="editSelected">{{ $t('Portfolio.edit') }}</button>
-                            <button class="pf-btn-ghost danger" @click="removeSelected">{{ $t('Portfolio.delete') }}</button>
-                        </div>
-                    </div>
-
-                    <div v-if="rollup" class="pf-totals">
-                        <div class="pf-stat"><b>{{ rollup.totals.projects }}</b><span>{{ $t('Portfolio.projects') }}</span></div>
-                        <div class="pf-stat"><b>{{ rollup.totals.progressPct }}%</b><span>{{ $t('Portfolio.progress') }}</span></div>
-                        <div class="pf-stat ok"><b>{{ rollup.totals.onTrack }}</b><span>{{ $t('Portfolio.on_track') }}</span></div>
-                        <div class="pf-stat warn"><b>{{ rollup.totals.atRisk }}</b><span>{{ $t('Portfolio.at_risk') }}</span></div>
-                        <div class="pf-stat bad"><b>{{ rollup.totals.offTrack }}</b><span>{{ $t('Portfolio.off_track') }}</span></div>
-                        <div class="pf-stat"><b>{{ rollup.totals.overdueTasks }}</b><span>{{ $t('Portfolio.overdue') }}</span></div>
-                    </div>
-
-                    <div class="pf-grid">
-                        <div v-for="proj in (rollup ? rollup.projects : [])" :key="proj.projectId" class="pf-card" :class="proj.health">
-                            <div class="pf-card-head">
-                                <span class="pf-card-name" :title="proj.name">{{ proj.name }}</span>
-                                <span class="pf-health" :class="proj.health">{{ $t('Portfolio.h_' + proj.health.replace('-', '_')) }}</span>
-                            </div>
-                            <div class="pf-bar"><div class="pf-bar-fill" :style="{ width: proj.progressPct + '%' }"></div></div>
-                            <div class="pf-card-meta">
-                                <span>{{ proj.progressPct }}%</span>
-                                <span>{{ proj.done }}/{{ proj.total }} {{ $t('Portfolio.done') }}</span>
-                                <span v-if="proj.overdue" class="pf-overdue">{{ proj.overdue }} {{ $t('Portfolio.overdue') }}</span>
-                            </div>
-                            <div class="pf-card-ms" v-if="proj.milestones && proj.milestones.total">
-                                {{ proj.milestones.total }} {{ $t('Portfolio.milestones') }}
-                                <span v-if="proj.milestones.overdue" class="pf-overdue">· {{ proj.milestones.overdue }} {{ $t('Portfolio.past_due') }}</span>
-                            </div>
-                        </div>
-                        <div v-if="rollup && !rollup.projects.length" class="pf-placeholder">{{ $t('Portfolio.no_projects') }}</div>
-                    </div>
-                </template>
-            </section>
+        <div v-if="!portfolios.length && !loading" class="rp-empty">
+            <strong>{{ $t('ReportsV2.portfolio_none_title') }}</strong>
+            <span>{{ $t('ReportsV2.portfolio_none_body') }}</span>
+            <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="openCreate">{{ $t('ReportsV2.new_portfolio') }}</button>
         </div>
 
-        <!-- Create / edit modal -->
-        <div v-if="showForm" class="pf-modal-bg" @click.self="showForm = false">
-            <div class="pf-modal">
-                <h3 class="m-0">{{ editing ? $t('Portfolio.edit') : $t('Portfolio.new') }}</h3>
-                <input v-model="form.name" class="form-control" :placeholder="$t('Portfolio.name_ph')" />
-                <div class="pf-projects">
-                    <label v-for="pr in allProjects" :key="pr._id" class="pf-proj">
-                        <input type="checkbox" :value="String(pr._id)" v-model="form.projectIds" />
-                        <span>{{ pr.ProjectName || '(untitled)' }}</span>
-                    </label>
-                    <div v-if="!allProjects.length" class="pf-empty">{{ $t('Portfolio.no_company_projects') }}</div>
+        <div v-else-if="rollup" class="rp-two">
+            <div class="rp-col">
+                <div class="rp-stats rp-stats--4">
+                    <div class="rp-stat">
+                        <span class="rp-stat__label">{{ $t('ReportsV2.on_track') }}</span>
+                        <span class="rp-stat__value is-ok">{{ rollup.totals.onTrack }}</span>
+                    </div>
+                    <div class="rp-stat">
+                        <span class="rp-stat__label">{{ $t('ReportsV2.at_risk') }}</span>
+                        <span class="rp-stat__value is-warn">{{ rollup.totals.atRisk }}</span>
+                    </div>
+                    <div class="rp-stat">
+                        <span class="rp-stat__label">{{ $t('ReportsV2.off_track') }}</span>
+                        <span class="rp-stat__value is-danger">{{ rollup.totals.offTrack }}</span>
+                    </div>
+                    <div class="rp-stat">
+                        <span class="rp-stat__label">{{ $t('ReportsV2.team_load') }}</span>
+                        <span class="rp-stat__value">{{ capacity ? `${capacity.totals.utilizationPct}%` : '—' }}</span>
+                    </div>
                 </div>
-                <div class="pf-modal-actions">
-                    <button class="pf-btn" :disabled="busy || !form.name.trim()" @click="save">{{ busy ? $t('Portfolio.saving') : $t('Portfolio.save') }}</button>
-                    <button class="pf-btn-ghost" @click="showForm = false">{{ $t('Portfolio.cancel') }}</button>
+
+                <div class="rp-card">
+                    <div class="rp-card__head">
+                        {{ burndownTitle }}
+                        <span v-if="burndownNote" class="rp-card__note">{{ burndownNote }}</span>
+                    </div>
+                    <ApexChart v-if="burndownDays.length" type="line" height="230" :options="burndownOptions" :series="burndownSeries" />
+                    <div v-else class="rp-empty"><span>{{ $t('ReportsV2.no_active_sprint') }}</span></div>
+                </div>
+
+                <div class="rp-card">
+                    <div class="rp-card__head">
+                        {{ $t('ReportsV2.at_risk_now') }}
+                        <span class="rp-card__note">{{ atRisk.length }}</span>
+                    </div>
+                    <div v-for="p in atRisk" :key="p.projectId" class="rp-meter">
+                        <span class="rp-meter__name" :title="p.name">{{ p.name }}</span>
+                        <span class="rp-meter__track"><span class="rp-meter__fill" :class="{ 'is-over': p.health === 'off-track' }" :style="{ width: `${p.progressPct}%` }"></span></span>
+                        <span class="rp-meter__pct">{{ p.progressPct }}%</span>
+                        <span class="ah-chip" :class="p.health === 'off-track' ? 'ah-chip--danger' : 'ah-chip--warn'">{{ $t(`ReportsV2.h_${p.health.replace('-', '_')}`) }}</span>
+                        <span class="rp-row__data">{{ $t('ReportsV2.n_overdue', { n: p.overdue }) }}</span>
+                    </div>
+                    <span v-if="!atRisk.length" class="ah-small">{{ $t('ReportsV2.nothing_at_risk') }}</span>
+                </div>
+            </div>
+
+            <div class="rp-col">
+                <div class="rp-dark">
+                    <div class="rp-dark__head">
+                        <span class="rp-dark__mark"><ShellIcon name="ai" :size="13" /></span>
+                        <span>{{ $t('ReportsV2.digest_title') }}</span>
+                        <span v-if="summaryModel" class="rp-dark__meta">{{ summaryModel }}</span>
+                    </div>
+                    <div v-if="summary" class="rp-dark__body">{{ summary }}</div>
+                    <div v-else class="rp-dark__body">{{ $t(`ReportsV2.digest_${summaryReason}`) }}</div>
+                </div>
+
+                <div class="rp-card">
+                    <div class="rp-card__head">
+                        {{ $t('ReportsV2.capacity_week') }}
+                        <span class="rp-card__note">{{ capacity ? $t('ReportsV2.n_people', { n: capacity.totals.users }) : '' }}</span>
+                    </div>
+                    <div v-for="u in capacityRows" :key="u.userId" class="rp-meter">
+                        <span class="rp-meter__name" :title="u.name">{{ u.name }}</span>
+                        <span class="rp-meter__track">
+                            <span class="rp-meter__fill" :class="{ 'is-over': u.status === 'over' }" :style="{ width: `${Math.min(100, u.utilizationPct)}%` }"></span>
+                        </span>
+                        <span class="rp-meter__pct" :class="{ 'is-over': u.status === 'over' }">{{ u.utilizationPct }}%</span>
+                        <span v-if="u.ptoHours" class="rp-row__data">{{ $t('ReportsV2.pto_h', { h: Math.round(u.ptoHours) }) }}</span>
+                    </div>
+                    <span v-if="!capacityRows.length" class="ah-small">{{ $t('ReportsV2.no_capacity') }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="showForm" class="rp-modal-bg" @click.self="showForm = false">
+            <div class="rp-modal">
+                <h2 class="ah-h2">{{ editing ? $t('ReportsV2.edit_portfolio') : $t('ReportsV2.new_portfolio') }}</h2>
+                <label class="ah-field">
+                    <span class="ah-field__label">{{ $t('ReportsV2.portfolio_name') }}</span>
+                    <input v-model="form.name" class="ah-input" :placeholder="$t('ReportsV2.portfolio_name_ph')" />
+                </label>
+                <div class="rp-modal__list ah-scroll">
+                    <label v-for="pr in allProjects" :key="pr._id" class="rp-row">
+                        <input type="checkbox" :value="String(pr._id)" v-model="form.projectIds" />
+                        <span class="rp-row__name">{{ pr.ProjectName || $t('ReportsV2.untitled_project') }}</span>
+                    </label>
+                    <span v-if="!allProjects.length" class="ah-small">{{ $t('ReportsV2.no_company_projects') }}</span>
+                </div>
+                <div class="rp-modal__actions">
+                    <button type="button" class="ah-btn ah-btn--primary" :disabled="busy || !form.name.trim()" @click="savePortfolio">
+                        {{ busy ? $t('ReportsV2.saving') : $t('ReportsV2.save') }}
+                    </button>
+                    <button type="button" class="ah-btn ah-btn--ghost" @click="showForm = false">{{ $t('ReportsV2.cancel') }}</button>
+                    <button v-if="editing" type="button" class="ah-btn ah-btn--ghost" @click="removeSelected">{{ $t('ReportsV2.delete') }}</button>
                 </div>
             </div>
         </div>
     </div>
 </template>
 
-<script>
-// Explicit multi-word name to satisfy eslint vue/multi-word-component-names
-// (the file is Portfolio.vue / route 'Portfolio', but the component is named here).
-export default { name: 'PortfolioView' };
-</script>
-
 <script setup>
-import { ref, reactive, computed, onMounted, inject } from 'vue';
+import { ref, reactive, computed, watch, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
+import moment from 'moment';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import ReportsTabs from '@/views/Projects/Reports/ReportsTabs.vue';
 
-// REP-01 — cross-project Portfolio rollup (CEO single-pane view). Lists portfolios,
-// creates one over selected projects, and renders rolled-up progress / health /
-// overdue / milestones from real data (GET /api/v1/portfolio/:id/rollup).
-const companyIdRef = inject('$companyId');
-const cid = computed(() => (companyIdRef && companyIdRef.value) || companyIdRef || '');
+defineOptions({ name: 'PortfolioReport' });
 
+const { t } = useI18n();
+
+const portfolios = ref([]);
+const selectedId = ref('');
+const rollup = ref(null);
+const capacity = ref(null);
+const burndown = ref(null);
+const burndownProject = ref('');
+const summary = ref('');
+const summaryModel = ref('');
+const summaryReason = ref('unavailable');
+const allProjects = ref([]);
 const loading = ref(false);
 const busy = ref(false);
-const portfolios = ref([]);
-const allProjects = ref([]);
-const selected = ref(null);
-const rollup = ref(null);
 const showForm = ref(false);
 const editing = ref(false);
 const form = reactive({ name: '', projectIds: [] });
+
+const selected = computed(() => portfolios.value.find((p) => String(p._id) === selectedId.value) || null);
+
+const headline = computed(() => {
+    const count = rollup.value ? rollup.value.totals.projects : 0;
+    return t('ReportsV2.portfolio_head', { n: count, week: moment().startOf('week').format('MMM D') }).toUpperCase();
+});
+
+const atRisk = computed(() => (rollup.value ? rollup.value.projects : [])
+    .filter((p) => p.health !== 'on-track')
+    .sort((a, b) => b.overdue - a.overdue));
+
+const capacityRows = computed(() => ((capacity.value && capacity.value.users) || []).slice(0, 6));
+
+const burndownDays = computed(() => ((burndown.value && burndown.value.days) || []));
+const burndownTitle = computed(() => (burndown.value && burndown.value.sprintName
+    ? `${burndown.value.sprintName} · ${burndownProject.value}`
+    : t('ReportsV2.burndown')));
+const burndownNote = computed(() => {
+    if (!burndown.value || !burndown.value.endDate) return '';
+    const left = moment(burndown.value.endDate).diff(moment(), 'days');
+    return left >= 0 ? t('ReportsV2.days_left', { n: left }).toUpperCase() : t('ReportsV2.sprint_over').toUpperCase();
+});
+
+const burndownSeries = computed(() => [
+    { name: t('ReportsV2.remaining'), data: burndownDays.value.map((d) => (d.remainingPoints === null ? null : Number(d.remainingPoints) || 0)) },
+    { name: t('ReportsV2.ideal'), data: burndownDays.value.map((d) => Number(d.idealPoints) || 0) },
+]);
+
+const burndownOptions = computed(() => ({
+    chart: { id: 'portfolio-burndown', toolbar: { show: false }, animations: { enabled: false }, fontFamily: 'Inter Tight, sans-serif' },
+    colors: ['#2F3990', 'rgba(0,0,0,.2)'],
+    stroke: { width: [2.5, 1.5], dashArray: [0, 5], curve: 'straight' },
+    dataLabels: { enabled: false },
+    markers: { size: 0 },
+    xaxis: { categories: burndownDays.value.map((d) => d.date), labels: { rotate: -45, hideOverlappingLabels: true, style: { fontSize: '10px' } }, tooltip: { enabled: false } },
+    yaxis: { min: 0, labels: { style: { fontSize: '10px' } } },
+    legend: { position: 'top', horizontalAlign: 'right', fontSize: '11px' },
+    grid: { borderColor: 'rgba(0,0,0,.07)' },
+}));
 
 const loadPortfolios = async () => {
     loading.value = true;
     try {
         const body = (await apiRequest('get', env.PORTFOLIO))?.data;
         portfolios.value = (body && body.data) || [];
+        if (!selectedId.value && portfolios.value.length) selectedId.value = String(portfolios.value[0]._id);
     } catch (e) { portfolios.value = []; } finally { loading.value = false; }
 };
+
 const loadProjects = async () => {
     try {
         const body = (await apiRequest('get', env.PROJECT))?.data;
         const list = Array.isArray(body) ? body : (body && body.data) || [];
-        // Active projects only — hide closed / deleted / archived from the picker.
         allProjects.value = list.filter((p) => p && p.status !== 'close' && p.deletedStatusKey !== 1 && p.deletedStatusKey !== 2);
     } catch (e) { allProjects.value = []; }
 };
-const select = async (p) => {
-    selected.value = p;
-    rollup.value = null;
+
+const loadCapacity = async () => {
+    const from = moment().startOf('week').format('YYYY-MM-DD');
+    const to = moment().endOf('week').format('YYYY-MM-DD');
     try {
-        const body = (await apiRequest('get', `${env.PORTFOLIO}/${p._id}/rollup`))?.data;
+        const body = (await apiRequest('get', `${env.CAPACITY}?from=${from}&to=${to}`))?.data;
+        capacity.value = (body && body.status) ? body.data : null;
+    } catch (e) { capacity.value = null; }
+};
+
+// The burn-down shown is the one that matters most: the active sprint of the
+// project furthest from on-track.
+const loadBurndown = async () => {
+    burndown.value = null;
+    burndownProject.value = '';
+    const candidate = atRisk.value[0] || (rollup.value ? rollup.value.projects[0] : null);
+    if (!candidate) return;
+    try {
+        const res = await apiRequest('get', `/api/v1/${env.GET_SPRINT_OR_PROJECT}/${candidate.projectId}?collection=sprints`);
+        const sprints = res?.data?.data || res?.data || [];
+        const active = (sprints || []).find((s) => s && s.isScrum === true && s.state === 'active')
+            || (sprints || []).filter((s) => s && s.isScrum === true).sort((a, b) => new Date(b.startDate || 0) - new Date(a.startDate || 0))[0];
+        if (!active) return;
+        const body = (await apiRequest('get', `${env.AGILE_BURNDOWN}?sprintId=${encodeURIComponent(String(active._id || active.id))}`))?.data;
+        if (body && body.status) {
+            burndown.value = body.data;
+            burndownProject.value = candidate.name;
+        }
+    } catch (e) { burndown.value = null; }
+};
+
+const loadSummary = async () => {
+    summary.value = '';
+    summaryModel.value = '';
+    summaryReason.value = 'unavailable';
+    if (!selectedId.value) return;
+    try {
+        const body = (await apiRequest('post', env.PORTFOLIO_SUMMARY, { portfolioId: selectedId.value }))?.data;
+        if (body && body.status && body.data) {
+            summary.value = body.data.summary || '';
+            summaryModel.value = body.data.model || '';
+            summaryReason.value = body.data.reason || 'unavailable';
+        }
+    } catch (e) { summaryReason.value = 'unavailable'; }
+};
+
+const loadRollup = async () => {
+    rollup.value = null;
+    if (!selectedId.value) return;
+    try {
+        const body = (await apiRequest('get', `${env.PORTFOLIO}/${selectedId.value}/rollup`))?.data;
         if (body && body.status) rollup.value = body.data;
     } catch (e) { rollup.value = null; }
+    await Promise.all([loadBurndown(), loadSummary()]);
 };
+
 const openCreate = () => { editing.value = false; form.name = ''; form.projectIds = []; showForm.value = true; };
-const editSelected = () => {
+const openEdit = () => {
     if (!selected.value) return;
     editing.value = true;
     form.name = selected.value.name;
     form.projectIds = (selected.value.projectIds || []).map(String);
     showForm.value = true;
 };
-const save = async () => {
+
+const savePortfolio = async () => {
     if (busy.value || !form.name.trim()) return;
     busy.value = true;
     try {
-        const payload = { name: form.name.trim(), projectIds: form.projectIds };
-        if (editing.value && selected.value) {
-            await apiRequest('put', `${env.PORTFOLIO}/${selected.value._id}`, payload);
-        } else {
-            await apiRequest('post', env.PORTFOLIO, payload);
-        }
+        const body = { name: form.name.trim(), projectIds: form.projectIds };
+        if (editing.value && selected.value) await apiRequest('put', `${env.PORTFOLIO}/${selected.value._id}`, body);
+        else await apiRequest('post', env.PORTFOLIO, body);
         showForm.value = false;
         await loadPortfolios();
-        const match = portfolios.value.find((x) => x.name === payload.name);
-        if (match) await select(match);
-    } catch (e) { /* surfaced via reload */ } finally { busy.value = false; }
+        const match = portfolios.value.find((x) => x.name === body.name);
+        if (match) selectedId.value = String(match._id);
+        await loadRollup();
+    } catch (e) { /* the reload shows what actually saved */ } finally { busy.value = false; }
 };
+
 const removeSelected = async () => {
     if (!selected.value) return;
     try {
         await apiRequest('delete', `${env.PORTFOLIO}/${selected.value._id}`);
-        selected.value = null; rollup.value = null;
+        showForm.value = false;
+        selectedId.value = '';
+        rollup.value = null;
         await loadPortfolios();
-    } catch (e) { /* surfaced via reload */ }
+    } catch (e) { /* the reload shows what actually deleted */ }
 };
 
-onMounted(() => { loadPortfolios(); loadProjects(); });
+watch(selectedId, loadRollup);
+onMounted(() => { loadPortfolios(); loadProjects(); loadCapacity(); });
 </script>
 
+<style src="@/views/Projects/Reports/reportsV2.css"></style>
 <style scoped>
-.pf-wrap { display: flex; flex-direction: column; height: calc(100dvh - 46px); }
-.pf-topbar { display: flex; align-items: center; gap: 14px; padding: 12px 20px; border-bottom: 1px solid #e6e7ee; }
-.pf-home img { width: 20px; height: 20px; }
-.pf-title { font-size: 18px; margin: 0; flex: 1; }
-.pf-body { flex: 1; display: flex; overflow: hidden; }
-.pf-side { width: 240px; border-right: 1px solid #e6e7ee; overflow-y: auto; padding: 10px; }
-.pf-side-item { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #fff; border: 1px solid #eef0f6; border-radius: 8px; padding: 9px 11px; margin-bottom: 7px; cursor: pointer; text-align: left; }
-.pf-side-item.active { border-color: #2f3a8f; background: #f5f6fd; }
-.pf-side-name { font-size: 13px; color: #3a3f52; font-weight: 600; }
-.pf-side-count { font-size: 11px; color: #6b7280; background: #eef0f6; border-radius: 10px; padding: 1px 8px; }
-.pf-main { flex: 1; overflow-y: auto; padding: 18px 22px; }
-.pf-placeholder, .pf-empty { color: #9aa0b4; font-size: 13px; padding: 14px 4px; }
-.pf-main-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-.pf-main-actions { display: flex; gap: 8px; }
-.pf-totals { display: flex; flex-wrap: wrap; gap: 22px; background: #f7f8fc; border: 1px solid #e6e7ee; border-radius: 10px; padding: 14px 18px; margin-bottom: 18px; }
-.pf-stat { display: flex; flex-direction: column; }
-.pf-stat b { font-size: 22px; color: #3a3f52; }
-.pf-stat span { font-size: 11.5px; color: #6b7280; }
-.pf-stat.ok b { color: #1c7a43; }
-.pf-stat.warn b { color: #9a6b00; }
-.pf-stat.bad b { color: #c0392b; }
-.pf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
-.pf-card { background: #fff; border: 1px solid #e6e7ee; border-left-width: 4px; border-radius: 10px; padding: 14px; }
-.pf-card.on-track { border-left-color: #1c7a43; }
-.pf-card.at-risk { border-left-color: #d99a00; }
-.pf-card.off-track { border-left-color: #c0392b; }
-.pf-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
-.pf-card-name { font-weight: 700; font-size: 13.5px; color: #3a3f52; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pf-health { font-size: 10.5px; font-weight: 700; border-radius: 5px; padding: 2px 7px; white-space: nowrap; }
-.pf-health.on-track { background: #e7f6ee; color: #1c7a43; }
-.pf-health.at-risk { background: #fff8e6; color: #9a6b00; }
-.pf-health.off-track { background: #fdecec; color: #c0392b; }
-.pf-bar { height: 7px; background: #eef0f6; border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
-.pf-bar-fill { height: 100%; background: #2f3a8f; }
-.pf-card-meta { display: flex; gap: 12px; font-size: 12px; color: #6b7280; flex-wrap: wrap; }
-.pf-card-ms { font-size: 11.5px; color: #6b7280; margin-top: 8px; }
-.pf-overdue { color: #c0392b; }
-.pf-btn { background: #2f3a8f; color: #fff; border: none; border-radius: 7px; padding: 8px 15px; font-size: 13px; cursor: pointer; }
-.pf-btn:disabled { opacity: .55; cursor: default; }
-.pf-btn-ghost { background: #fff; color: #2f3a8f; border: 1px solid #cdd2e6; border-radius: 7px; padding: 7px 13px; font-size: 12.5px; cursor: pointer; }
-.pf-btn-ghost.danger { color: #c0392b; border-color: #e9c4c0; }
-.pf-modal-bg { position: fixed; inset: 0; background: rgba(20,22,40,.4); display: flex; align-items: center; justify-content: center; z-index: 9999; }
-.pf-modal { background: #fff; border-radius: 12px; padding: 20px; width: 440px; max-width: 92vw; max-height: 84vh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
-.pf-projects { display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow-y: auto; border: 1px solid #eef0f6; border-radius: 8px; padding: 10px; }
-.pf-proj { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #3a3f52; }
-.pf-modal-actions { display: flex; gap: 10px; }
+.rp-modal-bg { position: fixed; inset: 0; background: rgba(20, 22, 40, .45); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+.rp-modal { background: var(--surface); border-radius: var(--r-modal); padding: 20px; width: 440px; max-width: 92vw; max-height: 84vh; display: flex; flex-direction: column; gap: 12px; box-shadow: var(--shadow-modal); }
+.rp-modal__list { display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow-y: auto; border: 1px solid var(--hairline); border-radius: var(--r-input); padding: 10px; }
+.rp-modal__actions { display: flex; gap: 8px; }
 </style>

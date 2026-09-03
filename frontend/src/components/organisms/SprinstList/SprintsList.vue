@@ -8,101 +8,122 @@
             {{sprint.folderName}}
         </div>
 
-        <div class="sprint_name TaskName d-flex justify-content-between align-items-center flex-wrap"  :class="{'mb-20px': sprint.isExpanded , 'flex-column align-items-start' : clientWidth<=512}" >
-            <div @click="sprint.deletedStatusKey === 0 || sprint.deletedStatusKey === undefined ? $emit('change',sprint?.id) : ''" :class="clientWidth <= 767 ? `mw-100 w-100 justify-content-between ${clientWidth <= 480 ? '' : 'd-flex align-items-center'}` : 'mw-60 d-flex align-items-center'">
-                <div class="d-flex align-items-center" :class="checkApps('AI',project) && 
-                        checkPermission('task.task_list',project?.isGlobalPermission) === true && 
-                        checkPermission('task.task_create',project?.isGlobalPermission) === true ? clientWidth <= 480 ? 'mw-100' : clientWidth <= 991 ? 'mw-40' : clientWidth <= 1440 ? 'mw-50' : 'mw-65' : clientWidth <= 480 ? '' : clientWidth <= 991 ? 'mw-50' : 'mw-80'">
-                    <img v-if="sprint.deletedStatusKey === 0 || sprint.deletedStatusKey === undefined" :src="triangleBlack" alt="traingle" :style="`transform: rotateZ(${sprint.isExpanded ? 90 : 0}deg); width: 6px;`" class="cursor-pointer">
-                    <img v-if="sprint.deletedStatusKey === 2" :src="inventory_2" class="pr-10px" />
-                    <img v-if="sprint.isFolder === true" :src="folder">
-                    <span class="text-ellipse font-weight-bold text-capitalize ml-10px cursor-pointer font-size-14 color52">{{ sprint.name }}</span>
-                </div>
-                <div :class="clientWidth <= 480 ? 'pt-1' : ''" class="d-flex align-items-center sprint-head-actions">
-                    <SprintStateChip :sprint="sprint" />
-                    <template v-if="$route?.query?.tab !== 'Calendar'">
-                        <button
-                            v-if="sprint.isExpanded && !searchedTask && checkPermission('task.task_create',project.isGlobalPermission) === true && checkPermission('task.task_list',project.isGlobalPermission) == true && showArchiveVar === false"
-                            class="outline-secondary-bg-gray"
-                            :class="clientWidth <= 480  ? '' : 'ml-10px'"
-                            id="createtask_driver"
-                            @click.stop="createTask = !createTask,startTaskTour('isTaskTour')"
-                        >
-                            + {{$t('Projects.new_task')}}
-                        </button>
-                    </template>
-                    <div class="d-flex align-items-center ml-10px cursor-pointer suggest-tasks-cta" :class="[{'pointer-event-none' : isSpinner}]" v-if="checkApps('AI',project) &&
-                        checkPermission('task.task_list',project?.isGlobalPermission) === true &&
-                        checkPermission('task.task_create',project?.isGlobalPermission) === true">
-                        <img :src="aiIcon" class="mr-3px" />
-                        <span @click.stop="suggestTask()" class="ai-color font-size-14 font-weight-500 ai-border-bottom" :class="[{'pointer-event-none' : isSpinner}]">{{$t("AI.suggest_tasks")}}</span>
+        <div class="spr__head" :class="{ 'is-open': sprint.isExpanded }">
+            <div
+                class="spr__id"
+                @click="sprint.deletedStatusKey === 0 || sprint.deletedStatusKey === undefined ? $emit('change',sprint?.id) : ''"
+            >
+                <img
+                    v-if="sprint.deletedStatusKey === 0 || sprint.deletedStatusKey === undefined"
+                    :src="triangleBlack"
+                    alt=""
+                    class="spr__caret"
+                    :style="`transform: rotateZ(${sprint.isExpanded ? 90 : 0}deg);`"
+                >
+                <img v-if="sprint.deletedStatusKey === 2" :src="inventory_2" class="spr__icon" />
+                <img v-if="sprint.isFolder === true" :src="folder" class="spr__icon" />
+                <span v-else class="ah-dot" :class="stateDotClass"></span>
+                <div class="spr__title-wrap">
+                    <div class="spr__title">
+                        <span class="spr__name" :title="sprint.name">{{ sprint.name }}</span>
+                        <span v-if="sprintWindow" class="ah-mono spr__window">{{ sprintWindow }}</span>
+                        <SprintStateChip :sprint="sprint" />
                     </div>
-                    <!-- Planned / Logged / Overdue for the whole sprint, on the same
-                         definitions the Tasks Summary by Status card uses. Counted on the
-                         server: the list pages at 35 and subtasks are not loaded at all
-                         while collapsed, so a client-side sum would quietly under-report.
-                         No period here — this is the sprint entire. -->
-                    <span v-if="showSprintHours" class="sprint-hours ml-10px" @click.stop>
-                        <span class="sprint-hours__item" :title="$t('Projects.sprint_planned_hint')">
-                            <span class="sprint-hours__label">{{ $t('Projects.sprint_planned') }}</span>
-                            <span class="sprint-hours__value">{{ hoursLabel(sprintHours.plannedMinutes) }}</span>
-                        </span>
-                        <span class="sprint-hours__item" :title="$t('Projects.sprint_logged_hint')">
-                            <span class="sprint-hours__label">{{ $t('Projects.sprint_logged') }}</span>
-                            <span class="sprint-hours__value">{{ hoursLabel(sprintHours.loggedMinutes) }}</span>
-                        </span>
-                        <!-- Only an overrun is worth colouring; a sprint inside its plan
-                             has nothing to report. -->
-                        <span class="sprint-hours__item" :title="$t('Projects.sprint_overdue_hint')">
-                            <span class="sprint-hours__label">{{ $t('Projects.sprint_overdue') }}</span>
-                            <span class="sprint-hours__value" :class="{ 'sprint-hours__value--over': sprintHours.overdueMinutes > 0 }">
-                                {{ hoursLabel(sprintHours.overdueMinutes) }}
-                            </span>
-                        </span>
-                    </span>
+                    <div v-if="showSprintProgress" class="spr__bar">
+                        <div class="spr__bar-fill" :style="{ width: `${progressPercent}%` }"></div>
+                    </div>
                 </div>
             </div>
-            <div v-if="!showArchiveVar" class="d-flex align-items-center sharewith__status-toggle" :style="[{paddingTop : clientWidth <=512 ? '15px' : '' }]">
-                <div class="position-re mr-10px">
-                    <DropDown>
-                        <template #button>
-                            <a href="#" class="d-flex align-items-center justify-content-center border border-radius-5-px eye__icon-wrapper">
-                                <img :src="eyeIcon">
-                            </a>
-                            <span class="sprint-watcher-count">{{ sprint?.watchers?.length || 0 }}</span>
-                        </template>
-                        <template #head>
-                            <div :class="{'border-bottom' : clientWidth > 767}" :style="`padding: ${clientWidth <= 767 ? 0 : 10}px;`">
-                                <InputText
-                                    v-model="searchWatcher"
-                                    :place-holder="$t('PlaceHolder.search')"
-                                    type="text"
-                                    height="30px !important"
-                                    :isOutline="false"
-                                />
-                            </div>
-                        </template>
-                        <template #options>
-                            <DropDownOption
-                                v-for="user in filteredWatchers"
-                                :key="user._id"
-                                :item="user"
-                                :class="{ 'selected-watcher': user.isWatcher == true }"
-                            >
+
+            <div class="spr__actions">
+                <span v-if="showSprintProgress" class="ah-mono spr__pts">{{ $t('MembersV2.sprint_points', { done: donePoints, total: committedPoints }) }}</span>
+
+                <template v-if="$route?.query?.tab !== 'Calendar'">
+                    <button
+                        v-if="sprint.isExpanded && !searchedTask && checkPermission('task.task_create',project.isGlobalPermission) === true && checkPermission('task.task_list',project.isGlobalPermission) == true && showArchiveVar === false"
+                        type="button"
+                        class="ah-btn ah-btn--secondary ah-btn--sm"
+                        id="createtask_driver"
+                        @click.stop="createTask = !createTask,startTaskTour('isTaskTour')"
+                    >+ {{$t('Projects.new_task')}}</button>
+                </template>
+
+                <button
+                    v-if="checkApps('AI',project) && checkPermission('task.task_list',project?.isGlobalPermission) === true && checkPermission('task.task_create',project?.isGlobalPermission) === true"
+                    type="button"
+                    class="spr__ai"
+                    :disabled="isSpinner"
+                    @click.stop="suggestTask()"
+                >✦ {{$t("AI.suggest_tasks")}}</button>
+
+                <!-- Planned / Logged / Overdue for the whole sprint, on the same definitions the
+                     Tasks Summary by Status card uses, counted on the server: the list pages at 35
+                     and subtasks are not loaded while collapsed, so a client-side sum would quietly
+                     under-report. -->
+                <span v-if="showSprintHours" class="spr__hours" @click.stop>
+                    <span class="spr__hour" :title="$t('Projects.sprint_planned_hint')">
+                        <span class="ah-label">{{ $t('Projects.sprint_planned') }}</span>
+                        <span class="ah-mono">{{ hoursLabel(sprintHours.plannedMinutes) }}</span>
+                    </span>
+                    <span class="spr__hour" :title="$t('Projects.sprint_logged_hint')">
+                        <span class="ah-label">{{ $t('Projects.sprint_logged') }}</span>
+                        <span class="ah-mono">{{ hoursLabel(sprintHours.loggedMinutes) }}</span>
+                    </span>
+                    <span class="spr__hour" :title="$t('Projects.sprint_overdue_hint')">
+                        <span class="ah-label">{{ $t('Projects.sprint_overdue') }}</span>
+                        <span class="ah-mono" :class="{ 'spr__over': sprintHours.overdueMinutes > 0 }">{{ hoursLabel(sprintHours.overdueMinutes) }}</span>
+                    </span>
+                </span>
+
+                <button
+                    v-if="canRunScrum && (scrumState === 'active' || scrumState === 'overdue')"
+                    type="button"
+                    class="ah-btn ah-btn--primary ah-btn--sm"
+                    @click.stop="showCompleteSprint = true"
+                >{{ $t('MembersV2.close_sprint') }}</button>
+                <button
+                    v-else-if="canRunScrum && scrumState === 'planned'"
+                    type="button"
+                    class="ah-btn ah-btn--outline ah-btn--sm"
+                    @click.stop="startSprint()"
+                >{{ $t('MembersV2.start_sprint') }}</button>
+
+                <template v-if="!showArchiveVar">
+                    <div class="spr__watchers" @click.stop>
+                        <DropDown>
+                            <template #button>
+                                <span class="spr__eye">
+                                    <img :src="eyeIcon" alt="">
+                                    <span class="ah-mono">{{ sprint?.watchers?.length || 0 }}</span>
+                                </span>
+                            </template>
+                            <template #head>
+                                <div :class="{'border-bottom' : clientWidth > 767}" :style="`padding: ${clientWidth <= 767 ? 0 : 10}px;`">
+                                    <InputText
+                                        v-model="searchWatcher"
+                                        :place-holder="$t('PlaceHolder.search')"
+                                        type="text"
+                                        height="30px !important"
+                                        :isOutline="false"
+                                    />
+                                </div>
+                            </template>
+                            <template #options>
+                                <DropDownOption
+                                    v-for="user in filteredWatchers"
+                                    :key="user._id"
+                                    :item="user"
+                                    :class="{ 'selected-watcher': user.isWatcher == true }"
+                                >
                                     <div class="d-flex align-items-center justify-content-between w-100">
                                         <div class="d-flex align-items-center" @click="updateWatchers(user._id, 'add')">
                                             <img class="cursor-pointer emp__profile-imgurl"
                                                 v-if="!getUser(user._id).Employee_profileImageURL"
                                                 :src="user.Employee_profileImage"
                                                 alt="userImg"
-                                               
                                             >
                                             <WasabiIamgeCompp v-else :userImage="true" :thumbnail="'26x26'" :data="{title:getUser(user._id).Employee_Name, url: getUser(user._id).Employee_profileImageURL}" class="cursor-pointer emp__profile-imgurl"/>
-                                            <span 
-                                                class="cursor-pointer ml-5px"
-                                            >
-                                                {{ user.Employee_Name }}
-                                            </span>
+                                            <span class="cursor-pointer ml-5px">{{ user.Employee_Name }}</span>
                                         </div>
                                         <img
                                             class="cursor-pointer"
@@ -111,19 +132,17 @@
                                             @click="updateWatchers(user._id, 'remove')"
                                         />
                                     </div>
-                            </DropDownOption>
-                        </template>
-                    </DropDown>
-                </div>
-                <div  class="d-flex align-items-center" v-if="checkPermission('project.sprint_type_change',project.isGlobalPermission) === true">
-                    <span class="dark-gray font-weight-500" :class="clientWidth <=767 ? 'font-size-11' : 'font-size-12'">{{$t('Projects.share_with')}}:</span>
-                    <div class="d-flex align-items-center justify-content-between">
-                        <span class="cursor-default share__everyone-private font-size-12 gray81 text-capitalize" :class="clientWidth <=767 ? 'mr-5px ml-5px' : 'ml-10px mr-10px'">{{$t('Projects.everyone')}}</span>
-                        <Toggle :modelValue="sprint?.private" inActiveColor="#8591F9" width="20" @click="togglePrivatePublic(!sprint?.private)"/>
-                        <span class="cursor-default share__everyone-private font-size-12 gray81 text-capitalize" :class="clientWidth <=767 ? 'ml-5px' : 'ml-10px'">{{$t('Projects.private')}}</span>
+                                </DropDownOption>
+                            </template>
+                        </DropDown>
+                    </div>
 
+                    <div class="spr__share" v-if="checkPermission('project.sprint_type_change',project.isGlobalPermission) === true" @click.stop>
+                        <span class="ah-label">{{$t('Projects.share_with')}}</span>
+                        <span class="spr__share-label">{{$t('Projects.everyone')}}</span>
+                        <Toggle :modelValue="sprint?.private" inActiveColor="#8591F9" width="20" @click="togglePrivatePublic(!sprint?.private)"/>
+                        <span class="spr__share-label">{{$t('Projects.private')}}</span>
                         <Assignee
-                            :style="[{marginLeft : clientWidth > 767 ? '35px' : '10px'}]"
                             class="share__with-assignee"
                             v-if="sprint?.private"
                             :users="sprint?.AssigneeUserId || []"
@@ -135,67 +154,68 @@
                             :isDisplayTeam="true"
                         />
                     </div>
-                </div>
-                <div class="ml-10px">
-                    <DropDown>
-                        <template #button>
-                            <img :ref=sprint.id :src="horizontalDots" alt="horizontalDots" class="vertical-middle">
-                        </template>
-                    <template #options>
-                        <DropDownOption @click="$refs[sprint.id].click(), updateItem(0)" v-if="showArchiveVar && sprint?.deletedStatusKey === 2">
-                            <div class="d-flex align-items-center project-mobile-desc">
-                                <img :src="restore_icon" alt="restore_icon" class="mr-10px">
-                                {{$t('Projects.restore')}}
-                            </div>
-                        </DropDownOption>
-                        <DropDownOption
-                            v-if="canRunScrum && scrumState === 'planned'"
-                            @click="$refs[sprint.id]?.click(), startSprint()"
-                        >
-                            <div class="d-flex align-items-center project-mobile-desc">
-                                <img :src="sprintStartIcon" alt="start sprint" class="mr-10px">
-                                {{ $t('Scrum.start_sprint') }}
-                            </div>
-                        </DropDownOption>
-                        <DropDownOption
-                            v-if="canRunScrum && (scrumState === 'active' || scrumState === 'overdue')"
-                            @click="$refs[sprint.id]?.click(), showCompleteSprint = true"
-                        >
-                            <div class="d-flex align-items-center project-mobile-desc">
-                                <img :src="sprintCompleteIcon" alt="complete sprint" class="mr-10px">
-                                {{ $t('Scrum.complete_sprint') }}
-                            </div>
-                        </DropDownOption>
-                        <DropDownOption
-                            v-if="canRunScrum"
-                            @click="$refs[sprint.id]?.click(), showSprintSetup = true"
-                        >
-                            <div class="d-flex align-items-center project-mobile-desc">
-                                <img :src="sprintSetupIcon" alt="sprint settings" class="mr-10px">
-                                {{ scrumState === 'none' ? $t('Scrum.make_it_a_sprint') : $t('Scrum.sprint_settings') }}
-                            </div>
-                        </DropDownOption>
-                        <DropDownOption @click="$refs[sprint.id]?.click(), showSidebar = true, archive = true" v-if="!showArchiveVar">
-                            <div class="d-flex align-items-center project-mobile-desc">
-                                <img :src="inventoryIcon" alt="inventoryIcon" class="mr-10px">
-                                {{$t('Projects.archive')}}
-                            </div>
-                        </DropDownOption>
-                        <DropDownOption @click="$refs[sprint.id]?.click(), showMoveToFolder = true" v-if="!showArchiveVar && !sprint.isFolder && folderList.length">
-                            <div class="d-flex align-items-center project-mobile-desc">
-                                <img :src="folder" alt="folder" class="mr-10px" style="width: 16px;">
-                                {{$t('Projects.move_to_folder')}}
-                            </div>
-                        </DropDownOption>
-                    <DropDownOption @click="$refs[sprint.id]?.click(), showSidebar = true, archive = false">
-                        <div class="d-flex align-items-center project-mobile-desc mobile-deleteIcon red">
-                            <img :src="deleteIcon" alt="deleteIcon" class="mr-10px">
-                            {{$t('Projects.delete')}}
-                        </div>
-                    </DropDownOption>
-                    </template>
-                    </DropDown>
-                </div>
+
+                    <div class="spr__menu" @click.stop>
+                        <DropDown>
+                            <template #button>
+                                <img :ref=sprint.id :src="horizontalDots" alt="horizontalDots" class="vertical-middle">
+                            </template>
+                            <template #options>
+                                <DropDownOption @click="$refs[sprint.id].click(), updateItem(0)" v-if="showArchiveVar && sprint?.deletedStatusKey === 2">
+                                    <div class="d-flex align-items-center project-mobile-desc">
+                                        <img :src="restore_icon" alt="restore_icon" class="mr-10px">
+                                        {{$t('Projects.restore')}}
+                                    </div>
+                                </DropDownOption>
+                                <DropDownOption
+                                    v-if="canRunScrum && scrumState === 'planned'"
+                                    @click="$refs[sprint.id]?.click(), startSprint()"
+                                >
+                                    <div class="d-flex align-items-center project-mobile-desc">
+                                        <img :src="sprintStartIcon" alt="start sprint" class="mr-10px">
+                                        {{ $t('Scrum.start_sprint') }}
+                                    </div>
+                                </DropDownOption>
+                                <DropDownOption
+                                    v-if="canRunScrum && (scrumState === 'active' || scrumState === 'overdue')"
+                                    @click="$refs[sprint.id]?.click(), showCompleteSprint = true"
+                                >
+                                    <div class="d-flex align-items-center project-mobile-desc">
+                                        <img :src="sprintCompleteIcon" alt="complete sprint" class="mr-10px">
+                                        {{ $t('Scrum.complete_sprint') }}
+                                    </div>
+                                </DropDownOption>
+                                <DropDownOption
+                                    v-if="canRunScrum"
+                                    @click="$refs[sprint.id]?.click(), showSprintSetup = true"
+                                >
+                                    <div class="d-flex align-items-center project-mobile-desc">
+                                        <img :src="sprintSetupIcon" alt="sprint settings" class="mr-10px">
+                                        {{ scrumState === 'none' ? $t('Scrum.make_it_a_sprint') : $t('Scrum.sprint_settings') }}
+                                    </div>
+                                </DropDownOption>
+                                <DropDownOption @click="$refs[sprint.id]?.click(), showSidebar = true, archive = true" v-if="!showArchiveVar">
+                                    <div class="d-flex align-items-center project-mobile-desc">
+                                        <img :src="inventoryIcon" alt="inventoryIcon" class="mr-10px">
+                                        {{$t('Projects.archive')}}
+                                    </div>
+                                </DropDownOption>
+                                <DropDownOption @click="$refs[sprint.id]?.click(), showMoveToFolder = true" v-if="!showArchiveVar && !sprint.isFolder && folderList.length">
+                                    <div class="d-flex align-items-center project-mobile-desc">
+                                        <img :src="folder" alt="folder" class="mr-10px" style="width: 16px;">
+                                        {{$t('Projects.move_to_folder')}}
+                                    </div>
+                                </DropDownOption>
+                                <DropDownOption @click="$refs[sprint.id]?.click(), showSidebar = true, archive = false">
+                                    <div class="d-flex align-items-center project-mobile-desc mobile-deleteIcon red">
+                                        <img :src="deleteIcon" alt="deleteIcon" class="mr-10px">
+                                        {{$t('Projects.delete')}}
+                                    </div>
+                                </DropDownOption>
+                            </template>
+                        </DropDown>
+                    </div>
+                </template>
             </div>
         </div>
         <div>
@@ -293,7 +313,7 @@
             @close="showSprintSetup = false"
             @saved="onSprintSaved"
         />
-        <CompleteSprintModal
+        <CloseSprintStep
             v-if="showCompleteSprint"
             :sprint="sprint"
             :siblings="siblingSprints"
@@ -323,7 +343,7 @@ import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/Conf
 import MoveToFolderModal from "@/components/molecules/MoveToFolder/MoveToFolderModal.vue"
 import SprintStateChip from "@/components/molecules/SprintScrum/SprintStateChip.vue"
 import SprintSetupModal from "@/components/molecules/SprintScrum/SprintSetupModal.vue"
-import CompleteSprintModal from "@/components/molecules/SprintScrum/CompleteSprintModal.vue"
+import CloseSprintStep from "./CloseSprintStep.vue"
 import CalendarViewComponent from '@/views/Projects/ProjectCalendarView/CalendarViewComponent.vue';
 import Skelaton from "@/components/atom/Skelaton/AiSkelaton.vue"
 import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp'
@@ -434,11 +454,11 @@ const loadSprintHours = () => {
 let hoursTimer = null;
 const refreshSprintHours = () => {
     clearTimeout(hoursTimer);
-    hoursTimer = setTimeout(loadSprintHours, 600);
+    hoursTimer = setTimeout(() => { loadSprintHours(); loadSprintPlan(); }, 600);
 };
 watch(() => getters["projectData/tasks"]?.[project.value?._id]?.[props.sprint?.id]?.tasks,
     refreshSprintHours, { deep: true });
-onMounted(loadSprintHours);
+onMounted(() => { loadSprintHours(); loadSprintPlan(); });
 onUnmounted(() => clearTimeout(hoursTimer));
 
 watch(route, () => {
@@ -500,6 +520,42 @@ const canRunScrum = computed(() => !props.sprint?.isFolder
     && !showArchiveVar.value
     && scrumState.value !== 'closed'
     && checkPermission('project.project_sprint_create', project.value?.isGlobalPermission) === true);
+
+const STATE_DOT = { active: 'spr__dot--active', overdue: 'spr__dot--overdue', planned: 'spr__dot--planned', closed: 'spr__dot--closed' };
+const stateDotClass = computed(() => STATE_DOT[scrumState.value] || 'spr__dot--plain');
+
+const dayLabel = (value) => {
+    if (!value) return '';
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }).toUpperCase();
+};
+
+const sprintWindow = computed(() => {
+    const from = dayLabel(props.sprint?.startDate);
+    const to = dayLabel(props.sprint?.endDate);
+    return from && to ? `${from}–${to}` : '';
+});
+
+// Committed vs done, read from the same preview the close step uses so the header
+// and the close decision can never disagree. Paged task lists on the client would.
+const sprintPlan = ref(null);
+const donePoints = computed(() => sprintPlan.value?.done?.points || 0);
+const committedPoints = computed(() => {
+    const committed = Number(sprintPlan.value?.commitment?.points);
+    if (Number.isFinite(committed) && committed > 0) return committed;
+    return (sprintPlan.value?.done?.points || 0) + (sprintPlan.value?.notDone?.points || 0);
+});
+const showSprintProgress = computed(() => !!sprintPlan.value && committedPoints.value > 0);
+const progressPercent = computed(() => (committedPoints.value ? Math.min(100, Math.round((donePoints.value / committedPoints.value) * 100)) : 0));
+
+const loadSprintPlan = () => {
+    if (!canRunScrum.value || !['active', 'overdue'].includes(scrumState.value) || !props.sprint?.id) return;
+    apiRequest('get', `/api/v2/sprints/complete-preview?sprintId=${encodeURIComponent(props.sprint.id)}`)
+        .then((res) => { if (res?.data?.status) sprintPlan.value = res.data.data; })
+        .catch(() => {
+            // A failed count must not blank a number that was right a moment ago.
+        });
+};
 
 // Every other sprint in this project, so "where should the unfinished work go"
 // can offer somewhere real. Foldered sprints live in their own bucket.

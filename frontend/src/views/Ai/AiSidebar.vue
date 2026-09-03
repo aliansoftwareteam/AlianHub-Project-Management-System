@@ -43,6 +43,9 @@ const busy = ref(false);
 const items = computed(() => [
     { name: "AiHub", label: "AiV2.agents", icon: "agent" },
     { name: "AiInbox", label: "AiV2.inbox", icon: "inbox", count: waiting.value },
+    { name: "AgentTeammates", label: "ParityV2.nav_teammates", icon: "members" },
+    { name: "AgentRouting", label: "ParityV2.nav_routing", icon: "automations" },
+    { name: "AiAsk", label: "ParityV2.nav_ask", icon: "ai" },
     { name: "AiSkills", label: "AiV2.skills", icon: "docs" },
     { name: "AuditLog", label: "AiV2.audit", icon: "audit" }
 ]);

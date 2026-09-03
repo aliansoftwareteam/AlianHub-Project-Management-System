@@ -47,7 +47,7 @@
     import EmailComponentListing from '../../atom/customFieldTaskView/emailComponentListing.vue';
     import PhoneComponentListing from '../../atom/customFieldTaskView/phoneComponentListing.vue';
     import ComputedComponentListing from '../../atom/customFieldTaskView/computedComponentListing.vue';
-    import { computeCustomFieldValue } from '@/plugins/customFieldView/formulaEngine.js';
+    import { computeCustomFieldValue, recomputeCustomFields } from '@/plugins/customFieldView/formulaEngine.js';
     import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 
 
@@ -234,6 +234,19 @@
     };
     const handleUpdate = (value,detail,id) => {
         emit('blurUpdate',value,detail,id,true);
+        requestRecompute();
+    };
+
+    // Formula and rollup values are evaluated on the server and stored on the
+    // task, so a changed input has to ask for a fresh computation.
+    let recomputeTimer = null;
+    const requestRecompute = () => {
+        const hasComputed = processedCustomFieldList.value.some(item => ['formula','rollup'].includes(item?.fieldType));
+        if (!hasComputed || !props.task?._id) return;
+        clearTimeout(recomputeTimer);
+        recomputeTimer = setTimeout(() => {
+            recomputeCustomFields({ taskIds: [props.task._id], projectId: props.task.projectId || '' });
+        }, 400);
     };
 
     const getView = (fieldType) => {
@@ -252,6 +265,7 @@
             }
         }
         emit('blurUpdate',value,detail,id);
+        requestRecompute();
     };
 
     // Lifecycle hooks

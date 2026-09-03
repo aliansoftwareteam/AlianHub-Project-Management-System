@@ -1,69 +1,71 @@
 <template>
     <div>
         <Sidebar
-            :title="$t('Watcher.list_of_watcher')"
+            :title="$t('MembersV2.watchers')"
             :visible="openSidebar"
             @update:visible="$emit('update:openSidebar', !openSidebar)"
         >
             <template #body>
-                <div class="bg-white p-1 h-100">
-                    <div class="border-radius-5-px bg-light-gray p0x-10px">
-                        <div class="cursor-pointer d-flex align-items-center border-bottom py-10px" @click="filterUsers.map((x) => x.id)?.includes(userId) ? (watchType = 'all_activity', changeWatchType()) : ''">
-                            <input class="mr-5px m-0"  type="radio" name="type" value="all_activity" :disabled="!filterUsers.map((x) => x.id)?.includes(userId)" v-model="watchType"/>
-                            <label>{{$t('Watcher.all_activity')}}</label>
-                        </div>
-                        <div class="cursor-pointer d-flex align-items-center border-bottom py-10px" @click="filterUsers.map((x) => x.id)?.includes(userId) ? (watchType = 'participating_mentions', changeWatchType()) : ''">
-                            <input class="mr-5px m-0" type="radio" name="type" value="participating_mentions" :disabled="!filterUsers.map((x) => x.id)?.includes(userId)" v-model="watchType"/>
-                            <label>{{$t('Watcher.participating_mentions')}}</label>
-                        </div>
-                        <div class="cursor-pointer d-flex align-items-center py-10px" @click="filterUsers.map((x) => x.id)?.includes(userId) ? (watchType = 'ignore', changeWatchType()) : ''">
-                            <input class="mr-5px m-0" type="radio" name="type" value="ignore" :disabled="!filterUsers.map((x) => x.id)?.includes(userId)" v-model="watchType"/>
-                            <label>{{$t('Watcher.ignore')}}</label>
-                        </div>
+                <div class="pw">
+                    <div class="ah-label">{{ $t('Watcher.list_of_watcher') }}</div>
+                    <div class="pw__modes">
+                        <label
+                            v-for="mode in watchModes"
+                            :key="mode.value"
+                            class="pw__mode"
+                            :class="{ 'is-active': watchType === mode.value, 'is-locked': !canChange }"
+                        >
+                            <input
+                                type="radio"
+                                name="watch-type"
+                                :value="mode.value"
+                                :disabled="!canChange"
+                                v-model="watchType"
+                                @change="changeWatchType()"
+                            />
+                            <span>{{ $t(mode.label) }}</span>
+                        </label>
                     </div>
-                    <h3 class="pt-1 border-top mt-1">{{$t('Watcher.watchers_list')}}</h3>
-                    <input type="text" v-model="search" class="form-control m10px-0px" :placeholder="$t('PlaceHolder.search_here')">
-                    <div class="overflow-y-auto style-scroll filterusers__wrapper">
+                    <p v-if="!canChange" class="ah-small pw__note">{{ $t('MembersV2.watch_note') }}</p>
+
+                    <input type="text" v-model="search" class="ah-input" :placeholder="$t('PlaceHolder.search_here')">
+
+                    <div class="pw__list ah-scroll">
                         <template v-if="filterUsers?.length">
                             <TransitionGroup>
                                 <div
-                                    v-for="user in filterUsers" :key="user.id"
-                                    class="d-flex align-items-center justify-content-between hover-bg-light-gray cursor-pointer border-radius-5-px p5px-p10px"
+                                    v-for="user in filterUsers"
+                                    :key="user.id"
+                                    class="pw__row"
+                                    :class="{ 'is-watching': user.watcher }"
                                     @click="addWatchers(user.id, 'add')"
                                 >
-                                    <div class="d-flex align-items-center">
-                                        <UserProfile
-                                            width="30px"
-                                            :thumbnail="'30x30'"
-                                            :showDot="false"
-                                            class="user__profile-component"
-                                            :data="{image: getUser(user.id)?.Employee_profileImageURL, title: getUser(user.id)?.Employee_Name}"
-                                        />
-                                        <div class="ml-5px">
-                                            <span class="font-size-14 d-block">
-                                                {{getUser(user.id)?.Employee_Name}}
-                                            </span>
-                                            <span class="font-size-14 d-block">
-                                                <template v-if="getUser(user.id)?.companyOwnerId === user.id">
-                                                    {{$t('Watcher.owner')}}
-                                                </template>
-                                                <template v-else>
-                                                    {{designations.find((x) => x.key === getUser(user.id)?.designation)?.name}}
-                                                </template>
-                                            </span>
-                                        </div>
+                                    <UserProfile
+                                        width="30px"
+                                        :thumbnail="'30x30'"
+                                        :showDot="false"
+                                        class="pw__avatar"
+                                        :data="{ image: getUser(user.id)?.Employee_profileImageURL, title: getUser(user.id)?.Employee_Name }"
+                                    />
+                                    <div class="pw__who">
+                                        <span class="pw__name">{{ getUser(user.id)?.Employee_Name }}</span>
+                                        <span class="pw__role">
+                                            <template v-if="getUser(user.id)?.companyOwnerId === user.id">{{ $t('Watcher.owner') }}</template>
+                                            <template v-else>{{ designations.find((x) => x.key === getUser(user.id)?.designation)?.name }}</template>
+                                        </span>
                                     </div>
-                                    <div v-if="user.id === userId && user?.watcher">
-                                        <img :src="closeRedImage" alt="" class="cursor-pointer" @click.stop="addWatchers(user.id, 'remove')">
-                                    </div>
+                                    <span v-if="user.watcher" class="ah-chip ah-chip--brand">{{ $t('MembersV2.watching') }}</span>
+                                    <button
+                                        v-if="user.id === userId && user?.watcher"
+                                        type="button"
+                                        class="pw__x"
+                                        :aria-label="$t('MembersV2.remove')"
+                                        @click.stop="addWatchers(user.id, 'remove')"
+                                    >&#215;</button>
                                 </div>
                             </TransitionGroup>
                         </template>
-                        <template v-else>
-                            <div class="red text-center">
-                                {{$t('ProjectSlider.no_result_found')}}
-                            </div>
-                        </template>
+                        <p v-else class="ah-empty">{{ $t('MembersV2.no_watchers') }}</p>
                     </div>
                 </div>
             </template>
@@ -92,8 +94,11 @@ const {getUser} = useGetterFunctions();
 const {debounce} = useCustomComposable();
 const $toast = useToast();
 
-// IMAGES
-const closeRedImage = require("@/assets/images/close.png");
+const watchModes = [
+    { value: 'all_activity', label: 'MembersV2.watch_all' },
+    { value: 'participating_mentions', label: 'MembersV2.watch_participating' },
+    { value: 'ignore', label: 'MembersV2.watch_ignore' },
+];
 
 const designations = computed(() => getters["settings/designations"]);
 const companyOwnerId = computed(() => getters["settings/companyOwnerDetail"]?.userId);
@@ -133,6 +138,7 @@ watch([() => props.watchers, () => props.options], () => {
 })
 
 const filterUsers = ref(users.value);
+const canChange = computed(() => filterUsers.value.map((x) => x.id)?.includes(userId.value));
 
 
 watch([search, users], debounce(() => {
@@ -237,19 +243,59 @@ onMounted(() => {
 
 </script>
 
-<style>
-.v-enter-active,
-.v-leave-active {
-  transition: all 0.2s ease;
+<style scoped>
+.pw {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    height: 100%;
+    padding: 16px;
+    background: var(--surface);
+    color: var(--ink);
+    font: var(--text-body);
 }
-.v-enter-from,
-.v-leave-to {
-  opacity: 0;
+.pw__modes { display: flex; flex-direction: column; gap: 4px; }
+.pw__mode {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 11px;
+    border: 1px solid var(--hairline);
+    border-radius: 9px;
+    cursor: pointer;
+    transition: border-color var(--t-state) var(--ease), background var(--t-state) var(--ease);
 }
-.filterusers__wrapper{
-   height: calc(100% - 225px);
+.pw__mode.is-active { border-color: var(--brand); background: var(--brand-tint); color: var(--brand); font-weight: 600; }
+.pw__mode.is-locked { cursor: not-allowed; opacity: .6; }
+.pw__mode input { margin: 0; accent-color: var(--brand); }
+.pw__note { margin: 0; }
+
+.pw__list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.pw__row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 9px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background var(--t-state) var(--ease);
 }
-.user__profile-component{
-    object-fit: cover;
+.pw__row:hover { background: var(--surface-hover); }
+.pw__avatar { object-fit: cover; border-radius: 50%; flex: none; }
+.pw__who { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.pw__name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pw__role { font-size: 11.5px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pw__x {
+    border: 0;
+    background: transparent;
+    color: var(--ink-3);
+    font-size: 15px;
+    line-height: 1;
+    padding: 0 3px;
+    cursor: pointer;
 }
+.pw__x:hover { color: var(--danger); }
+
+.v-enter-active, .v-leave-active { transition: opacity var(--t-state) var(--ease); }
+.v-enter-from, .v-leave-to { opacity: 0; }
 </style>

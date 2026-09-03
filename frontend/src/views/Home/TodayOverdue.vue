@@ -117,6 +117,7 @@ import AgendaCard from "@/components/molecules/Home/AgendaCard.vue";
 import PlannerPanel from "@/components/molecules/Home/PlannerPanel.vue";
 import TimerChip from "@/components/molecules/Home/TimerChip.vue";
 import SetupChecklist from "@/components/molecules/Home/SetupChecklist.vue";
+import { isFirstRunStepDone, FIRST_RUN_STEPS } from "@/composable/firstRunProgress";
 import StatusChip from "@/components/molecules/Home/StatusChip.vue";
 import { homeState } from "@/components/molecules/Home/homeState";
 import { useMyWork } from "@/components/molecules/Home/useMyWork";
@@ -165,12 +166,21 @@ const companyName = computed(() => getters["settings/selectedCompany"]?.Cst_Comp
 const sampleProject = computed(() => projects.value[0] || null);
 
 const checklist = ref({ dismissed: false, reviewedPermissions: false });
+const firstRunSteps = computed(() => {
+    void route.fullPath;
+    return {
+        board: isFirstRunStepDone(FIRST_RUN_STEPS.BOARD_VIEW),
+        notifications: isFirstRunStepDone(FIRST_RUN_STEPS.NOTIFICATIONS)
+    };
+});
 const checklistSteps = computed(() => [
     { key: "company", label: "HomeV2.step_company", done: true, cta: "HomeV2.step_company" },
     { key: "sample", label: "HomeV2.step_sample", done: projects.value.length > 0, cta: "HomeV2.create_project" },
     { key: "invite", label: "HomeV2.step_invite", done: companyUsers.value.length > 1, cta: "HomeV2.invite_team" },
     { key: "project", label: "HomeV2.step_project", done: projects.value.length > 1, cta: "HomeV2.create_project" },
-    { key: "permissions", label: "HomeV2.step_permissions", note: "HomeV2.step_permissions_note", done: checklist.value.reviewedPermissions, cta: "HomeV2.review_permissions" }
+    { key: "permissions", label: "HomeV2.step_permissions", note: "HomeV2.step_permissions_note", done: checklist.value.reviewedPermissions, cta: "HomeV2.review_permissions" },
+    { key: "board", label: "HomeV2.step_board", done: firstRunSteps.value.board, cta: "HomeV2.step_board" },
+    { key: "notifications", label: "HomeV2.step_notifications", done: firstRunSteps.value.notifications, cta: "HomeV2.step_notifications" }
 ]);
 const checklistComplete = computed(() => checklistSteps.value.every((s) => s.done));
 const isOwnerOrAdmin = computed(() => [1, 2].includes(companyUser.value.roleType));

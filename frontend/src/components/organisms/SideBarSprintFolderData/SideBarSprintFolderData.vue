@@ -1,22 +1,35 @@
 <template>
-    <div class="project-item-wrapper position-re sidebar__sprint-task">
-        <div class="project-item border-radius-5-px cursor-pointer ml-016" :class="[{'convert__sprint--projectitem': folder === true,'duplicate_task_hover' : data.isDuplicateSprint}]">
-            <div class="position-ab subtask__down-arrow">
-                <img @click.stop="$emit('change', data),$emit('expand')" v-if="data.sprintsObj && Object.keys(data.sprintsObj).length && props.isShowIcon === true" :src="triangleBlack" alt="" :style="`transform: rotateZ(${data.isExpanded ? '90' : '0'}deg)`">
-            </div>
-            <div class="item-left">
-                <div class="text-ellipsis">
-                    <img v-if="data.deletedStatusKey !== undefined && data.deletedStatusKey === 2" :src="inventoryIcon" alt="inventoryIcon" class="inventory__Icon ml-8px">
-                    <img v-else-if="data.deletedStatusKey !== undefined && data.deletedStatusKey === 1" :src="deleteIcon" alt="deleteIcon" class="delete__Icon ml-8px">
-                    <img v-if="folder" :src="folderIcon" alt="folderIcon" class="convert__subtask-foldericon ml-6px">
-                    <span class="text-ellipsis project-sb-desc text-capitalize ml-8px mw-40" :class="{'font-size-13' : clientWidth > 767, 'font-size-16' : clientWidth <= 767}" :title="data.name">
-                        <img v-if="props.isMoveTask === false && isDuplicate === false && isConvertTask === false ? !folder : false" :src="triangleBlack" alt="" :style="`transform: rotateZ(${allData.isTaskExpanded ? '90' : '0'}deg)`" @click="expandTask(),$emit('expand')"> 
-                        {{data.name}}
-                    </span>
-                </div>
-            </div>
+    <div class="sbf">
+        <div class="sbf__row" :class="{ 'is-folder': folder === true, 'is-target': data.isDuplicateSprint }">
+            <button
+                v-if="data.sprintsObj && Object.keys(data.sprintsObj).length && props.isShowIcon === true"
+                type="button"
+                class="sbf__caret"
+                :aria-label="data.name"
+                @click.stop="$emit('change', data), $emit('expand')"
+            >
+                <img :src="triangleBlack" alt="" :style="`transform: rotateZ(${data.isExpanded ? '90' : '0'}deg)`">
+            </button>
+            <span v-else class="sbf__caret sbf__caret--empty"></span>
+
+            <img v-if="data.deletedStatusKey === 2" :src="inventoryIcon" alt="" class="sbf__icon">
+            <img v-else-if="data.deletedStatusKey === 1" :src="deleteIcon" alt="" class="sbf__icon">
+            <img v-if="folder" :src="folderIcon" alt="" class="sbf__icon">
+
+            <button
+                v-if="props.isMoveTask === false && isDuplicate === false && isConvertTask === false && !folder"
+                type="button"
+                class="sbf__caret sbf__caret--tasks"
+                :aria-label="data.name"
+                @click="expandTask(), $emit('expand')"
+            >
+                <img :src="triangleBlack" alt="" :style="`transform: rotateZ(${allData.isTaskExpanded ? '90' : '0'}deg)`">
+            </button>
+
+            <span class="sbf__name" :title="data.name">{{ data.name }}</span>
+            <span v-if="allData.isTaskExpanded && items.length" class="ah-mono sbf__count">{{ $t('MembersV2.sprint_tasks', { count: items.length }) }}</span>
         </div>
-        <div v-if="data.isExpanded && data.sprintsObj && Object.keys(data.sprintsObj).length > 0" class="pl-10px"  :class="[{'covert__folder-sprint': data.isExpanded && data.sprintsObj && Object.keys(data.sprintsObj).length}]">
+        <div v-if="data.isExpanded && data.sprintsObj && Object.keys(data.sprintsObj).length > 0" class="sbf__children">
             <SideBarSprintFolderData
                 v-for="(subItem,index) in isMoveTask === true ? Object.values(data.sprintsObj).filter((x)=> (x.deletedStatusKey == undefined || x.deletedStatusKey === 0) && x.id !== task.sprintId) : Object.values(data.sprintsObj).filter((x)=> (x.deletedStatusKey === undefined || x.deletedStatusKey === 0))"
                 :key="subItem.id"
@@ -40,7 +53,7 @@
                 :item="item"
             />
         </div>
-        <div v-if="allData.isTaskExpanded && props.isMoveTask === false && props.isDuplicate === false && isConvertTask === false" class="scrollClass" @scroll="onScroll">
+        <div v-if="allData.isTaskExpanded && props.isMoveTask === false && props.isDuplicate === false && isConvertTask === false" class="sbf__tasks ah-scroll" @scroll="onScroll">
             <!-- <div v-for="(task, taskIndex) in taskSearch === '' ? items : searchData.filter((x) => x.sprintId === data.id)" :key="taskIndex" class="taskin__Sidebar-wrapper"> -->
                 <TaskInSidebar
                     v-for="(task, taskIndex) in taskSearch === '' ? items : searchData.filter((x) => x.sprintId === data.id)"
@@ -138,7 +151,6 @@ const inventoryIcon = require("@/assets/images/inventory_2.png");
 const deleteIcon = require("@/assets/images/DeleteIcon.png");
 const folderIcon = require("@/assets/images/svg/blue_folder.svg");
 const allData = ref(props.data);
-const clientWidth = inject("$clientWidth");
 const selectedSprintData = ref({});
 const items = ref([]);
 const sprintRefs = ref([])

@@ -26,7 +26,6 @@
                         </AdvanceSearchModal>
                         <router-view/>
                         <TourCom ref="mainTour"/>
-                        <FirstRunChecklist/>
                     </div>
                 </template>
                 <div v-else class="ah-app">
@@ -51,7 +50,6 @@
                         </div>
                         <TourCom ref="mainTour"/>
                         <TaskDetailOverlay />
-                        <FirstRunChecklist/>
                     </main>
                     <MobileTabBar v-if="!$route.meta.hideHeader" />
                     <ShellPanels v-if="!$route.meta.hideHeader" />
@@ -106,7 +104,6 @@
 import { computed, defineComponent, onMounted, provide, ref, watch, inject} from 'vue'
 // COMPONENTS
 import TourCom from "@/components/organisms/Tour/TourComponet.vue"
-import FirstRunChecklist from "@/components/molecules/FirstRunChecklist/FirstRunChecklist.vue"
 import HeaderComponent from '@/components/organisms/Header/Header.vue'
 import GlobalRail from '@/components/organisms/Shell/GlobalRail.vue'
 import MobileTabBar from '@/components/organisms/Shell/MobileTabBar.vue'

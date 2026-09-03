@@ -15,6 +15,7 @@ const {
 
 const COMPANY = '64b7f0c2a1b2c3d4e5f60700';
 const SPRINT = '64b7f0c2a1b2c3d4e5f60711';
+const PROJECT = '64b7f0c2a1b2c3d4e5f60722';
 
 describe('🌐 PUBLIC SHARES - Rules', () => {
 
@@ -40,11 +41,16 @@ describe('🌐 PUBLIC SHARES - Rules', () => {
 
     describe('validateCreateShare', () => {
 
-        test('the four shareable entity types pass; anything else fails', () => {
-            for (const entityType of ['sprint', 'report', 'page', 'form']) {
+        test('every shareable entity type passes; anything else fails', () => {
+            for (const entityType of ['sprint', 'report', 'page', 'form', 'client_view']) {
                 expect(validateCreateShare({ companyId: COMPANY, entityType, entityId: SPRINT }).valid).toBe(true);
             }
             expect(validateCreateShare({ companyId: COMPANY, entityType: 'task', entityId: SPRINT }).valid).toBe(false);
+        });
+
+        test('a client_view share is scoped to one project id', () => {
+            expect(validateCreateShare({ companyId: COMPANY, entityType: 'client_view', entityId: PROJECT }).valid).toBe(true);
+            expect(validateCreateShare({ companyId: COMPANY, entityType: 'client_view', entityId: 'not-an-id' }).valid).toBe(false);
         });
 
         test('missing companyId or bad entityId fail', () => {

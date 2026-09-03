@@ -41,7 +41,7 @@ const canStart = (agent, { trigger, viaAccount } = {}) => {
     return { ok: true, reason: '' };
 };
 
-const create = async (companyId, { agent, taskId, projectId, skill, trigger, startedBy, viaAccount }) => {
+const create = async (companyId, { agent, taskId, projectId, skill, trigger, startedBy, viaAccount, note }) => {
     const run = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AGENT_RUNS,
         data: {
@@ -49,7 +49,8 @@ const create = async (companyId, { agent, taskId, projectId, skill, trigger, sta
             skill: skill || null, trigger: trigger || 'manual', status: STATUS.RUNNING, viaAccount: viaAccount || agent.account || 'workspace',
             startedBy: startedBy ? String(startedBy) : null, startedAt: new Date(), elapsedMs: 0,
             spend: { tokens: 0, usd: 0, model: null, billedToWorkspace: (viaAccount || agent.account || 'workspace') === 'workspace' },
-            actions: [], proposals: [], refusals: 0,
+            actions: note ? [{ action: 'mention', note: String(note).slice(0, 2000), at: new Date() }] : [],
+            proposals: [], refusals: 0,
         },
     }, 'save');
     emit(companyId, 'run', { run });
