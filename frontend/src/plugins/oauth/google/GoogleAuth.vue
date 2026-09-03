@@ -1,7 +1,8 @@
 <template>
-    <button @click="signInWithGoogle" class="border-0 border-radius-6-px cursor-pointer p-15px" :disabled="isSpinner" title="Google">
-        <div v-if="isSpinner" class="oauth-spinner"></div>
-        <img v-else :src="GoogleIcon" alt="google-icon"/>
+    <button type="button" class="auth__provider" :disabled="isSpinner" :aria-busy="isSpinner" @click="signInWithGoogle">
+        <span v-if="isSpinner" class="oauth-spinner"></span>
+        <ShellIcon v-else name="google" :size="16" />
+        <span>{{ label || $t('Auth.continue_with', { provider: 'Google' }) }}</span>
     </button>
 </template>
 
@@ -14,13 +15,13 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from "vue-i18n";
 
 // Image
-import GoogleIcon from "@/assets/images/svg/google_icon.svg";
 
 // Utilities
 import { apiRequestWithoutSecure, apiRequestWithoutCompnay, getAuth } from "@/services";
 import * as env from '@/config/env';
 
 const props = defineProps({
+    label: { type: String, default: "" },
     mode: {
         type: String,
         default: "login"

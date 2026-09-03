@@ -1,18 +1,9 @@
 <template>
     <header class="mc-head">
-        <!-- Anything that has to sit left of the conversation, e.g. the button that
-             brings the list back on a narrow screen. Empty on wide layouts, where the
-             list is always visible and there is nothing to go back to. -->
         <slot name="lead"></slot>
 
-        <MainChatConversationIcon
-            :title="title"
-            :avatar-src="avatarSrc"
-            :is-channel="isChannel"
-            :icon="icon"
-            :presence="presence"
-            :size="34"
-        />
+        <span v-if="isChannel" class="mc-head-hash">#</span>
+        <MainChatAvatar v-else :name="title" :src="avatarSrc" :presence="presence" :size="28" />
 
         <div class="mc-head-id">
             <span class="mc-head-name">{{ title }}</span>
@@ -20,16 +11,19 @@
         </div>
 
         <div class="mc-head-actions">
-            <!--
-              Extension point for the planned Audio / Video call controls: drop the
-              buttons into this slot and they land left of the built-in actions,
-              without this component needing to know anything about calling.
-              e.g. <template #call-actions><button class="mc-icon-btn" …/></template>
-            -->
+            <button
+                type="button"
+                class="mc-head-ai"
+                :disabled="summarizing"
+                :title="$t('ChatV2.summarize')"
+                @click="$emit('summarize')"
+            >
+                <ShellIcon name="ai" :size="13" />
+                <span>{{ summarizing ? $t('ChatV2.summarizing') : $t('ChatV2.summarize') }}</span>
+            </button>
+
             <slot name="call-actions"></slot>
 
-            <!-- Both open a pane in the right-hand column; the active one stays lit
-                 so it is obvious which is showing and that clicking again closes it. -->
             <button
                 type="button"
                 class="mc-icon-btn"
@@ -41,16 +35,8 @@
             <button
                 type="button"
                 class="mc-icon-btn"
-                :class="{ 'mc-icon-btn--on': activePane === 'pinned' }"
-                :title="$t('MainChat.pinned_messages')"
-                @click="$emit('pinned')"
-            ><MainChatIcon name="pin" /></button>
-
-            <button
-                type="button"
-                class="mc-icon-btn"
-                :class="{ 'mc-icon-btn--on': activePane === 'info' }"
-                :title="isChannel ? $t('MainChat.channel_info') : $t('MainChat.user_info')"
+                :class="{ 'mc-icon-btn--on': detailsOpen }"
+                :title="detailsOpen ? $t('ChatV2.close_details') : $t('ChatV2.open_details')"
                 @click="$emit('info')"
             ><MainChatIcon name="info" /></button>
 
@@ -61,7 +47,8 @@
 
 <script setup>
 import { defineProps, defineEmits } from 'vue';
-import MainChatConversationIcon from './MainChatConversationIcon.vue';
+import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import MainChatAvatar from './MainChatAvatar.vue';
 import MainChatIcon from './MainChatIcon.vue';
 
 defineProps({
@@ -70,11 +57,10 @@ defineProps({
     avatarSrc: { type: String, default: '' },
     presence: { type: Boolean, default: null },
     isChannel: { type: Boolean, default: false },
-    // A channel's own icon (image or glyph); empty for direct messages.
-    icon: { type: Object, default: () => ({}) },
-    // '' | 'info' | 'search' | 'pinned' — which right-hand pane the parent has open.
     activePane: { type: String, default: '' },
+    detailsOpen: { type: Boolean, default: false },
+    summarizing: { type: Boolean, default: false },
 });
 
-defineEmits(['search', 'info', 'pinned']);
+defineEmits(['search', 'info', 'summarize']);
 </script>

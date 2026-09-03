@@ -8,7 +8,7 @@ export default [
             title: "Settings",
             requiresAuth: true
         },
-        component: () => import(/* webpackChunkName: Settings */ '@/components/templates/Settings/Settings.vue'),
+        component: () => import(/* webpackChunkName: Settings */ '@/views/Settings/SettingsShell.vue'),
         children: [
             {
                 path: "setting",

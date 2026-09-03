@@ -1,6 +1,8 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
+import { initTheme } from '@/components/organisms/Shell/shellState'
+initTheme()
 import store from './store'
 import '@/config/firebaseInit';
 import ToastPlugin from 'vue-toast-notification';

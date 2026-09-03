@@ -1,6 +1,7 @@
 const config = require('./config');
 const oidc = require('./oidc');
 const saml = require('./saml');
+const discover = require('./discover');
 
 exports.init = (app) => {
     // Admin config — owner/admin enforced in-controller (holds IdP secrets).
@@ -9,6 +10,7 @@ exports.init = (app) => {
 
     // Login page — unauthenticated, secret-free (must be auth-exempt).
     app.get('/api/v2/sso/public', config.getPublicSsoConfig);
+    app.get('/api/v2/sso/discover', discover.discover);
 
     // OIDC login flow (pre-auth; must be auth-exempt).
     app.get('/api/v2/sso/oidc/initiate', oidc.oidcInitiate);

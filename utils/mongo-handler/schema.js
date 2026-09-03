@@ -172,6 +172,22 @@ const schema = {
             type: mongoose.Schema.Types.ObjectId,
             required: false,
         },
+        // Provenance of Done — written only by Modules/Tasks/helpers/completion.js:
+        // { workBy: [{ actorId, actorType, agentId?, viaAccount, hours }],
+        //   checkedBy: { actorId, actorType:'human', at } | null,
+        //   closedBy:  { actorId, actorType:'human', at } | null,
+        //   badge: 'HUMAN'|'AGENT'|'MIXED'|'UNCHECKED'|null, reopenCount }
+        'completion': {
+            type: Object,
+            required: false,
+        },
+        // External links (PR, branch, doc, url) attached through task.link:
+        // [{ url, kind, label, addedBy, actorType, agentId?, addedAt }]
+        'links': {
+            type: Array,
+            default: [],
+            required: false,
+        },
         descriptionBlock: {
             type : Object,
             required: false
@@ -272,6 +288,22 @@ const schema = {
             default: true,
             required: false,
         },
+        actorType: {
+            type: String,
+            required: false,
+        },
+        agentId: {
+            type: String,
+            required: false,
+        },
+        viaAccount: {
+            type: String,
+            required: false,
+        },
+        runId: {
+            type: String,
+            required: false,
+        },
     },
     history: {
         Key: {
@@ -348,6 +380,14 @@ const schema = {
         active: { type: Boolean, default: true, required: false },
         expiresAt: { type: Date, required: false },
         lastUsedAt: { type: Date, required: false },
+        // 'user' (a script acting as the person) or 'agent' (a CLI/coding agent —
+        // the action registry applies). Absent means 'user'.
+        kind: { type: String, required: false },
+        agentId: { type: String, required: false },
+        // { mode: 'workspace'|'personal'|'local', provider, linkedAt, label }
+        agentAccount: { type: Object, required: false },
+        // Contractor narrowing: when set, tasks.next / tasks.search stay inside these projects.
+        projectIds: { type: Array, default: [], required: false },
     },
     // Per-call audit of token-authenticated API requests
     apiActivityLogs: {
@@ -545,6 +585,9 @@ const schema = {
     ssoConfigs: {
         provider: { type: String, default: 'oidc', required: false },
         isEnabled: { type: Boolean, default: false, required: false },
+        displayName: { type: String, default: '', required: false },
+        domains: { type: [String], default: [], required: false },
+        enforcement: { type: String, default: 'optional', required: false },
         autoProvisionUsers: { type: Boolean, default: true, required: false },
         defaultRoleType: { type: Number, default: 3, required: false },
         oidc: { type: Object, required: false },
@@ -667,14 +710,152 @@ const schema = {
     // (which tasks) + actions (set_priority); applied on demand as a bulk update.
     automationRules: {
         name: { type: String, required: true },
-        trigger: { type: String, default: 'manual', required: false },
+        // v1 stored a bare trigger name ("task_created"); v2 stores
+        // { type, event, cron, tz }. Mixed so both shapes validate — existing
+        // rules keep working untouched, and the matcher reads either
+        // (`rule.trigger.event || rule.trigger`). Narrowing this to Object would
+        // orphan every rule already saved.
+        trigger: { type: mongoose.Schema.Types.Mixed, default: 'manual', required: false },
+        version: { type: Number, default: 1, required: false },
         conditions: { type: Object, default: {}, required: false },
+        // v1 flat action list. Kept because the on-demand bulk `apply` still
+        // reads it; v2 rules use `steps` instead.
         actions: { type: Array, default: [], required: false },
+        steps: { type: Array, default: [], required: false },
+        scope: { type: Object, default: {}, required: false },
+        limits: { type: Object, default: {}, required: false },
+        stats: { type: Object, default: {}, required: false },
+        // Opt-in to reacting to automation-authored events. Off by default: this
+        // is the switch that stops rule A and rule B triggering each other forever.
+        reactToAutomation: { type: Boolean, default: false, required: false },
         enabled: { type: Boolean, default: true, required: false },
         lastRunAt: { type: Date, required: false },
         lastRunCount: { type: Number, default: 0, required: false },
         createdBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // Canonical domain events, written by event/domainEventBus.js. Phase 0 of the
+    // automation engine records envelopes without acting on them, so we can read a
+    // week of real traffic and find the events we don't yet emit before the matcher
+    // is built against the wrong shape. Capped by TTL — this is a diagnostic log,
+    // never a source of truth.
+    automationEventLog: {
+        eventId: { type: String, required: true },
+        type: { type: String, required: true },
+        occurredAt: { type: Date, required: true },
+        actor: { type: Object, default: {}, required: false },
+        depth: { type: Number, default: 0, required: false },
+        scope: { type: Object, default: {}, required: false },
+        entity: { type: Object, default: {}, required: false },
+        changedFields: { type: Array, default: [], required: false },
+        hasPrevious: { type: Boolean, default: false, required: false },
+    },
+    // One document per rule execution. `cursor` is what makes a container restart
+    // mid-run resumable instead of replaying: the runner writes it after every
+    // step, so a resumed run picks up at the next step rather than re-applying
+    // mutations that already landed.
+    // What an agent has already reported for a task, keyed on the STABLE fact id
+    // rather than the finding's title. The model re-words the same defect on every
+    // run ("Shorten meta description to 160 characters" one run, "…to avoid
+    // truncation" the next), so title-based dedup silently fails and the board
+    // fills with the same six defects again and again.
+    agentFindings: {
+        projectId: { type: String, required: true },
+        taskId: { type: String, required: true },
+        factId: { type: String, required: true },
+        skill: { type: String, required: false },
+        subtaskId: { type: String, required: false },
+        title: { type: String, required: false },
+        severity: { type: String, required: false },
+        // open | resolved | wontfix — `wontfix` is set by a human and is never
+        // re-filed, which is how the "ignore this check" list learns itself.
+        status: { type: String, default: 'open', required: false },
+        occurrences: { type: Number, default: 1, required: false },
+        firstSeenAt: { type: Date, required: false },
+        lastSeenAt: { type: Date, required: false },
+    },
+    // Agents as teammates — managed by Modules/Agents.
+    agents: {
+        name: { type: String, required: true },
+        slug: { type: String, required: false },
+        description: { type: String, required: false },
+        ownerId: { type: String, required: false },
+        skills: { type: Array, default: [], required: false },
+        // Subset of Modules/Agents/registry.js keys this agent may use. Empty = every registry action.
+        allowedActions: { type: Array, default: [], required: false },
+        projectIds: { type: Array, default: [], required: false },
+        // 0 suggest everything · 1 act on low risk · 2 act on medium, propose the rest · 3 also on a schedule
+        autonomy: { type: Number, default: 0, required: false },
+        spendCapUsd: { type: Number, default: 30, required: false },
+        // { month: 'YYYY-MM', usd, tokens, runs }
+        spendMonth: { type: Object, required: false },
+        paused: { type: Boolean, default: false, required: false },
+        pausedReason: { type: String, required: false },
+        pausedAt: { type: Date, required: false },
+        // 'workspace' | 'personal' | 'local'
+        account: { type: String, default: 'workspace', required: false },
+        model: { type: String, required: false },
+        schedule: { type: Object, required: false },
+        rateLimitPerDay: { type: Number, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    agentRuns: {
+        agentId: { type: String, required: true },
+        agentName: { type: String, required: false },
+        taskId: { type: String, required: false },
+        projectId: { type: String, required: false },
+        skill: { type: String, required: false },
+        trigger: { type: String, required: false },
+        // queued | running | waiting_approval | done | failed | stopped
+        status: { type: String, default: 'queued', required: true },
+        viaAccount: { type: String, required: false },
+        startedBy: { type: String, required: false },
+        startedAt: { type: Date, required: false },
+        finishedAt: { type: Date, required: false },
+        elapsedMs: { type: Number, default: 0, required: false },
+        // { tokens, usd, model, billedToWorkspace }
+        spend: { type: Object, required: false },
+        actions: { type: Array, default: [], required: false },
+        proposals: { type: Array, default: [], required: false },
+        refusals: { type: Number, default: 0, required: false },
+        outcome: { type: String, required: false },
+        error: { type: String, required: false },
+    },
+    agentProposals: {
+        agentId: { type: String, required: true },
+        agentName: { type: String, required: false },
+        runId: { type: String, required: false },
+        taskId: { type: String, required: false },
+        projectId: { type: String, required: false },
+        what: { type: String, required: true },
+        why: { type: String, required: false },
+        // [{ action, params, label, reversible }] — every action a registry key
+        changes: { type: Array, default: [], required: false },
+        // pending | approved | edited | declined | undone
+        status: { type: String, default: 'pending', required: true },
+        gate: { type: String, required: false },
+        priority: { type: String, required: false },
+        decidedBy: { type: String, required: false },
+        decidedAt: { type: Date, required: false },
+        undoUntil: { type: Date, required: false },
+        auditIds: { type: Array, default: [], required: false },
+        cost: { type: Object, required: false },
+    },
+    automationRuns: {
+        ruleId: { type: String, required: true },
+        ruleName: { type: String, required: false },
+        eventId: { type: String, required: true },
+        eventType: { type: String, required: false },
+        entity: { type: Object, default: {}, required: false },
+        envelope: { type: Object, default: {}, required: false },
+        status: { type: String, default: 'queued', required: true },
+        cursor: { type: Number, default: 0, required: false },
+        attempts: { type: Number, default: 0, required: false },
+        steps: { type: Array, default: [], required: false },
+        outputs: { type: Object, default: {}, required: false },
+        error: { type: String, required: false },
+        startedAt: { type: Date, required: false },
+        finishedAt: { type: Date, required: false },
     },
     // Integration connections — managed by Modules/Integrations (AUTO-04). Generic
     // registry backing the marketplace, Slack and iframe apps. Secrets live in
@@ -736,6 +917,16 @@ const schema = {
         linkedTasks: { type: [mongoose.Schema.Types.ObjectId], required: false, default: [] },
         // 'project' (anyone who can see the project) or 'private' (only its author).
         visibility: { type: String, required: false, default: 'project' },
+        isWiki: { type: Boolean, required: false, default: false },
+        ownerId: { type: String, required: false },
+        reviewDate: { type: Date, required: false },
+        reviewedAt: { type: Date, required: false },
+        reviewedBy: { type: String, required: false },
+        createdByAgent: { type: Boolean, required: false, default: false },
+        agentName: { type: String, required: false },
+        // 'draft' until a person approves an agent-written page.
+        agentStatus: { type: String, required: false },
+        approvedBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
     pageVersions: {
@@ -1016,6 +1207,15 @@ const schema = {
             type: String,
             required: false,
             default: ""
+        },
+        workingHours: {
+            type: Object,
+            required: false
+        },
+        // Personal coding-agent link (27b): { mode, provider, linkedAt, label, email }
+        agentAccount: {
+            type: Object,
+            required: false
         }
     },
     adminDetail: {
@@ -1147,6 +1347,11 @@ const schema = {
         }
     },
     companies: {
+        // { allowedModes: ['workspace','personal','local'], requireCheckBeforeDone }
+        agentPolicy: {
+            type: Object,
+            required: false
+        },
         "legacyId": {
             type: String,
             required: false
@@ -2370,6 +2575,20 @@ const schema = {
         userId: {
             type: String,
             required: true,
+        },
+        quietHours: {
+            type: Object,
+            required: false
+        },
+        agentActivity: {
+            type: Boolean,
+            required: false,
+            default: true
+        },
+        dailyDigest: {
+            type: Boolean,
+            required: false,
+            default: false
         }
     },
     mentions: {
@@ -2583,7 +2802,10 @@ const schema = {
         folderId:{
             type: mongoose.Schema.Types.ObjectId,
             required: false,
-        }
+        },
+        transcript: { type: String, required: false },
+        isAgent: { type: Boolean, required: false },
+        agentName: { type: String, required: false }
     },
     mainChat: {
         ProjectCode: {
@@ -3031,7 +3253,31 @@ const schema = {
         rolledFrom: {
             type: mongoose.Schema.Types.ObjectId,
             required: false
-        }
+        },
+        purpose: { type: String, required: false },
+        linkedProjectId: { type: String, required: false },
+        visibility: { type: String, required: false },
+        slackMirror: { type: Object, default: {}, required: false }
+    },
+    calls: {
+        callId: { type: String, required: true },
+        chatId: { type: String, required: false },
+        projectId: { type: String, required: false },
+        sprintId: { type: String, required: false },
+        media: { type: String, required: false },
+        title: { type: String, required: false },
+        participants: { type: Array, default: [], required: false },
+        startedAt: { type: Date, required: false },
+        endedAt: { type: Date, required: false },
+        durationSec: { type: Number, default: 0, required: false },
+        notetaker: { type: Boolean, default: false, required: false },
+        transcript: { type: String, default: '', required: false },
+        summary: { type: String, default: '', required: false },
+        actionItems: { type: Array, default: [], required: false },
+        status: { type: String, default: 'ready', required: false },
+        recapPostedAt: { type: Date, required: false },
+        createdBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false }
     },
     folders:{
         name:{

@@ -93,6 +93,10 @@ exports.init = (app) => {
     app.post("/api/v2/auth/2fa/disable", ctrl.twoFaDisable)
     app.post("/api/v2/auth/2fa/validate", ctrl.twoFaValidate, ctrl.manageAttempt)
 
+    // Passwordless login link (public, pre-auth). Enable/disable with MAGIC_LINK_ENABLED.
+    app.post("/api/v2/auth/magic-link", ctrl.requestMagicLink)
+    app.get("/api/v2/auth/magic-link/verify", ctrl.verifyMagicLink)
+
 
     /**
      * @swagger

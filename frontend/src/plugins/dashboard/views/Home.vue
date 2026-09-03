@@ -34,8 +34,6 @@
                 <DashboardSpinner :is-spinner="isSpinner"/>
             </div>
         </div>
-        <TaskDetail v-if="isTaskDetail" :companyId="companyId" :projectId="projectId" :sprintId="sprintId"
-            :taskId="taskId" :isTaskDetailSideBar="isTaskDetail" @toggleTaskDetail="toggleTaskDetail" :zIndex='7' />
     </div>
     <div v-else class="d-flex bg-off-white align-items-center justify-content-center w-100 h-100">
         <img :src="accessDeniedImage" alt="accessDenied">
@@ -61,9 +59,9 @@ import { useRouter } from 'vue-router';
 import { useCustomComposable } from '@/composable';
 import { apiRequest, apiRequestWithoutCompnay } from '@/services';
 import { useGetterFunctions } from "@/composable/index.js";
-import TaskDetail from '@/views/TaskDetail/TaskDetail.vue';
+import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import ConfirmModal from '@/components/atom/Modal/Modal.vue';
-import { defineComponent ,ref,inject,computed,onMounted,provide, nextTick} from "vue";
+import { defineComponent ,ref,inject,computed,onMounted,provide} from "vue";
 import DashboardSpinner from '@/components/atom/Dashboard/DashboardSpinner.vue'
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from 'vue-i18n';
@@ -103,31 +101,25 @@ const allProjectsArrayFilter = ref(JSON.parse(JSON.stringify(projectsGetter.valu
 
 const {getUser} = useGetterFunctions();
 
-const toggleTaskDetail = (task,close=false,isComment = false) => {
+const toggleTaskDetail = (task, close = false, isComment = false) => {
     isTaskDetail.value = false;
-    if(close == true) {
+    if (close == true) {
         taskDetail.value = task;
-        router.push({name: 'Home',query: {}, params: {cid: companyId.value}})
         return;
     }
-    projectId.value = '';
-    sprintId.value = '';
-    taskId.value = '';
-    nextTick(()=>{
-        if(isComment) {
-            router.push({name: 'Home',query: {detailTab: "comment"}, params: {cid: companyId.value}})
-        }else{
-            router.push({name: 'Home',query: {detailTab: "task-detail-tab"}, params: {cid: companyId.value}});
-        }
-        openInNewTab(task);
-    })
-}
-const openInNewTab = (task) => {
-    projectId.value = task.ProjectID
-    sprintId.value = task.sprintId
-    taskId.value = task._id
+    projectId.value = task.ProjectID;
+    sprintId.value = task.sprintId;
+    taskId.value = task._id;
     isTaskDetail.value = true;
-};
+    openTask({
+        companyId: companyId.value,
+        projectId: task.ProjectID,
+        sprintId: task.sprintId,
+        folderId: task.folderObjId || task.sprintArray?.folderId || '',
+        taskId: task._id,
+        tab: isComment ? 'activity' : ''
+    });
+}
 
 const companyUser = computed(() => getUser(userId.value));
 

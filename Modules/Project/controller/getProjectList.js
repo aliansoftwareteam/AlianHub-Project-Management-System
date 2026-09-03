@@ -84,7 +84,9 @@ exports.getProjectList = async (req, res) => {
                             [privateQuery] : []
                         ),
                         publicQuery
-                    ]
+                    ],
+                    // A personal list is private to its owner even for admins.
+                    $and: [{ $or: [{ isPersonal: { $ne: true } }, { personalOwner: uid }] }]
                 }
             },
             {

@@ -1,22 +1,34 @@
 <template>
-    <!-- deleted -->
     <span v-if="message.isDeleted" class="mc-deleted">
         {{ message.sent ? $t('MainChat.deleted_by_you') : $t('MainChat.deleted') }}
     </span>
 
     <template v-else>
-        <!-- quoted reply: a left rule and one muted line, never a nested card -->
         <div v-if="message.hasReply" class="mc-quote">
             <b>{{ replyAuthor }}</b>
             <span v-if="replyPreview"> · {{ replyPreview }}</span>
         </div>
 
-        <!-- any attachment: image, audio, video or file -->
-        <MainChatMedia v-if="isMedia" :message="message" @preview="$emit('preview')" />
+        <template v-if="isMedia">
+            <div v-if="gallery.length > 1" class="mc-gallery">
+                <MainChatMedia
+                    v-for="item in gallery"
+                    :key="item._id || item.tempId"
+                    :message="item"
+                    tile
+                    @preview="$emit('preview', item)"
+                />
+            </div>
+            <MainChatMedia
+                v-else
+                :message="message"
+                @preview="$emit('preview', message)"
+                @make-task="$emit('make-task', $event)"
+                @transcribed="$emit('transcribed', $event)"
+            />
+            <div v-if="gallery.length > 1" class="mc-gallery-hint">{{ $t('ChatV2.lightbox_hint') }}</div>
+        </template>
 
-        <!-- text / link — rendered exactly as the existing comment renderer does:
-             stored text is HTML-escaped on write, changeText() turns mention
-             tokens into markup, and v-html renders the entities back as text. -->
         <span v-else v-html="renderedBody"></span>
     </template>
 </template>
@@ -28,31 +40,20 @@ import MainChatMedia from './MainChatMedia.vue';
 
 const props = defineProps({
     message: { type: Object, required: true },
+    siblings: { type: Array, default: () => [] },
 });
 
-defineEmits(['preview']);
+defineEmits(['preview', 'make-task', 'transcribed']);
 
 const { changeText, checkLink } = useCustomComposable();
 const { getUser } = useGetterFunctions();
 
 const isMedia = computed(() => !['text', 'link'].includes(props.message.type));
+const gallery = computed(() => [props.message, ...props.siblings]);
 
-/**
- * The message body: mentions rendered, then URLs turned into anchors.
- *
- * Linkified for EVERY text message, not just `type === 'link'`. Nothing in the send
- * path ever writes that type — so the old condition was unreachable and a pasted URL
- * always rendered as dead text. Doing it here also covers a link sitting among other
- * words, which a type flag on the whole message never could.
- *
- * Order matters: changeText() first, so mention markup exists, then checkLink() over
- * the result. Safe because the stored text was HTML-escaped on write, and checkLink
- * only wraps http/https/ftp matches — a `javascript:` URL cannot match its pattern.
- */
-const renderedBody = computed(() => {
-    const rendered = changeText(String(props.message.message || ''));
-    return checkLink(rendered, true);
-});
+// Mentions first so their markup exists, then URLs. Stored text was escaped on write and
+// checkLink only wraps http/https/ftp matches, so a javascript: URL cannot get through.
+const renderedBody = computed(() => checkLink(changeText(String(props.message.message || '')), true));
 
 const replyAuthor = computed(() => {
     const user = props.message.reply_userId ? getUser(props.message.reply_userId) : null;

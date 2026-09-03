@@ -25,6 +25,7 @@
                                     <span class="workload_title font-size-18 font-weight-700">{{$t('UserTimesheet.tracker_timesheet')}}</span>
                                 </li>
                             </ul>
+                        <TimesheetTabs active="tracker" class="ts-legacy-tabs" />
                         </div>
                     </div>
                 </div>
@@ -168,6 +169,8 @@
 </template>
 
 <script setup>
+    import TimesheetTabs from '@/views/Timesheet/TimesheetTabs.vue';
+    import '@/views/Timesheet/timeV2.css';
     import { useCustomComposable ,useGetterFunctions } from '@/composable';
     import TimebarComponent from '@/components/atom/TimesheetView/TrackerTimeSheetView/TimebarComponent.vue'
     import { defineComponent , onMounted ,ref , computed , inject ,watch } from "vue";

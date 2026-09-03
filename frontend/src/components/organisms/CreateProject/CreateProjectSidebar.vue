@@ -1,1086 +1,352 @@
-<!-- =========================================================================================
-    File Name: CreateProjectSidebar.vue
-    Created By : Dipsha Kalariya
-    Commnet : This file is used as main sidebar of create project module.
-========================================================================================== -->
 <template>
-<div class="createProjectSidebarWrapper commonProjectSidebar createTemplateProjectSidebarWrapper d-flex flex-row h-100 overflow-hidden" id="useTemplateId">
-    <div id="back_arrow_id" class="">
-        <Sidebar v-if="isVisible" :close-on-back-drop="!(isSpinnerForTemplate || isSpinner)" :visible="isActiveCreateSidebar" v-model:value="items" :grouped="true" :enable-search="false" :tourId="'createprojectfirst_driver'"
-            :multi-select="false" @clear="items = []" :width="widthVal" @update:visible="$emit('closeSidebar',$event)" :top="clientWidth <= 767 ? '0px' : '46px'">
-                <template #head-left>
-                    <span class="font-size-18 font-weight-700 blue" :class="[{'templateNameProject':isDisplayTemplate}]">{{isDisplayTemplate === false ? $t('Projects.create_project') : useTemplateName || isButtonClicked ?  t('Projects.use_template') : t('Templates.templates')}}</span>
-                </template>
-                <template #head-right>
-                    <button class="use-template-btn cursor-pointer" v-if="isDisplayDetail == true && !isButtonClicked" type="button" @click="handleButtonClick">{{$t('Projects.use_template')}}</button>
-                    <button class="btn outline-primary d-flex align-items-center justify-content-center create-project-cancelbtn" :class="{'cursor-pointer' : (!isSpinner || !isSpinnerForTemplate) , 'cursor-default pointer-event-none' : (isSpinner || isSpinnerForTemplate)}" :disabled="(isSpinner || isSpinnerForTemplate)" @click="handleCloseSidebar">{{$t('Projects.cancel')}}</button>
-                </template>
-            <template #body>
-                <div class="bg-light-gray mobile-common-background h-100" :class="{'p-015' : !isDisplayTemplate , 'addUseTemplate' : isDisplayTemplate, 'wizard-tt-fill' : activeIndex === 3 && !isDisplayTemplate, 'wizard-status-fill' : (activeIndex === 4 || activeIndex === 5) && !isDisplayTemplate, 'wizard-step-fill' : (activeIndex === 3 || activeIndex === 4 || activeIndex === 5) && !isDisplayTemplate}" >
-                    <div class="header-sidebar default-background-header d-flex bg-white border-radius-8-px">
-                        <div id="create-project-loading" class="createProjectWizardSlider createProjectBlankUseTemplateWrapper w-100" :class="{'p-020' : !isDisplayTemplate}">
-                            <template v-if="checkProjectPlan() === true">
-                                <div class="project-step-container mainwrapperbtn createTamplateMainBtn p-0" id="project-step-container" v-if="activeIndex === -1 && !isDisplayTemplate && !manageTemplate">
-                                    <div class="form-group text-center" id="createblankproject_driver">
-                                        <button type="button" @click="createBlankProject()">
-                                        <img src="@/assets/images/addProjectplus.png" class="defaultImg">
-                                        <img src="@/assets/images/addProjectplusBlue.png" class="hoverImg">
-                                        </button>
-                                        <p class="mb-0 choose-project-tilte">{{$t('Projects.blank_project')}}</p>
-                                    </div>
-                                    <div class="form-group text-center" id="createprojectusingtemplate_driver">
-                                        <button type="button" @click="useTemplateData()"><img src="@/assets/images/Rocket.png"></button>
-                                        <p class="mb-0 choose-project-tilte">{{$t('Projects.use_template')}}</p>
-                                    </div>
-                                </div>
+    <teleport to="body">
+        <div v-if="isVisible && !aiOpen" class="ah-cp" role="dialog" aria-modal="true" :aria-label="$t('AuthV2.new_project')" @keydown.esc="close">
+            <div class="ah-cp__backdrop" @click="!busy && close()"></div>
+            <div class="ah-cp__modal">
+                <aside class="ah-cp__left">
+                    <div class="ah-cp__head">
+                        <h2 class="ah-h1">{{ $t('AuthV2.new_project') }}</h2>
+                        <input v-model.trim="search" type="search" class="ah-input ah-cp__search" :placeholder="$t('AuthV2.search_templates')" :aria-label="$t('AuthV2.search_templates')" />
+                    </div>
+                    <div class="ah-cp__filters">
+                        <button v-if="teamFocus" type="button" class="ah-cp__filter" :class="{ 'is-on': filter === 'focus' }" @click="filter = 'focus'">{{ $t('AuthV2.for_focus', { focus: $t(`AuthV2.focus_${teamFocus}`) }) }}</button>
+                        <button type="button" class="ah-cp__filter" :class="{ 'is-on': filter === 'all' }" @click="filter = 'all'">{{ $t('AuthV2.all') }}</button>
+                    </div>
+                    <div class="ah-cp__list ah-scroll">
+                        <button type="button" class="ah-cp__tpl" :class="{ 'is-on': selected._id === blank._id }" @click="select(blank)">
+                            <span class="ah-cp__tpl-icon"><ShellIcon name="plus" :size="15" /></span>
+                            <span><span class="ah-cp__tpl-name">{{ blank.TemplateName }}</span><span class="ah-cp__tpl-desc">{{ blank.Description }}</span></span>
+                        </button>
+                        <div v-if="loading" class="ah-cp__spin"><SpinnerComp :is-spinner="true" /></div>
+                        <template v-else>
+                            <button v-for="tpl in shownGlobal" :key="tpl._id" type="button" class="ah-cp__tpl" :class="{ 'is-on': selected._id === tpl._id }" @click="select(tpl)">
+                                <span class="ah-cp__tpl-icon" :class="`ah-cp__tpl-icon--${templateGlyph(tpl).tone}`"><ShellIcon :name="templateGlyph(tpl).icon" :size="15" /></span>
+                                <span>
+                                    <span class="ah-cp__tpl-name">{{ tpl.TemplateName }}</span>
+                                    <span class="ah-cp__tpl-desc">{{ shortDescription(tpl) }} {{ $t('AuthV2.template_meta', { statuses: tpl.taskStatusData?.length || 0, tasks: tpl.sampleTaskCount || 0 }) }}</span>
+                                </span>
+                            </button>
+                            <template v-if="shownCustom.length">
+                                <div class="ah-label ah-cp__group">{{ $t('AuthV2.workspace_templates', { company: companyName }) }}</div>
+                                <button v-for="tpl in shownCustom" :key="tpl._id" type="button" class="ah-cp__tpl" :class="{ 'is-on': selected._id === tpl._id }" @click="select(tpl)">
+                                    <span class="ah-cp__tpl-icon ah-cp__tpl-icon--brand"><ShellIcon name="star" :size="15" /></span>
+                                    <span>
+                                        <span class="ah-cp__tpl-name">{{ tpl.TemplateName }}</span>
+                                        <span class="ah-cp__tpl-desc">{{ shortDescription(tpl) }} {{ $t('AuthV2.template_meta', { statuses: tpl.taskStatusData?.length || 0, tasks: 0 }) }}</span>
+                                    </span>
+                                </button>
                             </template>
-                            <div v-else>
-                                <div v-if="isSpinner === false">
-                                    <div class="bg-white border-radius-12-px d-flex align-items-center flex-column position-re">
-                                        <UpgradePlanSidebar
-                                            :title="$t('Upgrades.You_have_reached_the_free_plan_limit').replace('PLAN_NAME',`${currentCompany.planFeature?.planName} plan` || '') + '.'"
-                                            :message='$t(("Upgrades.require_upgrade_message")).replace("PROJECT_COUNT", currentCompany.planFeature?.project || 0).replace("PROJECT_NAME",currentCompany.planFeature?.planName || "")'
-                                            :buttonText="$t('Upgrades.upgrade_your_plan')"
-                                         />
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- USE AS A EXIST TEMPLATE DATA HTML START (DIPSHA) -->
-                            <div class="statusTaskWrapper statusTaskWrapperMain usetemplatesWrapper d-flex" :class="{'useTemaplteHeight' : isDisplayTemplate}">
-                                <div class="mainLeftside" v-if="isDisplayTemplate && !isDisplayDetail">
-                                    <h5>{{$t('ProjectDetails.browse_by_category')}}</h5>
-                                    <div class="use-template-browsecategory">
-                                        <ul class="taskStatusLeftListWrapper" v-if="categoryArray && categoryArray.length">
-                                            <li v-for="(item,index) in categoryArray" v-bind:key="index" :style="`${selectedDefaultCategory.key === item.key ? 'background-color: #DBF1FF !important;cursor:pointer;border: 1px solid #dbf1ff;' : ''}`">
-                                                <span class="templated_name" @click="changeCategoryData(item,'defaultData')" :style="`${selectedDefaultCategory.key === item.key ? 'color: #535358 !important;' : ''}`"> {{item.name}} </span>
-                                            </li>
-                                        </ul>
-                                        <ul class="taskStatusLeftListWrapper" v-else>
-                                            {{$t('Projects.no_category_found')}}
-                                        </ul>
-                                    </div>
-                                    <h5 class="mobile-use-template-text">{{$t('Projects.template')}}</h5>
-                                    <div class="use-template-browsecategory">
-                                        <ul class="taskStatusLeftListWrapper">
-                                            <li :style="`${(selectedCategory === CompanyDatabase && categoryType == 'basicData') ? 'background-color: #DBF1FF !important;cursor:pointer;border: 1px solid #dbf1ff;' : ''}`">
-                                                <span class="templated_name" @click="changeCategoryData('','basicData')" :style="`${selectedCategory === CompanyDatabase ? 'color: #535358 !important;' : ''}`">
-                                                    <p>{{userDataVal.companyData && userDataVal.companyData.filter((x) => x._id === CompanyDatabase)[0].Cst_CompanyName}}'s {{$t('Projects.template')}}</p>
-                                                </span>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                </div>
-                                <img v-if="(showArrow == true && !isButtonClicked)" :src="back_arrow" class="backArrow cursor-pointer mr-15px" @click="()=>{!isDisplayDetail ? (isDisplayTemplate = false,widthVal='607px',selectedDefaultData= [],isTemplateExist = false,showArrow = false) : manageSelectedVal(!isDisplayDetail)}">
-                                <img v-if="(showArrow == true && isButtonClicked)" :src="back_arrow" class="backArrow cursor-pointer mr-15px" :class="{'pointer-event-none' : isSpinnerForTemplate}" @click="isButtonClicked = false,emit('useTemplate',false),widthVal='923px'">
-                                <div class="template-right-side position-re" :class="{'template__spinner' : clientWidth <= 767 && isSpinnerTemplate}">
-                                    <SpinnerComp :is-spinner="isSpinner" v-if="isSpinner"/>
-                                    <div v-if="!spinner">
-                                        <div v-if="selectedDefaultData && selectedDefaultData.length > 0 && !isSpinner">
-                                            <div v-if="!isDisplayDetail && !isSpinnerTemplate" class="d-flex mobile-usetempllate-list-display w-100 flex-wrap">
-                                                <SingleTemplate v-for="(tempDefItem) in selectedDefaultData" v-bind:key="tempDefItem.id" :displayDataObject="tempDefItem" @click.prevent='displayTemplateDetail(tempDefItem)'/>
-                                            </div>
-                                            <TemplateDetail @update-processing="updateProcessing" :isButtonClicked="isButtonClicked" :model-value="formData" :currentSelectedKey="selectedDefaultCategory.key" v-if="isDisplayDetail" @update:manageTempList="manageTempList" :templateView="templateView" :isUseTemplate="true" :isExportTemplate="false" @click:closeDetails="closeDetails" @closeSecond="closeSecond" @click:updateSidebarVal="manageSelectedVal" @useTemplate="$event === false ? widthVal='923px' : widthVal='607px',useTemplateName = $event,showArrow == false,isButtonClicked = false"/>
-                                        </div>
-                                        <div v-else>
-                                            <div class="position-ab position-center">
-                                                <img :src="noResultFound" alt="norecordfound"/>
-                                                <div class="error-text text-center">
-                                                    <h2>{{$t('Filters.no_data_found')}}</h2>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- USE AS A EXIST TEMPLATE DATA HTML END (DIPSHA) -->
-                            <!-- USE AS A BLACK TEMPLATE HTML START (DIPSHA) -->
-                            <div id="project-step-container" v-if="activeIndex === 0" class="mobile-projectName-category-wrapper">
-                                <ProjectForm v-if="activeIndex === 0" v-model="formData"/>
-                            </div>
-                            <div id="project-step-container" v-if="activeIndex === 1" class="mobile-projectColorImage-wrapper">
-                                <ProjectProfileForm v-if="activeIndex === 1" v-model="formData.projectProfileField" :name="formData.projectName" @update:image="(ele)=>{updateImageValue(ele)}"/>
-                            </div>
-                            <div id="project-step-container" class="ProjectShareGraphicModel" v-if="activeIndex === 2">
-                                <ProjectWorkspace v-if="activeIndex === 2" v-model="formData.workSpaceField" :leader="formData.leadUser" :userDataVal="userDataVal" :name="formData.projectName" @disableNext="disableButton"/>
-                            </div>
-                            <div id="project-step-container" v-if="activeIndex === 3" class="mobile-project-taskstatus-section task-detail-mobile">
-                                <ProjectTaskTypeForm v-if="activeIndex === 3" v-model="formData.taskTypeForm" @disableNext="(val) =>{isDisable = val}"/>
-                            </div>
-                            <div id="project-step-container" v-if="activeIndex === 4" class="mobile-add-status-project mobile-project-taskstatus-section">
-                                <ProjectStatusForm v-if="activeIndex === 4" v-model="formData.projectStatusForm" @disableNext="(val) =>{isDisable = val}"/>
-                            </div>
-                            <div id="project-step-container" v-if="activeIndex === 5" class="mobile-project-taskstatus-section task-detail-mobile">
-                                <TaskStatusForm v-if="activeIndex === 5" v-model="formData.taskStatusForm" />
-                            </div>
-                            <div id="project-step-container" v-if="activeIndex === 6" class="mobile-project-taskstatus-section">
-                                <ProjectAlianAppsForm v-if="activeIndex === 6" v-model="formData.alianAppsObj"/>
-                            </div>
-                            <div id="project-step-container" v-if="currentCompany?.planFeature?.customFields === true && activeIndex === 7 && JSON.parse(JSON.stringify(formData?.alianAppsObj)).length && JSON.parse(JSON.stringify(formData?.alianAppsObj))?.find((e)=>e.key === 'CustomFields')?.appStatus === true && currentCompany?.planFeature?.customFields === true" class="mobile-project-taskstatus-section">
-                                <CustomFieldProjectComponent :customField="customFiedlsValue" @manageCustomField="(val)=>{customFiedlsValue = val}"/>
-                            </div>
-                            <div id="project-step-container" v-if="activeIndex === (JSON.parse(JSON.stringify(formData?.alianAppsObj)).length && JSON.parse(JSON.stringify(formData?.alianAppsObj))?.find((e)=>e.key === 'CustomFields')?.appStatus === true && currentCompany?.planFeature?.customFields === true ? 8 : 7)" class="mobile-project-taskstatus-section">
-                                <ProjectRequiredViewForm v-if="activeIndex === (JSON.parse(JSON.stringify(formData?.alianAppsObj)).length && JSON.parse(JSON.stringify(formData?.alianAppsObj))?.find((e)=>e.key === 'CustomFields')?.appStatus === true && currentCompany?.planFeature?.customFields === true ? 8 : 7)" v-model="formData.requiredViewobj"/>
-                            </div>
-                            <div id="project-step-container" v-if="activeIndex === (JSON.parse(JSON.stringify(formData?.alianAppsObj)).length && JSON.parse(JSON.stringify(formData?.alianAppsObj))?.find((e)=>e.key === 'CustomFields')?.appStatus === true && currentCompany?.planFeature?.customFields === true ? 9 : 8)" class="mobile-project-taskstatus-section">
-                                <ProjectAllDetailPage v-if="activeIndex === (JSON.parse(JSON.stringify(formData?.alianAppsObj)).length && JSON.parse(JSON.stringify(formData?.alianAppsObj))?.find((e)=>e.key === 'CustomFields')?.appStatus === true && currentCompany?.planFeature?.customFields === true ? 9 : 8)" v-model="formData"/>
-                            </div>
-                            <div id="project-step-container" v-if="isActiveTemplatePage" class="mobile-project-taskstatus-section">
-                                <BlankProjectTemplatePage v-if="isActiveTemplatePage" :templateDetail="formData.templateDetail" v-model="formData"/>
-                            </div>
-                            <!-- USE AS A BLACK TEMPLATE HTML END (DIPSHA) -->
-                            <div class="conditional-btn-wrapper d-flex justify-content-end mt-31px">
-                            <button v-if="activeIndex >= 0 && isDisable ===false && !isSpinner" @click="prevStep()" class="cursor-pointer conditional-previous-step btn border-primary border-radius-4-px blue bg-white">{{$t('Projects.previous')}}</button>
-                            <button v-if="activeIndex >= 0 && isDisable === true" class="conditional-previous-step disabled__previous btn border-secondary border-radius-4-px bg-white">{{$t('Projects.previous')}}</button>
-                            <button v-if="activeIndex < (JSON.parse(JSON.stringify(formData?.alianAppsObj)).length && JSON.parse(JSON.stringify(formData?.alianAppsObj))?.find((e)=>e.key === 'CustomFields')?.appStatus === true && currentCompany?.planFeature?.customFields === true ? 9 : 8) && activeIndex !== -1 && isDisable ===false" @click="nextStep()" class="cursor-pointer conditional-next-step btn border-radius-4-px white border-0 bg-blue">{{$t('Home.Next')}}</button>
-                            <button v-if="activeIndex < 8 && activeIndex !== -1 && isDisable === true" class="conditional-next-step btn border-radius-4-px white border-0 bg-gray81">{{$t('Home.Next')}}</button>
-                            <button v-if="activeIndex == (JSON.parse(JSON.stringify(formData?.alianAppsObj)).length && JSON.parse(JSON.stringify(formData?.alianAppsObj))?.find((e)=>e.key === 'CustomFields')?.appStatus === true && currentCompany?.planFeature?.customFields === true ? 9 : 8) && isShowTemplateBtn && !isSpinner"  @click="showTemplatePage()" class="cursor-pointer conditional-saveas-template btn border-radius-4-px border-primary blue bg-white" id="createprojectsavetemp_driver">{{$t('Projects.save_tamplete')}}</button>
-                            <button v-if="activeIndex == (JSON.parse(JSON.stringify(formData?.alianAppsObj)).length && JSON.parse(JSON.stringify(formData?.alianAppsObj))?.find((e)=>e.key === 'CustomFields')?.appStatus === true && currentCompany?.planFeature?.customFields === true ? 9 : 8) && !isSpinner"  @click="submitData()" class="submit-btn cursor-pointer conditional-create-project btn border-radius-4-px bg-blue white border-0" id="createprojectbtn_driver">{{$t('Projects.create_project')}}</button>
-                            <button v-if="isActiveTemplatePage&& !isSpinner"  @click="submitTemplateData()" class="submit-btn cursor-pointer conditional__save-create btn border-radius-4-px bg-blue white border-0">{{$t('Projects.save_create')}} </button>
-                            <button v-else-if="isSpinner" type="button" class="btn btn-blue btn-login btn-disabled font-roboto-sans bg-blue white cursor-pointer font-weight-500" disabled><span id="btn-spinner"></span>{{$t('Auth.loading')}}...</button>
-                        </div>
+                            <div v-if="search && !shownGlobal.length && !shownCustom.length" class="ah-cp__empty">{{ $t('AuthV2.no_templates_match') }}</div>
+                        </template>
+                        <button type="button" class="ah-cp__tpl" @click="aiOpen = true">
+                            <span class="ah-cp__tpl-icon ah-cp__tpl-icon--agent"><ShellIcon name="ai" :size="15" /></span>
+                            <span><span class="ah-cp__tpl-name">{{ $t('AuthV2.from_description') }}</span><span class="ah-cp__tpl-desc">{{ $t('AuthV2.from_description_desc') }}</span></span>
+                        </button>
+                    </div>
+                </aside>
+
+                <section class="ah-cp__right ah-scroll">
+                    <div>
+                        <div class="ah-label">{{ $t('AuthV2.preview', { name: selected.TemplateName }) }}</div>
+                        <div class="ah-cp__statuses">
+                            <span v-for="(s, i) in selected.taskStatusData || []" :key="s.key || s.name" class="ah-cp__status" :class="`ah-cp__status--${statusTone(s, i)}`">{{ s.name }}</span>
                         </div>
                     </div>
-                </div>
-            </template>
-        </Sidebar>
-    </div>
-</div>
+
+                    <div class="ah-card ah-cp__sample">
+                        <template v-if="sampleCount">
+                            <div class="ah-label">{{ $t('AuthV2.sample_tasks_label', { n: sampleCount }) }}</div>
+                            <div v-for="name in (selected.sampleTaskNames || []).slice(0, 3)" :key="name" class="ah-cp__sample-row"><span class="ah-cp__box"></span>{{ name }}<span class="ah-mono">1h</span></div>
+                            <div v-if="sampleCount > 3" class="ah-cp__sample-row ah-cp__sample-row--more"><span class="ah-cp__box"></span>{{ $t('AuthV2.more_tasks', { n: sampleCount - 3 }) }}</div>
+                        </template>
+                        <div v-else class="ah-cp__sample-row ah-cp__sample-row--more">{{ $t('AuthV2.no_sample') }}</div>
+                    </div>
+
+                    <form class="ah-cp__form" novalidate @submit.prevent="submit">
+                        <div v-if="banner" class="ah-field__error"><ShellIcon name="x" :size="12" />{{ banner }}</div>
+                        <div class="ah-field">
+                            <label class="ah-field__label" for="cp-name">{{ $t('AuthV2.project_name') }}</label>
+                            <input
+                                id="cp-name"
+                                ref="nameInput"
+                                v-model.trim="form.name"
+                                type="text"
+                                class="ah-input ah-input--name"
+                                :class="{ 'ah-input--error': errors.name }"
+                                maxlength="100"
+                                autocomplete="off"
+                                :placeholder="$t('PlaceHolder.Enter_Project_Name')"
+                                @input="onNameInput"
+                            />
+                            <div v-if="errors.name" class="ah-field__error"><ShellIcon name="x" :size="12" />{{ errors.name }}</div>
+                        </div>
+                        <div class="ah-cp__row">
+                            <div class="ah-field">
+                                <label class="ah-field__label" for="cp-key">{{ $t('AuthV2.project_key') }}</label>
+                                <input id="cp-key" v-model.trim="form.key" type="text" class="ah-input ah-mono" :class="{ 'ah-input--error': errors.key }" maxlength="10" autocomplete="off" @input="onKeyInput" />
+                                <div v-if="errors.key" class="ah-field__error"><ShellIcon name="x" :size="12" />{{ errors.key }}</div>
+                            </div>
+                            <div class="ah-field">
+                                <label class="ah-field__label" for="cp-visibility">{{ $t('AuthV2.visibility') }}</label>
+                                <select id="cp-visibility" v-model="form.isPrivate" class="ah-input ah-cp__select">
+                                    <option :value="false">{{ $t('AuthV2.everyone_in', { company: companyName }) }}</option>
+                                    <option :value="true">{{ $t('AuthV2.private_project') }}</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="ah-cp__row">
+                            <div class="ah-field">
+                                <label class="ah-field__label">{{ $t('ProjectDetails.source') }}</label>
+                                <ProjectSourceSelect v-model="form.source" @changed="errors.source = ''; errors.proposalId = ''" />
+                                <div v-if="errors.source" class="ah-field__error"><ShellIcon name="x" :size="12" />{{ errors.source }}</div>
+                            </div>
+                            <div v-if="isUpwork(form.source)" class="ah-field">
+                                <label class="ah-field__label" for="cp-proposal">{{ $t('ProjectDetails.proposal_id') }}</label>
+                                <input id="cp-proposal" v-model.trim="form.proposalId" type="text" class="ah-input" :class="{ 'ah-input--error': errors.proposalId }" maxlength="100" :placeholder="$t('PlaceHolder.Enter_Proposal_Id')" @input="errors.proposalId = ''" />
+                                <div v-if="errors.proposalId" class="ah-field__error"><ShellIcon name="x" :size="12" />{{ errors.proposalId }}</div>
+                                <div v-else class="ah-field__hint">{{ $t('Projects.proposal_id_format_hint') }}</div>
+                            </div>
+                            <div v-else class="ah-field">
+                                <label class="ah-field__label">{{ $t('AuthV2.due_date') }}</label>
+                                <VueDatePicker v-model="form.dueDate" :placeholder="$t('PlaceHolder.Select_Project_Due_Date')" auto-apply :close-on-auto-apply="true" :min-date="new Date()" :enable-time-picker="false" />
+                            </div>
+                        </div>
+                        <div class="ah-cp__row">
+                            <div class="ah-field">
+                                <label class="ah-field__label">{{ $t('AuthV2.lead') }}</label>
+                                <div class="ah-cp__lead">
+                                    <Assignee :users="form.leads.map((x) => x.id)" :options="users.map((x) => x._id)" :num-of-users="3" imageWidth="30px" :isDisplayTeam="false" @selected="updateLead($event, 'add')" @removed="updateLead($event, 'remove')" />
+                                </div>
+                            </div>
+                            <div class="ah-field">
+                                <label class="ah-field__label">{{ $t('ProjectDetails.skills') }}</label>
+                                <SkillsSelect v-model="form.skills" :bordered="true" :showAll="true" />
+                            </div>
+                        </div>
+                        <div v-if="isUpwork(form.source)" class="ah-field">
+                            <label class="ah-field__label">{{ $t('AuthV2.due_date') }}</label>
+                            <VueDatePicker v-model="form.dueDate" :placeholder="$t('PlaceHolder.Select_Project_Due_Date')" auto-apply :close-on-auto-apply="true" :min-date="new Date()" :enable-time-picker="false" />
+                        </div>
+                        <label v-if="sampleCount" class="ah-cp__check">
+                            <input v-model="form.includeSamples" type="checkbox" class="ah-check" />
+                            <span>{{ $t('AuthV2.include_samples', { n: sampleCount }) }} <span class="ah-muted">{{ $t('AuthV2.include_samples_hint') }}</span></span>
+                        </label>
+                        <div class="ah-cp__foot">
+                            <button type="button" class="ah-btn ah-btn--secondary" :disabled="busy" @click="close">{{ $t('Projects.cancel') }}</button>
+                            <button type="submit" class="ah-btn ah-btn--primary" :disabled="busy" id="createprojectbtn_driver">
+                                <span v-if="busy" class="ah-spin"></span>{{ busy ? $t('AuthV2.creating_project') : $t('AuthV2.create_project') }}
+                            </button>
+                        </div>
+                    </form>
+                </section>
+            </div>
+        </div>
+    </teleport>
+    <AiProjectCreator v-if="aiOpen" :visible="aiOpen" @close="aiOpen = false" @created="onAiCreated" />
 </template>
+
 <script setup>
+import { computed, inject, nextTick, onMounted, reactive, ref, watch } from "vue";
+
+defineOptions({ name: "CreateProjectSidebar" });
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { computed, defineComponent,defineProps, ref, inject, watch, onMounted, nextTick } from "vue";
-import { defineEmits } from 'vue';
-import { dbCollections } from "@/utils/Collections";
-import ProjectForm from '@/components/templates/CreateProject/ProjectForm.vue';
-import { checkSourceFields } from '@/utils/projectSource';
-import ProjectProfileForm from '@/components/templates/CreateProject/ProjectProfileForm.vue';
-import ProjectWorkspace from '@/components/templates/CreateProject/ProjectWorkspace.vue';
-import ProjectTaskTypeForm from '@/components/templates/CreateProject/ProjectTaskTypeForm.vue'
-import ProjectStatusForm from '@/components/templates/CreateProject/ProjectStatusForm.vue';
-import TaskStatusForm from '@/components/templates/CreateProject/TaskStatusForm.vue';
-import ProjectAlianAppsForm from '@/components/templates/CreateProject/ProjectAlianAppsForm.vue';
-import ProjectRequiredViewForm from '@/components/templates/CreateProject/ProjectRequiredViewForm.vue';
-import ProjectAllDetailPage from '@/components/templates/CreateProject/ProjectAllDetailPage.vue';
-import BlankProjectTemplatePage from '@/components/templates/CreateProject/BlankProjectTemplatePage.vue'
-import Sidebar from "@/components/molecules/Sidebar/Sidebar.vue";
-import { useValidation } from "@/composable/Validation";
-import {useToast} from 'vue-toast-notification';
-import * as helper from '@/components/templates/CreateProject/helper.js'
-import {removeDuplicatesWithKey} from "@/views/Settings/Template/helper.js";
-import TemplateDetail from '@/components/templates/CreateProject/TemplateDetail.vue';
-import SingleTemplate from "@/views/Settings/Template/SingleTemplate.vue"
-import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
-import * as env from '@/config/env';
-import cloneDeep from 'lodash/cloneDeep'; // Import a cloning library
-import { apiRequestWithoutCompnay } from '../../../services';
-import UpgradePlanSidebar from "@/components/atom/UpgradePlanSidebar/UpgradePlanSidebar.vue"
 import { useI18n } from "vue-i18n";
-const { t } = useI18n();
+import { useToast } from "vue-toast-notification";
+import VueDatePicker from "@vuepic/vue-datepicker";
+import "@vuepic/vue-datepicker/dist/main.css";
+import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import SpinnerComp from "@/components/atom/SpinnerComp/SpinnerComp.vue";
+import Assignee from "@/components/molecules/Assignee/Assignee.vue";
+import SkillsSelect from "@/components/molecules/SkillsSelect/SkillsSelect.vue";
+import ProjectSourceSelect from "@/components/molecules/ProjectSourceSelect/ProjectSourceSelect.vue";
+import AiProjectCreator from "@/components/organisms/AiProjectCreator/AiProjectCreator.vue";
+import { useGetterFunctions } from "@/composable";
+import { dbCollections } from "@/utils/Collections";
+import { isUpwork, checkProposalId, PROJECT_SOURCES, DEFAULT_SOURCE } from "@/utils/projectSource";
+import * as helper from "@/components/templates/CreateProject/helper.js";
+import { apiRequest } from "@/services";
+import * as env from "@/config/env";
+import { blankTemplate, templateGlyph, colorForName, keyFromName, statusTone } from "./templates";
 
 const props = defineProps({
-    isActiveCreateSidebar: {
-        type: Boolean,
-        default: false
-    },
-    isAdvanceFilterApplied: {
-        type: Boolean,
-        default: false
-    }
-})
+    isActiveCreateSidebar: { type: Boolean, default: false },
+    isAdvanceFilterApplied: { type: Boolean, default: false }
+});
+const emit = defineEmits(["update:visible", "click:closeSidebar", "closeSidebar", "update:manageTempList", "useTemplate", "update-processing"]);
 
-const defaultCurrency = computed(() => getters['settings/allCurrencyArray']?.find((x) => x.code === "INR"));
-// image
-const noResultFound = require("@/assets/images/svg/No-Search-Result.svg");
-const isVisible = ref(props.isActiveCreateSidebar);
-const userId = inject('$userId');
-const clientWidth = inject("$clientWidth");
-const { getUser } = useGetterFunctions();
-import { useGetterFunctions } from "@/composable";
-import { useRoute, useRouter } from 'vue-router';
-import {storageQueryBuilder,generateFileName} from '@/utils/storageQueryBuild.js';
-import { apiRequest } from '../../../services';
-
+const { t } = useI18n();
 const $toast = useToast();
-const  { checkAllFields } = useValidation();
+const route = useRoute();
+const router = useRouter();
+const { getters, dispatch, commit } = useStore();
+const { getUser } = useGetterFunctions();
+const userId = inject("$userId");
+const companyId = inject("$companyId");
 
-    defineComponent({
-        name: "CreateProject-Component",
-        components: {
-            ProjectForm,
-            Sidebar
-        },
-    })
-    const formData = ref({
-        projectName: {
-            value: "",
-            rules:
-            "required | min:3| max:100",
-            name: "project name",
-            error: "",
-        },
-        projectCode: {
-            value: "",
-            rules:
-            "required",
-            name: "project key",
-            error: "",
-            isUniqueProjectCode : '',
-        },
-        leadUser: {
-            value: [],
-            rules:
-            "required",
-            name: "leadUser",
-            error: "",
-        },
-        dueDate: {
-            value: "",
-            rules:
-            "required",
-            name: "dueDate",
-            error: "",
-        },
-        proposalId: {
-            value: "",
-            rules: "",
-            name: "proposal id",
-            error: "",
-        },
-        skills: {
-            value: [],
-            rules: "",
-            name: "skills",
-            error: "",
-        },
-        source: {
-            value: "",
-            rules: "",
-            name: "source",
-            error: "",
-        },
-        projectProfileField:{
-            selectedColor : {
-                value: "",
-                rules:
-                "required",
-                name: "selectedColor",
-                error: "",
-            },
-            uploadedImage : {
-                value: "",
-                rules:
-                "required",
-                name: "Choose an Image to Upload",
-                error: "",
-            },
-            previewImage : {
-                value: "",
-                rules:
-                "required",
-                name: "previewImage",
-                error: "",
-            }
-        },
-        workSpaceField : {
-            privateSpaceValue : {
-                value: false,
-                rules:
-                "required",
-                name: "privateSpaceValue",
-                error: "",
-            },
-            privateSpaceUsers : {
-                value: [],
-                rules:
-                "required",
-                name: "privateSpaceUsers",
-                error: "",
-            }
-        },
-        taskTypeForm : {
-            taskTypeField : {
-                value: {},
-                rules:
-                "required",
-                name: "taskTypeField",
-                error: "",
-            }
-        },
-        projectStatusForm : {
-            projectStatusField : {
-                value: {},
-                rules:
-                "required",
-                name: "projectStatusField",
-                error: "",
-            } 
-        },
-        taskStatusForm : {
-            taskStatusField : {
-                value: {},
-                rules:
-                "required",
-                name: "taskStatusField",
-                error: "",
-            }
-        },
-        alianAppsObj :[],
-        requiredViewobj: {
-            value: [],
-            rules:
-            "required",
-            name: "requiredViewobj",
-            error: "",
-        },
-        templateDetail : {
-            templateName: {
-                value: "",
-                rules:
-                "required",
-                name: "templateName",
-                error: "",
-            },
-            description : {
-                value: "",
-                rules:
-                "required",
-                name: "description",
-                error: "",
-            },
-            uploadedImage : {
-                value: "",
-                rules:
-                "required",
-                name: "uploadedImage",
-                error: "",
-            },
-            previewImage : {
-                value: "",
-                rules:
-                "required",
-                name: "previewImage",
-                error: "",
-            }
-        }
-    })
-    const previewImage = ref(null);
-    const emit = defineEmits(["update:visible", "click:closeSidebar", "closeSidebar","update:manageTempList","useTemplate",'update-processing']);
-    const { getters , dispatch, commit} = useStore();
-    const userDataVal = getUserData();
-    const CompanyDatabase = inject("$companyId");
-    const hanldeBlankProjectTour = inject("hanldeBlankProjectTour");
-    const companyUser = ref(getters['settings/companyUserDetail']);
-    const projectTemplateGetter = computed(() => {
-        return getters["projectData/projectTemplate"];
-    })
-    const currentCompany = computed(() => getters['settings/selectedCompany']);
-    const isSpinnerTemplate = ref(false);
-    const items = ref([]);
-    const isDisplayTemplate = ref(false);
-    const isDisplayDetail = ref(false);
-    const manageTemplate = ref(false);
-    const useTemplateName = ref(false);
-    const isShowTemplateBtn = ref(false);
-    const isActiveTemplatePage = ref(false);
-    const isSpinner = ref(false);
-    const spinner = ref(false);
-    const isSpinnerForTemplate = ref(false);
-    const isDisable = ref(false);
-    const templateView = ref({});
-    const isButtonClicked = ref(false);
-    const useTemplateProj = ref('category');
-    const customFiedlsValue = ref([]);
-    const route = useRoute();
-    const router = useRouter();
-    const updateProcessing = (status) => {
-        isSpinnerForTemplate.value = status;
-    };
-    // MANAGE TEMPLATE CREATE DETAILS (DIPSHA)
-    const activeIndex = ref(-1);
-    const createBlankProject = () =>{
-        activeIndex.value = 0;
-        isShowTemplateBtn.value = true;
-        setTimeout(() => {
-            if(hanldeBlankProjectTour) {
-                hanldeBlankProjectTour()
-            }
-        }, 100);
-    }
-    const handleButtonClick = () => {
-        widthVal.value = "607px";
-        isButtonClicked.value = true;
-    };
-    function getUserData() {
-        const user = getUser(userId.value,true);
-        const userData = {
-            id: user.id,
-            Employee_Name: user.Employee_Name,
-            companyid : user.AssignCompany,
-            companyData : [],
-            companyOwnerId : user.companyOwnerId
-        }
-        return userData;
-    }
-    const companies = computed(() => {
-        return getters["settings/companies"];
-    })
-    if(companies.value && companies.value.length > 0){
-        userDataVal.companyid.forEach(element => {
-            let indexVal = companies.value.findIndex((item)=>{
-                return item._id === element
-            })
-            if(indexVal !== -1){
-                userDataVal.companyData.push(companies.value[indexVal])
-            }
-        });
-    }
-    const nextStep = ()=>{
-        if(activeIndex.value === 0){
-            // Runs before checkAllFields, not inside its success branch: the user
-            // should see every missing field at once, not the source error only
-            // after fixing the name and key.
-            const sourceValid = checkSourceFields(formData.value, t);
-            checkAllFields({projectName : formData.value.projectName,projectCode:formData.value.projectCode}).then((valid)=>{
-                if(valid && sourceValid){
-                    if(formData.value.projectCode.isUniqueProjectCode !== ""){
-                        return
-                    }
-                    else{
-                        activeIndex.value += 1;
-                    }
-                }
-            })
-        }
-        else if(activeIndex.value === 3){
-            if(!Object.keys(formData.value.taskTypeForm.taskTypeField.value).length){
-                formData.value.taskTypeForm.taskTypeField.error = t('errorPage.please_select_template');
-                return;
-            }
-            else{
-                checkAllFields(formData.value.taskTypeForm.taskTypeField).then((valid)=>{
-                    if(valid){
-                        activeIndex.value += 1;
-                    }
-                })
-            }
-        }
-        else if(activeIndex.value === 5){
-            if(!Object.keys(formData.value.taskStatusForm.taskStatusField.value).length){
-                formData.value.taskStatusForm.taskStatusField.error = t('errorPage.please_select_template');
-                return;
-            }
-            else{
-                activeIndex.value += 1;
-            }
-        }
-        else if(activeIndex.value === 7 && JSON.parse(JSON.stringify(formData.value?.alianAppsObj)).length && JSON.parse(JSON.stringify(formData.value?.alianAppsObj))?.find((e)=>e.key === 'CustomFields')?.appStatus == false){
-            const isValid = JSON.parse(JSON.stringify(formData.value?.requiredViewobj.value)).some(item => item.setAsDefault || item.viewStatus);
-            if(!isValid) {
-                formData.value.requiredViewobj.error = t('ViewList.error_message_for_empty');
-                return;
-            } else {
-                activeIndex.value += 1;
-                formData.value.requiredViewobj.error='';
-            }  
-        }
-        else if(activeIndex.value === 8 && JSON.parse(JSON.stringify(formData.value?.alianAppsObj)).length && JSON.parse(JSON.stringify(formData.value?.alianAppsObj))?.find((e)=>e.key === 'CustomFields')?.appStatus == true) {
-            const isValid = JSON.parse(JSON.stringify(formData.value?.requiredViewobj.value)).some(item => item.setAsDefault || item.viewStatus);
-            if(!isValid) {
-                formData.value.requiredViewobj.error = t('ViewList.error_message_for_empty');
-                return;
-            } else {
-                activeIndex.value += 1;
-                formData.value.requiredViewobj.error='';
-            }
-        }
-        else{
-            if(activeIndex.value === 6) {
-                if(JSON.parse(JSON.stringify(formData.value?.alianAppsObj)).length && JSON.parse(JSON.stringify(formData.value?.alianAppsObj))?.find((e)=>e.key === 'CustomFields')?.appStatus == false) {
-                    customFiedlsValue.value = [];
-                }
-            }
-            activeIndex.value += 1;
-        }
-    }
-    const prevStep = () =>{
-        activeIndex.value -= 1;
-        isActiveTemplatePage.value = false;
-        formData.value.projectName.error = '';
-        formData.value.projectCode.error = '';
-    }
-    const back_arrow = require("@/assets/images/back_arrow.png");
-    const categoryArray = ref([]);
-    const selectedDefaultCategory = ref({});
-    const defaultMainTemplate = ref([]);
-    const allProjectTemplate = ref([]);
-    const selectedDefaultData = ref([]);
-    const selectedCategory = ref({});
-    const categoryType = ref("");
-    const isTemplateExist = ref(false);
-    const showArrow = ref(false);
-    const widthVal = ref('607px');
-    const proIconData = ref({});
+const isVisible = ref(props.isActiveCreateSidebar);
+watch(() => props.isActiveCreateSidebar, (v) => { isVisible.value = v; });
 
-    onMounted(() => {
-        checkProjectPlan();
-    })
-    const useTemplateData = () =>{
-        showArrow.value = true
-        widthVal.value = '1329px';
-        categoryType.value = '';
-        isDisplayTemplate.value = true;
-        isShowTemplateBtn.value = true;
-        selectedDefaultData.value = [];
-        isSpinner.value = true;
-        spinner.value = true;
-        apiRequest("post", env.GLOBAL_PROJECT_TEMPLATE).then((result)=>{
-            if(result.data.status){
-                defaultMainTemplate.value = result.data.statusText;
-                categoryArray.value = removeDuplicatesWithKey(defaultMainTemplate.value.map(ele=>ele.TemplateCategory),'key');
-                selectedDefaultCategory.value = categoryArray.value[0];
-                selectedDefaultData.value = defaultMainTemplate.value.filter(tempData=>tempData.TemplateCategory.key === selectedDefaultCategory.value.key);
-            }
-            spinner.value = false;
-            isSpinner.value = false;
-        }).catch((error)=>{
-            spinner.value = false;
-            isSpinner.value = false;
-            console.error('Error in getting projectTemplate',error);
-        });
-    }
-    const projectStaus = computed(() => {
-        return cloneDeep(getters['settings/projectStaus']);
-    })
-    const taskType = computed(() => {
-        return cloneDeep(getters['settings/taskType']);
-    })
-    const taskStatus = computed(() => {
-        return cloneDeep(getters['settings/taskStatus']);
-    })
-    watch(() => getters['projectData/projectTemplate'],(newVal)=>{
-        if(newVal && Object.keys(newVal).length == 0) {
-            if(selectedDefaultCategory.value && Object.keys(selectedDefaultCategory.value).length == 0) {
-                selectedDefaultData.value = [];
-                isTemplateExist.value = true;
-            }
-        } else {
-            allProjectTemplate.value = newVal.data;
-            if(selectedDefaultCategory.value && Object.keys(selectedDefaultCategory.value).length == 0) {
-                selectedDefaultData.value = allProjectTemplate.value;
-                isTemplateExist.value = false;
-            }
-        }
-    })
-    function manageSelectedVal(value){
-        isDisplayDetail.value = value;
-        manageTempList(isDisplayDetail.value);
-    }
-    function manageTempList(value){
-        isDisplayDetail.value = value;
-        if(isDisplayDetail.value === false){
-            widthVal.value = '1329px';
-        }else {
-            widthVal.value = '923px';
-        }
-    }
-    function changeCategoryData(itemData,type){
-        if(type == "basicData"){
-            useTemplateProj.value = 'withoutcategory';
-            if(categoryType.value == '' || categoryType.value !== 'basicData') {
-                isTemplateExist.value = false;
-                isSpinnerTemplate.value = true;
-                categoryType.value = "basicData";
-                selectedCategory.value = CompanyDatabase.value;
-                selectedDefaultCategory.value = {};
-                getProjectTemplate().then(()=>{
-                    selectedDefaultData.value = allProjectTemplate.value.sort((a, b) => a?.Created_At?.seconds > b?.Created_At?.seconds ? -1 : 1);
-                    isSpinnerTemplate.value = false;
-                    if(allProjectTemplate.value.length <= 0){
-                        isTemplateExist.value = true;
-                    }
-                }).catch((err)=>{
-                    isSpinnerTemplate.value = false;
-                    console.error(err)
-                })
-            }
-        }
-        if(type == "defaultData"){
-            useTemplateProj.value = 'category';
-            isTemplateExist.value = false;
-            categoryType.value = "";
-            selectedDefaultData.value = [];
-            isDisplayDetail.value = false;
-            selectedCategory.value = {};
-            selectedDefaultCategory.value = itemData;
-            selectedDefaultData.value = defaultMainTemplate.value.filter(tempData=>tempData.TemplateCategory.key === selectedDefaultCategory.value.key)
-            if(selectedDefaultData.value.length <= 0){
-                isTemplateExist.value = true; 
-            }
-        }
-    }
-    async function submitData(){
-        try {
-            isSpinner.value = true;
-            var templateProjectStatus = [];
-            if(Object.keys(formData.value.taskStatusForm.taskStatusField.value).length>0){
-                if(formData.value.taskStatusForm.taskStatusField.value.defaultActive && Object.keys(formData.value.taskStatusForm.taskStatusField.value.defaultActive).length > 0){
-                    templateProjectStatus.push({
-                        'name': formData.value.taskStatusForm.taskStatusField.value.defaultActive.name,
-                        'bgColor': formData.value.taskStatusForm.taskStatusField.value.defaultActive.textColor + '35',
-                        'textColor': formData.value.taskStatusForm.taskStatusField.value.defaultActive.textColor,
-                        'key' : formData.value.taskStatusForm.taskStatusField.value.defaultActive.key,
-                        'statusImage': "",
-                        'isDeleted' : true,
-                        'type': 'default_active'
-                    })
-                }
-                if(formData.value.taskStatusForm.taskStatusField.value.ActiveStatusList && formData.value.taskStatusForm.taskStatusField.value.ActiveStatusList.length > 0){
-                    for(let j=0;j<formData.value.taskStatusForm.taskStatusField.value.ActiveStatusList.length;j++){
-                        templateProjectStatus.push({
-                            'name': formData.value.taskStatusForm.taskStatusField.value.ActiveStatusList[j].name,
-                            'bgColor': formData.value.taskStatusForm.taskStatusField.value.ActiveStatusList[j].textColor + '35',
-                            'textColor': formData.value.taskStatusForm.taskStatusField.value.ActiveStatusList[j].textColor,
-                            'key' : formData.value.taskStatusForm.taskStatusField.value.ActiveStatusList[j].key,
-                            'statusImage': "",
-                            'isDeleted' : true,
-                            'type': 'active'
-                        })
-                    }
-                }
-                if(formData.value.taskStatusForm.taskStatusField.value.DoneStatusList && formData.value.taskStatusForm.taskStatusField.value.DoneStatusList.length > 0){
-                    for(let j=0;j<formData.value.taskStatusForm.taskStatusField.value.DoneStatusList.length;j++){
-                        templateProjectStatus.push({
-                            'name': formData.value.taskStatusForm.taskStatusField.value.DoneStatusList[j].name,
-                            'bgColor': formData.value.taskStatusForm.taskStatusField.value.DoneStatusList[j].textColor + '35',
-                            'textColor': formData.value.taskStatusForm.taskStatusField.value.DoneStatusList[j].textColor,
-                            'key' : formData.value.taskStatusForm.taskStatusField.value.DoneStatusList[j].key,
-                            'statusImage': "",
-                            'isDeleted' : true,
-                            'type': 'done'
-                        })
-                    }
-                }
-                if(formData.value.taskStatusForm.taskStatusField.value.defaultComplete && Object.keys(formData.value.taskStatusForm.taskStatusField.value.defaultComplete).length > 0){
-                    templateProjectStatus.push({
-                        'name': formData.value.taskStatusForm.taskStatusField.value.defaultComplete.name,
-                        'bgColor': formData.value.taskStatusForm.taskStatusField.value.defaultComplete.textColor + '35',
-                        'textColor': formData.value.taskStatusForm.taskStatusField.value.defaultComplete.textColor,
-                        'key' : formData.value.taskStatusForm.taskStatusField.value.defaultComplete.key,
-                        'statusImage': "",
-                        'isDeleted' : true,
-                        'type': 'close'
-                    })
-                }
-            }
+const currentCompany = computed(() => getters["settings/selectedCompany"] || {});
+const companyName = computed(() => currentCompany.value.Cst_CompanyName || "");
+const teamFocus = computed(() => currentCompany.value.teamFocus || "");
+const users = computed(() => getters["users/users"] || []);
+const companyUser = computed(() => getters["settings/companyUserDetail"] || {});
+const defaultCurrency = computed(() => getters["settings/allCurrencyArray"]?.find((x) => x.code === "INR") || {});
+const existingKeys = computed(() => (getters["projectData/allProjects"]?.data || []).map((p) => String(p.ProjectCode || "").toUpperCase()));
 
-            let index = projectStaus.value.findIndex((x) => {
-                return x._id === formData.value.projectStatusForm.projectStatusField.value._id
-            })
-            let projectStausValue = projectStaus.value[index];
+const blank = blankTemplate(t);
+const globalTemplates = ref([]);
+const customTemplates = ref([]);
+const loading = ref(false);
+const search = ref("");
+const filter = ref(teamFocus.value ? "focus" : "all");
+const selected = ref(blank);
+const aiOpen = ref(false);
+const busy = ref(false);
+const banner = ref("");
+const nameInput = ref(null);
 
-            let taskTypeindex = taskType.value.findIndex((x) => {
-                return x._id === formData.value.taskTypeForm.taskTypeField.value._id
-            })
-            let taskTypeValue = taskType.value[taskTypeindex];
+const form = reactive({ name: "", key: "", keyTouched: false, isPrivate: false, source: DEFAULT_SOURCE, proposalId: "", dueDate: "", leads: [], skills: [], includeSamples: true });
+const errors = reactive({ name: "", key: "", source: "", proposalId: "" });
 
-            let taskStatusindex = taskStatus.value.findIndex((x) => {
-                return x._id === formData.value.taskStatusForm.taskStatusField.value._id
-            })
-            let taskStausValue = taskStatus.value[taskStatusindex];
-            if(JSON.parse(JSON.stringify(formData.value?.alianAppsObj)).length && JSON.parse(JSON.stringify(formData.value?.alianAppsObj))?.find((e)=>e.key === 'CustomFields')?.appStatus !== true) {
-                customFiedlsValue.value = [];
-            }
-            const obj = {
-                // need to discussion
-                'TemplateName':  manageTemplate.value == true ? '' : '',
-                'TemplateId' : "",
-                // DEFAULT
-                'AssigneeUserId': Array.from(new Set([companyUser.value.userId,...formData.value.leadUser.value.map((x)=>x.id), ...formData.value.workSpaceField.privateSpaceUsers.value.map((x) => x.id)])),
-                'CompanyId': CompanyDatabase.value,
-                'ProjectType': "Fix",
-                'status': formData.value.projectStatusForm.projectStatusField.value.projectActiveStatus.filter((x) => x.default === true)[0].value,
-                'markAsStar': false,
-                'sprintsfolders': {},
-                'sprintsObj': {},
-                'ProjectCurrency': defaultCurrency.value || {},
-                'statusType': "active",
-                'lastTaskId': 0,
-                'projectCreatedBy':userId.value,
-                //STEP : 1
-                'ProjectName': formData.value.projectName.value,
-                'ProjectCode': formData.value.projectCode.value,
-                'LeadUserId': Array.from(new Set([companyUser.value.userId,...formData.value.leadUser.value.map((x)=>x.id)])),
-                'DueDate': formData.value.dueDate.value !== '' ? new Date(formData.value.dueDate.value) : "",
-                ...(formData.value.dueDate.value !== '' && { 'dueDateDeadLine': [{'date': new Date(formData.value.dueDate.value) }] }),
-                'proposalId': formData.value.proposalId.value,
-                'skills': formData.value.skills.value,
-                'source': formData.value.source.value,
-                // STEP 3
-                'isPrivateSpace': formData.value.workSpaceField.privateSpaceValue.value,
-                // STEP 4
-                'TaskTypeTemplateId' : formData.value?.taskTypeForm?.taskTypeField.value?.taskTypes.length === taskTypeValue?.taskTypes.length ?  formData.value?.taskTypeForm?.taskTypeField.value._id : '',
-                'taskTypeCounts' : formData.value.taskTypeForm.taskTypeField.value.taskTypes,
-                // STEP 5
-                'projectStatusData': [...formData.value.projectStatusForm.projectStatusField.value.projectActiveStatus, ...formData.value.projectStatusForm.projectStatusField.value.projectDoneStatus, {...formData.value.projectStatusForm.projectStatusField.value.projectCompletedStatus}],
-                'projectStatusTemplateId' : formData.value?.projectStatusForm?.projectStatusField.value?.projectActiveStatus?.length === projectStausValue?.projectActiveStatus.length && formData.value?.projectStatusForm?.projectStatusField.value?.projectDoneStatus.length === projectStausValue?.projectDoneStatus?.length ? formData.value?.projectStatusForm?.projectStatusField.value._id : '',
-                // STEP 6
-                'taskStatusData' : templateProjectStatus,
-                'TemplateTaskStatusId' : formData.value?.taskStatusForm?.taskStatusField.value?.ActiveStatusList.length === taskStausValue?.ActiveStatusList.length && formData.value?.taskStatusForm?.taskStatusField.value?.DoneStatusList.length === taskStausValue?.DoneStatusList.length ?  formData.value.taskStatusForm?.taskStatusField.value?._id : '',
-                // STEP 7
-                'apps': manageTemplate.value == true 
-                    ? [] 
-                    : formData.value.alianAppsObj 
-                        ? formData.value.alianAppsObj
-                            .filter((x) => x.appStatus === true)
-                            .map((x) => x.key) 
-                : [],
-                // STEP 8
-                'ProjectRequiredComponent' : formData.value.requiredViewobj.value.filter((x) => x.viewStatus === true).map((x)=>({
-                    _id:x._id,
-                    viewStatus:x.viewStatus,
-                    setAsDefault:x.setAsDefault
-                })),
-                'ProjectRequiredDefaultComponent': formData.value.requiredViewobj.value.filter((x) => x.setAsDefault === true)[0].keyName,
-                'isGlobalPermission' : true,
-                'customFiedlsValue':customFiedlsValue.value,
-            }
-            let path = `${CompanyDatabase.value}/${CompanyDatabase.value}/${dbCollections.PROJECTS}`;
-            const getId = await apiRequest("get",env.GENERATEMONGOID);
-            const docId = getId.status === 200 ? getId?.data || '' : '';
-            if(!docId){
-                $toast.error(t("Toast.Error_in_creating_project"),{position: 'top-right'});
-                isSpinner.value = false;
-                emit('click:closeSidebar',false);
-                helper.resetStatus();
-                return;
-            }
-            if(formData.value.projectProfileField.previewImage.value !== "" && previewImage.value !== null){
-                let name = generateFileName(previewImage.value.name,env.STORAGE_TYPE);
-                let filePath = `Project/${docId}/Settings/ProjectIcon/${name}`;
+const matches = (tpl) => {
+    const q = search.value.toLowerCase();
+    return !q || `${tpl.TemplateName} ${tpl.Description || ""}`.toLowerCase().includes(q);
+};
+const shownGlobal = computed(() => globalTemplates.value.filter((tpl) => matches(tpl) && (filter.value !== "focus" || tpl.focus === teamFocus.value)));
+const shownCustom = computed(() => customTemplates.value.filter(matches));
+const sampleCount = computed(() => Number(selected.value.sampleTaskCount) || 0);
+const shortDescription = (tpl) => {
+    const text = String(tpl.Description || "").replace(/\s+/g, " ").trim();
+    return text.length > 90 ? `${text.slice(0, 87).trim()}…` : text;
+};
 
-                const apiFormData = new FormData();
-                apiFormData.append("companyId", CompanyDatabase.value);
-                apiFormData.append("path", filePath);
-                apiFormData.append("key", 'projectIcon');
-                apiFormData.append("file", previewImage.value);
-                await apiRequestWithoutCompnay("post", storageQueryBuilder('upload').route, apiFormData, "form").then((res)=>{
-                    if(res.data.status){
-                        let imageUrlPath = env.STORAGE_TYPE && env.STORAGE_TYPE==='server' ? res.data.statusText : res.data.statusText[0];
-                        obj.projectIcon = {type:"image", data: imageUrlPath}
-                    }else{
-                        obj.projectIcon = {type:"image", data: ''}
-                    }
-                }).catch((err) => {
-                    console.error(err,"ERROR IN UPLOAD FILE IN WASABI");
-                })
-            }
-            else{
-                obj.projectIcon = {type: "color", data : formData.value.projectProfileField.selectedColor.value };
-            }
-            let axiosData = {...obj,_id:docId};
-            axiosData.projectStatusData = axiosData.projectStatusData.map(x => ({key:x.key,type:x.type, ...(x.key === 1 && {default: true})}));
-            axiosData.taskStatusData = axiosData.taskStatusData.map(x => ({key:x.key,type:x.type}));
-            axiosData.taskTypeCounts = axiosData.taskTypeCounts.map(x => ({key:x.key}));
-            helper.HandleProject(path,axiosData,userDataVal,CompanyDatabase.value,true).then(async(result)=>{
-                if(result.status === true){
-                    if(isActiveTemplatePage.value){
-                        if(formData.value.templateDetail.previewImage.value !== ""){
-                            let name = generateFileName(formData.value.templateDetail.previewImage.value.name,env.STORAGE_TYPE);
-                            let filePath = `ProjectTemplate/${name}`;
-    
-                            const apiFormData = new FormData();
-                            apiFormData.append("companyId", CompanyDatabase.value);
-                            apiFormData.append("path", filePath);
-                            apiFormData.append("file", formData.value.templateDetail.previewImage.value);
-                            await apiRequestWithoutCompnay("post", storageQueryBuilder('upload').route, apiFormData, "form").then((res)=>{
-                                if(res.data.status){
-                                    proIconData.value = {type:"image", data: res.data.statusText}
-                                }else{
-                                    proIconData.value = {type:"image", data: ''}
-                                }
-                            })
-                        }
-                        const templateObj = {
-                            'AssigneeUserId': [companyUser.value.userId],
-                            'TemplateName': formData.value.templateDetail.templateName.value,
-                            "templateImageURL": proIconData.value,
-                            'Description' : formData.value.templateDetail.description.value,
-                            'CompanyId': CompanyDatabase.value,
-                            'LeadUserId': [companyUser.value.userId],
-                            'updatedAt': new Date(),
-                            'createdAt': new Date(),
-                            'TemplateRequiredComponent' : formData.value.requiredViewobj.value.filter((x) => x.viewStatus === true),
-                            'taskStatusData': templateProjectStatus.map((x) => ({
-                                type: x.type,
-                                name: x.name,
-                                textColor: x.textColor,
-                                key: x.key,
-                                bgColor: x.bgColor
-                            })),
-                            'apps': formData.value.alianAppsObj 
-                                ? formData.value.alianAppsObj
-                                    .filter((x) => x.appStatus === true)
-                                    .map((x) => x.key) 
-                            : [],
-                            'TemplateTaskStatusId' : formData.value.taskStatusForm.taskStatusField.value._id,
-                            'TaskTypeTemplateId' : formData.value.taskTypeForm.taskTypeField.value._id,
-                            'TemplateTaskType' : formData.value.taskTypeForm.taskTypeField.value.taskTypes.map((x) => ({
-                                name:x.name,
-                                taskImage:x.taskImage,
-                                key:x.key,
-                                value:x.value
-                            })),
-                            'projectStatusData': [...formData.value.projectStatusForm.projectStatusField.value.projectActiveStatus, ...formData.value.projectStatusForm.projectStatusField.value.projectDoneStatus, {...formData.value.projectStatusForm.projectStatusField.value.projectCompletedStatus}].map((x) => ({
-                                type:x.type,
-                                name:x.name,
-                                textColor:x.textColor,
-                                key:x.key,
-                                backgroundColor:x.backgroundColor,
-                                value:x.value
-                            })),
-                            'ProjectRequiredDefaultComponent': formData.value.requiredViewobj.value.filter((x) => x.setAsDefault === true)[0].keyName,
-                            'ProjectCurrency': defaultCurrency.value || {},
-                            'projectCreatedBy':userId.value,
-                            'isGlobalPermission' : true,
-                            'customFiedlsValue':customFiedlsValue.value,
-                            'TemplateTaskCloseKey': 2,
-                        }
+onMounted(async () => {
+    loading.value = true;
+    try {
+        const [globalRes] = await Promise.all([
+            apiRequest("post", env.GLOBAL_PROJECT_TEMPLATE, { teamFocus: teamFocus.value }),
+            dispatch("projectData/setprojectTemplate", companyId.value).catch(() => {})
+        ]);
+        if (globalRes.data.status) globalTemplates.value = (globalRes.data.statusText || []).map((tpl) => ({ ...tpl, useTemplateProj: "category" }));
+        customTemplates.value = (getters["projectData/projectTemplate"]?.data || []).map((tpl) => ({ ...tpl, useTemplateProj: "withoutcategory", focus: "other" }));
+        const first = shownGlobal.value[0];
+        if (first) selected.value = first;
+    } catch (error) {
+        console.error("Error in getting projectTemplate", error);
+    } finally {
+        loading.value = false;
+        nextTick(() => nameInput.value?.focus());
+    }
+});
 
-                        // API request save project template
-                        let axiosData = { data: templateObj }
-                        await apiRequest("post", `${env.PROJECT_TEMPLATE}`, axiosData).then((result) => {
-                            if (result.status) {
-                                $toast.success(t("Toast.Template_&_Project_data_has_been_added_successfully"), { position: 'top-right' });
-                            }
-                        });
-                    }
-                    else{
-                        $toast.success(t("Toast.Project_data_has_been_added_successfully", {
-                        filterMessage: props.isAdvanceFilterApplied
-                            ? t("Toast.please_remove_the_advanced_filter_to_view_newly_created_projects")
-                            : "",
-                        }),{position: 'top-right'});
-                    }
-                    isSpinner.value = false;
-                    emit('click:closeSidebar',false);
-                    helper.resetStatus();
-                    var newObj = {snap: null, privateSnap: false, op: "added", data: {...result.data, id: result.id}};
-                    commit("projectData/mutateProjects",[newObj]);
-                    nextTick(() => {
-                        setTimeout(()=>{
-                            if(props.isAdvanceFilterApplied === false) {
-                                let currentTab = formData.value.requiredViewobj.value.find((x) => x.setAsDefault === true);
-                                router.replace({name: "Project", params: {cid: route.params?.cid, id: result.id}, query: {...route.query, tab : currentTab?.keyName ?? "ProjectListView"}});
-                            }
-                        },100)
-                    });
-                    if(result?.customFieldValueArray) {
-                        result.customFieldValueArray.forEach((customDataObj)=>{
-                            commit("settings/mutateFinalCustomFields", {data: customDataObj || {},op: "added"});
-                        })
-                    }
-                }else{
-                    $toast.error(t("Toast.Error_in_creating_project"),{position: 'top-right'});
-                    isSpinner.value = false;
-                    emit('click:closeSidebar',false);
-                    helper.resetStatus();
-                }
-            })
-            .catch((error) => {
-                isSpinner.value = false;
-                console.error("ERROR in Craete project: ", error);
-                helper.resetStatus();
-            })
-        }
-        catch(error){
-            isSpinner.value = false;
-            console.error(error);
-            helper.resetStatus();
-        }
-    }
-    function submitTemplateData(){
-        try{
-            checkAllFields({templateName : formData.value.templateDetail.templateName}).then((valid)=>{
-                if(valid){
-                    submitData();
-                }
-            })
-        }
-        catch(error){
-            isSpinner.value = false;
-            console.error(error);
-        }
-    }
-    function showTemplatePage(){
-        activeIndex.value += 1;
-        isActiveTemplatePage.value = true;
-    }
-    function displayTemplateDetail(item){
-        widthVal.value = '923px'
-        isDisplayDetail.value = true;
-        templateView.value = item;
-        templateView.value.useTemplateProj = useTemplateProj.value;
-    }
-    function closeDetails(){
-        emit('click:closeSidebar',false);
-        isButtonClicked.value = false;
-        helper.resetStatus();
-    }
-    function closeSecond () {
-        isDisplayDetail.value = true;
-    }
-    function getProjectTemplate () {
-        try {
-            return new Promise((res)=>{
-                dispatch('projectData/setprojectTemplate', CompanyDatabase.value)
-                .then(() => {
-                    if(projectTemplateGetter.value && Object.keys(projectTemplateGetter.value).length != 0) {
-                        isTemplateExist.value = false;
-                        allProjectTemplate.value = projectTemplateGetter.value?.data ? projectTemplateGetter.value.data : [];
-                    } else {
-                        allProjectTemplate.value = [];
-                        isTemplateExist.value - true;
-                    }
-                    res()
-                })
-            })
-        } catch (error) {
-            console.error(error);
-        }
-    }
-    function updateImageValue(ele) {
-        previewImage.value = ele[0]
-    }
+const select = (tpl) => { selected.value = tpl; form.includeSamples = (Number(tpl.sampleTaskCount) || 0) > 0; };
+const onNameInput = () => {
+    errors.name = "";
+    if (!form.keyTouched) { form.key = keyFromName(form.name); errors.key = ""; }
+};
+const onKeyInput = () => {
+    form.keyTouched = form.key !== "";
+    form.key = form.key.replace(/[^a-z0-9]/gi, "").toUpperCase();
+    errors.key = "";
+};
+const updateLead = (member, type) => {
+    if (type === "add") form.leads.push({ ...member });
+    else form.leads = form.leads.filter((x) => x.id !== member.id);
+};
 
-    function checkProjectPlan () {
-        let projectCount = currentCompany.value?.projectCount?.projectCount || 0;
-        let planfeatures = currentCompany.value?.planFeature;
-        if(planfeatures === undefined){
-            return false;
-        }
-        if(planfeatures?.project === null){
-            return true;
-        }else{
-            if(planfeatures?.project > projectCount){
-                return true;
-            }else{
-                return false;
-            }
-        }
-    }
+const validate = () => {
+    errors.name = !form.name ? t("AuthV2.project_name_required") : form.name.length < 3 ? t("AuthV2.project_name_short") : "";
+    errors.key = !form.key ? t("AuthV2.key_required") : existingKeys.value.includes(form.key) ? t("AuthV2.key_taken") : "";
+    errors.source = PROJECT_SOURCES.includes(form.source) ? "" : t("Projects.source_required");
+    errors.proposalId = checkProposalId(form.source, form.proposalId) === "required" ? t("Projects.proposal_id_required_upwork") : "";
+    return !errors.name && !errors.key && !errors.source && !errors.proposalId;
+};
 
-    function disableButton (event) {
-        isDisable.value = event;
-    }
+const close = () => {
+    if (busy.value) return;
+    isVisible.value = false;
+    emit("closeSidebar", false);
+    emit("click:closeSidebar", false);
+};
 
-    const handleCloseSidebar = () => {
-        isVisible.value=!isVisible.value;
-        emit('closeSidebar',isVisible.value);
-        helper.resetStatus();
+const userData = () => {
+    const user = getUser(userId.value, true) || {};
+    return { id: user.id, Employee_Name: user.Employee_Name, companyid: user.AssignCompany, companyData: [], companyOwnerId: user.companyOwnerId };
+};
+
+const submit = async () => {
+    if (!validate() || busy.value) return;
+    busy.value = true;
+    banner.value = "";
+    try {
+        const tpl = selected.value;
+        const leadIds = form.leads.map((x) => x.id);
+        const due = form.dueDate ? new Date(form.dueDate) : "";
+        const getId = await apiRequest("get", env.GENERATEMONGOID);
+        const docId = getId.status === 200 ? getId?.data || "" : "";
+        if (!docId) throw new Error("no id");
+        const payload = {
+            _id: docId,
+            AssigneeUserId: Array.from(new Set([companyUser.value.userId, ...leadIds].filter(Boolean))),
+            ProjectName: form.name,
+            CompanyId: companyId.value,
+            ProjectCode: form.key,
+            ProjectType: "Fix",
+            LeadUserId: leadIds,
+            markAsStar: false,
+            sprintsObj: {},
+            sprintsfolders: {},
+            DueDate: due,
+            ...(due && { dueDateDeadLine: [{ date: due }] }),
+            proposalId: form.proposalId,
+            skills: form.skills,
+            source: form.source,
+            projectIcon: { type: "color", data: colorForName(form.name) },
+            TemplateName: tpl._id === blank._id ? "" : tpl.TemplateName,
+            TemplateId: tpl._id,
+            isPrivateSpace: form.isPrivate,
+            TaskTypeTemplateId: "",
+            statusType: "active",
+            lastTaskId: 0,
+            ProjectRequiredDefaultComponent: (tpl.TemplateRequiredComponent || []).find((x) => x.setAsDefault)?.keyName || "ProjectListView",
+            ProjectCurrency: defaultCurrency.value,
+            useTemplateProj: tpl.useTemplateProj || "category",
+            projectCreatedBy: userId.value,
+            isGlobalPermission: true,
+            customFiedlsValue: tpl.customFiedlsValue || [],
+            includeSampleTasks: form.includeSamples && sampleCount.value > 0,
+            sampleFocus: tpl.focus || ""
+        };
+        const path = `${companyId.value}/${companyId.value}/${dbCollections.PROJECTS}`;
+        const result = await helper.HandleProject(path, payload, userData(), companyId.value, false);
+        if (!result.status) { banner.value = t("AuthV2.project_failed"); return; }
+        $toast.success(t("Toast.Project_data_has_been_added_successfully", {
+            filterMessage: props.isAdvanceFilterApplied ? t("Toast.please_remove_the_advanced_filter_to_view_newly_created_projects") : ""
+        }), { position: "top-right" });
+        commit("projectData/mutateProjects", [{ snap: null, privateSnap: false, op: "added", data: { ...result.data, id: result.id } }]);
+        (result.customFieldValueArray || []).forEach((field) => commit("settings/mutateFinalCustomFields", { data: field || {}, op: "added" }));
+        close();
+        if (!props.isAdvanceFilterApplied) {
+            const tab = payload.ProjectRequiredDefaultComponent;
+            setTimeout(() => router.replace({ name: "Project", params: { cid: route.params?.cid, id: result.id }, query: { ...route.query, tab } }), 100);
+        }
+    } catch (error) {
+        console.error("ERROR in create project: ", error);
+        banner.value = t("AuthV2.project_failed");
+    } finally {
+        busy.value = false;
     }
+};
+
+const onAiCreated = ({ projectId } = {}) => {
+    aiOpen.value = false;
+    close();
+    if (projectId) router.replace({ name: "Project", params: { cid: route.params?.cid, id: projectId }, query: { ...route.query, tab: "ProjectListView" } });
+};
 </script>
+
 <style>
 @import "./style.css";
-
-/* Create-project wizard, task-type step only (desktop): fill the step to the full body
-   height so both lists grow + scroll and the add/new-template buttons stay pinned —
-   mirrors the settings sidebar. Gated on .wizard-tt-fill, which is only present when
-   activeIndex===3, so the other wizard steps, the Next/Prev footer, and the template
-   flow are untouched. Chain: body → header row → slider column → step → form → lists. */
-@media(min-width: 768px){
-    .wizard-tt-fill { display: flex; flex-direction: column; box-sizing: border-box; }
-    .wizard-tt-fill > .header-sidebar { flex: 1 1 auto; min-height: 0; }
-    .wizard-tt-fill > .header-sidebar > .createProjectWizardSlider { display: flex; flex-direction: column; min-height: 0; }
-    .wizard-tt-fill #project-step-container { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-    .wizard-tt-fill .conditional-btn-wrapper { flex: none; }
-
-    .wizard-tt-fill .statusHeader { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-    .wizard-tt-fill .statusHeader > .bg-light-gray { flex: none; margin-bottom: 16px; }
-    .wizard-tt-fill .taskStatusSection { flex: 1 1 auto; min-height: 0; max-height: none !important; overflow: hidden; }
-    /* scope to the step's own columns row — .usetemplatesWrapper is also a
-       .statusTaskWrapper and must not be stretched. */
-    .wizard-tt-fill #project-step-container .statusTaskWrapper { height: 100%; min-height: 0; }
-
-    .wizard-tt-fill .taskStatusLeft { display: flex; flex-direction: column; min-height: 0; }
-    .wizard-tt-fill .taskStatusLeft .templated_name_ul { max-height: none !important; min-height: 60px; }
-    .wizard-tt-fill .taskStatusLeft .add_template { flex: none; }
-
-    .wizard-tt-fill .taskyou_need_right { display: flex; flex-direction: column; min-height: 0; }
-    .wizard-tt-fill .taskyou_need_right .ddf__root { min-height: 0; display: flex; flex-direction: column; }
-    .wizard-tt-fill .taskyou_need_right .status_ul { flex: 1 1 auto; max-height: none !important; min-height: 0; overflow-y: auto; }
-    .wizard-tt-fill .taskyou_need_right .addStatusBtn { flex: none; padding-top: 12px; }
-
-    /* Status steps (project-status / task-status), desktop: same intent as the task-type step —
-       fill the body height so the columns use the space and Prev/Next pins to the bottom (no dead
-       space below it). The section is the scroll area here because the status right column has
-       several sections (active / done / close) rather than one list to scroll. */
-    .wizard-status-fill { display: flex; flex-direction: column; box-sizing: border-box; }
-    .wizard-status-fill > .header-sidebar { flex: 1 1 auto; min-height: 0; }
-    .wizard-status-fill > .header-sidebar > .createProjectWizardSlider { display: flex; flex-direction: column; min-height: 0; }
-    .wizard-status-fill #project-step-container { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-    .wizard-status-fill .conditional-btn-wrapper { flex: none; }
-    .wizard-status-fill .statusHeader,
-    .wizard-status-fill #project-step-container > .taskStatusSection { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-    .wizard-status-fill .statusHeader > .bg-light-gray,
-    .wizard-status-fill .statusHeader > div:first-child,
-    .wizard-status-fill #project-step-container > .taskStatusSection > .bg-light-gray { flex: none; }
-    /* the section is NOT a shared scroll — each column scrolls on its own (below). */
-    .wizard-status-fill .taskStatusSection { flex: 1 1 auto; min-height: 0; max-height: none !important; overflow: hidden !important; display: flex; flex-direction: column; }
-    .wizard-status-fill .usetemplatesWrapper { flex: none; }
-    .wizard-status-fill #project-step-container .statusTaskWrapper { flex: 1 1 auto; min-height: 0; }
-    /* left: templates list is content-height (flex-grow 0 → no gap before +New) and scrolls on its
-       own only when it is taller than the column. */
-    .wizard-status-fill .taskStatusLeft { display: flex; flex-direction: column; min-height: 0; }
-    .wizard-status-fill .taskStatusLeft .templated_name_ul { flex: 0 1 auto; min-height: 0; max-height: none !important; overflow-y: auto; }
-    .wizard-status-fill .taskStatusLeft .add_template,
-    .wizard-status-fill .taskStatusLeft .err_temp_status { flex: none; }
-    /* right: its own scroll, independent of the templates list (override project-status's 308px cap). */
-    .wizard-status-fill .taskStatusRight { display: flex; flex-direction: column; min-height: 0; max-height: none !important; overflow-y: auto !important; }
-    .wizard-status-fill .taskStatusRight .status_ul { max-height: none !important; }
-    .wizard-status-fill .taskStatusRight .addStatusBtn { flex: none; }
-}
-
-/* Mobile: the three shell steps (task-type / project-status / task-status) each show ONE
-   column at a time via TemplateSelectForm's stepper, so fill the screen, pin the Prev/Next
-   footer to the bottom (no wasted space below it), and let whichever column is visible take
-   the remaining height and scroll. Gated on .wizard-step-fill (activeIndex 3/4/5). */
-@media(max-width: 767px){
-    .wizard-step-fill { display: flex; flex-direction: column; }
-    .wizard-step-fill > .header-sidebar { flex: 1 1 auto; min-height: 0; }
-    .wizard-step-fill > .header-sidebar > .createProjectWizardSlider { display: flex; flex-direction: column; min-height: 0; }
-    .wizard-step-fill #project-step-container { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; max-height: none !important; overflow: hidden !important; }
-    .wizard-step-fill .conditional-btn-wrapper { flex: none; }
-
-    /* form root fills + stacks the step title above the columns. */
-    .wizard-step-fill .statusHeader,
-    .wizard-step-fill #project-step-container > .taskStatusSection { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-    .wizard-step-fill .statusHeader > .bg-light-gray,
-    .wizard-step-fill .statusHeader > div:first-child,
-    .wizard-step-fill #project-step-container > .taskStatusSection > .bg-light-gray { flex: none; }
-    /* the section is the scroll area (identical to the task-status step): the column content scrolls
-       here while the gray step header + Prev/Next stay put; the sub-header is position:sticky. */
-    .wizard-step-fill .taskStatusSection { flex: 1 1 auto; min-height: 0; max-height: none !important; overflow-y: auto !important; display: flex; flex-direction: column; }
-    .wizard-step-fill .usetemplatesWrapper { flex: none; }
-    .wizard-step-fill #project-step-container .statusTaskWrapper { flex: 1 1 auto; min-height: 0; }
-
-    /* under 480px style.css sets .statusTaskWrapper{flex-wrap:wrap}; force nowrap so tall content
-       scrolls in the section instead of wrapping into a second column. */
-    .wizard-step-fill #project-step-container,
-    .wizard-step-fill .statusHeader,
-    .wizard-step-fill .taskStatusSection,
-    .wizard-step-fill .statusTaskWrapper,
-    .wizard-step-fill .taskStatusLeft,
-    .wizard-step-fill .taskStatusRight { flex-wrap: nowrap; }
-
-    /* columns flow their content into the section scroll; max-height:none overrides project-status's
-       leftover scoped 300px cap so it matches the task-status step (which has no such cap). */
-    .wizard-step-fill .taskStatusLeft,
-    .wizard-step-fill .taskStatusRight { display: flex; flex-direction: column; min-height: 0; max-height: none !important; overflow: visible !important; }
-    /* uncap the desktop list heights (140px left / 220px right) so nothing clips inside the scroll. */
-    .wizard-step-fill .taskStatusLeft .templated_name_ul,
-    .wizard-step-fill .taskStatusRight .status_ul { max-height: none !important; overflow: visible !important; }
-    .wizard-step-fill .taskStatusLeft .add_template,
-    .wizard-step-fill .taskStatusLeft .err_temp_status,
-    .wizard-step-fill .taskStatusRight .addStatusBtn { flex: none; }
-}
 </style>

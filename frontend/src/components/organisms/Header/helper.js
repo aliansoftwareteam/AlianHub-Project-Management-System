@@ -4,6 +4,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useCustomComposable } from "@/composable";
 import { useStore } from "vuex";
 import { useToast } from "vue-toast-notification";
+import { openTask, isSameProjectPage } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
 const {checkPermission} = useCustomComposable();
 import { i18n } from "@/locales/main";
 const t = i18n.global.t;
@@ -17,10 +18,15 @@ export function useHelper() {
             show:true,
             showerr: () => {
                 return true;
-                // return this.rules && this.checkPermission(this.rules.project, this.companyUserDetail.roleType) !== null && this.checkPermission(this.rules.project.project_list, this.companyUserDetail.roleType) !== null;
             },
             submenu: [],
             isActive: true
+        },
+        {
+            name: "Pages",
+            to: {path: `/${companyId.value}/pages`},
+            show: true,
+            submenu: [],
         },
         {
             // Workspace — oversight + planning + apps grouped under one menu.
@@ -249,6 +255,17 @@ export function useHelper() {
                         route.name = "Project";
                     }
                 }
+            }
+            if (route.params.taskId && isSameProjectPage(route.params.id, route.params.sprintId)) {
+                openTask({
+                    companyId: route.params.cid,
+                    projectId: route.params.id,
+                    sprintId: route.params.sprintId,
+                    folderId: route.params.folderId || "",
+                    taskId: route.params.taskId,
+                    tab: route.query?.detailTab === "comment" ? "activity" : ""
+                });
+                return;
             }
             router.push(route);
         } catch (error) {

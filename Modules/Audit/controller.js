@@ -5,6 +5,28 @@ const logger = require("../../Config/loggerConfig");
 
 const companyOf = (req) => req.headers['companyid'] || (req.query && req.query.companyId);
 
+// POST /api/v1/audit-logs/:id/undo — replay the inverse of an agent action, logged
+// as the person pressing Undo. Any member may undo; an agent token may not.
+exports.undoAuditLog = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const { resolveActor, isAgent } = require('../Agents/actor');
+        const { undoAuditRow } = require('../Agents/undo');
+        const agentAudit = require('../Agents/agentAudit');
+        const actor = await resolveActor(req);
+        if (isAgent(actor) || !actor.userId) return res.status(403).json({ status: false, message: 'Agents cannot perform undo', statusText: 'Agents cannot perform undo' });
+        const row = await agentAudit.findById(companyId, req.params.id);
+        if (!row) return res.status(404).json({ status: false, statusText: 'Audit row not found.' });
+        const out = await undoAuditRow(companyId, row, actor, req.ip || '');
+        if (!out.ok) return res.status(409).json({ status: false, statusText: out.reason, message: out.reason });
+        return res.send({ status: true, statusText: 'Undone.', data: out.result });
+    } catch (error) {
+        logger.error(`undoAuditLog: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
 // GET /api/v1/audit-logs?actorId=&entityType=&entityId=&action=&from=&to=&page=&limit=
 // Owner/admin only. Filterable + paginated, newest first.
 exports.listAuditLogs = async (req, res) => {

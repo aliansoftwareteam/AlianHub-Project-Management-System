@@ -1,0 +1,25 @@
+.home__content { display: flex; flex-direction: column; gap: 16px; }
+.home__grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 16px; min-width: 0; align-items: start; }
+.home__side { display: flex; flex-direction: column; gap: 16px; min-height: 0; min-width: 0; }
+.home__sidebar-toggle { display: none; }
+.home__date-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; bottom: 0; left: 0; }
+.home .hc-mywork { min-height: 320px; }
+
+@media (max-width: 1279px) {
+    .home__sidebar-toggle { display: inline-flex; }
+    .home__planner { position: absolute; right: 0; top: var(--toolbar-h); bottom: 0; z-index: 25; box-shadow: var(--shadow-pop); }
+}
+@media (max-width: 991px) {
+    .home__grid { grid-template-columns: 1fr; }
+    .home__manage { display: none; }
+}
+@media (max-width: 767px) {
+    .ah-page__content { padding: 14px 12px; }
+    .ah-page .ah-toolbar { padding: 0 12px; gap: 8px; }
+    .ah-toolbar__date { display: none; }
+    .ah-tbtn { height: 44px; }
+    .hc-row { min-height: 44px; }
+    .hc-row__meta { max-width: 80px; }
+    .home__planner { width: 100%; }
+    .home__planner-toggle { display: none; }
+}

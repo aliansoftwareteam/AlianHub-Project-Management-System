@@ -225,7 +225,8 @@
     import {ref,inject,computed,watch,onMounted} from "vue";
     import { useStore } from "vuex";
     import { useToast } from "vue-toast-notification";
-    import { useRoute, useRouter } from "vue-router"
+    import { useRoute } from "vue-router"
+    import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
     import { useUpdateTasks } from "@/views/Projects/helper"
     import TagChip from '@/components/atom/TagChip/TagChip.vue'
     import Priority from "@/components/molecules/PriorityCompo/PriorityComp.vue"
@@ -243,7 +244,6 @@
     import DueDateCompo from '@/components/molecules/DueDateCompo/DueDateCompo.vue';
     import { useI18n } from "vue-i18n";
     const { t } = useI18n();
-    const router = useRouter()
     const props = defineProps({
         data: Object,
         groupValue: Number,
@@ -582,11 +582,7 @@
         if(element.value.folderObjId) {
             paramsObj.folderId = element.value.folderObjId;
         }
-        router.push({
-            name: element.value.folderObjId? 'ProjectFolderSprintTask' : 'ProjectSprintTask',
-            params: paramsObj,
-            query: {...route.query, detailTab: "comment"}
-        })
+        openTask({ ...paramsObj, companyId: paramsObj.cid, projectId: paramsObj.id, tab: 'activity' })
     }
 </script>
 <style src="./new-style.css" scoped />

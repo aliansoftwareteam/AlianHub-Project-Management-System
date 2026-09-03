@@ -351,18 +351,6 @@
                             </div>
                         </div>
                     </div>
-                    <div>
-                        <TaskDetail
-                            v-if="isTaskDetail && selectedTask"
-                            :companyId="companyId"
-                            :projectId="projectData._id"
-                            :sprintId="selectedTask.sprintId"
-                            :taskId="selectedTask.id"
-                            :isTaskDetailSideBar="isTaskDetail"
-                            :selectedTask="selectedTask"
-                            @toggleTaskDetail="toggleTaskDetail"
-                        />
-                    </div>
 
                     <ProjectSidebars
                         :filterUsers="filterUsers"
@@ -396,9 +384,7 @@
                             />
                         </div>
                     </template>
-                    <div v-else class="d-flex bg-light-gray align-items-center justify-content-center w-100 h-100">
-                        <img :src="accessDenied" alt="accessDenied">
-                    </div>
+                    <AppState v-else kind="forbidden" />
                 </template>
             </template>
             <template v-else>
@@ -438,14 +424,13 @@
             @closeAiSidebar="openAiSidebar = false"
         />
     </div>
-    <div v-else class="d-flex align-items-center justify-content-center w-100 h-100">
-        <img :src="accessDenied" alt="accessDenied">
-    </div>
+    <AppState v-else kind="forbidden" />
     <!-- Multi-select bulk action bar — renders only when tasks are selected -->
     <BulkActionBar />
 </template>
 
 <script setup>
+import AppState from '@/components/molecules/AppState/AppState.vue';
 // PACKAGES
 import { computed, defineComponent, inject, onMounted, provide, ref, watch, onUnmounted, nextTick } from 'vue';
 import isEqual from 'lodash/isEqual';
@@ -466,7 +451,7 @@ import UpgradYourPlanComponent from '@/components/atom/UpgradYourPlanComponent/U
 import ProjectDetailRightSide from '@/components/organisms/ProjectDetailRightSide/ProjectDetailRightSide.vue';
 import DropDown from '@/components/molecules/DropDown/DropDown.vue';
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
-import TaskDetail from '@/views/TaskDetail/TaskDetail.vue';
+import { openTask, overlayState } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import ViewsList from '@/components/atom/ViewsList/ViewsList.vue';
 import InputText from '@/components/atom/InputText/InputText.vue';
 
@@ -682,7 +667,6 @@ const { checkPermission, makeUniqueId } = useCustomComposable();
 const { getUser } = useGetterFunctions();
 
 // IMAGES
-const accessDenied = require('@/assets/images/access_denied_img.png');
 const listDropIcon = require('@/assets/images/svg/list_view_dropicon.svg');
 const publicIcon = require('@/assets/images/svg/public_folder.svg');
 const addIcon = require('@/assets/images/Shape 614.png');
@@ -1249,45 +1233,18 @@ function getView(val) {
     }
 }
 
-// Task Detail
-const isTaskDetail = ref(false);
-const selectedTask = ref({});
-
-watch(() => route.params.taskId, (taskId) => {
-    if (taskId && !isTaskDetail.value) {
-        selectedTask.value = { id: taskId, sprintId: route.params.sprintId };
-        isTaskDetail.value = true;
-    } else if (!taskId) {
-        isTaskDetail.value = false;
-        selectedTask.value = {};
-    }
-}, { immediate: true });
-
-const toggleTaskDetail = async (task) => {
-    skipWatcher.value = true;
-    const routeObj = {
-        cid: companyId.value,
-        id: task.ProjectID,
+// Task detail opens as the global overlay; the route only changes for deep links.
+const toggleTaskDetail = (task, close = false, isComment = false) => {
+    if (!task || !task._id) return;
+    if (close || overlayState.current?.taskId === task._id) return;
+    openTask({
+        companyId: companyId.value,
+        projectId: task.ProjectID || projectData.value?._id,
         sprintId: task.sprintId,
-    };
-    if (task.folderObjId) {
-        routeObj.folderId = task.folderObjId;
-    }
-
-    if (!isTaskDetail.value) {
-        routeObj.taskId = task._id;
-        const taskDetail = { ...task, sprintName: task?.sprintArray?.name, folderName: task?.sprintArray?.folderName, id: task._id };
-        selectedTask.value = taskDetail;
-        isTaskDetail.value = true;
-        await router.push({ name: task.folderObjId?.length ? 'ProjectFolderSprint' : 'ProjectSprint', params: routeObj });
-        await router.push({ name: task.folderObjId?.length ? 'ProjectFolderSprintTask' : 'ProjectSprintTask', params: routeObj, query: { ...route.query, detailTab: 'task-detail-tab' } });
-    } else {
-        isTaskDetail.value = false;
-        selectedTask.value = {};
-        await router.push({ name: task.folderObjId?.length ? 'ProjectFolderSprint' : 'ProjectSprint', params: routeObj, query: { tab: route.query.tab } });
-    }
-    await nextTick();
-    skipWatcher.value = false;
+        folderId: task.folderObjId || task.sprintArray?.folderId || '',
+        taskId: task._id,
+        tab: isComment ? 'activity' : ''
+    });
 };
 provide('toggleTaskDetail', toggleTaskDetail);
 provide('isRouteRequired', true);

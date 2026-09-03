@@ -1,5 +1,5 @@
 <template>
-    <div class="d-flex justify-content-center outh-item-gap">
+    <div class="auth__providers">
         <div v-if="isAuthWithGoogle && isAuthWithGoogle === 'true'">
             <oAuthWithGoogle :mode="mode" :companyID="companyID" :companyUserDocID="companyUserDocID"/>
         </div>

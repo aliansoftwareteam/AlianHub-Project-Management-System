@@ -1,54 +1,31 @@
 <template>
-    <div class="container">
-        <div class="box">
-        <p>
-            If you are not automatically redirected, click or tap
-            <strong>Continue</strong> button.
-        </p>
-        <button @click="redirect" class="continue_btn">Continue</button>
+    <AuthShell :proof="false">
+        <div class="av2-auth-card">
+            <div class="auth__glyph auth__glyph--brand"><ShellIcon name="time" :size="15" /></div>
+            <h2 class="auth__h">{{ $t('AuthV2.tracker_title') }}</h2>
+            <p class="auth__p">{{ $t('AuthV2.tracker_body') }}</p>
+            <button type="button" class="ah-btn ah-btn--primary ah-btn--block ah-btn--lg" @click="redirect">{{ $t('AuthV2.tracker_continue') }}</button>
         </div>
-    </div>
+    </AuthShell>
 </template>
+
 <script setup>
-    import {onMounted,inject} from 'vue';
-    import Cookies from 'js-cookie';
-    const userId = inject("$userId");
-    const refreshToken = Cookies.get('refreshToken') || '';
-    onMounted(()=>{
-        redirect();
-    })
+import { inject, onMounted } from "vue";
 
-    function redirect() {
-        window.location.href = `myapp://authorize?client_id=${userId.value}&client_secret=${refreshToken}`
-    }
+defineOptions({ name: "TrackerLoginPage" });
+import Cookies from "js-cookie";
+import AuthShell from "@/components/templates/AuthShell/AuthShell.vue";
+import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+
+const userId = inject("$userId");
+const refreshToken = Cookies.get("refreshToken") || "";
+
+const redirect = () => {
+    window.location.href = `myapp://authorize?client_id=${userId.value}&client_secret=${refreshToken}`;
+};
+onMounted(redirect);
 </script>
-<style scoped>
-    .container {
-        height: 100vh;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        background-color: #f0f4f8;
-    }
 
-    .box {
-        border: 2px solid #333;
-        padding: 20px;
-        background: #fff;
-        box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
-        border-radius: 8px;
-        text-align: center;
-    }
-
-    .continue_btn {
-        font-size: 16px;
-        background: #2f3990 !important;
-        padding: 7px 10px;
-        height: 30px;
-        border-radius: 4px;
-        border: 0;
-        color: #fff;
-        cursor: pointer;
-        margin-left: 15px;
-    }
+<style>
+@import "../authV2.css";
 </style>

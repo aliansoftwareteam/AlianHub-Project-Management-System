@@ -1,6 +1,7 @@
 const ctrl = require('./controller');
 const { handleEvents } = require('./eventController');
 const transcribe = require('./transcribe');
+const meetingNotes = require('./meetingNotes');
 
 exports.init = (app) => {
     app.post('/api/v1/generatePrompt', ctrl.generatePrompt);
@@ -17,8 +18,10 @@ exports.init = (app) => {
     // llmProvider). companyId resolves from the companyid header (set by the
     // axios interceptor). Returns { questions } or { description }.
     app.post('/api/v1/ai/description', ctrl.writeDescription);
+    app.post('/api/v1/ai/task-summary', ctrl.summarizeTask);
     // Talk to Text — audio → text via OpenAI Whisper (multipart, field "file").
     app.post('/api/v1/ai/transcribe', ...transcribe.transcribe);
+    app.post('/api/v1/ai/meeting-notes', meetingNotes.meetingNotesHandler);
     app.get('/api/v1/generatePrompt/events/:id', (req, res) => {
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');

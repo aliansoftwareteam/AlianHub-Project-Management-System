@@ -30,6 +30,23 @@ function isReasoningModel(modelId) {
     return false;
 }
 
+// Each provider clamps the shared LLM_MAX_TOKENS_PLAN ask to what *this*
+// model will actually accept. Anthropic and DeepSeek already do this.
+// OpenAI did not, so gpt-4o (16,384 max output) 400'd when the env asked
+// for 32,000. Caller still asks freely; we bound it here.
+function openaiMaxOutputTokens(modelId) {
+    const id = String(modelId || '').toLowerCase();
+    if (id.startsWith('gpt-5') || id.startsWith('o1') || id.startsWith('o3') || id.startsWith('o4')) {
+        return 100000;
+    }
+    if (id.startsWith('gpt-4.1')) return 32768;
+    if (id.includes('gpt-4-turbo') || id === 'gpt-4' || id.startsWith('gpt-4-0') || id.startsWith('gpt-3.5')) {
+        return 4096;
+    }
+    // gpt-4o, gpt-4o-mini, and unknown chat models
+    return 16384;
+}
+
 const openaiProvider = {
     name: 'openai',
     get isConfigured() {
@@ -53,6 +70,7 @@ const openaiProvider = {
         }
 
         const reasoning = isReasoningModel(config.AI_MODEL);
+        const maxTokens = Math.min(opts.maxTokens || 32000, openaiMaxOutputTokens(config.AI_MODEL));
         const body = {
             model: config.AI_MODEL,
             messages,
@@ -62,10 +80,10 @@ const openaiProvider = {
             // value returns 400) and use max_completion_tokens. Reasoning
             // models burn hidden tokens internally on top of the visible
             // output, so a roomy default is essential.
-            body.max_completion_tokens = opts.maxTokens || 32000;
+            body.max_completion_tokens = maxTokens;
         } else {
             body.temperature = typeof opts.temperature === 'number' ? opts.temperature : 0.4;
-            body.max_tokens = opts.maxTokens || 32000;
+            body.max_tokens = maxTokens;
         }
         if (opts.jsonMode) {
             body.response_format = { type: 'json_object' };

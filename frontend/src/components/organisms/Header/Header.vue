@@ -1,10 +1,10 @@
 <template>
-    <div class="d-flex align-items-center justify-content-between px-1 bg-blue white header__wrapper border-bottom-lightgray">
+    <div class="d-flex align-items-center justify-content-between px-1 kiln-shell header__wrapper">
         <div class="d-flex align-items-center h-100">
-            <img :src="toggle" alt="options" class="pr-1 cursor-pointer" v-if="clientWidth <= 1200" @click="visible = !visible">
-            <router-link :to="{name: 'Home', params: {cid: companyId}}" class="d-flex align-items-center h-100">
-                <img :src="headerLogo" class="cursor-pointer" />
-                <img class="cursor-pointer m0px-20px logo-app-icon" v-if="clientWidth > 990" src="@/assets/images/svg/header_dashboard.svg" alt="">
+            <img :src="toggle" alt="options" class="pr-1 cursor-pointer kiln-toggle" v-if="clientWidth <= 1200" @click="visible = !visible">
+            <router-link :to="{name: 'Home', params: {cid: companyId}}" class="kiln-mark">
+                <img :src="headerLogo" class="kiln-mark__logo cursor-pointer" />
+                <span class="kiln-mark__word">Alian<span>Hub</span></span>
             </router-link>
 
             <NavLinks v-if="clientWidth > 1200 && rules && Object.keys(rules).length" :menu="menu" />
@@ -79,7 +79,7 @@
                 <img src="@/assets/images/svg/tour_image.svg" class="cursor-pointer" id="tour_icon" @click="getTourDetails(),tourVisible = true">
             </div>
             <div>
-                <a :href="brandSettings && brandSettings?.helpLink ? brandSettings?.helpLink : 'javascript:void(0)'" :target="brandSettings && brandSettings?.helpLink  ? '_blank' : ''" class="help__icon">
+                <a id="help_driver" :href="brandSettings && brandSettings?.helpLink ? brandSettings?.helpLink : 'javascript:void(0)'" :target="brandSettings && brandSettings?.helpLink  ? '_blank' : ''" class="help__icon">
                     <img :src="questionMarkIcon" alt="help" class="question__icon">
                 </a>
             </div>

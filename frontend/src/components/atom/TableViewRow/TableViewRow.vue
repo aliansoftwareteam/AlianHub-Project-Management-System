@@ -134,7 +134,7 @@ import {useGetterFunctions , useCustomComposable , useMoment , useConvertDate} f
 import { useTaskSelection } from '@/composable/useTaskSelection.js';
 import { useStore } from 'vuex'
 import TaskStatus from '@/components/atom/TaskStatus/TaskStatus.vue'
-import { useRouter, useRoute } from "vue-router"
+import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { taskDueDateAdd, taskDueDateChange } from "@/utils/NotificationTemplate"
 import DueDateCompo from '@/components/molecules/DueDateCompo/DueDateCompo.vue';
 import Assignee from "@/components/molecules/Assignee/Assignee.vue"
@@ -165,8 +165,6 @@ const props = defineProps({
 
 const chatIcon = require("@/assets/images/svg/ChatIcon.svg");
 const subTaskIcon = require("@/assets/images/png/subTaskIcon.png");
-const route = useRoute()
-const router = useRouter()
 const showArchiveVar = inject("showArchived");
 const task = ref(props.data)
 const { getters,commit } = useStore()
@@ -363,11 +361,7 @@ function changeRoute(tab ='') {
     if(task.value.folderObjId) {
         paramsObj.folderId = task.value.folderObjId;
     }
-    router.push({
-        name: task.value.folderObjId? 'ProjectFolderSprintTask' : 'ProjectSprintTask',
-        params: paramsObj,
-        query: {...route.query, detailTab: !tab ? "comment" : tab}
-    })
+    openTask({ ...paramsObj, companyId: paramsObj.cid, projectId: paramsObj.id, tab: tab === 'task-detail-tab' ? 'description' : 'activity' })
 }
 
 function getUserData() {

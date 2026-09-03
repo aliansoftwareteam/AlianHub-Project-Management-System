@@ -188,6 +188,8 @@ const verifyJWTTokenWithCRoute = [
     // Talk to Text speech-to-text (Modules/AI/transcribe) — JWT + companyId so
     // only authenticated users can spend the STT quota.
     '/api/v1/ai/transcribe',
+    '/api/v1/ai/meeting-notes',
+    '/api/v1/ai/task-summary',
     // Personal API tokens (Modules/ApiTokens). app.use prefix-matching
     // covers /:id, /:id/logs and /me too. Routes were previously
     // unauthenticated (trusted body userData) — now JWT-protected; the
@@ -204,7 +206,12 @@ const verifyJWTTokenWithCRoute = [
     // req.uid. The login-flow routes (/api/v2/sso/oidc|saml|public) stay PUBLIC
     // (pre-auth), so they are intentionally NOT listed here.
     '/api/v2/sso/config',
+    '/api/v1/notifications/preferences',
     '/api/v1/audit-logs',
+    // Agents as teammates (Modules/Agents): runs, proposals, spend, personal accounts.
+    // A prefix, so /:id, /runs, /proposals/:id/approve are all behind a token. The MCP
+    // endpoint (/mcp) is deliberately NOT here — it authenticates its own bearer PAT.
+    '/api/v2/agents',
     // SCIM admin config (Modules/Scim) — JWT+company; owner/admin gated
     // in-controller. The SCIM 2.0 protocol routes (/scim/v2/*) use bearer-token
     // auth (company resolved from the token) and are intentionally NOT listed.
@@ -224,6 +231,9 @@ const verifyJWTTokenWithCRoute = [
     '/api/v1/reports/custom',
     '/api/v1/reports/variance',
     '/api/v1/reports/capacity',
+    // Web timer reconciliation (Modules/LogTime webTimer) — JWT+company so req.uid scopes the caller's sessions.
+    '/api/v2/timetracker/running',
+    '/api/v2/timetracker/trim',
     '/api/v1/reports/schedules',
     // Email-to-task management (AUTO-01). NOTE: only the /inboxes management
     // routes are JWT-protected; the public inbound webhook /api/v1/email-in/:token
@@ -233,6 +243,10 @@ const verifyJWTTokenWithCRoute = [
     // /api/v1/calendar/ics/:token is intentionally NOT listed (token authenticates it).
     '/api/v1/calendar/feeds',
     '/api/v1/automations',
+    // The v2 registry manifest carries no tenant data, but it does describe every
+    // trigger and action the engine supports; there is no reason to serve it to
+    // an unauthenticated caller when the rest of the module is protected.
+    '/api/v2/automations',
     '/api/v1/integrations',
     // Cloud storage attachments (AHE-3838). The OAuth callback is NOT under
     // this prefix — it lives at /api/v1/cloud-oauth/callback because a provider
@@ -278,6 +292,7 @@ const verifyJWTToken = [
     "/api/v1/storage/uploadFile",
     "/api/v1/storage/uploadFileBase64",
     "/api/v1/user",
+    "/api/v2/users/sessions",
     "/api/v2/session/update",
     "/api/v1/userAndCompanyCheck",
     "/api/v1/admin/wasabi/retriveObject",

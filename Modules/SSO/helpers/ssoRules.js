@@ -25,7 +25,7 @@ const validateSsoConfig = ({ provider, oidc, saml } = {}) => {
 /* Strip secrets — the only fields safe to expose to the (unauthenticated) login page. */
 const publicSsoView = (cfg) => {
     if (!cfg || !cfg.isEnabled) return null;
-    return { provider: cfg.provider, isEnabled: true };
+    return { provider: cfg.provider, isEnabled: true, displayName: cfg.displayName || '', enforcement: cfg.enforcement || 'optional' };
 };
 
 /* Normalise an identity from SSO claims/attributes using an optional attribute

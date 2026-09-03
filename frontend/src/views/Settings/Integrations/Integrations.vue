@@ -1,253 +1,184 @@
 <template>
-    <div class="position-re mySettingsWrapper p-1">
+    <div class="ig" :class="{ 'ig--busy': isSpinner }">
         <SpinnerComp :is-spinner="isSpinner" />
-        <div class="my-settings-main">
-            <div class="row">
-                <div class="col-md-2 settingprofile">
-                    <div class="col-md-10 settingprofileform setting_profile_mobile_responsive">
-                        <div class="profileform">
-                            <div class="intg-head">
-                                <h3 class="intg-title">{{ $t('Integrations.title') }}</h3>
-                                <p class="intg-desc">{{ $t('Integrations.desc') }}</p>
-                            </div>
+        <div class="ig__head">
+            <h2 class="ah-h3 ig__title">{{ $t('Integrations.title') }}</h2>
+            <span class="ah-label">{{ $t('SettingsV2.connected_count', { n: connectedCount }) }}</span>
+            <div class="ig__head-actions">
+                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="toggleWebhookForm()"><ShellIcon name="plus" :size="14" />{{ $t('SettingsV2.webhook') }}</button>
+                <router-link v-if="apiTokensRoute" class="ah-btn ah-btn--secondary ah-btn--sm" :to="apiTokensRoute">{{ $t('SettingsV2.api_keys') }}</router-link>
+            </div>
+        </div>
 
-                            <!-- One-time secret (shown only right after create) -->
-                            <div v-if="newSecret" class="intg-secret">
-                                <p class="intg-secret-title">{{ $t('Integrations.secret_title') }}</p>
-                                <p class="intg-secret-desc">{{ $t('Integrations.secret_desc') }}</p>
-                                <div class="intg-secret-row">
-                                    <code class="intg-secret-code">{{ newSecret }}</code>
-                                    <button type="button" class="btn_btn intg-ghost-btn" @click="copySecret">{{ $t('Integrations.copy') }}</button>
-                                    <button type="button" class="btn_btn intg-ghost-btn" @click="newSecret = ''">{{ $t('Integrations.done') }}</button>
-                                </div>
-                            </div>
+        <section v-if="newSecret" class="ah-card ig__secret">
+            <div class="ah-card__body">
+                <strong>{{ $t('Integrations.secret_title') }}</strong>
+                <div class="ah-small">{{ $t('Integrations.secret_desc') }}</div>
+                <div class="ig__secret-row">
+                    <code class="ah-mono ig__code">{{ newSecret }}</code>
+                    <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="copySecret"><ShellIcon name="copy" :size="14" />{{ $t('Integrations.copy') }}</button>
+                    <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="newSecret = ''">{{ $t('Integrations.done') }}</button>
+                </div>
+            </div>
+        </section>
 
-                            <!-- Add / edit webhook -->
-                            <form class="intg-form" @submit.prevent="submitForm">
-                                <h4 class="intg-section-title">{{ editingId ? $t('Integrations.edit_webhook') : $t('Integrations.add_webhook') }}</h4>
+        <section v-if="showWebhookForm || editingId" class="ah-card">
+            <div class="ah-card__head">
+                <h3 class="ah-h3">{{ editingId ? $t('Integrations.edit_webhook') : $t('Integrations.add_webhook') }}</h3>
+                <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :aria-label="$t('Integrations.cancel')" @click="closeWebhookForm()"><ShellIcon name="x" :size="16" /></button>
+            </div>
+            <form class="ah-card__body ig__form" @submit.prevent="submitForm">
+                <div class="ah-field">
+                    <span class="ah-field__label">{{ $t('Integrations.destination') }}</span>
+                    <div class="ah-tabs" role="radiogroup">
+                        <button v-for="opt in formatOptions" :key="opt.value" type="button" class="ah-tab" :class="{ 'is-active': form.format === opt.value }" role="radio" :aria-checked="form.format === opt.value" @click="form.format = opt.value">{{ opt.label }}</button>
+                    </div>
+                </div>
+                <div class="ig__form-grid">
+                    <div class="ah-field">
+                        <label class="ah-field__label" for="ig-name">{{ $t('Integrations.name') }}</label>
+                        <input id="ig-name" class="ah-input" :class="{ 'ah-input--error': formError.name }" v-model.trim="form.name" :placeholder="$t('Integrations.name_ph')" maxlength="80" @input="formError.name = ''" />
+                        <div v-if="formError.name" class="ah-field__error">{{ formError.name }}</div>
+                    </div>
+                    <div class="ah-field">
+                        <label class="ah-field__label" for="ig-url">{{ urlLabel }}</label>
+                        <input id="ig-url" class="ah-input ah-mono" :class="{ 'ah-input--error': formError.url }" v-model.trim="form.url" :placeholder="urlPlaceholder" @input="formError.url = ''" />
+                        <div v-if="form.format === 'slack'" class="ah-field__hint">{{ $t('Integrations.slack_hint') }}</div>
+                        <div v-else-if="form.format === 'discord'" class="ah-field__hint">{{ $t('Integrations.discord_hint') }}</div>
+                        <div v-if="formError.url" class="ah-field__error">{{ formError.url }}</div>
+                    </div>
+                </div>
+                <div class="ah-field">
+                    <span class="ah-field__label">{{ $t('Integrations.events') }}</span>
+                    <label class="ig__check"><input type="checkbox" class="ah-check" :checked="allEvents" @change="toggleAllEvents($event)" /><span>{{ $t('Integrations.all_events') }}</span></label>
+                    <div v-if="!allEvents" class="ig__events">
+                        <label v-for="ev in eventCatalogue" :key="ev" class="ig__check"><input type="checkbox" class="ah-check" :value="ev" v-model="form.events" /><span>{{ eventLabel(ev) }}</span></label>
+                    </div>
+                    <div v-if="formError.events" class="ah-field__error">{{ formError.events }}</div>
+                </div>
+                <div class="ig__actions">
+                    <button type="submit" class="ah-btn ah-btn--primary" :disabled="isSpinner">{{ editingId ? $t('Integrations.save') : (form.format === 'slack' ? $t('Integrations.send_to_slack') : $t('Integrations.create')) }}</button>
+                    <button type="button" class="ah-btn ah-btn--secondary" @click="closeWebhookForm()">{{ $t('Integrations.cancel') }}</button>
+                </div>
+            </form>
+        </section>
 
-                                <div class="inputfield">
-                                    <label>{{ $t('Integrations.destination') }}</label>
-                                    <div class="intg-format-tabs">
-                                        <button type="button" v-for="opt in formatOptions" :key="opt.value"
-                                            class="intg-format-tab" :class="{ 'is-active': form.format === opt.value }"
-                                            @click="form.format = opt.value">{{ opt.label }}</button>
-                                    </div>
-                                </div>
-
-                                <div class="inputfield position-re">
-                                    <label>{{ $t('Integrations.name') }} *</label>
-                                    <input type="text" class="logininput" v-model.trim="form.name" :placeholder="$t('Integrations.name_ph')" maxlength="80" />
-                                    <div class="invalid-feedback red pt-5px">{{ formError.name }}</div>
-                                </div>
-
-                                <div class="inputfield position-re">
-                                    <label>{{ urlLabel }} *</label>
-                                    <input type="text" class="logininput" v-model.trim="form.url" :placeholder="urlPlaceholder" />
-                                    <div class="intg-hint" v-if="form.format === 'slack'">{{ $t('Integrations.slack_hint') }}</div>
-                                    <div class="intg-hint" v-else-if="form.format === 'discord'">{{ $t('Integrations.discord_hint') }}</div>
-                                    <div class="invalid-feedback red pt-5px">{{ formError.url }}</div>
-                                </div>
-
-                                <div class="inputfield position-re">
-                                    <label>{{ $t('Integrations.events') }} *</label>
-                                    <label class="intg-check">
-                                        <input type="checkbox" :checked="allEvents" @change="toggleAllEvents($event)" />
-                                        <span>{{ $t('Integrations.all_events') }}</span>
-                                    </label>
-                                    <div class="intg-events" v-if="!allEvents">
-                                        <label class="intg-check" v-for="ev in eventCatalogue" :key="ev">
-                                            <input type="checkbox" :value="ev" v-model="form.events" />
-                                            <span>{{ eventLabel(ev) }}</span>
-                                        </label>
-                                    </div>
-                                    <div class="invalid-feedback red pt-5px">{{ formError.events }}</div>
-                                </div>
-
-                                <div class="mysetiing_save d-flex" style="gap:10px; flex-wrap:wrap;">
-                                    <button type="submit" class="btn_btn mysetting_save_btn" :disabled="isSpinner">
-                                        {{ editingId ? $t('Integrations.save') : (form.format === 'slack' ? $t('Integrations.send_to_slack') : $t('Integrations.create')) }}
-                                    </button>
-                                    <button v-if="editingId" type="button" class="btn_btn intg-ghost-btn" @click="resetForm">{{ $t('Integrations.cancel') }}</button>
-                                </div>
-                            </form>
-
-                            <!-- Existing webhooks -->
-                            <div class="intg-list-wrap">
-                                <h4 class="intg-section-title">
-                                    {{ $t('Integrations.your_webhooks') }}
-                                    <span class="intg-count" v-if="webhooks.length">{{ webhooks.length }}</span>
-                                </h4>
-                                <p v-if="!webhooks.length" class="intg-empty">{{ $t('Integrations.empty') }}</p>
-
-                                <div v-for="hook in webhooks" :key="hook._id" class="intg-row">
-                                    <div class="intg-row-top">
-                                        <div class="intg-row-main">
-                                            <span class="intg-badge" :class="'is-' + (hook.format || 'json')">{{ (hook.format || 'json').toUpperCase() }}</span>
-                                            <div class="intg-row-text">
-                                                <div class="intg-row-name">{{ hook.name }}</div>
-                                                <div class="intg-row-url" :title="hook.url">{{ shortUrl(hook.url) }}</div>
-                                                <div class="intg-row-meta">{{ eventsSummary(hook.events) }} · {{ lastDeliveryLabel(hook) }}</div>
-                                            </div>
-                                        </div>
-                                        <div class="intg-row-actions">
-                                            <label class="intg-switch" :title="hook.active ? $t('Integrations.active') : $t('Integrations.paused')">
-                                                <input type="checkbox" :checked="hook.active" @change="toggleActive(hook)" />
-                                                <span class="intg-slider"></span>
-                                            </label>
-                                            <button type="button" class="intg-link" @click="viewLogs(hook)">{{ $t('Integrations.logs') }}</button>
-                                            <button type="button" class="intg-link" @click="editWebhook(hook)">{{ $t('Integrations.edit') }}</button>
-                                            <button type="button" class="intg-link intg-danger" @click="removeWebhook(hook)">{{ $t('Integrations.delete') }}</button>
-                                        </div>
-                                    </div>
-
-                                    <div v-if="logsFor === hook._id" class="intg-logs">
-                                        <p v-if="!logs.length" class="intg-empty">{{ $t('Integrations.no_logs') }}</p>
-                                        <table v-else class="intg-logs-table">
-                                            <thead>
-                                                <tr>
-                                                    <th>{{ $t('Integrations.event') }}</th>
-                                                    <th>{{ $t('Integrations.status') }}</th>
-                                                    <th>{{ $t('Integrations.duration') }}</th>
-                                                    <th>{{ $t('Integrations.when') }}</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <tr v-for="(log, i) in logs" :key="i">
-                                                    <td>{{ log.event }}</td>
-                                                    <td :class="log.success ? 'intg-ok' : 'intg-fail'">
-                                                        {{ log.success ? (log.statusCode || 'OK') : (log.statusCode || 'fail') }}<span v-if="log.attempt > 1"> ({{ $t('Integrations.retry') }})</span>
-                                                    </td>
-                                                    <td>{{ log.durationMs != null ? log.durationMs + 'ms' : '—' }}</td>
-                                                    <td>{{ formatTime(log.createdAt) }}</td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                        <button
-                                            v-if="logsHasMore"
-                                            type="button"
-                                            class="intg-logs-more"
-                                            :disabled="logsBusy"
-                                            @click="loadMoreLogs"
-                                        >{{ logsBusy ? $t('Integrations.loading') : $t('Integrations.load_more') }}</button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- ───────────────────────────────────────────────
-                                 AHE-3838 — cloud storage for attachments.
-                                 Workspace-level app registration per provider.
-                                 Each person then connects their OWN account,
-                                 because everyone has their own drive.
-                            ──────────────────────────────────────────────── -->
-                            <div class="intg-list-wrap intg-cloud">
-                                <h4 class="intg-section-title">{{ $t('Integrations.cloud_title') }}</h4>
-                                <p class="intg-desc">{{ $t('Integrations.cloud_desc') }}</p>
-
-                                <div v-if="cloudRedirectUri" class="intg-cloud-redirect">
-                                    <span class="intg-cloud-redirect-lbl">{{ $t('Integrations.cloud_redirect_uri') }}</span>
-                                    <code class="intg-secret-code">{{ cloudRedirectUri }}</code>
-                                    <button type="button" class="btn_btn intg-ghost-btn" @click="copyRedirectUri">{{ $t('Integrations.copy') }}</button>
-                                    <div class="intg-hint">{{ $t('Integrations.cloud_redirect_hint') }}</div>
-                                </div>
-
-                                <div v-for="p in cloudProviders" :key="p.provider" class="intg-row intg-cloud-row">
-                                    <div class="intg-row-top">
-                                        <div class="intg-row-main">
-                                            <span class="intg-cloud-ic">{{ p.icon }}</span>
-                                            <div class="intg-row-text">
-                                                <div class="intg-row-name">
-                                                    {{ p.name }}
-                                                    <span v-if="p.configured" class="intg-cloud-pill on">{{ $t('Integrations.cloud_ready') }}</span>
-                                                    <span v-else class="intg-cloud-pill">{{ $t('Integrations.cloud_not_setup') }}</span>
-                                                </div>
-                                                <div class="intg-row-meta">
-                                                    <template v-if="p.configured && p.oauth">
-                                                        <span v-if="p.connected">{{ $t('Integrations.cloud_your_account') }}: {{ p.accountEmail || $t('Integrations.cloud_connected') }}</span>
-                                                        <span v-else-if="p.connectionStatus === 'reauth_required'">{{ $t('Integrations.cloud_reauth') }}</span>
-                                                        <span v-else>{{ $t('Integrations.cloud_not_connected') }}</span>
-                                                    </template>
-                                                    <span v-else-if="p.configured">{{ $t('Integrations.cloud_no_signin_needed') }}</span>
-                                                    <span v-else>{{ p.setupHint }}</span>
-                                                </div>
-                                                <button
-                                                    v-if="p.requirements && p.requirements.length"
-                                                    type="button" class="intg-link intg-cloud-stepstoggle"
-                                                    @click="toggleCloudSteps(p)"
-                                                >{{ isCloudStepsOpen(p) ? $t('Integrations.cloud_hide_steps') : $t('Integrations.cloud_show_steps', { count: p.requirements.length }) }}</button>
-                                            </div>
-                                        </div>
-                                        <div class="intg-row-actions">
-                                            <!-- Per-user connect: available to everyone once an admin
-                                                 has entered the workspace credentials. -->
-                                            <button
-                                                v-if="p.configured && p.oauth && !p.connected"
-                                                type="button" class="intg-link" @click="connectCloud(p)"
-                                            >{{ $t('Integrations.cloud_connect') }}</button>
-                                            <button
-                                                v-if="p.configured && p.oauth && p.connected"
-                                                type="button" class="intg-link intg-danger" @click="disconnectCloud(p)"
-                                            >{{ $t('Integrations.cloud_disconnect') }}</button>
-                                            <button
-                                                type="button" class="intg-link" @click="toggleCloudForm(p)"
-                                            >{{ cloudEditing === p.provider ? $t('Integrations.cancel') : (p.configured ? $t('Integrations.edit') : $t('Integrations.cloud_setup')) }}</button>
-                                            <button
-                                                v-if="p.configured"
-                                                type="button" class="intg-link intg-danger" @click="removeCloud(p)"
-                                            >{{ $t('Integrations.delete') }}</button>
-                                        </div>
-                                    </div>
-
-                                    <!-- Per-provider setup checklist. Each line is
-                                         something whose omission silently breaks a
-                                         specific capability. -->
-                                    <ol v-if="isCloudStepsOpen(p) && p.requirements && p.requirements.length" class="intg-cloud-reqs">
-                                        <li v-for="(req, i) in p.requirements" :key="i" v-html="formatRequirement(req)"></li>
-                                        <li v-if="p.needsRedirectUri" class="intg-cloud-reqs__uri">
-                                            {{ $t('Integrations.cloud_redirect_uri') }}:
-                                            <code>{{ cloudRedirectUri }}</code>
-                                            <button type="button" class="intg-link" @click="copyRedirectUri">{{ $t('Integrations.copy') }}</button>
-                                        </li>
-                                    </ol>
-
-                                    <div v-if="cloudEditing === p.provider" class="intg-cloud-form">
-                                        <div v-for="f in p.fields" :key="f.key" class="inputfield position-re">
-                                            <label>{{ f.label }}</label>
-                                            <input
-                                                class="logininput"
-                                                :type="f.secret ? 'password' : 'text'"
-                                                autocomplete="off"
-                                                v-model.trim="cloudForm[f.key]"
-                                                :placeholder="f.secret && p.secrets && p.secrets[f.key] ? $t('Integrations.cloud_secret_set') : ''"
-                                            />
-                                        </div>
-                                        <div class="mysetiing_save d-flex" style="gap:10px; flex-wrap:wrap;">
-                                            <button type="button" class="btn_btn mysetting_save_btn" :disabled="isSpinner" @click="saveCloud(p)">{{ $t('Integrations.save') }}</button>
-                                            <button type="button" class="btn_btn intg-ghost-btn" @click="cloudEditing = ''">{{ $t('Integrations.cancel') }}</button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                            </div>
+        <div class="ig__list">
+            <div v-for="p in connectedProviders" :key="p.provider" class="ah-card ig__row">
+                <div class="ig__row-main">
+                    <span class="ig__mark" aria-hidden="true">{{ p.icon }}</span>
+                    <div class="ig__row-text">
+                        <div class="ig__row-name">{{ p.name }}</div>
+                        <div class="ah-small">
+                            <template v-if="p.oauth && p.connected">{{ $t('Integrations.cloud_your_account') }}: {{ p.accountEmail || $t('Integrations.cloud_connected') }}</template>
+                            <template v-else-if="p.oauth && p.connectionStatus === 'reauth_required'">{{ $t('Integrations.cloud_reauth') }}</template>
+                            <template v-else-if="p.oauth">{{ $t('Integrations.cloud_not_connected') }}</template>
+                            <template v-else>{{ $t('Integrations.cloud_no_signin_needed') }}</template>
                         </div>
+                    </div>
+                    <span class="ig__status ah-small">
+                        <span class="ah-dot" :class="p.connected || !p.oauth ? 'ah-dot--ok' : 'ah-dot--warn'"></span>
+                        {{ p.connected || !p.oauth ? $t('Integrations.cloud_ready') : $t('Integrations.cloud_not_connected') }}
+                    </span>
+                    <div class="ig__row-actions">
+                        <button v-if="p.oauth && !p.connected" type="button" class="ig__link" @click="connectCloud(p)">{{ $t('Integrations.cloud_connect') }}</button>
+                        <button v-if="p.oauth && p.connected" type="button" class="ig__link ig__link--danger" @click="disconnectCloud(p)">{{ $t('Integrations.cloud_disconnect') }}</button>
+                        <button type="button" class="ig__link" @click="toggleCloudForm(p)">{{ cloudEditing === p.provider ? $t('Integrations.cancel') : $t('SettingsV2.configure') }}</button>
+                        <button type="button" class="ig__link ig__link--danger" @click="removeCloud(p)">{{ $t('Integrations.delete') }}</button>
                     </div>
                 </div>
             </div>
+
+            <div v-for="hook in webhooks" :key="hook._id" class="ah-card ig__row" :class="{ 'is-paused': !hook.active }">
+                <div class="ig__row-main">
+                    <span class="ig__mark ig__mark--hook" :class="'is-' + (hook.format || 'json')" aria-hidden="true">{{ (hook.format || 'json').slice(0, 1).toUpperCase() }}</span>
+                    <div class="ig__row-text">
+                        <div class="ig__row-name">{{ hook.name }} <span class="ah-chip ah-chip--mono">{{ (hook.format || 'json').toUpperCase() }}</span></div>
+                        <div class="ah-small" :title="hook.url">{{ shortUrl(hook.url) }} · {{ eventsSummary(hook.events) }} · {{ lastDeliveryLabel(hook) }}</div>
+                    </div>
+                    <span class="ig__status ah-small">
+                        <span class="ah-dot" :class="hook.active ? 'ah-dot--ok' : 'ah-dot--warn'"></span>{{ hook.active ? $t('Integrations.active') : $t('Integrations.paused') }}
+                    </span>
+                    <div class="ig__row-actions">
+                        <AhSwitch small :modelValue="!!hook.active" :label="hook.active ? $t('Integrations.active') : $t('Integrations.paused')" @update:modelValue="toggleActive(hook)" />
+                        <button type="button" class="ig__link" @click="viewLogs(hook)">{{ $t('Integrations.logs') }}</button>
+                        <button type="button" class="ig__link" @click="editWebhook(hook)">{{ $t('Integrations.edit') }}</button>
+                        <button type="button" class="ig__link ig__link--danger" @click="removeWebhook(hook)">{{ $t('Integrations.delete') }}</button>
+                    </div>
+                </div>
+                <div v-if="logsFor === hook._id" class="ig__logs">
+                    <div v-if="!logs.length" class="ah-empty">{{ $t('Integrations.no_logs') }}</div>
+                    <div v-else class="ig__logs-scroll">
+                        <table class="ig__logs-table">
+                            <thead><tr><th>{{ $t('Integrations.event') }}</th><th>{{ $t('Integrations.status') }}</th><th>{{ $t('Integrations.duration') }}</th><th>{{ $t('Integrations.when') }}</th></tr></thead>
+                            <tbody>
+                                <tr v-for="(log, i) in logs" :key="i">
+                                    <td class="ah-mono">{{ log.event }}</td>
+                                    <td><span class="ah-chip ah-chip--mono" :class="log.success ? 'ah-chip--ok' : 'ah-chip--danger'">{{ log.success ? (log.statusCode || 'OK') : (log.statusCode || 'fail') }}<template v-if="log.attempt > 1"> · {{ $t('Integrations.retry') }}</template></span></td>
+                                    <td class="ah-mono">{{ log.durationMs != null ? log.durationMs + 'ms' : '—' }}</td>
+                                    <td class="ah-mono">{{ formatTime(log.createdAt) }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <button v-if="logsHasMore" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="logsBusy" @click="loadMoreLogs">{{ logsBusy ? $t('Integrations.loading') : $t('Integrations.load_more') }}</button>
+                </div>
+            </div>
+
+            <div v-if="!connectedProviders.length && !webhooks.length && !isSpinner" class="ah-empty">{{ $t('SettingsV2.integrations_empty') }}</div>
+        </div>
+
+        <div class="ah-label">{{ $t('SettingsV2.available') }}</div>
+        <div class="ig__chips">
+            <button v-for="p in availableProviders" :key="p.provider" type="button" class="ig__chip" :class="{ 'is-active': cloudEditing === p.provider }" @click="toggleCloudForm(p)"><span aria-hidden="true">{{ p.icon }}</span> {{ p.name }}</button>
+            <button v-for="opt in formatOptions" :key="opt.value" type="button" class="ig__chip" @click="toggleWebhookForm(opt.value)">{{ opt.label }} {{ $t('SettingsV2.webhook').toLowerCase() }}</button>
+        </div>
+
+        <section v-if="editingProvider" class="ah-card">
+            <div class="ah-card__head">
+                <h3 class="ah-h3">{{ $t('SettingsV2.set_up_provider', { provider: editingProvider.name }) }}</h3>
+                <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :aria-label="$t('Integrations.cancel')" @click="cloudEditing = ''"><ShellIcon name="x" :size="16" /></button>
+            </div>
+            <div class="ah-card__body ig__form">
+                <div v-if="cloudRedirectUri" class="ig__redirect">
+                    <span class="ah-small">{{ $t('Integrations.cloud_redirect_uri') }}</span>
+                    <code class="ah-mono ig__code">{{ cloudRedirectUri }}</code>
+                    <button type="button" class="ig__link" @click="copyRedirectUri">{{ $t('Integrations.copy') }}</button>
+                    <div class="ah-field__hint">{{ $t('Integrations.cloud_redirect_hint') }}</div>
+                </div>
+                <ol v-if="editingProvider.requirements && editingProvider.requirements.length" class="ig__reqs">
+                    <li v-for="(req, i) in editingProvider.requirements" :key="i" v-html="formatRequirement(req)"></li>
+                </ol>
+                <div class="ig__form-grid">
+                    <div v-for="f in editingProvider.fields" :key="f.key" class="ah-field">
+                        <label class="ah-field__label" :for="'ig-cloud-' + f.key">{{ f.label }}</label>
+                        <input :id="'ig-cloud-' + f.key" class="ah-input ah-mono" :type="f.secret ? 'password' : 'text'" autocomplete="off" v-model.trim="cloudForm[f.key]" :placeholder="f.secret && editingProvider.secrets && editingProvider.secrets[f.key] ? $t('Integrations.cloud_secret_set') : ''" />
+                    </div>
+                </div>
+                <div class="ig__actions">
+                    <button type="button" class="ah-btn ah-btn--primary" :disabled="isSpinner" @click="saveCloud(editingProvider)">{{ $t('Integrations.save') }}</button>
+                    <button type="button" class="ah-btn ah-btn--secondary" @click="cloudEditing = ''">{{ $t('Integrations.cancel') }}</button>
+                </div>
+            </div>
+        </section>
+
+        <div class="ah-card ig__note">
+            <ShellIcon name="agent" :size="16" class="ig__note-icon" />
+            <span>{{ $t('SettingsV2.integrations_agent_note') }}</span>
         </div>
     </div>
 </template>
 
-<script>
-// Named (multi-word) to satisfy vue/multi-word-component-names; the route and
-// file stay "Integrations".
-export default { name: 'IntegrationsSettings' };
-</script>
-
 <script setup>
+defineOptions({ name: "IntegrationsSettings" });
 import * as env from '@/config/env';
 import { useToast } from 'vue-toast-notification';
 import { ref, computed, onMounted } from 'vue';
 import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
+import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import AhSwitch from '@/components/molecules/Setting/AhSwitch.vue';
+import { useRouter } from 'vue-router';
+import { inject } from 'vue';
 import { apiRequest } from '../../../services';
 import { useI18n } from 'vue-i18n';
 import {
@@ -265,6 +196,15 @@ const isSpinner = ref(false);
 const webhooks = ref([]);
 const eventCatalogue = ref(['task.created', 'task.updated', 'task.deleted', 'task.archived', 'task.restored']);
 const newSecret = ref('');
+const showWebhookForm = ref(false);
+const router = useRouter();
+const companyId = inject('$companyId');
+const apiTokensRoute = computed(() => (router.hasRoute('ApiTokens') ? { name: 'ApiTokens', params: { cid: companyId.value } } : null));
+const toggleWebhookForm = (format) => {
+    if (format) { form.value.format = format; showWebhookForm.value = true; return; }
+    showWebhookForm.value = !showWebhookForm.value;
+};
+const closeWebhookForm = () => { showWebhookForm.value = false; resetForm(); };
 const editingId = ref('');
 const logsFor = ref('');
 const logs = ref([]);
@@ -363,6 +303,7 @@ const submitForm = async () => {
         if (!editingId.value && res.data.data && res.data.data.secret) newSecret.value = res.data.data.secret;
         $toast.success(editingId.value ? t('Toast.webhook_updated') : t('Toast.webhook_created'), { position: 'top-right' });
         resetForm();
+        showWebhookForm.value = false;
         await fetchWebhooks();
     } catch (e) {
         $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
@@ -373,6 +314,7 @@ const submitForm = async () => {
 
 const editWebhook = (hook) => {
     editingId.value = hook._id;
+    showWebhookForm.value = true;
     form.value = { name: hook.name || '', url: hook.url || '', format: hook.format || 'json', events: [...(hook.events || ['*'])] };
     formError.value = { name: '', url: '', events: '' };
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -467,6 +409,10 @@ const cloudProviders = ref([]);
 const cloudRedirectUri = ref('');
 const cloudEditing = ref('');
 const cloudForm = ref({});
+const connectedProviders = computed(() => cloudProviders.value.filter((p) => p.configured));
+const availableProviders = computed(() => cloudProviders.value.filter((p) => !p.configured));
+const editingProvider = computed(() => cloudProviders.value.find((p) => p.provider === cloudEditing.value) || null);
+const connectedCount = computed(() => connectedProviders.value.length + webhooks.value.filter((h) => h.active).length);
 
 const loadCloudSettings = async () => {
     try {
@@ -539,14 +485,6 @@ const disconnectCloud = async (p) => {
     }
 };
 
-// Setup steps are collapsed for a provider that's already working, and open by
-// default for one that still needs configuring — that's when you need them.
-const cloudStepsOpen = ref({});
-const toggleCloudSteps = (p) => { cloudStepsOpen.value[p.provider] = !isCloudStepsOpen(p); };
-const isCloudStepsOpen = (p) => {
-    const explicit = cloudStepsOpen.value[p.provider];
-    return explicit === undefined ? !p.configured : explicit;
-};
 
 /**
  * Render the light markup used in provider requirement strings: **bold** and
@@ -591,166 +529,52 @@ onMounted(() => {
 </script>
 
 <style scoped>
-@import '../MySettings/style.css';
-.intg-head { margin-bottom: 18px; }
-.intg-title { font-size: 18px; font-weight: 600; color: #1F212A; margin: 0 0 4px; }
-.intg-desc { font-size: 13px; color: #6B7280; margin: 0; max-width: 560px; line-height: 1.5; }
-.intg-section-title { font-size: 15px; font-weight: 600; color: #1F212A; margin: 22px 0 10px; display: flex; align-items: center; gap: 8px; }
-.intg-count { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 6px; background: #EEF0FE; color: #6473E8; border-radius: 9px; font-size: 11px; font-weight: 600; }
-
-.intg-secret { background: #FBFCFF; border: 1px dashed #C9D0F8; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; }
-.intg-secret-title { font-weight: 600; color: #1F212A; margin: 0 0 2px; }
-.intg-secret-desc { font-size: 12px; color: #6B7280; margin: 0 0 8px; }
-.intg-secret-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.intg-secret-code { font-family: monospace; font-size: 13px; background: #F1F3F7; padding: 6px 10px; border-radius: 6px; word-break: break-all; flex: 1; min-width: 200px; }
-
-.intg-form { max-width: 560px; }
-.intg-format-tabs { display: inline-flex; gap: 6px; }
-.intg-format-tab { padding: 6px 14px; border: 1px solid #DFE1E6; background: #fff; border-radius: 6px; cursor: pointer; font-size: 13px; color: #4B5563; }
-.intg-format-tab.is-active { background: #2f3990; border-color: #2f3990; color: #fff; }
-.intg-hint { font-size: 11px; color: #8A909C; margin-top: 4px; }
-.intg-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #374151; cursor: pointer; white-space: nowrap; }
-.intg-check input[type="checkbox"] { width: 15px; height: 15px; margin: 0; flex-shrink: 0; cursor: pointer; }
-.intg-events { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 10px 20px; }
-
-/* .btn_btn forces a navy background (!important), so secondary buttons (Cancel,
-   Copy, Done) just need readable white text — same as the primary button. */
-.intg-ghost-btn { color: #fff; }
-
-.intg-list-wrap { max-width: 720px; }
-.intg-empty { font-size: 13px; color: #8A909C; padding: 8px 0; }
-.intg-row { border: 1px solid #EDF0F7; border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; background: #fff; }
-.intg-row-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.intg-row-main { display: flex; gap: 10px; min-width: 0; }
-.intg-badge { flex-shrink: 0; height: 20px; padding: 0 8px; display: inline-flex; align-items: center; border-radius: 5px; font-size: 10px; font-weight: 700; letter-spacing: 0.4px; color: #fff; background: #6473E8; }
-.intg-badge.is-slack { background: #4A154B; }
-.intg-badge.is-discord { background: #5865F2; }
-.intg-badge.is-json { background: #6B7280; }
-.intg-row-text { min-width: 0; }
-.intg-row-name { font-size: 14px; font-weight: 600; color: #1F212A; }
-.intg-row-url { font-size: 12px; color: #6473E8; font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.intg-row-meta { font-size: 12px; color: #8A909C; margin-top: 2px; }
-.intg-row-actions { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
-.intg-link { background: none; border: none; padding: 0; cursor: pointer; font-size: 13px; color: #2f3990; }
-.intg-link.intg-danger { color: #E5484D; }
-
-.intg-switch { position: relative; display: inline-block; width: 34px; height: 18px; }
-.intg-switch input { opacity: 0; width: 0; height: 0; }
-.intg-slider { position: absolute; inset: 0; background: #C9CDD6; border-radius: 18px; transition: 0.2s; cursor: pointer; }
-.intg-slider::before { content: ''; position: absolute; height: 14px; width: 14px; left: 2px; bottom: 2px; background: #fff; border-radius: 50%; transition: 0.2s; }
-.intg-switch input:checked + .intg-slider { background: #1CB303; }
-.intg-switch input:checked + .intg-slider::before { transform: translateX(16px); }
-
-.intg-logs { margin-top: 12px; border-top: 1px solid #EDF0F7; padding-top: 10px; }
-.intg-logs-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.intg-logs-table th { text-align: left; color: #8A909C; font-weight: 600; padding: 4px 8px; }
-.intg-logs-table td { padding: 4px 8px; color: #1F212A; border-top: 1px solid #F2F4F8; }
-.intg-logs-more {
-    display: block;
-    width: 100%;
-    margin-top: 8px;
-    padding: 7px 0;
-    border: 1px solid #E3E6EF;
-    border-radius: 6px;
-    background: #FAFBFD;
-    color: #2F3990;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
+.ig { display: flex; flex-direction: column; gap: 12px; max-width: 860px; position: relative; }
+.ig--busy { pointer-events: none; }
+.ig__head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ig__title { font-size: 15px; }
+.ig__head-actions { margin-left: auto; display: flex; gap: 6px; }
+.ig__head-actions a { text-decoration: none; }
+.ig__secret { border-color: var(--brand); }
+.ig__secret-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.ig__code { padding: 6px 9px; background: var(--surface-2); border-radius: 6px; word-break: break-all; color: var(--ink); }
+.ig__form { display: flex; flex-direction: column; gap: 12px; }
+.ig__form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ig__events { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; }
+.ig__check { display: flex; align-items: center; gap: 7px; font: var(--text-small); color: var(--ink-label); cursor: pointer; }
+.ig__actions { display: flex; gap: 8px; }
+.ig__list { display: flex; flex-direction: column; gap: 7px; }
+.ig__row { padding: 11px 13px; display: flex; flex-direction: column; gap: 10px; }
+.ig__row.is-paused { opacity: .75; }
+.ig__row-main { display: flex; align-items: center; gap: 11px; flex-wrap: wrap; }
+.ig__mark { width: 30px; height: 30px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--hairline); display: grid; place-items: center; font-size: 15px; flex: none; }
+.ig__mark--hook { font: 600 12px/1 var(--font-mono); color: #fff; border: 0; background: var(--rail); }
+.ig__mark--hook.is-slack { background: #4a154b; }
+.ig__mark--hook.is-discord { background: #5865f2; }
+.ig__row-text { flex: 1; min-width: 200px; }
+.ig__row-name { font: 600 13px/1.3 var(--font-ui); color: var(--ink); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ig__status { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.ig__row-actions { display: flex; align-items: center; gap: 10px; }
+.ig__link { border: 0; background: transparent; color: var(--brand); font: 600 12px/1 var(--font-ui); cursor: pointer; padding: 4px 2px; }
+.ig__link--danger { color: var(--danger-ink); }
+.ig__link:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 4px; }
+.ig__logs { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--hairline); padding-top: 10px; }
+.ig__logs-scroll { overflow-x: auto; }
+.ig__logs-table { width: 100%; border-collapse: collapse; font: var(--text-small); }
+.ig__logs-table th { text-align: left; font: var(--text-label); text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); padding: 4px 8px; border-bottom: 1px solid var(--hairline); }
+.ig__logs-table td { padding: 6px 8px; border-bottom: 1px solid var(--hairline); color: var(--ink); }
+.ig__chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.ig__chip { padding: 6px 11px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); color: var(--ink); font: 400 12px/1 var(--font-ui); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: border-color var(--t-state) var(--ease); }
+.ig__chip:hover, .ig__chip.is-active { border-color: var(--brand); color: var(--brand); }
+.ig__chip:focus-visible { outline: none; box-shadow: var(--focus); }
+.ig__redirect { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ig__redirect .ah-field__hint { width: 100%; }
+.ig__reqs { margin: 0; padding-left: 18px; font: var(--text-small); color: var(--ink-label); line-height: 1.5; }
+.ig__note { padding: 10px 12px; border-color: rgba(47, 57, 144, .25); font: 400 12px/1.5 var(--font-ui); color: var(--ink); display: flex; align-items: flex-start; gap: 8px; }
+.ig__note-icon { color: var(--agent); flex: none; margin-top: 1px; }
+@media (max-width: 767px) {
+    .ig__form-grid { grid-template-columns: 1fr; }
+    .ig__head-actions { margin-left: 0; }
+    .ig__link, .ig__chip { min-height: 44px; }
 }
-.intg-logs-more:hover:not(:disabled) { background: #F2F4FB; }
-.intg-logs-more:disabled { opacity: 0.6; cursor: default; }
-.intg-ok { color: #1B7F3B; }
-.intg-fail { color: #E5484D; }
-
-/* AHE-3838 — cloud storage for attachments */
-.intg-cloud { margin-top: 30px; padding-top: 22px; border-top: 1px solid #EDEFF5; }
-.intg-cloud .intg-desc { margin-bottom: 14px; }
-.intg-cloud-redirect {
-    background: #FBFCFF;
-    border: 1px dashed #C9D0F8;
-    border-radius: 8px;
-    padding: 12px 14px;
-    margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-.intg-cloud-redirect-lbl { font-size: 12.5px; font-weight: 600; color: #1F212A; }
-.intg-cloud-redirect .intg-hint { flex-basis: 100%; margin: 0; }
-.intg-cloud-row { display: block; }
-/* Keep the actions pinned top-right regardless of how long the provider's hint
-   is. `.intg-row-top` wraps by default and `.intg-row-main` has no flex-basis, so
-   Google's longer setup hint pushed the buttons onto their own line while
-   Dropbox's shorter one happened to fit — the two rows disagreed. Scoped to cloud
-   rows so the webhook rows above keep their existing wrapping behaviour. */
-.intg-cloud-row .intg-row-top { flex-wrap: nowrap; align-items: flex-start; }
-.intg-cloud-row .intg-row-main { flex: 1 1 auto; min-width: 0; }
-.intg-cloud-row .intg-row-actions { flex: 0 0 auto; align-items: flex-start; white-space: nowrap; }
-@media (max-width: 640px) {
-    /* Too narrow to hold both columns — let it stack rather than crush the text. */
-    .intg-cloud-row .intg-row-top { flex-wrap: wrap; }
-}
-.intg-cloud-ic {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 34px;
-    height: 34px;
-    flex: none;
-    font-size: 17px;
-    background: #F4F5FB;
-    border-radius: 8px;
-}
-.intg-cloud-pill {
-    display: inline-flex;
-    align-items: center;
-    margin-left: 8px;
-    padding: 1px 8px;
-    font-size: 10.5px;
-    font-weight: 600;
-    color: #6B7280;
-    background: #F1F2F6;
-    border-radius: 999px;
-    vertical-align: middle;
-}
-.intg-cloud-pill.on { color: #1B7F3B; background: #E4F5EA; }
-.intg-cloud-form {
-    margin-top: 12px;
-    padding: 14px;
-    background: #FBFCFF;
-    border: 1px solid #EDEFF5;
-    border-radius: 8px;
-}
-.intg-cloud-form .inputfield { margin-bottom: 12px; }
-
-.intg-cloud-stepstoggle {
-    margin-top: 4px;
-    padding: 0;
-    font-size: 12px;
-}
-.intg-cloud-reqs {
-    margin: 10px 0 0;
-    padding: 12px 14px 12px 32px;
-    background: #FBFCFF;
-    border: 1px solid #EDEFF5;
-    border-radius: 8px;
-    font-size: 12.5px;
-    line-height: 1.65;
-    color: #4A4B63;
-}
-.intg-cloud-reqs li { margin-bottom: 5px; }
-.intg-cloud-reqs li:last-child { margin-bottom: 0; }
-.intg-cloud-reqs strong { color: #1F212A; font-weight: 600; }
-.intg-cloud-reqs code {
-    padding: 1px 5px;
-    background: #EEF0FE;
-    border-radius: 4px;
-    font-size: 11.5px;
-    color: #2F3990;
-    word-break: break-all;
-}
-.intg-cloud-reqs__uri { padding-top: 4px; }
-.intg-cloud-reqs__uri .intg-link { margin-left: 6px; }
 </style>

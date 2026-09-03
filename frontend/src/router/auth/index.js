@@ -10,6 +10,15 @@ export default [
         },
     },
     {
+        path: '/sso',
+        name: 'Sso_Login',
+        component: () => import(/* webpackChunkName: "login" */ '@/views/Authentication/Sso/SsoLogin.vue'),
+        meta: {
+            title: "Sign in with SSO",
+            requiresAuth: false,
+        },
+    },
+    {
         path: '/forgot-password',
         name: 'Forgot_Password',
         component: () => import(/* webpackChunkName: "Forgot_Password" */ '@/views/Authentication/ForgotPassword/ForgotPassword.vue'),

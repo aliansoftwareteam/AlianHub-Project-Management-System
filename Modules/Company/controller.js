@@ -15,6 +15,10 @@ const { updateCompanyFun } = require("./controller/updateCompany.js");
 const { updateUserFun } = require("../Users/controller.js");
 const { storeRefferalCode, checkAndStoreRefferalCode } = require("../Affiliate/controller.js");
 const { handleCreateCompanyDataStorageFunForUpload, handleCreateCompanyDataStorageFun } = require(`../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
+const { seedSampleProject } = require("../createProject/sampleProject.js");
+const { normaliseFocus, FOCUS_LABELS } = require("../createProject/sampleTasks.js");
+
+const TEAM_SIZES = ["1", "2-15", "16-50", "50+"];
 
 
 exports.setCompany = (companyId) => {
@@ -245,24 +249,17 @@ exports.companyValidation = (bodyData, cb) => {
             })
             return;
         }
-        if (!(bodyData && bodyData.phoneNumber)) {
+        if (bodyData.teamSize !== undefined && bodyData.teamSize !== "" && !TEAM_SIZES.includes(String(bodyData.teamSize))) {
             cb({
                 status: false,
-                statusText: "phoneNumber is required"
+                statusText: "teamSize is invalid"
             })
             return;
         }
-        if (!(bodyData && bodyData.country)) {
+        if (bodyData.teamFocus !== undefined && bodyData.teamFocus !== "" && !FOCUS_LABELS[normaliseFocus(bodyData.teamFocus)]) {
             cb({
                 status: false,
-                statusText: "country is required"
-            })
-            return;
-        }
-        if (!(bodyData && bodyData.countryCodeObj)) {
-            cb({
-                status: false,
-                statusText: "countryCodeObj is required"
+                statusText: "teamFocus is invalid"
             })
             return;
         }
@@ -525,11 +522,13 @@ exports.createCompanyV2 = (req, res) => {
                     data: {
                         userId: bodyData.userId,
                         Cst_CompanyName:  bodyData.companyName,
-                        Cst_Phone:  bodyData.phoneNumber,
-                        Cst_Country: bodyData.country,
-                        Cst_City: bodyData.city,
-                        Cst_State: bodyData.state,
-                        Cst_DialCode: bodyData.countryCodeObj,
+                        Cst_Phone:  bodyData.phoneNumber || "",
+                        Cst_Country: bodyData.country || "",
+                        Cst_City: bodyData.city || "",
+                        Cst_State: bodyData.state || "",
+                        Cst_DialCode: bodyData.countryCodeObj || {},
+                        teamSize: bodyData.teamSize ? String(bodyData.teamSize) : "",
+                        teamFocus: bodyData.teamFocus ? normaliseFocus(bodyData.teamFocus) : "",
                         Cst_LogTimeDays: bodyData.logtimeDays,
                         totalProjects: bodyData.totalProjects,
                         isInactive: bodyData.isInactive,
@@ -567,6 +566,10 @@ exports.createCompanyV2 = (req, res) => {
                 serviceFunctionCtr.allSettledWithRetry(3, allProcess)
                 .then(async(allSettledRes) => {
                     await handleCreateCompanyDataStorageFunForUpload(req.body, companyId)
+                    if (bodyData.teamFocus && bodyData.seedSampleProject !== false) {
+                        emitListener(bodyData?.eventId, {step: 2});
+                        await seedSampleProject({ companyId, uid: bodyData.userId, teamFocus: bodyData.teamFocus });
+                    }
                     emitListener(bodyData?.eventId, {step: "STOP",companyId:companyId});
                     if (process.env.PAYMENTMETHOD) {
                         paymentObj = allSettledRes[4].status === "fulfilled" ? allSettledRes[4].value : {}

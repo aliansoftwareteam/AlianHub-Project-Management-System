@@ -107,12 +107,11 @@
             <AppTeaserBlock appKey="TimeTracking" />
         </div>
     </div>
-    <div v-else class="d-flex align-items-center justify-content-center w-100 h-100">
-        <img :src="accessDeniedImage" alt="accessDenied">
-    </div>
+    <AppState v-else kind="forbidden" />
 </template>
 
 <script setup>
+import AppState from '@/components/molecules/AppState/AppState.vue';
     import moment from 'moment';
     import { ref , inject ,defineProps, onMounted ,computed, defineComponent ,defineEmits, watch } from 'vue'
 
@@ -136,7 +135,6 @@
     const { getters } = useStore();
     const {makeUniqueId,checkApps,getAppState} = useCustomComposable();
     const defaultUserIcon = inject("$defaultUserAvatar");
-    const accessDeniedImage = require("@/assets/images/access_denied_img.png");
 
     defineComponent({
         components: {

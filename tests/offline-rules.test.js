@@ -69,3 +69,27 @@ describe('synthetic responses', () => {
         expect(r._offline).toBe('queued');
     });
 });
+
+describe('queued write descriptions and conflicts', () => {
+    const taskPut = (fields, at = 1000) => ({
+        id: 1, at, type: 'put', endPoint: '/api/v1/task',
+        data: { firstParameter: { objId: { _id: '6a350f0a383f83342195a939' } }, secondParameter: { $set: fields }, key: 'updateOne' },
+    });
+    test('taskWriteOf reads the task id and the $set fields', () => {
+        expect(R.taskWriteOf(taskPut({ statusKey: 'review' }))).toEqual({ taskId: '6a350f0a383f83342195a939', fields: { statusKey: 'review' } });
+        expect(R.taskWriteOf({ type: 'post', endPoint: '/api/v1/comments', data: {} })).toBeNull();
+    });
+    test('describeQueuedWrite labels status, comment and time rows', () => {
+        expect(R.describeQueuedWrite(taskPut({ statusKey: 'In review' })).tag).toBe('STATUS');
+        expect(R.describeQueuedWrite({ type: 'post', endPoint: '/api/v1/comments', data: { data: { message: 'vendor wants a <b>signed</b> DPA' } } }))
+            .toEqual({ tag: 'COMMENT', text: '"vendor wants a signed DPA"', taskId: '' });
+        expect(R.describeQueuedWrite({ type: 'post', endPoint: '/api/v2/manualLogtime', data: { timeDuration: '01:12', taskName: 'AHE-298', ticketId: 'x' } }))
+            .toEqual({ tag: 'TIME', text: '01:12 on AHE-298', taskId: 'x' });
+    });
+    test('findConflicts only flags fields the server moved after the queue time', () => {
+        const write = R.taskWriteOf(taskPut({ statusKey: 'review' }, 1000));
+        expect(R.findConflicts(write, { statusKey: 'blocked', updatedAt: new Date(2000) }, 1000)).toEqual([{ field: 'statusKey', mine: 'review', theirs: 'blocked' }]);
+        expect(R.findConflicts(write, { statusKey: 'blocked', updatedAt: new Date(500) }, 1000)).toEqual([]);
+        expect(R.findConflicts(write, { statusKey: 'review', updatedAt: new Date(2000) }, 1000)).toEqual([]);
+    });
+});

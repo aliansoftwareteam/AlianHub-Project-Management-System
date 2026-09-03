@@ -1,5 +1,6 @@
 const { defineConfig } = require('@vue/cli-service');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const path = require('path');
 const brandSettings = require('../brandSettings.json');
 const imageURL = `/api/v1/getlogo?key=logo&type=web`;
 
@@ -24,6 +25,11 @@ module.exports = defineConfig({
     }
   },
   configureWebpack: {
+    resolve: {
+      alias: {
+        '@pageContent': path.resolve(__dirname, '../Modules/Pages/helpers/pageContent.js'),
+      },
+    },
     plugins: [
       new HtmlWebpackPlugin({
         template: 'public/index.html',

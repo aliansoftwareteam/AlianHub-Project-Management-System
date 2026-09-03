@@ -4,7 +4,7 @@
             <a href="#" @click.prevent="scrollToBottom" class="btn-scroll-to-bottom" :style="{paddingBottom: checkApps('tags') ? '15px' : ''}" v-if="clientWidth < 767">
                 {{$t('general.scroll_to_bottom')}}
             </a>
-            <div class="d-flex mobile__bg--withPadding" v-if="checkApps('tags')">
+            <div class="d-flex mobile__bg--withPadding" v-if="show.tags && checkApps('tags')">
                 <div class="d-flex align-items-center overflow-auto style-scroll tagList__main-wrapper-sidebar pb-1px">
                     <div v-for="(item, index) in tagChipArray" :key="index" @click.stop="">
                         <div class="tagList taglist__mobile-margin">
@@ -18,11 +18,11 @@
             </div>
             <!-- Tags app available on the plan but not switched on for this project: representational teaser. -->
             <AppTeaserBlock
-                v-else-if="getAppState('tags', projectData) === 'disabled'"
+                v-else-if="show.tags && getAppState('tags', projectData) === 'disabled'"
                 appKey="tags" class="mb-1"
             />
             <Description
-                v-if="checkPermission('task.task_description',projectData?.isGlobalPermission) !== null && checkApps('AI',projectData) !== undefined && checkPermission('task.task_description',projectData?.isGlobalPermission) !== undefined && Object.keys(projectData).length > 0"
+                v-if="show.description && checkPermission('task.task_description',projectData?.isGlobalPermission) !== null && checkApps('AI',projectData) !== undefined && checkPermission('task.task_description',projectData?.isGlobalPermission) !== undefined && Object.keys(projectData).length > 0"
                 :isShowAi="checkApps('AI',projectData) && checkPermission('task.task_description',projectData?.isGlobalPermission) == true"
                 :description="task?.descriptionBlock ? task.descriptionBlock : task.description"
                 :editPermission="checkPermission('task.task_description',projectData?.isGlobalPermission)"
@@ -34,7 +34,7 @@
                 :isMainSpinner="isMainSpinner"
             />
             <SubTasks
-                v-if="task.isParentTask && checkPermission('task.sub_task_create',projectData?.isGlobalPermission) !== null"
+                v-if="show.subtasks && task.isParentTask && checkPermission('task.sub_task_create',projectData?.isGlobalPermission) !== null"
                 :task="task"
                 class="mt-1"
                 :parentAssignee="task.AssigneeUserId"
@@ -42,20 +42,23 @@
                 :isMainSpinner="isMainSpinner"
             />
             <LinkedTasks
+                v-if="show.linkedTasks"
                 :task="task"
                 class="mt-1"
             />
             <LinkedDocs
+                v-if="show.linkedDocs"
                 :task="task"
                 :refreshKey="docsRefreshKey"
                 class="mt-1"
                 @open="$emit('openDoc', $event)"
             />
             <EpicPicker
+                v-if="show.epic"
                 :task="task"
                 class="mt-1"
             />
-            <div class="position-re" v-if="checkPermission('task.task_custom_field',projectData?.isGlobalPermission) !== null">
+            <div class="position-re" v-if="show.customFields && checkPermission('task.task_custom_field',projectData?.isGlobalPermission) !== null">
                 <!-- App enabled for this project: existing behavior (feature, or blurred feature + upgrade overlay when the plan doesn't include it). -->
                 <div v-if="checkApps('CustomFields')">
                     <div :class="[{'pointer-event-none opacity-5 blur-3-px':!currentCompany?.planFeature?.customFields}]">
@@ -86,7 +89,7 @@
                 />
             </div>
             <CheckListComponent 
-                v-if="checkPermission('task.task_checklist',projectData?.isGlobalPermission) !== null"
+                v-if="show.checklist && checkPermission('task.task_checklist',projectData?.isGlobalPermission) !== null"
                 :taskId="task._id"
                 :sprintId="task.sprintId"
                 :data="checkList"
@@ -98,7 +101,7 @@
             />
             <Attachments
                 class="mt-20px"
-                v-if="checkPermission('task.task_attachments',projectData?.isGlobalPermission) !== null"
+                v-if="show.attachments && checkPermission('task.task_attachments',projectData?.isGlobalPermission) !== null"
                 :permission="checkPermission('task.task_attachments',projectData?.isGlobalPermission)"
                 :attachments="task.attachments"
                 :extensions="fileExtentions"
@@ -187,8 +190,19 @@ const props = defineProps({
     docsRefreshKey: {
         type: Number,
         default: 0
+    },
+    // Which blocks to render; the task overlay splits them across its tabs.
+    sections: {
+        type: Object,
+        default: () => ({})
     }
 });
+
+const show = computed(() => ({
+    tags: true, description: true, subtasks: true, linkedTasks: true, linkedDocs: true,
+    epic: true, customFields: true, checklist: true, attachments: true,
+    ...(props.sections || {})
+}));
 
 // emit
 const emit = defineEmits(["openSeeAll", 'openDoc']);

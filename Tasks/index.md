@@ -8,3 +8,10 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 002 | Make the task-type migration production-ready | active | high | — | active/002-task-type-migration-prod |
 | 003 | Show library task-type icons in the time tracker | done | medium | — | done/003-tracker-task-type-icons |
 | 004 | Reusable template-selection form component (task types + statuses) | active | medium | — | active/004-reusable-template-select-form |
+| 005 | Automation engine foundation (phase 0) | active | high | — | active/005-automation-engine-foundation |
+| 006 | AI agent engine foundation + QA agent | active | medium | 005 | active/006-agent-engine-foundation |
+| 007 | Automation sentence builder UI + v2 rule API | active | high | 005 | active/007-automation-builder-ui |
+| 008 | Redesign stage 1 — tokens, login/auth, global rail shell, Home, task detail panel | active | high | — | active/008-shell-redesign-stage1 |
+| 009 | Redesign stages 2–3 — first run and daily work in the new shell | active | high | 008 | active/009-redesign-daily-work |
+| 010 | Redesign stage 4 — auditable AI agent system | active | high | 009 | active/010-redesign-ai-system |
+| 011 | Redesign stage 5 — money & scale | active | medium | 009 | active/011-redesign-money-scale |

@@ -1,86 +1,70 @@
 <template>
-    <div v-if="isVerify === true" class="h-100dvh">
-        <SpinnerComp :is-spinner="isVerify" v-if="isVerify"/>
-    </div>
-    <AuthTemplate>
-        <div class="create-accountlink">
-            <span class="mb-20px d-block font-size-26">{{$t('Auth.link_expired')}}</span>
-            <span class="font-roboto-sans font-weight-normal font-weight-400 gray">{{$t('Auth.backlogin')}}? <router-link class="light-purple font-weight-500" :to="{name:'Log-in'}">{{$t('Auth.loging')}}</router-link></span>
+    <AuthShell :proof="false">
+        <div v-if="stage === 'checking'" class="av2-center">
+            <div class="auth__spinner"></div>
+            <p class="auth__p">{{ $t('AuthV2.invite_checking') }}</p>
         </div>
-    </AuthTemplate>
+
+        <div v-else-if="stage === 'accepted'" class="av2-auth-card">
+            <div class="auth__glyph av2-glyph-ok"><ShellIcon name="check" :size="15" /></div>
+            <h2 class="auth__h">{{ $t('AuthV2.invite_accepted_title') }}</h2>
+            <p class="auth__p">{{ $t('AuthV2.invite_accepted_body') }}</p>
+            <router-link :to="{ name: 'Log-in' }" class="ah-btn ah-btn--primary ah-btn--block ah-btn--lg">{{ $t('Auth.log_in') }}</router-link>
+        </div>
+
+        <div v-else class="av2-auth-card">
+            <div class="auth__glyph auth__glyph--warn">!</div>
+            <h2 class="auth__h">{{ $t('AuthV2.invite_invalid_title') }}</h2>
+            <p class="auth__p">{{ message || $t('AuthV2.invite_invalid_body') }}</p>
+            <router-link :to="{ name: 'Log-in' }" class="ah-btn ah-btn--secondary ah-btn--block ah-btn--lg">{{ $t('AuthV2.back_to_login') }}</router-link>
+        </div>
+    </AuthShell>
 </template>
 
 <script setup>
-import { onMounted, inject, ref } from "vue";
-import AuthTemplate from "@/components/templates/Authentication/index.vue";
-import {useToast} from 'vue-toast-notification';
-import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
-import { useRouter, useRoute } from 'vue-router'
-import * as env from '@/config/env';
-import { apiRequest } from '../../../services'
+import { inject, onMounted, ref } from "vue";
+
+defineOptions({ name: "VerifyInvitationPage" });
+import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
+import AuthShell from "@/components/templates/AuthShell/AuthShell.vue";
+import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import { apiRequest } from "@/services";
+import * as env from "@/config/env";
+
 const { t } = useI18n();
-
 const axios = inject("$axios");
+const userId = inject("$userId");
 const route = useRoute();
-const router = useRouter()
-const $toast = useToast();
-const isVerify = ref(false);
-const userId = inject('$userId')
+const router = useRouter();
 
-onMounted(() => {
-    isVerify.value = true;
-    const axiosData = {
-        id: route.query.id,
-    };
-    let valid = true;
+const stage = ref("checking");
+const message = ref("");
 
-    Object.keys(axiosData).forEach(function(key) {
-        if(axiosData[key] === undefined || axiosData[key] === "") {
-            valid = false;
+onMounted(async () => {
+    if (!route.query.id) { stage.value = "invalid"; return; }
+    try {
+        const result = await axios.post(env.API_URI + env.INVITATION_CONFIRMATION, { id: route.query.id });
+        if (result.data.key !== 5) {
+            message.value = result.data.statusText || "";
+            stage.value = "invalid";
+            return;
         }
-    })
-
-    if(!valid) {
-        $toast.error(t("Toast.Invalid URL"),{position: 'top-right'});
-        isVerify.value = false;
-        router.replace({ name: "Log-in" });
-        return;
-    }
-    axios.post(env.API_URI + env.INVITATION_CONFIRMATION, axiosData).then((result) => {
-        if(result.data.key === 5) {
-            const axiosData = {
-                "companyId": result.data.companyId,
-                "userId": result.data.userId,
-            };
-            apiRequest("post", env.IMPORT_NOTIFICATION_SETTING, axiosData).then(()=>{
-                isVerify.value = false;
-                localStorage.setItem('selectedCompany',result.data.companyId);
-            })
-            .catch((error) =>{
-                console.error("ERROR in import settings: ", error.message);
-                $toast.error(error.message,{position: 'top-right'});
-            })
-
-            $toast.success(t("Toast.Invitation_accepted_successfully"),{position: 'top-right'});
-
-            setTimeout(()=>{
-                router.replace({ name: "Log-in" }).then(() => {
-                    if(userId.value !== ''){
-                        window.location.reload();
-                    }
-                });
-            },500)
-        } else {
-            isVerify.value = false;
-            $toast.error(result.data.statusText,{position: 'top-right'});
-        }
-    }).catch((error) =>{
+        localStorage.setItem("selectedCompany", result.data.companyId);
+        apiRequest("post", env.IMPORT_NOTIFICATION_SETTING, { companyId: result.data.companyId, userId: result.data.userId })
+            .catch((error) => console.error("ERROR in import settings: ", error.message));
+        stage.value = "accepted";
+        setTimeout(() => {
+            router.replace({ name: "Log-in" }).then(() => { if (userId.value !== "") window.location.reload(); });
+        }, 1200);
+    } catch (error) {
         console.error("ERROR in validate invitation: ", error);
-    });
+        message.value = t("Auth.server_error");
+        stage.value = "invalid";
+    }
 });
 </script>
 
 <style>
-@import url('../Login/style.css');
+@import "../authV2.css";
 </style>

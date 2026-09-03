@@ -10,6 +10,33 @@ const { getCachedGlobalTemplateData } = require("../../utils/enterpriseHelper");
 const { removeCache } = require('../../utils/commonFunctions');
 const { updateCompanyFun } = require("../Company/controller/updateCompany");
 const projectTemplate = require("../../utils/projectTemplates.json");
+const blankTemplate = require("./blankTemplate");
+const { seedSampleTasks } = require("./sampleProject");
+const { focusForTemplate, normaliseFocus, sampleTaskNamesFor, SAMPLE_TASK_COUNT } = require("./sampleTasks");
+
+const pickGlobalTemplate = (templateId) => {
+    if (String(templateId) === blankTemplate._id) return blankTemplate;
+    return projectTemplate.find((tpl) => String(tpl._id) === String(templateId)) || projectTemplate[0];
+};
+
+const createDefaultSprint = (req, project, projectName, sample) => {
+    const addObj = {
+        body: {
+            companyId: req.body.CompanyId,
+            projectId: project._id,
+            sprintName: 'List',
+            userData:{},
+            projectName
+        }
+    }
+    addSprintFun(addObj).then((sprintRes) => {
+        if(!sample.focus || !sprintRes?.data?._id) return;
+        seedSampleTasks({ companyId: req.body.CompanyId, projectDoc: project, sprintDoc: sprintRes.data, uid: sample.uid, focus: sample.focus })
+            .catch((err) => logger.error(`sample tasks for ${project._id}: ${err?.message || err}`));
+    }).catch((err)=>{
+        logger.error('Create Sprint Error',err)
+    });
+};
 const { resolveProjectSkills } = require("../settings/ProjectSkills/helper");
 const { normaliseSource, cleanProposalId, numericProposalId, validateProposalId } = require("../Project/helpers/projectSourceRules");
 
@@ -253,7 +280,7 @@ exports.createProject = async (req) => {
                                         reject({status: false, statusText: 'error in getting template with category'});
                                         return;
                                     }
-                                    let projectTemplateData = projectTemplate[0];
+                                    let projectTemplateData = pickGlobalTemplate(createProjectObject.TemplateId);
                                     let incrementProjectStatus = projectStatusData[0].totalStatus;
                                     let incrementTask = taskStatusData[0]?.totalStatus;
                                     let incrementTaskType = taskTypeData[0]?.totalStatus;
@@ -480,9 +507,17 @@ exports.createProject = async (req) => {
                     ] 
                     let customFieldVal = JSON.parse(JSON.stringify(createProjectObject.customFiedlsValue)) || [];
                     createProjectObject._id = new mongoose.Types.ObjectId(createProjectObject?._id);
+                    const sample = {
+                        focus: createProjectObject.includeSampleTasks === true
+                            ? normaliseFocus(createProjectObject.sampleFocus || focusForTemplate(pickGlobalTemplate(createProjectObject.TemplateId)))
+                            : '',
+                        uid: createProjectObject.projectCreatedBy,
+                    };
                     delete createProjectObject?.isTemplate;
                     delete createProjectObject?.useTemplateProj;
                     delete createProjectObject?.customFiedlsValue;
+                    delete createProjectObject?.includeSampleTasks;
+                    delete createProjectObject?.sampleFocus;
                     let finalObj = {
                         type: dbCollections.PROJECTS,
                         data: createProjectObject
@@ -567,18 +602,7 @@ exports.createProject = async (req) => {
                             MongoDbCrudOpration(req.body.CompanyId,finalObjCostom,"insertMany").then((customResponce)=>{   
                                 removeCache(`customField:${req.body.CompanyId}`);
                                 resolve({status: true, statusText: 'createProject added successfully', data: respone,customFieldVal: customResponce})
-                                const addObj = {
-                                    body: {
-                                        companyId: req.body.CompanyId,
-                                        projectId: respone._id,
-                                        sprintName: 'List',
-                                        userData:{},
-                                        projectName: createProjectObject.ProjectName
-                                    }
-                                }
-                                addSprintFun(addObj).catch((err)=>{
-                                    logger.error('Create Sprint Error',err)
-                                });
+                                createDefaultSprint(req, respone, createProjectObject.ProjectName, sample);
                             }).catch((e)=>{
                                 logger.error(`error in add create project: ${e}`);
                                 exports.deleteProject(respone,req.body.CompanyId);
@@ -586,18 +610,7 @@ exports.createProject = async (req) => {
                             })
                         } else {
                             resolve({status: true, statusText: 'createProject added successfully', data: respone});
-                            const addObj = {
-                                body: {
-                                    companyId: req.body.CompanyId,
-                                    projectId: respone._id,
-                                    sprintName: 'List',
-                                    userData:{},
-                                    projectName: createProjectObject.ProjectName
-                                }
-                            }
-                            addSprintFun(addObj).catch((err)=>{
-                                logger.error('Create Sprint Error',err)
-                            });
+                            createDefaultSprint(req, respone, createProjectObject.ProjectName, sample);
                         }
                     }).catch((err)=>{
                         reject({status: false, statusText: err});
@@ -740,10 +753,26 @@ exports.removeProjectCount = (companyId,isPrivateSpace) => {
     }
 }
 
+exports.decorateGlobalTemplates = (templates, teamFocus) => {
+    const focus = teamFocus ? normaliseFocus(teamFocus) : '';
+    const list = (Array.isArray(templates) ? templates : []).map((tpl) => {
+        const plain = JSON.parse(JSON.stringify(tpl));
+        plain.focus = focusForTemplate(plain);
+        plain.sampleTaskCount = SAMPLE_TASK_COUNT;
+        plain.sampleTaskNames = sampleTaskNamesFor(plain.focus);
+        return plain;
+    });
+    if(!focus) return list;
+    return list
+        .map((tpl, index) => ({ tpl, index }))
+        .sort((a, b) => (a.tpl.focus === focus ? 0 : 1) - (b.tpl.focus === focus ? 0 : 1) || a.index - b.index)
+        .map((x) => x.tpl);
+};
+
 exports.getGlobalTemplate = (req,res) => {
     try {
         getCachedGlobalTemplateData().then((resp) => {
-            res.send(resp);
+            res.send({ status: true, statusText: exports.decorateGlobalTemplates(resp.statusText, req.body?.teamFocus) });
         }).catch((error) => {
             res.send({status: false,statusText: error});
         })

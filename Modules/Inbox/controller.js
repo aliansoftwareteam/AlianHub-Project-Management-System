@@ -12,6 +12,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const logger = require('../../Config/loggerConfig');
 const { Notification_key } = require('../../Config/notificationKey.js');
 const { updateUnReadCommentsCountFun } = require('../notification-count/controller');
+const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const R = require('./helpers/inboxRules');
 
 // The per-user counters document behind the header's red dot. `key` selects the field:
@@ -48,20 +49,22 @@ const fail = (res, statusText) => res.send({ status: false, statusText });
  * have NOT read it, so membership is unread and absence is archived.
  */
 // No `skip`: paging happens on the merged list, never inside a source. See list().
-const readNotifications = async (companyId, userId, { limit, read, sort }) => {
+const readNotifications = async (companyId, userId, { limit, read, sort, ids, exclude, keyOnly, keyNot }) => {
     const dir = R.sortDirection(sort);
+    const and = [
+        { assigneeUsers: { $in: [userId] } },
+        { key: { $ne: Notification_key.COMMENTS_IM_MENTIONS_IN } },
+        { $or: [{ notificationType: 'push' }, { notificationType: null }] },
+        { receiverID: userId },
+    ];
+    if (read === true) and.push({ notSeen: { $nin: [userId] } });
+    if (read === false) and.push({ notSeen: { $in: [userId] } });
+    if (ids) and.push({ _id: { $in: ids.map(oid).filter(Boolean) } });
+    if (exclude && exclude.length) and.push({ _id: { $nin: exclude.map(oid).filter(Boolean) } });
+    if (keyOnly) and.push({ key: keyOnly });
+    if (keyNot) and.push({ key: { $ne: keyNot } });
     const query = [
-        {
-            $match: {
-                $and: [
-                    { assigneeUsers: { $in: [userId] } },
-                    { key: { $ne: Notification_key.COMMENTS_IM_MENTIONS_IN } },
-                    { $or: [{ notificationType: 'push' }, { notificationType: null }] },
-                    { receiverID: userId },
-                    read ? { notSeen: { $nin: [userId] } } : { notSeen: { $in: [userId] } },
-                ],
-            },
-        },
+        { $match: { $and: and } },
         { $sort: { createdAt: dir, _id: 1 } },
         { $limit: limit },
     ];
@@ -92,6 +95,8 @@ const readNotifications = async (companyId, userId, { limit, read, sort }) => {
         type: String(r.type || ''),
         Key: r.Key,
         companyId: String(r.companyId || ''),
+        // Rows an agent wrote carry an agent type or key; a person never does.
+        agent: String(r.type || '').toLowerCase() === 'agent' || /^agent[_-]/i.test(String(r.key || '')),
         // WHO did this, as an id — resolved to a name and picture on the client through
         // getUser(), exactly as the bell dropdown does it.
         //
@@ -118,11 +123,12 @@ const readNotifications = async (companyId, userId, { limit, read, sort }) => {
  * Mirroring readNotifications instead: membership in `notSeen` is unread, absence is
  * archived.
  */
-const readMentions = async (companyId, userId, { limit, read, sort }) => {
-    const filter = {
-        mentionIds: { $in: [userId] },
-        notSeen: read ? { $nin: [userId] } : { $in: [userId] },
-    };
+const readMentions = async (companyId, userId, { limit, read, sort, ids, exclude }) => {
+    const filter = { mentionIds: { $in: [userId] } };
+    if (read === true) filter.notSeen = { $nin: [userId] };
+    if (read === false) filter.notSeen = { $in: [userId] };
+    if (ids) filter._id = { $in: ids.map(oid).filter(Boolean) };
+    if (exclude && exclude.length) filter._id = { ...(filter._id || {}), $nin: exclude.map(oid).filter(Boolean) };
 
     const rows = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.MENTIONS,
@@ -157,6 +163,42 @@ const readMentions = async (companyId, userId, { limit, read, sort }) => {
     }));
 };
 
+/**
+ * Time-off requests waiting on this user. Only an owner or admin can decide
+ * them (Modules/Pto), so nobody else sees them; a person's own request is
+ * never something they approve.
+ */
+const readApprovals = async (companyId, userId) => {
+    try {
+        const roleType = await getRoleType(companyId, userId);
+        if (!isPrivileged(roleType)) return [];
+        const rows = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.PTO_ENTRIES,
+            data: [
+                { status: 'pending', deletedStatusKey: { $ne: 1 }, userId: { $ne: userId } },
+                {},
+                { sort: { createdAt: -1 }, limit: 20 },
+            ],
+        }, 'find');
+        return (rows || []).map((r) => ({
+            sourceType: 'approval',
+            sourceId: String(r._id),
+            key: 'pto_request',
+            approvalType: 'pto',
+            ptoType: String(r.type || ''),
+            startDate: r.startDate,
+            endDate: r.endDate,
+            reason: String(r.reason || ''),
+            actorId: String(r.userId || ''),
+            unread: true,
+            createdAt: r.createdAt,
+        }));
+    } catch (e) {
+        logger.error(`${LOG_PREFIX} approval read failed: ${e.message}`);
+        return [];
+    }
+};
+
 /** Task names for the rows on this page — the sources carry an id but no title. */
 const readTaskNames = async (companyId, items) => {
     const ids = [...new Set(items.map((i) => i.taskId).filter(Boolean))].map(oid).filter(Boolean);
@@ -187,11 +229,21 @@ exports.list = async (req, res) => {
         const tab = R.normalizeTab(req.query.tab);
         // Narrows Archive to one kind. Ignored on the tabs that already are one kind.
         const source = R.normalizeSource(req.query.source);
+        const kind = R.normalizeKind(req.query.kind);
         const limit = R.normalizeLimit(req.query.limit);
         const skip = R.normalizeSkip(req.query.skip);
         const sort = R.normalizeSort(req.query.sort);
-        const plan = R.planFor(tab, source);
+        const plan = R.planFor(tab, source, kind);
         const now = new Date();
+
+        // The Later list lives with the reader (it is theirs, per device); Primary is
+        // told what to leave out and Later what to bring back.
+        const exclude = tab === 'primary' ? R.parseIdList(req.query.exclude) : [];
+        const ids = tab === 'later' ? R.parseIdList(req.query.ids) : null;
+        if (tab === 'later' && !ids.length) {
+            return res.send({ status: true, data: { tab, source, kind, sort, items: [], approvals: [], hasMore: false, nextSkip: 0 } });
+        }
+        const readOpts = { read: plan.read, sort, ids, exclude, keyOnly: plan.keyOnly, keyNot: plan.keyNot };
 
         // Each source is read from the TOP through the end of the requested page, not from
         // `skip`. Skipping inside each source loses rows: page 1 fetches 10 of each, merges
@@ -207,9 +259,11 @@ exports.list = async (req, res) => {
         // more button that adds nothing when clicked.
         const window = skip + limit;
         const probe = window + 1;
-        const [notifications, mentions] = await Promise.all([
-            plan.notifications ? readNotifications(companyId, userId, { limit: probe, read: plan.read, sort }) : [],
-            plan.mentions ? readMentions(companyId, userId, { limit: probe, read: plan.read, sort }) : [],
+        const wantApprovals = tab === 'primary' && skip === 0 && (kind === 'all' || kind === 'approval');
+        const [notifications, mentions, approvals] = await Promise.all([
+            plan.notifications && kind !== 'approval' ? readNotifications(companyId, userId, { ...readOpts, limit: probe }) : [],
+            plan.mentions && kind !== 'approval' ? readMentions(companyId, userId, { ...readOpts, limit: probe }) : [],
+            wantApprovals ? readApprovals(companyId, userId) : [],
         ]);
 
         // The two sources arrive already sorted; this only re-orders the merge of them,
@@ -229,15 +283,19 @@ exports.list = async (req, res) => {
         for (const i of page) {
             i.taskName = names.get(i.taskId) || '';
             i.dateGroup = R.dateGroupOf(i.createdAt, now);
+            i.kind = R.kindOf(i);
         }
+        for (const a of approvals) a.kind = 'approval';
 
         return res.send({
             status: true,
             data: {
                 tab,
                 source,
+                kind,
                 sort,
                 items: page,
+                approvals,
                 // Two ways there is more: the merge itself has rows past this page, or a
                 // source handed back the probe row and so still has rows behind it.
                 hasMore: merged.length > window
@@ -287,7 +345,7 @@ exports.counts = async (req, res) => {
             return (rows && rows[0] && rows[0].n) || 0;
         };
 
-        const [notifications, mentions] = await Promise.all([
+        const [notifications, mentions, approvals] = await Promise.all([
             count(SCHEMA_TYPE.NOTIFICATIONS, {
                 assigneeUsers: { $in: [userId] },
                 key: { $ne: Notification_key.COMMENTS_IM_MENTIONS_IN },
@@ -308,6 +366,7 @@ exports.counts = async (req, res) => {
                 message: '$comment_message',
                 at: { $dateTrunc: { date: '$createdAt', unit: 'second' } },
             }),
+            readApprovals(companyId, userId).then((rows) => rows.length),
         ]);
 
         return res.send({
@@ -318,6 +377,12 @@ exports.counts = async (req, res) => {
                 mentions,
                 // Archive is read rows; a badge there would count things already dealt with.
                 archive: 0,
+                // Primary is `all` plus what waits on this user; the client takes its own
+                // Later rows out of it. Done is read rows, so no badge either.
+                primary: notifications + mentions + approvals,
+                approvals,
+                later: 0,
+                done: 0,
             },
         });
     } catch (e) {
@@ -444,8 +509,8 @@ exports.markAllRead = async (req, res) => {
         if (!companyId || !userId) return fail(res, 'companyId and an authenticated user are required.');
 
         const tab = R.normalizeTab(req.body && req.body.tab);
-        if (tab === 'archive') return fail(res, 'Those are already read.');
-        const plan = R.planFor(tab);
+        if (tab === 'archive' || tab === 'done') return fail(res, 'Those are already read.');
+        const plan = R.planFor(tab === 'later' ? 'all' : tab);
 
         if (plan.notifications) {
             await MongoDbCrudOpration(companyId, {

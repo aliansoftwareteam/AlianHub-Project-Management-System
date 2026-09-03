@@ -32,7 +32,7 @@ exports.setSsoConfig = async (req, res) => {
         const companyId = companyOf(req);
         if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
         if (!(await callerIsAdmin(req))) return res.status(403).json({ status: false, statusText: 'Owner/admin only.' });
-        const { provider, oidc, saml, isEnabled, autoProvisionUsers, defaultRoleType } = req.body || {};
+        const { provider, oidc, saml, isEnabled, autoProvisionUsers, defaultRoleType, displayName, domains, enforcement } = req.body || {};
         const check = validateSsoConfig({ provider, oidc, saml });
         if (!check.valid) return res.send({ status: false, statusText: check.reason });
         const actor = String(req.uid || '');
@@ -43,6 +43,9 @@ exports.setSsoConfig = async (req, res) => {
             isEnabled: isEnabled !== false,
             autoProvisionUsers: autoProvisionUsers !== false,
             defaultRoleType: Number(defaultRoleType) || 3,
+            displayName: String(displayName || '').slice(0, 80),
+            domains: Array.isArray(domains) ? domains.map((d) => String(d).trim().toLowerCase()).filter(Boolean).slice(0, 50) : [],
+            enforcement: ['optional', 'required', 'required_except_guests'].includes(enforcement) ? enforcement : 'optional',
             updatedBy: actor,
             deletedStatusKey: 0,
         };

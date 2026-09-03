@@ -77,7 +77,7 @@ exports.removeUserNotification = (req,res) => {
  * req.errorMessageObject and calls next() (the route's manageAttempt handler
  * returns the error). Behaviour is unchanged from the previous inline block.
  */
-const finalizeSession = (req, res, uid, next) => {
+const finalizeSession = (req, res, uid, next, onSuccess) => {
     const forwarded = req?.headers['x-forwarded-for'] || req.ip;
     const clientIp = forwarded ? forwarded?.split(',')[0] : req?.connection?.remoteAddress;
     sesstionCtr.insertSessionFun({userId: uid}, req.headers['user-agent'] || "", clientIp, (sData) => {
@@ -104,11 +104,16 @@ const finalizeSession = (req, res, uid, next) => {
             };
             res.cookie("refreshToken", sData.data.refreshToken, { ...setCookie, maxAge: Number(process.env.SESSIONEXPIREDTIME || 172800)*1000 });
             res.cookie("accessToken", gData.token, { ...setCookie });
-            res.status(200).json({
+            const payload = {
                 uid: uid,
                 refreshToken: sData.data.refreshToken,
                 accessToken: gData.token
-            });
+            };
+            if (typeof onSuccess === "function") {
+                onSuccess(payload);
+                return;
+            }
+            res.status(200).json(payload);
         });
     });
 };

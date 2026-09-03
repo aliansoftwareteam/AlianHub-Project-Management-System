@@ -121,13 +121,12 @@
                 </div>
             </div>  
         </div>
-        <div class="noproject-area" v-else>
-            <img src="@/assets/images/access_denied_img.png">
-        </div>
+        <AppState v-else kind="forbidden" />
     </div>
 </template>
 
 <script setup>
+import AppState from '@/components/molecules/AppState/AppState.vue';
 import { defineComponent, onMounted, computed, ref,watch,inject,nextTick } from "vue";
 import ProjectsListingSetting from "@/components/molecules/ProjectsListingSetting/ProjectsListingSetting.vue";
 import { useProjectsHelper } from '@/views/Projects/helper';
