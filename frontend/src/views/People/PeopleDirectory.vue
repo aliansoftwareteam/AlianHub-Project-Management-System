@@ -4,13 +4,46 @@
             <h1 class="ah-toolbar__title">{{ $t('MembersV2.people') }}</h1>
             <span class="ah-mono pd__count">{{ $t('MembersV2.people_count', { count: people.length, teams: teams.length }) }}</span>
             <div class="ah-toolbar__spacer"></div>
-            <div class="pd__search">
+            <div v-if="mode === 'directory'" class="pd__search">
                 <ShellIcon name="search" :size="15" />
                 <input v-model.trim="search" class="pd__search-input" type="search" :placeholder="$t('MembersV2.people_search_ph')" />
             </div>
+            <div class="ah-tabs">
+                <button type="button" class="ah-tab" :class="{ 'is-active': mode === 'directory' }" @click="mode = 'directory'">{{ $t('OrgV2.tab_directory') }}</button>
+                <button type="button" class="ah-tab" :class="{ 'is-active': mode === 'org' }" @click="mode = 'org'">{{ $t('OrgV2.tab_org') }}</button>
+            </div>
         </header>
 
-        <div class="pd__body ah-scroll">
+        <div v-if="mode === 'org'" class="pd__body ah-scroll">
+            <section v-for="root in orgRoots" :key="root.id" class="ah-card">
+                <div class="ah-card__body org__tree">
+                    <div v-for="row in root.rows" :key="row.id" class="org__row" :style="{ paddingLeft: row.indent }">
+                        <span v-if="row.depth" class="org__branch"></span>
+                        <span class="ah-avatar">
+                            <img v-if="row.person.image" :src="row.person.image" :alt="row.person.name" />
+                            <template v-else>{{ row.person.initial }}</template>
+                        </span>
+                        <span class="org__who">
+                            <span class="org__name">{{ row.person.name }}</span>
+                            <span class="ah-small">{{ row.person.subtitle }}</span>
+                        </span>
+                        <span v-if="row.reports" class="ah-chip ah-chip--mono">{{ $t('OrgV2.reports_count', { count: row.reports }) }}</span>
+                    </div>
+                </div>
+            </section>
+
+            <div v-if="!people.length" class="ah-empty">{{ $t('MembersV2.no_people') }}</div>
+            <div v-else-if="!managedCount" class="ah-card">
+                <div class="ah-card__body org__empty">
+                    <div class="ah-label">{{ $t('OrgV2.empty_title') }}</div>
+                    <p class="ah-small org__empty-note">{{ canEditManager ? $t('OrgV2.empty_editable') : $t('OrgV2.empty_readonly') }}</p>
+                    <button v-if="canEditManager" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="mode = 'directory'">{{ $t('OrgV2.empty_action') }}</button>
+                </div>
+            </div>
+            <p class="ah-small pd__privacy">{{ $t('OrgV2.org_note') }}</p>
+        </div>
+
+        <div v-else class="pd__body ah-scroll">
             <div class="pd__grid">
                 <section v-if="selected" class="ah-card pd__focus">
                     <div class="ah-card__body pd__focus-body">
@@ -45,6 +78,23 @@
                                 <div class="ah-small">{{ $t('MembersV2.in_projects') }}</div>
                             </div>
                         </div>
+
+                        <div v-if="canEditManager" class="ah-field">
+                            <label class="ah-field__label" :for="`pd-manager-${selected.id}`">{{ $t('OrgV2.reports_to') }}</label>
+                            <select
+                                :id="`pd-manager-${selected.id}`"
+                                class="ah-input"
+                                :class="{ 'ah-input--error': managerError }"
+                                :value="selected.managerId"
+                                :disabled="savingManager"
+                                @change="setManager(selected, $event.target.value)"
+                            >
+                                <option value="">{{ $t('OrgV2.no_manager') }}</option>
+                                <option v-for="option in managerOptions" :key="option.id" :value="option.id">{{ option.name }}</option>
+                            </select>
+                            <span v-if="managerError" class="ah-field__error">{{ managerError }}</span>
+                        </div>
+                        <p v-else-if="selected.managerName" class="ah-small">{{ $t('OrgV2.reports_to_name', { name: selected.managerName }) }}</p>
 
                         <div class="pd__actions">
                             <button v-if="hasChat" type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="goChat()">{{ $t('MembersV2.message') }}</button>
@@ -113,16 +163,23 @@ defineOptions({ name: "PeopleDirectory" });
 
 const { t } = useI18n();
 const router = useRouter();
-const { getters } = useStore();
+const { getters, commit } = useStore();
 const { checkPermission } = useCustomComposable();
 const { getCompanyUsers } = memberData();
 const companyId = inject("$companyId");
+const userId = inject("$userId");
 
 const HOURS_PER_DAY = 8;
 const WINDOW_DAYS = 14;
+const OWNER_ROLE = 1;
+const ADMIN_ROLE = 2;
+const MAX_DEPTH = 6;
 
 const search = ref("");
+const mode = ref("directory");
 const selectedId = ref("");
+const managerError = ref("");
+const savingManager = ref(false);
 const listing = ref([]);
 const loadByUser = ref({});
 const ptoByUser = ref({});
@@ -177,6 +234,8 @@ const people = computed(() => listing.value
         if (pto) parts.push(t("MembersV2.on_pto", { date: pto }));
         return {
             id,
+            requestId: String(u.requestId || u._id || ""),
+            managerId: String(u.managerId || ""),
             name: u.Employee_Name || u.userEmail,
             image: u.Employee_profileImageURL || "",
             initial: (u.Employee_Name || u.userEmail || "?").trim().charAt(0).toUpperCase(),
@@ -205,7 +264,121 @@ const filtered = computed(() => {
     return people.value.filter((person) => `${person.name} ${person.subtitle} ${person.skills.map((s) => s.name).join(" ")}`.toLowerCase().includes(term));
 });
 
-const selected = computed(() => filtered.value.find((p) => p.id === selectedId.value) || filtered.value[0] || null);
+const selected = computed(() => {
+    const person = filtered.value.find((p) => p.id === selectedId.value) || filtered.value[0] || null;
+    if (!person) return null;
+    const manager = people.value.find((p) => p.id === person.managerId);
+    return { ...person, managerId: manager ? manager.id : "", managerName: manager ? manager.name : "" };
+});
+
+const myRoleType = computed(() => {
+    const me = listing.value.find((u) => String(u.userId || "") === String(userId.value || ""));
+    return me ? Number(me.roleType) : null;
+});
+const canEditManager = computed(() => myRoleType.value === OWNER_ROLE || myRoleType.value === ADMIN_ROLE);
+
+// A manager cannot be someone already below the person, or the person themselves.
+const managerOptions = computed(() => {
+    if (!selected.value) return [];
+    const barred = new Set([selected.value.id]);
+    const stack = [selected.value.id];
+    while (stack.length) {
+        const current = stack.pop();
+        people.value.forEach((person) => {
+            if (person.managerId !== current || barred.has(person.id)) return;
+            barred.add(person.id);
+            stack.push(person.id);
+        });
+    }
+    return people.value.filter((person) => !barred.has(person.id));
+});
+
+const managedCount = computed(() => {
+    const known = new Set(people.value.map((person) => person.id));
+    return people.value.filter((person) => person.managerId && known.has(person.managerId)).length;
+});
+
+/* Iterative on purpose: a cycle that somehow reached the client must break the
+ * walk, not the tab. Anyone unreachable from a root is promoted to one. */
+const orgRoots = computed(() => {
+    if (!managedCount.value) return [];
+    const known = new Set(people.value.map((person) => person.id));
+    const nodes = new Map(people.value.map((person) => [person.id, { id: person.id, person, reports: [] }]));
+    const childrenOf = new Map();
+    const rootIds = [];
+
+    people.value.forEach((person) => {
+        const manager = person.managerId;
+        if (manager && manager !== person.id && known.has(manager)) {
+            if (!childrenOf.has(manager)) childrenOf.set(manager, []);
+            childrenOf.get(manager).push(person.id);
+        } else {
+            rootIds.push(person.id);
+        }
+    });
+
+    const visited = new Set(rootIds);
+    const expand = (seed) => {
+        const stack = [seed];
+        while (stack.length) {
+            const id = stack.pop();
+            (childrenOf.get(id) || []).forEach((child) => {
+                if (visited.has(child)) return;
+                visited.add(child);
+                nodes.get(id).reports.push(nodes.get(child));
+                stack.push(child);
+            });
+        }
+    };
+    rootIds.forEach(expand);
+    people.value.forEach((person) => {
+        if (visited.has(person.id)) return;
+        visited.add(person.id);
+        rootIds.push(person.id);
+        expand(person.id);
+    });
+
+    return rootIds.map((id) => {
+        const rows = [];
+        const stack = [{ node: nodes.get(id), depth: 0 }];
+        while (stack.length) {
+            const { node, depth } = stack.pop();
+            rows.push({
+                id: node.id,
+                person: node.person,
+                depth,
+                indent: `${Math.min(depth, MAX_DEPTH) * 20}px`,
+                reports: node.reports.length
+            });
+            for (let i = node.reports.length - 1; i >= 0; i -= 1) stack.push({ node: node.reports[i], depth: depth + 1 });
+        }
+        return { id, rows };
+    });
+});
+
+async function setManager(person, nextManagerId) {
+    managerError.value = "";
+    savingManager.value = true;
+    try {
+        const response = await apiRequest("put", env.API_MEMBERS, { id: person.requestId, data: { managerId: nextManagerId } });
+        if (!response.data?.status) {
+            managerError.value = response.data?.statusText || t("OrgV2.save_failed");
+            return;
+        }
+        const saved = response.data.data;
+        listing.value = listing.value.map((u) => (String(u.requestId || u._id) === String(person.requestId) ? { ...u, managerId: nextManagerId } : u));
+        if (saved) {
+            commit("settings/mutateCompanyUsers", {
+                data: { ...saved, _id: saved._id, isCurrentUser: saved.userId === userId.value, requestId: saved._id },
+                op: "modified"
+            });
+        }
+    } catch (error) {
+        managerError.value = error?.response?.data?.statusText || t("OrgV2.save_failed");
+    } finally {
+        savingManager.value = false;
+    }
+}
 
 function dotClass(person) {
     if (person.onPto) return "";
@@ -361,6 +534,20 @@ onMounted(() => {
     transition: border-color var(--t-state) var(--ease), color var(--t-state) var(--ease);
 }
 .pd__find-chip.is-on { border-color: var(--brand); color: var(--brand); font-weight: 600; }
+.org__tree { display: flex; flex-direction: column; gap: 2px; }
+.org__row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 6px 0;
+}
+.org__branch { width: 10px; height: 1px; margin-left: -20px; background: var(--border); flex: none; }
+.org__who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.org__name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.org__empty { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.org__empty-note { margin: 0; line-height: 1.5; max-width: 62ch; }
+
 .pd__note { margin: 0; line-height: 1.5; }
 .pd__privacy { margin: 0; line-height: 1.5; }
 

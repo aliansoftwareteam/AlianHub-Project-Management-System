@@ -3762,6 +3762,20 @@ export default {
         by_source_source: "Logged hours from the timesheet, and elapsed time on agent runs split by the account each run was billed to. People are one bucket on purpose: that account is an AI subscription, so a run has one and a person's hours do not. Nothing recorded on a time log says which client it was entered from, and a split drawn from a guess would be worse than none.",
         source_people: "people"
     },
+    OrgV2: {
+        tab_directory: "Directory",
+        tab_org: "Org chart",
+        reports_to: "Reports to",
+        reports_to_name: "Reports to {name}",
+        no_manager: "No manager",
+        reports_count: "{count} REPORTS",
+        empty_title: "No reporting lines yet",
+        empty_editable: "Nobody in this workspace has a manager recorded. Open someone in the directory and set who they report to, and the chart builds itself from there.",
+        empty_readonly: "Nobody in this workspace has a manager recorded. An owner or an admin can set who reports to whom.",
+        empty_action: "Back to the directory",
+        org_note: "A reporting line is set by an owner or an admin and is separate from team membership. Guests, invitations that are still pending and agents never appear here.",
+        save_failed: "That reporting line could not be saved."
+    },
     Header: {
         help: "Help",
         Project_Forecasting: "Project Forecasting (Coming soon)",

@@ -1845,6 +1845,13 @@ const schema = {
             type: String,
             required: false
         },
+        // The userId of this member's manager in the same company. Empty means no
+        // reporting line is recorded, which is the normal state for most workspaces.
+        managerId: {
+            type: String,
+            required: false,
+            default: ""
+        },
         isTrackerUser: {
             type: Boolean,
             required: false

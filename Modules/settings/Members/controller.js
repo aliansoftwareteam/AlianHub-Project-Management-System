@@ -3,6 +3,28 @@ const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueri
 const mongoose = require("mongoose")
 const { myCache } = require('../../../Config/config');
 const { removeCache } = require('../../../utils/commonFunctions');
+const socketEmitter = require('../../../event/socketEventEmitter');
+const reportingLine = require('../../Users/helpers/reportingLine');
+
+const MANAGER_ERROR = Object.freeze({
+    [reportingLine.REASON.NO_SUBJECT]: 'That member is not part of this workspace.',
+    [reportingLine.REASON.NOT_A_PERSON]: 'Only people can hold a reporting line.',
+    [reportingLine.REASON.SELF]: 'Nobody can report to themselves.',
+    [reportingLine.REASON.UNKNOWN]: 'That manager is not a member of this workspace.',
+    [reportingLine.REASON.GUEST]: 'A guest cannot be a manager.',
+    [reportingLine.REASON.NOT_ACTIVE]: 'A manager has to be an active member.',
+    [reportingLine.REASON.CYCLE]: 'That would make the reporting line loop back on itself.'
+});
+
+const listCompanyMembers = (companyId) => MongoDbCrudOpration(companyId, {
+    type: SCHEMA_TYPE.COMPANY_USERS,
+    data: [{}]
+}, 'find').then((rows) => rows || []).catch(() => []);
+
+const setMemberFields = (companyId, docId, set) => MongoDbCrudOpration(companyId, {
+    type: SCHEMA_TYPE.COMPANY_USERS,
+    data: [{ _id: new mongoose.Types.ObjectId(docId) }, { $set: set }]
+}, 'updateOne');
 
 /**
  * This endpoint is used to get member users of company
@@ -236,6 +258,37 @@ exports.updateMember = async (req, res) => {
             }
         }
 
+        const companyId = req.headers['companyid'];
+        const changesManager = Boolean(data) && Object.prototype.hasOwnProperty.call(data, 'managerId');
+        // Losing the seat, the invite or the member role all strand whoever reports here.
+        const becomesGuest = Boolean(data) && data.roleType !== undefined && data.roleType !== null && Number(data.roleType) === reportingLine.GUEST_ROLE;
+        const departing = Boolean(data) && (data.isDelete === true || Number(data.status) === 3 || becomesGuest);
+
+        const members = (changesManager || departing) ? await listCompanyMembers(companyId) : [];
+        const subject = members.find((member) => String(member._id) === String(id));
+
+        if (changesManager) {
+            const { getRoleType, ROLE_OWNER, ROLE_ADMIN } = require('../../../Config/permissionGuard');
+            const callerRole = await getRoleType(companyId || '', req.uid);
+            if (callerRole !== ROLE_OWNER && callerRole !== ROLE_ADMIN) {
+                return res.status(403).json({
+                    status: false,
+                    statusText: 'Only an owner or an admin can change who someone reports to.',
+                    message: 'Forbidden'
+                });
+            }
+
+            const check = reportingLine.validateManagerAssignment(members, subject && subject.userId, data.managerId);
+            if (!check.ok) {
+                return res.status(400).json({
+                    status: false,
+                    statusText: MANAGER_ERROR[check.reason] || 'That reporting line is not allowed.',
+                    message: check.reason
+                });
+            }
+            data.managerId = check.managerId;
+        }
+
         const params = {
             type: SCHEMA_TYPE.COMPANY_USERS,
             data: [
@@ -249,7 +302,23 @@ exports.updateMember = async (req, res) => {
             ]
         }
 
-        const response = await MongoDbCrudOpration(req.headers['companyid'], params, 'findOneAndUpdate');
+        const response = await MongoDbCrudOpration(companyId, params, 'findOneAndUpdate');
+
+        if (departing && subject) {
+            const moves = reportingLine.reassignReports(members, subject.userId);
+            for (const move of moves) {
+                if (move.docId) await setMemberFields(companyId, move.docId, { managerId: move.managerId });
+            }
+        }
+
+        if (changesManager) {
+            socketEmitter.emit('update', {
+                type: 'update',
+                data: { data: response },
+                updatedFields: { managerId: data.managerId },
+                module: 'companyUsers'
+            });
+        }
 
         removeCache(`company_users:${req.headers['companyid']}`);
         removeCache("UserProjectData:", true);
@@ -313,6 +382,15 @@ exports.rootUpdateMember = async (req, res) => {
             return res.status(400).json({
                 status: false,
                 message: `'id' parameter is required.`
+            });
+        }
+
+        // Reporting lines are only writable where the cycle and eligibility rules run.
+        if (data && Object.prototype.hasOwnProperty.call(data, 'managerId')) {
+            return res.status(400).json({
+                status: false,
+                statusText: 'Set a reporting line through the members endpoint, where it is validated.',
+                message: 'managerId is not writable here'
             });
         }
 

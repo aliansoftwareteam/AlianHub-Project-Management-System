@@ -33,3 +33,32 @@ All four fixes carry regression tests in `tests/create-project-settings.test.js`
 ### 2026-09-03
 - Task queued at the user's request, after the coverage map showed 61 built / 42 in flight / 9 not started / 2 cut / 15 with no screen.
 - Correction worth recording: an earlier attempt to create a project through the UI appeared to show a dead "Create project" button on the Home checklist. That was not a product bug — the API had crashed on a stale merge-conflict fatal, and concurrent agent edits were restarting nodemon continuously. Re-test this flow for real when the instance is stable before concluding anything about it.
+
+### 2026-09-03 (the loop closed)
+The project now runs itself from inside AlianHub. Work is pulled through the MCP server
+we built, not from notes.
+
+- Minted a scoped personal token via `POST /api/v2/api-tokens/mcp` — a route that had a
+  controller but no registration until today, so the mint was unreachable.
+- Handshook `POST /mcp` (protocol 2025-06-18, ten tools), pulled the backlog with
+  `tasks.search`, and read AR-9 with `task.get`, which returned a brief — goal, sprint,
+  acceptance criteria, relations, thread digest and the `youMayNot` boundary — not a row.
+- `task.status.set("Done")` was refused over the wire with an audit id, exactly as the
+  registry specifies. The boundary holds in production paths, not only in unit tests.
+- All status moves and review comments since have gone through MCP, so every one is audited.
+
+Nine handoff screens built (27a–27d, 28a, 28c, 29b, 25e, 24d) and eight functional gaps
+filed as real tasks in the right sprints. Six of the eight are built and In Review.
+
+Board at last check: 15 In Review, 1 In Progress (gap-3, reporting lines), 1 To Do
+(gap-7, the HTTP 200-on-failure convention, which needs a product decision).
+
+**A bug found in MCP by using it:** `status` was returned as the stored
+`{text, key, type}` object while the tool description promised a string, so an agent
+reading it got an object. Fixed.
+
+**Correction worth recording:** gap-3 was moved to In Progress and then not dispatched
+for a while — I built gap-6 and gap-8 myself, sent two agents out, and that one fell
+through the gap. Caught on a board read, not by anything automated. A task sitting In
+Progress with nothing behind it is exactly the failure this dogfooding was meant to
+surface, and it surfaced.
