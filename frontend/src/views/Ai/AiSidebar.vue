@@ -47,6 +47,9 @@ const items = computed(() => [
     { name: "AgentRouting", label: "ParityV2.nav_routing", icon: "automations" },
     { name: "AiAsk", label: "ParityV2.nav_ask", icon: "ai" },
     { name: "AiSkills", label: "AiV2.skills", icon: "docs" },
+    { name: "AiPipeline", label: "PipelineV2.nav_pipeline", icon: "layout" },
+    { name: "AiRelease", label: "PipelineV2.nav_release", icon: "share" },
+    { name: "AiAccounts", label: "AccountsV2.nav", icon: "key" },
     { name: "AuditLog", label: "AiV2.audit", icon: "audit" }
 ]);
 

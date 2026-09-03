@@ -129,6 +129,7 @@
                 <div v-if="showCardMeta" class="card-meta">
                     <span v-if="taskKey" class="card-key">{{ taskKey }}</span>
                     <span v-if="isTiming" class="card-timer">● {{ timerClock }}</span>
+                    <ProvenanceBadge :task="element" />
                 </div>
                 <div class="d-flex justify-content-between mt-10px" :class="{'ml-5px': element.AssigneeUserId.length > 0}">
                     <!-- Assignee -->
@@ -241,6 +242,7 @@
     import { useToast } from "vue-toast-notification";
     import { useRoute, useRouter } from "vue-router"
     import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
+    import ProvenanceBadge from '@/components/molecules/Provenance/ProvenanceBadge.vue';
     import { useUpdateTasks } from "@/views/Projects/helper"
     import TagChip from '@/components/atom/TagChip/TagChip.vue'
     import Priority from "@/components/molecules/PriorityCompo/PriorityComp.vue"

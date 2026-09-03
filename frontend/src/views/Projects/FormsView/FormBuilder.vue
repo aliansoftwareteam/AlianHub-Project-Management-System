@@ -245,14 +245,46 @@
                     <span>{{ $t(`Projects.form_${tog}`) }}</span>
                 </label>
 
-                <!-- Rules live in Automations, and only a person with access there can
-                     change them, so they are listed as facts with a way through. -->
-                <div class="fb__side-title fb__side-title--sub">{{ $t('ViewsV2.then_automations') }}</div>
-                <div v-for="rule in submitRules" :key="rule._id" class="fb__rule fb__rule--ro">
-                    <span class="ah-dot ah-dot--ok"></span>
-                    <span class="fb__rule-name">{{ rule.name }}</span>
+                <div class="fb__side-title fb__side-title--sub">{{ $t('GapsV2.on_submit_rules') }}</div>
+                <div v-for="rule in submitRules" :key="rule._id" class="fb__rule fb__rule--auto">
+                    <span class="ah-dot" :class="rule.enabled ? 'ah-dot--ok' : ''"></span>
+                    <span class="fb__rule-name" :title="rule.summary || rule.name">{{ rule.summary || rule.name }}</span>
+                    <button type="button" class="fb__rule-btn" @click="toggleRule(rule)">
+                        {{ rule.enabled ? $t('GapsV2.submit_rule_on') : $t('GapsV2.submit_rule_off') }}
+                    </button>
+                    <button type="button" class="fb__rule-btn fb__rule-btn--danger" @click="removeRule(rule)">
+                        {{ $t('GapsV2.submit_rule_remove') }}
+                    </button>
                 </div>
-                <p v-if="!submitRules.length" class="ah-small fb__side-note">{{ $t('ViewsV2.no_submit_rules') }}</p>
+                <p v-if="!submitRules.length && !draft" class="ah-small fb__side-note">{{ $t('GapsV2.no_submit_rules_v2') }}</p>
+
+                <div v-if="draft" class="fb__rule fb__rule--field">
+                    <span class="fb__rule-label">{{ $t('GapsV2.submit_rule_when') }}</span>
+                    <select v-model="draft.questionId" class="ah-input fb__select">
+                        <option value="">{{ $t('GapsV2.submit_rule_any') }}</option>
+                        <option v-for="q in visible" :key="q.id" :value="q.id">{{ q.label }}</option>
+                    </select>
+                    <template v-if="draft.questionId">
+                        <span class="fb__rule-label">{{ $t('GapsV2.submit_rule_is') }}</span>
+                        <input v-model="draft.answer" class="ah-input" type="text" :placeholder="$t('GapsV2.submit_rule_value')" />
+                    </template>
+                    <span class="fb__rule-label">{{ $t('GapsV2.submit_rule_then') }}</span>
+                    <select v-model="draft.action" class="ah-input fb__select">
+                        <option v-for="a in ruleActions" :key="a.key" :value="a.key">{{ a.label }}</option>
+                    </select>
+                    <select v-if="draftOptions.length" v-model="draft.value" class="ah-input fb__select">
+                        <option v-for="opt in draftOptions" :key="opt" :value="opt">{{ opt }}</option>
+                    </select>
+                    <input v-else v-model="draft.value" class="ah-input" type="text" :placeholder="$t('GapsV2.submit_rule_value')" />
+                    <p v-if="ruleErr" class="ah-field__error">{{ ruleErr }}</p>
+                    <div class="fb__rule-actions">
+                        <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="ruleBusy" @click="saveRule">{{ $t('GapsV2.submit_rule_save') }}</button>
+                        <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="draft = null">{{ $t('GapsV2.submit_rule_cancel') }}</button>
+                    </div>
+                </div>
+                <button v-else-if="canAddRule" type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="startRule">{{ $t('GapsV2.add_submit_rule') }}</button>
+                <p v-else class="ah-small fb__side-note">{{ ruleBlockedReason }}</p>
+
                 <router-link class="fb__side-link" :to="{ name: 'Automations', params: { cid: companyId } }">{{ $t('ViewsV2.open_automations') }}</router-link>
 
                 <div class="fb__side-title fb__side-title--sub">{{ $t('ViewsV2.sharing') }}</div>
@@ -506,22 +538,131 @@ const loadCatalogue = async () => {
     } catch (e) { groups.value = []; }
 };
 
-/* What actually runs after the task is filed. There is no form.submitted trigger
- * in the automations registry, so this lists the task.created rules that cover
- * this project — read-only, because they are owned over there. */
+/* What actually runs after a submission. These are real automation rules on the
+ * `form.submitted` trigger, bound to this form by a `formId` condition — the
+ * same documents the Automations screen edits, so a rule made here is not a
+ * second kind of rule. */
+const SUBMIT_TRIGGER = 'form.submitted';
+const RULE_ACTION_KEYS = ['set_priority', 'set_status', 'add_comment'];
+
+const registryActions = ref([]);
+const draft = ref(null);
+const ruleErr = ref('');
+const ruleBusy = ref(false);
+
+const ruleActions = computed(() => registryActions.value.filter((a) => RULE_ACTION_KEYS.includes(a.key)));
+
+const projectStatusNames = computed(() => (Array.isArray(props.projectData?.taskStatusData)
+    ? props.projectData.taskStatusData.map((s) => String(s?.name || '')).filter(Boolean)
+    : []));
+
+/* The value control follows the action's own schema, so a new action needs no
+ * case added here — a select when the schema names its options, a box when not. */
+const draftOptions = computed(() => {
+    if (!draft.value) return [];
+    const action = ruleActions.value.find((a) => a.key === draft.value.action);
+    const spec = action && action.schema ? Object.values(action.schema)[0] : null;
+    if (spec && Array.isArray(spec.options)) return spec.options;
+    if (draft.value.action === 'set_status') return projectStatusNames.value;
+    return [];
+});
+
+const canAddRule = computed(() => !!props.form._id && !!props.projectData?._id && settings.value.createTask !== false);
+const ruleBlockedReason = computed(() => {
+    if (!props.projectData?._id) return t('GapsV2.submit_rule_needs_project');
+    if (settings.value.createTask === false) return t('GapsV2.submit_rule_needs_task');
+    return t('ViewsV2.publish_to_share');
+});
+
+const bindsToThisForm = (rule) => {
+    const id = String(props.form._id || '');
+    if (!id) return false;
+    const args = Array.isArray(rule?.conditions?.args) ? rule.conditions.args : [rule?.conditions];
+    return args.some((a) => a && a.field === 'formId' && String(a.value) === id);
+};
+
 const loadSubmitRules = async () => {
     try {
         const body = (await apiRequest('get', env.AUTOMATIONS_V2))?.data;
         const rows = (body && body.status && Array.isArray(body.data)) ? body.data : [];
-        const pid = String(props.projectData?._id || '');
-        submitRules.value = rows.filter((r) => r.enabled === true
-            && String(r.trigger || '') === 'task.created'
-            && (r.scope?.allProjects !== false || (r.scope?.projectIds || []).map(String).includes(pid)));
+        submitRules.value = rows.filter((r) => String(r.trigger?.event || '') === SUBMIT_TRIGGER && bindsToThisForm(r));
     } catch (e) { submitRules.value = []; }
 };
 
-onMounted(() => { hydrate(); loadCatalogue(); loadSubmitRules(); });
-watch(() => props.form._id, hydrate);
+const loadRegistry = async () => {
+    try {
+        const body = (await apiRequest('get', `${env.AUTOMATIONS_V2}/registry`))?.data;
+        registryActions.value = (body && body.status && body.data && body.data.actions) || [];
+    } catch (e) { registryActions.value = []; }
+};
+
+const startRule = () => {
+    ruleErr.value = '';
+    draft.value = { questionId: '', answer: '', action: ruleActions.value[0]?.key || 'set_priority', value: '' };
+};
+
+const buildConditions = () => {
+    const args = [{ op: 'eq', field: 'formId', value: String(props.form._id) }];
+    if (draft.value.questionId) {
+        args.push({ op: 'eq', field: `answers.${draft.value.questionId}`, value: String(draft.value.answer || '') });
+    }
+    return { op: 'and', args };
+};
+
+const configFor = (actionKey, value) => {
+    const action = ruleActions.value.find((a) => a.key === actionKey);
+    const field = action && action.schema ? Object.keys(action.schema)[0] : 'value';
+    return { [field]: value };
+};
+
+const saveRule = async () => {
+    if (!draft.value) return;
+    ruleErr.value = '';
+    if (!String(draft.value.value || '').trim()) {
+        ruleErr.value = t('GapsV2.submit_rule_value');
+        return;
+    }
+    ruleBusy.value = true;
+    try {
+        const label = ruleActions.value.find((a) => a.key === draft.value.action)?.label || draft.value.action;
+        const body = (await apiRequest('post', env.AUTOMATIONS_V2, {
+            name: t('GapsV2.submit_rule_name', { action: label }),
+            trigger: { type: 'event', event: SUBMIT_TRIGGER },
+            scope: { allProjects: false, projectIds: [String(props.projectData._id)] },
+            conditions: buildConditions(),
+            steps: [{ id: 's1', type: 'action', action: draft.value.action, config: configFor(draft.value.action, draft.value.value) }],
+            enabled: true,
+        }))?.data;
+        if (!body || body.status !== true) {
+            ruleErr.value = (body && body.statusText) || t('GapsV2.submit_rule_failed');
+            return;
+        }
+        draft.value = null;
+        toast.success(t('GapsV2.submit_rule_saved'));
+        await loadSubmitRules();
+    } catch (e) {
+        ruleErr.value = t('GapsV2.submit_rule_failed');
+    } finally {
+        ruleBusy.value = false;
+    }
+};
+
+const toggleRule = async (rule) => {
+    try {
+        await apiRequest('patch', `${env.AUTOMATIONS_V2}/${rule._id}/enabled`, { enabled: !rule.enabled });
+        await loadSubmitRules();
+    } catch (e) { ruleErr.value = t('GapsV2.submit_rule_failed'); }
+};
+
+const removeRule = async (rule) => {
+    try {
+        await apiRequest('delete', `${env.AUTOMATIONS_V2}/${rule._id}`);
+        await loadSubmitRules();
+    } catch (e) { ruleErr.value = t('GapsV2.submit_rule_failed'); }
+};
+
+onMounted(() => { hydrate(); loadCatalogue(); loadRegistry(); loadSubmitRules(); });
+watch(() => props.form._id, () => { hydrate(); draft.value = null; loadSubmitRules(); });
 
 const addOption = (q) => {
     if (!Array.isArray(q.options)) q.options = [];

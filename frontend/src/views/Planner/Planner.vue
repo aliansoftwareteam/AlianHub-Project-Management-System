@@ -1,32 +1,20 @@
 <template>
     <div class="ah-page planner">
-        <ContextSidebar width="250px" :open="homeState.sidebarOpen" :label="$t('HomeV2.unscheduled')" @close="homeState.sidebarOpen = false">
-            <div class="planner__tray-title">{{ $t('HomeV2.unscheduled') }}</div>
-            <div class="planner__tray-tabs">
-                <button type="button" class="hc-tab" :class="{ 'is-active': tray === 'mine' }" @click="tray = 'mine'">{{ $t('HomeV2.mine') }} · {{ unscheduled.length }}</button>
-                <button type="button" class="hc-tab" :class="{ 'is-active': tray === 'overdue' }" @click="tray = 'overdue'">{{ $t('HomeV2.overdue_tab') }} · {{ overdue.length }}</button>
-            </div>
-            <div class="planner__tray">
-                <article
-                    v-for="task in trayTasks"
-                    :key="task._id"
-                    class="planner__card"
-                    :class="{ 'planner__card--overdue': tray === 'overdue' }"
-                    draggable="true"
-                    @dragstart="onDragStart($event, task)"
-                    @dragend="dragging = null"
-                    @click="openTask(task)"
-                >
-                    <span>{{ task.TaskName }}</span>
-                    <span class="planner__card-meta" :class="{ 'planner__card-meta--danger': tray === 'overdue' }">
-                        <template v-if="tray === 'overdue'">{{ $t('HomeV2.overdue_since', { date: moment(task.DueDate).format('MMM D') }) }}</template>
-                        <template v-else>{{ work.projectOf(task)?.ProjectName }} · {{ task.totalEstimatedTime ? $t('HomeV2.est', { value: fmtEstimate(task.totalEstimatedTime) }) : $t('HomeV2.no_estimate') }}</template>
-                    </span>
-                </article>
-                <p v-if="!trayTasks.length && work.loaded.value" class="hc-hint" style="margin: 0">{{ $t('HomeV2.tray_empty') }}</p>
-                <p v-if="!work.loaded.value" class="hc-loading">{{ $t('HomeV2.loading') }}</p>
-            </div>
-            <div class="planner__tray-foot">{{ $t('HomeV2.tray_footer') }}</div>
+        <ContextSidebar v-if="!isMobile" width="250px" :open="homeState.sidebarOpen" :label="$t('HomeV2.unscheduled')" @close="homeState.sidebarOpen = false">
+            <PlannerTray
+                :title="$t('HomeV2.unscheduled')"
+                :tabs="trayTabs"
+                :active="tray"
+                :items="trayItems"
+                :loading="!work.loaded.value"
+                :loadingText="$t('HomeV2.loading')"
+                :emptyText="$t('HomeV2.tray_empty')"
+                :footer="$t('HomeV2.tray_footer')"
+                @tab="tray = $event"
+                @select="openTask"
+                @dragstart="onDragStart"
+                @dragend="dragging = null"
+            />
         </ContextSidebar>
 
         <div class="ah-page__main">
@@ -54,6 +42,20 @@
                 </div>
             </header>
 
+            <nav v-if="isMobile" class="planner__days">
+                <button
+                    v-for="day in weekDays"
+                    :key="day.key"
+                    type="button"
+                    class="planner__day"
+                    :class="{ 'is-active': day.key === days[0].key }"
+                    @click="anchor = day.date"
+                >
+                    <span>{{ day.dow }}</span>
+                    <span class="ah-mono">{{ day.num }}</span>
+                </button>
+            </nav>
+
             <div class="planner__grid-wrap ah-scroll">
                 <div class="planner__grid" :style="{ gridTemplateColumns: `44px repeat(${days.length}, minmax(0, 1fr))` }">
                     <div class="planner__corner"></div>
@@ -72,6 +74,7 @@
                         @dragleave="onDragLeave(d)"
                         @drop.prevent="onDrop($event, d)"
                         @dblclick="onDoubleClick($event, d)"
+                        @click="onColumnClick($event, d)"
                     >
                         <div
                             v-for="item in blocksFor(d)"
@@ -92,6 +95,27 @@
                         <div v-if="d.isToday && nowTop !== null" class="planner__now" :style="{ top: `${nowTop}px` }"></div>
                     </div>
                 </div>
+            </div>
+
+            <div v-if="isMobile" class="planner__sheet">
+                <div v-if="pending" class="planner__pick">
+                    <span>{{ $t('ProvenanceV2.mob_tap_slot', { task: pending.TaskName }) }}</span>
+                    <button type="button" class="planner__pick-cancel" @click="pending = null">{{ $t('ProvenanceV2.mob_cancel') }}</button>
+                </div>
+                <PlannerTray
+                    :title="$t('HomeV2.unscheduled')"
+                    :tabs="trayTabs"
+                    :active="tray"
+                    :items="trayItems"
+                    :selectedId="pending ? pending._id : ''"
+                    :loading="!work.loaded.value"
+                    :loadingText="$t('HomeV2.loading')"
+                    :emptyText="$t('HomeV2.tray_empty')"
+                    @tab="tray = $event"
+                    @select="pickTask"
+                    @dragstart="onDragStart"
+                    @dragend="dragging = null"
+                />
             </div>
         </div>
 
@@ -117,6 +141,7 @@ import { useToast } from "vue-toast-notification";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import ContextSidebar from "@/components/organisms/Shell/ContextSidebar.vue";
 import TaskDetail from "@/views/TaskDetail/TaskDetail.vue";
+import PlannerTray from "./PlannerTray.vue";
 import { homeState } from "@/components/molecules/Home/homeState";
 import { useMyWork } from "@/components/molecules/Home/useMyWork";
 import { useAgenda } from "@/components/molecules/Home/useAgenda";
@@ -149,6 +174,8 @@ const overKey = ref(null);
 const ghostTop = ref(0);
 const now = ref(moment());
 const detail = ref({ open: false, taskId: "", projectId: "", sprintId: "" });
+const isMobile = ref(false);
+const pending = ref(null);
 
 const hours = computed(() => Array.from({ length: endHour.value - startHour.value }, (_, i) => startHour.value + i));
 const gridHeight = computed(() => (endHour.value - startHour.value) * HOUR_PX);
@@ -175,6 +202,29 @@ const rangeLabel = computed(() => {
 const unscheduled = computed(() => work.mine.value.filter((task) => !task.startDate && dueBucket(task) !== "overdue"));
 const overdue = computed(() => work.mine.value.filter((task) => dueBucket(task) === "overdue"));
 const trayTasks = computed(() => (tray.value === "mine" ? unscheduled.value : overdue.value));
+
+const trayTabs = computed(() => [
+    { key: "mine", label: t("HomeV2.mine"), count: unscheduled.value.length },
+    { key: "overdue", label: t("HomeV2.overdue_tab"), count: overdue.value.length }
+]);
+
+const trayItems = computed(() => trayTasks.value.map((task) => ({
+    id: task._id,
+    title: task.TaskName,
+    danger: tray.value === "overdue",
+    meta: tray.value === "overdue"
+        ? t("HomeV2.overdue_since", { date: moment(task.DueDate).format("MMM D") })
+        : [work.projectOf(task)?.ProjectName, task.totalEstimatedTime ? t("HomeV2.est", { value: fmtEstimate(task.totalEstimatedTime) }) : t("HomeV2.no_estimate")].filter(Boolean).join(" · "),
+    task
+})));
+
+const weekDays = computed(() => {
+    const monday = moment(anchor.value).startOf("isoWeek");
+    return Array.from({ length: 7 }, (_, i) => {
+        const day = monday.clone().add(i, "days");
+        return { key: day.format("YYYY-MM-DD"), date: day, dow: day.format("dd").slice(0, 1), num: day.format("D") };
+    });
+});
 
 const calendarTo = computed(() => ({ name: router.hasRoute("IntegrationsHub") ? "IntegrationsHub" : "Setting", params: { cid: companyId.value } }));
 
@@ -231,11 +281,7 @@ function onDragOver(event, day) {
 function onDragLeave(day) {
     if (overKey.value === day.key) overKey.value = null;
 }
-async function onDrop(event, day) {
-    const task = dragging.value;
-    const begin = ghostStart(day);
-    overKey.value = null;
-    dragging.value = null;
+async function place(task, begin) {
     if (!task) return;
     const end = begin.clone().add(estimateMinutes(task), "minutes");
     try {
@@ -245,6 +291,29 @@ async function onDrop(event, day) {
         console.error("schedule failed", error);
         $toast.error(t("HomeV2.schedule_failed"), { position: "top-right" });
     }
+}
+
+function onDrop(event, day) {
+    const task = dragging.value;
+    const begin = ghostStart(day);
+    overKey.value = null;
+    dragging.value = null;
+    place(task, begin);
+}
+
+/* Touch has no drag-and-drop, so on a phone a tray card is picked up with one
+ * tap and dropped with a second on the hour it belongs to. Same landing. */
+function pickTask(task) {
+    pending.value = pending.value && pending.value._id === task._id ? null : task;
+}
+function onColumnClick(event, day) {
+    const task = pending.value;
+    if (!task) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const y = Math.max(0, event.clientY - rect.top);
+    const slot = Math.round((Math.min(y, gridHeight.value) / HOUR_PX) * 2) / 2;
+    pending.value = null;
+    place(task, moment(day.date).startOf("day").add(startHour.value, "hours").add(slot * 60, "minutes"));
 }
 
 function onDoubleClick(event, day) {
@@ -283,11 +352,22 @@ function closeTask() {
     work.fetchOpen().catch(() => {});
 }
 
+/* One day at a time under 768px (24d) — the week grid does not survive 375px. */
+function syncViewport() {
+    isMobile.value = window.innerWidth <= 768;
+    if (isMobile.value) mode.value = "day";
+}
+
 let clock = null;
 onMounted(() => {
+    syncViewport();
+    window.addEventListener("resize", syncViewport);
     work.fetchOpen().catch((error) => console.error("planner tasks failed", error));
     agenda.load().catch(() => {});
     clock = setInterval(() => { now.value = moment(); }, 60000);
 });
-onUnmounted(() => clearInterval(clock));
+onUnmounted(() => {
+    window.removeEventListener("resize", syncViewport);
+    clearInterval(clock);
+});
 </script>

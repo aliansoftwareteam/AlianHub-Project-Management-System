@@ -63,6 +63,10 @@
                 <span class="lv2__risk-dot"></span>{{ risk.score }}
             </span>
         </span>
+
+        <span class="lv2__c-done">
+            <ProvenanceBadge :task="data" />
+        </span>
     </div>
 </template>
 
@@ -70,6 +74,7 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import ProvenanceBadge from "@/components/molecules/Provenance/ProvenanceBadge.vue";
 import { useGetterFunctions } from "@/composable";
 import { dueBucket, dueLabel, fmtEstimate, priorityMeta } from "@/components/molecules/Home/homeFormat";
 import { timerState, isTimerFor, elapsedSeconds } from "@/components/organisms/TaskDetailOverlay/useTaskTimer";

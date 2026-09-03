@@ -12,6 +12,7 @@ const { resolveActor, isAgent } = require('./actor');
 const tools = require('../Automations/engine/tools');
 const team = require('./team');
 const scope = require('./scope');
+const shipping = require('./shipping');
 
 const companyOf = (req) => req.headers['companyid'] || (req.query && req.query.companyId) || '';
 // 'mention' is a run started by @naming the agent in a comment (13b); it is
@@ -345,4 +346,24 @@ exports.routableTasks = async (req, res) => {
         }, 'find').catch(() => []);
         return res.send({ status: true, data: rows || [] });
     } catch (e) { logger.error(`routableTasks: ${e.message}`); return fail(res, e.message); }
+};
+
+/* GET /api/v2/agents/pipeline — tasks an agent has worked on (28a task picker). */
+exports.pipelineTasks = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        if (!companyId || !req.uid) return fail(res, 'Unauthorized.', 401);
+        const data = await shipping.pipelineTasks(companyId, req.uid, { limit: req.query && req.query.limit });
+        return res.send({ status: true, data });
+    } catch (e) { logger.error(`pipelineTasks: ${e.message}`); return fail(res, e.message); }
+};
+
+/* GET /api/v2/agents/release?since= — the release candidate (28c). */
+exports.releaseCandidate = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        if (!companyId || !req.uid) return fail(res, 'Unauthorized.', 401);
+        const data = await shipping.releaseCandidate(companyId, req.uid, { since: req.query && req.query.since });
+        return res.send({ status: true, data });
+    } catch (e) { logger.error(`releaseCandidate: ${e.message}`); return fail(res, e.message); }
 };

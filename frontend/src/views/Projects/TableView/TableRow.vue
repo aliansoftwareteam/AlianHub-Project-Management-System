@@ -47,7 +47,26 @@
             <span class="tv2__risk-dot"></span>{{ $t(`ListV2.risk_${risk.level}`) }} · {{ risk.score }}
         </span>
 
-        <span class="tv2__area" :title="$t('ListV2.area_hint')">{{ $t('ListV2.not_generated') }}</span>
+        <span class="tv2__cell-ai" @click.stop>
+            <span v-if="category.state === 'ready'" class="tv2__area" :title="categoryTitle">{{ category.category }}</span>
+            <span v-else-if="category.state === 'loading'" class="tv2__area-empty">{{ $t('CategoryV2.loading') }}</span>
+            <span v-else-if="category.state === 'empty'" class="tv2__area-empty" :title="categoryTitle">{{ $t(`CategoryV2.empty_${category.reason === 'no-vocabulary' ? 'no_vocabulary' : 'no_fit'}`) }}</span>
+            <span v-else-if="category.state === 'unavailable'" class="tv2__area-empty">{{ $t('ListV2.ai_not_configured') }}</span>
+            <button v-else type="button" class="tv2__gen" @click="generateCategory">✦ {{ $t('ListV2.ai_generate') }}</button>
+
+            <span v-if="category.state === 'ready'" class="tv2__source" :class="{ 'is-pinned': category.pinned }">
+                <span>{{ categorySource }}</span>
+                <button
+                    type="button"
+                    class="tv2__pin"
+                    :class="{ 'is-on': category.pinned }"
+                    :title="category.pinned ? $t('ListV2.ai_unpin') : $t('ListV2.ai_pin')"
+                    @click="toggleCategoryPin"
+                >
+                    <ShellIcon name="pin" :size="11" />{{ category.pinned ? $t('ListV2.ai_pinned') : $t('ListV2.ai_pin') }}
+                </button>
+            </span>
+        </span>
     </div>
 </template>
 
@@ -59,6 +78,7 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { useGetterFunctions } from "@/composable";
 import { taskRisk } from "@/views/Projects/composables/taskRisk";
 import { useTaskSummaries } from "./useTaskSummaries.js";
+import { useTaskCategories } from "./useTaskCategories.js";
 
 defineOptions({ name: "TableRow" });
 
@@ -72,6 +92,7 @@ defineEmits(["open", "select"]);
 const { t } = useI18n();
 const { getUser, getTaskStatus } = useGetterFunctions();
 const summaries = useTaskSummaries();
+const categories = useTaskCategories();
 const rowRef = ref(null);
 let observer = null;
 
@@ -90,6 +111,18 @@ const summary = computed(() => summaries.get(props.data._id));
 const sourceLabel = computed(() => t("ListV2.ai_source", {
     time: summary.value.updatedAt ? moment(summary.value.updatedAt).format("HH:mm") : "--:--"
 }));
+
+const category = computed(() => categories.get(props.data._id));
+const categorySourceName = computed(() => (category.value.source === "custom-field" && category.value.sourceName)
+    ? category.value.sourceName
+    : t(`CategoryV2.source_${(category.value.source || "tag").replace("-", "_")}`));
+const categorySource = computed(() => t("CategoryV2.chip_source", {
+    from: categorySourceName.value,
+    time: category.value.updatedAt ? moment(category.value.updatedAt).format("HH:mm") : "--:--"
+}));
+const categoryTitle = computed(() => (category.value.state === "empty"
+    ? t(`CategoryV2.why_${category.value.reason === "no-vocabulary" ? "no_vocabulary" : "no_fit"}`)
+    : t("CategoryV2.chip_hint", { from: categorySourceName.value })));
 
 const risk = computed(() => taskRisk(props.data));
 const riskTitle = computed(() => {
@@ -110,12 +143,20 @@ function togglePin() {
     if (summary.value.pinned) summaries.unpin(props.data._id);
     else summaries.pin(props.data._id);
 }
+function generateCategory() {
+    categories.generate(props.data._id);
+}
+function toggleCategoryPin() {
+    if (category.value.pinned) categories.unpin(props.data._id);
+    else categories.pin(props.data._id);
+}
 
 onMounted(() => {
     if (!rowRef.value || typeof IntersectionObserver === "undefined") return;
     observer = new IntersectionObserver((entries) => {
         if (!entries[0]?.isIntersecting) return;
         summaries.ensure(props.data._id);
+        categories.ensure(props.data._id);
         observer.disconnect();
         observer = null;
     }, { rootMargin: "120px" });

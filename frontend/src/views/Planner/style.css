@@ -63,12 +63,11 @@
 }
 
 .planner__hour {
-    height: 52px;
-    padding: 2px 8px 0 0;
+    position: absolute;
+    right: 8px;
     text-align: right;
     font: var(--text-data);
     color: var(--ink-3);
-    border-bottom: 1px solid var(--hairline);
 }
 
 .planner__col {
@@ -124,6 +123,11 @@
     min-height: 0;
     background: var(--surface);
 }
+.ah-sidebar > .planner__tray { flex: 1; }
+.planner__tray-list { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; overflow: auto; }
+.planner__tray-count { color: var(--ink-3); }
+.planner__tray-empty { margin: 0 14px; }
+.planner__card--picked { border-color: var(--brand); box-shadow: 0 0 0 1.5px var(--brand-ring), var(--shadow-card); }
 .planner__tray-title {
     display: flex;
     align-items: center;
@@ -162,6 +166,82 @@
     .planner__tray { display: none; }
     .planner__sidebar-toggle { display: inline-flex; }
 }
+/* 24d — one day, a tray under it, and every target big enough for a thumb. */
+.planner__days { display: none; }
+.planner__sheet { display: none; }
+
 @media (max-width: 768px) {
-    .planner__grid { grid-template-columns: 46px minmax(220px, 1fr); }
+    .planner { height: 100%; }
+    .planner .ah-page__main { display: flex; flex-direction: column; min-height: 0; }
+    .planner .ah-toolbar { padding: 0 12px; gap: 8px; }
+    .planner__sidebar-toggle,
+    .planner .ah-toolbar__actions .ah-tabs,
+    .planner__cal,
+    .planner__hours { display: none; }
+    .planner .ah-toolbar__actions { margin-left: auto; }
+    .planner__range button { min-width: 32px; min-height: 44px; }
+
+    .planner__days {
+        display: flex;
+        justify-content: space-between;
+        gap: 2px;
+        padding: 6px 10px 8px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--hairline);
+    }
+    .planner__day {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        flex: 1;
+        min-width: 44px;
+        min-height: 44px;
+        padding: 4px 0;
+        border: 0;
+        border-radius: 9px;
+        background: transparent;
+        font: var(--text-data);
+        color: var(--ink-2);
+        cursor: pointer;
+    }
+    .planner__day.is-active { background: var(--brand-tint); color: var(--brand); font-weight: 700; }
+
+    .planner__grid-wrap { flex: 1; border-right: 0; }
+    /* The column template is set inline from the day count; only the desktop
+       minimum has to go so one day fits a 375px screen. */
+    .planner__grid { min-width: 0; }
+    .planner__day-head { font-size: 12.5px; }
+    .planner__block { min-height: 44px; padding: 8px 10px; font-size: 13px; }
+    .planner__col { cursor: pointer; }
+
+    .planner__sheet {
+        display: flex;
+        flex-direction: column;
+        max-height: 45vh;
+        border-top: 1px solid var(--hairline);
+        background: var(--surface);
+    }
+    .planner__sheet .planner__tray { min-height: 0; }
+    .planner__sheet .planner__card { min-height: 44px; justify-content: center; }
+    .planner__pick {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 44px;
+        padding: 8px 14px;
+        background: var(--brand-tint);
+        font: var(--text-small);
+        color: var(--brand);
+    }
+    .planner__pick-cancel {
+        margin-left: auto;
+        min-height: 44px;
+        padding: 0 6px;
+        border: 0;
+        background: transparent;
+        font: 600 12.5px/1 var(--font-ui);
+        color: var(--brand);
+        cursor: pointer;
+    }
 }

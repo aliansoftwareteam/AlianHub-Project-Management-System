@@ -1,7 +1,7 @@
 /* List view (handoff 14a) */
 
 .lv2 {
-    --lv2-cols: 28px minmax(0, 1fr) 90px 100px 80px 70px 60px;
+    --lv2-cols: 28px minmax(0, 1fr) 90px 100px 80px 70px 60px 104px;
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -201,4 +201,11 @@
     .lv2__c-assignee, .lv2__c-due, .lv2__c-prio { display: none; }
     .lv2__row { min-height: 44px; }
     .lv2__add { padding-left: 24px; min-height: 44px; }
+}
+
+/* Handoff 29b — who did the work, who checked it, who closed it. */
+.lv2__c-done { display: flex; align-items: center; min-width: 0; }
+@media (max-width: 1100px) {
+    .lv2 { --lv2-cols: 28px minmax(0, 1fr) 90px 100px 80px 70px 60px; }
+    .lv2__c-done { display: none; }
 }

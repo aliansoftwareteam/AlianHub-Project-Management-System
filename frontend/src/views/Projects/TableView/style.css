@@ -1,7 +1,7 @@
 /* Table view with AI fields (handoff 13c) */
 
 .tv2 {
-    --tv2-cols: 28px minmax(0, 1fr) 100px 90px 1.3fr 110px 120px;
+    --tv2-cols: 28px minmax(0, 1fr) 100px 90px 1.3fr 110px 140px;
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -131,6 +131,7 @@
     color: var(--ink-label);
 }
 .tv2__cell-ai:hover .tv2__source, .tv2__source.is-pinned { display: flex; }
+.tv2__source > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tv2__pin {
     background: none; border: 0; padding: 0;
     color: var(--ink-label);
@@ -152,7 +153,21 @@
 .tv2__risk--med .tv2__risk-dot { background: var(--warn); }
 .tv2__risk--high .tv2__risk-dot { background: var(--danger); }
 
-.tv2__area { color: var(--ink-3); font-size: 11.5px; font-style: italic; }
+.tv2__area {
+    display: inline-block;
+    max-width: 100%;
+    padding: 2px 8px;
+    border-radius: 5px;
+    font-size: 11.5px;
+    background: rgba(0, 0, 0, .06);
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: help;
+}
+:root[data-theme="dark"] .tv2__area { background: rgba(255, 255, 255, .1); }
+.tv2__area-empty { color: var(--ink-3); font-size: 11.5px; font-style: italic; }
 
 .tv2__foot {
     display: flex;

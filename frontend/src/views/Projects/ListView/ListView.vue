@@ -49,6 +49,7 @@
                         <span class="lv2__c-prio">{{ $t('ListV2.col_priority') }}</span>
                         <span>{{ $t('ListV2.col_est') }}</span>
                         <span>✦ {{ $t('ListV2.col_risk') }}</span>
+                        <span class="lv2__c-done">{{ $t('ProvenanceV2.col_done_by') }}</span>
                     </div>
 
                     <section v-for="sprint in groupedTasks" :key="sprint?.id" class="lv2__sprint" :id="`sprint_${sprint?.id}`">

@@ -12,9 +12,11 @@ const reminderctrl = require('./controller/timeReminders');
 const billingctrl = require('./controller/billing');
 const weekctrl = require('./controller/weekTimesheet');
 const gridctrl = require('./controller/workloadGrid');
+const hoursctrl = require('./controller/hoursBySource');
 exports.init = (app) => {
     app.post('/api/v1/timesheet/user',userctrl.getUserTimeSheet);
     app.get('/api/v1/timesheet/week', weekctrl.getWeekTimesheet);
+    app.get('/api/v1/timesheet/hours-by-source', hoursctrl.getHoursBySource);
     app.put('/api/v1/timesheet/entries/billable', weekctrl.setEntriesBillable);
     app.post('/api/v1/timesheet/workload-grid', gridctrl.getWorkloadGrid);
     app.post('/api/v1/timesheet/workload-move', gridctrl.moveWorkloadChip);

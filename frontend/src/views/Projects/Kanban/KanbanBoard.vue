@@ -14,10 +14,16 @@
                     <span class="column-title" :title="column.name">{{ column.name }}</span>
                     <button type="button" class="task-count" :title="$t('ProjectsV2.wip_set')" @click.stop="wipFor = wipFor === column.key ? '' : column.key">{{ tasksCount(column) }}</button>
                     <span class="column-head__spacer"></span>
-                    <span v-if="atWipLimit(column)" class="wip-chip">{{ $t('ProjectsV2.wip_chip', { n: tasksCount(column), limit: wipLimit(column) }) }}</span>
+                    <span
+                        v-if="wipLimit(column) > 0"
+                        class="wip-chip"
+                        :class="{ 'wip-chip--at': atWipLimit(column), 'wip-chip--over': overWipLimit(column) }"
+                        :title="overWipLimit(column) ? $t('GapsV2.wip_over', { limit: wipLimit(column) }) : ''"
+                    >{{ $t('ProjectsV2.wip_chip', { n: tasksCount(column), limit: wipLimit(column) }) }}</span>
                     <div v-if="wipFor === column.key" class="ah-pop wip-pop" @click.stop>
                         <div class="ah-label">{{ $t('ProjectsV2.wip_limit') }}</div>
                         <input class="ah-input" type="number" min="0" :value="wipLimit(column) || ''" :placeholder="$t('ProjectsV2.wip_none')" @change="setWipLimit(column, $event.target.value)">
+                        <p class="ah-small wip-pop__note">{{ wipError || $t('GapsV2.wip_note') }}</p>
                     </div>
                     <img class="cursor-pointer add-task-icon" src="@/assets/images/svg/pluss.svg" alt="addTask" @click="showAddInput(column.key)">
                 </div>
@@ -70,6 +76,7 @@
 import { ref, defineProps, nextTick, inject, watch, onMounted, onUnmounted, computed } from 'vue'
 import Draggable from 'vuedraggable'
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import Cookies from "js-cookie";
 
 //Cmponents
@@ -111,6 +118,7 @@ const hoveredColumnIndex = ref(null)
 const isExternalDrop = ref(false)
 const timer = ref(null)
 const { dispatch, commit } = useStore()
+const { t } = useI18n()
 const { updateTaskByGroup } = useUpdateTasks()
 const { checkPermission } = useCustomComposable();
 
@@ -411,12 +419,18 @@ const moreCount = (column) => Math.max(0, tasksCount(column) - (column?.tasksArr
 
 const isBlockedColumn = (column) => /block/i.test(String(column?.name || ''));
 
-// WIP limits have no field on the status document yet, so they are the viewer's
-// own setting until one exists; `column.wipLimit` is read first so a future
-// per-status limit takes over without touching this component.
+// The limit lives on the status entry inside project.taskStatusData, which the
+// board columns are already built from — so `column.wipLimit` is the value once
+// one has been set. The per-viewer localStorage map is only a fallback: it still
+// answers for projects that never had a limit saved, and for the assignee /
+// priority / due-date groupings, which have no status document to hang one on.
 const WIP_KEY = 'ah.wip';
 const wipFor = ref('');
 const wipLimits = ref({});
+// A saved limit, held here as well as written back to the project, because the
+// board columns are rebuilt from a grouping snapshot taken before the save.
+const wipSaved = ref({});
+const wipError = ref('');
 
 const readWipLimits = () => {
     try {
@@ -426,18 +440,66 @@ const readWipLimits = () => {
     }
 };
 readWipLimits();
-watch(() => projectData.value?._id, readWipLimits);
+watch(() => projectData.value?._id, () => { wipSaved.value = {}; readWipLimits(); });
+watch(wipFor, () => { wipError.value = ''; });
 
-const wipLimit = (column) => Number(column?.wipLimit || wipLimits.value[column?.key] || 0);
+const wipLimit = (column) => {
+    const key = column?.key;
+    const saved = Object.prototype.hasOwnProperty.call(wipSaved.value, key) ? wipSaved.value[key] : column?.wipLimit;
+    if (saved !== undefined && saved !== null && saved !== '') return Number(saved) || 0;
+    return Number(wipLimits.value[key] || 0);
+};
 const atWipLimit = (column) => {
     const limit = wipLimit(column);
     return limit > 0 && tasksCount(column) >= limit;
 };
-const setWipLimit = (column, value) => {
-    const limit = Math.max(0, Number(value) || 0);
+const overWipLimit = (column) => {
+    const limit = wipLimit(column);
+    return limit > 0 && tasksCount(column) > limit;
+};
+
+const rememberWipLocally = (column, limit) => {
     wipLimits.value = { ...wipLimits.value, [column.key]: limit };
-    localStorage.setItem(`${WIP_KEY}.${projectData.value?._id}`, JSON.stringify(wipLimits.value));
-    wipFor.value = '';
+    try {
+        localStorage.setItem(`${WIP_KEY}.${projectData.value?._id}`, JSON.stringify(wipLimits.value));
+    } catch (error) {
+        // Private-mode storage refuses writes; the in-memory map still answers.
+    }
+};
+
+const applyWipLimit = (column, limit) => {
+    wipSaved.value = { ...wipSaved.value, [column.key]: limit };
+    const statuses = projectData.value?.taskStatusData;
+    const entry = Array.isArray(statuses) ? statuses.find((s) => String(s.key) === String(column.key)) : null;
+    if (entry) entry.wipLimit = limit;
+};
+
+const setWipLimit = async (column, value) => {
+    const limit = Math.max(0, Number(value) || 0);
+    const projectId = projectData.value?._id;
+    if (Number(groupValue.value) !== 0 || !projectId) {
+        rememberWipLocally(column, limit);
+        wipFor.value = '';
+        return;
+    }
+    wipError.value = '';
+    try {
+        const body = (await apiRequest('post', env.PROJECT_WIP_LIMIT, {
+            companyId: companyId.value,
+            projectId: String(projectId),
+            statusKey: column.key,
+            wipLimit: limit || null,
+        }))?.data;
+        if (!body || body.status !== true) {
+            wipError.value = (body && body.statusText) || t('GapsV2.wip_save_failed');
+            return;
+        }
+        applyWipLimit(column, body.data?.wipLimit ?? null);
+        rememberWipLocally(column, limit);
+        wipFor.value = '';
+    } catch (error) {
+        wipError.value = t('GapsV2.wip_save_failed');
+    }
 };
 
 // "+ Task" in the project header (ProjectHeader) bumps this counter; the board

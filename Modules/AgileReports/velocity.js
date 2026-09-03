@@ -19,9 +19,9 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const mongoose = require('mongoose');
 const logger = require('../../Config/loggerConfig');
+const provenance = require('../Tasks/helpers/provenanceRollup');
 
 const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
-const DONE_TYPE = 'close';
 
 /* GET /api/v1/agile/velocity?projectId=&limit=10  (companyId from header) */
 exports.getVelocity = async (req, res) => {
@@ -70,27 +70,30 @@ exports.getVelocity = async (req, res) => {
             type: SCHEMA_TYPE.TASKS,
             data: [
                 { sprintId: { $in: sprintIds }, deletedStatusKey: { $in: [0, 2, undefined] }, isParentTask: true },
-                '_id sprintId points statusType',
+                '_id sprintId points statusType completion',
             ],
         }, 'find');
 
-        const completedBySprint = new Map();
-        ordered.forEach((s) => completedBySprint.set(String(s._id), 0));
-        (tasks || []).forEach((t) => {
-            if (t.statusType !== DONE_TYPE) return;
-            const key = String(t.sprintId);
-            if (!completedBySprint.has(key)) return;
-            completedBySprint.set(key, completedBySprint.get(key) + (Number(t.points) || 0));
-        });
+        // 29c — the same points, split by who did the work. completedHuman +
+        // completedAgent always equals completed, so the human-only line on the
+        // chart is a reading of the same series, not a second number.
+        const splitBySprint = provenance.bySprint(tasks || [], sprintIds);
 
-        const rows = ordered.map((s) => ({
-            sprintId: String(s._id),
-            name: s.name || 'Sprint',
-            startDate: s.startDate || null,
-            endDate: s.endDate || null,
-            committed: Number(s.commitment.points) || 0,
-            completed: completedBySprint.get(String(s._id)) || 0,
-        }));
+        const rows = ordered.map((s) => {
+            const split = splitBySprint[String(s._id)] || provenance.velocitySplit([]);
+            return {
+                sprintId: String(s._id),
+                name: s.name || 'Sprint',
+                startDate: s.startDate || null,
+                endDate: s.endDate || null,
+                committed: Number(s.commitment.points) || 0,
+                completed: split.completed,
+                completedHuman: split.completedHuman,
+                completedAgent: split.completedAgent,
+                unchecked: split.unchecked,
+                byPattern: split.byPattern,
+            };
+        });
 
         // Rolling-3 average of completed points.
         const withAvg = rows.map((row, i) => {

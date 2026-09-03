@@ -23,6 +23,7 @@ const CANON_TRIGGERS = [
     { event: 'task.renamed', phrase: 'a task is renamed', re: /^a task is renamed$/i },
     { event: 'task.created', phrase: 'a task is created', re: /^a task is created$/i },
     { event: 'task.updated', phrase: 'a task is updated', re: /^a task is (updated|edited)$/i },
+    { event: 'form.submitted', phrase: 'a form is submitted', re: /^a form is submitted$/i },
 ];
 
 // "a task is marked X" / "a task status changes to X" also carry a condition, so

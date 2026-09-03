@@ -20,6 +20,10 @@ exports.init = (app) => {
     // axios interceptor). Returns { questions } or { description }.
     app.post('/api/v1/ai/description', ctrl.writeDescription);
     app.post('/api/v1/ai/task-summary', ctrl.summarizeTask);
+    // Files a task under one of the labels its OWN project already uses (a
+    // category custom field, else the project tags, else the company task
+    // types). Never invents a vocabulary — a project with none gets a reason.
+    app.post('/api/v1/ai/task-category', ctrl.categoriseTask);
     // Ask (handoff 13i). Retrieval is scoped to the projects the caller can
     // already open, so this endpoint can never widen anyone's permissions.
     app.get('/api/v1/ai/ask/sources', askController.sources);

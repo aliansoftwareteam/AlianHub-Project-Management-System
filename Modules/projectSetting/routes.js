@@ -1,6 +1,7 @@
 const ctrl = require('./controller');
 const autoArchive = require('./autoArchive');
 const estimationScale = require('./estimationScale');
+const wipLimit = require('./wipLimit');
 
 exports.init = (app) => {
      /**
@@ -98,6 +99,10 @@ exports.init = (app) => {
      *              description: status:true/false, statusText:message
      */
     app.post('/api/v1/projectSetting/taskStatus', ctrl.changeTaskStatus);
+    // Under the /taskStatus prefix on purpose: setMiddleware guards that prefix,
+    // so this write is behind the same JWT + company audience check as every
+    // other task-status change rather than needing a new entry in that list.
+    app.post('/api/v1/projectSetting/taskStatus/wipLimit', wipLimit.setWipLimit);
     app.post('/api/v1/projectSetting/migrateSprintsFun', ctrl.migrateSprintsFun);
 
     // Per-project auto-archive rule (completed tasks archive after N days —

@@ -15,6 +15,7 @@ const { updateMemberFunction } = require('../settings/Members/controller.js');
 const aiPrompts = require('../../utils/aiPrompts.json');
 const { generateDescription } = require('./aiDescriptionWriter');
 const { summarizeTask } = require('./taskSummary');
+const { categoriseTask } = require('./taskCategory');
 
 // AI-Assist used to post straight to OpenAI, so LLM_PROVIDER had no effect here
 // even though every other AI feature in the app honours it. It now goes through
@@ -566,5 +567,23 @@ exports.summarizeTask = async (req, res) => {
     } catch (error) {
         logger.error(`summarizeTask error: ${error && error.message ? error.message : error}`);
         return res.send({ status: false, statusText: (error && error.message) || 'An error occurred while summarising the task.' });
+    }
+};
+
+exports.categoriseTask = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'];
+        if (!companyId) {
+            return res.status(400).send({ status: false, statusText: 'companyId header required' });
+        }
+        const { taskId = '', force = false } = req.body || {};
+        const result = await categoriseTask({ companyId, taskId: String(taskId), force: force === true });
+        if (!result.status) {
+            return res.send({ status: false, statusText: result.reason || 'Could not categorise this task.' });
+        }
+        return res.send({ status: true, data: result.data });
+    } catch (error) {
+        logger.error(`categoriseTask error: ${error && error.message ? error.message : error}`);
+        return res.send({ status: false, statusText: (error && error.message) || 'An error occurred while categorising the task.' });
     }
 };

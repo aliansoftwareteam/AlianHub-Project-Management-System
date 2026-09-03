@@ -99,9 +99,12 @@
 
 .kanban-board .wip-chip {
     font: var(--text-label);
-    color: var(--warn-ink);
+    color: var(--ink-label);
     white-space: nowrap;
 }
+
+.kanban-board .wip-chip--at { color: var(--warn-ink); }
+.kanban-board .wip-chip--over { color: var(--danger-ink); }
 
 .kanban-board .wip-pop {
     position: absolute;
@@ -114,6 +117,7 @@
     gap: 8px;
 }
 .kanban-board .wip-pop input { width: 100%; }
+.kanban-board .wip-pop__note { margin: 0; color: var(--ink-label); }
 .kanban-board .column-head-wrap { position: relative; }
 
 .kanban-board .kanban-card-wrapper {

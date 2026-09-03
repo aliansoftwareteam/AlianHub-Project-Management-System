@@ -8,6 +8,7 @@ const { mapSubmission, buildDescription, buildDescriptionBlock } = require('./he
 const { normalizeSettings, hydrateStored } = require('./helpers/formRules');
 const { typeOf, resolveSpan, GRID_COLUMNS } = require('./helpers/questionTypes');
 const { storeSubmissionFiles, messageFor, REPICK, ACCEPT_ATTR, MAX_FILE_BYTES, MAX_FILES } = require('./helpers/formUpload');
+const { publishFormSubmitted } = require('../Automations/engine/formEvent');
 
 // The public half of Forms: an unauthenticated page, and the submission that
 // becomes a task.
@@ -439,6 +440,14 @@ exports.submitForm = async (req, res) => {
                 type: SCHEMA_TYPE.FORMS,
                 data: [{ _id: form._id }, { $inc: { submissionCount: 1 } }, {}],
             }, 'updateOne').catch(() => {});
+            publishFormSubmitted({
+                companyId,
+                form,
+                submissionId: stored && stored._id,
+                answers: mapped.record,
+                task: null,
+                actor: { kind: 'system' },
+            });
             return redirectAfterSubmit(res, req.params.token);
         }
 
@@ -502,6 +511,15 @@ exports.submitForm = async (req, res) => {
                 }, {}],
             }, 'updateOne').catch(() => {});
         }
+
+        publishFormSubmitted({
+            companyId,
+            form,
+            submissionId: stored && stored._id,
+            answers: mapped.record,
+            task: (result.data && result.data._id) ? result.data : data,
+            actor: { kind: 'system' },
+        });
 
         // Redirected, not rendered: the empty form with its self-dismissing banner
         // is served by the GET that follows, so reloading it repeats nothing.

@@ -192,6 +192,14 @@
 .fb__rule--field { flex-direction: column; align-items: stretch; gap: 4px; }
 .fb__rule--inline { border: 0; padding: 0; }
 .fb__rule--ro { color: var(--ink-2); }
+.fb__rule--auto .fb__rule-name { flex: 1; min-width: 0; }
+.fb__rule-btn {
+    background: none; border: 0; padding: 0;
+    font: var(--text-small); font-weight: 600; color: var(--brand);
+    cursor: pointer;
+}
+.fb__rule-btn--danger { color: var(--danger-ink); }
+.fb__rule-actions { display: flex; gap: 8px; margin-top: 4px; }
 .fb__rule-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fb__select { height: 30px; font-size: 12.5px; }
 .fb__side-note { margin: 0; }

@@ -50,6 +50,10 @@
                         </div>
                         <TourCom ref="mainTour"/>
                         <TaskDetailOverlay />
+                        <!-- Handoff 28b surface 4. Mounted here rather than on the AI pages so
+                             the rail's running count is true everywhere, not only after a visit
+                             to /ai. Renders nothing when no one is live. -->
+                        <AgentLiveStrip />
                     </main>
                     <MobileTabBar v-if="!$route.meta.hideHeader" />
                     <ShellPanels v-if="!$route.meta.hideHeader" />
@@ -109,6 +113,7 @@ import GlobalRail from '@/components/organisms/Shell/GlobalRail.vue'
 import MobileTabBar from '@/components/organisms/Shell/MobileTabBar.vue'
 import ShellPanels from '@/components/organisms/Shell/ShellPanels.vue'
 import TaskDetailOverlay from '@/components/organisms/TaskDetailOverlay/TaskDetailOverlay.vue'
+import AgentLiveStrip from '@/views/Ai/AgentLiveStrip.vue'
 import '@/components/organisms/Shell/style.css'
 import CallOverlay from '@/components/organisms/CallOverlay/CallOverlay.vue'
 import AdvanceSearchModal from '@/components/atom/Modal/Modal.vue'

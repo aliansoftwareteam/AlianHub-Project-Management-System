@@ -40,5 +40,23 @@ export default [
         name: 'AiAsk',
         component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/AskPage.vue'),
         meta: { title: 'Ask', requiresAuth: true }
+    },
+    {
+        path: '/:cid/ai/pipeline',
+        name: 'AiPipeline',
+        component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/AiPipeline.vue'),
+        meta: { title: 'Pipeline', requiresAuth: true }
+    },
+    {
+        path: '/:cid/ai/release',
+        name: 'AiRelease',
+        component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/AiRelease.vue'),
+        meta: { title: 'Release & deploy', requiresAuth: true }
+    },
+    {
+        path: '/:cid/ai/accounts',
+        name: 'AiAccounts',
+        component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/AiAccounts.vue'),
+        meta: { title: 'Coding accounts', requiresAuth: true }
     }
 ];

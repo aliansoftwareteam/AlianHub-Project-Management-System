@@ -47,7 +47,9 @@ export function useNavItems(companyId) {
                     { key: "inbox", label: "Inbox.title", icon: "inbox", to: to("inbox"), match: (r) => r.name === "inbox", show: ready.value },
                     { key: "portfolio", label: "Header.Portfolio", icon: "portfolio", to: to("Portfolio"), match: (r) => r.name === "Portfolio", show: ready.value },
                     { key: "automations", label: "Automations.title", icon: "automations", to: to("Automations"), match: (r) => r.name === "Automations", show: ready.value && exists("Automations") },
-                    { key: "integrations", label: "Header.Integrations", icon: "integrations", to: to("IntegrationsHub"), match: (r) => r.name === "IntegrationsHub", show: ready.value && exists("IntegrationsHub") }
+                    { key: "integrations", label: "Header.Integrations", icon: "integrations", to: to("IntegrationsHub"), match: (r) => r.name === "IntegrationsHub", show: ready.value && exists("IntegrationsHub") },
+                    { key: "connections", label: "ParityV2.nav_connections", icon: "key", to: to("Connections"), match: (r) => r.name === "Connections", show: ready.value && exists("Connections") },
+                    { key: "externalData", label: "ProvenanceV2.nav_external_data", icon: "globe", to: to("ExternalData"), match: (r) => r.name === "ExternalData", show: ready.value && exists("ExternalData") }
                 ]
             },
             {
