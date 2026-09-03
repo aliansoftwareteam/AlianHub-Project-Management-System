@@ -50,8 +50,20 @@ we built, not from notes.
 Nine handoff screens built (27a–27d, 28a, 28c, 29b, 25e, 24d) and eight functional gaps
 filed as real tasks in the right sprints. Six of the eight are built and In Review.
 
-Board at last check: 15 In Review, 1 In Progress (gap-3, reporting lines), 1 To Do
-(gap-7, the HTTP 200-on-failure convention, which needs a product decision).
+Board at last check: 17 In Review, 1 To Do (gap-7, the HTTP 200-on-failure convention,
+which needs a product decision).
+
+**gap-9 (AR-26) filed and fixed from a re-test.** The Home checklist "Create project" CTA I once
+wrongly called broken was re-tested live and works; the same pass found two steps (`board`,
+`notifications`) that were real dead buttons. Filed through the app's own List quick-add — MCP has
+no `task.create`, only `subtask.create`, which is a gap in the agent surface worth its own row —
+then commented and moved to In Review over MCP so it is audited like the rest.
+
+**Two non-findings, recorded so nobody chases them:** Enter in the quick-add row looked dead and
+"Try the Board view" looked unclickable; both were the browser tool failing to deliver events
+(no keydown reached a focused input; a click landed on a Planner sheet that had opened over the
+checklist). Instrumenting with capture listeners before concluding is what separated the one real
+bug from the two false ones — the third time this session that habit prevented a wrong report.
 
 **A bug found in MCP by using it:** `status` was returned as the stored
 `{text, key, type}` object while the tool description promised a string, so an agent

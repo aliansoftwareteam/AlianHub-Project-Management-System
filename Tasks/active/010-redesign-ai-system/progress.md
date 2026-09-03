@@ -3,9 +3,9 @@
 ## Checklist
 - [x] Data model: provenance of Done, agent action registry, agent runs, proposals, spend, accounts
 - [x] AI Hub, AI Inbox, agent settings, wizard, skill library (audit log page still the existing one)
-- [ ] Agents as teammates, AI fields, NL automations, connections, Ask, Team page, Planner v2
-- [x] MCP server + PAT scopes + CLI setup snippet (personal-account UI pending)
-- [ ] Pipeline surfaces, release & deploy, agent picker
+- [x] Agents as teammates, AI fields, NL automations, connections, Ask, Team page, Planner v2 — routes `AgentTeammates`, `AgentRouting`, `AiAsk`, `Connections`, `ExternalData`, `PeopleDirectory`, `Planner` all registered and reachable from the AI sidebar / rail
+- [x] MCP server + PAT scopes + CLI setup snippet + personal accounts (27a–d: `AiAccounts`, `AccountAttribution`, `AgentIdentity`)
+- [x] Pipeline surfaces, release & deploy (28a, 28c: `AiPipeline`, `AiRelease`); agent picker via `AgentMentionBox`
 
 ## Last step
 Backend (registry, runs, proposals, undo, accounts, MCP) and the AI Hub / Inbox / agent settings / skill library screens are in. Verified: agents cannot set Done or reach any NEVER action.
