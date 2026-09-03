@@ -123,6 +123,14 @@ const executors = {
         return { result: { subtaskId: r.subtaskId, title: r.title }, undo: { kind: 'subtask', subtaskId: r.subtaskId, parentTaskId: String(params.taskId) }, entityId: params.taskId };
     },
 
+    async 'task.create'({ companyId, actor, params }) {
+        const r = await tools.createTask(companyId, params.projectId, {
+            title: params.title, description: params.description || '', sprintId: params.sprintId || '', priority: params.priority || 'MEDIUM',
+            leaderId: actor.userId || '',
+        }, context(actor, 'task.create'));
+        return { result: { taskId: r.taskId, key: r.key, title: r.title }, undo: { kind: 'task', taskId: r.taskId, projectId: String(params.projectId) }, entityId: r.taskId, entityName: r.title };
+    },
+
     async 'timelog.start'({ companyId, actor, params }) {
         const task = await tools.getTask(companyId, params.taskId);
         const userId = String(actor.userId || '');

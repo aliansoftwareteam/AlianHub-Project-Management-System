@@ -244,4 +244,95 @@ const createSubtask = async (companyId, parentTaskId, { title, description = '' 
     return { changed: true, subtaskId: String(saved._id), title: name };
 };
 
-module.exports = { DeterministicError, getTask, updateTask, addComment, createSubtask, resolveStatus, oid };
+const PRIORITIES = ['URGENT', 'HIGH', 'MEDIUM', 'LOW'];
+
+/* A top-level task made the way the UI makes one — the project's own key counter,
+ * opening status and status-group index — so it shows on the List at once and
+ * reads as AR-27, not a made-up suffix. Always the opening status and never
+ * assigned: an agent files work it found, it does not decide who does it. */
+const createTask = async (companyId, projectId, { title, description = '', sprintId = '', priority = 'MEDIUM', leaderId = '' } = {}, context = {}) => {
+    const name = String(title || '').trim();
+    if (!name) throw new DeterministicError('task title is empty');
+    const _pid = oid(projectId);
+    if (!_pid) throw new DeterministicError(`invalid project id "${projectId}"`);
+    const project = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.PROJECTS, data: [{ _id: _pid, deletedStatusKey: { $ne: 1 } }],
+    }, 'findOne');
+    if (!project || !project._id || String(project.CompanyId) !== String(companyId)) {
+        throw new DeterministicError(`project ${projectId} not found`);
+    }
+
+    const statuses = (Array.isArray(project.taskStatusData) ? project.taskStatusData : [])
+        .map((row) => (row && row.convertStatus ? row.convertStatus : row))
+        .filter(Boolean);
+    const opening = statuses.find((s) => s.type === 'default_active') || statuses[0];
+    if (!opening) throw new DeterministicError('project has no statuses');
+    const taskType = (Array.isArray(project.taskTypeCounts) && project.taskTypeCounts[0]) || { name: 'task', key: 1 };
+
+    let sprint = {};
+    if (sprintId) {
+        const _sid = oid(sprintId);
+        const s = _sid ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SPRINTS, data: [{ _id: _sid }] }, 'findOne').catch(() => null) : null;
+        const owner = s && (s.projectId || s.ProjectID || s.ProjectId);
+        if (!s || (owner && String(owner) !== String(project._id))) throw new DeterministicError(`sprint ${sprintId} is not in this project`);
+        sprint = { sprintId: String(s._id), sprintArray: { id: String(s._id), name: s.sprintName || s.name || '' } };
+    }
+
+    // The schema requires a leader. For an agent that is the person whose token
+    // it acts under; failing that, whoever owns the project.
+    const leader = String(leaderId || project.userId || project.createdBy || project.ProjectLeader || '').trim();
+    if (!leader) throw new DeterministicError('no one to record as task leader');
+
+    const wanted = String(priority || '').toUpperCase();
+    const _id = new mongoose.Types.ObjectId();
+    const saved = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TASKS,
+        data: {
+            _id,
+            TaskName: name.slice(0, 250),
+            TaskKey: '--',
+            description: String(description || '').slice(0, 4000),
+            rawDescription: String(description || '').slice(0, 4000),
+            CompanyId: String(companyId),
+            ProjectID: String(project._id),
+            ParentTaskId: '',
+            isParentTask: true,
+            TaskType: taskType.name,
+            TaskTypeKey: taskType.key,
+            status: { key: opening.key, value: opening.value || '', text: opening.name, type: opening.type },
+            statusType: opening.type,
+            statusKey: opening.key,
+            Task_Priority: PRIORITIES.includes(wanted) ? wanted : 'MEDIUM',
+            Task_Leader: leader,
+            AssigneeUserId: [],
+            watchers: [leader],
+            deletedStatusKey: 0,
+            ...sprint,
+        },
+    }, 'save');
+
+    // Required lazily: the Tasks helpers pull in LogTime, which must not load
+    // just because the automation engine did.
+    const internals = require('../../Tasks/helpers/taskMongo/internals.js');
+    await internals.updateTaskKey({
+        companyId, projectCode: project.ProjectCode || 'TASK', projectId: project._id, taskId: saved._id,
+        taskTypeKey: taskType.key, sprintId: sprint.sprintId || '', isParentTask: true,
+        indexObj: { indexName: 'groupByStatusIndex', searchKey: 'statusKey', searchValue: opening.key },
+    });
+    const task = await getTask(companyId, saved._id);
+
+    emitAutomationUpdate(task, { created: true }, context.depth);
+    recordAudit(companyId, {
+        actorId: context.ruleId ? `rule:${context.ruleId}` : 'automation',
+        actorName: context.ruleName || 'Automation',
+        action: 'automation.task.create',
+        entityType: 'task',
+        entityId: String(task._id),
+        entityName: name,
+        meta: { runId: context.runId || null, projectId: String(project._id) },
+    });
+
+    return { changed: true, taskId: String(task._id), key: task.TaskKey || '', title: name };
+};
+
+module.exports = { DeterministicError, getTask, updateTask, addComment, createSubtask, createTask, resolveStatus, oid };

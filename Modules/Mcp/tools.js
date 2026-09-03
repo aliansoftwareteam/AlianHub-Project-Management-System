@@ -100,6 +100,17 @@ const TOOLS = [
         params: (args) => ({ taskId: str(args.taskId, 40), url: str(args.url, 2000), label: str(args.label, 200), kind: str(args.kind, 40) || 'link' }),
     },
     {
+        name: 'task.create',
+        action: 'task.create',
+        description: 'File a new task in a project, in its opening status and unassigned. Use it for work you found that is not on the board yet; put the goal and acceptance criteria in the description.',
+        input: {
+            type: 'object',
+            properties: { projectId: { type: 'string' }, title: { type: 'string' }, description: { type: 'string' }, sprintId: { type: 'string' }, priority: { type: 'string', enum: ['URGENT', 'HIGH', 'MEDIUM', 'LOW'] } },
+            required: ['projectId', 'title'],
+        },
+        params: (args) => ({ projectId: str(args.projectId, 40), title: str(args.title, 250), description: str(args.description, 4000), sprintId: str(args.sprintId, 40), priority: str(args.priority, 10) || 'MEDIUM' }),
+    },
+    {
         name: 'subtask.create',
         action: 'subtask.create',
         description: 'Break the task down. One subtask per call.',

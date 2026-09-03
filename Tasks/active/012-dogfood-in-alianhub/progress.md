@@ -59,6 +59,12 @@ wrongly called broken was re-tested live and works; the same pass found two step
 no `task.create`, only `subtask.create`, which is a gap in the agent surface worth its own row —
 then commented and moved to In Review over MCP so it is audited like the rest.
 
+**The loop closed on itself.** gap-11 (AR-28) is `task.create` over MCP — and AR-27 and AR-28 were the
+first two tasks filed *by* it, with audit ids, real project keys and the status-group index so they
+appeared on the List at once. The first live call failed on a schema rule no test had modelled
+(`Task_Leader` is required); the token owner is now recorded as leader. gap-10 (AR-27) is the SPA
+fallback for deep links, verified live: client routes 200 as HTML, `/api` and missing assets still 404.
+
 **Two non-findings, recorded so nobody chases them:** Enter in the quick-add row looked dead and
 "Try the Board view" looked unclickable; both were the browser tool failing to deliver events
 (no keydown reached a focused input; a click landed on a Planner sheet that had opened over the

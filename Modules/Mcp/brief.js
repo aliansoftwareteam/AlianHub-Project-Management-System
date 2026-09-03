@@ -4,7 +4,7 @@ const { getTask, oid } = require('../Automations/engine/tools');
 const logger = require('../../Config/loggerConfig');
 
 const ACCEPTANCE_HEADING = /^\s*(acceptance|acceptance criteria|done when|definition of done|ac)\s*[:\-–]?\s*$/i;
-const ACCEPTANCE_INLINE = /(acceptance criteria|done when|definition of done)\s*[:\-–]\s*(.+)/i;
+const ACCEPTANCE_INLINE = /(acceptance criteria|acceptance|done when|definition of done)\s*[:\-–]\s*(.+)/i;
 const GOAL_INLINE = /(goal|objective|why)\s*[:\-–]\s*(.+)/i;
 
 const plain = (html) => String(html || '')
