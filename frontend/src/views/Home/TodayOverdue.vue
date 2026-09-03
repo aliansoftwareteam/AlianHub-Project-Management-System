@@ -209,6 +209,12 @@ function onChecklistAction(key) {
         saveChecklist({ reviewedPermissions: true });
         router.push({ name: router.hasRoute("Security & Permissions") ? "Security & Permissions" : "Setting", params: { cid: companyId.value } });
     }
+    // Both tick themselves once the screen opens (firstRunProgress), so the CTA
+    // only has to get the owner there.
+    else if (key === "board") {
+        if (!sampleProject.value) createProjectOpen.value = true;
+        else router.push({ name: "Project", params: { cid: companyId.value, id: sampleProject.value._id }, query: { tab: "ProjectKanban" } });
+    } else if (key === "notifications") router.push({ name: "Notifications", params: { cid: companyId.value } });
 }
 
 function openTask(task) {
