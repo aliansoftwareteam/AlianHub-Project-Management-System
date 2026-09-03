@@ -5,6 +5,12 @@ const dashboardRouter = [{
     meta: {
         title: 'Home',
         requiresAuth: true,
+    },
+    // "/" is the legacy card dashboard. A signed-in user with a workspace
+    // should land on Home; the cards live under /:cid/dashboards now.
+    beforeEnter: (to) => {
+        const cid = localStorage.getItem('selectedCompany');
+        return cid ? { name: 'Home', params: { cid }, query: to.query } : true;
     }
 },
 {

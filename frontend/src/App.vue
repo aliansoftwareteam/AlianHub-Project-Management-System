@@ -411,6 +411,12 @@ async function getFirebaseData() {
                             dispatch('settings/setCompanyUsers', {companyName: companyId.value, userId: userId.value}).then(async()=>{
                                     if (userId.value !== null && companyId.value) {
                                         handleSocketsConnection();
+                                        // The legacy dashboard used to load this on mount; the new
+                                        // shell lands on Home, which only reads the store.
+                                        if (!getters['projectData/allProjects']?.data?.length) {
+                                            dispatch('projectData/setProjects', { roleType: getters['settings/companyUserDetail']?.roleType, uid: userId.value })
+                                                .catch((error) => console.error('setProjects', error));
+                                        }
                                         if (process.env.VUE_APP_AFFILIATEON == 'true') {
                                             dispatch('settings/setCompanyRefferal',companyId.value).catch((error)=>{
                                                 console.error(error);
