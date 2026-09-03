@@ -18,8 +18,9 @@ const taskRow = (t) => ({
     taskId: String(t._id),
     key: t.TaskKey || '',
     title: t.TaskName || '',
-    status: t.status || '',
-    statusType: t.statusType || '',
+    // Stored as { text, key, type }; agents get the readable name, not the object.
+    status: (t.status && typeof t.status === 'object') ? (t.status.text || '') : (t.status || ''),
+    statusType: t.statusType || (t.status && t.status.type) || '',
     priority: t.Task_Priority || '',
     projectId: String(t.ProjectID || ''),
     sprintId: String(t.sprintId || ''),

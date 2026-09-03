@@ -27,6 +27,10 @@ function seedTemplateSamples (project, createObject, sprintRes) {
     try {
         // The demo project composes its own list from the team's answer during setup, so it hands
         // the rows over directly rather than being looked up by template name.
+        // "Include the sample tasks" is a real choice: an explicit false means none, even
+        // for a built-in template. Only an absent flag falls back to the template's own set.
+        if (createObject && createObject.includeSampleTasks === false) return;
+
         let rows = (createObject && Array.isArray(createObject.sampleTaskRows) && createObject.sampleTaskRows.length)
             ? createObject.sampleTaskRows
             : null;
@@ -197,6 +201,20 @@ exports.createProject = async (req) => {
                     let updateTaskTypeStatus = {};
                     let TaskTypeStatusArrayCheck = [];
                     const [projectStatusData, taskStatusData, taskTypeData, appsData, projectTabComponentsData] = resultsValue;
+                    // A workspace can be missing one of these settings documents entirely
+                    // (task_type is absent on workspaces created before it was seeded), and a
+                    // template merge would then throw "cannot read properties of undefined".
+                    // Reading through these keeps the merge a no-op instead of failing the
+                    // whole project creation.
+                    const settingsOf = (rows) => (Array.isArray(rows) && rows[0] && Array.isArray(rows[0].settings)) ? rows[0].settings : [];
+                    // These seed the key counter for entries the template introduces. Left
+                    // undefined (no settings document) every `+= 1` produced NaN, which stored
+                    // as a null key — the project created, but nothing could be added to it
+                    // because the schema needs a Number.
+                    const totalOf = (rows) => (Array.isArray(rows) && rows[0] && Number.isFinite(Number(rows[0].totalStatus))) ? Number(rows[0].totalStatus) : 0;
+                    const projectStatusSettings = settingsOf(projectStatusData);
+                    const taskStatusSettings = settingsOf(taskStatusData);
+                    const taskTypeSettings = settingsOf(taskTypeData);
                     appsData.forEach(element => {
                         appArray.push(element);
                     });
@@ -206,7 +224,7 @@ exports.createProject = async (req) => {
                     if(req.body.isTemplate === true){
                         try {
                             const projectStatusMergedArray = createProjectObject.projectStatusData.map(item => {
-                                const valueItem = projectStatusData[0].settings.find(value => value.key === item.key);
+                                const valueItem = projectStatusSettings.find(value => value.key === item.key);
                                 if (valueItem) {
                                     return Object.assign(
                                         {},
@@ -222,7 +240,7 @@ exports.createProject = async (req) => {
                                 return item;
                             });
                             const taskStatusMergedArray = createProjectObject.taskStatusData.map(item => {
-                                const valueItem = taskStatusData[0].settings.find(value => value.key === item.key);
+                                const valueItem = taskStatusSettings.find(value => value.key === item.key);
                                 if (valueItem) {
                                     return Object.assign(
                                         {},
@@ -237,7 +255,7 @@ exports.createProject = async (req) => {
                                 return item;
                             });
                             const taskTypeMergedArray = createProjectObject.taskTypeCounts.map(item => {
-                                const valueItem = taskTypeData[0].settings.find(value => value.key === item.key);
+                                const valueItem = taskTypeSettings.find(value => value.key === item.key);
                                 if (valueItem) {
                                     return Object.assign(
                                         {},
@@ -293,11 +311,11 @@ exports.createProject = async (req) => {
                                         return;
                                     }
                                     let projectTemplateData = pickGlobalTemplate(createProjectObject.TemplateId);
-                                    let incrementProjectStatus = projectStatusData[0].totalStatus;
-                                    let incrementTask = taskStatusData[0]?.totalStatus;
-                                    let incrementTaskType = taskTypeData[0]?.totalStatus;
+                                    let incrementProjectStatus = totalOf(projectStatusData);
+                                    let incrementTask = totalOf(taskStatusData);
+                                    let incrementTaskType = totalOf(taskTypeData);
                                     const projectStatusMergedTempArray = projectTemplateData.projectStatusData.map(item => {
-                                    const valueItem = projectStatusData[0].settings.find(value => value.name.toLowerCase() === item.name.toLowerCase());
+                                    const valueItem = projectStatusSettings.find(value => value.name.toLowerCase() === item.name.toLowerCase());
                                         if (valueItem) {
                                             return Object.assign(
                                                 {},
@@ -333,7 +351,7 @@ exports.createProject = async (req) => {
                                     });
                                     
                                     const taskStatusMergedTempArray = projectTemplateData.taskStatusData.map(item => {
-                                        const valueItem = taskStatusData[0].settings.find(value => value.name.toLowerCase() === item.name.toLowerCase());
+                                        const valueItem = taskStatusSettings.find(value => value.name.toLowerCase() === item.name.toLowerCase());
                                         if (valueItem) {
                                             return Object.assign(
                                                 {},
@@ -366,7 +384,7 @@ exports.createProject = async (req) => {
                                         return item;
                                     });
                                     const taskTypeMergedTempArray = projectTemplateData.TemplateTaskType.map(item => {
-                                        const valueItem = taskTypeData[0].settings.find(value => value.name.toLowerCase() === item.name.toLowerCase());
+                                        const valueItem = taskTypeSettings.find(value => value.name.toLowerCase() === item.name.toLowerCase());
                                         if (valueItem) {
                                             return Object.assign(
                                                 {},
@@ -437,8 +455,11 @@ exports.createProject = async (req) => {
                                     createProjectObject.ProjectRequiredComponent = projectRequiredTempComponent;
                                     createProjectObject.status = createProjectObject.projectStatusData.filter((x) => x.type === 'default_active')[0].value;
                             } catch(err){
-                                reject({status: false, statusText: 'error in getting template with category'});
-                                logger.error(`status update error: ${err}`);
+                                // Say what actually broke: this catch used to report a template
+                                // problem for any failure in the merge, including a missing
+                                // settings document, which sent debugging the wrong way.
+                                reject({status: false, statusText: `error applying the category template: ${err && err.message ? err.message : err}`});
+                                logger.error(`create project (category template): ${err && err.stack ? err.stack : err}`);
                             }
                         }else{
                             try{
@@ -529,6 +550,8 @@ exports.createProject = async (req) => {
                     delete createProjectObject?.isTemplate;
                     delete createProjectObject?.useTemplateProj;
                     delete createProjectObject?.customFiedlsValue;
+                    // Kept for seedTemplateSamples, which runs after the project is saved.
+                    const includeSampleTasks = createProjectObject.includeSampleTasks;
                     delete createProjectObject?.includeSampleTasks;
                     delete createProjectObject?.sampleFocus;
                     let finalObj = {
@@ -625,7 +648,7 @@ exports.createProject = async (req) => {
                                     }
                                 }
                                 addSprintFun(addObj)
-                                .then((sprintRes) => seedTemplateSamples(respone, createProjectObject, sprintRes))
+                                .then((sprintRes) => seedTemplateSamples(respone, { ...createProjectObject, includeSampleTasks }, sprintRes))
                                 .catch((err)=>{
                                     logger.error('Create Sprint Error',err)
                                 });
@@ -646,7 +669,7 @@ exports.createProject = async (req) => {
                                 }
                             }
                             addSprintFun(addObj)
-                            .then((sprintRes) => seedTemplateSamples(respone, createProjectObject, sprintRes))
+                            .then((sprintRes) => seedTemplateSamples(respone, { ...createProjectObject, includeSampleTasks }, sprintRes))
                             .catch((err)=>{
                                 logger.error('Create Sprint Error',err)
                             });
