@@ -19,9 +19,6 @@ const moduleDirs = fs.readdirSync(path.join(ROOT, 'Modules'), { withFileTypes: t
 const moduleFiles = walk(path.join(ROOT, 'Modules'));
 const frontendFiles = walk(path.join(ROOT, 'frontend', 'src'));
 
-// Legacy exceptions that predate the rule; each one is removed when its file is.
-const ROUTE_FILE_EXCEPTIONS = new Set(['Modules/Auth/routes2.js']);
-
 describe('module folders', () => {
     it('never use snake_case', () => {
         expect(moduleDirs.filter((d) => d.includes('_'))).toEqual([]);
@@ -37,7 +34,7 @@ describe('file names', () => {
         expect(hits).toEqual([]);
     });
     it('register routes from routes.js only', () => {
-        const hits = moduleFiles.map(rel).filter((p) => /\/routes?\d+\.js$/.test(p) && !ROUTE_FILE_EXCEPTIONS.has(p));
+        const hits = moduleFiles.map(rel).filter((p) => /\/routes?\d+\.js$/.test(p));
         expect(hits).toEqual([]);
     });
     it('do not carry a redundant -config suffix', () => {

@@ -1,0 +1,713 @@
+{
+  "AI_API_KEY": {
+    "group": "ai",
+    "description": "API key for the configured LLM provider (LLM_PROVIDER).",
+    "secret": true
+  },
+  "AI_MAX_TASK_MINUTES": {
+    "group": "ai",
+    "description": "Upper bound, in minutes, for a task the AI project generator may plan."
+  },
+  "AI_MODEL": {
+    "group": "ai",
+    "description": "recommended: gpt-4o or gpt-4.1 for best instruction-following on complex plans",
+    "default": "gpt-4.1"
+  },
+  "ANTHROPIC_API_KEY": {
+    "group": "ai",
+    "description": "Anthropic API key, used when LLM_PROVIDER is anthropic.",
+    "secret": true
+  },
+  "ANTHROPIC_MODEL": {
+    "group": "ai",
+    "description": "current Sonnet 4.5 model id",
+    "default": "claude-sonnet-4-5-20250929"
+  },
+  "ANTHROPIC_TIMEOUT_MS": {
+    "group": "ai",
+    "description": "optional: raise Anthropic SDK timeout (default 10 min)",
+    "default": "600000"
+  },
+  "APIKEY": {
+    "group": "integrations",
+    "description": "Firebase web API key used by the server for push notifications.",
+    "secret": true
+  },
+  "APIURL": {
+    "group": "server",
+    "description": "Public base URL of this API, with a trailing slash (used in emails, OAuth callbacks and share links).",
+    "required": true,
+    "default": ""
+  },
+  "APPID": {
+    "group": "integrations",
+    "description": "Firebase app id."
+  },
+  "APP_NAME": {
+    "group": "server",
+    "description": "Product name shown in emails and page titles.",
+    "default": "Alian Hub"
+  },
+  "AUDIT_RETENTION_DAYS": {
+    "group": "security",
+    "description": "Days to keep audit-log entries before the recorder prunes them."
+  },
+  "AUTH_RATE_LIMIT_BLOCK_MS": {
+    "group": "security",
+    "description": "How long an IP stays blocked after too many failed logins.",
+    "default": "1800000"
+  },
+  "AUTH_RATE_LIMIT_MAX_ATTEMPTS": {
+    "group": "security",
+    "description": "Failed login attempts allowed per window before blocking.",
+    "default": "5"
+  },
+  "AUTH_RATE_LIMIT_WINDOW_MS": {
+    "group": "security",
+    "description": "Window over which failed login attempts are counted.",
+    "default": "900000"
+  },
+  "AUTODOMAIN": {
+    "group": "integrations",
+    "description": "Firebase auth domain."
+  },
+  "AUTOMATION_CONCURRENCY": {
+    "group": "jobs",
+    "description": "Automation runs processed in parallel.",
+    "default": "5"
+  },
+  "AUTOMATION_ENGINE": {
+    "group": "jobs",
+    "description": "Set to false to stop the automation engine from starting.",
+    "default": "true"
+  },
+  "AUTOMATION_EVENT_LOG": {
+    "group": "jobs",
+    "description": "Set to true to record every domain event in automation_event_log for debugging automations."
+  },
+  "AUTOMATION_QUEUE_DRIVER": {
+    "group": "jobs",
+    "description": "Queue driver for automation runs (agenda or memory).",
+    "default": "agenda"
+  },
+  "AWS_SES_FROM_DEFAULT": {
+    "group": "mail",
+    "description": "Default From address when mail is sent through AWS SES."
+  },
+  "AWS_SES_KEY": {
+    "group": "mail",
+    "description": "AWS access key for SES mail delivery.",
+    "secret": true
+  },
+  "AWS_SES_REGION": {
+    "group": "mail",
+    "description": "AWS region of the SES account."
+  },
+  "AWS_SES_SECRET": {
+    "group": "mail",
+    "description": "AWS secret key for SES mail delivery.",
+    "secret": true
+  },
+  "BODY_LIMIT": {
+    "group": "limits",
+    "description": "Maximum JSON/urlencoded/raw request body (body-parser size string).",
+    "default": "2mb"
+  },
+  "CANYONLICENSEKEY": {
+    "group": "integrations",
+    "description": "Canyon licence key registered at boot.",
+    "secret": true
+  },
+  "CLOUD_STORAGE_ENC_KEY": {
+    "group": "storage",
+    "description": "Key used to encrypt cloud-storage provider credentials at rest.",
+    "secret": true
+  },
+  "CLOUD_STORAGE_MAX_IMPORT_BYTES": {
+    "group": "limits",
+    "description": "Largest file the cloud-storage importer will copy into a project."
+  },
+  "CORS_ORIGINS": {
+    "group": "security",
+    "description": "Extra origins allowed by CORS, comma-separated (WEBURL and APIURL are always allowed).",
+    "default": "http://localhost:8080"
+  },
+  "CRON_TZ": {
+    "group": "jobs",
+    "description": "IANA time zone for scheduled jobs (reminders, digests).",
+    "default": "UTC"
+  },
+  "DEEPSEEK_API_KEY": {
+    "group": "ai",
+    "description": "DeepSeek API key, used when LLM_PROVIDER is deepseek.",
+    "secret": true
+  },
+  "DEEPSEEK_BASE_URL": {
+    "group": "ai",
+    "description": "optional: override DeepSeek base URL (e.g. for a compatible proxy)",
+    "default": "https://api.deepseek.com"
+  },
+  "DEEPSEEK_MODEL": {
+    "group": "ai",
+    "description": "deepseek-chat / deepseek-reasoner / deepseek-v4-flash / deepseek-v4-pro (all V4: 1M ctx, up to 384K output)",
+    "default": "deepseek-v4-flash"
+  },
+  "DEEPSEEK_TIMEOUT_MS": {
+    "group": "ai",
+    "description": "optional: raise DeepSeek axios timeout (default: 10 min for reasoner, 4 min for chat)",
+    "default": "600000"
+  },
+  "DEMO_EMAIL": {
+    "group": "general",
+    "description": "Email of the demo account shown on the login page when DEMO_MODE is on.",
+    "default": ""
+  },
+  "DEMO_MODE": {
+    "group": "general",
+    "description": "Set to true to show the demo login banner and credentials.",
+    "default": "false"
+  },
+  "DEMO_PASSWORD": {
+    "group": "general",
+    "description": "Password of the demo account shown when DEMO_MODE is on.",
+    "secret": true
+  },
+  "DISABLE_PERMISSION_ENFORCEMENT": {
+    "group": "security",
+    "description": "Set to true to turn the permission guard into log-only mode. Never in production."
+  },
+  "EMAIL_IN_DOMAIN": {
+    "group": "mail",
+    "description": "Domain of the inbound-email addresses that create tasks.",
+    "default": "inbox.alianhub.com"
+  },
+  "ENDPOINT_KEY": {
+    "group": "security",
+    "description": "Shared key expected by the internal service endpoints.",
+    "secret": true
+  },
+  "ERRORRECIVEREMAIL": {
+    "group": "general",
+    "description": "Email to receive error alerts",
+    "default": "admin@yourdomain.com"
+  },
+  "ESTIMATE_SAMPLES": {
+    "group": "ai",
+    "description": "Number of historical tasks sampled when the AI estimates effort."
+  },
+  "ESTIMATE_TARGET": {
+    "group": "ai",
+    "description": "Target accuracy band the AI estimator calibrates against.",
+    "default": ""
+  },
+  "FORM_MAX_FILES": {
+    "group": "limits",
+    "description": "Maximum attachments on one public form submission.",
+    "default": "3"
+  },
+  "FORM_MAX_FILE_BYTES": {
+    "group": "limits",
+    "description": "Maximum size of one public form attachment."
+  },
+  "FREE_COMPANY_COUNT": {
+    "group": "billing",
+    "description": "Companies a user may create on the free plan."
+  },
+  "GENERAL_REMINDERS_CRON": {
+    "group": "jobs",
+    "description": "Cron expression for the general reminders scheduler."
+  },
+  "GITHUB_BASE_OAUTH_URL": {
+    "group": "integrations",
+    "description": "authorize + access_token base",
+    "default": "https://github.com/login/oauth"
+  },
+  "GITHUB_CLIENT_ID": {
+    "group": "integrations",
+    "description": "GitHub OAuth app client id."
+  },
+  "GITHUB_CLIENT_SECRET": {
+    "group": "integrations",
+    "description": "GitHub OAuth app client secret.",
+    "secret": true
+  },
+  "GITHUB_OAUTH_REQUIRED": {
+    "group": "integrations",
+    "description": "\"true\" requires server-side verification via GitHub /user (recommended)",
+    "default": "true"
+  },
+  "GITHUB_TOKEN": {
+    "group": "integrations",
+    "description": "Token used to read release notes from GitHub for the changelog page.",
+    "secret": true
+  },
+  "GITLAB_BASE_API_URL": {
+    "group": "integrations",
+    "description": "used to verify the identity (/user)",
+    "default": "https://gitlab.com/api/v4"
+  },
+  "GITLAB_BASE_OAUTH_URL": {
+    "group": "integrations",
+    "description": "authorize + token base",
+    "default": "https://gitlab.com/oauth"
+  },
+  "GITLAB_CLIENT_ID": {
+    "group": "integrations",
+    "description": "GitLab OAuth app client id."
+  },
+  "GITLAB_CLIENT_SECRET": {
+    "group": "integrations",
+    "description": "GitLab OAuth app client secret.",
+    "secret": true
+  },
+  "GITLAB_OAUTH_REQUIRED": {
+    "group": "integrations",
+    "description": "\"true\" requires server-side verification via GitLab /user (recommended)",
+    "default": "true"
+  },
+  "GLOBAL_RATE_LIMIT_PER_MIN": {
+    "group": "security",
+    "description": "Requests per minute allowed per IP by the global rate limiter."
+  },
+  "GOOGLE_CLIENT_ID": {
+    "group": "integrations",
+    "description": "used for token exchange AND id-token verification"
+  },
+  "GOOGLE_CLIENT_SECRET": {
+    "group": "integrations",
+    "description": "Google OAuth client secret.",
+    "secret": true
+  },
+  "GOOGLE_OAUTH_CLIENT_ID": {
+    "group": "integrations",
+    "description": "Google OAuth client id accepted when verifying Google sign-in tokens."
+  },
+  "GOOGLE_OAUTH_REQUIRED": {
+    "group": "integrations",
+    "description": "\"true\" rejects logins that fail id-token verification (recommended)",
+    "default": "true"
+  },
+  "GOOGLE_OAUTH_URL": {
+    "group": "integrations",
+    "description": "Google token endpoint",
+    "default": "https://oauth2.googleapis.com/token"
+  },
+  "IAM_ENDPOINT": {
+    "group": "storage",
+    "description": "Wasabi IAM endpoint used when provisioning per-company storage users.",
+    "default": "https://iam.wasabisys.com"
+  },
+  "INSTANCE_ADMIN_KEY": {
+    "group": "security",
+    "description": "Shared key that grants the instance-admin API without a product-owner session.",
+    "secret": true,
+    "default": ""
+  },
+  "JWT_ALGORITHM": {
+    "group": "auth",
+    "description": "Algorithm used to sign JWTs.",
+    "default": "HS256"
+  },
+  "JWT_EXP": {
+    "group": "auth",
+    "description": "Access token lifetime (jsonwebtoken duration string).",
+    "default": "24h"
+  },
+  "JWT_SECRET": {
+    "group": "auth",
+    "description": "Secret used to sign JWTs and derive encryption keys.",
+    "required": true,
+    "secret": true,
+    "default": "your_jwt_secret_here"
+  },
+  "LLM_MAX_TOKENS_CLARIFY": {
+    "group": "ai",
+    "description": "cap for follow-up Q&A",
+    "external": true,
+    "default": "2000"
+  },
+  "LLM_MAX_TOKENS_PLAN": {
+    "group": "ai",
+    "description": "cap for the planning call (raise if you see \"ran out of output token budget\")",
+    "secret": true,
+    "default": "32000"
+  },
+  "LLM_PRICING": {
+    "group": "ai",
+    "description": "JSON map of model name to per-token prices used to report AI spend.",
+    "default": ""
+  },
+  "LLM_PROVIDER": {
+    "group": "ai",
+    "description": "openai | anthropic | deepseek",
+    "default": ""
+  },
+  "LOG_DATE_PATTERN": {
+    "group": "logging",
+    "description": "Date pattern appended to rotated log file names.",
+    "default": "YYYY-MM-DD"
+  },
+  "LOG_DIR": {
+    "group": "logging",
+    "description": "Directory that receives the rotated log files.",
+    "default": "log"
+  },
+  "LOG_MAX_FILES": {
+    "group": "logging",
+    "description": "Retention window for rotated log files (winston-daily-rotate-file).",
+    "default": "14d"
+  },
+  "LOG_MAX_SIZE": {
+    "group": "logging",
+    "description": "Size at which a log file rotates.",
+    "default": "20m"
+  },
+  "MAGIC_LINK_ENABLED": {
+    "group": "auth",
+    "description": "Set to false to disable passwordless magic-link sign-in.",
+    "default": "true"
+  },
+  "MAX_IMAGE_FILE_BYTES": {
+    "group": "limits",
+    "description": "Largest image accepted for processing.",
+    "default": "26214400"
+  },
+  "MAX_IMAGE_PIXELS": {
+    "group": "limits",
+    "description": "Largest image, in pixels, accepted for processing (decompression-bomb guard).",
+    "default": "50000000"
+  },
+  "MEASUREMENTID": {
+    "group": "integrations",
+    "description": "Firebase analytics measurement id."
+  },
+  "MEMBERSHIP_CACHE_TTL_SECONDS": {
+    "group": "security",
+    "description": "Seconds a user-company membership check is cached before MongoDB is asked again.",
+    "default": "60"
+  },
+  "MESSAGINGSENDERID": {
+    "group": "integrations",
+    "description": "Firebase messaging sender id."
+  },
+  "MONGODB_URL": {
+    "group": "general",
+    "description": "mongo connection string (no trailing slash)",
+    "required": true,
+    "default": ""
+  },
+  "MONGO_CLOUD_URL": {
+    "group": "general",
+    "description": "Documented in .env.example; not read by the current code.",
+    "external": true,
+    "default": "https://cloud.mongodb.com/api"
+  },
+  "MONGO_MIN_POOL_SIZE": {
+    "group": "database",
+    "description": "Minimum connections kept open per company database."
+  },
+  "MONGO_POOL_SIZE": {
+    "group": "database",
+    "description": "Maximum connections per company database."
+  },
+  "MONGO_WAIT_QUEUE_TIMEOUT_MS": {
+    "group": "database",
+    "description": "How long a query waits for a free connection before failing."
+  },
+  "NODEMAILER_ALLOW_SELF_SIGNED": {
+    "group": "mail",
+    "description": "Accept self-signed certificates from the SMTP server.",
+    "default": ""
+  },
+  "NODEMAILER_EMAIL": {
+    "group": "mail",
+    "description": "SMTP username / From address.",
+    "default": "your@email.com"
+  },
+  "NODEMAILER_EMAIL_PASSWORD": {
+    "group": "general",
+    "description": "Use app password for Gmail",
+    "secret": true
+  },
+  "NODEMAILER_HOST": {
+    "group": "mail",
+    "description": "SMTP host.",
+    "default": "smtp.gmail.com"
+  },
+  "NODEMAILER_PORT": {
+    "group": "general",
+    "description": "587 (STARTTLS) or 465 (SSL)",
+    "default": "587"
+  },
+  "NODE_ENV": {
+    "group": "server",
+    "description": "development | production",
+    "default": "development"
+  },
+  "NOOFPRESETCOMPANY": {
+    "group": "general",
+    "description": "Number of preset companies seeded at first run.",
+    "default": "10"
+  },
+  "NOTIFICATIONACTIVETIME": {
+    "group": "jobs",
+    "description": "Minutes a user counts as active for notification batching."
+  },
+  "OPENAI_TIMEOUT_MS": {
+    "group": "ai",
+    "description": "optional: raise OpenAI axios timeout (default: 10 min for reasoning/gpt-5, 4 min for others)",
+    "default": "600000"
+  },
+  "PAYMENTMETHOD": {
+    "group": "billing",
+    "description": "Payment provider used at sign-up (chargebee or paddle)."
+  },
+  "PERMISSION_RECONCILE": {
+    "group": "security",
+    "description": "One-shot: set to true to reconcile every company's permission rules at boot (superseded by migrations).",
+    "default": "false"
+  },
+  "PORT": {
+    "group": "server",
+    "description": "TCP port the HTTP server listens on.",
+    "required": true,
+    "default": "4000"
+  },
+  "PRECOMPANYKEY": {
+    "group": "security",
+    "description": "Random key that identifies the preset company routes; generated at setup.",
+    "required": true,
+    "secret": true,
+    "default": "your_preset_key"
+  },
+  "PROJECTID": {
+    "group": "integrations",
+    "description": "Firebase project id."
+  },
+  "RESEND_API_KEY": {
+    "group": "general",
+    "description": "Get from resend.com",
+    "secret": true
+  },
+  "RESEND_FROM_EMAIL": {
+    "group": "general",
+    "description": "Use verified domain in production",
+    "default": "onboarding@resend.dev"
+  },
+  "S3_CONNECTION_TIMEOUT_MS": {
+    "group": "storage",
+    "description": "Connection timeout for S3-compatible storage calls."
+  },
+  "S3_SOCKET_TIMEOUT_MS": {
+    "group": "storage",
+    "description": "Socket timeout for S3-compatible storage calls."
+  },
+  "SERVICE_FILE": {
+    "group": "integrations",
+    "description": "Path to Firebase service account JSON (must be inside project root)",
+    "default": "./firebase-adminsdk.json"
+  },
+  "SESSIONEXPIREDTIME": {
+    "group": "auth",
+    "description": "Idle time after which a login session expires.",
+    "default": "172800"
+  },
+  "SOCKETIO_ADMIN_PASSWORD_HASH": {
+    "group": "security",
+    "description": "bcrypt hash of the Socket.IO admin UI password; the UI stays off while unset.",
+    "secret": true,
+    "default": "$2a$12$HHemhzmTrC8Dmf2Gd9v/Teo9oiCxfYJb.St3HKMBx1L3wJmZLeX5u"
+  },
+  "SOCKETIO_ADMIN_USERNAME": {
+    "group": "security",
+    "description": "Username for the Socket.IO admin UI; the UI stays off while unset.",
+    "default": "alian"
+  },
+  "STORAGEBUCKET": {
+    "group": "integrations",
+    "description": "Firebase storage bucket."
+  },
+  "STORAGE_TYPE": {
+    "group": "storage",
+    "description": "wasabi | server",
+    "required": true,
+    "default": "wasabi"
+  },
+  "TRACKSHOT_RETENTION_DAYS": {
+    "group": "storage",
+    "description": "Days to keep time-tracker screenshots before deletion.",
+    "default": "180"
+  },
+  "TRUST_PROXY": {
+    "group": "server",
+    "description": "Express trust proxy setting; loopback by default so X-Forwarded-For is honoured behind a local reverse proxy.",
+    "default": "loopback"
+  },
+  "TURN_CREDENTIAL_TTL_SECONDS": {
+    "group": "calling",
+    "description": "Lifetime of TURN credentials minted from TURN_STATIC_AUTH_SECRET.",
+    "secret": true,
+    "default": "3600"
+  },
+  "TWO_FACTOR_ENC_KEY": {
+    "group": "auth",
+    "description": "key material for encrypting TOTP secrets at rest",
+    "secret": true
+  },
+  "TWO_FACTOR_ISSUER": {
+    "group": "auth",
+    "description": "label shown in the user's authenticator app",
+    "default": "AlianHub"
+  },
+  "TWO_FACTOR_TEMP_SECRET": {
+    "group": "auth",
+    "description": "signs the short-lived login second-step (temp) token",
+    "secret": true,
+    "default": "${process.env.JWT_SECRET || ''}::2fa-temp"
+  },
+  "UNDER_MAINTENANCE": {
+    "group": "server",
+    "description": "true | false",
+    "default": "false"
+  },
+  "UPLOAD_MAX_FILES": {
+    "group": "limits",
+    "description": "Maximum files per upload request.",
+    "default": "20"
+  },
+  "UPLOAD_MAX_FILE_BYTES": {
+    "group": "limits",
+    "description": "Maximum size of one uploaded file."
+  },
+  "USERPROFILEBUCKET": {
+    "group": "storage",
+    "description": "Bucket that holds user profile pictures.",
+    "default": "your-bucket-name"
+  },
+  "VUE_APP_AFFILIATEON": {
+    "group": "frontend",
+    "description": "Show the affiliate programme entry points."
+  },
+  "VUE_APP_APIKEY": {
+    "group": "frontend",
+    "description": "Firebase web API key (push notifications).",
+    "secret": true
+  },
+  "VUE_APP_APPID": {
+    "group": "frontend",
+    "description": "Firebase app id."
+  },
+  "VUE_APP_AUTHDOMAIN": {
+    "group": "frontend",
+    "description": "Firebase auth domain."
+  },
+  "VUE_APP_CUSTOMFIELDID": {
+    "group": "frontend",
+    "description": "Custom field id used by the support product link."
+  },
+  "VUE_APP_CUSTOMFIELDPRODUCTID": {
+    "group": "frontend",
+    "description": "Custom field id that stores the product on support tickets."
+  },
+  "VUE_APP_GITHUB_BASE_OAUTH_URL": {
+    "group": "frontend",
+    "description": "GitHub OAuth authorize URL."
+  },
+  "VUE_APP_GITHUB_CLIENT_ID": {
+    "group": "frontend",
+    "description": "GitHub OAuth client id for the login button."
+  },
+  "VUE_APP_GITLAB_BASE_OAUTH_URL": {
+    "group": "frontend",
+    "description": "GitLab OAuth authorize URL."
+  },
+  "VUE_APP_GITLAB_CLIENT_ID": {
+    "group": "frontend",
+    "description": "GitLab OAuth client id for the login button."
+  },
+  "VUE_APP_GOOGLE_CLIENT_ID": {
+    "group": "frontend",
+    "description": "Google OAuth client id for the login button."
+  },
+  "VUE_APP_IS_GITHUB_LOGIN": {
+    "group": "frontend",
+    "description": "Show the GitHub login button."
+  },
+  "VUE_APP_IS_GITLAB_LOGIN": {
+    "group": "frontend",
+    "description": "Show the GitLab login button."
+  },
+  "VUE_APP_IS_GOOGLE_LOGIN": {
+    "group": "frontend",
+    "description": "Show the Google login button."
+  },
+  "VUE_APP_IS_SSO_LOGIN": {
+    "group": "frontend",
+    "description": "Show the SSO login entry point."
+  },
+  "VUE_APP_MEASUREMENTID": {
+    "group": "frontend",
+    "description": "Firebase analytics measurement id."
+  },
+  "VUE_APP_MESSAGINGSENDERID": {
+    "group": "frontend",
+    "description": "Firebase messaging sender id."
+  },
+  "VUE_APP_PROJECTID": {
+    "group": "frontend",
+    "description": "Firebase project id."
+  },
+  "VUE_APP_STORAGEBUCKET": {
+    "group": "frontend",
+    "description": "Firebase storage bucket."
+  },
+  "VUE_APP_STORAGE_TYPE": {
+    "group": "frontend",
+    "description": "Storage backend the web app assumes (server or wasabi); mirror STORAGE_TYPE."
+  },
+  "VUE_APP_SUPPORT_COMPANYID": {
+    "group": "frontend",
+    "description": "Company id that receives support tickets raised from the app."
+  },
+  "VUE_APP_SUPPORT_MAIL": {
+    "group": "frontend",
+    "description": "Mailbox shown for support requests."
+  },
+  "VUE_APP_SUPPORT_PROJECTID": {
+    "group": "frontend",
+    "description": "Project id that receives support tickets raised from the app."
+  },
+  "VUE_APP_USEREMAIL": {
+    "group": "frontend",
+    "description": "Default account email pre-filled on demo builds."
+  },
+  "WASABIENDPOINT": {
+    "group": "storage",
+    "description": "Wasabi S3 endpoint.",
+    "default": "https://s3.wasabisys.com"
+  },
+  "WASABI_ACCESS_KEY": {
+    "group": "storage",
+    "description": "Wasabi access key.",
+    "secret": true
+  },
+  "WASABI_REGION": {
+    "group": "storage",
+    "description": "Wasabi region.",
+    "default": "us-east-1"
+  },
+  "WASABI_SECRET_ACCESS_KEY": {
+    "group": "storage",
+    "description": "Wasabi secret access key.",
+    "secret": true
+  },
+  "WASABI_USERID": {
+    "group": "storage",
+    "description": "Wasabi account user id used for IAM policies."
+  },
+  "WEBURL": {
+    "group": "server",
+    "description": "Public base URL of the web app, used in emails and CORS.",
+    "default": "http://localhost:4000"
+  }
+}
