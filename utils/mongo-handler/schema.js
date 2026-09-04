@@ -2798,7 +2798,7 @@ const schema = {
             type: Boolean,
             required: false,
             default: false
-        }
+        },
     },
     comments: {
         "legacyId": {
@@ -2915,7 +2915,13 @@ const schema = {
         },
         transcript: { type: String, required: false },
         isAgent: { type: Boolean, required: false },
-        agentName: { type: String, required: false }
+        agentName: { type: String, required: false },
+        // 27c attribution. Without these the fields were stripped on save and every
+        // agent comment read as posted by the person who approved it.
+        actorType: { type: String, default: "" },
+        agentId: { type: String, default: "" },
+        viaAccount: { type: String, default: "" },
+        runId: { type: String, default: "" }
     },
     mainChat: {
         ProjectCode: {

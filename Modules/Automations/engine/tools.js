@@ -105,10 +105,13 @@ const addComment = async (companyId, taskId, body, context = {}) => {
             projectId,
             taskId: oid(taskId),
             sprintId: task.sprintId || undefined,
-            userId: context.ruleId ? `automation:${context.ruleId}` : 'automation',
+            userId: context.userId || (context.ruleId ? `automation:${context.ruleId}` : 'automation'),
             type: 'text',
             message: text,
             isDeleted: false,
+            // Attribution written with the row: the post-insert update the agent path
+            // used to rely on never applied, so agent comments read as "automation".
+            ...(context.actorType ? { actorType: context.actorType, agentId: context.agentId || null, viaAccount: context.viaAccount || null, runId: context.runId || null } : {}),
         },
     }, 'save');
 

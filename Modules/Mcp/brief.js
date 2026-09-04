@@ -78,7 +78,8 @@ const buildBrief = async (ctx, taskId) => {
     const [comments, project, sprint, relatedRows, pages] = await Promise.all([
         MongoDbCrudOpration(ctx.companyId, {
             type: SCHEMA_TYPE.COMMENTS,
-            data: [{ taskId: String(task._id), deletedStatusKey: { $ne: 1 } }, null, { sort: { createdAt: 1 }, limit: 60 }],
+            // Comments store taskId as an ObjectId (Comments/controller.js); older rows may hold a string.
+            data: [{ taskId: { $in: [task._id, String(task._id)] }, isDeleted: { $ne: true }, deletedStatusKey: { $ne: 1 } }, null, { sort: { createdAt: 1 }, limit: 60 }],
         }, 'find').catch(() => []),
         MongoDbCrudOpration(ctx.companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{ _id: oid(task.ProjectID) }] }, 'findOne').catch(() => null),
         task.sprintId

@@ -135,3 +135,16 @@ is a light lavender and every primary button kept white text (2.55:1) — dark i
 white wrappers in dark; darkened only when a redesigned page is inside so legacy views keep their
 light panels and dark ink. Settings › General is still legacy-light in dark by design of the compat
 rule; its own white-on-white "Task Priority" label is a legacy defect, not filed.
+
+### 2026-09-04 (AR-44: an agent team on our own project)
+Built four agents through the wizard (Daily PM, Code Reviewer, Reporter, QA Reviewer), ran them, and
+followed one real QA run end to end (public help site → gpt-4o → 4 findings → Inbox proposal →
+approved → subtasks + summary → undo). What using it surfaced, all fixed unless noted:
+- "Run now" with no task created a run that never executed and never finished — stuck running forever.
+- Skills saved as "[object Object]" (map(String) on objects); a template agent then ran a skill by that name.
+- The ladder said L1 = Suggest; the registry let L1 act on low-risk actions, so a "Suggest" agent wrote to the board unasked.
+- Agent comments had no attribution: the comments schema had no actorType/agentId, so the fields were stripped and the approver was credited. The MCP brief queried taskId as a string while comments store an ObjectId, so agents could never read a thread.
+- gpt-4o priced at $0 (OpenAI prices are not built in by design); LLM_PRICING set and documented.
+- A run whose proposal was decided stayed "waiting_approval" forever.
+- localhost URLs are refused (SSRF guard, correct) but the skip said "no reviewable URL".
+Left as friction, not fixed: templates are only offered on the empty state; no Stop control on a Hub card; only one skill (qa-review) actually executes — the other template skills are labels.
