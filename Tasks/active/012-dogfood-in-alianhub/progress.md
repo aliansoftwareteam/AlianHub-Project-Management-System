@@ -179,3 +179,13 @@ when the caller opts in: an API/MCP token gets it automatically, anyone else can
 Prefer: status-codes. The body is never changed; X-Status-Mapped announces it. Inference from the
 wording the codebase uses (not found → 404, permission → 403, already → 409, token → 401, else 400),
 or an explicit statusCode in the body. Verified: app JWT 200, Prefer 400, API token 400.
+
+### 2026-09-04 (AR-52: the guard list, and a crash anyone could trigger)
+Probing every /api/v2 prefix without a token: imports, epics, exports, reactions, recent-visits,
+search, custom-fields, the v2 email/notification triggers and sendMail — an open mail relay — all ran
+their handlers for anyone with a company id in a header. app.use only guards the prefixes it is
+given. Worse: POST /api/v2/single-notification-email with an empty body killed the process — the
+handler rejected a promise nobody awaited and index.js exited on unhandledRejection. Guarded them
+all, made the handler answer, stopped unhandled rejections exiting the process, and added a test that
+every registered v2 prefix is guarded, public by design, or self-guarded, so the next module cannot
+ship open. Along the way: AR-24 decided (opt-in status codes for API tokens and Prefer).

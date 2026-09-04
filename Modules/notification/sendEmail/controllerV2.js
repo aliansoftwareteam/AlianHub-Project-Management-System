@@ -32,9 +32,14 @@ exports.sendEmailHandlerSingle = (EmailDetails) => {
 
 }
 exports.sendEmailHandlerSingleApi = (req, res) => {
+  // An Express handler that returned a rejecting promise and never answered: a bad
+  // body threw, the rejection was unhandled, and the process died. Validate, answer.
+  const EmailDetails = req.body || {};
+  if (!EmailDetails.notification || !EmailDetails.notification.Employee_Email) {
+    return res.send({ status: false, statusText: 'notification with Employee_Email is required.' });
+  }
   return new Promise(async (resolve, reject) => {
     try {
-      var EmailDetails = req.body
       let email = [EmailDetails.notification.Employee_Email]
       var action_url = await actionForOpenTask(EmailDetails.notification)
       this.manageEmailData(EmailDetails).then(async response => {
@@ -42,7 +47,8 @@ exports.sendEmailHandlerSingleApi = (req, res) => {
         await sendMail.SendNotificationEmail(`${config.APP_NAME} - ${"Update: Stay Informed About Recent Changes"}`, mail, email, true, (result) => {
           if (!result.status) {
             logger.error(`send Email Handler Single Not Send`)
-            reject({ message: error.message })
+            if (!res.headersSent) res.send({ status: false, statusText: 'Email not sent.' })
+            resolve(false)
           } else {
             removeDocument(EmailDetails.notification)
             UpdateDocument(EmailDetails.notification)
@@ -52,7 +58,9 @@ exports.sendEmailHandlerSingleApi = (req, res) => {
       })
 
     } catch (error) {
-       reject({ message: error.message })
+       logger.error(`sendEmailHandlerSingleApi: ${error.message}`)
+       if (!res.headersSent) res.send({ status: false, statusText: error.message })
+       resolve(false)
     }
   })
 

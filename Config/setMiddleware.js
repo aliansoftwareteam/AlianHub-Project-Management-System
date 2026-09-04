@@ -57,6 +57,23 @@ const verifyJWTTokenWithCRoute = [
     // Wiki pages (Modules/Pages). These were reachable without a token: the prefix was in
     // neither JWT list, and app.use only guards the prefixes it is given. The handlers now
     // take the author from req.uid, which this is what sets.
+    // Found by probing every v2 prefix without a token (AR-52): these ran their
+    // handlers for anyone with a company id in a header. app.use only guards the
+    // prefixes it is given, so a module that forgets to register here is open.
+    // an unauthenticated mail relay: anyone could POST subject/html/toMail and the server sent it
+    "/api/v2/sendMail",
+    "/api/v2/test",
+    "/api/v2/custom-fields",
+    "/api/v2/single-notification-email",
+    "/api/v2/prepare-notification-data",
+    "/api/v2/email-cron-handler",
+    "/api/v2/sendInvitationEmail",
+    "/api/v2/epics",
+    "/api/v2/exports",
+    "/api/v2/imports",
+    "/api/v2/reactions",
+    "/api/v2/recent-visits",
+    "/api/v2/search",
     "/api/v2/pages",
     // Forms (Modules/Forms). Managing a form is company data: the prefix has to be
     // listed here or every handler below is reachable with no token, and the author
