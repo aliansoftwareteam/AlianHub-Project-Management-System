@@ -173,11 +173,11 @@ exports.mongoErrorMessage = (errorObj) => {
         }
 
         switch (errorObj?.errorResponse?.code) {
-            case 11000:
-                // Handle duplicate key error
+            case 11000: {
                 const key = Object.keys(errorObj?.errorResponse?.keyValue || {}).join(", ");
                 const value = Object.values(errorObj?.errorResponse?.keyValue || {}).join(", ");
                 return `The value '${value}' already exists for the field(s) '${key}'.`;
+            }
             case 13:
                 // Unauthorized error
                 return "Unauthorized: You do not have the necessary permissions to perform this action.";
