@@ -5,6 +5,17 @@
                 <ShellIcon name="chevron" :size="16" />
             </button>
 
+            <select
+                v-if="projects.length > 1"
+                class="ph2__switch"
+                :value="project?._id"
+                :aria-label="$t('ProjectsV2.title')"
+                :title="$t('ProjectsV2.title')"
+                @change="$emit('select-project', $event.target.value)"
+            >
+                <option v-for="item in projects" :key="item._id" :value="item._id">{{ item.ProjectName }}</option>
+            </select>
+
             <div v-if="$slots.title" class="ph2__title-slot">
                 <slot name="title"></slot>
             </div>
@@ -68,6 +79,7 @@
  *
  * Props
  *   project       Object   the project document (ProjectName, ProjectCode, projectIcon)
+ *   projects      Array    the user's projects; two or more render the switcher (emits select-project(id))
  *   sprint        Object   { name, startDate, endDate } — the sprint in view, or null
  *   views         Array    [{ keyName, name }] rendered as the tab strip (ignored when the `views` slot is used)
  *   activeView    String   keyName of the active tab
@@ -95,6 +107,7 @@ const { t, te } = useI18n();
 
 const props = defineProps({
     project: { type: Object, default: () => ({}) },
+    projects: { type: Array, default: () => [] },
     sprint: { type: Object, default: null },
     views: { type: Array, default: () => [] },
     activeView: { type: String, default: '' },
@@ -107,7 +120,7 @@ const props = defineProps({
     showBack: { type: Boolean, default: false }
 });
 
-defineEmits(['select-view', 'add-view', 'filter', 'ai-assist', 'add-task', 'toggle-favourite', 'back']);
+defineEmits(['select-view', 'add-view', 'filter', 'ai-assist', 'add-task', 'toggle-favourite', 'back', 'select-project']);
 
 const PALETTE = ['#2F3990', '#2f9e7e', '#d98324', '#6b5ce7', '#0EA5E9', '#EC4899'];
 

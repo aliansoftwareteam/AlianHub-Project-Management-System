@@ -258,7 +258,7 @@ function onProjectChange() {
     const projectId = selectedProjectItem.value && selectedProjectItem.value._id;
     if (!projectId) return;
     sprintLoading.value = true;
-    // Mirror the project list's visibility rule (ProjectListing.vue): show only
+    // Same visibility rule as the project views: show only
     // ACTIVE items. deletedStatusKey: 0/undefined = active, 1 = deleted,
     // 2 = archived, 5 = closed. A sprint inside an archived/deleted folder is
     // hidden too, so we load folders and check the parent folder's status.
