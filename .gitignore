@@ -27,6 +27,7 @@ log/
 *.log
 
 # Runtime generated upload/storage directories
+/storage/
 wasabiUploads/
 wasabiUploadsLocal/
 thumbnails/
