@@ -242,6 +242,7 @@
                                 </div>
                             </template>
                             <template #actions>
+                            <NewInProjectMenu :projectData="projectData" />
                             <ProjectActionsBar
                                 :projectData="projectData"
                                 :clientWidth="clientWidth"
@@ -498,6 +499,7 @@ import NotFound from '../NotFound.vue';
 // EXTRACTED PIECES
 import ProjectActionsBar from './components/ProjectActionsBar.vue';
 import ProjectHeader from './components/ProjectHeader.vue';
+import NewInProjectMenu from './components/NewInProjectMenu.vue';
 import ProjectFiltersToolbar from './components/ProjectFiltersToolbar.vue';
 import { useProjectAgents } from './Kanban/useProjectAgents';
 import AiTaskCreator from '@/components/organisms/AiTaskCreator/AiTaskCreator.vue';
