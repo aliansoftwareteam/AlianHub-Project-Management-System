@@ -12,14 +12,14 @@
 const fs = require('fs');
 const path = require('path');
 
-const HOME = path.join(__dirname, '..', 'frontend', 'src', 'views', 'Home', 'TodayOverdue.vue');
+/* The checklist's store readers live in the onboarding composable Home mounts. */
+const HOME = path.join(__dirname, '..', 'frontend', 'src', 'composable', 'useOnboardingChecklist.js');
 
-/* Rebuild Home's readers from its own source so they cannot drift from what ships. */
+/* Rebuild the readers from the shipped source so they cannot drift from it. */
 function buildReaders(source) {
-    const block = source.slice(source.indexOf('<script setup>'), source.indexOf('</script>'));
     const grab = (name) => {
-        const m = block.match(new RegExp(`const ${name} = computed\\(([^;]*)\\);`));
-        if (!m) throw new Error(`${name} not found in TodayOverdue.vue`);
+        const m = source.match(new RegExp(`const ${name} = computed\\(([^;]*)\\);`));
+        if (!m) throw new Error(`${name} not found in useOnboardingChecklist.js`);
         return m[1];
     };
     // eslint-disable-next-line no-new-func
