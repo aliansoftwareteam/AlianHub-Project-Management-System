@@ -106,3 +106,9 @@ the filesystem: 111 built, 0 in flight, 0 not started (2 cut, 15 with no screen)
 frozen before wave 2 landed. The one real gap it exposed: the four-step import wizard existed but the
 project List toolbar still opened the legacy modal, so nobody could reach it. Toolbar wired to the
 wizard, legacy modal deleted, verified from the List (AR-38, In Review).
+
+Mobile pass at 375×812 (the stage-2 criterion nobody had ticked): Home checklist card ~500px tall
+(AR-39), Planner's unscheduled tray collapsed to 1px and then rendered empty because the ≤1280 rule
+that hides the desktop tray also hid it inside the sheet, Board column "+" stretched to 44px by the
+generic tap-target rule (AR-40). All fixed and measured. Still legacy at 375: the project header/list
+toolbar (search overflows, duplicate ••• menus).
