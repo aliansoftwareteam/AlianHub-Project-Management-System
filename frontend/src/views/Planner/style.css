@@ -207,7 +207,9 @@
     }
     .planner__day.is-active { background: var(--brand-tint); color: var(--brand); font-weight: 700; }
 
-    .planner__grid-wrap { flex: 1; border-right: 0; }
+    /* min-height: 0 lets the hour grid shrink; without it the grid keeps its content
+       height and pushes the tray under the tab bar. */
+    .planner__grid-wrap { flex: 1; min-height: 0; border-right: 0; }
     /* The column template is set inline from the day count; only the desktop
        minimum has to go so one day fits a 375px screen. */
     .planner__grid { min-width: 0; }
@@ -218,11 +220,16 @@
     .planner__sheet {
         display: flex;
         flex-direction: column;
+        /* The hour grid above is flex: 1 and content-tall; without a floor the tray
+           shrank to 1px with its cards inside. */
+        flex: none;
+        min-height: 168px;
         max-height: 45vh;
         border-top: 1px solid var(--hairline);
         background: var(--surface);
     }
-    .planner__sheet .planner__tray { min-height: 0; }
+    /* The <=1280 rule hides the desktop tray; inside the sheet it must show. */
+    .planner__sheet .planner__tray { display: flex; min-height: 0; }
     .planner__sheet .planner__card { min-height: 44px; justify-content: center; }
     .planner__pick {
         display: flex;

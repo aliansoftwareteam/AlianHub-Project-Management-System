@@ -374,3 +374,9 @@
     border: 1.5px solid var(--surface);
     z-index: 2;
 }
+
+/* 375px: a generic 44px tap-target rule stretched the 13x12 plus glyph to 44px tall.
+   Keep the target, shrink the glyph: padding makes up the difference. */
+@media (max-width: 767px) {
+    .kanban-board .add-task-icon { width: 14px; height: 14px; min-width: 0; min-height: 0; padding: 15px; box-sizing: content-box; object-fit: contain; }
+}
