@@ -30,6 +30,8 @@ export function useNavItems(companyId) {
 
     const rail = computed(() => [
         { key: "home", label: "Shell.home", icon: "home", to: to("Home"), match: (r) => r.name === "Home" || r.name === "PersonalList", show: true },
+        { key: "projects", label: "Header.Projects", icon: "projects", to: to("Projects"), match: (r) => String(r.name || "").startsWith(PROJECT_ROUTE_PREFIX), show: allowed("project.project_list") },
+        { key: "inbox", label: "Inbox.title", icon: "inbox", to: to("inbox"), match: (r) => r.name === "inbox", show: ready.value },
         { key: "planner", label: "Shell.planner", icon: "planner", to: to("Planner"), match: (r) => r.name === "Planner", show: exists("Planner") },
         { key: "chat", label: "Shell.chat", icon: "chat", to: to("chats"), match: (r) => String(r.name || "").startsWith("chat"), show: allowed("chat") },
         { key: "ai", label: "Shell.ai", icon: "ai", to: to("AiHub"), match: (r) => String(r.name || "").startsWith("Ai"), show: exists("AiHub") },
@@ -43,8 +45,6 @@ export function useNavItems(companyId) {
             {
                 label: "Shell.work",
                 items: [
-                    { key: "projects", label: "Header.Projects", icon: "projects", to: to("Projects"), match: (r) => String(r.name || "").startsWith(PROJECT_ROUTE_PREFIX), show: allowed("project.project_list") },
-                    { key: "inbox", label: "Inbox.title", icon: "inbox", to: to("inbox"), match: (r) => r.name === "inbox", show: ready.value },
                     { key: "portfolio", label: "Header.Portfolio", icon: "portfolio", to: to("Portfolio"), match: (r) => r.name === "Portfolio", show: ready.value },
                     { key: "automations", label: "Automations.title", icon: "automations", to: to("Automations"), match: (r) => r.name === "Automations", show: ready.value && exists("Automations") },
                     { key: "integrations", label: "Header.Integrations", icon: "integrations", to: to("IntegrationsHub"), match: (r) => r.name === "IntegrationsHub", show: ready.value && exists("IntegrationsHub") },
