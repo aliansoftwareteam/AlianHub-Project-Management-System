@@ -18,3 +18,4 @@
 | 2026-09-04 | Drill: fresh instance (agent D) | PASS after 1 fix | empty Mongo → setup/status installed:false → setup/complete creates owner (isProductOwner), company, WELCOME project (14 tasks), 6 migrations ok → 409 on repeat; closed DB port → dbOk:false, /health 503, process alive. Fix: JWT_ALGORITHM/JWT_EXP defaults so a JWT_SECRET-only install can log in |
 | 2026-09-04 | Drill: backup/restore (agent D) | PASS after 1 fix | archive 20 KB, manifest first; rename + new collection, restore with typed name → company name back, counts identical (30 collections / 322 docs). Fix: restore drops collections created after the backup |
 | 2026-09-04 | Gate after drills | green | jest 112 suites / 1375 tests; lint 0 errors; env docs in sync |
+| 2026-09-04 | PR #542 opened; AR-58 filed + In Review | done | MCP task.create without a list id failed schema validation → fixed (oldest live list); live check SPWC-11 created; jest 112 suites / 1376 tests |
