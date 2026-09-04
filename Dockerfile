@@ -87,6 +87,7 @@ COPY public/ ./public/
 COPY scripts/ ./scripts/
 COPY socket/ ./socket/
 COPY utils/ ./utils/
+COPY wasabiUploadsLocal/ ./wasabiUploadsLocal/
 
 # Writable directories: uploaded files (STORAGE_TYPE=server), logs, backups —
 # each mounted as a volume in compose so they survive an image update.
