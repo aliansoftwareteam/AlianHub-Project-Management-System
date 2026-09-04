@@ -172,7 +172,7 @@ Choose an archive, read its manifest (date, version, workspaces) and type its na
 
 1. takes a safety backup (`pre-restore-*`);
 2. switches the API to maintenance (every call except `/health` and the Instance console answers 503; open tabs show a banner and recover on their own);
-3. drops and refills every collection named in the archive, and the files if they were included;
+3. drops every collection of each database named in the archive, including ones created after the backup, refills the ones the archive holds, and the files if they were included;
 4. reruns migrations, clears caches and reconnects to the database.
 
 Restore an archive taken by the same or an older version, never a newer one. A restore drill on a throwaway instance is the only way to know your backups work: run a second copy (`docker compose -p drill up -d` with a fresh volume), upload an archive there, restore it, log in.

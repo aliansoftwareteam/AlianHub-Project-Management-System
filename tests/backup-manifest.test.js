@@ -3,7 +3,7 @@ const os = require('os');
 const path = require('path');
 const archiver = require('archiver');
 const { EJSON } = require('bson');
-const { buildManifest, validateManifest, isValidName, backupName, ENTRY_RX, readManifest, walkArchive, FORMAT } = require('../Modules/Instance/backups');
+const { buildManifest, validateManifest, staleCollections, isValidName, backupName, ENTRY_RX, readManifest, walkArchive, FORMAT } = require('../Modules/Instance/backups');
 
 describe('the manifest', () => {
     it('records format, version, time, files flag, databases and companies', () => {
@@ -30,6 +30,12 @@ describe('archive names and entries', () => {
         expect(name).toMatch(/^alianhub-\d+\.\d+\.\d+-20260904-101112\.tar\.gz$/);
         expect(isValidName(name)).toBe(true);
         for (const bad of ['../etc/passwd', 'x.tar.gz', 'alianhub-1.0.0-20260904-101112.tar', 'alianhub-1.0.0-20260904-101112.tar.gz/../x']) expect(isValidName(bad)).toBe(false);
+    });
+
+    it('drops collections created after the backup so a restore leaves nothing newer behind', () => {
+        expect(staleCollections(['tasks', 'notes', 'users'], ['users', 'tasks'])).toEqual(['notes']);
+        expect(staleCollections(['users'], ['users', 'tasks'])).toEqual([]);
+        expect(staleCollections([], [])).toEqual([]);
     });
 
     it('only restores collection files under global or a company id', () => {
