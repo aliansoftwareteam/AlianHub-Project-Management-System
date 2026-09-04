@@ -172,3 +172,10 @@ boundary, so the digest and PR skills verify like the QA skill: a sentence namin
 data or a number that is not one of the counts is dropped (24/48 pass only as hours); a PR risk whose
 "where" is not in the diff is dropped. What was dropped is written into the proposal's reasoning so
 the reviewer sees it. Live: the claim came back, was dropped, and the record says so.
+
+### 2026-09-04 (AR-24: the 200-on-failure convention, decided)
+Kept for the app, real codes for those who care. A middleware maps 200 + {status:false} to 4xx only
+when the caller opts in: an API/MCP token gets it automatically, anyone else can send
+Prefer: status-codes. The body is never changed; X-Status-Mapped announces it. Inference from the
+wording the codebase uses (not found → 404, permission → 403, already → 409, token → 401, else 400),
+or an explicit statusCode in the body. Verified: app JWT 200, Prefer 400, API token 400.
