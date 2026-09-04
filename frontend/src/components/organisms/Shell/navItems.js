@@ -68,7 +68,7 @@ export function useNavItems(companyId) {
                     { key: "clips", label: "Clips.title", icon: "clips", panel: "clips", show: ready.value },
                     { key: "reminders", label: "Reminders.header_tooltip", icon: "reminder", panel: "reminders", show: ready.value },
                     { key: "talk", label: "TalkToText.title", icon: "mic", panel: "talkToText", show: ready.value },
-                    { key: "tour", label: "Header.take_tour", icon: "tour", panel: "tour", show: ready.value && isOwnerOrAdmin.value }
+                    { key: "tour", label: "Header.take_tour", icon: "tour", panel: "tour", show: ready.value }
                 ]
             },
             {
