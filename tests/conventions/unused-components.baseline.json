@@ -1,17 +1,6 @@
 [
-  "components/atom/UpgradePlanSidebar/UpgradePlanSidebar.vue",
-  "components/molecules/MemberTable/MemberTable.vue",
-  "components/molecules/MobileDropDown/MobileDropDown.vue",
-  "components/molecules/Provenance/ProvenanceFilter.vue",
-  "components/molecules/Provenance/ProvenanceRollup.vue",
-  "components/molecules/SecurityandPermissionTable/SecurityandPermissionTable.vue",
-  "components/molecules/SprintScrum/CompleteSprintModal.vue",
   "components/organisms/FilterChat/FilterChat.vue",
   "components/organisms/MainChat/MainChatConversationIcon.vue",
   "components/organisms/MainChat/ThreadSummary.vue",
-  "components/organisms/MainChatSidebar/MainChatSidebar.vue",
-  "components/templates/CreateProject/BlankProjectTemplatePage.vue",
-  "components/templates/CreateProject/ProjectAllDetailPage.vue",
-  "components/templates/Settings/Settings.vue",
-  "views/Settings/Template/SingleTemplate.vue"
+  "components/organisms/MainChatSidebar/MainChatSidebar.vue"
 ]
