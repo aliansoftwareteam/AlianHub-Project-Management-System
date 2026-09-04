@@ -22,7 +22,6 @@ const bodyParser = require("body-parser");
 const config =  require('./Config/config.js');
 const { loadDotEnv, applyEnvMap } = require('./Config/applyEnv.js');
 loadDotEnv();
-if (!process.env.STORAGE_TYPE) applyEnvMap({ STORAGE_TYPE: 'wasabi' });
 const { makeDefaultBrandSettings } = require("./Modules/Admin/common/controller.js");
 const { corsOriginDelegate } = require('./utils/cors.js');
 const { getHealth } = require('./Modules/Instance/health.js');
@@ -189,7 +188,7 @@ function initializeControllers() {
     require('./Modules/notification-count/init').init(app);
     require('./Modules/notification/sendEmail/init').init(app);
     require('./Modules/trackerUserPermission/init').init(app);
-    require('./Modules/SaasAdmin/init').init(app);
+    require('./Modules/Instance/init').init(app);
     require('./Modules/ScreenshotRetention/init').init(app);
     require('./Modules/projectClose/init').init(app);
     if (process.env.CRON_ENABLED !== 'false') {
@@ -267,38 +266,55 @@ function initializeControllers() {
 require('./Config/setMiddleware.js').setMiddlewareWithCV2(app);
 require('./Config/setMiddleware.js').setMiddlewareV2(app);
 
-if (process.env.MONGODB_URL) {
-    initializeControllers();
-}
-
-// Registered outside initializeControllers so the wizard can report a missing database.
-require('./Modules/Setup/init').init(app);
-
-// SWAGGER CONFIGURATION
-require('./Modules/swaggerAPI/init').init(app, config.APIURL);
-
-// COMMON CODE 
-require('./Modules/common/init').init(app);
-
-const { initSocket } = require("./socket/socketinit.js");
-app.get("/health", async (req, res) => {
-    const { httpStatus, body } = await getHealth();
-    res.status(httpStatus).json(body);
-});
-
-fs.watch(__dirname + "/Modules/Template/", (event_type, file_name) => {
+/* Settings saved in the database are applied before any module loads, because the
+ * storage driver and the AWS clients are chosen at require time. A database that
+ * is down is skipped within seconds so the setup page can say so. */
+async function applySavedSettings() {
+    if (!process.env.MONGODB_URL) return;
+    const { checkDb } = require('./Modules/Instance/health.js');
+    const db = await checkDb();
+    if (!db.ok) { console.error(`instance settings: skipped, ${db.error}`); return; }
     try {
-        delete require.cache[require.resolve(__dirname + "/Modules/Template/" + file_name)];;
+        await require('./Config/instanceSettings.js').loadInstanceSettings(require('./Config/loggerConfig'));
     } catch (error) {
-        console.error("ERROR in remove cache", error);
+        console.error(`instance settings: could not load, ${error.message}`);
     }
-});
-
-if (!config.UNDER_MAINTENANCE || config.UNDER_MAINTENANCE == "false") {
-    app.use(require('./Config/spaFallback').spaFallback(path.join(__dirname, './frontend/dist/index.html')));
 }
 
 (async () => {
+    await applySavedSettings();
+    if (!process.env.STORAGE_TYPE) applyEnvMap({ STORAGE_TYPE: 'wasabi' });
+    if (process.env.MONGODB_URL) {
+        initializeControllers();
+    }
+
+    // Registered outside initializeControllers so the wizard can report a missing database.
+    require('./Modules/Setup/init').init(app);
+
+    // SWAGGER CONFIGURATION
+    require('./Modules/swaggerAPI/init').init(app, config.APIURL);
+
+    // COMMON CODE 
+    require('./Modules/common/init').init(app);
+
+    const { initSocket } = require("./socket/socketinit.js");
+    app.get("/health", async (req, res) => {
+        const { httpStatus, body } = await getHealth();
+        res.status(httpStatus).json(body);
+    });
+
+    fs.watch(__dirname + "/Modules/Template/", (event_type, file_name) => {
+        try {
+            delete require.cache[require.resolve(__dirname + "/Modules/Template/" + file_name)];;
+        } catch (error) {
+            console.error("ERROR in remove cache", error);
+        }
+    });
+
+    if (!config.UNDER_MAINTENANCE || config.UNDER_MAINTENANCE == "false") {
+        app.use(require('./Config/spaFallback').spaFallback(path.join(__dirname, './frontend/dist/index.html')));
+    }
+
     if (process.env.MONGODB_URL) {
         await require('./migrations').runMigrationsAtBoot();
     }

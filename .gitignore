@@ -139,3 +139,5 @@ frontend/public/firebase-messaging-sw.js
 /storage/firebase-adminsdk.json
 /firebase-adminsdk.json
 package-lock.json
+# Backups written by Settings > Instance > Backups
+/backups

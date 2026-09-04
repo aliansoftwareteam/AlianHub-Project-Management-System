@@ -7,6 +7,7 @@
 </template>
 
 <script setup>
+import { publicConfig } from "@/config/publicConfig";
 import { onMounted, ref, defineProps } from "vue";
 import Cookies from 'js-cookie';
 import { useToast } from 'vue-toast-notification';
@@ -71,10 +72,10 @@ onMounted(async () => {
 // Trigger GitHub OAuth
 function loginWithGitHub() {
     localStorage.setItem("githubAuthMode", props.mode);
-    const clientId = process.env.VUE_APP_GITHUB_CLIENT_ID;
+    const clientId = publicConfig.auth.github.clientId;
     const scope = "read:user user:email";
     const redirectUri = window.location.origin; 
-    const githubAuthUrl = `${process.env.VUE_APP_GITHUB_BASE_OAUTH_URL}/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}`;
+    const githubAuthUrl = `${publicConfig.auth.github.baseUrl}/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}`;
     window.location.href = githubAuthUrl;
 }
 

@@ -13,7 +13,8 @@
 </template>
 
 <script setup>
-import { ref, defineProps } from "vue";
+import { publicConfig } from "@/config/publicConfig";
+import { computed, defineProps } from "vue";
 
 defineProps({
     mode: {
@@ -30,9 +31,9 @@ defineProps({
     }
 });
 
-const isAuthWithGoogle = ref(process.env.VUE_APP_IS_GOOGLE_LOGIN || null);
-const isAuthWithGithub = ref(process.env.VUE_APP_IS_GITHUB_LOGIN || null);
-const isAuthWithGitlab = ref(process.env.VUE_APP_IS_GITLAB_LOGIN || null);
+const isAuthWithGoogle = computed(() => (publicConfig.auth.google.enabled ? "true" : null));
+const isAuthWithGithub = computed(() => (publicConfig.auth.github.enabled ? "true" : null));
+const isAuthWithGitlab = computed(() => (publicConfig.auth.gitlab.enabled ? "true" : null));
 </script>
 
 <style>

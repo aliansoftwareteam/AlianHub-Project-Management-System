@@ -337,3 +337,23 @@ module.exports.SETUP_STATUS = '/api/v2/setup/status';
 module.exports.SETUP_COMPLETE = '/api/v2/setup/complete';
 module.exports.SETUP_EVENTS = '/api/v2/setup/events';
 module.exports.ADMIN_GUIDE_URL = 'https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/blob/main/docs/ADMIN-GUIDE.md';
+
+// Instance console (Modules/Instance); public-config is the only public one
+module.exports.INSTANCE_PUBLIC_CONFIG = '/api/v2/instance/public-config';
+module.exports.INSTANCE_ACCESS = '/api/v2/instance/access';
+module.exports.INSTANCE_SETTINGS = '/api/v2/instance/settings';
+module.exports.INSTANCE_SETTINGS_TEST = '/api/v2/instance/settings/test';
+module.exports.INSTANCE_HEALTH = '/api/v2/instance/health';
+module.exports.INSTANCE_MAINTENANCE = '/api/v2/instance/maintenance';
+module.exports.INSTANCE_UPGRADE = '/api/v2/instance/upgrade';
+module.exports.INSTANCE_MIGRATIONS_RUN = '/api/v2/instance/migrations/run';
+module.exports.INSTANCE_LOGS = '/api/v2/instance/logs';
+module.exports.INSTANCE_LOG_FILES = '/api/v2/instance/logs/files';
+module.exports.INSTANCE_LOG_DOWNLOAD = '/api/v2/instance/logs/download';
+module.exports.INSTANCE_BACKUPS = '/api/v2/instance/backups';
+module.exports.INSTANCE_STATS = '/api/v2/instance/stats';
+module.exports.INSTANCE_COMPANIES = '/api/v2/instance/companies';
+module.exports.INSTANCE_AUDIT_EXPORT = '/api/v2/instance/audit-export';
+
+// The storage flag is decided by the server at runtime; build-time VUE_APP_STORAGE_TYPE is only the fallback
+module.exports.setRuntimeConfig = (cfg) => { if (cfg && cfg.storageType) module.exports.STORAGE_TYPE = cfg.storageType; };

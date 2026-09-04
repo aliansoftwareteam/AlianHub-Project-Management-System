@@ -179,6 +179,7 @@ import ProviderButton from "@/plugins/oauth/ProviderButton.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { apiRequestWithoutCompnay, apiRequestWithoutSecure, getAuth } from "@/services";
 import * as env from "@/config/env";
+import { publicConfig, enabledProviders } from "@/config/publicConfig";
 
 const { t } = useI18n();
 const $toast = useToast();
@@ -189,12 +190,8 @@ const axios = inject("$axios");
 
 const brand = computed(() => getters["brandSettingTab/brandSettings"] || {});
 const showRegister = computed(() => router.hasRoute("Sign-up") || router.hasRoute("Signup") || router.hasRoute("Register"));
-const providers = [
-    process.env.VUE_APP_IS_GOOGLE_LOGIN === "true" && "google",
-    process.env.VUE_APP_IS_GITHUB_LOGIN === "true" && "github",
-    process.env.VUE_APP_IS_GITLAB_LOGIN === "true" && "gitlab"
-].filter(Boolean);
-const ssoAvailable = computed(() => process.env.VUE_APP_IS_SSO_LOGIN !== "false");
+const providers = computed(() => enabledProviders());
+const ssoAvailable = computed(() => publicConfig.auth.sso !== false);
 
 const step = ref("login");
 const busy = ref(false);

@@ -7,6 +7,7 @@
 </template>
 
 <script setup>
+import { publicConfig } from "@/config/publicConfig";
 /* global google */
 import { onMounted, ref, defineProps } from "vue";
 import Cookies from 'js-cookie';
@@ -54,7 +55,7 @@ onMounted(() => {
     }
 
     googleClient = google.accounts.oauth2.initCodeClient({
-        client_id: process.env.VUE_APP_GOOGLE_CLIENT_ID,
+        client_id: publicConfig.auth.google.clientId,
         scope: "openid email profile",
         ux_mode: "popup",
         redirect_uri: "postmessage",

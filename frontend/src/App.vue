@@ -824,6 +824,7 @@ onMounted(() => {
             console.error('ERROR in set Set Brand Settings',error)
         })
     }
+    dispatch('brandSettingTab/setPublicConfig');
     getFirebaseData();
     initOffline();
     userId.value = localStorage.getItem("userId") !== null ? localStorage.getItem("userId") :  '';
