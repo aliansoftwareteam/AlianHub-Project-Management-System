@@ -38,7 +38,7 @@
                 :key="project._id"
                 :ref="(el) => observeRow(el, project._id)"
                 class="pl2__row"
-                :class="{ 'pl2__row--muted': project.deletedStatusKey === 2 }"
+                :class="{ 'pl2__row--muted': isArchived(project) }"
                 role="button"
                 tabindex="0"
                 @click="openProject(project)"
@@ -58,7 +58,7 @@
                         <ShellIcon name="star" :size="13" />
                     </button>
                     <span v-if="isSample(project)" class="pl2__sample">{{ $t('ProjectsV2.sample') }}</span>
-                    <span v-if="project.deletedStatusKey === 2" class="ah-chip">{{ $t('ProjectsV2.archived') }}</span>
+                    <span v-if="isArchived(project)" class="ah-chip">{{ $t('ProjectsV2.archived') }}</span>
                 </div>
 
                 <span class="pl2__health" :class="`pl2__health--${health(project).key}`" :title="healthTitle(project)">
@@ -89,7 +89,7 @@
                             <button type="button" class="ah-pop__item" @click="menuFor = ''; toggleFavourite(project)">
                                 {{ isFavourite(project) ? $t('ProjectsV2.unfavourite') : $t('ProjectsV2.favourite') }}
                             </button>
-                            <template v-if="project.deletedStatusKey === 2">
+                            <template v-if="isArchived(project)">
                                 <div class="ah-pop__sep"></div>
                                 <button type="button" class="ah-pop__item" @click="menuFor = ''; restore(project)">{{ $t('ProjectsV2.restore') }}</button>
                             </template>
@@ -155,6 +155,7 @@ import AiProjectCreator from '@/components/organisms/AiProjectCreator/AiProjectC
 import { SAMPLE_PROJECT_NAME } from '@/components/organisms/CreateProject/templates';
 import { useProjectsHelper } from '../helper';
 import { useProjectLifecycle } from '../composables/useProjectLifecycle';
+import { lifecycleOf, ARCHIVED, TRASHED } from '@/utils/lifecycle';
 import { deriveHealth, loadProjectSnapshot, projectSnapshot, sprintWindow } from './useProjectHealth';
 
 const { t } = useI18n();
@@ -169,6 +170,7 @@ const userId = inject('$userId');
 const companyId = inject('$companyId');
 
 const showArchived = ref(false);
+const isArchived = (project) => lifecycleOf(project, 'project') === ARCHIVED;
 const onlyFavourites = ref(localStorage.getItem('favoriteFilter') === 'true');
 const filterOpen = ref(false);
 const menuFor = ref('');
@@ -188,15 +190,15 @@ const aiEnabled = computed(() => Boolean(currentCompany.value?.planFeature?.aiPe
 const hasPortfolio = computed(() => router.hasRoute('Portfolio'));
 const canCreate = computed(() => checkPermission('project.project_create') === true);
 
-const visible = computed(() => allProjects.value.filter((p) => p && !p.isPersonal && p.deletedStatusKey !== 1));
-const activeCount = computed(() => visible.value.filter((p) => p.deletedStatusKey !== 2).length);
-const archivedCount = computed(() => visible.value.filter((p) => p.deletedStatusKey === 2).length);
+const visible = computed(() => allProjects.value.filter((p) => p && !p.isPersonal && lifecycleOf(p, 'project') !== TRASHED));
+const activeCount = computed(() => visible.value.filter((p) => !isArchived(p)).length);
+const archivedCount = computed(() => visible.value.filter((p) => isArchived(p)).length);
 const filterOn = computed(() => showArchived.value || onlyFavourites.value);
 
 const isFavourite = (project) => Boolean((project.favouriteTasks || []).find((x) => x.userId === userId.value));
 
 const rows = computed(() => {
-    let list = visible.value.filter((p) => (showArchived.value ? p.deletedStatusKey === 2 : p.deletedStatusKey !== 2));
+    let list = visible.value.filter((p) => (showArchived.value ? isArchived(p) : !isArchived(p)));
     if (onlyFavourites.value) list = list.filter(isFavourite);
     const rank = (p) => (isFavourite(p) ? 0 : 1);
     return [...list].sort((a, b) => rank(a) - rank(b) || new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
