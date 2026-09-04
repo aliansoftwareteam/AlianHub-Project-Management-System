@@ -1,5 +1,6 @@
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
+const { tenantOf } = require("../../Config/tenant");
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const socketEmitter = require("../../event/socketEventEmitter");
@@ -85,7 +86,7 @@ const callerId = (req) => String((req && req.uid) || '');
  *   contentBlocks?, isWiki?, ownerId?, reviewDate?, createdByAgent?, agentName? } */
 exports.createPage = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         const {
             title, projectId, parentPageId, visibility, linkedTasks, contentBlocks,
             isWiki, ownerId, reviewDate, createdByAgent, agentName,
@@ -156,7 +157,7 @@ exports.createPage = async (req, res) => {
  * company-wide docs, i.e. those with no ProjectID. */
 exports.listPages = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         if (!companyId) {
             return res.send({ status: false, statusText: 'companyId is required.' });
         }
@@ -205,7 +206,7 @@ exports.listPages = async (req, res) => {
 /* GET /api/v2/pages/:id — full page. */
 exports.getPage = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         const { id } = req.params;
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid page id are required.' });
@@ -235,7 +236,7 @@ exports.getPage = async (req, res) => {
  *   isWiki?, ownerId?, reviewDate?, agentStatus? } */
 exports.updatePage = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         const { id } = req.params;
         const {
             title, contentHtml, contentBlocks, visibility, linkedTasks, isWiki, ownerId, reviewDate, agentStatus,
@@ -334,7 +335,7 @@ const patchPage = async (companyId, id, update) => MongoDbCrudOpration(companyId
  * the page is still right; the next review is three months out unless a date is given. */
 exports.markReviewed = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         const { id } = req.params;
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid page id are required.' });
@@ -371,7 +372,7 @@ exports.markReviewed = async (req, res) => {
 /* PUT /api/v2/pages/:id/approve — a person signs off an agent-drafted page. */
 exports.approvePage = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         const { id } = req.params;
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid page id are required.' });
@@ -397,7 +398,7 @@ exports.approvePage = async (req, res) => {
  * restored under a still-deleted parent is re-rooted by the tree, so nothing is lost. */
 exports.restorePage = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         const { id } = req.params;
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid page id are required.' });
@@ -419,7 +420,7 @@ exports.restorePage = async (req, res) => {
 /* DELETE /api/v2/pages/:id — soft delete, together with everything nested under it. */
 exports.deletePage = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         const { id } = req.params;
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid page id are required.' });
@@ -477,7 +478,7 @@ exports.aiStatus = (req, res) => {
 /* POST /api/v2/pages/ai  body: { action, title?, instruction?, currentText?, pageId? } */
 exports.composeWithAi = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         if (!companyId) {
             return res.send({ status: false, statusText: 'companyId is required.' });
         }
