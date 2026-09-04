@@ -1,14 +1,17 @@
 <template>
-    <div class="task-assigneesearch-groupbywrapper" :class="{'overflow-auto' : clientWidth <=767}">
+    <div class="task-assigneesearch-groupbywrapper pft" :class="{ 'pft--search-open': searchOpen }">
         <div class="d-flex align-items-center justify-content-between flex-wrap task-filtersearchassignee-wrapper" :class="{'w-545' : clientWidth <=767 }" v-if="['ProjectListView', 'Calendar', 'ProjectKanban','TableView'].includes(activeTab)">
-            <div class="d-flex align-items-center justify-content-start task-filtersearch" :class="[{ 'mb-10px': clientWidth <= 767 }]" :style="{width: (clientWidth <= 767 ? '100%' : '')}" v-if="!showArchived">
+            <div class="d-flex align-items-center justify-content-start task-filtersearch" :class="[{ 'mb-10px': clientWidth <= 767 }]" v-if="!showArchived">
                 <TaskFilter :projectData="projectData" @apply="(q) => $emit('applyFilter', q)" @clear="$emit('clearFilter')" v-if="Object.keys(projectData).length > 0"/>
-                <div class="position-re task-fitler-search" id="projectviewfiltersearch_driver">
+                <button type="button" class="pft__search-toggle" :aria-label="$t('PlaceHolder.search')" @click="searchOpen = !searchOpen">
+                    <ShellIcon name="search" :size="15" />
+                </button>
+                <div class="position-re task-fitler-search pft__search" id="projectviewfiltersearch_driver">
+                    <ShellIcon name="search" :size="14" class="pft__search-icon" />
                     <input
                         type="text"
                         :placeHolder="$t('PlaceHolder.search')"
-                        class="form-control"
-                        :style="{width: (clientWidth > 767 ? '260px' : '90%')}"
+                        class="form-control pft__input"
                         :value="taskSearch"
                         @input="$emit('update:taskSearch', $event.target.value)"
                     >
@@ -72,8 +75,8 @@
                         <template #button>
                             <button class="text-nowrap btn-white border-groupBy border-radius-6-px cursor-pointer" ref="group_by_status" @click="currentActive='group'">
                                 <div class="group-by-dropdown" :class="{'active' : clientWidth <= 767 && currentActive == 'group' }">
-                                    <strong :style="{color: (clientWidth <= 767 ? '#535358' : '#000')}" :class="{'font-size-12 font-weight-500' : clientWidth > 767 , 'font-size-14 font-weight-400' : clientWidth <=767}">{{ $t('Projects.group_by') }} : </strong>
-                                    <span :style="{color: (clientWidth <= 767 ? '#535358' : '#818181')}" :class="{'font-size-12' : clientWidth > 767 , 'font-size-14' : clientWidth <=767}">{{ $t(`Projects.${groupByOptions.find(x => x.id === groupBy).label}`) }}</span>
+                                    <strong :class="{'font-size-12 font-weight-500' : clientWidth > 767 , 'font-size-14 font-weight-400' : clientWidth <=767}">{{ $t('Projects.group_by') }} : </strong>
+                                    <span :class="{'font-size-12' : clientWidth > 767 , 'font-size-14' : clientWidth <=767}">{{ $t(`Projects.${groupByOptions.find(x => x.id === groupBy).label}`) }}</span>
                                 </div>
                             </button>
                         </template>
@@ -90,8 +93,8 @@
                         <template #button>
                             <button class="text-nowrap btn-white border-groupBy border-radius-6-px cursor-pointer" ref="expand_collapse" @click="currentActive='subtask'">
                                 <div class="group-by-dropdown current__dropdown" :class="{'active' : clientWidth <= 767 && currentActive == 'subtask' }">
-                                    <strong :style="{color: (clientWidth <= 767 ? '#535358' : '#000')}" :class="{'font-size-12 font-weight-500' : clientWidth > 767 , 'font-size-14 font-weight-400' : clientWidth <=767}">{{ $t('Projects.subtask') }}: </strong>
-                                    <span :style="{color: (clientWidth <= 767 ? '#535358' : '#818181')}" :class="{'font-size-12' : clientWidth > 767 , 'font-size-14' : clientWidth <=767}"> {{collapsed ? $t('Projects.collapsed') : $t('Projects.expanded')}}</span>
+                                    <strong :class="{'font-size-12 font-weight-500' : clientWidth > 767 , 'font-size-14 font-weight-400' : clientWidth <=767}">{{ $t('Projects.subtask') }}: </strong>
+                                    <span :class="{'font-size-12' : clientWidth > 767 , 'font-size-14' : clientWidth <=767}"> {{collapsed ? $t('Projects.collapsed') : $t('Projects.expanded')}}</span>
                                 </div>
                             </button>
                         </template>
@@ -199,7 +202,7 @@
                         </div>
                     </div>
                 </template>
-                <button class="archived-btn font-weight-400 d-flex align-items-center justify-content-between" :style="{color: (clientWidth <= 767 ? '#535358' : '')}" :class="{'outline-primary show-archived-active': showArchived, 'outline-secondary': !showArchived, 'border-radius-6-px font-size-14' : clientWidth <=767 , 'border-0 font-size-13' : clientWidth > 767 }">
+                <button class="archived-btn font-weight-400 d-flex align-items-center justify-content-between" :class="{'outline-primary show-archived-active': showArchived, 'outline-secondary': !showArchived, 'border-radius-6-px font-size-14' : clientWidth <=767 , 'border-0 font-size-13' : clientWidth > 767 }">
                     <template v-if="showArchived">
                         <span class="font-weight-bold font-size-16 dark-gray">{{ $t('ProjectSlider.archived_list') }}</span>
                         <span v-if="!showArchivedProjects" @click="$emit('update:showArchived', false)">{{ $t('ProjectSlider.hide_archive') }}</span>
@@ -258,6 +261,7 @@
 
 <script setup>
 import { ref, computed, defineProps, defineEmits } from 'vue';
+import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { useRoute } from 'vue-router';
 import DropDown from '@/components/molecules/DropDown/DropDown.vue';
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
@@ -324,6 +328,7 @@ const props = defineProps({
 });
 
 const route = useRoute();
+const searchOpen = ref(false);
 // The wizard files rows into one sprint: the one in the route, else the project's first.
 // 22b's "into Mobile App v2" headline reads from this.
 const importSprint = computed(() => {
@@ -373,6 +378,9 @@ const activeGroupIcon = require('@/assets/images/peopleBlue.png');
 const groupIcon = require('@/assets/images/peopleGray.png');
 </script>
 
+<style>
+@import "./project-filters.css";
+</style>
 <style scoped>
 /* Tighten the gaps between the desktop action buttons so the row is less
    crowded — the global .mr-1 gap is 16px (1rem); 8px reads better. This is
