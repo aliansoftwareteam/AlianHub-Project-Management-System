@@ -95,7 +95,6 @@ app.use(bodyParser.raw({ limit: BODY_LIMIT }));
 // Set Maintenance Mode
 if (!config.UNDER_MAINTENANCE || config.UNDER_MAINTENANCE == "false") {
     app.use(express.static(path.join(__dirname, './frontend/dist')));
-    app.use(express.static(path.join(__dirname, './installation/dist')));
     // RUN FRONTEND SERVER
     app.get("/", (req, res) => {
         res.sendFile(path.join(__dirname, './frontend/dist/index.html'));

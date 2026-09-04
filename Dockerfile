@@ -70,7 +70,7 @@ COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 # stage we're only running, not installing.
 COPY package.json ./
 COPY brandSettings.json ./
-COPY index.js server.js check-version.js installation.js ./
+COPY index.js server.js ./
 COPY Config/ ./Config/
 COPY Modules/ ./Modules/
 COPY common-storage/ ./common-storage/

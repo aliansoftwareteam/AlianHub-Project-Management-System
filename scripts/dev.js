@@ -16,7 +16,7 @@
  * behaviour production relies on (pm2 then restarts the app). Locally there is no
  * process manager, so just run `npm start` again afterwards and sign in.
  *
- * All existing scripts (npm start, npm run nodemon, npm run basic-install) are untouched.
+ * All existing scripts (npm start, npm run nodemon) are untouched.
  */
 'use strict';
 
@@ -29,11 +29,9 @@ const crypto = require('crypto');
 // ─── Paths ────────────────────────────────────────────────────────────────────
 const ROOT          = path.join(__dirname, '..');
 const FRONTEND_DIR  = path.join(ROOT, 'frontend');
-const INSTALL_DIR   = path.join(ROOT, 'installation');
 const ENV_PATH      = path.join(ROOT, '.env');
 const ENV_EXAMPLE   = path.join(ROOT, '.env.example');
 const FRONTEND_DIST = path.join(FRONTEND_DIR, 'dist');
-const INSTALL_DIST  = path.join(INSTALL_DIR, 'dist');
 
 // ─── Flags ────────────────────────────────────────────────────────────────────
 const argv         = process.argv.slice(2);
@@ -114,46 +112,10 @@ async function installAll() {
     return;
   }
   step('Installing dependencies');
-  const tasks = [
+  await Promise.all([
     npmInstall(ROOT, 'root'),
     npmInstall(FRONTEND_DIR, 'frontend'),
-  ];
-  if (fs.existsSync(INSTALL_DIR)) {
-    tasks.push(npmInstall(INSTALL_DIR, 'wizard'));
-  }
-  await Promise.all(tasks);
-}
-
-// A dist dir is only "valid" if it contains a built index.html — a half-built
-// dir from a Ctrl+C'd build would otherwise be silently treated as ready.
-function isDistValid(dir) {
-  return fs.existsSync(path.join(dir, 'index.html'));
-}
-
-// ─── Stage 2b : Build installation wizard UI (one-time) ──────────────────────
-async function buildWizard() {
-  if (SKIP_INSTALL) return;
-  if (!fs.existsSync(INSTALL_DIR)) return;
-  // Skip only if a real built dist already exists. The wizard UI is served from
-  // installation/dist; if the main app (frontend/dist) is already built the
-  // system is set up and the wizard isn't needed.
-  if (isDistValid(INSTALL_DIST) || isDistValid(FRONTEND_DIST)) return;
-
-  step('Building installation wizard UI (one-time, ~1 min)');
-  return new Promise(resolve => {
-    const child = spawn('npm', ['run', 'build'], { cwd: INSTALL_DIR, shell: true, stdio: 'pipe' });
-    child.stdout.on('data', d =>
-      d.toString().split('\n').forEach(l => l.trim() && process.stdout.write(`${DIM}${tag('wizard', YELLOW)} ${l}\n${R}`))
-    );
-    child.stderr.on('data', d =>
-      d.toString().split('\n').forEach(l => l.trim() && process.stderr.write(`${DIM}${tag('wizard', YELLOW)} ${l}\n${R}`))
-    );
-    child.on('close', code => {
-      if (code !== 0) warn('Wizard UI build failed — the wizard may not display until it is built.');
-      else tick('Installation wizard UI built');
-      resolve();
-    });
-  });
+  ]);
 }
 
 // ─── Stage 3 : Bootstrap .env ────────────────────────────────────────────────
@@ -332,7 +294,6 @@ async function main() {
   checkNode();
 
   await installAll();
-  await buildWizard();
   bootstrapEnv();
 
   const apiPort = readApiPort();

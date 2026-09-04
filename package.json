@@ -100,8 +100,6 @@
     "lint": "eslint .",
     "start": "node server.js",
     "nodemon": "nodemon index.js",
-    "check-version": "node check-version.js",
-    "basic-install": "node installation.js && npm run start",
     "setup": "node scripts/dev.js",
     "dev": "node scripts/dev.js --skip-install",
     "setup:reset": "node scripts/dev.js --force",
