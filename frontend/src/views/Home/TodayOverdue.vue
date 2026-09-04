@@ -33,9 +33,21 @@
                     <SetupChecklist
                         v-if="showChecklist"
                         :company-name="companyName"
+                        :title="isOwnerOrAdmin ? '' : $t('HomeV2.member_setup_title')"
                         :steps="checklistSteps"
                         @action="onChecklistAction"
                         @dismiss="dismissChecklist"
+                    />
+                    <ConfirmationSidebar
+                        v-if="confirmRemoveSample"
+                        v-model="confirmRemoveSample"
+                        :title="$t('ProjectsV2.remove_sample')"
+                        :message="$t('ProjectsV2.remove_sample_confirm')"
+                        confirmationString="remove"
+                        acceptButtonClass="btn-danger"
+                        :acceptButton="$t('ProjectsV2.remove_sample')"
+                        :showSpinner="onboarding.removingSample.value"
+                        @confirm="removeSampleConfirmed"
                     />
                     <div class="home__grid">
                         <MyWorkCard
@@ -117,15 +129,14 @@ import AgendaCard from "@/components/molecules/Home/AgendaCard.vue";
 import PlannerPanel from "@/components/molecules/Home/PlannerPanel.vue";
 import TimerChip from "@/components/molecules/Home/TimerChip.vue";
 import SetupChecklist from "@/components/molecules/Home/SetupChecklist.vue";
-import { isFirstRunStepDone, FIRST_RUN_STEPS } from "@/composable/firstRunProgress";
+import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue";
+import { useOnboardingChecklist } from "@/composable/useOnboardingChecklist";
 import StatusChip from "@/components/molecules/Home/StatusChip.vue";
 import { homeState } from "@/components/molecules/Home/homeState";
 import { useMyWork } from "@/components/molecules/Home/useMyWork";
 import { useTimer } from "@/components/molecules/Home/useTimer";
 import { useAgenda } from "@/components/molecules/Home/useAgenda";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
-import { apiRequestWithoutCompnay } from "@/services";
-import * as env from "@/config/env";
 import "@/components/molecules/Home/style.css";
 import "./style.css";
 
@@ -160,32 +171,18 @@ const pendingDateTask = ref(null);
 
 const todayLabel = computed(() => moment().format("ddd MMM D"));
 const projects = computed(() => getters["projectData/projects"]?.data || []);
-const companyUsers = computed(() => getters["settings/companyUsers"] || []);
-const companyUser = computed(() => getters["settings/companyUserDetail"] || {});
 const companyName = computed(() => getters["settings/selectedCompany"]?.Cst_CompanyName || "");
 const sampleProject = computed(() => projects.value[0] || null);
 
-const checklist = ref({ dismissed: false, reviewedPermissions: false });
-const firstRunSteps = computed(() => {
-    void route.fullPath;
-    return {
-        board: isFirstRunStepDone(FIRST_RUN_STEPS.BOARD_VIEW),
-        notifications: isFirstRunStepDone(FIRST_RUN_STEPS.NOTIFICATIONS)
-    };
+const mainTour = inject("$mainTour", null);
+const onboarding = useOnboardingChecklist({
+    openCreateProject: () => { createProjectOpen.value = true; },
+    startTour: (which) => mainTour?.value?.startTour?.(which),
+    routeVersion: () => route.fullPath
 });
-const checklistSteps = computed(() => [
-    { key: "company", label: "HomeV2.step_company", done: true, cta: "HomeV2.step_company" },
-    { key: "sample", label: "HomeV2.step_sample", done: projects.value.length > 0, cta: "HomeV2.create_project" },
-    { key: "invite", label: "HomeV2.step_invite", done: companyUsers.value.length > 1, cta: "HomeV2.invite_team" },
-    { key: "project", label: "HomeV2.step_project", done: projects.value.length > 1, cta: "HomeV2.create_project" },
-    { key: "permissions", label: "HomeV2.step_permissions", note: "HomeV2.step_permissions_note", done: checklist.value.reviewedPermissions, cta: "HomeV2.review_permissions" },
-    { key: "board", label: "HomeV2.step_board", done: firstRunSteps.value.board, cta: "HomeV2.step_board" },
-    { key: "notifications", label: "HomeV2.step_notifications", done: firstRunSteps.value.notifications, cta: "HomeV2.step_notifications" }
-]);
-const checklistComplete = computed(() => checklistSteps.value.every((s) => s.done));
-const isOwnerOrAdmin = computed(() => [1, 2].includes(companyUser.value.roleType));
+const { steps: checklistSteps, show: showChecklist, complete: checklistComplete, isOwnerOrAdmin, dismiss: dismissChecklist } = onboarding;
 const firstRun = computed(() => projects.value.length <= 1 || !checklistComplete.value);
-const showChecklist = computed(() => firstRun.value && isOwnerOrAdmin.value && !checklist.value.dismissed && !checklistComplete.value);
+const confirmRemoveSample = ref(false);
 
 const agendaItems = computed(() => agenda.itemsFor(agendaDay.value, work.mine.value));
 
@@ -193,29 +190,25 @@ function shiftAgenda(delta) {
     agendaDay.value = delta === 0 ? moment() : moment(agendaDay.value).add(delta, "day");
 }
 
-function saveChecklist(patch) {
-    checklist.value = { ...checklist.value, ...patch };
-    apiRequestWithoutCompnay("put", env.USER_UPATE, {
-        userId: userId.value,
-        updateObject: { $set: { homeChecklist: checklist.value } }
-    }).catch((error) => console.error("checklist save failed", error));
-}
-const dismissChecklist = () => saveChecklist({ dismissed: true });
-
 function onChecklistAction(key) {
-    if (key === "invite") router.push({ name: "Members", params: { cid: companyId.value } });
-    else if (key === "sample" || key === "project") createProjectOpen.value = true;
-    else if (key === "permissions") {
-        saveChecklist({ reviewedPermissions: true });
-        router.push({ name: router.hasRoute("Security & Permissions") ? "Security & Permissions" : "Setting", params: { cid: companyId.value } });
-    }
-    // Both tick themselves once the screen opens (firstRunProgress), so the CTA
-    // only has to get the owner there.
-    else if (key === "board") {
-        if (!sampleProject.value) createProjectOpen.value = true;
-        else router.push({ name: "Project", params: { cid: companyId.value, id: sampleProject.value._id }, query: { tab: "ProjectKanban" } });
-    } else if (key === "notifications") router.push({ name: "Notifications", params: { cid: companyId.value } });
+    if (!onboarding.onAction(key)) confirmRemoveSample.value = true;
 }
+
+async function removeSampleConfirmed() {
+    try {
+        await onboarding.removeSample();
+        $toast.success(t("ProjectsV2.remove_sample_done"), { position: "top-right" });
+    } catch (error) {
+        console.error("remove sample failed", error);
+        $toast.error(t("Toast.something_went_wrong"), { position: "top-right" });
+    } finally {
+        confirmRemoveSample.value = false;
+    }
+}
+
+watch(() => timer.active, (now, before) => {
+    if (before && !now) onboarding.mark("log_time");
+});
 
 function openTask(task) {
     detail.value = { open: true, taskId: task._id, projectId: task.ProjectID, sprintId: task.sprintId };
@@ -225,12 +218,14 @@ function closeTask() {
     work.fetchOpen().catch(() => {});
 }
 function goProject(project) {
+    onboarding.mark("open_project");
     router.push({ name: "Project", params: { cid: companyId.value, id: project._id } });
 }
 
 async function onComplete(task) {
     try {
         await work.complete(task);
+        onboarding.mark("complete_task");
         $toast.success(t("HomeV2.task_done"), { position: "top-right" });
     } catch (error) {
         console.error("complete failed", error);
@@ -321,7 +316,7 @@ const onVisible = () => { if (document.visibilityState === "visible") work.fetch
 
 onMounted(() => {
     const me = getUser(userId.value, "all") || {};
-    if (me.homeChecklist) checklist.value = { ...checklist.value, ...me.homeChecklist };
+    onboarding.load();
     if (me.presence) homeState.presence = { ...homeState.presence, ...me.presence };
     work.fetchOpen().catch((error) => console.error("my work failed", error));
     agenda.load().catch(() => {});

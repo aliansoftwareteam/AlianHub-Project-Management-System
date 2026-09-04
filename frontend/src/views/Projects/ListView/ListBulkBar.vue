@@ -26,8 +26,22 @@
             </div>
         </span>
 
+        <button v-if="canArchive" type="button" class="lv2-bulk__btn" :disabled="working" @click.stop="ask('bulkArchive')">{{ $t('ProjectsV2.bulk_archive') }}</button>
+        <button v-if="canDelete" type="button" class="lv2-bulk__btn lv2-bulk__btn--danger" :disabled="working" @click.stop="ask('bulkTrash')">{{ $t('ProjectsV2.bulk_delete') }}</button>
+
         <span class="lv2-bulk__esc">{{ $t('ListV2.esc') }}</span>
     </div>
+    <ConfirmationSidebar
+        v-if="confirmOpen"
+        v-model="confirmOpen"
+        :title="pending === 'bulkTrash' ? $t('ProjectsV2.bulk_delete') : $t('ProjectsV2.bulk_archive')"
+        :message="$t(pending === 'bulkTrash' ? 'ProjectsV2.bulk_delete_confirm' : 'ProjectsV2.bulk_archive_confirm', { n: selection.count.value })"
+        :confirmationString="pending === 'bulkTrash' ? 'delete' : 'archive'"
+        :acceptButtonClass="pending === 'bulkTrash' ? 'btn-danger' : 'btn-primary'"
+        :acceptButton="pending === 'bulkTrash' ? $t('ProjectsV2.bulk_delete') : $t('ProjectsV2.bulk_archive')"
+        :showSpinner="working"
+        @confirm="runConfirmed"
+    />
 </template>
 
 <script setup>
@@ -40,6 +54,7 @@ import * as env from "@/config/env";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { useTaskSelection } from "@/composable/useTaskSelection.js";
 import { useTaskSummaries } from "@/views/Projects/TableView/useTaskSummaries.js";
+import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue";
 
 defineOptions({ name: "ListBulkBar" });
 
@@ -61,6 +76,20 @@ const working = ref(false);
 
 const canStatus = computed(() => checkPermission("task.task_status", props.project?.isGlobalPermission) === true);
 const canAssign = computed(() => checkPermission("task.task_assignee", props.project?.isGlobalPermission) === true);
+const canArchive = computed(() => checkPermission("task.task_archive", props.project?.isGlobalPermission) === true);
+const canDelete = computed(() => checkPermission("task.task_delete", props.project?.isGlobalPermission) === true);
+
+const confirmOpen = ref(false);
+const pending = ref("");
+function ask(action) {
+    open.value = "";
+    pending.value = action;
+    confirmOpen.value = true;
+}
+async function runConfirmed() {
+    await run(pending.value, {});
+    confirmOpen.value = false;
+}
 
 const statuses = computed(() => (props.project?.taskStatusData || []).map((status) => ({
     id: status.key, label: status.name, color: status.textColor, raw: status
@@ -219,6 +248,8 @@ onBeforeUnmount(() => {
 .lv2-bulk__btn:hover:not(:disabled) { color: #fff; }
 .lv2-bulk__btn:disabled { opacity: .4; cursor: not-allowed; }
 .lv2-bulk__btn--ai { color: #a892ff; font-weight: 600; }
+.lv2-bulk__btn--danger { color: #ff9b9b; }
+.lv2-bulk__btn--danger:hover:not(:disabled) { color: #ffc2c2; }
 .lv2-bulk__esc { margin-left: auto; color: rgba(255, 255, 255, .5); }
 .lv2-bulk__menu-wrap { position: relative; }
 .lv2-bulk__menu {

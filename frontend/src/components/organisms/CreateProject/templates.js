@@ -17,6 +17,7 @@ export const blankTemplate = (t) => ({
         { name: "Done", type: "close" }
     ],
     TemplateRequiredComponent: [{ keyName: "ProjectListView", setAsDefault: true }],
+    apps: ["Priority", "MultipleAssignees", "TimeTracking", "tags", "CustomFields"].map((key) => ({ key, appStatus: true })),
     sampleTaskCount: 0,
     sampleTaskNames: [],
     customFiedlsValue: []

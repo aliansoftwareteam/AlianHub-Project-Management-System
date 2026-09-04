@@ -724,6 +724,11 @@ module.exports = {
         return this._bulkArchiveDelete({ companyId, userData, taskIds, deletedStatusKey: 1, action: 'bulkDelete', includeArchived: true });
     },
 
+    // Same soft delete under the name the Trash page and bulk bar use.
+    bulkTrash({ companyId, userData, taskIds }) {
+        return this._bulkArchiveDelete({ companyId, userData, taskIds, deletedStatusKey: 1, action: 'bulkTrash', includeArchived: true });
+    },
+
     _bulkArchiveDelete({ companyId, userData, taskIds, deletedStatusKey, action, includeArchived = false, includeDeleted = false }) {
         return new Promise(async (resolve, reject) => {
             try {

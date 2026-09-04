@@ -19,6 +19,7 @@ import ai from './ai';
 import automations from './automations';
 import billing from './billing';
 import team from './team';
+import trash from './trash';
 
 import { useCustomComposable } from '@/composable'
 import dashboard from "../plugins/dashboard/router";
@@ -71,6 +72,7 @@ const routes = [
 	...integrations,
 	...inbox,
 	...pages,
+	...trash,
 	...home,
 	...people,
 

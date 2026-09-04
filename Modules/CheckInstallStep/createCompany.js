@@ -1,6 +1,7 @@
 const { SCHEMA_TYPE } = require("../../Config/schemaType.js");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries.js");
 const iCtr = require('../ImportSettings/controller.js');
+const { ensureNotificationDefaults } = require('../notification/defaults');
 const { addAndRemoveUserInMongodbNotificationCount } = require("../Auth/controller.js");
 const logger = require('../../Config/loggerConfig.js');
 const { default: mongoose } = require("mongoose");
@@ -249,6 +250,7 @@ exports.createCompany = (data) => {
                 exports.addAndRemoveUserInMongodbNotificationCountFun(companyId, data.userId), // addAndRemoveUserInMongodbNotificationCount
                 exports.createCompanyGlobalFun(dataObj), // Create Company in Global Database
                 exports.importSettingsFun(axiosData), // Import Settings
+                ensureNotificationDefaults(companyId, data.userId),
             ];
         
             Promise.allSettled(allProcess).then(async() => {

@@ -22,7 +22,7 @@
                 />
             </template>
             <template v-if="item.image && imageDisplayForPriority">
-                <img v-if="item.image.includes('http')" :title="item.title ? item.title : 'N/A'" :src="companyPrioritiesIcons(item.value).statusImage" alt="" :style="{width: '11px', height: '11px','margin-right': '10px','border-radius': '2px !important','vertical-align':'middle'}"/>
+                <img v-if="isBundledPriorityImage(item.image) || item.image.includes('http')" :title="item.title ? item.title : 'N/A'" :src="companyPrioritiesIcons(item.value)?.statusImage" alt="" :style="{width: '11px', height: '11px','margin-right': '10px','border-radius': '2px !important','vertical-align':'middle'}"/>
                 <WasabiImage :style="{width: '10px', height: '10px'}" v-else :data="{title: item.title ? item.title : 'N/A', url: item.image, filename: item.image.split('/').pop(), extension: item.image.split('/').pop().split('.').pop()}"/>
             </template>
             <div :class="[{'d-flex align-items-center' : isDisable === true}]">
@@ -70,7 +70,7 @@ import DropDown from '@/components/molecules/DropDown/DropDown.vue';
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
 import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
 import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
-import { companyPrioritiesIcons } from '@/composable/commonFunction';
+import { companyPrioritiesIcons, isBundledPriorityImage } from '@/composable/commonFunction';
 defineProps({
     item: {
         type: Object,

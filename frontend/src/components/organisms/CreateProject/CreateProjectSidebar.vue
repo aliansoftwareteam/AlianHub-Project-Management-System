@@ -127,6 +127,11 @@
                             <label class="ah-field__label">{{ $t('AuthV2.due_date') }}</label>
                             <VueDatePicker v-model="form.dueDate" :placeholder="$t('PlaceHolder.Select_Project_Due_Date')" auto-apply :close-on-auto-apply="true" :min-date="new Date()" :enable-time-picker="false" />
                         </div>
+                        <div v-if="appCatalog.length" class="ah-field">
+                            <div class="ah-field__label">{{ $t('AppsV2.pick_title') }}</div>
+                            <div class="ah-field__hint">{{ $t('AppsV2.pick_hint') }}</div>
+                            <ProjectAppsList v-model="form.apps" :apps="appCatalog" />
+                        </div>
                         <label v-if="sampleCount" class="ah-cp__check">
                             <input v-model="form.includeSamples" type="checkbox" class="ah-check" />
                             <span>{{ $t('AuthV2.include_samples', { n: sampleCount }) }} <span class="ah-muted">{{ $t('AuthV2.include_samples_hint') }}</span></span>
@@ -160,6 +165,7 @@ import SpinnerComp from "@/components/atom/SpinnerComp/SpinnerComp.vue";
 import Assignee from "@/components/molecules/Assignee/Assignee.vue";
 import SkillsSelect from "@/components/molecules/SkillsSelect/SkillsSelect.vue";
 import ProjectSourceSelect from "@/components/molecules/ProjectSourceSelect/ProjectSourceSelect.vue";
+import ProjectAppsList from "@/components/molecules/ProjectAppsList/ProjectAppsList.vue";
 import AiProjectCreator from "@/components/organisms/AiProjectCreator/AiProjectCreator.vue";
 import { useGetterFunctions } from "@/composable";
 import { dbCollections } from "@/utils/Collections";
@@ -207,7 +213,12 @@ const busy = ref(false);
 const banner = ref("");
 const nameInput = ref(null);
 
-const form = reactive({ name: "", key: "", keyTouched: false, isPrivate: false, source: DEFAULT_SOURCE, proposalId: "", dueDate: "", leads: [], skills: [], includeSamples: true });
+const form = reactive({ name: "", key: "", keyTouched: false, isPrivate: false, source: DEFAULT_SOURCE, proposalId: "", dueDate: "", leads: [], skills: [], includeSamples: true, apps: [] });
+const appCatalog = ref([]);
+const defaultAppsFor = (tpl) => {
+    const fromTemplate = (tpl?.apps || []).filter((a) => a.appStatus).map((a) => a.key);
+    return fromTemplate.length ? fromTemplate : appCatalog.value.filter((a) => a.appStatus).map((a) => a.key);
+};
 const errors = reactive({ name: "", key: "", source: "", proposalId: "" });
 
 const matches = (tpl) => {
@@ -225,14 +236,17 @@ const shortDescription = (tpl) => {
 onMounted(async () => {
     loading.value = true;
     try {
-        const [globalRes] = await Promise.all([
+        const [globalRes, appsRes] = await Promise.all([
             apiRequest("post", env.GLOBAL_PROJECT_TEMPLATE, { teamFocus: teamFocus.value }),
+            apiRequest("get", env.PROJECTS_APPS).catch(() => ({ data: [] })),
             dispatch("projectData/setprojectTemplate", companyId.value).catch(() => {})
         ]);
         if (globalRes.data.status) globalTemplates.value = (globalRes.data.statusText || []).map((tpl) => ({ ...tpl, useTemplateProj: "category" }));
         customTemplates.value = (getters["projectData/projectTemplate"]?.data || []).map((tpl) => ({ ...tpl, useTemplateProj: "withoutcategory", focus: "other" }));
+        appCatalog.value = Array.isArray(appsRes?.data) ? appsRes.data : [];
         const first = shownGlobal.value[0];
         if (first) selected.value = first;
+        form.apps = defaultAppsFor(selected.value);
     } catch (error) {
         console.error("Error in getting projectTemplate", error);
     } finally {
@@ -241,7 +255,11 @@ onMounted(async () => {
     }
 });
 
-const select = (tpl) => { selected.value = tpl; form.includeSamples = (Number(tpl.sampleTaskCount) || 0) > 0; };
+const select = (tpl) => {
+    selected.value = tpl;
+    form.includeSamples = (Number(tpl.sampleTaskCount) || 0) > 0;
+    form.apps = defaultAppsFor(tpl);
+};
 const onNameInput = () => {
     errors.name = "";
     if (!form.keyTouched) { form.key = keyFromName(form.name); errors.key = ""; }
@@ -317,7 +335,8 @@ const submit = async () => {
             isGlobalPermission: true,
             customFiedlsValue: tpl.customFiedlsValue || [],
             includeSampleTasks: form.includeSamples && sampleCount.value > 0,
-            sampleFocus: tpl.focus || ""
+            sampleFocus: tpl.focus || "",
+            apps: form.apps
         };
         const path = `${companyId.value}/${companyId.value}/${dbCollections.PROJECTS}`;
         const result = await helper.HandleProject(path, payload, userData(), companyId.value, false);

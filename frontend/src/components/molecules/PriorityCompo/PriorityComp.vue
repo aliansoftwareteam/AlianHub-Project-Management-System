@@ -2,7 +2,7 @@
     <div class="priority__component" :id="tourId">
         <div class="d-flex align-items-center cursor-pointer" @click.stop.prevent="permission ? visible = true : ''">
             <img
-                v-if="!selectedPriority.image || selectedPriority.image === ''" 
+                v-if="isBundledPriorityImage(selectedPriority.image)"
                 :src="companyPrioritiesIcons(priorityVal)?.statusImage"
                 alt="priority_image" 
                 :title="selectedPriority.name"
@@ -34,7 +34,7 @@
 import { defineProps, ref, defineComponent, defineEmits, computed, inject } from 'vue';
 import Sidebar from '@/components/molecules/Sidebar/Sidebar.vue';
 import { useGetterFunctions } from '@/composable/index';
-import { companyPrioritiesIcons } from '@/composable/commonFunction';
+import { companyPrioritiesIcons, isBundledPriorityImage } from '@/composable/commonFunction';
 import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
 
 // UTILS

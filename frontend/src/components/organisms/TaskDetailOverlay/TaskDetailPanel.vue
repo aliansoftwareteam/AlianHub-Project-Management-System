@@ -440,6 +440,16 @@ function projectSlice() {
     };
 }
 
+/* The actor's own socket room does not echo taskUpdate back, so push the change
+   through the same mutations the listener uses and the list rows update at once. */
+function reflectOwnUpdate(updatedFields) {
+    task.value = { ...task.value, ...updatedFields };
+    const payload = { snap: {}, op: "modified", pid: String(task.value.ProjectID || props.projectId), sprintId: String(task.value.sprintId || props.sprintId), data: { ...task.value }, updatedFields };
+    commit("projectData/mutateUpdateFirebaseTasks", payload);
+    commit("projectData/mutateMongoUpdatedTask", payload);
+    commit("projectData/mutateTypesenseTableTasks", payload);
+}
+
 function updateTaskName(val) {
     if (!val?.trim()?.length) return;
     taskClass.updateTaskName({
@@ -449,6 +459,7 @@ function updateTaskName(val) {
         obj: { previousTaskName: task.value.TaskName, userName: user.Employee_Name },
         userData: userData()
     }).then(() => {
+        reflectOwnUpdate({ TaskName: val });
         $toast.success(t("Toast.Task_name_updated_successfully"), { position: "top-right" });
     }).catch((err) => console.error(err));
 }
@@ -507,6 +518,7 @@ function toggleDone(done) {
         task: task.value,
         userData: userData()
     }).then(() => {
+        reflectOwnUpdate({ status: { text: next.name, key: next.key, type: next.type, value: next.value }, statusType: next.type, statusKey: next.key });
         $toast.success(t("Toast.Status_updated_successfully"), { position: "top-right" });
     }).catch(() => {
         $toast.error(t("Toast.Status_not_updated"), { position: "top-right" });

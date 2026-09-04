@@ -242,6 +242,7 @@
                                 </div>
                             </template>
                             <template #actions>
+                            <NewInProjectMenu :projectData="projectData" />
                             <ProjectActionsBar
                                 :projectData="projectData"
                                 :clientWidth="clientWidth"
@@ -498,6 +499,7 @@ import NotFound from '../NotFound.vue';
 // EXTRACTED PIECES
 import ProjectActionsBar from './components/ProjectActionsBar.vue';
 import ProjectHeader from './components/ProjectHeader.vue';
+import NewInProjectMenu from './components/NewInProjectMenu.vue';
 import ProjectFiltersToolbar from './components/ProjectFiltersToolbar.vue';
 import { useProjectAgents } from './Kanban/useProjectAgents';
 import AiTaskCreator from '@/components/organisms/AiTaskCreator/AiTaskCreator.vue';
@@ -1056,7 +1058,7 @@ const isProjectFavourite = computed(() => Boolean((projectData.value?.favouriteT
 const canAiAssist = computed(() => checkApps('AI', projectData.value) && checkPermission('task.task_create', projectData.value?.isGlobalPermission) === true);
 // Only shown where a view actually answers the request (the board injects
 // `addTaskRequest`); other views opt in by injecting it too.
-const OWN_BULK_BAR_VIEWS = ['ProjectListView', 'TableView'];
+const OWN_BULK_BAR_VIEWS = ['ProjectListView', 'TableView', 'ProjectKanban'];
 const hasOwnBulkBar = computed(() => OWN_BULK_BAR_VIEWS.includes(activeTab.value));
 const ADD_TASK_VIEWS = ['ProjectKanban'];
 const canAddTask = computed(() => ADD_TASK_VIEWS.includes(activeTab.value) && checkPermission('task.task_create', projectData.value?.isGlobalPermission) === true);
