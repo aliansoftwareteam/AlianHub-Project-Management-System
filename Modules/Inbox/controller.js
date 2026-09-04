@@ -168,6 +168,39 @@ const readMentions = async (companyId, userId, { limit, read, sort, ids, exclude
  * them (Modules/Pto), so nobody else sees them; a person's own request is
  * never something they approve.
  */
+/* Pending agent proposals (Modules/Agents). The handoff puts "asking permission" in
+ * this Inbox; until now they lived only under AI › Inbox and the owner never saw them. */
+const readProposals = async (companyId, userId) => {
+    try {
+        const roleType = await getRoleType(companyId, userId);
+        if (!isPrivileged(roleType)) return [];
+        const rows = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.AGENT_PROPOSALS,
+            data: [{ status: 'pending' }, {}, { sort: { createdAt: -1 }, limit: 20 }],
+        }, 'find');
+        return (rows || []).map((r) => ({
+            sourceType: 'proposal',
+            sourceId: String(r._id),
+            proposalId: String(r._id),
+            kind: 'proposal',
+            agentName: r.agentName || 'Agent',
+            agentId: r.agentId ? String(r.agentId) : '',
+            what: r.what || '',
+            why: r.why || '',
+            changes: Array.isArray(r.changes) ? r.changes.length : 0,
+            cost: r.cost || null,
+            gate: r.gate || null,
+            taskId: r.taskId ? String(r.taskId) : '',
+            projectId: r.projectId ? String(r.projectId) : '',
+            createdAt: r.createdAt,
+            unread: true,
+        }));
+    } catch (e) {
+        logger.error(`${LOG_PREFIX} readProposals: ${e.message}`);
+        return [];
+    }
+};
+
 const readApprovals = async (companyId, userId) => {
     try {
         const roleType = await getRoleType(companyId, userId);
@@ -260,10 +293,11 @@ exports.list = async (req, res) => {
         const window = skip + limit;
         const probe = window + 1;
         const wantApprovals = tab === 'primary' && skip === 0 && (kind === 'all' || kind === 'approval');
-        const [notifications, mentions, approvals] = await Promise.all([
+        const [notifications, mentions, approvals, proposals] = await Promise.all([
             plan.notifications && kind !== 'approval' ? readNotifications(companyId, userId, { ...readOpts, limit: probe }) : [],
             plan.mentions && kind !== 'approval' ? readMentions(companyId, userId, { ...readOpts, limit: probe }) : [],
             wantApprovals ? readApprovals(companyId, userId) : [],
+            wantApprovals ? readProposals(companyId, userId) : [],
         ]);
 
         // The two sources arrive already sorted; this only re-orders the merge of them,
@@ -296,6 +330,7 @@ exports.list = async (req, res) => {
                 sort,
                 items: page,
                 approvals,
+                proposals,
                 // Two ways there is more: the merge itself has rows past this page, or a
                 // source handed back the probe row and so still has rows behind it.
                 hasMore: merged.length > window
@@ -345,7 +380,7 @@ exports.counts = async (req, res) => {
             return (rows && rows[0] && rows[0].n) || 0;
         };
 
-        const [notifications, mentions, approvals] = await Promise.all([
+        const [notifications, mentions, approvals, proposals] = await Promise.all([
             count(SCHEMA_TYPE.NOTIFICATIONS, {
                 assigneeUsers: { $in: [userId] },
                 key: { $ne: Notification_key.COMMENTS_IM_MENTIONS_IN },
@@ -367,6 +402,7 @@ exports.counts = async (req, res) => {
                 at: { $dateTrunc: { date: '$createdAt', unit: 'second' } },
             }),
             readApprovals(companyId, userId).then((rows) => rows.length),
+            readProposals(companyId, userId).then((rows) => rows.length),
         ]);
 
         return res.send({
@@ -379,8 +415,9 @@ exports.counts = async (req, res) => {
                 archive: 0,
                 // Primary is `all` plus what waits on this user; the client takes its own
                 // Later rows out of it. Done is read rows, so no badge either.
-                primary: notifications + mentions + approvals,
+                primary: notifications + mentions + approvals + proposals,
                 approvals,
+                proposals,
                 later: 0,
                 done: 0,
             },
@@ -546,4 +583,4 @@ exports.markAllRead = async (req, res) => {
     }
 };
 
-exports.__internals = { readItemList };
+exports.__internals = { readItemList, readProposals };

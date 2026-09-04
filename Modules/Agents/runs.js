@@ -150,7 +150,7 @@ const executeSkill = async (companyId, run, agent, task, { proposals, actions, a
     const orchestrator = require('./engine/orchestrator');
     try {
         const result = await orchestrator.run({ skillSlug: run.skill || 'qa-review', task, companyId, budget: { maxTokens: 4000 } });
-        await recordSpend(companyId, run, result.usage, result.model);
+        const spent = await recordSpend(companyId, run, result.usage, result.model);
         if (result.status !== 'success') {
             await finish(companyId, run._id, { status: result.status === 'skipped' ? STATUS.DONE : STATUS.FAILED, outcome: result.reason });
             return;
@@ -173,7 +173,7 @@ const executeSkill = async (companyId, run, agent, task, { proposals, actions, a
             const proposal = await proposals.create(companyId, {
                 agent, runId: String(run._id), taskId: String(task._id), projectId: String(task.ProjectID),
                 what: Array.isArray(result.changes) ? `${run.skill}: ${changes.length} change(s) on ${task.TaskKey || task.TaskName}` : `File ${result.findings.length} QA finding(s) on ${task.TaskKey || task.TaskName}`, why: result.summary, changes,
-                cost: { tokens: result.usage && result.usage.totalTokens, model: result.model },
+                cost: { tokens: result.usage && result.usage.totalTokens, model: result.model, usd: spent && spent.usd },
             });
             await patch(companyId, run._id, { status: STATUS.WAITING }, { $push: { proposals: String(proposal._id) } });
         }

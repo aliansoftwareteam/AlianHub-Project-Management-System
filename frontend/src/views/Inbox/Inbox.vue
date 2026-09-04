@@ -95,6 +95,10 @@
                                     <strong>{{ actorName(it) || $t('InboxV2.someone') }}</strong> {{ $t('InboxV2.requested_off', { range: dateRange(it) }) }}
                                     <span class="ibx__dim">· {{ $t('InboxV2.needs_your_approval') }}</span>
                                 </template>
+                                <template v-else-if="it.kind === 'proposal'">
+                                    <strong>{{ it.agentName }}</strong> {{ $t('InboxV2.wants_to') }} {{ it.what }}
+                                    <span class="ibx__dim">· {{ $t('InboxV2.needs_your_approval') }}</span>
+                                </template>
                                 <template v-else-if="it.kind === 'reminder'">
                                     <strong>{{ $t('InboxV2.reminder') }}</strong> <span class="ibx__dim">· {{ it.unread ? $t('InboxV2.due_now') : $t('InboxV2.done') }}</span>
                                 </template>
@@ -114,6 +118,10 @@
                             <template v-if="it.kind === 'approval'">
                                 <span v-if="it.ptoType" class="ah-chip ibx__chip">{{ ptoLabel(it.ptoType) }}</span>
                                 <span v-if="it.reason" class="ibx__quote">"{{ it.reason }}"</span>
+                            </template>
+                            <template v-else-if="it.kind === 'proposal'">
+                                <span class="ah-chip ah-chip--agent ibx__chip">{{ $t('InboxV2.changes_n', { n: it.changes }) }}</span>
+                                <span v-if="it.why" class="ibx__quote">"{{ it.why }}"</span>
                             </template>
                             <template v-else-if="it.kind === 'mention'">
                                 <span class="ibx__quote">"<span v-html="render(it)"></span>"</span>
@@ -148,6 +156,11 @@
                             <template v-if="it.kind === 'approval'">
                                 <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy" @click="decide(it, 'approved')">{{ $t('InboxV2.approve') }}</button>
                                 <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="decide(it, 'rejected')">{{ $t('InboxV2.decline') }}</button>
+                            </template>
+                            <template v-else-if="it.kind === 'proposal'">
+                                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy" @click="decideProposal(it, 'approve')">{{ $t('InboxV2.approve') }}</button>
+                                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="decideProposal(it, 'decline')">{{ $t('InboxV2.decline') }}</button>
+                                <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="openAiInbox">{{ $t('InboxV2.open_ai_inbox') }}</button>
                             </template>
                             <template v-else-if="it.kind === 'reminder'">
                                 <button v-if="it.unread" type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy" @click="markDone(it)">{{ $t('InboxV2.done') }}</button>
@@ -319,7 +332,7 @@ const load = async (append = false) => {
         }
         const d = res.data.data || {};
         items.value = append ? [...items.value, ...(d.items || [])] : (d.items || []);
-        if (!append) approvals.value = d.approvals || [];
+        if (!append) approvals.value = [...(d.proposals || []), ...(d.approvals || [])];
         hasMore.value = !!d.hasMore;
         nextSkip.value = d.nextSkip || 0;
         if (!append) cursor.value = 0;
@@ -529,6 +542,22 @@ const removeRowSoft = (it) => {
     if (tab.value !== 'done') removeRow(it);
 };
 const openReminders = () => openPanel('reminders');
+const openAiInbox = () => router.push({ name: 'AiInbox', params: { cid: companyId?.value } }).catch(() => {});
+// Agent proposals decide through the agent API so the audit row, undo window and
+// run closure are the same whichever Inbox the person used.
+const decideProposal = async (it, verb) => {
+    busy.value = true;
+    try {
+        const res = await apiRequest('post', `${env.AGENT_PROPOSALS}/${it.proposalId}/${verb}`, {});
+        if (!res?.data?.status) { $toast.error(res?.data?.statusText || t('Inbox.action_failed'), { position: 'top-right' }); return; }
+        removeRow(it);
+        loadCounts();
+    } catch (e) {
+        $toast.error(e?.response?.data?.statusText || e?.message || t('Inbox.action_failed'), { position: 'top-right' });
+    } finally {
+        busy.value = false;
+    }
+};
 const reviewInAiInbox = () => router.push({ name: 'AiHub', params: { cid: companyId?.value } }).catch(() => {});
 
 const isTyping = (e) => ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName) || e.target?.isContentEditable;

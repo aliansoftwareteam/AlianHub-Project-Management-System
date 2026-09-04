@@ -158,3 +158,10 @@ subtasks ($0.0045); Reviewer fetched PR #533's diff, summarised it correctly and
 Stop on a Hub card with an open run, undo window 30s → 15 min. Noted, not fixed: the Reporter's
 digest invented "in review for 24 days" — a fact not in its data — despite the prompt forbidding it;
 a verify step like the QA skill's would drop unsupported claims.
+
+### 2026-09-04 (AR-50: proposals in the main Inbox)
+Owner opened Inbox and found nothing while three proposals waited under AI › Inbox. Pending
+proposals are now a source of the main Inbox (Primary, owners/admins), counted in its badge, with
+Approve / Decline / Open in AI Inbox on the row; deciding goes through the agent API so audit,
+undo window and run closure are identical whichever Inbox was used. Also carried usd onto
+proposals so the Inbox stops showing $0.00 for priced runs.
