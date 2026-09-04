@@ -1,0 +1,109 @@
+/* Project filters row (handoff 14a / 10b second row). Re-skins the legacy toolbar
+   onto the tokens without touching its controls, refs, ids or emits. */
+.pft {
+    background: var(--surface);
+    border-bottom: 1px solid var(--hairline);
+    padding: 6px 20px;
+    font: var(--text-small);
+    color: var(--ink);
+}
+.pft.overflow-auto { overflow: visible; }
+.pft .task-filtersearchassignee-wrapper { gap: 8px 10px; }
+/* Legacy CSS gives both groups fixed widths; on the tokens they size to content and the
+   controls take whatever is left, wrapping inside their own group when they must. */
+.pft .task-filtersearch { width: auto !important; flex: 0 0 auto; }
+.pft .task-filter-assignee { width: auto !important; flex: 1 1 auto; min-width: 0; justify-content: flex-end; flex-wrap: wrap; overflow: visible; }
+@media (min-width: 1024px) {
+    .pft .task-filtersearchassignee-wrapper { flex-wrap: nowrap; }
+}
+/* The legacy inner box drew its own frame inside the pill. */
+.pft .group-by-dropdown { border: 0 !important; padding: 0 !important; background: transparent !important; }
+.pft .task-filtersearchassignee-wrapper.w-545 { width: auto; }
+.pft .task-filtersearch { gap: 8px; min-width: 0; }
+.pft .task-filtersearch.mb-10px { margin-bottom: 0 !important; }
+.pft .task-filter-assignee { gap: 6px; flex-wrap: wrap; row-gap: 6px; }
+
+/* search */
+.pft__search-toggle { display: none; }
+.pft__search { display: flex; align-items: center; width: 260px; max-width: 100%; }
+.pft__search-icon { position: absolute; left: 10px; color: var(--ink-3); pointer-events: none; }
+.pft .pft__input.form-control {
+    height: 32px; width: 100%; padding: 0 30px 0 30px;
+    border: 1px solid var(--hairline); border-radius: 8px;
+    background: var(--surface); color: var(--ink); font: var(--text-small);
+    box-shadow: none;
+}
+.pft .pft__input.form-control:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-ring); outline: 0; }
+.pft .pft__input.form-control::placeholder { color: var(--ink-3); }
+.pft .task-fitler-search .dropdown-image-horizontal { right: 6px; }
+
+/* pill buttons: group by, subtask, more, calendar */
+.pft .border-groupBy,
+.pft .assignee-filter.manage__filter-users {
+    height: 32px; border: 1px solid var(--hairline) !important; border-radius: 8px !important;
+    background: var(--surface); color: var(--ink);
+}
+.pft .border-groupBy.btn-white { padding: 0 10px; font: var(--text-small); }
+.pft .border-groupBy.btn-white:hover, .pft .assignee-filter.manage__filter-users:hover { background: var(--surface-hover); }
+.pft .group-by-dropdown strong { color: var(--ink); font-weight: 600; font-size: 12.5px; }
+.pft .group-by-dropdown span { color: var(--ink-2); font-size: 12.5px; }
+.pft .group-by-dropdown.active { background: transparent; }
+.pft .assignee-filter .assignee-user, .pft .assignee-filter .assignee-status {
+    height: 30px; display: inline-flex; align-items: center; padding: 0 10px; color: var(--ink-2); font-size: 12.5px;
+}
+.pft .assignee-filter .assignee-user.bg-white, .pft .assignee-filter .assignee-status.bg-white { background: var(--brand-tint) !important; color: var(--brand); }
+.pft .assignee-filter .assignee-user { border-right: 1px solid var(--hairline); }
+
+/* AI + archive */
+.pft .ai_button {
+    height: 32px; padding: 0 12px; border-radius: 8px;
+    border: 1px solid rgba(47, 57, 144, .35); background: var(--surface); color: var(--brand);
+    font: 600 12.5px/1 var(--font-ui);
+}
+.pft .ai_button:hover { background: var(--brand-tint); }
+.pft .ai_button img { filter: none; width: 14px; }
+.pft .archived-btn { height: 32px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-2); font: var(--text-small); }
+.pft .archived-btn:hover { background: var(--surface-hover); color: var(--ink); }
+.pft .archived-btn .dark-gray { color: var(--ink) !important; font-size: 13px !important; }
+
+/* calendar controls */
+.pft .calendar-button {
+    height: 32px; min-width: 32px; padding: 0 10px; border: 1px solid var(--hairline); border-radius: 8px;
+    background: var(--surface); color: var(--ink); font: var(--text-small);
+}
+.pft .calendar-button:hover { background: var(--surface-hover); }
+.pft .monthly-calendar-view { font: 600 12.5px/32px var(--font-ui); color: var(--ink); width: auto !important; padding: 0 6px; }
+
+@media (max-width: 1279px) {
+    .pft .task-filtersearch { flex: 1 1 auto; min-width: 0; }
+    .pft__search { width: auto; flex: 1 1 160px; min-width: 160px; max-width: 220px; }
+    .pft .task-filter-assignee { gap: 4px; flex: 0 0 auto; }
+    .pft .border-groupBy.btn-white { padding: 0 8px; }
+}
+
+/* narrow: search collapses to an icon and expands inline; nothing overflows */
+@media (max-width: 800px) {
+    .pft { padding: 6px 14px; }
+    .pft__search-toggle {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 32px; height: 32px; border: 1px solid var(--hairline); border-radius: 8px;
+        background: var(--surface); color: var(--ink-2); cursor: pointer; flex: none;
+    }
+    .pft__search { display: none; }
+    .pft--search-open .pft__search { display: flex; width: 100%; flex: 1 1 100%; order: 9; }
+    .pft--search-open .pft__search-toggle { color: var(--brand); border-color: var(--brand); }
+    .pft .task-filtersearch { flex-wrap: wrap; }
+}
+@media (max-width: 767px) {
+    /* Left-aligned rows of equal-height pills; the search group takes its own row. */
+    /* !important on purpose: legacy utility classes (w-545, justify-content-between, btn-white)
+       sit on the same elements with the same specificity. */
+    .pft .task-filtersearchassignee-wrapper { flex-wrap: wrap !important; justify-content: flex-start !important; width: 100% !important; }
+    .pft .task-filtersearch { flex: 0 0 100% !important; width: 100% !important; justify-content: flex-start !important; }
+    .pft .task-filter-assignee { flex: 0 0 100% !important; width: 100% !important; justify-content: flex-start !important; gap: 6px; }
+    .pft .border-groupBy, .pft .ai_button, .pft .archived-btn, .pft .calendar-button, .pft__search-toggle,
+    .pft .assignee-filter.manage__filter-users, .pft .pft__input.form-control { min-height: 40px !important; height: 40px !important; line-height: 38px; }
+    .pft .assignee-filter .assignee-user, .pft .assignee-filter .assignee-status { height: 38px !important; }
+    .pft .border-groupBy.mr-1, .pft .ai_button.mr-1, .pft .assignee-filter.mr-1 { margin-right: 0 !important; }
+    .pft .archived-btn .text-nowrap { white-space: normal; }
+}

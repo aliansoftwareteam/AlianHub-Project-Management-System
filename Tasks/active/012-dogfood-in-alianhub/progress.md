@@ -112,3 +112,11 @@ Mobile pass at 375×812 (the stage-2 criterion nobody had ticked): Home checklis
 that hides the desktop tray also hid it inside the sheet, Board column "+" stretched to 44px by the
 generic tap-target rule (AR-40). All fixed and measured. Still legacy at 375: the project header/list
 toolbar (search overflows, duplicate ••• menus).
+
+### 2026-09-04 (AR-41: the last legacy surface)
+The project header was already on the tokens via ProjectHeader; the filters row under it was not.
+Re-skinned under a `pft` root with its own stylesheet, every control/ref/tour anchor/emit kept. One
+row from 1024px (search shrinks first), icon-collapse search under 800px, phone rows of 40px pills.
+Found on the way: the tablet List column rule (mine, yesterday) was declared after the phone rule and
+won, so at 375px the name column was 0px wide — restored. Left cosmetic: the Group-by pill's legacy
+inner box adds 2px at phone width.
