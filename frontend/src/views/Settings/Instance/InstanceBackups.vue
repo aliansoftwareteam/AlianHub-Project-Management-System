@@ -1,21 +1,21 @@
 <template>
     <div>
         <div class="in-actions">
-            <label class="ah-small in-inline"><input v-model="includeFiles" type="checkbox" class="ah-check" /> {{ $t('InstanceV2.include_files') }}</label>
+            <label class="ah-small in-inline"><input v-model="includeFiles" type="checkbox" class="ah-check" /> {{ $t('Instance.include_files') }}</label>
             <div class="ah-toolbar__spacer"></div>
-            <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="load">{{ $t('InstanceV2.refresh') }}</button>
+            <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="load">{{ $t('Instance.refresh') }}</button>
             <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy" @click="create">
-                <span v-if="busy && creating" class="ah-spin"></span>{{ creating ? $t('InstanceV2.backing_up') : $t('InstanceV2.backup_now') }}
+                <span v-if="busy && creating" class="ah-spin"></span>{{ creating ? $t('Instance.backing_up') : $t('Instance.backup_now') }}
             </button>
         </div>
-        <p class="ah-small">{{ $t('InstanceV2.backups_lead', { dir }) }} <a :href="guide('backup-restore')" target="_blank" rel="noopener">{{ $t('InstanceV2.guide') }}</a></p>
+        <p class="ah-small">{{ $t('Instance.backups_lead', { dir }) }} <a :href="guide('backup-restore')" target="_blank" rel="noopener">{{ $t('Instance.guide') }}</a></p>
         <div v-if="error" class="in-banner in-banner--danger"><ShellIcon name="alert" :size="15" /><span>{{ error }}</span></div>
         <div v-if="notice" class="in-banner in-banner--ok"><ShellIcon name="check" :size="15" /><span>{{ notice }}</span></div>
 
         <section class="ah-card in-card">
-            <div v-if="!backups.length" class="ah-empty">{{ $t('InstanceV2.no_backups') }}</div>
+            <div v-if="!backups.length" class="ah-empty">{{ $t('Instance.no_backups') }}</div>
             <table v-else class="in-table">
-                <thead><tr><th>{{ $t('InstanceV2.backup') }}</th><th>{{ $t('InstanceV2.created') }}</th><th>{{ $t('InstanceV2.size') }}</th><th></th></tr></thead>
+                <thead><tr><th>{{ $t('Instance.backup') }}</th><th>{{ $t('Instance.created') }}</th><th>{{ $t('Instance.size') }}</th><th></th></tr></thead>
                 <tbody>
                     <tr v-for="b in backups" :key="b.name">
                         <td class="ah-mono">{{ b.name }}</td>
@@ -23,8 +23,8 @@
                         <td>{{ formatBytes(b.size) }}</td>
                         <td>
                             <div class="in-actions">
-                                <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="busy" @click="download(`${env.INSTANCE_BACKUPS}/${b.name}/download`, b.name)"><ShellIcon name="download" :size="14" />{{ $t('InstanceV2.download') }}</button>
-                                <button type="button" class="ah-btn ah-btn--outline ah-btn--sm" :disabled="busy" @click="askRestore(b)">{{ $t('InstanceV2.restore') }}</button>
+                                <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="busy" @click="download(`${env.INSTANCE_BACKUPS}/${b.name}/download`, b.name)"><ShellIcon name="download" :size="14" />{{ $t('Instance.download') }}</button>
+                                <button type="button" class="ah-btn ah-btn--outline ah-btn--sm" :disabled="busy" @click="askRestore(b)">{{ $t('Instance.restore') }}</button>
                                 <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="busy" @click="remove(b)"><ShellIcon name="trash" :size="14" /></button>
                             </div>
                         </td>
@@ -34,22 +34,22 @@
         </section>
 
         <section v-if="restoring" class="ah-card in-card in-restore">
-            <div class="in-card__head"><ShellIcon name="alert" :size="16" /><span class="in-card__title">{{ $t('InstanceV2.restore_title', { name: restoring.name }) }}</span></div>
-            <p class="ah-small">{{ $t('InstanceV2.restore_lead') }}</p>
+            <div class="in-card__head"><ShellIcon name="alert" :size="16" /><span class="in-card__title">{{ $t('Instance.restore_title', { name: restoring.name }) }}</span></div>
+            <p class="ah-small">{{ $t('Instance.restore_lead') }}</p>
             <dl v-if="manifest" class="in-kv">
-                <dt>{{ $t('InstanceV2.taken') }}</dt><dd>{{ formatWhen(manifest.createdAt) }} · v{{ manifest.appVersion }}</dd>
-                <dt>{{ $t('InstanceV2.databases') }}</dt><dd>{{ Object.keys(manifest.databases).length }} ({{ manifest.companies.map((c) => c.name).filter(Boolean).join(', ') || 'global' }})</dd>
-                <dt>{{ $t('InstanceV2.files') }}</dt><dd>{{ manifest.includeFiles ? $t('InstanceV2.yes') : $t('InstanceV2.no') }}</dd>
+                <dt>{{ $t('Instance.taken') }}</dt><dd>{{ formatWhen(manifest.createdAt) }} · v{{ manifest.appVersion }}</dd>
+                <dt>{{ $t('Instance.databases') }}</dt><dd>{{ Object.keys(manifest.databases).length }} ({{ manifest.companies.map((c) => c.name).filter(Boolean).join(', ') || 'global' }})</dd>
+                <dt>{{ $t('Instance.files') }}</dt><dd>{{ manifest.includeFiles ? $t('Instance.yes') : $t('Instance.no') }}</dd>
             </dl>
             <div class="ah-field">
-                <label class="ah-field__label" for="confirm">{{ $t('InstanceV2.restore_type', { name: restoring.name }) }}</label>
+                <label class="ah-field__label" for="confirm">{{ $t('Instance.restore_type', { name: restoring.name }) }}</label>
                 <input id="confirm" v-model.trim="confirm" type="text" class="ah-input ah-mono" autocomplete="off" />
             </div>
             <div class="in-actions">
                 <button type="button" class="ah-btn ah-btn--danger" :disabled="busy || confirm !== restoring.name" @click="restore">
-                    <span v-if="busy" class="ah-spin"></span>{{ busy ? $t('InstanceV2.restoring') : $t('InstanceV2.restore_go') }}
+                    <span v-if="busy" class="ah-spin"></span>{{ busy ? $t('Instance.restoring') : $t('Instance.restore_go') }}
                 </button>
-                <button type="button" class="ah-btn ah-btn--secondary" :disabled="busy" @click="restoring = null">{{ $t('InstanceV2.cancel') }}</button>
+                <button type="button" class="ah-btn ah-btn--secondary" :disabled="busy" @click="restoring = null">{{ $t('Instance.cancel') }}</button>
             </div>
         </section>
     </div>
@@ -94,7 +94,7 @@ async function create() {
     busy.value = true; creating.value = true; notice.value = ""; error.value = "";
     try {
         const data = await post(env.INSTANCE_BACKUPS, { includeFiles: includeFiles.value });
-        notice.value = t("InstanceV2.backup_done", { name: data.name, size: formatBytes(data.size) });
+        notice.value = t("Instance.backup_done", { name: data.name, size: formatBytes(data.size) });
         await load();
     } catch (e) {
         error.value = message(e);
@@ -114,7 +114,7 @@ async function restore() {
     busy.value = true; error.value = ""; notice.value = "";
     try {
         const data = await post(`${env.INSTANCE_BACKUPS}/${restoring.value.name}/restore`, { confirm: confirm.value });
-        notice.value = t("InstanceV2.restore_done", { docs: data.restored.documents, colls: data.restored.collections, safety: data.safetyBackup });
+        notice.value = t("Instance.restore_done", { docs: data.restored.documents, colls: data.restored.collections, safety: data.safetyBackup });
         restoring.value = null;
         await load();
     } catch (e) {
@@ -125,7 +125,7 @@ async function restore() {
 }
 
 async function remove(b) {
-    if (!window.confirm(t("InstanceV2.delete_confirm", { name: b.name }))) return;
+    if (!window.confirm(t("Instance.delete_confirm", { name: b.name }))) return;
     busy.value = true;
     try { await del(`${env.INSTANCE_BACKUPS}/${b.name}`); await load(); } catch (e) { $toast.error(message(e)); } finally { busy.value = false; }
 }

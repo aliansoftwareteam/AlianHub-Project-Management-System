@@ -4,23 +4,23 @@
             <div>
                 <div class="billing__sheet-title">
                     {{ invoice.number }}
-                    <span class="ah-chip ah-chip--mono" :class="statusChip">{{ $t(`BillingV2.invoice_${invoice.status}`) }}</span>
+                    <span class="ah-chip ah-chip--mono" :class="statusChip">{{ $t(`Billing.invoice_${invoice.status}`) }}</span>
                 </div>
                 <div class="ah-small">{{ metaLine }}</div>
             </div>
             <span class="ah-toolbar__spacer"></span>
             <span v-if="periodLine" class="ah-mono billing__sheet-period">{{ periodLine }}</span>
-            <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :aria-label="$t('BillingV2.cancel')" @click="$emit('close')">
+            <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :aria-label="$t('Billing.cancel')" @click="$emit('close')">
                 <ShellIcon name="x" :size="15" />
             </button>
         </header>
 
         <div class="billing__sheet-body ah-scroll">
             <div class="billing__line billing__line--head">
-                <span>{{ $t('BillingV2.col_line') }}</span>
-                <span class="billing__num">{{ $t('BillingV2.col_qty') }}</span>
-                <span class="billing__num">{{ $t('BillingV2.col_rate') }}</span>
-                <span class="billing__num">{{ $t('BillingV2.col_amount') }}</span>
+                <span>{{ $t('Billing.col_line') }}</span>
+                <span class="billing__num">{{ $t('Billing.col_qty') }}</span>
+                <span class="billing__num">{{ $t('Billing.col_rate') }}</span>
+                <span class="billing__num">{{ $t('Billing.col_amount') }}</span>
             </div>
 
             <template v-for="line in invoice.lines" :key="line.id">
@@ -28,7 +28,7 @@
                     <div>
                         <div class="billing__line-label">{{ line.label }}</div>
                         <button type="button" class="billing__line-detail" @click="toggle(line.id)">
-                            {{ line.detail || $t('BillingV2.line_expand') }}
+                            {{ line.detail || $t('Billing.line_expand') }}
                             <ShellIcon :name="expanded === line.id ? 'chevronDown' : 'chevronRight'" :size="12" />
                         </button>
                     </div>
@@ -37,17 +37,17 @@
                     <span class="billing__num billing__figure">{{ money(line.amountMinor, symbol) }}</span>
                 </div>
                 <div v-if="expanded === line.id" class="billing__trace">
-                    <div v-if="!tasksFor(line).length && !logsFor(line).length" class="ah-small">{{ $t('BillingV2.line_nothing') }}</div>
+                    <div v-if="!tasksFor(line).length && !logsFor(line).length" class="ah-small">{{ $t('Billing.line_nothing') }}</div>
                     <div v-if="tasksFor(line).length" class="billing__trace-group">
-                        <div class="ah-label">{{ $t('BillingV2.line_tasks', { count: tasksFor(line).length }) }}</div>
+                        <div class="ah-label">{{ $t('Billing.line_tasks', { count: tasksFor(line).length }) }}</div>
                         <div v-for="task in tasksFor(line)" :key="task._id" class="billing__trace-row">
                             <span class="ah-mono billing__trace-key">{{ task.key }}</span>
                             <span class="billing__trace-name">{{ task.name }}</span>
-                            <span class="ah-chip" :class="task.done ? 'ah-chip--ok' : ''">{{ task.done ? $t('BillingV2.task_done') : $t('BillingV2.task_open') }}</span>
+                            <span class="ah-chip" :class="task.done ? 'ah-chip--ok' : ''">{{ task.done ? $t('Billing.task_done') : $t('Billing.task_open') }}</span>
                         </div>
                     </div>
                     <div v-if="logsFor(line).length" class="billing__trace-group">
-                        <div class="ah-label">{{ $t('BillingV2.line_timelogs', { count: logsFor(line).length }) }}</div>
+                        <div class="ah-label">{{ $t('Billing.line_timelogs', { count: logsFor(line).length }) }}</div>
                         <div v-for="log in logsFor(line)" :key="log._id" class="billing__trace-row">
                             <span class="ah-mono billing__trace-key">{{ dayLabel(log.at * 1000) }}</span>
                             <span class="billing__trace-name">{{ log.userName }} · {{ log.note }}</span>
@@ -59,30 +59,30 @@
 
             <form v-if="invoice.status === 'draft' && adding" class="billing__line-add" @submit.prevent="addLine">
                 <div class="ah-field">
-                    <label class="ah-field__label" for="line-kind">{{ $t('BillingV2.line_kind') }}</label>
+                    <label class="ah-field__label" for="line-kind">{{ $t('Billing.line_kind') }}</label>
                     <select id="line-kind" v-model="draft.kind" class="ah-input">
-                        <option value="change_request">{{ $t('BillingV2.kind_change_request') }}</option>
-                        <option value="expense">{{ $t('BillingV2.kind_expense') }}</option>
-                        <option value="adjustment">{{ $t('BillingV2.kind_adjustment') }}</option>
+                        <option value="change_request">{{ $t('Billing.kind_change_request') }}</option>
+                        <option value="expense">{{ $t('Billing.kind_expense') }}</option>
+                        <option value="adjustment">{{ $t('Billing.kind_adjustment') }}</option>
                     </select>
                 </div>
                 <div class="ah-field">
-                    <label class="ah-field__label" for="line-label">{{ $t('BillingV2.line_label') }}</label>
+                    <label class="ah-field__label" for="line-label">{{ $t('Billing.line_label') }}</label>
                     <input id="line-label" v-model="draft.label" class="ah-input" :class="{ 'ah-input--error': lineError }" maxlength="200" />
                     <span v-if="lineError" class="ah-field__error">{{ lineError }}</span>
                 </div>
                 <div class="ah-field">
-                    <label class="ah-field__label" for="line-qty">{{ draft.unit === '' ? $t('BillingV2.line_amount') : $t('BillingV2.col_qty') }}</label>
+                    <label class="ah-field__label" for="line-qty">{{ draft.unit === '' ? $t('Billing.line_amount') : $t('Billing.col_qty') }}</label>
                     <input id="line-qty" v-model="draft.qty" class="ah-input" type="number" min="0" step="0.01" />
-                    <span class="ah-field__hint">{{ $t('BillingV2.line_unit_hint') }}</span>
+                    <span class="ah-field__hint">{{ $t('Billing.line_unit_hint') }}</span>
                 </div>
                 <div class="ah-field">
-                    <label class="ah-field__label" for="line-rate">{{ $t('BillingV2.line_unit') }}</label>
+                    <label class="ah-field__label" for="line-rate">{{ $t('Billing.line_unit') }}</label>
                     <input id="line-rate" v-model="draft.unit" class="ah-input" type="number" min="0" step="0.01" />
                 </div>
                 <div class="billing__line-add-actions">
-                    <button type="submit" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy">{{ $t('BillingV2.save') }}</button>
-                    <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="adding = false">{{ $t('BillingV2.cancel') }}</button>
+                    <button type="submit" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy">{{ $t('Billing.save') }}</button>
+                    <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="adding = false">{{ $t('Billing.cancel') }}</button>
                 </div>
             </form>
             <button
@@ -91,12 +91,12 @@
                 class="billing__line-add-open"
                 @click="openAdd"
             >
-                <span class="billing__add-plus">+</span>{{ $t('BillingV2.add_line') }}
+                <span class="billing__add-plus">+</span>{{ $t('Billing.add_line') }}
             </button>
 
             <div class="billing__totals">
                 <div class="billing__total-row">
-                    <span class="ah-muted">{{ $t('BillingV2.subtotal') }}</span>
+                    <span class="ah-muted">{{ $t('Billing.subtotal') }}</span>
                     <span class="ah-mono billing__total-value">{{ money(invoice.subtotalMinor, symbol) }}</span>
                 </div>
                 <div v-if="invoice.taxRateBp" class="billing__total-row">
@@ -104,7 +104,7 @@
                     <span class="ah-mono billing__total-value">{{ money(invoice.taxMinor, symbol) }}</span>
                 </div>
                 <div class="billing__total-row billing__total-row--due">
-                    <span class="billing__due-label">{{ $t('BillingV2.total_due') }}</span>
+                    <span class="billing__due-label">{{ $t('Billing.total_due') }}</span>
                     <span class="billing__due-value">{{ money(invoice.totalMinor, symbol) }}</span>
                 </div>
             </div>
@@ -118,7 +118,7 @@
                 :disabled="busy"
                 @click="$emit('send', invoice._id)"
             >
-                {{ $t('BillingV2.send_to_client') }}
+                {{ $t('Billing.send_to_client') }}
             </button>
             <button
                 v-else-if="invoice.status === 'sent'"
@@ -127,21 +127,21 @@
                 :disabled="busy"
                 @click="$emit('paid', invoice._id)"
             >
-                {{ $t('BillingV2.mark_paid') }}
+                {{ $t('Billing.mark_paid') }}
             </button>
             <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="pdfBusy" @click="downloadPdf">
-                {{ $t('BillingV2.pdf') }}
+                {{ $t('Billing.pdf') }}
             </button>
             <button
                 type="button"
                 class="ah-btn ah-btn--secondary ah-btn--sm"
                 disabled
-                :title="$t('BillingV2.stripe_disabled')"
+                :title="$t('Billing.stripe_disabled')"
             >
-                {{ $t('BillingV2.export_stripe') }}
+                {{ $t('Billing.export_stripe') }}
             </button>
             <span class="ah-toolbar__spacer"></span>
-            <span class="ah-small">{{ $t('BillingV2.every_line_links') }}</span>
+            <span class="ah-small">{{ $t('Billing.every_line_links') }}</span>
         </footer>
     </article>
 </template>
@@ -188,7 +188,7 @@ const openAdd = () => {
  * sends the line, never a total. */
 const addLine = () => {
     if (!draft.label.trim()) {
-        lineError.value = t("BillingV2.line_label_required");
+        lineError.value = t("Billing.line_label_required");
         return;
     }
     lineError.value = "";
@@ -205,22 +205,22 @@ const addLine = () => {
 const CHIP = { draft: "ah-chip--warn", sent: "ah-chip--brand", paid: "ah-chip--ok" };
 const statusChip = computed(() => CHIP[invoice.value.status] || "");
 
-const metaLine = computed(() => t("BillingV2.invoice_meta", {
-    client: invoice.value.clientName || t("BillingV2.no_client"),
+const metaLine = computed(() => t("Billing.invoice_meta", {
+    client: invoice.value.clientName || t("Billing.no_client"),
     project: props.projectName,
     days: daysBetween(invoice.value.issuedDate, invoice.value.dueDate),
 }));
 
 const periodLine = computed(() => {
     if (!invoice.value.issuedDate) return "";
-    return t("BillingV2.period", {
+    return t("Billing.period", {
         from: (dayLabel(invoice.value.issuedDate) || "").toUpperCase(),
         to: (dayLabel(invoice.value.dueDate) || "").toUpperCase(),
     });
 });
 
-const taxLine = computed(() => t("BillingV2.tax_named", {
-    label: invoice.value.taxLabel || t("BillingV2.tax"),
+const taxLine = computed(() => t("Billing.tax_named", {
+    label: invoice.value.taxLabel || t("Billing.tax"),
     percent: percentFromBp(invoice.value.taxRateBp),
 }));
 
@@ -250,14 +250,14 @@ const downloadPdf = async () => {
             subtitle: metaLine.value,
             filename: inv.number,
             meta: [periodLine.value].filter(Boolean),
-            tableHead: [t("BillingV2.col_line"), t("BillingV2.col_qty"), t("BillingV2.col_rate"), t("BillingV2.col_amount")],
+            tableHead: [t("Billing.col_line"), t("Billing.col_qty"), t("Billing.col_rate"), t("Billing.col_amount")],
             tableRows: (inv.lines || []).map((line) => [
                 line.detail ? `${line.label} (${line.detail})` : line.label,
                 qty(line),
                 line.unitMinor === null ? "—" : money(line.unitMinor, symbol.value),
                 money(line.amountMinor, symbol.value),
             ]),
-            totalRow: ["", "", t("BillingV2.total_due"), money(inv.totalMinor, symbol.value)],
+            totalRow: ["", "", t("Billing.total_due"), money(inv.totalMinor, symbol.value)],
         };
         const res = await apiRequest("post", env.EXPORT_PDF, { type: "invoice", params }, undefined, { responseType: "blob" });
         const url = window.URL.createObjectURL(res.data);
@@ -269,7 +269,7 @@ const downloadPdf = async () => {
         link.remove();
         window.URL.revokeObjectURL(url);
     } catch (error) {
-        $toast.error(t("BillingV2.save_failed"));
+        $toast.error(t("Billing.save_failed"));
     } finally {
         pdfBusy.value = false;
     }

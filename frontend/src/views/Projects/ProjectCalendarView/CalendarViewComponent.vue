@@ -3,7 +3,7 @@
         <div class="cv__bar">
             <span class="ah-mono cv__month">{{ monthLabel }}</span>
             <div class="ah-toolbar__spacer"></div>
-            <span class="ah-label cv__show">{{ $t('ViewsV2.show') }}</span>
+            <span class="ah-label cv__show">{{ $t('Views.show') }}</span>
             <button
                 v-for="filter in filters"
                 :key="filter.key"
@@ -51,10 +51,10 @@
 
             <aside class="cv__tray ah-scroll">
                 <div class="cv__tray-head">
-                    <span class="cv__tray-title">{{ $t('ViewsV2.unscheduled') }}</span>
+                    <span class="cv__tray-title">{{ $t('Views.unscheduled') }}</span>
                     <span class="ah-mono cv__tray-count">{{ unscheduled.length }}</span>
                 </div>
-                <p v-if="!unscheduled.length" class="cv__tray-empty ah-small">{{ $t('ViewsV2.tray_empty') }}</p>
+                <p v-if="!unscheduled.length" class="cv__tray-empty ah-small">{{ $t('Views.tray_empty') }}</p>
                 <div
                     v-for="task in unscheduled"
                     :key="task._id"
@@ -71,7 +71,7 @@
                 <div v-if="proposal" class="cv__proposal">
                     <span class="cv__spark">✦</span>
                     {{ proposal.what }}
-                    <router-link class="cv__proposal-link" :to="{ name: 'AiInbox', params: { cid: companyId } }">{{ $t('ViewsV2.review') }}</router-link>
+                    <router-link class="cv__proposal-link" :to="{ name: 'AiInbox', params: { cid: companyId } }">{{ $t('Views.review') }}</router-link>
                 </div>
             </aside>
         </div>
@@ -139,9 +139,9 @@
     const showPto = ref(true);
     const showSprints = ref(true);
     const filters = computed(() => [
-        { key: 'due', label: t('ViewsV2.filter_due'), model: showDue },
-        { key: 'pto', label: t('ViewsV2.filter_pto'), model: showPto },
-        { key: 'sprints', label: t('ViewsV2.filter_sprints'), model: showSprints },
+        { key: 'due', label: t('Views.filter_due'), model: showDue },
+        { key: 'pto', label: t('Views.filter_pto'), model: showPto },
+        { key: 'sprints', label: t('Views.filter_sprints'), model: showSprints },
     ]);
 
     const unscheduled = ref([]);
@@ -279,7 +279,7 @@
                 return {
                     id: String(s.id || s._id),
                     current: String(s.id || s._id) === String(props.sprint?.id || props.sprint?._id),
-                    label: `${(s.name || t('ViewsV2.sprint_fallback')).toUpperCase()} · ${dayLabel(formatDate(from))}–${dayLabel(formatDate(to))}`,
+                    label: `${(s.name || t('Views.sprint_fallback')).toUpperCase()} · ${dayLabel(formatDate(from))}–${dayLabel(formatDate(to))}`,
                     left,
                     width,
                 };
@@ -299,7 +299,7 @@
             const to = new Date(entry.endDate);
             for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
                 const key = formatDate(d);
-                (map[key] = map[key] || []).push(entry.userName || t('ViewsV2.teammate'));
+                (map[key] = map[key] || []).push(entry.userName || t('Views.teammate'));
             }
         });
         return map;
@@ -310,8 +310,8 @@
     const dayCellContent = (arg) => {
         const iso = formatDate(arg.date);
         const names = ptoByDay.value[iso] || [];
-        const pto = names.map((name) => `<span class="cv__pto">${escapeHtml(name)} · ${t('ViewsV2.pto')}</span>`).join('');
-        const number = `<span class="cv__daynum">${arg.dayNumberText}${arg.isToday ? ` · ${t('ViewsV2.today')}` : ''}</span>`;
+        const pto = names.map((name) => `<span class="cv__pto">${escapeHtml(name)} · ${t('Views.pto')}</span>`).join('');
+        const number = `<span class="cv__daynum">${arg.dayNumberText}${arg.isToday ? ` · ${t('Views.today')}` : ''}</span>`;
         return { html: `${number}${pto}` };
     };
 
@@ -341,7 +341,7 @@
         weekends: true,
         dayCellContent,
         dayCellClassNames,
-        moreLinkContent: (arg) => t('ViewsV2.more_count', { n: arg.num }),
+        moreLinkContent: (arg) => t('Views.more_count', { n: arg.num }),
         datesSet: (arg) => {
             visibleRange.value = { start: arg.start, end: arg.end };
             loadPto(arg.start, arg.end);
@@ -597,7 +597,7 @@
                     $toast.success(t('Toast.Start_and_Due_date_updated_successfully'),{position: 'top-right'});
                 })
                 .catch((error) => {
-                    $toast.error(t('Toast.Start_an_Due_date_not_updated'),{position: 'top-right'});
+                    $toast.error(t('Toast.Start_and_Due_date_not_updated'),{position: 'top-right'});
                     console.error(error);
                 });
                 return;
@@ -648,7 +648,7 @@
         cell.classList.add('cv-drop');
         const hint = document.createElement('div');
         hint.className = 'cv-drop-hint';
-        hint.textContent = t('ViewsV2.drop_here', { date: dayLabel(cell.dataset.date) });
+        hint.textContent = t('Views.drop_here', { date: dayLabel(cell.dataset.date) });
         (cell.querySelector('.fc-daygrid-day-events') || cell).prepend(hint);
     };
     const onGridDragLeave = (event) => {

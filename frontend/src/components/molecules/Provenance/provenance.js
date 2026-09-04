@@ -46,4 +46,4 @@ export const CHIP_CLASS = Object.freeze({
     UNCHECKED: "ah-chip--danger"
 });
 
-export const badgeKey = (badge) => `ProvenanceV2.badge_${String(badge || "").toLowerCase()}`;
+export const badgeKey = (badge) => `Provenance.badge_${String(badge || "").toLowerCase()}`;

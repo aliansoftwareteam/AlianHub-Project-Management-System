@@ -3,16 +3,16 @@
         <div class="chg__wrap">
             <div class="chg__head">
                 <div>
-                    <div class="chg__title">{{ $t('InboxV2.chg_title') }}</div>
+                    <div class="chg__title">{{ $t('Inbox.chg_title') }}</div>
                     <div class="chg__sub">
                         <template v-if="currentVersion">
-                            {{ $t('InboxV2.chg_on_version', { v: currentVersion }) }}
-                            <template v-if="updateAvailable"> {{ $t('InboxV2.chg_available', { v: latestVersion }) }}</template>
-                            <template v-else> {{ $t('InboxV2.chg_up_to_date') }}</template>
+                            {{ $t('Inbox.chg_on_version', { v: currentVersion }) }}
+                            <template v-if="updateAvailable"> {{ $t('Inbox.chg_available', { v: latestVersion }) }}</template>
+                            <template v-else> {{ $t('Inbox.chg_up_to_date') }}</template>
                         </template>
                     </div>
                 </div>
-                <a v-if="repoUrl" class="ah-btn ah-btn--primary ah-btn--sm chg__cta" :href="`${repoUrl}/releases`" target="_blank" rel="noopener noreferrer">{{ $t('InboxV2.chg_upgrade_guide') }}</a>
+                <a v-if="repoUrl" class="ah-btn ah-btn--primary ah-btn--sm chg__cta" :href="`${repoUrl}/releases`" target="_blank" rel="noopener noreferrer">{{ $t('Inbox.chg_upgrade_guide') }}</a>
             </div>
 
             <div v-if="loading" class="chg__state">{{ $t('Inbox.loading') }}</div>
@@ -42,8 +42,8 @@
                             <span
                                 class="ah-chip ah-chip--mono chg__chip"
                                 :class="release.selfHost?.upgradeNeeded || release.selfHost?.breaking ? 'ah-chip--warn' : 'ah-chip--ok'"
-                                :title="$t('InboxV2.chg_upgrade_needed_q')"
-                            >{{ release.selfHost?.upgradeNeeded || release.selfHost?.breaking ? $t('InboxV2.chg_upgrade_needed') : $t('InboxV2.chg_upgrade_plain') }}</span>
+                                :title="$t('Inbox.chg_upgrade_needed_q')"
+                            >{{ release.selfHost?.upgradeNeeded || release.selfHost?.breaking ? $t('Inbox.chg_upgrade_needed') : $t('Inbox.chg_upgrade_plain') }}</span>
                             <span class="ah-toolbar__spacer"></span>
                             <a v-if="release.compareUrl" :href="release.compareUrl" target="_blank" rel="noopener noreferrer" class="chg__link">{{ $t('Changelog.compare_changes') }}</a>
                         </div>
@@ -51,7 +51,7 @@
                         <p v-for="(note, n) in release.notes" :key="`n${n}`" class="chg__text" v-html="note"></p>
 
                         <div class="chg__shipped">
-                            <div class="ah-label">{{ $t('InboxV2.chg_what_shipped') }}</div>
+                            <div class="ah-label">{{ $t('Inbox.chg_what_shipped') }}</div>
                             <div v-for="(section, s) in shipped(release)" :key="s" class="chg__section">
                                 <div v-if="section.title" class="chg__section-title">{{ section.title }}</div>
                                 <ul class="chg__items">
@@ -61,19 +61,19 @@
                         </div>
 
                         <div class="chg__selfhost" :class="{ 'is-needed': release.selfHost?.upgradeNeeded || release.selfHost?.breaking }">
-                            <div class="ah-label">{{ $t('InboxV2.chg_for_self_hosters') }}</div>
+                            <div class="ah-label">{{ $t('Inbox.chg_for_self_hosters') }}</div>
                             <template v-if="release.selfHost?.notes?.length">
                                 <div v-for="(note, i) in release.selfHost.notes" :key="i" class="chg__selfhost-note" v-html="note"></div>
                             </template>
-                            <div v-else class="chg__selfhost-note chg__selfhost-note--plain">{{ $t('InboxV2.chg_selfhost_none') }}</div>
-                            <div class="chg__req">{{ $t('InboxV2.chg_upgrade_steps') }}</div>
+                            <div v-else class="chg__selfhost-note chg__selfhost-note--plain">{{ $t('Inbox.chg_selfhost_none') }}</div>
+                            <div class="chg__req">{{ $t('Inbox.chg_upgrade_steps') }}</div>
                         </div>
                     </div>
                 </article>
             </div>
 
             <div class="chg__foot">
-                {{ $t('InboxV2.chg_footer') }}
+                {{ $t('Inbox.chg_footer') }}
                 <a v-if="repoUrl" :href="`${repoUrl}/releases.atom`" target="_blank" rel="noopener noreferrer" class="chg__link">RSS</a>
             </div>
         </div>

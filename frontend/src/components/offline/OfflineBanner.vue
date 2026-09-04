@@ -4,80 +4,80 @@
             <div class="ah-off__strip" :class="{ 'is-sync': !away }">
                 <span class="ah-dot" :class="away ? 'ah-dot--warn' : 'ah-dot--ok'"></span>
                 <span class="ah-off__text">
-                    <strong v-if="away">{{ $t('InboxV2.off_title') }}</strong>
-                    <template v-if="away"> — {{ $t('InboxV2.off_keep_working') }} </template>
-                    <template v-if="syncing">{{ $t('InboxV2.off_syncing', { n: pendingCount }) }}</template>
-                    <template v-else-if="pendingCount">{{ $t('InboxV2.off_queued', { n: pendingCount }) }}</template>
-                    <template v-if="conflicts.length"> · {{ $t('InboxV2.off_conflicts_n', { n: conflicts.length }) }}</template>
+                    <strong v-if="away">{{ $t('Inbox.off_title') }}</strong>
+                    <template v-if="away"> — {{ $t('Inbox.off_keep_working') }} </template>
+                    <template v-if="syncing">{{ $t('Inbox.off_syncing', { n: pendingCount }) }}</template>
+                    <template v-else-if="pendingCount">{{ $t('Inbox.off_queued', { n: pendingCount }) }}</template>
+                    <template v-if="conflicts.length"> · {{ $t('Inbox.off_conflicts_n', { n: conflicts.length }) }}</template>
                 </span>
                 <button type="button" class="ah-off__review" @click="open = !open">
-                    {{ open ? $t('InboxV2.off_hide_queue') : $t('InboxV2.off_review_queue') }}
+                    {{ open ? $t('Inbox.off_hide_queue') : $t('Inbox.off_review_queue') }}
                 </button>
             </div>
 
             <transition name="ah-fade">
-                <div v-if="open" class="ah-off__sheet ah-scroll" role="dialog" :aria-label="$t('InboxV2.off_title')">
+                <div v-if="open" class="ah-off__sheet ah-scroll" role="dialog" :aria-label="$t('Inbox.off_title')">
                     <div class="ah-off__grid">
                         <div class="ah-card ah-off__card">
-                            <div class="ah-off__card-title"><span class="ah-dot ah-dot--ok"></span>{{ $t('InboxV2.off_still_works') }}</div>
-                            <div class="ah-off__card-body">{{ $t('InboxV2.off_still_works_list') }}</div>
+                            <div class="ah-off__card-title"><span class="ah-dot ah-dot--ok"></span>{{ $t('Inbox.off_still_works') }}</div>
+                            <div class="ah-off__card-body">{{ $t('Inbox.off_still_works_list') }}</div>
                         </div>
                         <div class="ah-card ah-off__card">
-                            <div class="ah-off__card-title"><span class="ah-dot ah-off__dot-muted"></span>{{ $t('InboxV2.off_needs_server') }}</div>
-                            <div class="ah-off__card-body">{{ $t('InboxV2.off_needs_server_list') }}</div>
+                            <div class="ah-off__card-title"><span class="ah-dot ah-off__dot-muted"></span>{{ $t('Inbox.off_needs_server') }}</div>
+                            <div class="ah-off__card-body">{{ $t('Inbox.off_needs_server_list') }}</div>
                         </div>
                     </div>
 
                     <div class="ah-card ah-off__card">
                         <div class="ah-off__row-head">
-                            <span class="ah-off__card-title">{{ $t('InboxV2.off_queued_changes') }}</span>
-                            <span class="ah-off__meta">{{ queue.length }}<template v-if="oldest"> · {{ $t('InboxV2.off_oldest', { t: oldest }) }}</template></span>
+                            <span class="ah-off__card-title">{{ $t('Inbox.off_queued_changes') }}</span>
+                            <span class="ah-off__meta">{{ queue.length }}<template v-if="oldest"> · {{ $t('Inbox.off_oldest', { t: oldest }) }}</template></span>
                         </div>
-                        <div v-if="!queue.length" class="ah-off__card-body">{{ $t('InboxV2.off_queue_empty') }}</div>
+                        <div v-if="!queue.length" class="ah-off__card-body">{{ $t('Inbox.off_queue_empty') }}</div>
                         <div v-for="q in visibleQueue" :key="q.id" class="ah-off__row" :class="{ 'is-held': q.held }">
                             <span class="ah-off__tag">{{ q.tag }}</span>
                             <span class="ah-off__row-text">{{ q.text || q.endPoint }}</span>
-                            <span v-if="q.attempts" class="ah-off__meta">{{ $t('InboxV2.off_attempt', { n: q.attempts }) }}</span>
+                            <span v-if="q.attempts" class="ah-off__meta">{{ $t('Inbox.off_attempt', { n: q.attempts }) }}</span>
                             <span class="ah-off__meta">{{ stamp(q.at) }}</span>
                         </div>
                         <div v-if="queue.length > visibleQueue.length" class="ah-off__row ah-off__row--more">
                             <span class="ah-off__tag">+{{ queue.length - visibleQueue.length }}</span>
-                            <span class="ah-off__row-text">{{ $t('InboxV2.off_more_changes', { n: queue.length - visibleQueue.length }) }}</span>
+                            <span class="ah-off__row-text">{{ $t('Inbox.off_more_changes', { n: queue.length - visibleQueue.length }) }}</span>
                         </div>
                     </div>
 
                     <div v-if="conflicts.length" class="ah-card ah-off__card ah-off__card--conflict">
-                        <div class="ah-off__card-title ah-off__card-title--warn">{{ $t('InboxV2.off_conflicts_title', { n: conflicts.length }) }}</div>
+                        <div class="ah-off__card-title ah-off__card-title--warn">{{ $t('Inbox.off_conflicts_title', { n: conflicts.length }) }}</div>
                         <div v-for="c in conflicts" :key="c.id" class="ah-off__conflict">
                             <div class="ah-off__card-body">
-                                <i18n-t keypath="InboxV2.off_conflict_line" tag="span" scope="global">
+                                <i18n-t keypath="Inbox.off_conflict_line" tag="span" scope="global">
                                     <template #task><strong>{{ c.taskKey || c.taskId }}</strong></template>
                                     <template #mine>{{ valueOf(c.fields[0].mine) }}</template>
                                     <template #mineAt>{{ stamp(c.mineAt) }}</template>
-                                    <template #who>{{ c.theirsBy || $t('InboxV2.off_someone') }}</template>
+                                    <template #who>{{ c.theirsBy || $t('Inbox.off_someone') }}</template>
                                     <template #theirs>{{ valueOf(c.fields[0].theirs) }}</template>
                                     <template #theirsAt>{{ stamp(c.theirsAt) }}</template>
                                 </i18n-t>
                             </div>
                             <div class="ah-off__actions">
-                                <button type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="decide(c, 'mine')">{{ $t('InboxV2.off_keep_mine') }}</button>
-                                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="decide(c, 'theirs')">{{ $t('InboxV2.off_keep_theirs', { who: c.theirsBy || $t('InboxV2.off_theirs') }) }}</button>
-                                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="decide(c, 'open')">{{ $t('InboxV2.off_open_decide') }}</button>
+                                <button type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="decide(c, 'mine')">{{ $t('Inbox.off_keep_mine') }}</button>
+                                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="decide(c, 'theirs')">{{ $t('Inbox.off_keep_theirs', { who: c.theirsBy || $t('Inbox.off_theirs') }) }}</button>
+                                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="decide(c, 'open')">{{ $t('Inbox.off_open_decide') }}</button>
                             </div>
                         </div>
-                        <div class="ah-off__hint">{{ $t('InboxV2.off_conflict_hint') }}</div>
+                        <div class="ah-off__hint">{{ $t('Inbox.off_conflict_hint') }}</div>
                     </div>
 
                     <div class="ah-card ah-off__retry">
                         <span class="ah-off__spinner" :class="{ 'is-spinning': syncing || away }"></span>
                         <div class="ah-off__retry-text">
-                            <strong>{{ $t('InboxV2.off_retry_every', { s: RETRY_S }) }}</strong>
+                            <strong>{{ $t('Inbox.off_retry_every', { s: RETRY_S }) }}</strong>
                             <span class="ah-muted">
-                                {{ $t('InboxV2.off_stored_on_device') }}
-                                <span v-if="away" class="ah-off__meta">· {{ $t('InboxV2.state_retrying', { s: retryIn || RETRY_S, n: attempt }) }}</span>
+                                {{ $t('Inbox.off_stored_on_device') }}
+                                <span v-if="away" class="ah-off__meta">· {{ $t('Inbox.state_retrying', { s: retryIn || RETRY_S, n: attempt }) }}</span>
                             </span>
                         </div>
-                        <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="syncing" @click="retryNow()">{{ $t('InboxV2.off_retry_now') }}</button>
+                        <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="syncing" @click="retryNow()">{{ $t('Inbox.off_retry_now') }}</button>
                     </div>
                 </div>
             </transition>

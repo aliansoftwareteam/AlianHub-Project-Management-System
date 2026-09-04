@@ -1,18 +1,18 @@
 <template>
     <div class="ah-page tv-page vr">
         <div class="tv-head">
-            <h1 class="tv-title vr__title">{{ $t('TimeV2.variance') }}</h1>
+            <h1 class="tv-title vr__title">{{ $t('Time.variance') }}</h1>
             <span class="tv-range">
-                <button type="button" :aria-label="$t('TimeV2.prev_month')" @click="shift(-1)">‹</button>
+                <button type="button" :aria-label="$t('Time.prev_month')" @click="shift(-1)">‹</button>
                 <span>{{ headline }}</span>
-                <button type="button" :aria-label="$t('TimeV2.next_month')" @click="shift(1)">›</button>
+                <button type="button" :aria-label="$t('Time.next_month')" @click="shift(1)">›</button>
             </span>
             <div class="tv-actions">
                 <select v-model="groupBy" class="tv-select">
-                    <option value="project">{{ $t('TimeV2.by_project') }}</option>
-                    <option value="person">{{ $t('TimeV2.by_person') }}</option>
+                    <option value="project">{{ $t('Time.by_project') }}</option>
+                    <option value="person">{{ $t('Time.by_person') }}</option>
                 </select>
-                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="!groups.length" @click="exportReport">{{ $t('TimeV2.export') }}</button>
+                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="!groups.length" @click="exportReport">{{ $t('Time.export') }}</button>
             </div>
         </div>
 
@@ -20,28 +20,28 @@
 
         <div class="tv-card tv-card--pad vr__bars">
             <div class="vr__section">
-                <span class="tv-section-label">{{ groupBy === 'project' ? $t('TimeV2.section_project') : $t('TimeV2.section_person') }}</span>
-                <span class="vr__sort" :title="$t('TimeV2.sort_hint')">
+                <span class="tv-section-label">{{ groupBy === 'project' ? $t('Time.section_project') : $t('Time.section_person') }}</span>
+                <span class="vr__sort" :title="$t('Time.sort_hint')">
                     <button v-for="s in sorts" :key="s.key" type="button" class="tv-pill" :class="{ 'is-active': sortKey === s.key }" @click="setSort(s.key)">{{ $t(s.label) }}{{ sortKey === s.key ? (sortDir > 0 ? ' ↑' : ' ↓') : '' }}</button>
                 </span>
             </div>
             <button v-for="g in sortedGroups" :key="g.key" type="button" class="vr__bar-row" :class="{ 'is-active': drill && drill.key === g.key }" :disabled="groupBy !== 'project'" @click="drillInto(g)">
-                <span class="vr__bar-name" :title="g.name">{{ g.name || $t('TimeV2.unknown_project') }}</span>
+                <span class="vr__bar-name" :title="g.name">{{ g.name || $t('Time.unknown_project') }}</span>
                 <span class="vr__track">
                     <span class="vr__fill" :class="toneOf(g)" :style="{ width: `${widthPct(g.actualMinutes)}%` }"></span>
                     <span class="vr__est" :style="{ left: `${widthPct(g.estimatedMinutes)}%` }"></span>
                 </span>
                 <span class="vr__pct" :class="toneOf(g)">{{ signedPct(g) }}</span>
             </button>
-            <div v-if="!groups.length" class="tv-empty"><span>{{ loading ? $t('TimeV2.loading') : $t('TimeV2.variance_empty') }}</span></div>
-            <div class="ah-small">{{ $t('TimeV2.bar_hint') }}</div>
+            <div v-if="!groups.length" class="tv-empty"><span>{{ loading ? $t('Time.loading') : $t('Time.variance_empty') }}</span></div>
+            <div class="ah-small">{{ $t('Time.bar_hint') }}</div>
         </div>
 
         <div class="vr__two">
             <div class="tv-card tv-card--pad vr__drivers">
-                <span class="tv-section-label">{{ $t('TimeV2.drift_title') }}</span>
+                <span class="tv-section-label">{{ $t('Time.drift_title') }}</span>
                 <div v-for="d in drivers" :key="d.key" class="vr__driver">
-                    <span class="vr__driver-name">{{ $t(`TimeV2.driver_${d.key}`) }} <small>({{ d.tasks }})</small></span>
+                    <span class="vr__driver-name">{{ $t(`Time.driver_${d.key}`) }} <small>({{ d.tasks }})</small></span>
                     <span class="vr__mini"><span class="vr__mini-fill" :class="toneOfPct(d.driftPct)" :style="{ width: `${Math.min(100, Math.abs(d.driftPct))}%` }"></span></span>
                     <span class="vr__pct vr__pct--sm">{{ d.driftPct > 0 ? '+' : '' }}{{ d.driftPct }}%</span>
                 </div>
@@ -49,14 +49,14 @@
 
             <div class="tv-card tv-card--pad vr__table">
                 <div class="vr__section">
-                    <span class="tv-section-label">{{ drill ? `${$t('TimeV2.col_name')} · ${drill.name}` : $t('TimeV2.largest_title') }}</span>
-                    <button v-if="drill" type="button" class="tv-link" @click="drill = null">{{ $t('TimeV2.back_to_summary') }}</button>
+                    <span class="tv-section-label">{{ drill ? `${$t('Time.col_name')} · ${drill.name}` : $t('Time.largest_title') }}</span>
+                    <button v-if="drill" type="button" class="tv-link" @click="drill = null">{{ $t('Time.back_to_summary') }}</button>
                 </div>
                 <div class="vr__thead">
-                    <button type="button" class="vr__th" @click="setTaskSort('name')">{{ $t('TimeV2.col_name') }}</button>
-                    <button type="button" class="vr__th" @click="setTaskSort('estimatedMinutes')">{{ $t('TimeV2.col_estimate') }}</button>
-                    <button type="button" class="vr__th" @click="setTaskSort('actualMinutes')">{{ $t('TimeV2.col_actual') }}</button>
-                    <button type="button" class="vr__th" @click="setTaskSort('variance')">{{ $t('TimeV2.col_delta') }}</button>
+                    <button type="button" class="vr__th" @click="setTaskSort('name')">{{ $t('Time.col_name') }}</button>
+                    <button type="button" class="vr__th" @click="setTaskSort('estimatedMinutes')">{{ $t('Time.col_estimate') }}</button>
+                    <button type="button" class="vr__th" @click="setTaskSort('actualMinutes')">{{ $t('Time.col_actual') }}</button>
+                    <button type="button" class="vr__th" @click="setTaskSort('variance')">{{ $t('Time.col_delta') }}</button>
                 </div>
                 <div v-for="r in sortedTasks" :key="r.taskId" class="vr__tr">
                     <span class="vr__td vr__td--name" :title="r.name">{{ r.name }}<small v-if="!drill && r.projectName">{{ r.projectName }}</small></span>
@@ -64,13 +64,13 @@
                     <span class="vr__td">{{ formatHm(r.actualMinutes) }}</span>
                     <span class="vr__td" :class="toneOfPct(r.variancePct)">{{ signedDelta(r) }}</span>
                 </div>
-                <div v-if="!sortedTasks.length" class="ah-small">{{ $t('TimeV2.variance_empty') }}</div>
+                <div v-if="!sortedTasks.length" class="ah-small">{{ $t('Time.variance_empty') }}</div>
             </div>
         </div>
 
         <div class="tv-card vr__takeaway">
-            <span v-if="takeaway">{{ $t('TimeV2.takeaway', { project: takeaway.projectName || $t('TimeV2.unknown_project'), pct: `+${takeaway.variancePct}%`, task: takeaway.name, actual: formatHm(takeaway.actualMinutes), estimate: formatHm(takeaway.estimatedMinutes) }) }}</span>
-            <span v-else>{{ $t('TimeV2.takeaway_none') }}</span>
+            <span v-if="takeaway">{{ $t('Time.takeaway', { project: takeaway.projectName || $t('Time.unknown_project'), pct: `+${takeaway.variancePct}%`, task: takeaway.name, actual: formatHm(takeaway.actualMinutes), estimate: formatHm(takeaway.estimatedMinutes) }) }}</span>
+            <span v-else>{{ $t('Time.takeaway_none') }}</span>
         </div>
     </div>
 </template>
@@ -100,14 +100,14 @@ const taskSortKey = ref('variance');
 const taskSortDir = ref(-1);
 
 const sorts = [
-    { key: 'delta', label: 'TimeV2.col_delta' },
-    { key: 'actual', label: 'TimeV2.col_actual' },
-    { key: 'name', label: 'TimeV2.col_name' },
+    { key: 'delta', label: 'Time.col_delta' },
+    { key: 'actual', label: 'Time.col_actual' },
+    { key: 'name', label: 'Time.col_name' },
 ];
 const fromIso = computed(() => month.value.format('YYYY-MM-DD'));
 const toIso = computed(() => month.value.clone().endOf('month').format('YYYY-MM-DD'));
 const totals = computed(() => (data.value && data.value.totals) || { totalEstimated: 0, totalActual: 0, totalVariancePct: 0 });
-const headline = computed(() => t('TimeV2.head_range', {
+const headline = computed(() => t('Time.head_range', {
     range: month.value.format('MMM').toUpperCase(),
     est: Math.round(totals.value.totalEstimated / 60),
     act: Math.round(totals.value.totalActual / 60),
@@ -152,7 +152,7 @@ const load = async () => {
         if (!body.status) throw new Error(body.statusText || 'load_failed');
         data.value = body.data;
     } catch (e) {
-        error.value = t('TimeV2.load_failed');
+        error.value = t('Time.load_failed');
         data.value = null;
     } finally {
         loading.value = false;

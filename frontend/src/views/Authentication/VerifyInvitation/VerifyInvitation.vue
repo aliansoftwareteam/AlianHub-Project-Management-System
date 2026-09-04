@@ -2,21 +2,21 @@
     <AuthShell :proof="false">
         <div v-if="stage === 'checking'" class="av2-center">
             <div class="auth__spinner"></div>
-            <p class="auth__p">{{ $t('AuthV2.invite_checking') }}</p>
+            <p class="auth__p">{{ $t('Auth.invite_checking') }}</p>
         </div>
 
         <div v-else-if="stage === 'accepted'" class="av2-auth-card">
             <div class="auth__glyph av2-glyph-ok"><ShellIcon name="check" :size="15" /></div>
-            <h2 class="auth__h">{{ $t('AuthV2.invite_accepted_title') }}</h2>
-            <p class="auth__p">{{ $t('AuthV2.invite_accepted_body') }}</p>
+            <h2 class="auth__h">{{ $t('Auth.invite_accepted_title') }}</h2>
+            <p class="auth__p">{{ $t('Auth.invite_accepted_body') }}</p>
             <router-link :to="{ name: 'Log-in' }" class="ah-btn ah-btn--primary ah-btn--block ah-btn--lg">{{ $t('Auth.log_in') }}</router-link>
         </div>
 
         <div v-else class="av2-auth-card">
             <div class="auth__glyph auth__glyph--warn">!</div>
-            <h2 class="auth__h">{{ $t('AuthV2.invite_invalid_title') }}</h2>
-            <p class="auth__p">{{ message || $t('AuthV2.invite_invalid_body') }}</p>
-            <router-link :to="{ name: 'Log-in' }" class="ah-btn ah-btn--secondary ah-btn--block ah-btn--lg">{{ $t('AuthV2.back_to_login') }}</router-link>
+            <h2 class="auth__h">{{ $t('Auth.invite_invalid_title') }}</h2>
+            <p class="auth__p">{{ message || $t('Auth.invite_invalid_body') }}</p>
+            <router-link :to="{ name: 'Log-in' }" class="ah-btn ah-btn--secondary ah-btn--block ah-btn--lg">{{ $t('Auth.back_to_login') }}</router-link>
         </div>
     </AuthShell>
 </template>

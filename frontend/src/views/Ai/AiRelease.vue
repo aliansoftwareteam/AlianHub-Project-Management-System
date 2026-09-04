@@ -3,39 +3,39 @@
         <AiSidebar />
         <div class="ai-page__main">
             <div class="ah-toolbar">
-                <div class="ah-toolbar__title">{{ $t('PipelineV2.release_title') }}</div>
+                <div class="ah-toolbar__title">{{ $t('Pipeline.release_title') }}</div>
                 <div class="ah-toolbar__spacer"></div>
                 <span v-if="sinceLabel" class="ah-mono rel-since">{{ sinceLabel }}</span>
             </div>
 
-            <div v-if="loading" class="ai-page__body"><div class="ah-empty">{{ $t('PipelineV2.loading') }}</div></div>
+            <div v-if="loading" class="ai-page__body"><div class="ah-empty">{{ $t('Pipeline.loading') }}</div></div>
 
             <div v-else class="rel">
                 <div class="rel__main ah-scroll">
                     <div class="rel__head">
                         <h1 class="ah-h1">{{ candidateName }}</h1>
                         <span class="ah-mono rel__meta">{{ candidateMeta }}</span>
-                        <span v-if="staging.last" class="ah-chip ah-chip--warn">{{ $t('PipelineV2.on_staging') }}</span>
+                        <span v-if="staging.last" class="ah-chip ah-chip--warn">{{ $t('Pipeline.on_staging') }}</span>
                     </div>
 
                     <div class="rel__stats">
                         <div class="rel-stat">
-                            <div class="ah-label">{{ $t('PipelineV2.stat_done') }}</div>
+                            <div class="ah-label">{{ $t('Pipeline.stat_done') }}</div>
                             <div class="rel-stat__n">{{ counts.done }}</div>
-                            <div class="ah-small">{{ $t('PipelineV2.stat_done_sub', { n: counts.agentAssisted }) }}</div>
+                            <div class="ah-small">{{ $t('Pipeline.stat_done_sub', { n: counts.agentAssisted }) }}</div>
                         </div>
                         <div class="rel-stat">
-                            <div class="ah-label">{{ $t('PipelineV2.stat_agents') }}</div>
+                            <div class="ah-label">{{ $t('Pipeline.stat_agents') }}</div>
                             <div class="rel-stat__n">{{ counts.agents }}</div>
-                            <div class="ah-small">{{ $t('PipelineV2.stat_agents_sub', { n: counts.projects }) }}</div>
+                            <div class="ah-small">{{ $t('Pipeline.stat_agents_sub', { n: counts.projects }) }}</div>
                         </div>
                         <div class="rel-stat">
-                            <div class="ah-label">{{ $t('PipelineV2.stat_ci') }}</div>
-                            <div class="rel-stat__n rel-stat__n--none">{{ $t('PipelineV2.not_connected') }}</div>
-                            <div class="ah-small">{{ $t('PipelineV2.stat_ci_sub') }}</div>
+                            <div class="ah-label">{{ $t('Pipeline.stat_ci') }}</div>
+                            <div class="rel-stat__n rel-stat__n--none">{{ $t('Pipeline.not_connected') }}</div>
+                            <div class="ah-small">{{ $t('Pipeline.stat_ci_sub') }}</div>
                         </div>
                         <div class="rel-stat">
-                            <div class="ah-label">{{ $t('PipelineV2.stat_staging') }}</div>
+                            <div class="ah-label">{{ $t('Pipeline.stat_staging') }}</div>
                             <div class="rel-stat__n" :class="{ 'rel-stat__n--none': !staging.last }">{{ stagingAge }}</div>
                             <div class="ah-small">{{ stagingWho }}</div>
                         </div>
@@ -44,34 +44,34 @@
                     <section class="ah-card rel-card">
                         <div class="rel-card__head">
                             <span class="ah-avatar ah-avatar--agent ah-avatar--sm"><ShellIcon name="agent" :size="11" /></span>
-                            <strong>{{ $t('PipelineV2.notes_title') }}</strong>
-                            <span v-if="notesDraft" class="ah-chip ah-chip--warn ah-chip--mono">{{ $t('PipelineV2.draft') }}</span>
+                            <strong>{{ $t('Pipeline.notes_title') }}</strong>
+                            <span v-if="notesDraft" class="ah-chip ah-chip--warn ah-chip--mono">{{ $t('Pipeline.draft') }}</span>
                         </div>
                         <div class="ah-card__body">
                             <template v-if="notesDraft">
                                 <p class="rel-notes">{{ notesDraft.what }}</p>
                                 <p class="ah-small">{{ notesDraft.why }}</p>
                                 <router-link class="ah-btn ah-btn--secondary ah-btn--sm" :to="{ name: 'AiInbox', params: { cid: companyId } }">
-                                    {{ $t('PipelineV2.review_draft') }}
+                                    {{ $t('Pipeline.review_draft') }}
                                 </router-link>
                             </template>
                             <template v-else>
-                                <p class="ah-small">{{ $t('PipelineV2.notes_none') }}</p>
+                                <p class="ah-small">{{ $t('Pipeline.notes_none') }}</p>
                                 <ul class="rel-tasks">
                                     <li v-for="task in tasks.slice(0, 8)" :key="task._id" class="rel-task">
                                         <span class="ah-mono rel-task__key">{{ task.taskKey || '—' }}</span>
                                         <span class="rel-task__name">{{ task.name }}</span>
-                                        <span v-if="task.agentAssisted" class="ah-chip ah-chip--agent ah-chip--mono">{{ $t('PipelineV2.agent_worked') }}</span>
+                                        <span v-if="task.agentAssisted" class="ah-chip ah-chip--agent ah-chip--mono">{{ $t('Pipeline.agent_worked') }}</span>
                                     </li>
                                 </ul>
-                                <p v-if="!tasks.length" class="ah-small">{{ $t('PipelineV2.no_done_tasks') }}</p>
+                                <p v-if="!tasks.length" class="ah-small">{{ $t('Pipeline.no_done_tasks') }}</p>
                             </template>
                         </div>
                     </section>
 
                     <section class="ah-card rel-gate">
                         <div class="rel-card__head">
-                            <strong>{{ $t('PipelineV2.staging_title') }}</strong>
+                            <strong>{{ $t('Pipeline.staging_title') }}</strong>
                             <span class="ah-chip ah-chip--warn ah-chip--mono">{{ gateChip }}</span>
                         </div>
                         <div class="ah-card__body">
@@ -84,16 +84,16 @@
                                     v-if="p.status === 'pending'"
                                     class="ah-btn ah-btn--primary ah-btn--sm"
                                     :to="{ name: 'AiInbox', params: { cid: companyId } }"
-                                >{{ $t('PipelineV2.approve_in_inbox') }}</router-link>
+                                >{{ $t('Pipeline.approve_in_inbox') }}</router-link>
                             </div>
-                            <p v-if="!staging.proposals.length" class="pipe-none">{{ $t('PipelineV2.staging_none') }}</p>
+                            <p v-if="!staging.proposals.length" class="pipe-none">{{ $t('Pipeline.staging_none') }}</p>
                         </div>
                     </section>
 
                     <section class="ah-card rel-prod">
                         <div class="rel-card__head">
-                            <strong class="rel-prod__title">{{ $t('PipelineV2.prod_title') }}</strong>
-                            <span class="ah-chip ah-chip--danger ah-chip--mono">{{ $t('PipelineV2.human_only') }}</span>
+                            <strong class="rel-prod__title">{{ $t('Pipeline.prod_title') }}</strong>
+                            <span class="ah-chip ah-chip--danger ah-chip--mono">{{ $t('Pipeline.human_only') }}</span>
                         </div>
                         <div class="ah-card__body">
                             <ul class="rel-checks">
@@ -106,49 +106,49 @@
                             <div class="rel-prod__stop">
                                 <ShellIcon name="lock" :size="15" />
                                 <div>
-                                    <div class="rel-prod__stop-title">{{ $t('PipelineV2.no_target_title') }}</div>
-                                    <p class="ah-small">{{ $t('PipelineV2.no_target_body') }}</p>
+                                    <div class="rel-prod__stop-title">{{ $t('Pipeline.no_target_title') }}</div>
+                                    <p class="ah-small">{{ $t('Pipeline.no_target_body') }}</p>
                                     <p class="ah-small">{{ neverLine }}</p>
                                 </div>
                             </div>
                         </div>
                     </section>
 
-                    <p class="rel-foot">{{ $t('PipelineV2.rel_foot') }}</p>
+                    <p class="rel-foot">{{ $t('Pipeline.rel_foot') }}</p>
                 </div>
 
                 <aside class="rel__side ah-scroll">
-                    <div class="ah-label">{{ $t('PipelineV2.environments') }}</div>
+                    <div class="ah-label">{{ $t('Pipeline.environments') }}</div>
                     <div class="rel-env">
                         <span class="ah-dot" :class="production.offeredToAgents ? 'ah-dot--danger' : 'ah-dot--ok'"></span>
                         <div>
-                            <div class="rel-env__name">{{ $t('PipelineV2.env_production') }}</div>
+                            <div class="rel-env__name">{{ $t('Pipeline.env_production') }}</div>
                             <div class="ah-mono rel-env__meta">{{ productionLine }}</div>
                         </div>
                     </div>
                     <div class="rel-env" :class="{ 'rel-env--warn': staging.last }">
                         <span class="ah-dot" :class="staging.last ? 'ah-dot--warn' : ''"></span>
                         <div>
-                            <div class="rel-env__name">{{ $t('PipelineV2.env_staging') }}</div>
+                            <div class="rel-env__name">{{ $t('Pipeline.env_staging') }}</div>
                             <div class="ah-mono rel-env__meta">{{ stagingLine }}</div>
                         </div>
                     </div>
 
-                    <div class="ah-label rel-side__label">{{ $t('PipelineV2.deploy_history') }}</div>
+                    <div class="ah-label rel-side__label">{{ $t('Pipeline.deploy_history') }}</div>
                     <div v-for="row in history" :key="row.key" class="rel-hist" :class="{ 'rel-hist--refused': row.refused }">
                         <span class="ah-mono rel-hist__at">{{ row.at }}</span>
                         <span class="rel-hist__what">{{ row.what }}</span>
                     </div>
                     <p v-if="!history.length" class="pipe-none">{{ historyEmpty }}</p>
 
-                    <div class="ah-label rel-side__label">{{ $t('PipelineV2.code_providers') }}</div>
+                    <div class="ah-label rel-side__label">{{ $t('Pipeline.code_providers') }}</div>
                     <div v-for="provider in production.codeProviders || []" :key="provider.key" class="rel-provider">
                         <span class="ah-dot" :class="provider.connected ? 'ah-dot--ok' : ''"></span>
                         <span>{{ provider.name }}</span>
-                        <span class="ah-mono rel-provider__state">{{ provider.connected ? $t('PipelineV2.connected') : $t('PipelineV2.not_connected') }}</span>
+                        <span class="ah-mono rel-provider__state">{{ provider.connected ? $t('Pipeline.connected') : $t('Pipeline.not_connected') }}</span>
                     </div>
 
-                    <p class="rel-side__note">{{ $t('PipelineV2.side_note') }}</p>
+                    <p class="rel-side__note">{{ $t('Pipeline.side_note') }}</p>
                 </aside>
             </div>
         </div>
@@ -180,43 +180,43 @@ const production = computed(() => release.value?.production || { offeredToAgents
 const audit = computed(() => release.value?.audit || { visible: false, refusals: [] });
 
 const lastRelease = computed(() => (changelog.value?.releases || [])[0] || null);
-const sinceLabel = computed(() => (release.value?.since ? t("PipelineV2.since", { at: moment(release.value.since).format("D MMM YYYY") }) : ""));
-const candidateName = computed(() => t("PipelineV2.candidate", { version: changelog.value?.currentVersion || "—" }));
-const candidateMeta = computed(() => t("PipelineV2.candidate_meta", {
+const sinceLabel = computed(() => (release.value?.since ? t("Pipeline.since", { at: moment(release.value.since).format("D MMM YYYY") }) : ""));
+const candidateName = computed(() => t("Pipeline.candidate", { version: changelog.value?.currentVersion || "—" }));
+const candidateMeta = computed(() => t("Pipeline.candidate_meta", {
     last: lastRelease.value?.version || "—",
     n: counts.value.done
 }));
 
 const notesDraft = computed(() => (staging.value.proposals || []).find((p) => (p.actions || []).includes("page.draft") && p.status === "pending") || null);
 
-const stagingAge = computed(() => (staging.value.last?.decidedAt ? moment(staging.value.last.decidedAt).fromNow(true) : t("PipelineV2.none")));
-const stagingWho = computed(() => (staging.value.last ? t("PipelineV2.staging_by", { agent: staging.value.last.agentName }) : t("PipelineV2.staging_never")));
+const stagingAge = computed(() => (staging.value.last?.decidedAt ? moment(staging.value.last.decidedAt).fromNow(true) : t("Pipeline.none")));
+const stagingWho = computed(() => (staging.value.last ? t("Pipeline.staging_by", { agent: staging.value.last.agentName }) : t("Pipeline.staging_never")));
 const stagingLine = computed(() => (staging.value.last
     ? `${moment(staging.value.last.decidedAt).format("D MMM HH:mm")} · ${staging.value.last.status}`
-    : t("PipelineV2.env_none")));
+    : t("Pipeline.env_none")));
 const productionLine = computed(() => (changelog.value?.currentVersion
-    ? t("PipelineV2.env_prod_meta", { version: changelog.value.currentVersion })
-    : t("PipelineV2.env_none")));
+    ? t("Pipeline.env_prod_meta", { version: changelog.value.currentVersion })
+    : t("Pipeline.env_none")));
 
 const gateChip = computed(() => {
     const gated = staging.value.actions || [];
-    if (!gated.length) return t("PipelineV2.gate_none");
-    return gated[0].gate === "owner_admin" ? t("PipelineV2.gate_owner_admin") : gated[0].gate || t("PipelineV2.gate_human");
+    if (!gated.length) return t("Pipeline.gate_none");
+    return gated[0].gate === "owner_admin" ? t("Pipeline.gate_owner_admin") : gated[0].gate || t("Pipeline.gate_human");
 });
 
 const stagingRule = computed(() => {
     const gated = staging.value.actions || [];
-    if (!gated.length) return t("PipelineV2.staging_rule_none");
-    return t("PipelineV2.staging_rule", { keys: gated.map((a) => a.key).join(", "), gate: gateChip.value });
+    if (!gated.length) return t("Pipeline.staging_rule_none");
+    return t("Pipeline.staging_rule", { keys: gated.map((a) => a.key).join(", "), gate: gateChip.value });
 });
 
-const neverLine = computed(() => t("PipelineV2.never_line", { keys: (production.value.never || []).filter((k) => /deploy|merge|git/i.test(k)).join(", ") || "—" }));
+const neverLine = computed(() => t("Pipeline.never_line", { keys: (production.value.never || []).filter((k) => /deploy|merge|git/i.test(k)).join(", ") || "—" }));
 
 const checks = computed(() => [
-    { key: "done", state: counts.value.done ? "ok" : "todo", label: t("PipelineV2.check_done", { n: counts.value.done }) },
-    { key: "human", state: "ok", label: t("PipelineV2.check_human") },
-    { key: "staging", state: staging.value.last ? "ok" : "todo", label: staging.value.last ? t("PipelineV2.check_staging_ok", { at: moment(staging.value.last.decidedAt).fromNow() }) : t("PipelineV2.check_staging_todo") },
-    { key: "ci", state: "unknown", label: t("PipelineV2.check_ci") }
+    { key: "done", state: counts.value.done ? "ok" : "todo", label: t("Pipeline.check_done", { n: counts.value.done }) },
+    { key: "human", state: "ok", label: t("Pipeline.check_human") },
+    { key: "staging", state: staging.value.last ? "ok" : "todo", label: staging.value.last ? t("Pipeline.check_staging_ok", { at: moment(staging.value.last.decidedAt).fromNow() }) : t("Pipeline.check_staging_todo") },
+    { key: "ci", state: "unknown", label: t("Pipeline.check_ci") }
 ]);
 
 const history = computed(() => {
@@ -226,7 +226,7 @@ const history = computed(() => {
         .map((p) => ({
             key: p._id,
             at: moment(p.decidedAt).fromNow(true),
-            what: t("PipelineV2.hist_staging", { agent: p.agentName, status: p.status }),
+            what: t("Pipeline.hist_staging", { agent: p.agentName, status: p.status }),
             refused: p.status === "declined"
         }));
     const refusals = (audit.value.refusals || [])
@@ -235,13 +235,13 @@ const history = computed(() => {
         .map((r) => ({
             key: r._id,
             at: moment(r.at).fromNow(true),
-            what: t("PipelineV2.hist_refused", { who: r.actorName || "—", action: r.action }),
+            what: t("Pipeline.hist_refused", { who: r.actorName || "—", action: r.action }),
             refused: true
         }));
     return [...rows, ...refusals];
 });
 
-const historyEmpty = computed(() => (audit.value.visible ? t("PipelineV2.hist_none") : t("PipelineV2.hist_none_restricted")));
+const historyEmpty = computed(() => (audit.value.visible ? t("Pipeline.hist_none") : t("Pipeline.hist_none_restricted")));
 
 onMounted(async () => {
     try { await loadRelease(); } finally { loading.value = false; }

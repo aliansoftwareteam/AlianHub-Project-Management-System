@@ -2,15 +2,15 @@
     <AuthShell :proof="false">
         <div v-if="stage === 'checking'" class="av2-center">
             <div class="auth__spinner"></div>
-            <p class="auth__p">{{ $t('AuthV2.checking_link') }}</p>
+            <p class="auth__p">{{ $t('Auth.checking_link') }}</p>
         </div>
 
         <form v-else-if="stage === 'form'" class="av2-auth-card" novalidate @submit.prevent="submit">
             <h2 class="auth__h">{{ title }}</h2>
-            <p class="auth__p">{{ $t('AuthV2.password_rules') }}</p>
+            <p class="auth__p">{{ $t('Auth.password_rules') }}</p>
             <div class="auth__fields">
                 <div class="ah-field">
-                    <label class="ah-field__label" for="np-password">{{ $t('AuthV2.new_password') }}</label>
+                    <label class="ah-field__label" for="np-password">{{ $t('Auth.new_password') }}</label>
                     <div class="auth__pw">
                         <input
                             id="np-password"
@@ -32,7 +32,7 @@
                     <div v-if="errors.password" class="ah-field__error"><ShellIcon name="x" :size="12" />{{ errors.password }}</div>
                 </div>
                 <div class="ah-field">
-                    <label class="ah-field__label" for="np-confirm">{{ $t('AuthV2.confirm_password') }}</label>
+                    <label class="ah-field__label" for="np-confirm">{{ $t('Auth.confirm_password') }}</label>
                     <input
                         id="np-confirm"
                         v-model="confirm"
@@ -53,15 +53,15 @@
                     <span v-if="busy" class="ah-spin"></span>{{ busy ? $t('Auth.loading') : submitLabel }}
                 </button>
             </div>
-            <div class="auth__links" style="margin-top:28px"><router-link :to="{ name: 'Log-in' }">{{ $t('AuthV2.back_to_login') }}</router-link></div>
+            <div class="auth__links" style="margin-top:28px"><router-link :to="{ name: 'Log-in' }">{{ $t('Auth.back_to_login') }}</router-link></div>
         </form>
 
         <div v-else class="av2-auth-card">
             <div class="auth__glyph auth__glyph--warn">!</div>
-            <h2 class="auth__h">{{ $t('AuthV2.link_expired_title') }}</h2>
-            <p class="auth__p">{{ expiredMessage || $t('AuthV2.link_expired_body') }}</p>
-            <router-link :to="{ name: 'Forgot_Password' }" class="ah-btn ah-btn--secondary ah-btn--block ah-btn--lg">{{ $t('AuthV2.request_new_link') }}</router-link>
-            <div class="auth__links" style="margin-top:28px"><router-link :to="{ name: 'Log-in' }">{{ $t('AuthV2.back_to_login') }}</router-link></div>
+            <h2 class="auth__h">{{ $t('Auth.link_expired_title') }}</h2>
+            <p class="auth__p">{{ expiredMessage || $t('Auth.link_expired_body') }}</p>
+            <router-link :to="{ name: 'Forgot_Password' }" class="ah-btn ah-btn--secondary ah-btn--block ah-btn--lg">{{ $t('Auth.request_new_link') }}</router-link>
+            <div class="auth__links" style="margin-top:28px"><router-link :to="{ name: 'Log-in' }">{{ $t('Auth.back_to_login') }}</router-link></div>
         </div>
     </AuthShell>
 </template>
@@ -114,14 +114,14 @@ onMounted(async () => {
 
 const syncConfirm = () => {
     if (!confirm.value) { errors.confirm = ""; return; }
-    errors.confirm = confirm.value !== password.value ? t("AuthV2.confirm_mismatch") : "";
+    errors.confirm = confirm.value !== password.value ? t("Auth.confirm_mismatch") : "";
 };
 
 const validate = () => {
     errors.password = !password.value || password.value.length < 8
-        ? t("AuthV2.password_short")
-        : !PASSWORD_RE.test(password.value) ? t("AuthV2.password_weak") : "";
-    errors.confirm = !confirm.value ? t("AuthV2.confirm_required") : confirm.value !== password.value ? t("AuthV2.confirm_mismatch") : "";
+        ? t("Auth.password_short")
+        : !PASSWORD_RE.test(password.value) ? t("Auth.password_weak") : "";
+    errors.confirm = !confirm.value ? t("Auth.confirm_required") : confirm.value !== password.value ? t("Auth.confirm_mismatch") : "";
     return !errors.password && !errors.confirm;
 };
 

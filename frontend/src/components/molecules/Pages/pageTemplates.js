@@ -7,8 +7,8 @@ const callout = (text, tone = 'warn') => ({ type: 'callout', data: { text, tone 
 export default [
     {
         key: 'spec',
-        label: 'DocsV2.template_spec',
-        hint: 'DocsV2.template_spec_hint',
+        label: 'Docs.template_spec',
+        hint: 'Docs.template_spec_hint',
         icon: 'file',
         blocks: [
             paragraph('What changes for the person using it, in one paragraph.'),
@@ -22,8 +22,8 @@ export default [
     },
     {
         key: 'retro',
-        label: 'DocsV2.template_retro',
-        hint: 'DocsV2.template_retro_hint',
+        label: 'Docs.template_retro',
+        hint: 'Docs.template_retro_hint',
         icon: 'checkSquare',
         blocks: [
             header('Went well'),
@@ -36,8 +36,8 @@ export default [
     },
     {
         key: 'runbook',
-        label: 'DocsV2.template_runbook',
-        hint: 'DocsV2.template_runbook_hint',
+        label: 'Docs.template_runbook',
+        hint: 'Docs.template_runbook_hint',
         icon: 'book',
         wiki: true,
         blocks: [
@@ -53,8 +53,8 @@ export default [
     },
     {
         key: 'meeting',
-        label: 'DocsV2.template_meeting',
-        hint: 'DocsV2.template_meeting_hint',
+        label: 'Docs.template_meeting',
+        hint: 'Docs.template_meeting_hint',
         icon: 'calendar',
         blocks: [
             paragraph('<b>Attendees</b> — '),
@@ -66,8 +66,8 @@ export default [
     },
     {
         key: 'release',
-        label: 'DocsV2.template_release',
-        hint: 'DocsV2.template_release_hint',
+        label: 'Docs.template_release',
+        hint: 'Docs.template_release_hint',
         icon: 'play',
         blocks: [
             header('What shipped'),

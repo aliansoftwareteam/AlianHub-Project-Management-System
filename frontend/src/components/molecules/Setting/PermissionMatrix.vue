@@ -1,11 +1,11 @@
 <template>
     <div class="pm ah-card">
         <div class="pm__row pm__row--head" :style="gridStyle" role="row">
-            <span class="ah-label pm__perm" role="columnheader">{{ $t('SettingsV2.col_permission') }}</span>
+            <span class="ah-label pm__perm" role="columnheader">{{ $t('Settings.col_permission') }}</span>
             <span v-for="col in columns" :key="col.id" class="ah-label pm__cell" :class="{ 'pm__cell--agents': col.agents }" role="columnheader">{{ col.name }}</span>
         </div>
 
-        <div v-if="!groups.length" class="ah-empty pm__empty">{{ $t('SettingsV2.matrix_empty') }}</div>
+        <div v-if="!groups.length" class="ah-empty pm__empty">{{ $t('Settings.matrix_empty') }}</div>
 
         <template v-for="group in groups" :key="group.parent._id">
             <div class="pm__group" :style="gridStyle" role="row">
@@ -82,9 +82,9 @@
                     </template>
                 </span>
                 <span class="pm__cell pm__agent" role="cell">
-                    <span v-if="isDestructive(rule)" class="pm__never">{{ $t('SettingsV2.agent_never') }}</span>
-                    <span v-else-if="agentMode(rule) === 'proposes'" class="ah-chip ah-chip--warn ah-chip--mono">{{ $t('SettingsV2.agent_proposes') }}</span>
-                    <span v-else-if="agentMode(rule) === 'read'" class="pm__read">{{ $t('SettingsV2.agent_read') }}</span>
+                    <span v-if="isDestructive(rule)" class="pm__never">{{ $t('Settings.agent_never') }}</span>
+                    <span v-else-if="agentMode(rule) === 'proposes'" class="ah-chip ah-chip--warn ah-chip--mono">{{ $t('Settings.agent_proposes') }}</span>
+                    <span v-else-if="agentMode(rule) === 'read'" class="pm__read">{{ $t('Settings.agent_read') }}</span>
                     <span v-else class="pm__dash">—</span>
                 </span>
             </div>
@@ -127,8 +127,8 @@ const maxLimit = computed(() => (currentCompany.value.planFeature?.aiRequest ===
 const minLimit = computed(() => (currentCompany.value.planFeature?.aiRequest === null ? -1 : 0));
 
 const fixedColumns = computed(() => [
-    { id: "owner", name: t("SettingsV2.role_owner") },
-    { id: "admin", name: t("SettingsV2.role_admin") }
+    { id: "owner", name: t("Settings.role_owner") },
+    { id: "admin", name: t("Settings.role_admin") }
 ]);
 const editableRoles = computed(() => props.withoutOwnerRoles
     .filter((r) => r.key !== 2)
@@ -137,7 +137,7 @@ const editableRoles = computed(() => props.withoutOwnerRoles
 const columns = computed(() => [
     ...fixedColumns.value,
     ...editableRoles.value.map((r) => ({ id: `role-${r.key}`, name: r.name })),
-    { id: "agents", name: t("SettingsV2.role_agents"), agents: true }
+    { id: "agents", name: t("Settings.role_agents"), agents: true }
 ]);
 const gridStyle = computed(() => ({ gridTemplateColumns: `minmax(0, 1fr) repeat(${columns.value.length - 1}, 78px) 96px` }));
 
@@ -162,7 +162,7 @@ function setValue(rule, role, next) {
     const prev = value(rule, role);
     const granting = next !== null && next !== false && (prev === null || prev === false);
     if (isDestructive(rule) && granting && role.key !== 1) {
-        const ok = window.confirm(t("SettingsV2.confirm_destructive", { permission: ruleName(rule), role: role.name }));
+        const ok = window.confirm(t("Settings.confirm_destructive", { permission: ruleName(rule), role: role.name }));
         if (!ok) return;
     }
     props.changeRule(next, rule, role);

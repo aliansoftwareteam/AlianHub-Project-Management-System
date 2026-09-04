@@ -3,27 +3,27 @@
         <aside class="hub__side">
             <div class="hub__search">
                 <ShellIcon name="search" :size="14" class="hub__search-icon" />
-                <input v-model="query" type="search" class="ah-input hub__search-input" :placeholder="$t('DocsV2.search_docs')" />
+                <input v-model="query" type="search" class="ah-input hub__search-input" :placeholder="$t('Docs.search_docs')" />
             </div>
 
             <nav class="hub__nav">
                 <button type="button" class="hub__item" :class="{ 'is-active': view === 'recent' }" @click="view = 'recent'">
-                    {{ $t('DocsV2.recent') }}
+                    {{ $t('Docs.recent') }}
                 </button>
                 <button type="button" class="hub__item" :class="{ 'is-active': view === 'mine' }" @click="view = 'mine'">
-                    {{ $t('DocsV2.mine') }}<span class="hub__item-count">{{ mine.length }}</span>
+                    {{ $t('Docs.mine') }}<span class="hub__item-count">{{ mine.length }}</span>
                 </button>
                 <button type="button" class="hub__item" :class="{ 'is-active': view === 'wiki' }" @click="view = 'wiki'">
-                    {{ $t('DocsV2.wiki') }}
+                    {{ $t('Docs.wiki') }}
                     <span v-if="needsReview.length" class="hub__item-badge hub__item-badge--warn">{{ needsReview.length }}</span>
                     <span v-else class="hub__item-count">{{ wikiPages.length }}</span>
                 </button>
             </nav>
 
             <nav class="hub__nav">
-                <div class="ah-label hub__label">{{ $t('DocsV2.by_project') }}</div>
+                <div class="ah-label hub__label">{{ $t('Docs.by_project') }}</div>
                 <button type="button" class="hub__item" :class="{ 'is-active': view === 'project:' }" @click="view = 'project:'">
-                    <span class="hub__swatch hub__swatch--none"></span>{{ $t('DocsV2.workspace') }}
+                    <span class="hub__swatch hub__swatch--none"></span>{{ $t('Docs.workspace') }}
                     <span class="hub__item-count">{{ countFor('') }}</span>
                 </button>
                 <button
@@ -42,44 +42,44 @@
 
             <nav class="hub__nav">
                 <button type="button" class="hub__item" :class="{ 'is-active': view === 'agents' }" @click="view = 'agents'">
-                    <ShellIcon name="agent" :size="13" class="hub__item-icon" />{{ $t('DocsV2.agent_drafted') }}
+                    <ShellIcon name="agent" :size="13" class="hub__item-icon" />{{ $t('Docs.agent_drafted') }}
                     <span v-if="agentDrafts.length" class="hub__item-badge">{{ agentDrafts.length }}</span>
                 </button>
                 <button type="button" class="hub__item" :class="{ 'is-active': view === 'templates' }" @click="view = 'templates'">
-                    <ShellIcon name="layout" :size="13" class="hub__item-icon" />{{ $t('DocsV2.templates') }}
+                    <ShellIcon name="layout" :size="13" class="hub__item-icon" />{{ $t('Docs.templates') }}
                 </button>
                 <button type="button" class="hub__item" :class="{ 'is-active': view === 'trash' }" @click="view = 'trash'">
-                    <ShellIcon name="trash" :size="13" class="hub__item-icon" />{{ $t('DocsV2.trash') }}
+                    <ShellIcon name="trash" :size="13" class="hub__item-icon" />{{ $t('Docs.trash') }}
                 </button>
             </nav>
 
             <button type="button" class="ah-btn ah-btn--primary ah-btn--block hub__new" @click="createDoc({})">
-                <ShellIcon name="plus" :size="14" />{{ $t('DocsV2.new_doc') }}
+                <ShellIcon name="plus" :size="14" />{{ $t('Docs.new_doc') }}
             </button>
         </aside>
 
         <div class="hub__main">
             <div class="ah-toolbar">
                 <span class="ah-toolbar__title">
-                    {{ $t('DocsV2.docs') }}
-                    <span class="ah-label hub__stats">{{ $t('DocsV2.pages_count', { n: pages.length }) }}<template v-if="staleCount"> · {{ $t('DocsV2.stale_count', { n: staleCount }) }}</template></span>
+                    {{ $t('Docs.docs') }}
+                    <span class="ah-label hub__stats">{{ $t('Docs.pages_count', { n: pages.length }) }}<template v-if="staleCount"> · {{ $t('Docs.stale_count', { n: staleCount }) }}</template></span>
                 </span>
                 <select v-model="view" class="hub__view-select">
-                    <option value="recent">{{ $t('DocsV2.recent') }}</option>
-                    <option value="mine">{{ $t('DocsV2.mine') }}</option>
-                    <option value="wiki">{{ $t('DocsV2.wiki') }}</option>
-                    <option value="project:">{{ $t('DocsV2.workspace') }}</option>
+                    <option value="recent">{{ $t('Docs.recent') }}</option>
+                    <option value="mine">{{ $t('Docs.mine') }}</option>
+                    <option value="wiki">{{ $t('Docs.wiki') }}</option>
+                    <option value="project:">{{ $t('Docs.workspace') }}</option>
                     <option v-for="project in projects" :key="'vs-' + project._id" :value="'project:' + project._id">{{ project.ProjectName }}</option>
-                    <option value="agents">{{ $t('DocsV2.agent_drafted') }}</option>
-                    <option value="templates">{{ $t('DocsV2.templates') }}</option>
-                    <option value="trash">{{ $t('DocsV2.trash') }}</option>
+                    <option value="agents">{{ $t('Docs.agent_drafted') }}</option>
+                    <option value="templates">{{ $t('Docs.templates') }}</option>
+                    <option value="trash">{{ $t('Docs.trash') }}</option>
                 </select>
                 <span class="ah-toolbar__spacer"></span>
                 <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="createDoc({ isWiki: true })">
-                    <ShellIcon name="book" :size="13" />{{ $t('DocsV2.new_wiki_page') }}
+                    <ShellIcon name="book" :size="13" />{{ $t('Docs.new_wiki_page') }}
                 </button>
                 <button type="button" class="ah-btn ah-btn--sm ah-btn--primary" @click="createDoc({})">
-                    <ShellIcon name="plus" :size="13" />{{ $t('DocsV2.new_doc') }}
+                    <ShellIcon name="plus" :size="13" />{{ $t('Docs.new_doc') }}
                 </button>
             </div>
 
@@ -87,20 +87,20 @@
                 <template v-if="view === 'recent'">
                     <section v-if="needsReview.length" class="hub__section">
                         <div class="hub__section-head">
-                            <span class="ah-label">{{ $t('DocsV2.needs_review') }}</span>
-                            <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="view = 'wiki'">{{ $t('DocsV2.wiki') }}</button>
+                            <span class="ah-label">{{ $t('Docs.needs_review') }}</span>
+                            <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="view = 'wiki'">{{ $t('Docs.wiki') }}</button>
                         </div>
                         <WikiTable :rows="needsReview.slice(0, 5)" @open="open" @review="markReviewed" />
                     </section>
 
                     <section class="hub__section">
-                        <div class="hub__section-head"><span class="ah-label">{{ $t('DocsV2.recent') }}</span></div>
+                        <div class="hub__section-head"><span class="ah-label">{{ $t('Docs.recent') }}</span></div>
                         <div v-if="!recent.length" class="hub__empty">
-                            <p class="ah-h3">{{ $t('DocsV2.no_recent_title') }}</p>
-                            <p class="ah-small">{{ $t('DocsV2.no_recent_hint') }}</p>
+                            <p class="ah-h3">{{ $t('Docs.no_recent_title') }}</p>
+                            <p class="ah-small">{{ $t('Docs.no_recent_hint') }}</p>
                             <div class="hub__empty-actions">
-                                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="createDoc({})">{{ $t('DocsV2.new_doc') }}</button>
-                                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="view = 'templates'">{{ $t('DocsV2.templates') }}</button>
+                                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="createDoc({})">{{ $t('Docs.new_doc') }}</button>
+                                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="view = 'templates'">{{ $t('Docs.templates') }}</button>
                             </div>
                         </div>
                         <div v-else class="hub__grid">
@@ -110,8 +110,8 @@
 
                     <section v-if="agentDrafts.length" class="hub__section">
                         <div class="hub__section-head">
-                            <span class="ah-label">{{ $t('DocsV2.agent_drafted') }}</span>
-                            <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="view = 'agents'">{{ $t('DocsV2.review') }}</button>
+                            <span class="ah-label">{{ $t('Docs.agent_drafted') }}</span>
+                            <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="view = 'agents'">{{ $t('Docs.review') }}</button>
                         </div>
                         <AgentList :rows="agentDrafts.slice(0, 4)" @open="open" @approve="approve" />
                     </section>
@@ -119,14 +119,14 @@
                     <section v-for="group in byProject" :key="'grp-' + group.id" class="hub__section">
                         <div class="hub__section-head">
                             <span class="ah-label">{{ group.name }}</span>
-                            <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="view = 'project:' + group.id">{{ $t('DocsV2.by_project') }}</button>
+                            <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="view = 'project:' + group.id">{{ $t('Docs.by_project') }}</button>
                         </div>
                         <DocList :rows="group.pages.slice(0, 6)" @open="open" />
                     </section>
                 </template>
 
                 <template v-else-if="view === 'mine'">
-                    <div v-if="!mine.length" class="hub__empty"><p class="ah-small">{{ $t('DocsV2.no_mine') }}</p></div>
+                    <div v-if="!mine.length" class="hub__empty"><p class="ah-small">{{ $t('Docs.no_mine') }}</p></div>
                     <div v-else class="hub__grid">
                         <DocCard v-for="page in mine" :key="'mc-' + page._id" :page="page" @open="open" />
                     </div>
@@ -134,47 +134,47 @@
 
                 <template v-else-if="view === 'wiki'">
                     <div class="hub__section-head">
-                        <span class="ah-label">{{ $t('DocsV2.pages_count', { n: wikiPages.length }) }}<template v-if="staleCount"> · {{ $t('DocsV2.stale_count', { n: staleCount }) }}</template></span>
-                        <button type="button" class="ah-btn ah-btn--sm" :class="onlyDue ? 'ah-btn--outline' : 'ah-btn--secondary'" @click="onlyDue = !onlyDue">{{ $t('DocsV2.needs_review') }}</button>
+                        <span class="ah-label">{{ $t('Docs.pages_count', { n: wikiPages.length }) }}<template v-if="staleCount"> · {{ $t('Docs.stale_count', { n: staleCount }) }}</template></span>
+                        <button type="button" class="ah-btn ah-btn--sm" :class="onlyDue ? 'ah-btn--outline' : 'ah-btn--secondary'" @click="onlyDue = !onlyDue">{{ $t('Docs.needs_review') }}</button>
                     </div>
-                    <div v-if="!wikiRows.length" class="hub__empty"><p class="ah-small">{{ onlyDue ? $t('DocsV2.no_review_due') : $t('DocsV2.no_project_docs') }}</p></div>
+                    <div v-if="!wikiRows.length" class="hub__empty"><p class="ah-small">{{ onlyDue ? $t('Docs.no_review_due') : $t('Docs.no_project_docs') }}</p></div>
                     <WikiTable v-else :rows="wikiRows" @open="open" @review="markReviewed" />
                 </template>
 
                 <template v-else-if="view === 'agents'">
                     <div v-if="!agentDrafts.length" class="hub__empty">
-                        <p class="ah-h3">{{ $t('DocsV2.no_agent_drafts_title') }}</p>
-                        <p class="ah-small">{{ $t('DocsV2.no_agent_drafts_hint') }}</p>
+                        <p class="ah-h3">{{ $t('Docs.no_agent_drafts_title') }}</p>
+                        <p class="ah-small">{{ $t('Docs.no_agent_drafts_hint') }}</p>
                     </div>
                     <AgentList v-else :rows="agentDrafts" @open="open" @approve="approve" />
                 </template>
 
                 <template v-else-if="view === 'templates'">
-                    <p class="ah-small hub__hint">{{ $t('DocsV2.templates_hint') }}</p>
+                    <p class="ah-small hub__hint">{{ $t('Docs.templates_hint') }}</p>
                     <div class="hub__grid">
                         <button v-for="tpl in templates" :key="'tpl-' + tpl.key" type="button" class="ah-card hub__tpl" @click="createDoc({ template: tpl })">
                             <span class="hub__tpl-icon"><ShellIcon :name="tpl.icon" :size="16" /></span>
                             <span class="hub__card-title">{{ $t(tpl.label) }}</span>
                             <span class="hub__card-excerpt">{{ $t(tpl.hint) }}</span>
-                            <span class="hub__tpl-cta">{{ $t('DocsV2.use_template') }}</span>
+                            <span class="hub__tpl-cta">{{ $t('Docs.use_template') }}</span>
                         </button>
-                        <button type="button" class="hub__blank" @click="createDoc({})">+ {{ $t('DocsV2.blank_doc') }}</button>
+                        <button type="button" class="hub__blank" @click="createDoc({})">+ {{ $t('Docs.blank_doc') }}</button>
                     </div>
                 </template>
 
                 <template v-else-if="view === 'trash'">
                     <div v-if="!trash.length" class="hub__empty">
-                        <p class="ah-small">{{ $t('DocsV2.no_trash') }}</p>
-                        <p class="ah-small">{{ $t('DocsV2.trash_hint') }}</p>
+                        <p class="ah-small">{{ $t('Docs.no_trash') }}</p>
+                        <p class="ah-small">{{ $t('Docs.trash_hint') }}</p>
                     </div>
                     <div v-else class="ah-card hub__list">
                         <div v-for="page in trash" :key="'tr-' + page._id" class="hub__row">
                             <ShellIcon name="file" :size="14" class="hub__row-icon" />
-                            <span class="hub__row-title">{{ page.title || $t('DocsV2.untitled') }}</span>
+                            <span class="hub__row-title">{{ page.title || $t('Docs.untitled') }}</span>
                             <span class="hub__row-project">{{ projectNameOf(page.ProjectID) }}</span>
                             <span class="hub__row-time">{{ shortDate(page.updatedAt) }}</span>
                             <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="restore(page)">
-                                <ShellIcon name="restore" :size="13" />{{ $t('DocsV2.restore') }}
+                                <ShellIcon name="restore" :size="13" />{{ $t('Docs.restore') }}
                             </button>
                         </div>
                     </div>
@@ -184,10 +184,10 @@
                     <div class="hub__section-head">
                         <span class="ah-label">{{ projectNameOf(viewProjectId) }}</span>
                         <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="createDoc({ projectId: viewProjectId })">
-                            <ShellIcon name="plus" :size="13" />{{ $t('DocsV2.new_doc') }}
+                            <ShellIcon name="plus" :size="13" />{{ $t('Docs.new_doc') }}
                         </button>
                     </div>
-                    <div v-if="!projectRows.length" class="hub__empty"><p class="ah-small">{{ $t('DocsV2.no_project_docs') }}</p></div>
+                    <div v-if="!projectRows.length" class="hub__empty"><p class="ah-small">{{ $t('Docs.no_project_docs') }}</p></div>
                     <DocList v-else :rows="projectRows" tree @open="open" />
                 </template>
             </div>
@@ -232,9 +232,9 @@ const projects = computed(() => {
 });
 
 function projectNameOf(id) {
-    if (!id) return t('DocsV2.workspace');
+    if (!id) return t('Docs.workspace');
     const found = projects.value.find((p) => String(p._id) === String(id));
-    return found ? found.ProjectName : t('DocsV2.workspace');
+    return found ? found.ProjectName : t('Docs.workspace');
 }
 
 function swatch(id) {
@@ -326,7 +326,7 @@ function open(page) {
 
 function createDoc({ projectId = '', isWiki = false, template = null }) {
     const body = {
-        title: template ? t(template.label) : t('DocsV2.untitled'),
+        title: template ? t(template.label) : t('Docs.untitled'),
         ...(projectId ? { projectId } : {}),
         ...(isWiki || (template && template.wiki) ? { isWiki: true } : {}),
         ...(template ? { contentBlocks: template.blocks } : {}),
@@ -356,7 +356,7 @@ function markReviewed(page) {
     apiRequest('put', `${env.PAGES}/${page._id}/review`, {})
         .then((response) => {
             if (response.data?.status) {
-                $toast.success(t('DocsV2.marked_reviewed'), { position: 'top-right' });
+                $toast.success(t('Docs.marked_reviewed'), { position: 'top-right' });
                 fetchPages();
             } else {
                 $toast.error(response.data?.statusText || t('Toast.something_went_wrong'), { position: 'top-right' });
@@ -399,10 +399,10 @@ const DocCard = defineComponent({
             const agent = Boolean(page.createdByAgent && page.agentStatus !== 'approved');
             return h('button', { type: 'button', class: ['ah-card', 'hub__card', { 'hub__card--agent': agent }], onClick: () => emit('open', page) }, [
                 h('span', { class: 'hub__card-title' }, [
-                    page.title || t('DocsV2.untitled'),
-                    agent ? h('span', { class: 'ah-chip ah-chip--agent ah-chip--mono hub__tag' }, t('DocsV2.agent_draft')) : null,
+                    page.title || t('Docs.untitled'),
+                    agent ? h('span', { class: 'ah-chip ah-chip--agent ah-chip--mono hub__tag' }, t('Docs.agent_draft')) : null,
                 ]),
-                h('span', { class: 'hub__card-excerpt' }, page.excerpt || t('DocsV2.empty_page_excerpt')),
+                h('span', { class: 'hub__card-excerpt' }, page.excerpt || t('Docs.empty_page_excerpt')),
                 h('span', { class: 'hub__card-foot' }, [
                     reviewChip(page),
                     h('span', { class: 'ah-chip hub__card-project' }, projectNameOf(page.ProjectID)),
@@ -429,8 +429,8 @@ const DocList = defineComponent({
             onClick: () => emit('open', page),
         }, [
             h(ShellIcon, { name: page.isWiki ? 'book' : 'file', size: 14, class: 'hub__row-icon' }),
-            h('span', { class: 'hub__row-title' }, page.title || t('DocsV2.untitled')),
-            page.createdByAgent && page.agentStatus !== 'approved' ? h('span', { class: 'ah-chip ah-chip--agent ah-chip--mono hub__tag' }, t('DocsV2.agent')) : null,
+            h('span', { class: 'hub__row-title' }, page.title || t('Docs.untitled')),
+            page.createdByAgent && page.agentStatus !== 'approved' ? h('span', { class: 'ah-chip ah-chip--agent ah-chip--mono hub__tag' }, t('Docs.agent')) : null,
             reviewChip(page),
             props.tree ? null : h('span', { class: 'hub__row-project' }, projectNameOf(page.ProjectID)),
             h('span', { class: 'hub__row-time' }, shortDate(page.updatedAt)),
@@ -447,17 +447,17 @@ const AgentList = defineComponent({
             avatarNode('', true),
             h('span', { class: 'hub__row-main' }, [
                 h('span', { class: 'hub__row-title' }, [
-                    page.title || t('DocsV2.untitled'),
-                    h('span', { class: 'ah-chip ah-chip--agent ah-chip--mono hub__tag' }, t('DocsV2.agent')),
+                    page.title || t('Docs.untitled'),
+                    h('span', { class: 'ah-chip ah-chip--agent ah-chip--mono hub__tag' }, t('Docs.agent')),
                 ]),
-                h('span', { class: 'ah-small hub__row-sub' }, page.excerpt || t('DocsV2.empty_page_excerpt')),
+                h('span', { class: 'ah-small hub__row-sub' }, page.excerpt || t('Docs.empty_page_excerpt')),
             ]),
             h('span', { class: 'hub__row-time' }, [
-                page.agentName ? `${t('DocsV2.by_agent', { name: page.agentName })} · ` : '',
+                page.agentName ? `${t('Docs.by_agent', { name: page.agentName })} · ` : '',
                 relativeTime(page.updatedAt, t),
             ]),
-            h('button', { type: 'button', class: 'ah-btn ah-btn--sm ah-btn--secondary', onClick: () => emit('open', page) }, t('DocsV2.review')),
-            h('button', { type: 'button', class: 'ah-btn ah-btn--sm ah-btn--primary', onClick: () => emit('approve', page) }, t('DocsV2.approve')),
+            h('button', { type: 'button', class: 'ah-btn ah-btn--sm ah-btn--secondary', onClick: () => emit('open', page) }, t('Docs.review')),
+            h('button', { type: 'button', class: 'ah-btn ah-btn--sm ah-btn--primary', onClick: () => emit('approve', page) }, t('Docs.approve')),
         ])));
     },
 });
@@ -472,25 +472,25 @@ const WikiTable = defineComponent({
             : h('span', { class: ['ah-dot', state === 'stale' ? 'ah-dot--danger' : 'ah-dot--warn'] }));
         return () => h('div', { class: 'ah-card hub__wiki' }, [
             h('div', { class: 'hub__wiki-head' }, [
-                h('span', t('DocsV2.page').toUpperCase()),
-                h('span', t('DocsV2.owner').toUpperCase()),
-                h('span', t('DocsV2.reviewed').toUpperCase()),
-                h('span', t('DocsV2.state').toUpperCase()),
+                h('span', t('Docs.page').toUpperCase()),
+                h('span', t('Docs.owner').toUpperCase()),
+                h('span', t('Docs.reviewed').toUpperCase()),
+                h('span', t('Docs.state').toUpperCase()),
                 h('span'),
             ]),
             ...props.rows.map((page) => {
                 const owner = userOf(page.ownerId);
                 return h('div', { key: page._id, class: ['hub__wiki-row', `hub__wiki-row--${page.reviewState}`] }, [
                     h('button', { type: 'button', class: 'hub__wiki-page', onClick: () => emit('open', page) }, [
-                        h('span', { class: 'hub__wiki-title' }, page.title || t('DocsV2.untitled')),
+                        h('span', { class: 'hub__wiki-title' }, page.title || t('Docs.untitled')),
                         h('span', { class: 'ah-small hub__row-sub' }, [projectNameOf(page.ProjectID), page.excerpt ? ` · ${page.excerpt}` : '']),
                     ]),
                     h('span', { class: 'hub__wiki-owner' }, owner
                         ? [avatarNode(page.ownerId), owner.name]
-                        : [h('span', { class: 'ah-avatar ah-avatar--sm hub__avatar-none' }, '?'), t('DocsV2.no_owner')]),
+                        : [h('span', { class: 'ah-avatar ah-avatar--sm hub__avatar-none' }, '?'), t('Docs.no_owner')]),
                     h('span', { class: ['hub__mono', { 'hub__mono--danger': page.reviewState === 'stale' }] }, page.reviewedAt ? shortDate(page.reviewedAt) : '—'),
                     h('span', { class: ['hub__wiki-state', `hub__wiki-state--${page.reviewState}`] }, [dot(page.reviewState), t(reviewLabelKey(page.reviewState))]),
-                    h('button', { type: 'button', class: 'ah-btn ah-btn--sm ah-btn--ghost', onClick: () => emit('review', page) }, t('DocsV2.mark_reviewed')),
+                    h('button', { type: 'button', class: 'ah-btn ah-btn--sm ah-btn--ghost', onClick: () => emit('review', page) }, t('Docs.mark_reviewed')),
                 ]);
             }),
         ]);

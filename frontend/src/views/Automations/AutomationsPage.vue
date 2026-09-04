@@ -2,7 +2,7 @@
     <div class="ah-page au">
         <div class="ah-toolbar">
             <div class="ah-toolbar__title">{{ $t('Automations.title') }}</div>
-            <span class="parity-count">{{ $t('ParityV2.n_active', { n: activeCount }) }}</span>
+            <span class="parity-count">{{ $t('Parity.n_active', { n: activeCount }) }}</span>
             <div class="ah-toolbar__spacer"></div>
             <button v-if="!building" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="startNew">
                 <ShellIcon name="plus" :size="14" />{{ $t('Automations.new') }}
@@ -21,17 +21,17 @@
                         v-model="sentence"
                         class="au__sentence-input"
                         type="text"
-                        :placeholder="$t('ParityV2.sentence_placeholder')"
+                        :placeholder="$t('Parity.sentence_placeholder')"
                         @keyup.enter="compileSentence"
                         @blur="compileSentence"
                     />
                     <span class="ah-kbd">↵</span>
                 </div>
 
-                <p v-if="grammar.shape" class="ah-small au__grammar">{{ $t('ParityV2.grammar_shape', { shape: grammar.shape }) }}</p>
+                <p v-if="grammar.shape" class="ah-small au__grammar">{{ $t('Parity.grammar_shape', { shape: grammar.shape }) }}</p>
 
                 <div v-for="(item, i) in ambiguities" :key="i" class="au__ambiguous">
-                    <div class="ah-label">{{ $t('ParityV2.ambiguous') }}</div>
+                    <div class="ah-label">{{ $t('Parity.ambiguous') }}</div>
                     <p class="au__ambiguous-q">{{ item.question }}</p>
                     <div class="au__ambiguous-opts">
                         <button v-for="opt in item.options" :key="opt.sentence" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="resolve(item, opt)">
@@ -45,7 +45,7 @@
                 </ul>
 
                 <div class="au__compiled">
-                    <div class="ah-label">{{ $t('ParityV2.compiled_rule') }}</div>
+                    <div class="ah-label">{{ $t('Parity.compiled_rule') }}</div>
 
                     <div class="au__slots">
                         <span class="au__kw">{{ $t('Automations.when') }}</span>
@@ -60,7 +60,7 @@
                         </select>
 
                         <template v-for="(c, i) in conditions" :key="`c${i}`">
-                            <span class="au__kw">{{ i === 0 ? $t('Automations.if') : $t('ParityV2.and') }}</span>
+                            <span class="au__kw">{{ i === 0 ? $t('Automations.if') : $t('Parity.and') }}</span>
                             <select v-model="c.field" class="au__slot" @change="onFieldChange(c)">
                                 <option v-for="f in manifest.conditionFields" :key="f.field" :value="f.field">{{ f.label }}</option>
                             </select>
@@ -78,7 +78,7 @@
 
                     <div class="au__slots">
                         <template v-for="(s, i) in draft.steps" :key="s.id">
-                            <span class="au__kw">{{ i === 0 ? $t('Automations.then') : $t('ParityV2.and') }}</span>
+                            <span class="au__kw">{{ i === 0 ? $t('Automations.then') : $t('Parity.and') }}</span>
                             <select v-model="s.action" class="au__slot" @change="resetConfig(s)">
                                 <option v-for="a in manifest.actions" :key="a.key" :value="a.key">{{ a.label }}</option>
                             </select>
@@ -97,11 +97,11 @@
 
                     <div class="au__save">
                         <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="saving" @click="save(true)">
-                            {{ saving ? $t('ParityV2.saving') : $t('ParityV2.save_automation') }}
+                            {{ saving ? $t('Parity.saving') : $t('Parity.save_automation') }}
                         </button>
                         <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="saving" @click="save(false)">{{ $t('Automations.save_draft') }}</button>
                         <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="testing" @click="test">
-                            {{ backtest ? $t('ParityV2.backtest_result', { n: backtest.matched, days: backtest.windowDays }) : $t('ParityV2.test_30_days') }}
+                            {{ backtest ? $t('Parity.backtest_result', { n: backtest.matched, days: backtest.windowDays }) : $t('Parity.test_30_days') }}
                         </button>
                     </div>
                     <p v-if="backtest" class="ah-small">{{ backtest.basis }}</p>
@@ -109,7 +109,7 @@
             </template>
 
             <template v-else>
-                <p v-if="loading" class="ah-empty">{{ $t('ParityV2.loading') }}</p>
+                <p v-if="loading" class="ah-empty">{{ $t('Parity.loading') }}</p>
                 <div v-else-if="!rules.length" class="ah-empty au__empty">
                     <h2 class="ah-h2">{{ $t('Automations.empty_title') }}</h2>
                     <p>{{ $t('Automations.empty_sub') }}</p>
@@ -125,7 +125,7 @@
                         @click="toggle(r)"
                     ><span class="au__knob"></span></button>
                     <span class="au__rule-text">{{ r.sentence || r.summary }}</span>
-                    <span class="au__rule-count ah-mono">{{ $t('ParityV2.fired_n', { n: r.firedCount || 0 }) }}</span>
+                    <span class="au__rule-count ah-mono">{{ $t('Parity.fired_n', { n: r.firedCount || 0 }) }}</span>
                     <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="edit(r)">{{ $t('Automations.edit') }}</button>
                     <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm au__delete" @click="remove(r)">{{ $t('Automations.delete') }}</button>
                 </div>

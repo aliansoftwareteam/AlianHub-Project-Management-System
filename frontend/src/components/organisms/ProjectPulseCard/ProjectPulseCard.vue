@@ -3,21 +3,21 @@
         <div class="dc-stats">
             <button type="button" class="ppc__stat" @click="openDrill('active')">
                 <span class="dc-stat__num">{{ data.activeProjects }}</span>
-                <span class="dc-stat__label">{{ $t('DashV2.pulse_active') }}</span>
+                <span class="dc-stat__label">{{ $t('Dash.pulse_active') }}</span>
             </button>
             <button type="button" class="ppc__stat" @click="openDrill('working')">
                 <span class="dc-stat__num dc-stat__num--ok">{{ data.workingProjects }}</span>
-                <span class="dc-stat__label">{{ $t('DashV2.pulse_working') }}</span>
+                <span class="dc-stat__label">{{ $t('Dash.pulse_working') }}</span>
             </button>
             <div class="ppc__stat ppc__stat--static">
                 <span class="dc-stat__num">{{ idleProjects }}</span>
-                <span class="dc-stat__label">{{ $t('DashV2.pulse_idle') }}</span>
+                <span class="dc-stat__label">{{ $t('Dash.pulse_idle') }}</span>
             </div>
         </div>
 
         <div class="ppc__mix">
-            <div class="ah-label ppc__mix-title">{{ $t('DashV2.pulse_mix') }}</div>
-            <div v-if="!data.typeMix.length" class="dc-sub">{{ $t('DashV2.pulse_no_types') }}</div>
+            <div class="ah-label ppc__mix-title">{{ $t('Dash.pulse_mix') }}</div>
+            <div v-if="!data.typeMix.length" class="dc-sub">{{ $t('Dash.pulse_no_types') }}</div>
             <div v-else class="ppc__bars">
                 <button v-for="row in data.typeMix" :key="row.type" type="button" class="dc-row ppc__bar-row" @click="openDrill(row.type)">
                     <span class="dc-row__name" :title="row.type">{{ row.type }}</span>
@@ -95,7 +95,7 @@ const load = async () => {
                 typeMix: bodyData.data.typeMix || [],
             };
         }
-        meta.note = t('DashV2.pulse_note');
+        meta.note = t('Dash.pulse_note');
         meta.state = data.value.activeProjects ? 'ready' : 'empty';
     } catch (e) {
         meta.state = 'error';
@@ -108,8 +108,8 @@ const drillFilter = ref('active');
 const allDrillProjects = ref([]);
 
 const drillTitle = computed(() => {
-    if (drillFilter.value === 'active') return t('DashV2.pulse_active');
-    if (drillFilter.value === 'working') return t('DashV2.pulse_working');
+    if (drillFilter.value === 'active') return t('Dash.pulse_active');
+    if (drillFilter.value === 'working') return t('Dash.pulse_working');
     return drillFilter.value;
 });
 const drillProjects = computed(() => {

@@ -78,26 +78,26 @@ export function useOnboardingChecklist({ openCreateProject = () => {}, startTour
     };
 
     const CTA = {
-        company: "HomeV2.step_company",
-        sample: "HomeV2.create_project",
-        invite: "HomeV2.invite_team",
-        project: "HomeV2.create_project",
-        permissions: "HomeV2.review_permissions",
-        board: "HomeV2.step_board",
-        notifications: "HomeV2.step_notifications",
-        apps: "HomeV2.choose_apps",
-        remove_sample: "HomeV2.remove_sample",
-        open_project: "HomeV2.open_project",
-        complete_task: "HomeV2.step_complete_task",
-        log_time: "HomeV2.step_log_time",
-        tour: "HomeV2.take_tour"
+        company: "Home.step_company",
+        sample: "Home.create_project",
+        invite: "Home.invite_team",
+        project: "Home.create_project",
+        permissions: "Home.review_permissions",
+        board: "Home.step_board",
+        notifications: "Home.step_notifications",
+        apps: "Home.choose_apps",
+        remove_sample: "Home.remove_sample",
+        open_project: "Home.open_project",
+        complete_task: "Home.step_complete_task",
+        log_time: "Home.step_log_time",
+        tour: "Home.take_tour"
     };
 
     const keys = computed(() => (isOwnerOrAdmin.value ? ADMIN_STEPS : MEMBER_STEPS));
     const steps = computed(() => keys.value.map((key) => ({
         key,
-        label: `HomeV2.step_${key}`,
-        note: key === "permissions" ? "HomeV2.step_permissions_note" : "",
+        label: `Home.step_${key}`,
+        note: key === "permissions" ? "Home.step_permissions_note" : "",
         done: DONE[key](),
         cta: CTA[key]
     })));

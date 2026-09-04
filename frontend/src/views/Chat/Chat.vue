@@ -49,7 +49,7 @@
                         v-if="isMobile"
                         type="button"
                         class="cv-back"
-                        :title="$t('ChatV2.back_to_list')"
+                        :title="$t('Chat.back_to_list')"
                         @click="backToList"
                     ><ShellIcon name="chevronLeft" :size="18" /></button>
                 </template>
@@ -65,9 +65,9 @@
                 <div class="cv-empty-card">
                     <ShellIcon name="chat" :size="26" />
                     <h2 class="ah-h2">{{ $t('Chat.welcome_message').replace('BRAND_NAME', brandName) }}</h2>
-                    <p class="ah-small">{{ hasAnyConversation ? $t('ChatV2.pick_up') : $t('ChatV2.no_channels') }}</p>
+                    <p class="ah-small">{{ hasAnyConversation ? $t('Chat.pick_up') : $t('Chat.no_channels') }}</p>
                     <button v-if="canCreateChannel" type="button" class="ah-btn ah-btn--primary" @click="showCreateChannel = true">
-                        <ShellIcon name="plus" :size="14" /> {{ $t('ChatV2.new_channel') }}
+                        <ShellIcon name="plus" :size="14" /> {{ $t('Chat.new_channel') }}
                     </button>
                 </div>
             </div>
@@ -220,7 +220,7 @@ const subtitle = computed(() => {
     const count = watchers.value.length;
     const parts = [];
     if (linkedProject.value) parts.push(linkedProject.value.ProjectName);
-    parts.push(count === 1 ? t('ChatV2.member_one') : t('ChatV2.members_count', { count }));
+    parts.push(count === 1 ? t('Chat.member_one') : t('Chat.members_count', { count }));
     return parts.join(' · ');
 });
 

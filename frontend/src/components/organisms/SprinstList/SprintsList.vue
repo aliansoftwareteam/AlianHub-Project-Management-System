@@ -36,7 +36,7 @@
             </div>
 
             <div class="spr__actions">
-                <span v-if="showSprintProgress" class="ah-mono spr__pts">{{ $t('MembersV2.sprint_points', { done: donePoints, total: committedPoints }) }}</span>
+                <span v-if="showSprintProgress" class="ah-mono spr__pts">{{ $t('Members.sprint_points', { done: donePoints, total: committedPoints }) }}</span>
 
                 <template v-if="$route?.query?.tab !== 'Calendar'">
                     <button
@@ -80,13 +80,13 @@
                     type="button"
                     class="ah-btn ah-btn--primary ah-btn--sm"
                     @click.stop="showCompleteSprint = true"
-                >{{ $t('MembersV2.close_sprint') }}</button>
+                >{{ $t('Members.close_sprint') }}</button>
                 <button
                     v-else-if="canRunScrum && scrumState === 'planned'"
                     type="button"
                     class="ah-btn ah-btn--outline ah-btn--sm"
                     @click.stop="startSprint()"
-                >{{ $t('MembersV2.start_sprint') }}</button>
+                >{{ $t('Members.start_sprint') }}</button>
 
                 <template v-if="!showArchiveVar">
                     <div class="spr__watchers" @click.stop>

@@ -6,20 +6,20 @@
             :aria-expanded="open"
             :disabled="projectData?.status === 'close'"
             @click.stop="open = !open"
-        >+ {{ $t('ProjectsV2.new') }}</button>
+        >+ {{ $t('Projects.new') }}</button>
         <div v-if="open" class="ah-pop nip__pop" role="menu" @click.stop>
             <button v-if="canList" type="button" class="ah-pop__item" role="menuitem" @click="start('sprint')">
-                <ShellIcon name="layout" :size="14" />{{ $t('ProjectsV2.new_list') }}
+                <ShellIcon name="layout" :size="14" />{{ $t('Projects.new_list') }}
             </button>
             <button v-if="canFolder" type="button" class="ah-pop__item" role="menuitem" @click="start('folder')">
-                <ShellIcon name="file" :size="14" />{{ $t('ProjectsV2.new_folder') }}
+                <ShellIcon name="file" :size="14" />{{ $t('Projects.new_folder') }}
             </button>
         </div>
 
         <teleport to="body">
             <div v-if="mode" class="nip__overlay" @click.self="mode = ''">
                 <div class="nip__card" role="dialog" aria-modal="true">
-                    <h3 class="ah-h3 nip__title">{{ $t(mode === 'sprint' ? 'ProjectsV2.new_list' : 'ProjectsV2.new_folder') }}</h3>
+                    <h3 class="ah-h3 nip__title">{{ $t(mode === 'sprint' ? 'Projects.new_list' : 'Projects.new_folder') }}</h3>
                     <SprintFolderInput
                         :createSprint="mode === 'sprint'"
                         :createFolder="mode === 'folder'"

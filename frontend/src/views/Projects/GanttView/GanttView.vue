@@ -2,8 +2,8 @@
     <div class="ah-page gv">
         <div v-if="isMobile" class="gv__mobile">
             <div class="ah-empty gv__mobile-card">
-                <div class="gv__mobile-title">{{ $t('ViewsV2.desktop_only_title') }}</div>
-                <p class="gv__mobile-text">{{ $t('ViewsV2.desktop_only_gantt') }}</p>
+                <div class="gv__mobile-title">{{ $t('Views.desktop_only_title') }}</div>
+                <p class="gv__mobile-text">{{ $t('Views.desktop_only_gantt') }}</p>
             </div>
         </div>
 
@@ -25,58 +25,58 @@
                     :class="showCritical ? 'ah-btn--outline' : 'ah-btn--secondary'"
                     :aria-pressed="showCritical"
                     @click="toggleCritical"
-                >{{ $t('ViewsV2.critical_path') }}</button>
+                >{{ $t('Views.critical_path') }}</button>
                 <button
                     type="button"
                     class="ah-btn ah-btn--sm gv__toggle"
                     :class="showBaseline ? 'ah-btn--outline' : 'ah-btn--secondary'"
                     :aria-pressed="showBaseline"
                     @click="toggleBaseline"
-                >{{ $t('ViewsV2.baseline') }}</button>
-                <span v-if="readOnly" class="ah-chip ah-chip--warn">{{ $t('ViewsV2.view_only') }}</span>
+                >{{ $t('Views.baseline') }}</button>
+                <span v-if="readOnly" class="ah-chip ah-chip--warn">{{ $t('Views.view_only') }}</span>
                 <div class="ah-toolbar__spacer"></div>
                 <span class="ah-mono gv__count">
-                    {{ $t('ViewsV2.scheduled_count', { n: scheduled.length }) }}
-                    <template v-if="unscheduled.length"> · {{ $t('ViewsV2.unscheduled_count', { n: unscheduled.length }) }}</template>
+                    {{ $t('Views.scheduled_count', { n: scheduled.length }) }}
+                    <template v-if="unscheduled.length"> · {{ $t('Views.unscheduled_count', { n: unscheduled.length }) }}</template>
                 </span>
                 <button type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="replanOpen = !replanOpen">
-                    <span class="gv__spark">✦</span> {{ $t('ViewsV2.replan') }}
+                    <span class="gv__spark">✦</span> {{ $t('Views.replan') }}
                 </button>
             </div>
 
             <div class="gv__main">
                 <div v-if="loadError" class="gv__msg ah-empty">
-                    {{ $t('ViewsV2.gantt_module_missing') }}
+                    {{ $t('Views.gantt_module_missing') }}
                     <code>cd frontend &amp;&amp; npm install</code>
                 </div>
                 <template v-else>
                     <div ref="ganttEl" class="gv__chart"></div>
                     <div v-if="!scheduled.length && !loading" class="gv__empty ah-empty">
-                        {{ $t('ViewsV2.gantt_empty') }}
+                        {{ $t('Views.gantt_empty') }}
                     </div>
                 </template>
 
                 <aside v-if="unscheduled.length" class="gv__tray ah-scroll">
                     <div class="gv__tray-head">
-                        <span class="ah-label">{{ $t('ViewsV2.unscheduled') }}</span>
+                        <span class="ah-label">{{ $t('Views.unscheduled') }}</span>
                         <span class="ah-mono gv__tray-count">{{ unscheduled.length }}</span>
                     </div>
                     <div v-for="t in unscheduled" :key="t._id" class="gv__tray-item" @click="open(t)">
                         <span class="gv__tray-name" :title="t.TaskName">{{ t.TaskName || t.TaskKey }}</span>
                         <button v-if="!readOnly" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click.stop="schedule(t)">
-                            {{ $t('ViewsV2.schedule') }}
+                            {{ $t('Views.schedule') }}
                         </button>
                     </div>
                 </aside>
 
                 <div v-if="replanOpen" class="gv__replan">
-                    <button type="button" class="gv__replan-close" :aria-label="$t('ViewsV2.close')" @click="replanOpen = false">×</button>
+                    <button type="button" class="gv__replan-close" :aria-label="$t('Views.close')" @click="replanOpen = false">×</button>
                     <p v-for="(line, i) in replanLines" :key="i" class="gv__replan-line">
-                        <span v-if="i === 0" class="gv__replan-tag">✦ {{ $t('ViewsV2.replan') }}:</span> {{ line }}
+                        <span v-if="i === 0" class="gv__replan-tag">✦ {{ $t('Views.replan') }}:</span> {{ line }}
                     </p>
                     <p v-for="p in proposals" :key="p._id" class="gv__replan-line">
                         <span class="gv__replan-tag">✦ {{ p.agentName }}:</span> {{ p.what }}
-                        <router-link class="gv__replan-link" :to="{ name: 'AiInbox', params: { cid: companyId } }">{{ $t('ViewsV2.review') }}</router-link>
+                        <router-link class="gv__replan-link" :to="{ name: 'AiInbox', params: { cid: companyId } }">{{ $t('Views.review') }}</router-link>
                     </p>
                 </div>
             </div>
@@ -118,9 +118,9 @@ const loading = ref(true);
 const milestones = ref([]);
 const proposals = ref([]);
 const zoomLevels = computed(() => [
-    { key: 'Day', label: t('ViewsV2.zoom_days') },
-    { key: 'Week', label: t('ViewsV2.zoom_weeks') },
-    { key: 'Month', label: t('ViewsV2.zoom_months') },
+    { key: 'Day', label: t('Views.zoom_days') },
+    { key: 'Week', label: t('Views.zoom_weeks') },
+    { key: 'Month', label: t('Views.zoom_months') },
 ]);
 const zoom = ref('Week');
 const showCritical = ref(true);
@@ -171,7 +171,7 @@ const readOnly = computed(() =>
 
 const sprintName = (id) => {
     const hit = (props.sprints || []).find((s) => String(s.id || s._id) === String(id));
-    return (hit && (hit.name || hit.sprintName)) || t('ViewsV2.sprint_fallback');
+    return (hit && (hit.name || hit.sprintName)) || t('Views.sprint_fallback');
 };
 
 const blocksOf = (task) => (task.relations || []).filter((r) => r.type === 'blocks').map((r) => String(r.taskId));
@@ -243,7 +243,7 @@ function toGanttData() {
         const line = baselineEnd(task);
         return {
             id: String(task._id),
-            text: task.TaskName || task.TaskKey || t('ViewsV2.untitled'),
+            text: task.TaskName || task.TaskKey || t('Views.untitled'),
             start_date: new Date(task.startDate),
             end_date: new Date(task.DueDate),
             sprintGroup,
@@ -290,7 +290,7 @@ function toGanttData() {
         if (m && m.date) {
             data.push({
                 id: `ms_${m._id}`,
-                text: m.milestoneName || t('ViewsV2.milestone'),
+                text: m.milestoneName || t('Views.milestone'),
                 start_date: new Date(m.date),
                 type: (gantt && gantt.config && gantt.config.types ? gantt.config.types.milestone : 'milestone'),
                 readonly: true,
@@ -318,7 +318,7 @@ function placeToday() {
     if (!gantt || typeof gantt.addMarker !== 'function') return;
     try {
         if (todayMarker) gantt.deleteMarker(todayMarker);
-        todayMarker = gantt.addMarker({ start_date: new Date(), css: 'gv-today', text: t('ViewsV2.today') });
+        todayMarker = gantt.addMarker({ start_date: new Date(), css: 'gv-today', text: t('Views.today') });
     } catch (e) { /* markers are decoration */ }
 }
 
@@ -402,18 +402,18 @@ function toggleBaseline() {
 /* --------------------------------- replan panel --------------------------------- */
 const replanLines = computed(() => {
     const path = critical.value.path || [];
-    if (!path.length) return [t('ViewsV2.replan_none')];
+    if (!path.length) return [t('Views.replan_none')];
     const chain = path.map((id) => findTask(id)).filter(Boolean);
     const last = chain[chain.length - 1];
     const end = last ? new Date(last.DueDate) : null;
-    const lines = [t('ViewsV2.replan_chain', {
+    const lines = [t('Views.replan_chain', {
         n: chain.length,
         days: critical.value.durationDays,
         date: end ? end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '',
     })];
     const now = Date.now();
     const late = chain.find((task) => new Date(task.DueDate).getTime() < now && (task.status?.type || task.statusType) !== 'close');
-    if (late) lines.push(t('ViewsV2.replan_late', { task: late.TaskName || late.TaskKey }));
+    if (late) lines.push(t('Views.replan_late', { task: late.TaskName || late.TaskKey }));
     return lines;
 });
 
@@ -435,7 +435,7 @@ function ensureTasksLoaded() {
 
 function ownerCell(task) {
     if (!task || String(task.id).startsWith('sp_') || String(task.id).startsWith('ms_')) return '';
-    if (!task.owner) return `<span class="gv-unassigned">${t('ViewsV2.unassigned')}</span>`;
+    if (!task.owner) return `<span class="gv-unassigned">${t('Views.unassigned')}</span>`;
     const user = getUser(task.owner) || {};
     const name = user.Employee_Name || '';
     return `<span class="gv-owner" title="${name.replace(/"/g, '')}">${(name.trim().charAt(0) || '?').toUpperCase()}</span>`;
@@ -477,7 +477,7 @@ onMounted(async () => {
         gantt.config.bar_height = 16;
         gantt.config.show_markers = true;
         gantt.config.columns = [
-            { name: 'text', label: t('ViewsV2.col_task'), tree: true, width: 236, resize: true },
+            { name: 'text', label: t('Views.col_task'), tree: true, width: 236, resize: true },
             { name: 'owner', label: '', align: 'center', width: 48, template: ownerCell },
         ];
         gantt.templates.task_text = () => '';

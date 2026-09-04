@@ -1,14 +1,14 @@
 <template>
     <section class="ah-card">
         <div class="ah-card__head">
-            <span class="ah-h3">{{ $t('ParityV2.outcomes_title') }}</span>
-            <span class="parity-count">{{ $t('ParityV2.n_runs', { n: runs.length }) }}</span>
+            <span class="ah-h3">{{ $t('Parity.outcomes_title') }}</span>
+            <span class="parity-count">{{ $t('Parity.n_runs', { n: runs.length }) }}</span>
         </div>
 
         <div class="outcome">
             <div class="outcome__head">
-                <span class="outcome__tag">{{ $t('ParityV2.declined_tag') }}</span>
-                <span class="outcome__title">{{ $t('ParityV2.declined_title') }}</span>
+                <span class="outcome__tag">{{ $t('Parity.declined_tag') }}</span>
+                <span class="outcome__title">{{ $t('Parity.declined_title') }}</span>
             </div>
             <div v-for="(item, i) in declines" :key="`d${i}`" class="outcome__quote">
                 <span class="ah-avatar ah-avatar--agent"><ShellIcon name="agent" :size="13" /></span>
@@ -16,31 +16,31 @@
             </div>
             <div v-for="run in failed" :key="run._id" class="outcome__quote">
                 <span class="ah-avatar ah-avatar--agent"><ShellIcon name="agent" :size="13" /></span>
-                <span><strong>{{ run.agentName }}:</strong> {{ run.error || run.outcome || $t('ParityV2.failed_generic') }}</span>
+                <span><strong>{{ run.agentName }}:</strong> {{ run.error || run.outcome || $t('Parity.failed_generic') }}</span>
             </div>
-            <p v-if="!declines.length && !failed.length" class="ah-empty">{{ $t('ParityV2.no_declines') }}</p>
-            <p class="outcome__rule">{{ $t('ParityV2.declined_rule') }}</p>
+            <p v-if="!declines.length && !failed.length" class="ah-empty">{{ $t('Parity.no_declines') }}</p>
+            <p class="outcome__rule">{{ $t('Parity.declined_rule') }}</p>
         </div>
 
         <div class="outcome">
             <div class="outcome__head">
-                <span class="outcome__tag outcome__tag--warn">{{ $t('ParityV2.handback_tag') }}</span>
-                <span class="outcome__title">{{ $t('ParityV2.handback_title') }}</span>
+                <span class="outcome__tag outcome__tag--warn">{{ $t('Parity.handback_tag') }}</span>
+                <span class="outcome__title">{{ $t('Parity.handback_title') }}</span>
             </div>
-            <p v-if="!handedBack.length" class="ah-empty">{{ $t('ParityV2.no_handbacks') }}</p>
+            <p v-if="!handedBack.length" class="ah-empty">{{ $t('Parity.no_handbacks') }}</p>
             <div v-for="run in handedBack" :key="run._id" class="outcome__quote">
                 <span class="ah-avatar ah-avatar--agent"><ShellIcon name="agent" :size="13" /></span>
-                <span><strong>{{ run.agentName }}:</strong> {{ run.outcome || $t('ParityV2.handback_generic') }}</span>
+                <span><strong>{{ run.agentName }}:</strong> {{ run.outcome || $t('Parity.handback_generic') }}</span>
             </div>
-            <p class="outcome__rule">{{ $t('ParityV2.handback_rule') }}</p>
+            <p class="outcome__rule">{{ $t('Parity.handback_rule') }}</p>
         </div>
 
         <div class="outcome">
             <div class="outcome__head">
-                <span class="outcome__tag outcome__tag--danger">{{ $t('ParityV2.stop_tag') }}</span>
-                <span class="outcome__title">{{ $t('ParityV2.stop_title') }}</span>
+                <span class="outcome__tag outcome__tag--danger">{{ $t('Parity.stop_tag') }}</span>
+                <span class="outcome__title">{{ $t('Parity.stop_title') }}</span>
             </div>
-            <p v-if="!open.length" class="ah-empty">{{ $t('ParityV2.no_open_runs') }}</p>
+            <p v-if="!open.length" class="ah-empty">{{ $t('Parity.no_open_runs') }}</p>
             <div v-for="run in open" :key="run._id" class="outcome__run">
                 <span class="outcome__run-body">
                     <strong>{{ run.agentName }}</strong>
@@ -48,14 +48,14 @@
                     <span v-if="run.skill"> · {{ run.skill }}</span>
                 </span>
                 <button type="button" class="ah-btn ah-btn--danger ah-btn--sm" :disabled="stopping === run._id" @click="$emit('stop', run)">
-                    {{ stopping === run._id ? $t('ParityV2.stopping') : $t('ParityV2.stop') }}
+                    {{ stopping === run._id ? $t('Parity.stopping') : $t('Parity.stop') }}
                 </button>
             </div>
-            <p class="outcome__rule">{{ $t('ParityV2.stop_rule') }}</p>
+            <p class="outcome__rule">{{ $t('Parity.stop_rule') }}</p>
         </div>
 
         <div class="outcome">
-            <p class="outcome__law"><strong>{{ $t('ParityV2.law_label') }}</strong> {{ $t('ParityV2.law_body') }}</p>
+            <p class="outcome__law"><strong>{{ $t('Parity.law_label') }}</strong> {{ $t('Parity.law_body') }}</p>
         </div>
     </section>
 </template>

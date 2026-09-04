@@ -1,12 +1,12 @@
 <template>
-    <aside v-if="showCard" class="ah-gs" :aria-label="$t('AuthV2.gs_title')">
+    <aside v-if="showCard" class="ah-gs" :aria-label="$t('Auth.gs_title')">
         <div class="ah-gs__head">
             <div class="ah-gs__ring" :style="{ '--p': `${Math.round((doneCount / items.length) * 100)}%` }">
                 <span class="ah-gs__ring-in ah-mono">{{ doneCount }}/{{ items.length }}</span>
             </div>
             <div class="ah-gs__titles">
-                <strong>{{ $t('AuthV2.gs_title') }}</strong>
-                <span>{{ $t('AuthV2.gs_sub') }}</span>
+                <strong>{{ $t('Auth.gs_title') }}</strong>
+                <span>{{ $t('Auth.gs_sub') }}</span>
             </div>
         </div>
         <ul class="ah-gs__list">
@@ -18,8 +18,8 @@
             </li>
         </ul>
         <div class="ah-gs__foot">
-            <button type="button" class="ah-gs__dismiss" @click="dismiss">{{ $t('AuthV2.gs_dismiss') }}</button>
-            <a v-if="helpLink" :href="helpLink" target="_blank" rel="noopener">{{ $t('AuthV2.gs_docs') }}</a>
+            <button type="button" class="ah-gs__dismiss" @click="dismiss">{{ $t('Auth.gs_dismiss') }}</button>
+            <a v-if="helpLink" :href="helpLink" target="_blank" rel="noopener">{{ $t('Auth.gs_docs') }}</a>
         </div>
     </aside>
 </template>
@@ -76,10 +76,10 @@ const users = computed(() => getters["users/users"] || []);
 
 const go = (name) => router.push({ name, params: { cid: companyId.value } }).catch(() => {});
 const items = computed(() => [
-    { key: "tour", label: savedStep("shell") > 0 && !shellTourDone.value ? t("AuthV2.gs_resume_tour") : t("AuthV2.gs_take_tour"), done: shellTourDone.value, go: () => startTour("shell") },
-    { key: "invite", label: t("AuthV2.gs_invite"), done: users.value.length > 1, go: () => go("Members") },
-    { key: "project", label: t("AuthV2.gs_project"), done: projects.value.some((p) => p.ProjectName !== SAMPLE_PROJECT_NAME), go: () => go("Projects") },
-    { key: "track", label: t("AuthV2.gs_track"), done: tourStatus.value.hasTrackedTime === true, go: () => go("Home") }
+    { key: "tour", label: savedStep("shell") > 0 && !shellTourDone.value ? t("Auth.gs_resume_tour") : t("Auth.gs_take_tour"), done: shellTourDone.value, go: () => startTour("shell") },
+    { key: "invite", label: t("Auth.gs_invite"), done: users.value.length > 1, go: () => go("Members") },
+    { key: "project", label: t("Auth.gs_project"), done: projects.value.some((p) => p.ProjectName !== SAMPLE_PROJECT_NAME), go: () => go("Projects") },
+    { key: "track", label: t("Auth.gs_track"), done: tourStatus.value.hasTrackedTime === true, go: () => go("Home") }
 ]);
 const doneCount = computed(() => items.value.filter((i) => i.done).length);
 const showCard = computed(() => !dismissed.value && !route.meta.hideHeader && doneCount.value < items.value.length && wideEnough.value);
@@ -91,11 +91,11 @@ const firstPresent = (selectors) => selectors.find((s) => document.querySelector
 const buildSteps = (which) => STEPS[which].map((s, i, all) => ({
     element: firstPresent(s.els),
     popover: {
-        title: t(`AuthV2.tour_${which}_${s.key}_title`),
-        description: t(`AuthV2.tour_${which}_${s.key}_body`),
+        title: t(`Auth.tour_${which}_${s.key}_title`),
+        description: t(`Auth.tour_${which}_${s.key}_body`),
         side: s.side,
         align: s.align,
-        nextBtnText: i < all.length - 1 ? t("AuthV2.tour_next", { label: t(`AuthV2.tour_${which}_${s.key}_next`) }) : t("AuthV2.tour_done")
+        nextBtnText: i < all.length - 1 ? t("Auth.tour_next", { label: t(`Auth.tour_${which}_${s.key}_next`) }) : t("Auth.tour_done")
     }
 }));
 
@@ -116,7 +116,7 @@ const renderStepHeader = (popover, { state }) => {
     head.className = "ah-tour__head";
     const label = document.createElement("span");
     label.className = "ah-tour__step";
-    label.textContent = t("AuthV2.tour_step", { a: index + 1, b: total });
+    label.textContent = t("Auth.tour_step", { a: index + 1, b: total });
     const bars = document.createElement("div");
     bars.className = "ah-tour__bars";
     for (let i = 0; i < total; i += 1) {
@@ -130,11 +130,11 @@ const renderStepHeader = (popover, { state }) => {
     const skip = document.createElement("button");
     skip.type = "button";
     skip.className = "ah-tour__skip";
-    skip.textContent = t("AuthV2.tour_skip");
+    skip.textContent = t("Auth.tour_skip");
     skip.addEventListener("click", () => { pauseTour(); localStorage.setItem(skipKey(activeScreen), "1"); driverObj?.destroy(); });
     const meta = document.createElement("span");
     meta.className = "ah-tour__meta";
-    meta.textContent = t("AuthV2.tour_meta", { n: total, s: total * 10 });
+    meta.textContent = t("Auth.tour_meta", { n: total, s: total * 10 });
     popover.footer.append(skip, meta);
 };
 

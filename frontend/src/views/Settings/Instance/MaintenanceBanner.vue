@@ -1,7 +1,7 @@
 <template>
     <div v-if="maintenance" class="mt-banner" role="status">
         <span class="mt-banner__dot"></span>
-        <span>{{ $t('InstanceV2.maintenance_public') }}</span>
+        <span>{{ $t('Instance.maintenance_public') }}</span>
     </div>
 </template>
 

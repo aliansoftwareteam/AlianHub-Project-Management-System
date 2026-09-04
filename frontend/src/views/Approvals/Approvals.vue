@@ -1,14 +1,14 @@
 <template>
     <div class="ah-page tv-page ap">
         <div class="tv-head">
-            <h1 class="tv-title">{{ $t('TimeV2.approvals') }}</h1>
+            <h1 class="tv-title">{{ $t('Time.approvals') }}</h1>
             <span v-if="count" class="ap__count">{{ count }}</span>
             <nav class="tv-tabs ap__tabs" aria-label="Approval types">
                 <button v-for="f in filters" :key="f.key" type="button" class="tv-tab" :class="{ 'is-active': filter === f.key }" @click="filter = f.key">{{ $t(f.label) }}</button>
             </nav>
         </div>
 
-        <div v-if="!isManager" class="tv-empty"><span>{{ $t('TimeV2.no_access') }}</span></div>
+        <div v-if="!isManager" class="tv-empty"><span>{{ $t('Time.no_access') }}</span></div>
         <template v-else>
             <p v-if="error" class="tv-error">{{ error }}</p>
             <p v-else-if="notice" class="tv-ok">{{ notice }}</p>
@@ -29,41 +29,41 @@
                     </div>
 
                     <div v-if="card.kind === 'timesheet'" class="ap__facts">
-                        <span>{{ $t('TimeV2.billable_h', { h: formatHm(card.row.billableMinutes) }) }}</span>
-                        <span>{{ $t('TimeV2.internal_h', { h: formatHm(card.row.nonBillableMinutes) }) }}</span>
-                        <span v-if="card.row.overMinutes > 0" class="is-warn">{{ $t('TimeV2.over_cap', { h: formatHm(card.row.overMinutes) }) }}</span>
+                        <span>{{ $t('Time.billable_h', { h: formatHm(card.row.billableMinutes) }) }}</span>
+                        <span>{{ $t('Time.internal_h', { h: formatHm(card.row.nonBillableMinutes) }) }}</span>
+                        <span v-if="card.row.overMinutes > 0" class="is-warn">{{ $t('Time.over_cap', { h: formatHm(card.row.overMinutes) }) }}</span>
                     </div>
                     <div v-if="card.kind === 'leave' && card.overlap" class="ap__warn">{{ card.overlap }}</div>
                     <div v-if="card.kind === 'leave' && card.row.reason" class="ap__reason">{{ card.row.reason }}</div>
                     <div v-if="card.kind === 'agent'" class="ap__reason">{{ card.row.detail }}</div>
 
                     <div v-if="rejecting === card.key" class="ap__reject">
-                        <input v-model="rejectReason" class="ah-input" :class="{ 'ah-input--error': rejectError }" :placeholder="$t('TimeV2.reject_reason_ph')" @keyup.enter="confirmReject(card)" />
+                        <input v-model="rejectReason" class="ah-input" :class="{ 'ah-input--error': rejectError }" :placeholder="$t('Time.reject_reason_ph')" @keyup.enter="confirmReject(card)" />
                         <p v-if="rejectError" class="ah-field__error">{{ rejectError }}</p>
                         <div class="tv-row-actions">
-                            <button type="button" class="ah-btn ah-btn--danger ah-btn--grow" :disabled="!!busy" @click="confirmReject(card)">{{ $t('TimeV2.confirm_reject') }}</button>
-                            <button type="button" class="ah-btn ah-btn--secondary" :disabled="!!busy" @click="cancelReject">{{ $t('TimeV2.cancel') }}</button>
+                            <button type="button" class="ah-btn ah-btn--danger ah-btn--grow" :disabled="!!busy" @click="confirmReject(card)">{{ $t('Time.confirm_reject') }}</button>
+                            <button type="button" class="ah-btn ah-btn--secondary" :disabled="!!busy" @click="cancelReject">{{ $t('Time.cancel') }}</button>
                         </div>
                     </div>
                     <div v-else class="tv-row-actions">
                         <button type="button" class="ah-btn ah-btn--primary ah-btn--grow" :disabled="!!busy" @click="approve(card)">
-                            {{ busy === card.key ? $t('TimeV2.approving') : $t('TimeV2.approve') }}
+                            {{ busy === card.key ? $t('Time.approving') : $t('Time.approve') }}
                         </button>
-                        <button v-if="card.kind === 'timesheet'" type="button" class="ah-btn ah-btn--secondary" @click="openDetail(card.row)">{{ $t('TimeV2.detail') }}</button>
-                        <button v-if="card.kind === 'agent'" type="button" class="ah-btn ah-btn--secondary" :title="card.row.detail">{{ $t('TimeV2.why') }}</button>
-                        <button type="button" class="ah-btn ah-btn--secondary tv-btn-danger-outline" :disabled="!!busy" @click="startReject(card)">{{ $t('TimeV2.reject') }}</button>
+                        <button v-if="card.kind === 'timesheet'" type="button" class="ah-btn ah-btn--secondary" @click="openDetail(card.row)">{{ $t('Time.detail') }}</button>
+                        <button v-if="card.kind === 'agent'" type="button" class="ah-btn ah-btn--secondary" :title="card.row.detail">{{ $t('Time.why') }}</button>
+                        <button type="button" class="ah-btn ah-btn--secondary tv-btn-danger-outline" :disabled="!!busy" @click="startReject(card)">{{ $t('Time.reject') }}</button>
                     </div>
                 </article>
 
                 <div v-if="filter === 'agent' && !agentProposals.length" class="tv-empty">
-                    <strong>{{ $t('TimeV2.agent_section') }}</strong>
-                    <span>{{ $t('TimeV2.agent_empty') }}</span>
+                    <strong>{{ $t('Time.agent_section') }}</strong>
+                    <span>{{ $t('Time.agent_empty') }}</span>
                 </div>
                 <div v-else-if="!visibleCards.length && !loading" class="tv-empty">
-                    <strong>{{ $t('TimeV2.queue_empty_title') }}</strong>
-                    <span>{{ $t('TimeV2.queue_empty') }}</span>
+                    <strong>{{ $t('Time.queue_empty_title') }}</strong>
+                    <span>{{ $t('Time.queue_empty') }}</span>
                 </div>
-                <div v-else-if="loading && !visibleCards.length" class="ah-small">{{ $t('TimeV2.loading') }}</div>
+                <div v-else-if="loading && !visibleCards.length" class="ah-small">{{ $t('Time.loading') }}</div>
             </div>
         </template>
     </div>
@@ -104,10 +104,10 @@ const uid = computed(() => (currentUserId && currentUserId.value) || localStorag
 const isManager = computed(() => [1, 2].includes((getters['settings/companyUserDetail'] || {}).roleType));
 
 const filters = [
-    { key: 'all', label: 'TimeV2.filter_all' },
-    { key: 'timesheet', label: 'TimeV2.filter_time' },
-    { key: 'leave', label: 'TimeV2.filter_leave' },
-    { key: 'agent', label: 'TimeV2.filter_ai' },
+    { key: 'all', label: 'Time.filter_all' },
+    { key: 'timesheet', label: 'Time.filter_time' },
+    { key: 'leave', label: 'Time.filter_leave' },
+    { key: 'agent', label: 'Time.filter_ai' },
 ];
 const filter = ref('all');
 const timesheets = ref([]);
@@ -138,15 +138,15 @@ const overlapText = (row) => {
         .filter((o) => String(o.userId) !== String(row.userId) && moment(o.startDate).isSameOrBefore(row.endDate, 'day') && moment(o.endDate).isSameOrAfter(row.startDate, 'day'))
         .map((o) => o.userName || nameOf(o.userId))
         .filter(Boolean);
-    return names.length ? t('TimeV2.leave_overlap', { names: [...new Set(names)].join(', ') }) : '';
+    return names.length ? t('Time.leave_overlap', { names: [...new Set(names)].join(', ') }) : '';
 };
 
 const cards = computed(() => {
     const ts = timesheets.value.map((row) => ({
         kind: 'timesheet', key: `ts-${row._id}`, row, at: row.submittedAt,
         name: row.userName || nameOf(row.userId), avatar: row.userAvatar, color: colorFor(row.userId),
-        title: t('TimeV2.ts_card_title', { name: row.userName || nameOf(row.userId) }),
-        sub: t('TimeV2.week_of', { date: moment(row.periodStart).format('MMM D'), h: formatHm(row.totalMinutes) }),
+        title: t('Time.ts_card_title', { name: row.userName || nameOf(row.userId) }),
+        sub: t('Time.week_of', { date: moment(row.periodStart).format('MMM D'), h: formatHm(row.totalMinutes) }),
     }));
     const lv = leave.value.map((row) => {
         const days = Number(row.totalDays) || 0;
@@ -154,14 +154,14 @@ const cards = computed(() => {
         return {
             kind: 'leave', key: `pto-${row._id}`, row, at: row.createdAt,
             name: row.userName || nameOf(row.userId), avatar: '', color: colorFor(row.userId),
-            title: t('TimeV2.leave_title', { name: row.userName || nameOf(row.userId), type: t(`Pto.types.${row.type}`) }),
-            sub: days === 1 ? t('TimeV2.leave_one', { range }) : t('TimeV2.leave_range', { range, days }),
+            title: t('Time.leave_title', { name: row.userName || nameOf(row.userId), type: t(`Pto.types.${row.type}`) }),
+            sub: days === 1 ? t('Time.leave_one', { range }) : t('Time.leave_range', { range, days }),
             overlap: overlapText(row),
         };
     });
     const ag = agentProposals.value.map((row) => ({
         kind: 'agent', key: `ag-${row.id}`, row, at: row.createdAt, name: row.agentName, avatar: '', color: 'var(--agent)',
-        title: row.summary, sub: `${row.agentName}${row.reversible ? ` · ${t('TimeV2.reversible')}` : ''}`,
+        title: row.summary, sub: `${row.agentName}${row.reversible ? ` · ${t('Time.reversible')}` : ''}`,
     }));
     return [...ts, ...lv, ...ag].sort((a, b) => new Date(a.at || 0) - new Date(b.at || 0));
 });
@@ -184,7 +184,7 @@ const load = async () => {
         leave.value = bodyOf(p).status ? bodyOf(p).data || [] : [];
         approvedLeave.value = bodyOf(a).status ? bodyOf(a).data || [] : [];
     } catch (e) {
-        error.value = t('TimeV2.load_failed');
+        error.value = t('Time.load_failed');
     } finally {
         loading.value = false;
     }
@@ -211,9 +211,9 @@ const approve = async (card) => {
     error.value = '';
     try {
         await decide(card, 'approve');
-        flash(t('TimeV2.approved_ok'));
+        flash(t('Time.approved_ok'));
     } catch (e) {
-        error.value = t('TimeV2.action_failed');
+        error.value = t('Time.action_failed');
     } finally {
         busy.value = '';
     }
@@ -222,16 +222,16 @@ const startReject = (card) => { rejecting.value = card.key; rejectReason.value =
 const cancelReject = () => { rejecting.value = ''; rejectReason.value = ''; rejectError.value = ''; };
 const confirmReject = async (card) => {
     const reason = rejectReason.value.trim();
-    if (!reason) { rejectError.value = t('TimeV2.reason_required'); return; }
+    if (!reason) { rejectError.value = t('Time.reason_required'); return; }
     if (busy.value) return;
     busy.value = card.key;
     error.value = '';
     try {
         await decide(card, 'reject', reason);
         cancelReject();
-        flash(t('TimeV2.rejected_ok'));
+        flash(t('Time.rejected_ok'));
     } catch (e) {
-        error.value = t('TimeV2.action_failed');
+        error.value = t('Time.action_failed');
     } finally {
         busy.value = '';
     }

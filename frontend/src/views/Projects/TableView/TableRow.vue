@@ -24,10 +24,10 @@
 
         <span class="tv2__cell-ai" @click.stop>
             <span v-if="summary.state === 'ready'" class="tv2__summary" :title="summary.summary">{{ summary.summary }}</span>
-            <span v-else-if="summary.state === 'loading'" class="tv2__summary tv2__summary--empty">{{ $t('ListV2.ai_loading') }}</span>
-            <span v-else-if="summary.state === 'empty'" class="tv2__summary tv2__summary--empty">{{ $t('ListV2.ai_nothing_to_summarise') }}</span>
-            <span v-else-if="summary.state === 'unavailable'" class="tv2__summary tv2__summary--empty">{{ $t('ListV2.ai_not_configured') }}</span>
-            <button v-else type="button" class="tv2__gen" @click="generate">✦ {{ $t('ListV2.ai_generate') }}</button>
+            <span v-else-if="summary.state === 'loading'" class="tv2__summary tv2__summary--empty">{{ $t('List.ai_loading') }}</span>
+            <span v-else-if="summary.state === 'empty'" class="tv2__summary tv2__summary--empty">{{ $t('List.ai_nothing_to_summarise') }}</span>
+            <span v-else-if="summary.state === 'unavailable'" class="tv2__summary tv2__summary--empty">{{ $t('List.ai_not_configured') }}</span>
+            <button v-else type="button" class="tv2__gen" @click="generate">✦ {{ $t('List.ai_generate') }}</button>
 
             <span v-if="summary.state === 'ready'" class="tv2__source" :class="{ 'is-pinned': summary.pinned }">
                 <span>{{ sourceLabel }}</span>
@@ -35,24 +35,24 @@
                     type="button"
                     class="tv2__pin"
                     :class="{ 'is-on': summary.pinned }"
-                    :title="summary.pinned ? $t('ListV2.ai_unpin') : $t('ListV2.ai_pin')"
+                    :title="summary.pinned ? $t('List.ai_unpin') : $t('List.ai_pin')"
                     @click="togglePin"
                 >
-                    <ShellIcon name="pin" :size="11" />{{ summary.pinned ? $t('ListV2.ai_pinned') : $t('ListV2.ai_pin') }}
+                    <ShellIcon name="pin" :size="11" />{{ summary.pinned ? $t('List.ai_pinned') : $t('List.ai_pin') }}
                 </button>
             </span>
         </span>
 
         <span class="tv2__risk" :class="`tv2__risk--${risk.level}`" :title="riskTitle">
-            <span class="tv2__risk-dot"></span>{{ $t(`ListV2.risk_${risk.level}`) }} · {{ risk.score }}
+            <span class="tv2__risk-dot"></span>{{ $t(`List.risk_${risk.level}`) }} · {{ risk.score }}
         </span>
 
         <span class="tv2__cell-ai" @click.stop>
             <span v-if="category.state === 'ready'" class="tv2__area" :title="categoryTitle">{{ category.category }}</span>
-            <span v-else-if="category.state === 'loading'" class="tv2__area-empty">{{ $t('CategoryV2.loading') }}</span>
-            <span v-else-if="category.state === 'empty'" class="tv2__area-empty" :title="categoryTitle">{{ $t(`CategoryV2.empty_${category.reason === 'no-vocabulary' ? 'no_vocabulary' : 'no_fit'}`) }}</span>
-            <span v-else-if="category.state === 'unavailable'" class="tv2__area-empty">{{ $t('ListV2.ai_not_configured') }}</span>
-            <button v-else type="button" class="tv2__gen" @click="generateCategory">✦ {{ $t('ListV2.ai_generate') }}</button>
+            <span v-else-if="category.state === 'loading'" class="tv2__area-empty">{{ $t('Category.loading') }}</span>
+            <span v-else-if="category.state === 'empty'" class="tv2__area-empty" :title="categoryTitle">{{ $t(`Category.empty_${category.reason === 'no-vocabulary' ? 'no_vocabulary' : 'no_fit'}`) }}</span>
+            <span v-else-if="category.state === 'unavailable'" class="tv2__area-empty">{{ $t('List.ai_not_configured') }}</span>
+            <button v-else type="button" class="tv2__gen" @click="generateCategory">✦ {{ $t('List.ai_generate') }}</button>
 
             <span v-if="category.state === 'ready'" class="tv2__source" :class="{ 'is-pinned': category.pinned }">
                 <span>{{ categorySource }}</span>
@@ -60,10 +60,10 @@
                     type="button"
                     class="tv2__pin"
                     :class="{ 'is-on': category.pinned }"
-                    :title="category.pinned ? $t('ListV2.ai_unpin') : $t('ListV2.ai_pin')"
+                    :title="category.pinned ? $t('List.ai_unpin') : $t('List.ai_pin')"
                     @click="toggleCategoryPin"
                 >
-                    <ShellIcon name="pin" :size="11" />{{ category.pinned ? $t('ListV2.ai_pinned') : $t('ListV2.ai_pin') }}
+                    <ShellIcon name="pin" :size="11" />{{ category.pinned ? $t('List.ai_pinned') : $t('List.ai_pin') }}
                 </button>
             </span>
         </span>
@@ -108,27 +108,27 @@ const owner = computed(() => {
 const initial = (name) => String(name || "?").trim().charAt(0).toUpperCase();
 
 const summary = computed(() => summaries.get(props.data._id));
-const sourceLabel = computed(() => t("ListV2.ai_source", {
+const sourceLabel = computed(() => t("List.ai_source", {
     time: summary.value.updatedAt ? moment(summary.value.updatedAt).format("HH:mm") : "--:--"
 }));
 
 const category = computed(() => categories.get(props.data._id));
 const categorySourceName = computed(() => (category.value.source === "custom-field" && category.value.sourceName)
     ? category.value.sourceName
-    : t(`CategoryV2.source_${(category.value.source || "tag").replace("-", "_")}`));
-const categorySource = computed(() => t("CategoryV2.chip_source", {
+    : t(`Category.source_${(category.value.source || "tag").replace("-", "_")}`));
+const categorySource = computed(() => t("Category.chip_source", {
     from: categorySourceName.value,
     time: category.value.updatedAt ? moment(category.value.updatedAt).format("HH:mm") : "--:--"
 }));
 const categoryTitle = computed(() => (category.value.state === "empty"
-    ? t(`CategoryV2.why_${category.value.reason === "no-vocabulary" ? "no_vocabulary" : "no_fit"}`)
-    : t("CategoryV2.chip_hint", { from: categorySourceName.value })));
+    ? t(`Category.why_${category.value.reason === "no-vocabulary" ? "no_vocabulary" : "no_fit"}`)
+    : t("Category.chip_hint", { from: categorySourceName.value })));
 
 const risk = computed(() => taskRisk(props.data));
 const riskTitle = computed(() => {
     const top = risk.value.top;
-    if (!top) return t("ListV2.risk_none");
-    return t(`ListV2.risk_factor_${top.key}`, {
+    if (!top) return t("List.risk_none");
+    return t(`List.risk_factor_${top.key}`, {
         days: top.days || 0,
         pct: top.overPct || 0,
         done: top.done || 0,

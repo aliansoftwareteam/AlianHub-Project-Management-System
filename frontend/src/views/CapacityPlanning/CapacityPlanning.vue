@@ -1,26 +1,26 @@
 <template>
-    <div v-if="isMobile" class="ah-page tv-page"><div class="tv-empty"><span>{{ $t('TimeV2.desktop_only') }}</span></div></div>
+    <div v-if="isMobile" class="ah-page tv-page"><div class="tv-empty"><span>{{ $t('Time.desktop_only') }}</span></div></div>
     <div v-else class="ah-page tv-page cp">
         <div class="tv-head">
-            <h1 class="tv-title cp__title">{{ $t('TimeV2.capacity_planning') }}</h1>
+            <h1 class="tv-title cp__title">{{ $t('Time.capacity_planning') }}</h1>
             <span class="tv-range">
-                <button type="button" :aria-label="$t('TimeV2.prev_month')" @click="shift(-1)">‹</button>
+                <button type="button" :aria-label="$t('Time.prev_month')" @click="shift(-1)">‹</button>
                 <span>{{ rangeLabel }}</span>
-                <button type="button" :aria-label="$t('TimeV2.next_month')" @click="shift(1)">›</button>
+                <button type="button" :aria-label="$t('Time.next_month')" @click="shift(1)">›</button>
             </span>
             <div class="tv-actions">
                 <select v-model.number="span" class="tv-select">
-                    <option :value="3">{{ $t('TimeV2.months_3') }}</option>
-                    <option :value="4">{{ $t('TimeV2.months_4') }}</option>
-                    <option :value="6">{{ $t('TimeV2.months_6') }}</option>
+                    <option :value="3">{{ $t('Time.months_3') }}</option>
+                    <option :value="4">{{ $t('Time.months_4') }}</option>
+                    <option :value="6">{{ $t('Time.months_6') }}</option>
                 </select>
-                <label class="cp__hpd"><input v-model.number="hoursPerDay" type="number" min="1" max="24" class="ah-input" @change="load" /><span>{{ $t('TimeV2.hours_per_day') }}</span></label>
+                <label class="cp__hpd"><input v-model.number="hoursPerDay" type="number" min="1" max="24" class="ah-input" @change="load" /><span>{{ $t('Time.hours_per_day') }}</span></label>
                 <select v-model="teamFilter" class="tv-select">
-                    <option value="">{{ $t('TimeV2.by_team') }} · {{ $t('TimeV2.all_teams') }}</option>
+                    <option value="">{{ $t('Time.by_team') }} · {{ $t('Time.all_teams') }}</option>
                     <option v-for="tm in teams" :key="tm.teamId" :value="tm.teamId">{{ teamName(tm) }}</option>
                 </select>
-                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="!teams.length" @click="exportCsv">{{ $t('TimeV2.export') }}</button>
-                <button type="button" class="ah-btn ah-btn--outline ah-btn--sm" :disabled="!topGap" @click="modelGap">{{ $t('TimeV2.fill_gap') }}</button>
+                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="!teams.length" @click="exportCsv">{{ $t('Time.export') }}</button>
+                <button type="button" class="ah-btn ah-btn--outline ah-btn--sm" :disabled="!topGap" @click="modelGap">{{ $t('Time.fill_gap') }}</button>
             </div>
         </div>
 
@@ -41,35 +41,35 @@
                     </div>
                 </div>
                 <div v-if="whatIf.teamId === tm.teamId" class="cp__row cp__row--whatif">
-                    <span class="cp__team cp__team--whatif">{{ $t('TimeV2.contractor_row') }}</span>
+                    <span class="cp__team cp__team--whatif">{{ $t('Time.contractor_row') }}</span>
                     <div class="cp__whatif" :style="{ gridColumn: `2 / span ${months.length}` }">
                         <input v-model.number="whatIf.hours" type="number" min="0" step="10" class="ah-input cp__whatif-input" />
-                        <span>{{ $t('TimeV2.hours_per_month') }}</span>
-                        <span class="ah-muted">{{ $t('TimeV2.contractor_hint', { h: whatIf.hours, team: teamName(tm) }) }}</span>
-                        <button type="button" class="tv-link" @click="whatIf = { teamId: '', hours: 0 }">{{ $t('TimeV2.remove_contractor') }}</button>
+                        <span>{{ $t('Time.hours_per_month') }}</span>
+                        <span class="ah-muted">{{ $t('Time.contractor_hint', { h: whatIf.hours, team: teamName(tm) }) }}</span>
+                        <button type="button" class="tv-link" @click="whatIf = { teamId: '', hours: 0 }">{{ $t('Time.remove_contractor') }}</button>
                     </div>
                 </div>
             </template>
-            <div v-if="!visibleTeams.length" class="tv-empty"><span>{{ loading ? $t('TimeV2.loading') : $t('TimeV2.capacity_empty') }}</span></div>
+            <div v-if="!visibleTeams.length" class="tv-empty"><span>{{ loading ? $t('Time.loading') : $t('Time.capacity_empty') }}</span></div>
             <div class="tv-legend">
-                <span><i style="background: var(--brand)"></i>{{ $t('TimeV2.legend_committed') }}</span>
-                <span><i style="background: var(--brand); opacity: .5"></i>{{ $t('TimeV2.legend_pipeline') }}</span>
-                <span><i style="background: var(--danger)"></i>{{ $t('TimeV2.legend_over_avail') }}</span>
-                <span>{{ $t('TimeV2.legend_line') }}</span>
+                <span><i style="background: var(--brand)"></i>{{ $t('Time.legend_committed') }}</span>
+                <span><i style="background: var(--brand); opacity: .5"></i>{{ $t('Time.legend_pipeline') }}</span>
+                <span><i style="background: var(--danger)"></i>{{ $t('Time.legend_over_avail') }}</span>
+                <span>{{ $t('Time.legend_line') }}</span>
             </div>
         </div>
 
         <div v-if="topGap" class="tv-card cp__gap">
-            <strong>{{ $t('TimeV2.gap_title', { month: monthName(topGap.month) }) }}</strong>
-            {{ $t('TimeV2.gap_body', { team: topGap.teamName || $t('TimeV2.unassigned_team'), committed: fmtH(topGap.committedHours), available: fmtH(topGap.availableHours) }) }}<span v-if="gapNotes(topGap)"> ({{ gapNotes(topGap) }})</span>.
-            <span v-for="g in otherGaps" :key="`${g.teamId}-${g.month}`" class="cp__gap-more">· {{ monthName(g.month) }}: {{ g.teamName || $t('TimeV2.unassigned_team') }} +{{ fmtH(g.gapHours) }}h</span>
+            <strong>{{ $t('Time.gap_title', { month: monthName(topGap.month) }) }}</strong>
+            {{ $t('Time.gap_body', { team: topGap.teamName || $t('Time.unassigned_team'), committed: fmtH(topGap.committedHours), available: fmtH(topGap.availableHours) }) }}<span v-if="gapNotes(topGap)"> ({{ gapNotes(topGap) }})</span>.
+            <span v-for="g in otherGaps" :key="`${g.teamId}-${g.month}`" class="cp__gap-more">· {{ monthName(g.month) }}: {{ g.teamName || $t('Time.unassigned_team') }} +{{ fmtH(g.gapHours) }}h</span>
         </div>
-        <div v-else-if="teams.length" class="tv-card cp__gap cp__gap--ok">{{ $t('TimeV2.no_gaps') }}</div>
+        <div v-else-if="teams.length" class="tv-card cp__gap cp__gap--ok">{{ $t('Time.no_gaps') }}</div>
 
         <div v-if="topGap" class="tv-dark cp__options">
-            <span class="tv-spark">{{ $t('TimeV2.options') }}</span>
+            <span class="tv-spark">{{ $t('Time.options') }}</span>
             {{ options.join(' · ') }}.
-            <button type="button" class="tv-link" @click="modelGap">{{ $t('TimeV2.model_each') }}</button>
+            <button type="button" class="tv-link" @click="modelGap">{{ $t('Time.model_each') }}</button>
         </div>
     </div>
 </template>
@@ -105,7 +105,7 @@ const rangeLabel = computed(() => `${from.value.format('MMM')} – ${toIso.value
 const monthLabel = (m) => moment(m, 'YYYY-MM').format('MMM').toUpperCase();
 const monthName = (m) => moment(m, 'YYYY-MM').format('MMMM');
 const fmtH = (h) => Math.round(Number(h) || 0).toLocaleString();
-const teamName = (tm) => (tm.unassigned ? t('TimeV2.unassigned_team') : tm.name);
+const teamName = (tm) => (tm.unassigned ? t('Time.unassigned_team') : tm.name);
 const isFar = (m) => months.value.indexOf(m) >= 3;
 
 const cell = (tm, m) => {
@@ -129,17 +129,17 @@ const liveGaps = computed(() => {
 });
 const topGap = computed(() => liveGaps.value[0] || null);
 const otherGaps = computed(() => liveGaps.value.slice(1, 4));
-const gapNotes = (g) => (g.notes || []).map((n) => (n.kind === 'pto' ? t('TimeV2.gap_pto', { name: n.name, days: n.days }) : t('TimeV2.gap_over', { name: n.name, pct: n.pct }))).join(', ');
+const gapNotes = (g) => (g.notes || []).map((n) => (n.kind === 'pto' ? t('Time.gap_pto', { name: n.name, days: n.days }) : t('Time.gap_over', { name: n.name, pct: n.pct }))).join(', ');
 const options = computed(() => {
     const g = topGap.value;
     if (!g) return [];
-    const team = g.teamName || t('TimeV2.unassigned_team');
+    const team = g.teamName || t('Time.unassigned_team');
     const rounded = Math.ceil(g.gapHours / 40) * 40;
-    const list = [t('TimeV2.option_contractor', { month: monthName(g.month), h: rounded })];
+    const list = [t('Time.option_contractor', { month: monthName(g.month), h: rounded })];
     const tm = teams.value.find((x) => x.teamId === g.teamId);
     const roomMonth = tm ? months.value.find((m) => m > g.month && cell(tm, m).availableHours - cell(tm, m).committedHours >= g.gapHours) : null;
-    if (roomMonth) list.push(t('TimeV2.option_shift', { h: fmtH(g.gapHours), team, month: monthName(roomMonth) }));
-    list.push(t('TimeV2.option_cut', { h: fmtH(g.gapHours), team, month: monthName(g.month) }));
+    if (roomMonth) list.push(t('Time.option_shift', { h: fmtH(g.gapHours), team, month: monthName(roomMonth) }));
+    list.push(t('Time.option_cut', { h: fmtH(g.gapHours), team, month: monthName(g.month) }));
     return list;
 });
 const modelGap = () => {
@@ -158,7 +158,7 @@ const load = async () => {
         teams.value = body.data.teams || [];
         gaps.value = body.data.gaps || [];
     } catch (e) {
-        error.value = t('TimeV2.load_failed');
+        error.value = t('Time.load_failed');
     } finally {
         loading.value = false;
     }

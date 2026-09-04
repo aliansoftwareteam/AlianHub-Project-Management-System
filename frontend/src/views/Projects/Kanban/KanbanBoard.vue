@@ -12,18 +12,18 @@
                 <div class="column-head column-head-wrap">
                     <span class="status-color-dot" :style="`background-color: ${column.textColor || '#000'}`"></span>
                     <span class="column-title" :title="column.name">{{ column.name }}</span>
-                    <button type="button" class="task-count" :title="$t('ProjectsV2.wip_set')" @click.stop="wipFor = wipFor === column.key ? '' : column.key">{{ tasksCount(column) }}</button>
+                    <button type="button" class="task-count" :title="$t('Projects.wip_set')" @click.stop="wipFor = wipFor === column.key ? '' : column.key">{{ tasksCount(column) }}</button>
                     <span class="column-head__spacer"></span>
                     <span
                         v-if="wipLimit(column) > 0"
                         class="wip-chip"
                         :class="{ 'wip-chip--at': atWipLimit(column), 'wip-chip--over': overWipLimit(column) }"
-                        :title="overWipLimit(column) ? $t('GapsV2.wip_over', { limit: wipLimit(column) }) : ''"
-                    >{{ $t('ProjectsV2.wip_chip', { n: tasksCount(column), limit: wipLimit(column) }) }}</span>
+                        :title="overWipLimit(column) ? $t('Gaps.wip_over', { limit: wipLimit(column) }) : ''"
+                    >{{ $t('Projects.wip_chip', { n: tasksCount(column), limit: wipLimit(column) }) }}</span>
                     <div v-if="wipFor === column.key" class="ah-pop wip-pop" @click.stop>
-                        <div class="ah-label">{{ $t('ProjectsV2.wip_limit') }}</div>
-                        <input class="ah-input" type="number" min="0" :value="wipLimit(column) || ''" :placeholder="$t('ProjectsV2.wip_none')" @change="setWipLimit(column, $event.target.value)">
-                        <p class="ah-small wip-pop__note">{{ wipError || $t('GapsV2.wip_note') }}</p>
+                        <div class="ah-label">{{ $t('Projects.wip_limit') }}</div>
+                        <input class="ah-input" type="number" min="0" :value="wipLimit(column) || ''" :placeholder="$t('Projects.wip_none')" @change="setWipLimit(column, $event.target.value)">
+                        <p class="ah-small wip-pop__note">{{ wipError || $t('Gaps.wip_note') }}</p>
                     </div>
                     <img class="cursor-pointer add-task-icon" src="@/assets/images/svg/pluss.svg" alt="addTask" @click="showAddInput(column.key)">
                 </div>
@@ -63,7 +63,7 @@
                     </template>
                 </Draggable>
 
-                <div v-if="moreCount(column) > 0" class="more-count">+ {{ $t('ProjectsV2.more_count', { n: moreCount(column) }) }}</div>
+                <div v-if="moreCount(column) > 0" class="more-count">+ {{ $t('Projects.more_count', { n: moreCount(column) }) }}</div>
             </div>
 
             <!-- Drop Area -->
@@ -491,14 +491,14 @@ const setWipLimit = async (column, value) => {
             wipLimit: limit || null,
         }))?.data;
         if (!body || body.status !== true) {
-            wipError.value = (body && body.statusText) || t('GapsV2.wip_save_failed');
+            wipError.value = (body && body.statusText) || t('Gaps.wip_save_failed');
             return;
         }
         applyWipLimit(column, body.data?.wipLimit ?? null);
         rememberWipLocally(column, limit);
         wipFor.value = '';
     } catch (error) {
-        wipError.value = t('GapsV2.wip_save_failed');
+        wipError.value = t('Gaps.wip_save_failed');
     }
 };
 

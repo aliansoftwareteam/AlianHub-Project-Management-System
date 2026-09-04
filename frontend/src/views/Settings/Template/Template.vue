@@ -5,10 +5,10 @@
         <template v-if="!isDisplayTemplateDetail">
             <div class="tp__head">
                 <h1 class="ah-h2 tp__title">{{ $t('Templates.templates') }}</h1>
-                <span class="ah-label">{{ totalCount }} · {{ $t('SettingsV2.built_in_count', { n: defaultMainTemplate.length }) }}</span>
+                <span class="ah-label">{{ totalCount }} · {{ $t('Settings.built_in_count', { n: defaultMainTemplate.length }) }}</span>
                 <div class="tp__head-actions">
-                    <button type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="openSidebar('createTemplateWithAI')"><ShellIcon name="ai" :size="14" />{{ $t('SettingsV2.from_description') }}</button>
-                    <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="openSidebar('createTemplate')"><ShellIcon name="plus" :size="14" />{{ $t('SettingsV2.new_template') }}</button>
+                    <button type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="openSidebar('createTemplateWithAI')"><ShellIcon name="ai" :size="14" />{{ $t('Settings.from_description') }}</button>
+                    <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="openSidebar('createTemplate')"><ShellIcon name="plus" :size="14" />{{ $t('Settings.new_template') }}</button>
                 </div>
             </div>
 
@@ -24,16 +24,16 @@
                     @click="changeCategoryData(item, 'defaultData')"
                 >{{ item.name }}</button>
                 <button type="button" class="tp__tab" :class="{ 'is-active': categoryType === 'basicData' }" role="tab" :aria-selected="categoryType === 'basicData'" @click="changeCategoryData('', 'basicData')">
-                    {{ $t('SettingsV2.your_templates', { company: companyName }) }}
+                    {{ $t('Settings.your_templates', { company: companyName }) }}
                 </button>
             </div>
 
             <div class="ah-card tp__table" v-if="selectedDefaultData.length">
                 <div class="tp__row tp__row--head">
-                    <span class="ah-label">{{ $t('SettingsV2.col_template') }}</span>
-                    <span class="ah-label">{{ $t('SettingsV2.col_contains') }}</span>
-                    <span class="ah-label">{{ $t('SettingsV2.col_views') }}</span>
-                    <span class="ah-label">{{ $t('SettingsV2.col_owner') }}</span>
+                    <span class="ah-label">{{ $t('Settings.col_template') }}</span>
+                    <span class="ah-label">{{ $t('Settings.col_contains') }}</span>
+                    <span class="ah-label">{{ $t('Settings.col_views') }}</span>
+                    <span class="ah-label">{{ $t('Settings.col_owner') }}</span>
                     <span></span>
                 </div>
                 <div v-for="tpl in selectedDefaultData" :key="tpl._id" class="tp__row" role="button" tabindex="0" @click="displayTemplateDetail(tpl)" @keydown.enter="displayTemplateDetail(tpl)">
@@ -41,23 +41,23 @@
                         <div class="tp__name">{{ tpl.TemplateName }}</div>
                         <div class="ah-small tp__desc">{{ tpl.Description }}</div>
                     </div>
-                    <span class="ah-mono tp__mono">{{ $t('SettingsV2.statuses_count', { n: (tpl.taskStatusData || []).length }) }}<br>{{ $t('SettingsV2.task_types_count', { n: (tpl.TemplateTaskType || []).length }) }}</span>
+                    <span class="ah-mono tp__mono">{{ $t('Settings.statuses_count', { n: (tpl.taskStatusData || []).length }) }}<br>{{ $t('Settings.task_types_count', { n: (tpl.TemplateTaskType || []).length }) }}</span>
                     <span class="ah-mono tp__mono">{{ viewsCount(tpl) }}</span>
-                    <span class="ah-small">{{ categoryType === 'basicData' ? companyName : $t('SettingsV2.built_in') }}</span>
-                    <span class="tp__action">{{ $t('SettingsV2.view') }}</span>
+                    <span class="ah-small">{{ categoryType === 'basicData' ? companyName : $t('Settings.built_in') }}</span>
+                    <span class="tp__action">{{ $t('Settings.view') }}</span>
                 </div>
             </div>
             <div v-else-if="!isSpinner" class="ah-empty tp__empty">
-                <span>{{ categoryType === 'basicData' ? $t('SettingsV2.templates_empty_yours') : $t('SettingsV2.templates_empty') }}</span>
-                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="openSidebar('createTemplate')">{{ $t('SettingsV2.new_template') }}</button>
+                <span>{{ categoryType === 'basicData' ? $t('Settings.templates_empty_yours') : $t('Settings.templates_empty') }}</span>
+                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="openSidebar('createTemplate')">{{ $t('Settings.new_template') }}</button>
             </div>
 
             <div class="ah-card tp__carry">
-                <div class="ah-label">{{ $t('SettingsV2.template_carries') }}</div>
+                <div class="ah-label">{{ $t('Settings.template_carries') }}</div>
                 <div class="tp__chips">
                     <span v-for="c in carries" :key="c.key" class="ah-chip" :class="{ 'ah-chip--brand': c.brand }">{{ $t(c.label) }}</span>
                 </div>
-                <div class="ah-small">{{ $t('SettingsV2.template_never_copies') }}</div>
+                <div class="ah-small">{{ $t('Settings.template_never_copies') }}</div>
             </div>
         </template>
 
@@ -98,13 +98,13 @@ const companyId = inject("$companyId");
 
 const SKIP_VIEWS = new Set(["Gantt", "Timeline", "Embed"]);
 const carries = [
-    { key: "statuses", label: "SettingsV2.carry_statuses" },
-    { key: "types", label: "SettingsV2.carry_task_types" },
-    { key: "fields", label: "SettingsV2.carry_custom_fields" },
-    { key: "views", label: "SettingsV2.carry_views" },
-    { key: "project_status", label: "SettingsV2.carry_project_statuses" },
-    { key: "apps", label: "SettingsV2.carry_apps" },
-    { key: "agents", label: "SettingsV2.carry_agents", brand: true }
+    { key: "statuses", label: "Settings.carry_statuses" },
+    { key: "types", label: "Settings.carry_task_types" },
+    { key: "fields", label: "Settings.carry_custom_fields" },
+    { key: "views", label: "Settings.carry_views" },
+    { key: "project_status", label: "Settings.carry_project_statuses" },
+    { key: "apps", label: "Settings.carry_apps" },
+    { key: "agents", label: "Settings.carry_agents", brand: true }
 ];
 
 const categoryArray = ref([]);

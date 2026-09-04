@@ -2,7 +2,7 @@
     <div class="dc-body tbs">
         <div class="dc-metric">
             <span class="dc-num">{{ total }}</span>
-            <span class="dc-sub">{{ $t('DashV2.tbs_sub', { n: projects.length }) }}</span>
+            <span class="dc-sub">{{ $t('Dash.tbs_sub', { n: projects.length }) }}</span>
         </div>
 
         <div class="tbs__rows">
@@ -78,7 +78,7 @@ const legend = computed(() => statuses.value.map((s) => {
     const m = statusMeta(s.statusKey);
     return {
         statusKey: s.statusKey,
-        name: m.name || t('DashV2.tbs_unknown_status'),
+        name: m.name || t('Dash.tbs_unknown_status'),
         color: m.textColor || 'var(--brand)',
     };
 }));
@@ -112,7 +112,7 @@ const load = async () => {
         statuses.value = d.statuses || [];
         projects.value = d.projects || [];
         total.value = d.total || 0;
-        meta.note = d.scope === 'company' ? t('DashV2.tbs_note_company') : t('DashV2.tbs_note_self');
+        meta.note = d.scope === 'company' ? t('Dash.tbs_note_company') : t('Dash.tbs_note_self');
         meta.state = projects.value.length ? 'ready' : 'empty';
     } catch (e) {
         projects.value = [];

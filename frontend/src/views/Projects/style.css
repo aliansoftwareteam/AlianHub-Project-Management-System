@@ -1,10 +1,5 @@
-.section-left {
-  min-width: 375px;
-  width: 375px;
-  border-right: 1px solid #e0e0e0;
-}
 .section-right {
-  width: calc(100% - 376px);
+  width: 100%;
 }
 .list-type-error {
   padding-bottom: 3px;
@@ -304,7 +299,6 @@
   .list-view-header-title{font-size: 16px;line-height: 24.4px;padding-right: 8px;}
 }
 @media (max-width: 1300px) {
-  .section-right {width: 100%;}
   .showProjectDetailRight{width: calc(100% - 280px);overflow: auto;}
   .projectRightside {max-width: 280px;}
 }

@@ -2,8 +2,8 @@
     <div class="ah-page tr">
         <header class="tr__head">
             <div>
-                <h1 class="ah-h1 tr__title"><ShellIcon name="trash" :size="18" />{{ $t('TrashV2.title') }}</h1>
-                <p class="ah-muted ah-small tr__lead">{{ $t('TrashV2.lead') }}</p>
+                <h1 class="ah-h1 tr__title"><ShellIcon name="trash" :size="18" />{{ $t('Trash.title') }}</h1>
+                <p class="ah-muted ah-small tr__lead">{{ $t('Trash.lead') }}</p>
             </div>
         </header>
 
@@ -17,23 +17,23 @@
                 role="tab"
                 :aria-selected="kind === k"
                 @click="kind = k"
-            >{{ $t(`TrashV2.${k}`) }}</button>
+            >{{ $t(`Trash.${k}`) }}</button>
         </div>
 
-        <p v-if="loading" class="ah-small ah-muted tr__loading">{{ $t('TrashV2.loading') }}</p>
+        <p v-if="loading" class="ah-small ah-muted tr__loading">{{ $t('Trash.loading') }}</p>
 
         <EmptyState
             v-else-if="!rows.length"
-            :title="$t('TrashV2.empty_title')"
-            :message="$t('TrashV2.empty_message', { kind: $t(`TrashV2.empty_${kind}`) })"
+            :title="$t('Trash.empty_title')"
+            :message="$t('Trash.empty_message', { kind: $t(`Trash.empty_${kind}`) })"
         />
 
         <div v-else class="ah-card tr__list">
             <div class="tr__cols ah-label">
                 <span></span>
-                <span>{{ $t('TrashV2.col_name') }}</span>
-                <span class="tr__c-project">{{ $t('TrashV2.col_project') }}</span>
-                <span class="tr__c-when">{{ $t('TrashV2.col_when') }}</span>
+                <span>{{ $t('Trash.col_name') }}</span>
+                <span class="tr__c-project">{{ $t('Trash.col_project') }}</span>
+                <span class="tr__c-when">{{ $t('Trash.col_when') }}</span>
                 <span></span>
             </div>
             <div v-for="row in rows" :key="row._id" class="tr__row">
@@ -45,7 +45,7 @@
                 <span class="tr__row-project tr__c-project">{{ projectNameOf(row.projectId) }}</span>
                 <span class="tr__row-time tr__c-when">{{ shortDate(row.updatedAt) }}</span>
                 <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" :disabled="busy === row._id" @click="restore(row)">
-                    <ShellIcon name="restore" :size="13" />{{ $t('TrashV2.restore') }}
+                    <ShellIcon name="restore" :size="13" />{{ $t('Trash.restore') }}
                 </button>
             </div>
         </div>
@@ -78,9 +78,9 @@ const busy = ref('');
 
 const projects = computed(() => getters['projectData/allProjects']?.data || []);
 const projectNameOf = (id) => {
-    if (!id) return t('TrashV2.unknown_project');
+    if (!id) return t('Trash.unknown_project');
     const project = projects.value.find((p) => String(p._id) === String(id));
-    return project?.ProjectName || (kind.value === 'projects' ? '' : t('TrashV2.unknown_project'));
+    return project?.ProjectName || (kind.value === 'projects' ? '' : t('Trash.unknown_project'));
 };
 
 const shortDate = (value) => {
@@ -96,7 +96,7 @@ async function load() {
         rows.value = response.data?.status ? (response.data.data || []) : [];
     } catch (error) {
         console.error('ERROR in load trash: ', error);
-        $toast.error(t('TrashV2.load_failed'), { position: 'top-right' });
+        $toast.error(t('Trash.load_failed'), { position: 'top-right' });
         rows.value = [];
     } finally {
         loading.value = false;
@@ -113,10 +113,10 @@ async function restore(row) {
         });
         if (!response.data?.status) throw new Error(response.data?.statusText || 'restore failed');
         rows.value = rows.value.filter((r) => r._id !== row._id);
-        $toast.success(t('TrashV2.restored'), { position: 'top-right' });
+        $toast.success(t('Trash.restored'), { position: 'top-right' });
     } catch (error) {
         console.error('ERROR in restore: ', error);
-        $toast.error(t('TrashV2.restore_failed'), { position: 'top-right' });
+        $toast.error(t('Trash.restore_failed'), { position: 'top-right' });
     } finally {
         busy.value = '';
     }

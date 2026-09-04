@@ -15,44 +15,110 @@ AlianHub-Project-Management-System/
 │   ├── loggerConfig.js                  # Winston logger setup
 │   └── collections.js                   # MongoDB collection definitions + SCHEMA_TYPE enum
 │
-├── Modules/                             # Feature-based modules (50+)
-│   ├── auth/                            # Authentication & JWT
-│   │   ├── controller/
-│   │   │   ├── loginAuth.js
-│   │   │   ├── registerAuth.js
-│   │   │   └── helper.js
-│   │   ├── routes.js
-│   │   ├── routes2.js
-│   │   ├── helpers/
-│   │   ├── schema.js
-│   │   └── init.js
-│   │
-│   ├── Project/                         # Project management
-│   │   ├── controller/
-│   │   ├── routes.js
-│   │   ├── helpers/
-│   │   └── schema.js
-│   │
-│   ├── tasks/                           # Task/work item management
-│   │   ├── controller/
-│   │   ├── routes.js
-│   │   ├── helpers/
-│   │   ├── schema.js
-│   │   └── task_class.js
-│   │
-│   ├── Teams/                           # Team & role management
-│   ├── MainChats/                       # Project/task chat
-│   ├── Comments/                        # Comments on items
-│   ├── sprints/                         # Sprint management
-│   ├── TimeSheet/                       # Time tracking
-│   ├── AI/                              # AI features
-│   ├── SaasAdmin/                       # Admin dashboard
-│   ├── notification/                    # Notifications
-│   ├── MediaFiles/                      # File management
-│   ├── Admin/                           # System administration
-│   │   └── common/controller.js
-│   │
-│   └── [40+ more modules]               # Features: templates, invoices, apps, etc.
+├── Modules/                             # 98 feature modules (regenerated from `ls Modules`)
+│   │   Each: routes.js (init(app)), init.js, controller.js|controller/, helpers/, optional schema.js
+│   ├── Admin/
+│   ├── AdvancedGlobalFilter/
+│   ├── Affiliate/
+│   ├── Agents/
+│   ├── AgileReports/
+│   ├── AI/
+│   ├── AIProjectGenerator/
+│   ├── ApiTokens/
+│   ├── Apps/
+│   ├── Audit/
+│   ├── Auth/
+│   ├── Automations/
+│   ├── Calendar/
+│   ├── Calls/
+│   ├── CapacityPlanning/
+│   ├── Changelog/
+│   ├── CheckInstallStep/
+│   ├── Clips/
+│   ├── CloudStorage/
+│   ├── Comments/
+│   ├── common/
+│   ├── Company/
+│   ├── createProject/
+│   ├── CustomField/
+│   ├── CustomReports/
+│   ├── EmailIn/
+│   ├── EmailNotification/
+│   ├── emailTemplate/
+│   ├── Epics/
+│   ├── EstimatedTime/
+│   ├── Export/
+│   ├── ExportJobs/
+│   ├── Forms/
+│   ├── GeneralReminders/
+│   ├── generateMongoId/
+│   ├── githubOAuth/
+│   ├── gitlabOAuth/
+│   ├── GlobalSearch/
+│   ├── googleOAuth/
+│   ├── History/
+│   ├── Importers/
+│   ├── ImportSettings/
+│   ├── Inbox/
+│   ├── Integrations/
+│   ├── Invoice/
+│   ├── LogTime/
+│   ├── MainChats/
+│   ├── Mcp/
+│   ├── MediaFiles/
+│   ├── Milestone/
+│   ├── Notes/
+│   ├── notification/
+│   ├── notification-count/
+│   ├── notification1/
+│   ├── OAuth/
+│   ├── Pages/
+│   ├── PersonalList/
+│   ├── PlanFeature/
+│   ├── Portfolio/
+│   ├── Project/
+│   ├── projectClose/
+│   ├── ProjectDashboard/
+│   ├── projectRules/
+│   ├── projectSetting/
+│   ├── projectTabs/
+│   ├── ProjectTemplates/
+│   ├── Pto/
+│   ├── PublicShares/
+│   ├── Reactions/
+│   ├── RecentVisits/
+│   ├── RecurringTasks/
+│   ├── Reminders/
+│   ├── SaasAdmin/
+│   ├── ScheduledReports/
+│   ├── Scim/
+│   ├── ScreenshotRetention/
+│   ├── settings/
+│   ├── Sprints/
+│   ├── SSO/
+│   ├── storage/
+│   ├── subscription/
+│   ├── SubscriptionPlan/
+│   ├── swaggerAPI/
+│   ├── taskIndex/
+│   ├── Tasks/
+│   ├── Teams/
+│   ├── Template/
+│   ├── TimeSheet/
+│   ├── TimesheetApproval/
+│   ├── tours/
+│   ├── trackerDownload/
+│   ├── trackerUserPermission/
+│   ├── typesense/
+│   ├── UserDashboard/
+│   ├── UserId/
+│   ├── Users/
+│   ├── VarianceReport/
+│   ├── Webhooks/
+│   ├── service.js                        # shared helpers
+│   ├── serviceFunction.js                # shared helpers
+│   ├── servicewithAWS.js                 # shared helpers
+│   └── servicewithoutAWS.js              # shared helpers
 │
 ├── frontend/                            # Vue.js web UI (SPA)
 │   ├── src/
@@ -74,13 +140,6 @@ AlianHub-Project-Management-System/
 │   ├── vue.config.js
 │   ├── babel.config.js
 │   └── jsconfig.json
-│
-├── installation/                        # Setup wizard (separate Vue app)
-│   ├── src/                             # Setup form components
-│   ├── dist/                            # Built output (gitignored)
-│   ├── package.json
-│   ├── vue.config.js
-│   └── babel.config.js
 │
 ├── common-storage/                      # Storage abstraction layer
 │   ├── common.js                        # Base interface
@@ -127,9 +186,7 @@ AlianHub-Project-Management-System/
 │
 ├── index.js                             # Express server (dev entry point)
 ├── server.js                            # Express server (prod entry point)
-├── installation.js                      # Setup & initialization script
 ├── cron.js                              # Scheduled tasks runner
-├── check-version.js                     # Version checking utility
 │
 ├── .env.example                         # Environment template (REQUIRED)
 ├── .gitignore                           # Git ignore rules
@@ -149,48 +206,43 @@ AlianHub-Project-Management-System/
 ## Key Folder Purposes
 
 ### Config/
-**Purpose:** Centralized configuration management  
-**Rule:** All environment variables loaded here, exported globally  
+**Purpose:** Centralized configuration management
+**Rule:** All environment variables loaded here, exported globally
 **Never put:** Secrets (use .env instead), temporary files, test data
 
 **Key file:** `collections.js` defines SCHEMA_TYPE enum — all MongoDB queries reference this
 
 ### Modules/
-**Purpose:** Feature-based organization (one feature = one folder)  
-**Structure:** Each module has controller/, routes.js, helpers/, schema.js  
-**Rule:** PascalCase folder names, camelCase files  
+**Purpose:** Feature-based organization (one feature = one folder)
+**Structure:** Each module has controller/, routes.js, helpers/, schema.js
+**Rule:** PascalCase folder names, camelCase files
 **Never put:** Global utilities (use utils/ instead), configuration (use Config/)
 
 ### frontend/
-**Purpose:** Vue.js single-page application  
-**Build output:** frontend/dist/ (created by `npm run build`)  
-**Never modify:** dist/ (auto-generated), node_modules/  
+**Purpose:** Vue.js single-page application
+**Build output:** frontend/dist/ (created by `npm run build`)
+**Never modify:** dist/ (auto-generated), node_modules/
 **Rule:** Use environment variables for API URLs (avoid hardcoding)
 
-### installation/
-**Purpose:** Separate Vue app for initial setup wizard  
-**Run when:** App first starts (user not yet configured)  
-**Never put:** Production code here (it's only for setup)
-
 ### common-storage/
-**Purpose:** Storage abstraction layer  
-**Implementations:** Wasabi (cloud), local filesystem (dev)  
-**How to use:** Import and use without caring which backend is active  
+**Purpose:** Storage abstraction layer
+**Implementations:** Wasabi (cloud), local filesystem (dev)
+**How to use:** Import and use without caring which backend is active
 **Rule:** All file uploads/downloads go through this
 
 ### event/
-**Purpose:** Real-time event broadcasting  
-**Key file:** socketEventEmitter.js (Socket.io emits)  
+**Purpose:** Real-time event broadcasting
+**Key file:** socketEventEmitter.js (Socket.io emits)
 **Rule:** After mutations, emit corresponding event for LiveSync
 
 ### middlewares/
-**Purpose:** Express middleware (request processing)  
-**Examples:** Authentication, logging, error handling, CORS  
+**Purpose:** Express middleware (request processing)
+**Examples:** Authentication, logging, error handling, CORS
 **Rule:** Middleware is chained in routes before controller
 
 ### utils/
-**Purpose:** Shared utilities and static data  
-**Examples:** Currency definitions, timezone data, AI prompts  
+**Purpose:** Shared utilities and static data
+**Examples:** Currency definitions, timezone data, AI prompts
 **Never put:** Business logic (use Modules/), configuration (use Config/)
 
 ---
@@ -218,7 +270,6 @@ These folders are created at runtime and should NOT be committed:
 |--------|---------|------------------|
 | `node_modules/` | Installed dependencies | ✅ Ignored |
 | `frontend/dist/` | Built frontend | ✅ Ignored |
-| `installation/dist/` | Built setup wizard | ✅ Ignored |
 | `log/` | Runtime logs (track.log, error.log) | ⚠️ Should be ignored |
 | `wasabiUploads/` | Local file cache | ⚠️ Should be ignored |
 | `wasabiUploadsLocal/` | Wasabi file cache | ⚠️ Should be ignored |

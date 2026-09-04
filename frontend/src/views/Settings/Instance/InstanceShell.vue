@@ -1,7 +1,7 @@
 <template>
     <div class="ah-page in">
         <div class="ah-toolbar">
-            <div class="ah-toolbar__title">{{ $t('InstanceV2.group') }}</div>
+            <div class="ah-toolbar__title">{{ $t('Instance.group') }}</div>
             <div class="ah-tabs in__tabs">
                 <router-link v-for="tab in tabs" :key="tab.name" :to="{ name: tab.name, params: { cid } }" class="ah-tab" :class="{ 'is-active': route.name === tab.name }">
                     {{ $t(tab.label) }}
@@ -9,7 +9,7 @@
             </div>
             <div class="ah-toolbar__spacer"></div>
             <a class="ah-btn ah-btn--ghost ah-btn--sm" :href="guide(anchor)" target="_blank" rel="noopener">
-                <ShellIcon name="book" :size="14" />{{ $t('InstanceV2.guide') }}
+                <ShellIcon name="book" :size="14" />{{ $t('Instance.guide') }}
             </a>
         </div>
         <div class="in__body ah-scroll">
@@ -31,12 +31,12 @@ const cid = inject("$companyId");
 const { guide } = useInstanceApi();
 
 const tabs = [
-    { name: "InstanceHealth", label: "InstanceV2.nav_health", anchor: "troubleshooting" },
-    { name: "InstanceSettings", label: "InstanceV2.nav_settings", anchor: "configure" },
-    { name: "InstanceBackups", label: "InstanceV2.nav_backups", anchor: "backup-restore" },
-    { name: "InstanceUpgrade", label: "InstanceV2.nav_upgrade", anchor: "upgrade" },
-    { name: "InstanceLogs", label: "InstanceV2.nav_logs", anchor: "troubleshooting" },
-    { name: "InstanceStats", label: "InstanceV2.nav_stats", anchor: "reference" },
+    { name: "InstanceHealth", label: "Instance.nav_health", anchor: "troubleshooting" },
+    { name: "InstanceSettings", label: "Instance.nav_settings", anchor: "configure" },
+    { name: "InstanceBackups", label: "Instance.nav_backups", anchor: "backup-restore" },
+    { name: "InstanceUpgrade", label: "Instance.nav_upgrade", anchor: "upgrade" },
+    { name: "InstanceLogs", label: "Instance.nav_logs", anchor: "troubleshooting" },
+    { name: "InstanceStats", label: "Instance.nav_stats", anchor: "reference" },
 ];
 const anchor = computed(() => tabs.find((t) => t.name === route.name)?.anchor || "install");
 </script>

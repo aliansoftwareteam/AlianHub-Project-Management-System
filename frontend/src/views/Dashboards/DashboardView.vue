@@ -1,21 +1,21 @@
 <template>
     <div class="ah-page dash">
         <header class="ah-toolbar dash__toolbar">
-            <router-link class="dash__back" :to="{ name: 'Dashboards', params: { cid: companyId } }" :title="$t('DashV2.all_dashboards')">
+            <router-link class="dash__back" :to="{ name: 'Dashboards', params: { cid: companyId } }" :title="$t('Dash.all_dashboards')">
                 <ShellIcon name="arrowLeft" :size="15" />
             </router-link>
             <div class="ah-toolbar__title">
-                <span class="dash__title">{{ dashboard.title || $t('DashV2.dashboard') }}</span>
+                <span class="dash__title">{{ dashboard.title || $t('Dash.dashboard') }}</span>
                 <span class="ah-chip ah-chip--mono">{{ visibilityLabel }}</span>
             </div>
             <span class="ah-toolbar__spacer"></span>
             <span class="dash__owner">{{ ownerLine }}</span>
             <button v-if="dashboard.canEdit" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="locked = !locked">
                 <ShellIcon :name="locked ? 'lock' : 'grip'" :size="13" />
-                <span>{{ locked ? $t('DashV2.locked') : $t('DashV2.unlocked') }}</span>
+                <span>{{ locked ? $t('Dash.locked') : $t('Dash.unlocked') }}</span>
             </button>
             <button v-if="dashboard.canEdit" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="pickerOpen = true">
-                {{ $t('DashV2.add_card_short') }}
+                {{ $t('Dash.add_card_short') }}
             </button>
             <div v-if="dashboard.canEdit" class="dash__pop-anchor" @click.stop>
                 <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :aria-expanded="menuOpen" @click="menuOpen = !menuOpen">
@@ -23,8 +23,8 @@
                 </button>
                 <transition name="ah-fade">
                     <div v-if="menuOpen" class="ah-pop dash__pop" role="menu">
-                        <button type="button" class="ah-pop__item" role="menuitem" @click="openSettings">{{ $t('DashV2.dashboard_settings') }}</button>
-                        <button type="button" class="ah-pop__item" role="menuitem" @click="duplicate">{{ $t('DashV2.duplicate') }}</button>
+                        <button type="button" class="ah-pop__item" role="menuitem" @click="openSettings">{{ $t('Dash.dashboard_settings') }}</button>
+                        <button type="button" class="ah-pop__item" role="menuitem" @click="duplicate">{{ $t('Dash.duplicate') }}</button>
                     </div>
                 </transition>
             </div>
@@ -130,13 +130,13 @@
             </template>
 
             <div v-else-if="!loading" class="ah-empty dash__empty">
-                <p class="dash__empty-text">{{ $t('DashV2.empty_dashboard') }}</p>
+                <p class="dash__empty-text">{{ $t('Dash.empty_dashboard') }}</p>
                 <button v-if="dashboard.canEdit" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="pickerOpen = true">
-                    {{ $t('DashV2.add_first_card') }}
+                    {{ $t('Dash.add_first_card') }}
                 </button>
             </div>
 
-            <p v-if="hiddenCount" class="dash__hidden">{{ $t('DashV2.hidden_cards', { n: hiddenCount }) }}</p>
+            <p v-if="hiddenCount" class="dash__hidden">{{ $t('Dash.hidden_cards', { n: hiddenCount }) }}</p>
         </div>
 
         <CardPicker
@@ -148,32 +148,32 @@
 
         <div v-if="settingsOpen" class="dash__modal" @click.self="settingsOpen = false">
             <div class="dash__modal-panel">
-                <h2 class="ah-h2">{{ $t('DashV2.dashboard_settings') }}</h2>
+                <h2 class="ah-h2">{{ $t('Dash.dashboard_settings') }}</h2>
                 <label class="ah-field">
-                    <span class="ah-field__label">{{ $t('DashV2.name') }}</span>
+                    <span class="ah-field__label">{{ $t('Dash.name') }}</span>
                     <input v-model="form.title" type="text" class="ah-input" :class="{ 'ah-input--error': formError }" />
                     <span v-if="formError" class="ah-field__error">{{ formError }}</span>
                 </label>
                 <label class="ah-field">
-                    <span class="ah-field__label">{{ $t('DashV2.visibility') }}</span>
+                    <span class="ah-field__label">{{ $t('Dash.visibility') }}</span>
                     <select v-model="form.visibility" class="ah-input">
-                        <option value="private">{{ $t('DashV2.vis_private') }}</option>
-                        <option value="workspace">{{ $t('DashV2.vis_workspace') }}</option>
-                        <option value="project">{{ $t('DashV2.vis_project') }}</option>
+                        <option value="private">{{ $t('Dash.vis_private') }}</option>
+                        <option value="workspace">{{ $t('Dash.vis_workspace') }}</option>
+                        <option value="project">{{ $t('Dash.vis_project') }}</option>
                     </select>
                 </label>
                 <label v-if="form.visibility === 'project'" class="ah-field">
-                    <span class="ah-field__label">{{ $t('DashV2.project') }}</span>
+                    <span class="ah-field__label">{{ $t('Dash.project') }}</span>
                     <select v-model="form.projectId" class="ah-input">
-                        <option value="">{{ $t('DashV2.choose_project') }}</option>
+                        <option value="">{{ $t('Dash.choose_project') }}</option>
                         <option v-for="p in projects" :key="p._id" :value="p._id">{{ p.ProjectName }}</option>
                     </select>
                 </label>
                 <div class="dash__modal-actions">
-                    <button type="button" class="ah-btn ah-btn--danger ah-btn--sm" @click="destroy">{{ $t('DashV2.delete') }}</button>
+                    <button type="button" class="ah-btn ah-btn--danger ah-btn--sm" @click="destroy">{{ $t('Dash.delete') }}</button>
                     <span class="ah-toolbar__spacer"></span>
-                    <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="settingsOpen = false">{{ $t('DashV2.cancel') }}</button>
-                    <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="saveSettings">{{ $t('DashV2.save') }}</button>
+                    <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="settingsOpen = false">{{ $t('Dash.cancel') }}</button>
+                    <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="saveSettings">{{ $t('Dash.save') }}</button>
                 </div>
             </div>
         </div>
@@ -242,10 +242,10 @@ const weekRange = () => {
 };
 provide('dashboardGlobalRange', ref(weekRange()));
 
-const visibilityLabel = computed(() => t(`DashV2.vis_${dashboard.value.visibility || 'private'}`));
+const visibilityLabel = computed(() => t(`Dash.vis_${dashboard.value.visibility || 'private'}`));
 const ownerLine = computed(() => (dashboard.value.isMine
-    ? t('DashV2.owned_by_you')
-    : t('DashV2.owned_by', { name: dashboard.value.ownerName || t('DashV2.a_teammate') })));
+    ? t('Dash.owned_by_you')
+    : t('Dash.owned_by', { name: dashboard.value.ownerName || t('Dash.a_teammate') })));
 
 const toLayoutItem = (c) => ({
     ...(c.config && c.config.position ? c.config.position : {}),
@@ -313,7 +313,7 @@ const persist = async () => {
     try {
         await saveDashboardCards(route.params.dashboardId, cards.value.map(toCardDoc));
     } catch (e) {
-        $toast.error(t('DashV2.save_failed'), { position: 'top-right' });
+        $toast.error(t('Dash.save_failed'), { position: 'top-right' });
     }
 };
 
@@ -368,7 +368,7 @@ const openSettings = () => {
 
 const saveSettings = async () => {
     if (!form.title.trim()) {
-        formError.value = t('DashV2.name_required');
+        formError.value = t('Dash.name_required');
         return;
     }
     try {
@@ -380,7 +380,7 @@ const saveSettings = async () => {
         dashboard.value = { ...dashboard.value, ...(updated || {}) };
         settingsOpen.value = false;
     } catch (e) {
-        formError.value = (e && e.response && e.response.data && e.response.data.message) || t('DashV2.save_failed');
+        formError.value = (e && e.response && e.response.data && e.response.data.message) || t('Dash.save_failed');
     }
 };
 
@@ -390,7 +390,7 @@ const duplicate = async () => {
         const copy = await duplicateDashboard(route.params.dashboardId);
         if (copy && copy._id) router.push({ name: 'DashboardView', params: { cid: companyId.value, dashboardId: copy._id } });
     } catch (e) {
-        $toast.error(t('DashV2.save_failed'), { position: 'top-right' });
+        $toast.error(t('Dash.save_failed'), { position: 'top-right' });
     }
 };
 
@@ -399,7 +399,7 @@ const destroy = async () => {
         await removeDashboard(route.params.dashboardId);
         router.push({ name: 'Dashboards', params: { cid: companyId.value } });
     } catch (e) {
-        formError.value = t('DashV2.save_failed');
+        formError.value = t('Dash.save_failed');
     }
 };
 
@@ -416,8 +416,8 @@ const load = async () => {
         cards.value = renderable.map(toLayoutItem);
     } catch (e) {
         loadError.value = (e && e.response && e.response.status === 403)
-            ? t('DashV2.no_access')
-            : t('DashV2.load_failed');
+            ? t('Dash.no_access')
+            : t('Dash.load_failed');
     } finally {
         loading.value = false;
     }

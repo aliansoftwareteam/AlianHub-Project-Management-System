@@ -25,7 +25,7 @@
             </div>
 
             <div v-if="commandsOpen" class="ah-pop mc-cmd" @click.stop>
-                <div class="ah-label ah-pop__label">{{ $t('ChatV2.commands') }}</div>
+                <div class="ah-label ah-pop__label">{{ $t('Chat.commands') }}</div>
                 <button
                     v-for="command in filteredCommands"
                     :key="command.key"
@@ -37,7 +37,7 @@
                     <span>{{ $t(command.label) }}</span>
                     <kbd class="ah-kbd">/{{ command.key }}</kbd>
                 </button>
-                <p v-if="!filteredCommands.length" class="ah-small ah-pop__label">{{ $t('ChatV2.no_matches') }}</p>
+                <p v-if="!filteredCommands.length" class="ah-small ah-pop__label">{{ $t('Chat.no_matches') }}</p>
             </div>
 
             <div class="mc-comp-box" :class="{ 'is-recording': recording }">
@@ -56,24 +56,24 @@
                             @enter="submit"
                             @pasteFile="onPasted"
                         />
-                        <span v-if="!text" class="mc-comp-ph">{{ placeholder || $t('ChatV2.message') }}</span>
+                        <span v-if="!text" class="mc-comp-ph">{{ placeholder || $t('Chat.message') }}</span>
                     </div>
 
                     <div class="mc-comp-row">
                         <button type="button" class="mc-tool" :title="$t('MainChat.attach')" @click="picker && picker.click()">
-                            <ShellIcon name="paperclip" :size="13" /><span>{{ $t('ChatV2.attach') }}</span>
+                            <ShellIcon name="paperclip" :size="13" /><span>{{ $t('Chat.attach') }}</span>
                         </button>
-                        <button type="button" class="mc-tool" :title="$t('ChatV2.cmd_clip')" @click="$emit('command', { name: 'clip', text: '' })">
-                            <ShellIcon name="film" :size="13" /><span>{{ $t('ChatV2.clip') }}</span>
+                        <button type="button" class="mc-tool" :title="$t('Chat.cmd_clip')" @click="$emit('command', { name: 'clip', text: '' })">
+                            <ShellIcon name="film" :size="13" /><span>{{ $t('Chat.clip') }}</span>
                         </button>
-                        <button type="button" class="mc-tool" :title="$t('ChatV2.talk_to_text')" @click="$emit('command', { name: 'talk', text: '' })">
-                            <ShellIcon name="mic" :size="13" /><span>{{ $t('ChatV2.talk_to_text') }}</span>
+                        <button type="button" class="mc-tool" :title="$t('Chat.talk_to_text')" @click="$emit('command', { name: 'talk', text: '' })">
+                            <ShellIcon name="mic" :size="13" /><span>{{ $t('Chat.talk_to_text') }}</span>
                         </button>
-                        <button type="button" class="mc-tool" :title="$t('ChatV2.voice_note')" @click="startRecording">
-                            <ShellIcon name="wave" :size="13" /><span>{{ $t('ChatV2.voice_note') }}</span>
+                        <button type="button" class="mc-tool" :title="$t('Chat.voice_note')" @click="startRecording">
+                            <ShellIcon name="wave" :size="13" /><span>{{ $t('Chat.voice_note') }}</span>
                         </button>
-                        <button type="button" class="mc-tool mc-tool--ai" :class="{ 'is-on': commandsOpen }" :title="$t('ChatV2.ask_ai')" @click.stop="commandsOpen = !commandsOpen">
-                            <ShellIcon name="ai" :size="13" /><span>{{ $t('ChatV2.ask_ai') }}</span>
+                        <button type="button" class="mc-tool mc-tool--ai" :class="{ 'is-on': commandsOpen }" :title="$t('Chat.ask_ai')" @click.stop="commandsOpen = !commandsOpen">
+                            <ShellIcon name="ai" :size="13" /><span>{{ $t('Chat.ask_ai') }}</span>
                         </button>
 
                         <div class="mc-comp-send">
@@ -83,18 +83,18 @@
                                 :disabled="!canSend"
                                 :title="editing ? $t('MainChat.save') : $t('MainChat.send')"
                                 @click="submit"
-                            >{{ editing ? $t('MainChat.save') : $t('ChatV2.send') }}</button>
+                            >{{ editing ? $t('MainChat.save') : $t('Chat.send') }}</button>
                             <button
                                 v-if="!editing"
                                 type="button"
                                 class="mc-send-more"
                                 :disabled="!canSend"
-                                :title="$t('ChatV2.send_options')"
+                                :title="$t('Chat.send_options')"
                                 @click.stop="sendMenu = !sendMenu"
                             ><ShellIcon name="chevronDown" :size="13" /></button>
                             <div v-if="sendMenu" class="ah-pop mc-send-menu" @click.stop>
-                                <button type="button" class="ah-pop__item" @click="sendMenu = false; submit()">{{ $t('ChatV2.send_enter') }}</button>
-                                <button type="button" class="ah-pop__item" @click="sendMenu = false; submitAsTask()">{{ $t('ChatV2.send_and_task') }}</button>
+                                <button type="button" class="ah-pop__item" @click="sendMenu = false; submit()">{{ $t('Chat.send_enter') }}</button>
+                                <button type="button" class="ah-pop__item" @click="sendMenu = false; submitAsTask()">{{ $t('Chat.send_and_task') }}</button>
                             </div>
                         </div>
                     </div>
@@ -103,11 +103,11 @@
 
             <div class="mc-comp-hint">
                 <template v-if="recording">
-                    <span>{{ $t('ChatV2.transcription_note') }}</span>
-                    <span>{{ $t('ChatV2.max_note') }}</span>
+                    <span>{{ $t('Chat.transcription_note') }}</span>
+                    <span>{{ $t('Chat.max_note') }}</span>
                 </template>
                 <template v-else>
-                    <span>{{ $t('ChatV2.command_hint') }}</span>
+                    <span>{{ $t('Chat.command_hint') }}</span>
                     <span><span class="ah-kbd">Enter</span>{{ editing ? $t('MainChat.save') : $t('MainChat.enter_send') }} · <span class="ah-kbd">Shift + Enter</span>{{ $t('MainChat.shift_enter') }}</span>
                 </template>
             </div>
@@ -133,10 +133,10 @@ import MainChatRecorder from './MainChatRecorder.vue';
 const DRAFT_PREFIX = 'alianhub:mainchat-draft';
 
 const COMMANDS = [
-    { key: 'task', label: 'ChatV2.cmd_task', icon: 'checkSquare' },
-    { key: 'summarize', label: 'ChatV2.cmd_summarize', icon: 'ai' },
-    { key: 'clip', label: 'ChatV2.cmd_clip', icon: 'film' },
-    { key: 'voice', label: 'ChatV2.cmd_voice', icon: 'mic' },
+    { key: 'task', label: 'Chat.cmd_task', icon: 'checkSquare' },
+    { key: 'summarize', label: 'Chat.cmd_summarize', icon: 'ai' },
+    { key: 'clip', label: 'Chat.cmd_clip', icon: 'film' },
+    { key: 'voice', label: 'Chat.cmd_voice', icon: 'mic' },
 ];
 
 const props = defineProps({

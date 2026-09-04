@@ -1,8 +1,8 @@
 <template>
     <aside class="hp-panel" aria-label="Planner">
         <div class="hp-panel__head">
-            {{ $t('HomeV2.planner') }}
-            <button type="button" class="hp-panel__close" :title="$t('HomeV2.hide_planner')" @click="$emit('close')"><ShellIcon name="x" :size="14" /></button>
+            {{ $t('Home.planner') }}
+            <button type="button" class="hp-panel__close" :title="$t('Home.hide_planner')" @click="$emit('close')"><ShellIcon name="x" :size="14" /></button>
         </div>
         <div class="hp-days">
             <button
@@ -33,15 +33,15 @@
                     :style="{ top: `${item.top}px`, height: `${item.height}px` }"
                     :title="item.title"
                     @click="item.removable && $emit('remove-focus', item.id)"
-                >{{ item.title || $t('HomeV2.focus') }}</div>
+                >{{ item.title || $t('Home.focus') }}</div>
                 <div class="hp-block hp-block--drop" :class="{ 'is-over': over }" :style="{ top: `${dropTop}px`, height: '40px' }">
-                    {{ $t('HomeV2.planner_drop') }}
+                    {{ $t('Home.planner_drop') }}
                 </div>
             </div>
         </div>
         <div class="hp-panel__foot">
-            {{ $t('HomeV2.planner_footer') }}
-            <router-link :to="{ name: 'Planner', params: { cid: companyId } }">{{ $t('HomeV2.open_planner') }}</router-link>
+            {{ $t('Home.planner_footer') }}
+            <router-link :to="{ name: 'Planner', params: { cid: companyId } }">{{ $t('Home.open_planner') }}</router-link>
         </div>
     </aside>
 </template>

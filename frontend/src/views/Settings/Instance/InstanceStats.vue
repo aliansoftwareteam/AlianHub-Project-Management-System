@@ -1,22 +1,22 @@
 <template>
     <div>
         <div v-if="error" class="in-banner in-banner--danger"><ShellIcon name="alert" :size="15" /><span>{{ error }}</span></div>
-        <div v-else-if="!stats" class="ah-empty">{{ $t('InstanceV2.loading') }}</div>
+        <div v-else-if="!stats" class="ah-empty">{{ $t('Instance.loading') }}</div>
         <template v-else>
             <div class="in-grid">
-                <section class="ah-card in-card"><span class="ah-label">{{ $t('InstanceV2.companies') }}</span><strong class="in-big">{{ stats.companies }}</strong></section>
-                <section class="ah-card in-card"><span class="ah-label">{{ $t('InstanceV2.users') }}</span><strong class="in-big">{{ stats.users }}</strong></section>
-                <section class="ah-card in-card"><span class="ah-label">{{ $t('InstanceV2.version_short') }}</span><strong class="in-big ah-mono">v{{ stats.version }}</strong><span class="ah-small">{{ stats.nodeVersion }}</span></section>
+                <section class="ah-card in-card"><span class="ah-label">{{ $t('Instance.companies') }}</span><strong class="in-big">{{ stats.companies }}</strong></section>
+                <section class="ah-card in-card"><span class="ah-label">{{ $t('Instance.users') }}</span><strong class="in-big">{{ stats.users }}</strong></section>
+                <section class="ah-card in-card"><span class="ah-label">{{ $t('Instance.version_short') }}</span><strong class="in-big ah-mono">v{{ stats.version }}</strong><span class="ah-small">{{ stats.nodeVersion }}</span></section>
             </div>
             <section class="ah-card in-card">
-                <div class="in-card__head"><span class="in-card__title">{{ $t('InstanceV2.companies') }}</span></div>
+                <div class="in-card__head"><span class="in-card__title">{{ $t('Instance.companies') }}</span></div>
                 <table class="in-table">
-                    <thead><tr><th>{{ $t('InstanceV2.company') }}</th><th>{{ $t('InstanceV2.created') }}</th><th></th></tr></thead>
+                    <thead><tr><th>{{ $t('Instance.company') }}</th><th>{{ $t('Instance.created') }}</th><th></th></tr></thead>
                     <tbody>
                         <tr v-for="c in companies" :key="c._id">
                             <td>{{ c.Cst_CompanyName }} <span class="ah-small ah-mono">{{ c._id }}</span></td>
                             <td>{{ formatWhen(c.createdAt) }}</td>
-                            <td><button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="download(`${env.INSTANCE_AUDIT_EXPORT}?companyId=${c._id}`, `audit-${c._id}.csv`)"><ShellIcon name="download" :size="14" />{{ $t('InstanceV2.audit_csv') }}</button></td>
+                            <td><button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="download(`${env.INSTANCE_AUDIT_EXPORT}?companyId=${c._id}`, `audit-${c._id}.csv`)"><ShellIcon name="download" :size="14" />{{ $t('Instance.audit_csv') }}</button></td>
                         </tr>
                     </tbody>
                 </table>

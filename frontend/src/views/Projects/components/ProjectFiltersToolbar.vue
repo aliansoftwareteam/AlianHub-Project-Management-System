@@ -116,7 +116,7 @@
                         <template #options>
                             <template v-for="(group, gi) in moreGroups" :key="group.key">
                                 <div v-if="gi" class="ah-pop__sep"></div>
-                                <div class="ah-label ah-pop__label">{{ $t(`ProjectsV2.menu_${group.key}`) }}</div>
+                                <div class="ah-label ah-pop__label">{{ $t(`Projects.menu_${group.key}`) }}</div>
                                 <DropDownOption v-for="item in group.items" :key="item.key" @click="$refs.more_features_trigger.click(); item.open()">
                                     <div><span class="dropdown-label">{{ $t(item.label) }}</span></div>
                                 </DropDownOption>
@@ -194,15 +194,15 @@
                         />
                     </div>
                     <div class="mr-1 group_by d-flex">
-                        <button type="button" :title="$t('ProjectsV2.prev_month')" class="calendar-button" @click="$emit('prevMonth')">
+                        <button type="button" :title="$t('Projects.prev_month')" class="calendar-button" @click="$emit('prevMonth')">
                             <span class="fc-icon fc-icon-chevron-left"></span>
                         </button>
-                        <button type="button" :title="$t('ProjectsV2.next_month')" class="calendar-button" @click="$emit('nextMonth')">
+                        <button type="button" :title="$t('Projects.next_month')" class="calendar-button" @click="$emit('nextMonth')">
                             <span class="fc-icon fc-icon-chevron-right"></span>
                         </button>
                     </div>
                     <div class="mr-1 group_by">
-                        <button type="button" :title="$t('ProjectsV2.this_month')" class="calendar-button calendar-currentday-text" @click="$emit('defaultMonth')">{{ $t('Home.Today') }}</button>
+                        <button type="button" :title="$t('Projects.this_month')" class="calendar-button calendar-currentday-text" @click="$emit('defaultMonth')">{{ $t('Home.Today') }}</button>
                     </div>
                 </div>
             </div>
@@ -258,11 +258,11 @@ const moreGroups = [
         { key: 'public', label: 'Projects.public_link', open: opener(showPublicShare) }
     ] },
     { key: 'import', items: [
-        { key: 'import', label: 'ProjectsV2.import_any', open: opener(showImport) }
+        { key: 'import', label: 'Projects.import_any', open: opener(showImport) }
     ] },
     { key: 'settings', items: [
         { key: 'autoArchive', label: 'Projects.auto_archive', open: opener(showAutoArchive) },
-        { key: 'estimation', label: 'ProjectsV2.estimation_scale', open: opener(showEstimationScale) }
+        { key: 'estimation', label: 'Projects.estimation_scale', open: opener(showEstimationScale) }
     ] }
 ];
 import { useCustomComposable } from '@/composable';

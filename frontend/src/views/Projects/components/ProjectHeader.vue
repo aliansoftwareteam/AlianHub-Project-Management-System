@@ -1,9 +1,20 @@
 <template>
     <div class="ph2">
         <div class="ph2__bar">
-            <button v-if="showBack" type="button" class="ph2__back" :aria-label="$t('ProjectsV2.back')" @click="$emit('back')">
+            <button v-if="showBack" type="button" class="ph2__back" :aria-label="$t('Projects.back')" @click="$emit('back')">
                 <ShellIcon name="chevron" :size="16" />
             </button>
+
+            <select
+                v-if="projects.length > 1"
+                class="ph2__switch"
+                :value="project?._id"
+                :aria-label="$t('Projects.title')"
+                :title="$t('Projects.title')"
+                @change="$emit('select-project', $event.target.value)"
+            >
+                <option v-for="item in projects" :key="item._id" :value="item._id">{{ item.ProjectName }}</option>
+            </select>
 
             <div v-if="$slots.title" class="ph2__title-slot">
                 <slot name="title"></slot>
@@ -15,8 +26,8 @@
                     type="button"
                     class="ph2__star"
                     :class="{ 'is-on': favourite }"
-                    :aria-label="$t('ProjectsV2.favourite')"
-                    :title="$t('ProjectsV2.favourite')"
+                    :aria-label="$t('Projects.favourite')"
+                    :title="$t('Projects.favourite')"
                     @click="$emit('toggle-favourite')"
                 >
                     <ShellIcon name="star" :size="14" />
@@ -41,22 +52,22 @@
                         :class="{ 'is-active': activeView === view.keyName }"
                         @click="$emit('select-view', view.keyName)"
                     >{{ viewLabel(view) }}</button>
-                    <button v-if="canAddView" type="button" class="ph2__tab ph2__tab--add" @click="$emit('add-view')">+ {{ $t('ProjectsV2.view') }}</button>
+                    <button v-if="canAddView" type="button" class="ph2__tab ph2__tab--add" @click="$emit('add-view')">+ {{ $t('Projects.view') }}</button>
                 </slot>
             </div>
 
             <div class="ph2__actions">
-                <div v-if="agentChip" class="ph2__agents" :title="$t('ProjectsV2.agents_chip_title')">
+                <div v-if="agentChip" class="ph2__agents" :title="$t('Projects.agents_chip_title')">
                     <span class="ph2__agents-dot"></span>
-                    <span class="ph2__agents-label">{{ $t('ProjectsV2.agents_working', { n: agentChip.agents }) }}</span>
+                    <span class="ph2__agents-label">{{ $t('Projects.agents_working', { n: agentChip.agents }) }}</span>
                     <span class="ph2__agents-meta">{{ agentChip.meta }}</span>
                 </div>
                 <slot name="actions"></slot>
-                <button v-if="showFilter" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="$emit('filter')">{{ $t('ProjectsV2.filter') }}</button>
+                <button v-if="showFilter" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="$emit('filter')">{{ $t('Projects.filter') }}</button>
                 <button v-if="showAiAssist" type="button" class="ah-btn ah-btn--sm ph2__ai" @click="$emit('ai-assist')">
-                    <span aria-hidden="true">✦</span>{{ $t('ProjectsV2.ai_assist') }}
+                    <span aria-hidden="true">✦</span>{{ $t('Projects.ai_assist') }}
                 </button>
-                <button v-if="showAddTask" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="$emit('add-task')">+ {{ $t('ProjectsV2.task') }}</button>
+                <button v-if="showAddTask" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="$emit('add-task')">+ {{ $t('Projects.task') }}</button>
             </div>
         </div>
     </div>
@@ -68,6 +79,7 @@
  *
  * Props
  *   project       Object   the project document (ProjectName, ProjectCode, projectIcon)
+ *   projects      Array    the user's projects; two or more render the switcher (emits select-project(id))
  *   sprint        Object   { name, startDate, endDate } — the sprint in view, or null
  *   views         Array    [{ keyName, name }] rendered as the tab strip (ignored when the `views` slot is used)
  *   activeView    String   keyName of the active tab
@@ -95,6 +107,7 @@ const { t, te } = useI18n();
 
 const props = defineProps({
     project: { type: Object, default: () => ({}) },
+    projects: { type: Array, default: () => [] },
     sprint: { type: Object, default: null },
     views: { type: Array, default: () => [] },
     activeView: { type: String, default: '' },
@@ -107,7 +120,7 @@ const props = defineProps({
     showBack: { type: Boolean, default: false }
 });
 
-defineEmits(['select-view', 'add-view', 'filter', 'ai-assist', 'add-task', 'toggle-favourite', 'back']);
+defineEmits(['select-view', 'add-view', 'filter', 'ai-assist', 'add-task', 'toggle-favourite', 'back', 'select-project']);
 
 const PALETTE = ['#2F3990', '#2f9e7e', '#d98324', '#6b5ce7', '#0EA5E9', '#EC4899'];
 
@@ -132,7 +145,7 @@ const rangeLabel = computed(() => {
         ? `${MONTHS[start.getMonth()]} ${start.getDate()} – ${end.getDate()}`
         : `${MONTHS[start.getMonth()]} ${start.getDate()} – ${MONTHS[end.getMonth()]} ${end.getDate()}`;
     const daysLeft = Math.max(0, Math.ceil((end.getTime() - Date.now()) / 86400000));
-    return `${head} · ${t('ProjectsV2.days_left_short', { n: daysLeft })}`;
+    return `${head} · ${t('Projects.days_left_short', { n: daysLeft })}`;
 });
 
 const agentChip = computed(() => {

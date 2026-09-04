@@ -1,20 +1,20 @@
 <template>
     <div class="ah-page conn">
         <div class="ah-toolbar">
-            <div class="ah-toolbar__title">{{ $t('ParityV2.connections') }}</div>
+            <div class="ah-toolbar__title">{{ $t('Parity.connections') }}</div>
             <div class="ah-tabs" style="margin-left:8px">
                 <button v-for="tab in tabs" :key="tab" type="button" class="ah-tab" :class="{ 'is-active': view === tab }" @click="view = tab">
-                    {{ $t(`ParityV2.conn_tab_${tab}`) }}
+                    {{ $t(`Parity.conn_tab_${tab}`) }}
                 </button>
             </div>
             <div class="ah-toolbar__spacer"></div>
             <router-link class="ah-btn ah-btn--primary ah-btn--sm" :to="{ name: 'IntegrationsHub', params: { cid } }">
-                <ShellIcon name="plus" :size="14" />{{ $t('ParityV2.connect') }}
+                <ShellIcon name="plus" :size="14" />{{ $t('Parity.connect') }}
             </router-link>
         </div>
 
         <div class="conn__body ah-scroll">
-            <p class="parity-lead">{{ $t('ParityV2.connections_lead') }}</p>
+            <p class="parity-lead">{{ $t('Parity.connections_lead') }}</p>
             <p v-if="error" class="ah-field__error">{{ error }}</p>
 
             <div class="conn__grid">
@@ -32,18 +32,18 @@
                     </div>
                     <p class="conn__grants">{{ card.grants }}</p>
                     <div v-if="card.key === 'mcp-self'" class="conn__setup">
-                        <div class="ah-label">{{ $t('ParityV2.mcp_setup') }}</div>
+                        <div class="ah-label">{{ $t('Parity.mcp_setup') }}</div>
                         <code class="conn__code ah-mono">{{ mcpCommand }}</code>
                         <div class="conn__actions">
                             <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="minting" @click="mint">
-                                {{ minting ? $t('ParityV2.minting') : $t('ParityV2.mint_token') }}
+                                {{ minting ? $t('Parity.minting') : $t('Parity.mint_token') }}
                             </button>
-                            <span class="ah-small">{{ $t('ParityV2.mcp_tools_count', { n: (mcpManifest.tools || []).length }) }}</span>
+                            <span class="ah-small">{{ $t('Parity.mcp_tools_count', { n: (mcpManifest.tools || []).length }) }}</span>
                         </div>
                         <div v-if="minted" class="conn__token">
-                            <div class="ah-label">{{ $t('ParityV2.copy_now') }}</div>
+                            <div class="ah-label">{{ $t('Parity.copy_now') }}</div>
                             <code class="conn__code ah-mono">{{ minted.token }}</code>
-                            <p class="ah-small">{{ $t('ParityV2.token_once') }}</p>
+                            <p class="ah-small">{{ $t('Parity.token_once') }}</p>
                         </div>
                         <p v-if="mintError" class="ah-field__error">{{ mintError }}</p>
                     </div>
@@ -51,14 +51,14 @@
 
                 <article v-if="view === 'all' || view === 'apps'" class="conn__more">
                     <div class="conn__more-title">{{ availableNames }}</div>
-                    <div class="conn__more-sub">{{ $t('ParityV2.or_any_mcp') }}</div>
+                    <div class="conn__more-sub">{{ $t('Parity.or_any_mcp') }}</div>
                 </article>
             </div>
 
             <section v-if="mcpManifest.never" class="ah-card conn__never">
-                <div class="ah-card__head"><span class="ah-label">{{ $t('ParityV2.never_label') }}</span></div>
+                <div class="ah-card__head"><span class="ah-label">{{ $t('Parity.never_label') }}</span></div>
                 <div class="ah-card__body">
-                    <p class="parity-lead">{{ $t('ParityV2.never_body') }}</p>
+                    <p class="parity-lead">{{ $t('Parity.never_body') }}</p>
                     <div class="conn__never-list">
                         <span v-for="item in mcpManifest.never" :key="item" class="ah-chip ah-chip--mono">{{ item }}</span>
                     </div>
@@ -102,13 +102,13 @@ const MARKS = { github: "dark", gitlab: "orange", slack: "purple", google_calend
 /* What an agent may read and do through each connection, stated per connection
  * type rather than in the abstract. */
 const GRANTS = {
-    slack: "ParityV2.grant_slack",
-    github: "ParityV2.grant_github",
-    gitlab: "ParityV2.grant_gitlab",
-    google_calendar: "ParityV2.grant_calendar",
-    microsoft_teams: "ParityV2.grant_teams",
-    zapier: "ParityV2.grant_zapier",
-    custom_iframe: "ParityV2.grant_iframe"
+    slack: "Parity.grant_slack",
+    github: "Parity.grant_github",
+    gitlab: "Parity.grant_gitlab",
+    google_calendar: "Parity.grant_calendar",
+    microsoft_teams: "Parity.grant_teams",
+    zapier: "Parity.grant_zapier",
+    custom_iframe: "Parity.grant_iframe"
 };
 
 const connected = computed(() => {
@@ -128,7 +128,7 @@ const appCards = computed(() => catalog.value
             glyph: item.icon,
             mark: MARKS[item.key] || "grey",
             sub: conn.name && conn.name !== item.name ? conn.name : item.category,
-            grants: t(GRANTS[item.key] || "ParityV2.grant_generic"),
+            grants: t(GRANTS[item.key] || "Parity.grant_generic"),
             live: conn.enabled !== false && conn.status === "connected",
             badge: ""
         };
@@ -137,25 +137,25 @@ const appCards = computed(() => catalog.value
 const mcpCard = computed(() => ({
     key: "mcp-self",
     group: "mcp",
-    name: t("ParityV2.mcp_self_name"),
+    name: t("Parity.mcp_self_name"),
     glyph: "MCP",
     mark: "grey",
     sub: mcpUrl.value,
-    grants: t("ParityV2.grant_mcp", { n: (mcpManifest.value.tools || []).length }),
+    grants: t("Parity.grant_mcp", { n: (mcpManifest.value.tools || []).length }),
     live: Boolean(mcpManifest.value.protocolVersion),
-    badge: t("ParityV2.badge_served_here")
+    badge: t("Parity.badge_served_here")
 }));
 
 const agentTokenCards = computed(() => tokens.value.map((token) => ({
     key: `token-${token._id}`,
     group: "agents",
-    name: token.name || t("ParityV2.cli_agent"),
+    name: token.name || t("Parity.cli_agent"),
     glyph: "◉",
     mark: "grey",
-    sub: t("ParityV2.token_sub", { mode: (token.agentAccount && token.agentAccount.mode) || "personal" }),
-    grants: t("ParityV2.grant_token", { n: (token.projectIds || []).length || t("ParityV2.all_projects") }),
+    sub: t("Parity.token_sub", { mode: (token.agentAccount && token.agentAccount.mode) || "personal" }),
+    grants: t("Parity.grant_token", { n: (token.projectIds || []).length || t("Parity.all_projects") }),
     live: token.active !== false,
-    badge: t("ParityV2.badge_external")
+    badge: t("Parity.badge_external")
 })));
 
 const visible = computed(() => {
@@ -167,7 +167,7 @@ const visible = computed(() => {
 const availableNames = computed(() => catalog.value
     .filter((item) => !connected.value[item.key])
     .map((item) => item.name)
-    .join(" · ") || t("ParityV2.everything_connected"));
+    .join(" · ") || t("Parity.everything_connected"));
 
 const apiBase = computed(() => String(env.API_URI || "").replace(/\/$/, ""));
 const mcpUrl = computed(() => `${apiBase.value}/mcp?companyId=${cid.value || ""}`);
@@ -178,7 +178,7 @@ const mint = async () => {
     mintError.value = "";
     try {
         const res = await apiRequest("post", env.MCP_TOKENS, { name: "CLI agent", mode: "personal", provider: "claude-code" });
-        if (!res?.data?.status) { mintError.value = res?.data?.statusText || t("ParityV2.mint_failed"); return; }
+        if (!res?.data?.status) { mintError.value = res?.data?.statusText || t("Parity.mint_failed"); return; }
         minted.value = res.data.data;
         await loadTokens();
     } catch (e) {

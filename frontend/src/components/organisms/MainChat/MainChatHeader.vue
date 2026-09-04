@@ -15,11 +15,11 @@
                 type="button"
                 class="mc-head-ai"
                 :disabled="summarizing"
-                :title="$t('ChatV2.summarize')"
+                :title="$t('Chat.summarize')"
                 @click="$emit('summarize')"
             >
                 <ShellIcon name="ai" :size="13" />
-                <span>{{ summarizing ? $t('ChatV2.summarizing') : $t('ChatV2.summarize') }}</span>
+                <span>{{ summarizing ? $t('Chat.summarizing') : $t('Chat.summarize') }}</span>
             </button>
 
             <slot name="call-actions"></slot>
@@ -36,7 +36,7 @@
                 type="button"
                 class="mc-icon-btn"
                 :class="{ 'mc-icon-btn--on': detailsOpen }"
-                :title="detailsOpen ? $t('ChatV2.close_details') : $t('ChatV2.open_details')"
+                :title="detailsOpen ? $t('Chat.close_details') : $t('Chat.open_details')"
                 @click="$emit('info')"
             ><MainChatIcon name="info" /></button>
 

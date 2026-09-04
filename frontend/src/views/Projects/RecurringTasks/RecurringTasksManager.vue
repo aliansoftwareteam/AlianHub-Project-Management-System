@@ -1,11 +1,11 @@
 <template>
     <div class="rtx ah-page">
         <header class="ah-toolbar rtx__bar">
-            <h1 class="ah-toolbar__title">{{ $t('MembersV2.recurring') }}</h1>
-            <span class="ah-mono rtx__count">{{ $t('MembersV2.rules_count', { rules: defs.length }) }}</span>
+            <h1 class="ah-toolbar__title">{{ $t('Members.recurring') }}</h1>
+            <span class="ah-mono rtx__count">{{ $t('Members.rules_count', { rules: defs.length }) }}</span>
             <div class="ah-toolbar__spacer"></div>
             <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="startNew()">
-                <ShellIcon name="plus" :size="14" /> {{ $t('MembersV2.new_rule') }}
+                <ShellIcon name="plus" :size="14" /> {{ $t('Members.new_rule') }}
             </button>
         </header>
 
@@ -13,7 +13,7 @@
             <section v-if="editing" class="ah-card rtx__editor">
                 <div class="ah-card__body rtx__editor-body">
                     <div class="rtx__editor-head">
-                        <input v-model.trim="form.name" class="rtx__name-input" :placeholder="$t('MembersV2.rule_name_ph')" maxlength="120" />
+                        <input v-model.trim="form.name" class="rtx__name-input" :placeholder="$t('Members.rule_name_ph')" maxlength="120" />
                         <span class="ah-mono rtx__project">{{ (project.ProjectName || '').toUpperCase() }}</span>
                         <label v-if="form._id" class="rtx__toggle" :class="{ 'is-on': form.enabled }">
                             <input type="checkbox" v-model="form.enabled" />
@@ -21,55 +21,55 @@
                         </label>
                     </div>
 
-                    <input v-model.trim="form.taskName" class="ah-input" :placeholder="$t('MembersV2.rule_task_ph')" maxlength="200" />
+                    <input v-model.trim="form.taskName" class="ah-input" :placeholder="$t('Members.rule_task_ph')" maxlength="200" />
 
                     <div class="rtx__rule">
-                        <span class="rtx__word">{{ $t('MembersV2.every') }}</span>
+                        <span class="rtx__word">{{ $t('Members.every') }}</span>
                         <input v-if="form.freq !== 'weekly'" type="number" min="1" max="52" v-model.number="form.interval" class="rtx__pill rtx__num" />
                         <select v-model="form.freq" class="rtx__pill">
-                            <option value="daily">{{ $t('MembersV2.unit_days') }}</option>
-                            <option value="weekly">{{ $t('MembersV2.unit_weeks') }}</option>
-                            <option value="monthly">{{ $t('MembersV2.unit_months') }}</option>
+                            <option value="daily">{{ $t('Members.unit_days') }}</option>
+                            <option value="weekly">{{ $t('Members.unit_weeks') }}</option>
+                            <option value="monthly">{{ $t('Members.unit_months') }}</option>
                         </select>
 
                         <template v-if="form.freq === 'weekly'">
-                            <span class="rtx__word">{{ $t('MembersV2.on_day') }}</span>
+                            <span class="rtx__word">{{ $t('Members.on_day') }}</span>
                             <select v-model.number="form.weekday" class="rtx__pill">
                                 <option v-for="(day, index) in weekdayNames" :key="day" :value="index">{{ day }}</option>
                             </select>
                         </template>
                         <template v-if="form.freq === 'monthly'">
-                            <span class="rtx__word">{{ $t('MembersV2.on_day') }}</span>
+                            <span class="rtx__word">{{ $t('Members.on_day') }}</span>
                             <input type="number" min="1" max="28" v-model.number="form.monthday" class="rtx__pill rtx__num" />
                         </template>
 
-                        <span class="rtx__word">{{ $t('MembersV2.at_time') }}</span>
+                        <span class="rtx__word">{{ $t('Members.at_time') }}</span>
                         <select v-model.number="form.runHour" class="rtx__pill">
                             <option v-for="hour in 24" :key="hour" :value="hour - 1">{{ String(hour - 1).padStart(2, '0') }}:00</option>
                         </select>
 
                         <template v-if="!form._id">
-                            <span class="rtx__word">{{ $t('MembersV2.assign_to') }}</span>
+                            <span class="rtx__word">{{ $t('Members.assign_to') }}</span>
                             <select v-model="form.assignee" class="rtx__pill">
-                                <option value="">{{ $t('MembersV2.assign_nobody') }}</option>
+                                <option value="">{{ $t('Members.assign_nobody') }}</option>
                                 <option v-for="member in members" :key="member.id" :value="member.id">{{ member.name }}</option>
                             </select>
                         </template>
 
-                        <span class="rtx__word">{{ $t('MembersV2.ends') }}</span>
+                        <span class="rtx__word">{{ $t('Members.ends') }}</span>
                         <input type="date" v-model="form.until" class="rtx__pill" />
                     </div>
 
                     <div class="rtx__section">
-                        <div class="ah-label">{{ $t('MembersV2.next_occurrences') }}</div>
+                        <div class="ah-label">{{ $t('Members.next_occurrences') }}</div>
                         <div v-if="preview.length" class="rtx__chips">
                             <span v-for="(date, index) in preview" :key="date.getTime()" class="rtx__chip" :class="{ 'is-first': index === 0 }">{{ dayLabel(date) }}</span>
                         </div>
-                        <p v-else class="ah-small">{{ $t('MembersV2.no_occurrences') }}</p>
+                        <p v-else class="ah-small">{{ $t('Members.no_occurrences') }}</p>
                     </div>
 
                     <div class="rtx__section">
-                        <div class="ah-label">{{ $t('MembersV2.missed_head') }}</div>
+                        <div class="ah-label">{{ $t('Members.missed_head') }}</div>
                         <div class="rtx__choices">
                             <button
                                 v-for="option in missedOptions"
@@ -82,22 +82,22 @@
                         </div>
                     </div>
 
-                    <p class="ah-small">{{ $t('MembersV2.copy_template') }}</p>
+                    <p class="ah-small">{{ $t('Members.copy_template') }}</p>
                     <p v-if="formError" class="ah-field__error">{{ formError }}</p>
 
                     <div class="rtx__actions">
                         <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="saving" @click="save()">
-                            {{ form._id ? $t('MembersV2.save_rule') : $t('MembersV2.create_rule') }}
+                            {{ form._id ? $t('Members.save_rule') : $t('Members.create_rule') }}
                         </button>
-                        <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="editing = false">{{ $t('MembersV2.cancel') }}</button>
-                        <button v-if="form._id" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="runNow(form)">{{ $t('MembersV2.run_now') }}</button>
-                        <button v-if="form._id" type="button" class="ah-btn ah-btn--ghost ah-btn--sm rtx__danger" @click="remove(form)">{{ $t('MembersV2.delete_rule') }}</button>
+                        <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="editing = false">{{ $t('Members.cancel') }}</button>
+                        <button v-if="form._id" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="runNow(form)">{{ $t('Members.run_now') }}</button>
+                        <button v-if="form._id" type="button" class="ah-btn ah-btn--ghost ah-btn--sm rtx__danger" @click="remove(form)">{{ $t('Members.delete_rule') }}</button>
                     </div>
                 </div>
             </section>
 
-            <p v-if="loading" class="ah-small">{{ $t('MembersV2.loading') }}</p>
-            <div v-else-if="!defs.length && !editing" class="ah-empty">{{ $t('MembersV2.no_rules') }}</div>
+            <p v-if="loading" class="ah-small">{{ $t('Members.loading') }}</p>
+            <div v-else-if="!defs.length && !editing" class="ah-empty">{{ $t('Members.no_rules') }}</div>
 
             <div class="rtx__list">
                 <article v-for="def in listedDefs" :key="def._id" class="ah-card rtx__row" :class="{ 'is-paused': !def.enabled }">
@@ -109,8 +109,8 @@
                         <span class="rtx__row-name">{{ def.name }}</span>
                         <span class="rtx__row-sub">{{ scheduleText(def) }}</span>
                     </button>
-                    <span v-if="def.enabled && def.nextRunAt" class="ah-mono rtx__next">{{ $t('MembersV2.next_run', { when: dayLabel(new Date(def.nextRunAt)) }) }}</span>
-                    <span v-else class="ah-mono rtx__next">{{ $t('MembersV2.rule_paused') }}</span>
+                    <span v-if="def.enabled && def.nextRunAt" class="ah-mono rtx__next">{{ $t('Members.next_run', { when: dayLabel(new Date(def.nextRunAt)) }) }}</span>
+                    <span v-else class="ah-mono rtx__next">{{ $t('Members.rule_paused') }}</span>
                 </article>
             </div>
         </div>
@@ -146,9 +146,9 @@ const selectedProject = inject("selectedProject", ref({}));
 const PREVIEW_COUNT = 4;
 const weekdayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const missedOptions = [
-    { value: "skip", label: "MembersV2.missed_skip" },
-    { value: "create", label: "MembersV2.missed_create" },
-    { value: "roll", label: "MembersV2.missed_roll" }
+    { value: "skip", label: "Members.missed_skip" },
+    { value: "create", label: "Members.missed_create" },
+    { value: "roll", label: "Members.missed_roll" }
 ];
 
 const defs = ref([]);
@@ -206,12 +206,12 @@ function scheduleText(def) {
     const at = `${String(def.runHour ?? 9).padStart(2, "0")}:00`;
     if (def.freq === "weekly") {
         const days = (def.byweekday || []).map((i) => weekdayNames[i]).join(", ");
-        return `${t("MembersV2.every")} ${days || weekdayNames[0]} ${at}`;
+        return `${t("Members.every")} ${days || weekdayNames[0]} ${at}`;
     }
     if (def.freq === "monthly") {
-        return `${t("MembersV2.every")} ${def.interval || 1} ${t("MembersV2.unit_months")} · ${t("MembersV2.day_of_month", { day: def.monthday || 1 })} ${at}`;
+        return `${t("Members.every")} ${def.interval || 1} ${t("Members.unit_months")} · ${t("Members.day_of_month", { day: def.monthday || 1 })} ${at}`;
     }
-    return `${t("MembersV2.every")} ${def.interval || 1} ${t("MembersV2.unit_days")} ${at}`;
+    return `${t("Members.every")} ${def.interval || 1} ${t("Members.unit_days")} ${at}`;
 }
 
 function startNew() {
@@ -266,7 +266,7 @@ async function load() {
 async function save() {
     if (saving.value) return;
     if (!form.name || !form.taskName) {
-        formError.value = t("MembersV2.rule_needs_name");
+        formError.value = t("Members.rule_needs_name");
         return;
     }
     formError.value = "";

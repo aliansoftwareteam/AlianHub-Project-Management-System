@@ -117,7 +117,7 @@
                     />
                     <ul class="d-flex" v-else>
                         <li class="projectDataColorli black font-size-13">
-                            {{ $t('AppsV2.none') }}
+                            {{ $t('Apps.none') }}
                         </li>
                     </ul>
                 </div>

@@ -2,11 +2,11 @@
     <div class="ah-page fb">
         <div class="fb__main">
             <div class="fb__head">
-                <h2 class="ah-h2">{{ $t('FieldsV2.title') }}</h2>
-                <span class="fb__count">{{ fields.length }} · {{ $t('FieldsV2.scope_workspace') }}</span>
+                <h2 class="ah-h2">{{ $t('Fields.title') }}</h2>
+                <span class="fb__count">{{ fields.length }} · {{ $t('Fields.scope_workspace') }}</span>
                 <div class="fb__head-actions">
                     <button v-if="canEdit" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="startNew('text')">
-                        <ShellIcon name="plus" :size="14" /> {{ $t('FieldsV2.new_field') }}
+                        <ShellIcon name="plus" :size="14" /> {{ $t('Fields.new_field') }}
                     </button>
                 </div>
             </div>
@@ -23,10 +23,10 @@
             <div v-if="fields.length" class="ah-card fb__table">
                 <div class="fb__row fb__row-head">
                     <span></span>
-                    <span>{{ $t('FieldsV2.col_field') }}</span>
-                    <span>{{ $t('FieldsV2.col_type') }}</span>
-                    <span>{{ $t('FieldsV2.col_shown_in') }}</span>
-                    <span>{{ $t('FieldsV2.col_required') }}</span>
+                    <span>{{ $t('Fields.col_field') }}</span>
+                    <span>{{ $t('Fields.col_type') }}</span>
+                    <span>{{ $t('Fields.col_shown_in') }}</span>
+                    <span>{{ $t('Fields.col_required') }}</span>
                 </div>
                 <button
                     v-for="field in fields"
@@ -40,16 +40,16 @@
                     <span class="fb__name" :title="field.fieldTitle">{{ field.fieldTitle }}</span>
                     <span class="ah-chip" :class="{ 'ah-chip--brand': isComputed(field) }">{{ typeLabel(field.fieldType) }}</span>
                     <span class="fb__shown" :class="{ 'fb__shown--mono': isComputed(field) }">{{ shownIn(field) }}</span>
-                    <span v-if="isComputed(field)" class="fb__req--off">{{ $t('FieldsV2.read_only') }}</span>
+                    <span v-if="isComputed(field)" class="fb__req--off">{{ $t('Fields.read_only') }}</span>
                     <span v-else-if="isRequired(field)" class="fb__req"><ShellIcon name="check" :size="14" /></span>
                     <span v-else class="fb__req--off">—</span>
                 </button>
             </div>
-            <div v-else class="ah-empty">{{ $t('FieldsV2.empty_list') }}</div>
+            <div v-else class="ah-empty">{{ $t('Fields.empty_list') }}</div>
 
             <div class="ah-card">
                 <div class="ah-card__body">
-                    <div class="ah-label">{{ $t('FieldsV2.pick_a_type') }}</div>
+                    <div class="ah-label">{{ $t('Fields.pick_a_type') }}</div>
                     <div class="fb__types" style="margin-top: 9px">
                         <button
                             v-for="option in typeOptions"
@@ -63,7 +63,7 @@
                             <strong>{{ option.label }}</strong> <span>· {{ option.hint }}</span>
                         </button>
                     </div>
-                    <p class="fb__note" style="margin: 9px 0 0">{{ $t('FieldsV2.type_note') }}</p>
+                    <p class="fb__note" style="margin: 9px 0 0">{{ $t('Fields.type_note') }}</p>
                 </div>
             </div>
         </div>
@@ -72,19 +72,19 @@
             <template v-if="draft">
                 <div class="fb__panel-head">
                     <span class="fb__panel-mark">{{ draft.fieldType === 'rollup' ? 'Σ' : 'ƒ' }}</span>
-                    <span class="fb__panel-title">{{ draft.fieldTitle || $t('FieldsV2.untitled') }}</span>
+                    <span class="fb__panel-title">{{ draft.fieldTitle || $t('Fields.untitled') }}</span>
                     <span class="fb__panel-kind">{{ typeLabel(draft.fieldType) }}</span>
                 </div>
 
                 <div class="ah-field">
-                    <label class="ah-field__label" for="fb-title">{{ $t('FieldsV2.field_label') }}</label>
+                    <label class="ah-field__label" for="fb-title">{{ $t('Fields.field_label') }}</label>
                     <input
                         id="fb-title"
                         v-model.trim="draft.fieldTitle"
                         type="text"
                         class="ah-input"
                         :class="{ 'ah-input--error': errors.fieldTitle }"
-                        :placeholder="$t('FieldsV2.field_label_placeholder')"
+                        :placeholder="$t('Fields.field_label_placeholder')"
                     />
                     <span v-if="errors.fieldTitle" class="ah-field__error">{{ errors.fieldTitle }}</span>
                 </div>
@@ -95,7 +95,7 @@
                         ref="exprRef"
                         class="fb__expr"
                         :class="{ 'fb__expr--error': errors.formulaExpression }"
-                        :placeholder="$t('FieldsV2.expression_placeholder')"
+                        :placeholder="$t('Fields.expression_placeholder')"
                         spellcheck="false"
                         dir="ltr"
                     ></textarea>
@@ -103,14 +103,14 @@
 
                     <div class="fb__tokens">
                         <button v-for="name in visibleNames" :key="name" type="button" class="fb__token" @click="insert('{' + name + '}')">{{ '{' + name + '}' }}</button>
-                        <span v-if="hiddenNameCount" class="fb__token fb__token--more">{{ $t('FieldsV2.more_fields', { count: hiddenNameCount }) }}</span>
+                        <span v-if="hiddenNameCount" class="fb__token fb__token--more">{{ $t('Fields.more_fields', { count: hiddenNameCount }) }}</span>
                     </div>
                     <div class="fb__tokens">
                         <button v-for="fn in functionNames" :key="fn" type="button" class="fb__token fb__token--fn" @click="insert(fn + '(')">{{ fn }}</button>
                     </div>
 
                     <div v-if="preview.value !== null" class="fb__preview">
-                        <strong>{{ $t('FieldsV2.preview') }}</strong>
+                        <strong>{{ $t('Fields.preview') }}</strong>
                         <span class="fb__preview-value">{{ preview.value }}</span>
                     </div>
                     <div v-else-if="preview.error" class="fb__warn">{{ preview.error }}</div>
@@ -118,48 +118,48 @@
 
                 <template v-if="draft.fieldType === 'rollup'">
                     <div class="ah-field">
-                        <label class="ah-field__label" for="fb-rollup-src">{{ $t('FieldsV2.rollup_source') }}</label>
+                        <label class="ah-field__label" for="fb-rollup-src">{{ $t('Fields.rollup_source') }}</label>
                         <select id="fb-rollup-src" v-model="draft.rollupSourceFieldId" class="ah-input">
-                            <option value="">{{ $t('FieldsV2.rollup_source_count') }}</option>
+                            <option value="">{{ $t('Fields.rollup_source_count') }}</option>
                             <option v-for="field in numericFields" :key="field._id" :value="field._id">{{ field.fieldTitle }}</option>
                         </select>
                     </div>
                     <div class="ah-field">
-                        <label class="ah-field__label">{{ $t('FieldsV2.rollup_function') }}</label>
+                        <label class="ah-field__label">{{ $t('Fields.rollup_function') }}</label>
                         <div class="fb__seg">
                             <button v-for="fn in rollupFunctions" :key="fn" type="button" :class="{ 'is-active': draft.rollupFunction === fn }" @click="draft.rollupFunction = fn">{{ fn.toUpperCase() }}</button>
                         </div>
                     </div>
                     <div class="ah-field">
-                        <label class="ah-field__label">{{ $t('FieldsV2.rollup_scope') }}</label>
+                        <label class="ah-field__label">{{ $t('Fields.rollup_scope') }}</label>
                         <div class="fb__seg">
-                            <button type="button" :class="{ 'is-active': draft.rollupScope !== 'sprint' }" @click="draft.rollupScope = 'subtask'">{{ $t('FieldsV2.rollup_scope_subtasks') }}</button>
-                            <button type="button" :class="{ 'is-active': draft.rollupScope === 'sprint' }" @click="draft.rollupScope = 'sprint'">{{ $t('FieldsV2.rollup_scope_sprint') }}</button>
+                            <button type="button" :class="{ 'is-active': draft.rollupScope !== 'sprint' }" @click="draft.rollupScope = 'subtask'">{{ $t('Fields.rollup_scope_subtasks') }}</button>
+                            <button type="button" :class="{ 'is-active': draft.rollupScope === 'sprint' }" @click="draft.rollupScope = 'sprint'">{{ $t('Fields.rollup_scope_sprint') }}</button>
                         </div>
                     </div>
                 </template>
 
                 <div v-if="isComputed(draft)">
-                    <div class="ah-field__label" style="margin-bottom: 5px">{{ $t('FieldsV2.show_as') }}</div>
+                    <div class="ah-field__label" style="margin-bottom: 5px">{{ $t('Fields.show_as') }}</div>
                     <div class="fb__seg">
-                        <button v-for="format in displayFormats" :key="format" type="button" :class="{ 'is-active': draft.fieldValidation === format }" @click="draft.fieldValidation = format">{{ $t('FieldsV2.format_' + format) }}</button>
+                        <button v-for="format in displayFormats" :key="format" type="button" :class="{ 'is-active': draft.fieldValidation === format }" @click="draft.fieldValidation = format">{{ $t('Fields.format_' + format) }}</button>
                     </div>
                 </div>
 
-                <div class="fb__warn">{{ isComputed(draft) ? $t('FieldsV2.formula_rules') : $t('FieldsV2.plain_field_note') }}</div>
+                <div class="fb__warn">{{ isComputed(draft) ? $t('Fields.formula_rules') : $t('Fields.plain_field_note') }}</div>
 
                 <div class="fb__panel-foot">
                     <button type="button" class="ah-btn ah-btn--primary fb__save" :disabled="saving" @click="save">
-                        {{ saving ? $t('FieldsV2.saving') : $t('FieldsV2.save_field') }}
+                        {{ saving ? $t('Fields.saving') : $t('Fields.save_field') }}
                     </button>
-                    <button v-if="draft.fieldType === 'formula'" type="button" class="ah-btn ah-btn--secondary" :disabled="testing" @click="test">{{ $t('FieldsV2.test') }}</button>
-                    <button type="button" class="ah-btn ah-btn--ghost" @click="closeDraft">{{ $t('FieldsV2.cancel') }}</button>
+                    <button v-if="draft.fieldType === 'formula'" type="button" class="ah-btn ah-btn--secondary" :disabled="testing" @click="test">{{ $t('Fields.test') }}</button>
+                    <button type="button" class="ah-btn ah-btn--ghost" @click="closeDraft">{{ $t('Fields.cancel') }}</button>
                 </div>
             </template>
 
             <div v-else class="fb__empty-panel">
-                <div class="ah-label">{{ $t('FieldsV2.editor') }}</div>
-                <div class="ah-empty">{{ $t('FieldsV2.editor_empty') }}</div>
+                <div class="ah-label">{{ $t('Fields.editor') }}</div>
+                <div class="ah-empty">{{ $t('Fields.editor_empty') }}</div>
             </div>
         </aside>
 
@@ -205,17 +205,17 @@ const rollupFunctions = ["sum", "avg", "count", "min", "max"];
 const functionNames = ["IF", "ROUND", "SUM", "AVG", "MIN", "MAX", "COUNT"];
 
 const typeOptions = [
-    { key: "text", label: t("FieldsV2.type_text"), hint: t("FieldsV2.hint_text") },
-    { key: "textarea", label: t("FieldsV2.type_long_text"), hint: t("FieldsV2.hint_long_text") },
-    { key: "number", label: t("FieldsV2.type_number"), hint: t("FieldsV2.hint_number") },
-    { key: "money", label: t("FieldsV2.type_money"), hint: t("FieldsV2.hint_money") },
-    { key: "date", label: t("FieldsV2.type_date"), hint: t("FieldsV2.hint_date") },
-    { key: "dropdown", label: t("FieldsV2.type_dropdown"), hint: t("FieldsV2.hint_dropdown") },
-    { key: "checkbox", label: t("FieldsV2.type_checkbox"), hint: t("FieldsV2.hint_checkbox") },
-    { key: "email", label: t("FieldsV2.type_email"), hint: t("FieldsV2.hint_email") },
-    { key: "phone", label: t("FieldsV2.type_phone"), hint: t("FieldsV2.hint_phone") },
-    { key: "formula", label: t("FieldsV2.type_formula"), hint: t("FieldsV2.hint_formula"), computed: true },
-    { key: "rollup", label: t("FieldsV2.type_rollup"), hint: t("FieldsV2.hint_rollup"), computed: true }
+    { key: "text", label: t("Fields.type_text"), hint: t("Fields.hint_text") },
+    { key: "textarea", label: t("Fields.type_long_text"), hint: t("Fields.hint_long_text") },
+    { key: "number", label: t("Fields.type_number"), hint: t("Fields.hint_number") },
+    { key: "money", label: t("Fields.type_money"), hint: t("Fields.hint_money") },
+    { key: "date", label: t("Fields.type_date"), hint: t("Fields.hint_date") },
+    { key: "dropdown", label: t("Fields.type_dropdown"), hint: t("Fields.hint_dropdown") },
+    { key: "checkbox", label: t("Fields.type_checkbox"), hint: t("Fields.hint_checkbox") },
+    { key: "email", label: t("Fields.type_email"), hint: t("Fields.hint_email") },
+    { key: "phone", label: t("Fields.type_phone"), hint: t("Fields.hint_phone") },
+    { key: "formula", label: t("Fields.type_formula"), hint: t("Fields.hint_formula"), computed: true },
+    { key: "rollup", label: t("Fields.type_rollup"), hint: t("Fields.hint_rollup"), computed: true }
 ];
 
 const selectedId = ref("");
@@ -250,13 +250,13 @@ const isRequired = (field) => Array.isArray(field?.fieldRequired) && field.field
 const typeLabel = (key) => (typeOptions.find((option) => option.key === key) || {}).label || key;
 
 const shownIn = (field) => {
-    if (field.fieldType === "formula") return field.formulaExpression || t("FieldsV2.no_expression");
+    if (field.fieldType === "formula") return field.formulaExpression || t("Fields.no_expression");
     if (field.fieldType === "rollup") {
         const source = fields.value.find((entry) => entry._id === field.rollupSourceFieldId);
-        return `${String(field.rollupFunction || "sum").toUpperCase()} ${t("FieldsV2.of")} ${source ? source.fieldTitle : t("FieldsV2.rollup_scope_subtasks")}`;
+        return `${String(field.rollupFunction || "sum").toUpperCase()} ${t("Fields.of")} ${source ? source.fieldTitle : t("Fields.rollup_scope_subtasks")}`;
     }
     const surfaces = Array.isArray(field.fieldSurfaces) && field.fieldSurfaces.length ? field.fieldSurfaces : ["task_view"];
-    return surfaces.map((surface) => t(`FieldsV2.surface_${surface}`)).join(" · ");
+    return surfaces.map((surface) => t(`Fields.surface_${surface}`)).join(" · ");
 };
 
 // The global type catalogue is empty on a fresh install, and the legacy drawer
@@ -377,12 +377,12 @@ async function test() {
 
 function validate() {
     const next = {};
-    if (!draft.value.fieldTitle) next.fieldTitle = t("FieldsV2.error_title_required");
+    if (!draft.value.fieldTitle) next.fieldTitle = t("Fields.error_title_required");
     else if (fields.value.some((field) => field._id !== draft.value._id && slugOf(field.fieldTitle) === slugOf(draft.value.fieldTitle))) {
-        next.fieldTitle = t("FieldsV2.error_title_taken");
+        next.fieldTitle = t("Fields.error_title_taken");
     }
     if (draft.value.fieldType === "formula" && !String(draft.value.formulaExpression || "").trim()) {
-        next.formulaExpression = t("FieldsV2.error_expression_required");
+        next.formulaExpression = t("Fields.error_expression_required");
     }
     errors.value = next;
     return !Object.keys(next).length;

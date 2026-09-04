@@ -8,7 +8,7 @@
             <span class="attrib__name">{{ name }}</span>
             <span v-if="sub" class="attrib__sub">{{ sub }}</span>
         </span>
-        <span class="attrib__tag ah-mono" :class="`attrib__tag--${kind}`">{{ $t(`AccountsV2.tag_${kind}`) }}</span>
+        <span class="attrib__tag ah-mono" :class="`attrib__tag--${kind}`">{{ $t(`Accounts.tag_${kind}`) }}</span>
     </span>
 </template>
 
@@ -39,9 +39,9 @@ const kind = computed(() => {
 const name = computed(() => {
     const a = props.attribution || {};
     if (a.label) return a.label;
-    if (kind.value === "human") return a.personName || t("AccountsV2.attrib_member");
-    if (kind.value === "personal" && a.onBehalfOf) return t("AccountsV2.attrib_via", { who: a.personName || t("AccountsV2.attrib_member"), tool: a.agentName || a.provider || t("AccountsV2.attrib_agent") });
-    return a.agentName || t("AccountsV2.attrib_agent");
+    if (kind.value === "human") return a.personName || t("Accounts.attrib_member");
+    if (kind.value === "personal" && a.onBehalfOf) return t("Accounts.attrib_via", { who: a.personName || t("Accounts.attrib_member"), tool: a.agentName || a.provider || t("Accounts.attrib_agent") });
+    return a.agentName || t("Accounts.attrib_agent");
 });
 
 const initial = computed(() => String(name.value || "?").trim().charAt(0).toUpperCase() || "?");

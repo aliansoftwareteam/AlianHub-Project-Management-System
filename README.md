@@ -62,7 +62,7 @@ curl -O https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Man
 # Set JWT_SECRET (required) — see .env.example for full env-var reference
 echo "JWT_SECRET=$(openssl rand -hex 32)" > .env
 docker compose up -d
-# AlianHub running at http://localhost:4000 — the first visit opens the setup page
+# AlianHub running at http://localhost:4000
 ```
 
 Update to a newer version later:
@@ -81,10 +81,19 @@ cd AlianHub-Project-Management-System
 npm run setup
 ```
 
-That's it. `npm run setup` installs dependencies, writes a `.env` with random
-secrets, builds the web app once, starts the server and opens
-`http://localhost:4000/#/setup`, where you create **your own** owner account and
-workspace. Afterwards `npm start` is all you need.
+That's it. `npm run setup` will:
+
+1. Install all dependencies (root and frontend) in parallel
+2. Generate a `.env` file with secure random secrets
+3. Start the server (the same entry production uses)
+4. Open `http://localhost:4000` in your browser
+
+On an empty database the app opens its **first-run setup** (`/setup`): create
+your own owner account and company, optionally with sample data. Mail, storage,
+AI and sign-in providers are configured afterwards from **Settings → Instance**
+(product owners only) or through environment variables — see
+[docs/ENV.md](docs/ENV.md) for every variable and
+[docs/ADMIN-GUIDE.md](docs/ADMIN-GUIDE.md) for the operator walkthrough.
 
 **Prerequisite:** MongoDB running locally on `mongodb://localhost:27017`. If you don't have it: `docker run -d -p 27017:27017 mongo:7` or download from [mongodb.com](https://www.mongodb.com/try/download/community).
 
@@ -92,14 +101,14 @@ workspace. Afterwards `npm start` is all you need.
 
 | Command | What it does |
 |---------|--------------|
-| `npm run setup` | Install deps, prepare `.env`, build the web app, and start the server |
+| `npm run setup` | Install deps, prepare `.env`, and start the server |
 | `npm run dev` | Same as setup but skips dependency install |
 | `npm run setup:reset` | Wipe `node_modules` and reinstall everything |
 | `npm run setup -- --no-open` | Start without auto-opening a browser |
+| `npm test` / `npm run lint` | Jest (unit + conventions) / ESLint — the CI gate |
+| `cd frontend && npm test` | Vitest component specs |
 
-> For active development with hot-reload, run the backend (`npm run nodemon`) and the frontend dev server (`cd frontend && npm run serve`) separately once the system is installed.
->
-> Configuration (mail, storage, AI, sign-in), HTTPS, upgrades, backups and troubleshooting are covered in the **[admin guide](docs/ADMIN-GUIDE.md)**; the same pages are linked from **Settings › Instance** inside the app.
+> For active development with hot-reload, run the backend (`npm run nodemon`) and the frontend dev server (`cd frontend && npm run serve`) separately. Developers: [docs/DEVELOPER-GUIDE.md](docs/DEVELOPER-GUIDE.md).
 
 ---
 

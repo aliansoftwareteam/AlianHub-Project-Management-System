@@ -16,17 +16,17 @@
         </div>
 
         <div v-if="transcript" class="mc-note-transcript">
-            <span class="mc-note-label">{{ $t('ChatV2.transcript') }}</span>
+            <span class="mc-note-label">{{ $t('Chat.transcript') }}</span>
             “{{ transcript }}”
         </div>
 
         <div v-if="!compact && !message.isSending" class="mc-note-acts">
             <template v-if="transcript">
-                <button type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="$emit('make-task', { message, text: transcript })">{{ $t('ChatV2.make_task') }}</button>
-                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="copy">{{ $t('ChatV2.copy_text') }}</button>
+                <button type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="$emit('make-task', { message, text: transcript })">{{ $t('Chat.make_task') }}</button>
+                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="copy">{{ $t('Chat.copy_text') }}</button>
             </template>
             <button v-else type="button" class="ah-btn ah-btn--outline ah-btn--sm" :disabled="busy || !src" @click="transcribe">
-                {{ busy ? $t('ChatV2.transcribing') : $t('ChatV2.transcribe') }}
+                {{ busy ? $t('Chat.transcribing') : $t('Chat.transcribe') }}
             </button>
             <span v-if="error" class="ah-field__error">{{ error }}</span>
         </div>
@@ -152,7 +152,7 @@ async function transcribe() {
         const body = res && res.data;
         const text = body && body.status && body.data && typeof body.data.text === 'string' ? body.data.text.trim() : '';
         if (!text) {
-            error.value = (body && body.statusText) || t('ChatV2.transcribe_failed');
+            error.value = (body && body.statusText) || t('Chat.transcribe_failed');
             return;
         }
         transcript.value = text;
@@ -166,7 +166,7 @@ async function transcribe() {
         }
         emit('transcribed', { message: props.message, text });
     } catch (e) {
-        error.value = (e && e.response && e.response.data && e.response.data.statusText) || t('ChatV2.transcribe_failed');
+        error.value = (e && e.response && e.response.data && e.response.data.statusText) || t('Chat.transcribe_failed');
     } finally {
         busy.value = false;
     }
@@ -174,7 +174,7 @@ async function transcribe() {
 
 function copy() {
     navigator.clipboard.writeText(transcript.value || '')
-        .then(() => $toast.success(t('ChatV2.copied'), { position: 'top-right' }))
+        .then(() => $toast.success(t('Chat.copied'), { position: 'top-right' }))
         .catch(() => $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' }));
 }
 </script>

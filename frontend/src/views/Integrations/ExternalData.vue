@@ -1,11 +1,11 @@
 <template>
     <div class="ah-page xd">
         <header class="ah-toolbar">
-            <div class="ah-toolbar__title">{{ $t('ProvenanceV2.ext_title') }}</div>
-            <span class="ah-mono xd__meta">{{ $t('ProvenanceV2.ext_meta', { sources: liveSources.length, agents: agentCount }) }}</span>
+            <div class="ah-toolbar__title">{{ $t('Provenance.ext_title') }}</div>
+            <span class="ah-mono xd__meta">{{ $t('Provenance.ext_meta', { sources: liveSources.length, agents: agentCount }) }}</span>
             <div class="ah-toolbar__spacer"></div>
             <router-link class="ah-btn ah-btn--secondary ah-btn--sm" :to="{ name: 'IntegrationsHub', params: { cid } }">
-                <ShellIcon name="plus" :size="14" />{{ $t('ProvenanceV2.ext_connect') }}
+                <ShellIcon name="plus" :size="14" />{{ $t('Provenance.ext_connect') }}
             </router-link>
         </header>
 
@@ -14,8 +14,8 @@
 
             <section class="ah-card xd__card">
                 <div class="ah-card__head">
-                    <strong>{{ $t('ProvenanceV2.ext_sources') }}</strong>
-                    <span class="ah-small ah-muted xd__sub">{{ $t('ProvenanceV2.ext_sources_sub') }}</span>
+                    <strong>{{ $t('Provenance.ext_sources') }}</strong>
+                    <span class="ah-small ah-muted xd__sub">{{ $t('Provenance.ext_sources_sub') }}</span>
                 </div>
                 <div class="ah-card__body xd__rows">
                     <div v-for="source in sources" :key="source.key" class="xd__row" :class="{ 'xd__row--off': !source.live }">
@@ -27,25 +27,25 @@
                         <span v-if="source.live" class="xd__state">
                             <span class="ah-dot ah-dot--ok"></span>{{ source.since }}
                         </span>
-                        <router-link v-else class="xd__link" :to="{ name: 'IntegrationsHub', params: { cid } }">{{ $t('ProvenanceV2.ext_not_connected') }}</router-link>
+                        <router-link v-else class="xd__link" :to="{ name: 'IntegrationsHub', params: { cid } }">{{ $t('Provenance.ext_not_connected') }}</router-link>
                     </div>
-                    <p class="xd__note">{{ $t('ProvenanceV2.ext_no_mirror') }}</p>
+                    <p class="xd__note">{{ $t('Provenance.ext_no_mirror') }}</p>
                 </div>
             </section>
 
             <section class="ah-card xd__card xd__card--agents">
                 <div class="ah-card__head">
-                    <strong>{{ $t('ProvenanceV2.ext_hand_off') }}</strong>
-                    <span class="ah-chip ah-chip--brand ah-chip--mono xd__tag">{{ $t('ProvenanceV2.ext_external') }}</span>
+                    <strong>{{ $t('Provenance.ext_hand_off') }}</strong>
+                    <span class="ah-chip ah-chip--brand ah-chip--mono xd__tag">{{ $t('Provenance.ext_external') }}</span>
                 </div>
                 <div class="ah-card__body xd__rows">
                     <div class="xd__row xd__row--bordered">
                         <span class="xd__mark xd__mark--dark">MCP</span>
                         <div class="xd__id">
-                            <div class="xd__name">{{ $t('ProvenanceV2.ext_mcp_name') }}</div>
+                            <div class="xd__name">{{ $t('Provenance.ext_mcp_name') }}</div>
                             <div class="xd__desc ah-mono">{{ mcpUrl }}</div>
                         </div>
-                        <span class="ah-small ah-muted">{{ $t('ProvenanceV2.ext_tools', { n: tools.length }) }}</span>
+                        <span class="ah-small ah-muted">{{ $t('Provenance.ext_tools', { n: tools.length }) }}</span>
                     </div>
                     <div v-if="tools.length" class="xd__tools">
                         <span v-for="tool in tools" :key="tool" class="ah-chip ah-chip--mono">{{ tool }}</span>
@@ -55,43 +55,43 @@
                         <span class="xd__mark xd__mark--dark">◉</span>
                         <div class="xd__id">
                             <div class="xd__name">{{ account.label || account.provider }}</div>
-                            <div class="xd__desc">{{ $t('ProvenanceV2.ext_account_sub', { mode: account.mode }) }}</div>
+                            <div class="xd__desc">{{ $t('Provenance.ext_account_sub', { mode: account.mode }) }}</div>
                         </div>
-                        <span class="ah-small ah-muted">{{ $t('ProvenanceV2.ext_month', { tasks: summary.tasksWorked || 0, hours: summary.agentHours || 0, prs: summary.prsOpened || 0 }) }}</span>
+                        <span class="ah-small ah-muted">{{ $t('Provenance.ext_month', { tasks: summary.tasksWorked || 0, hours: summary.agentHours || 0, prs: summary.prsOpened || 0 }) }}</span>
                     </div>
                     <div v-else class="xd__row xd__row--bordered">
                         <span class="xd__mark">◉</span>
                         <div class="xd__id">
-                            <div class="xd__name">{{ $t('ProvenanceV2.ext_no_account') }}</div>
-                            <div class="xd__desc">{{ $t('ProvenanceV2.ext_no_account_sub') }}</div>
+                            <div class="xd__name">{{ $t('Provenance.ext_no_account') }}</div>
+                            <div class="xd__desc">{{ $t('Provenance.ext_no_account_sub') }}</div>
                         </div>
-                        <router-link v-if="hasConnections" class="xd__link" :to="{ name: 'Connections', params: { cid } }">{{ $t('ProvenanceV2.ext_link_account') }}</router-link>
+                        <router-link v-if="hasConnections" class="xd__link" :to="{ name: 'Connections', params: { cid } }">{{ $t('Provenance.ext_link_account') }}</router-link>
                     </div>
 
                     <div v-for="agent in agents" :key="agent._id" class="xd__row xd__row--bordered">
                         <span class="xd__mark xd__mark--agent">◉</span>
                         <div class="xd__id">
                             <div class="xd__name">{{ agent.name }}</div>
-                            <div class="xd__desc">{{ $t('ProvenanceV2.ext_agent_sub', { account: agent.account || 'workspace' }) }}</div>
+                            <div class="xd__desc">{{ $t('Provenance.ext_agent_sub', { account: agent.account || 'workspace' }) }}</div>
                         </div>
-                        <span v-if="agent.paused" class="ah-chip ah-chip--warn">{{ $t('ProvenanceV2.ext_paused') }}</span>
+                        <span v-if="agent.paused" class="ah-chip ah-chip--warn">{{ $t('Provenance.ext_paused') }}</span>
                     </div>
 
                     <div v-if="recentRuns.length" class="xd__runs">
                         <div v-for="run in recentRuns" :key="run._id" class="xd__run">
-                            <strong>{{ $t('ProvenanceV2.ext_handed', { agent: run.agentName || $t('ProvenanceV2.an_agent'), when: fromNow(run.startedAt) }) }}</strong>
+                            <strong>{{ $t('Provenance.ext_handed', { agent: run.agentName || $t('Provenance.an_agent'), when: fromNow(run.startedAt) }) }}</strong>
                         </div>
-                        <p class="xd__run-note">{{ $t('ProvenanceV2.ext_handed_note') }}</p>
+                        <p class="xd__run-note">{{ $t('Provenance.ext_handed_note') }}</p>
                     </div>
 
                     <div v-if="never.length" class="xd__never">
-                        <div class="ah-label">{{ $t('ProvenanceV2.ext_never') }}</div>
+                        <div class="ah-label">{{ $t('Provenance.ext_never') }}</div>
                         <div class="xd__tools">
                             <span v-for="item in never" :key="item" class="ah-chip ah-chip--mono">{{ item }}</span>
                         </div>
                     </div>
 
-                    <p class="xd__note">{{ $t('ProvenanceV2.ext_same_treatment') }}</p>
+                    <p class="xd__note">{{ $t('Provenance.ext_same_treatment') }}</p>
                 </div>
             </section>
         </div>
@@ -154,7 +154,7 @@ const sources = computed(() => catalog.value.map((item) => {
         glyph: item.icon,
         reads: item.description,
         live,
-        since: conn && conn.connectedAt ? fromNow(conn.connectedAt) : t("ProvenanceV2.ext_connected")
+        since: conn && conn.connectedAt ? fromNow(conn.connectedAt) : t("Provenance.ext_connected")
     };
 }));
 

@@ -1,13 +1,13 @@
 <template>
     <teleport to="body">
         <div v-if="modelValue" class="imd__overlay" @click.self="close()">
-            <div class="imd__card" role="dialog" aria-modal="true" :aria-label="$t('ProjectsV2.import_title')">
+            <div class="imd__card" role="dialog" aria-modal="true" :aria-label="$t('Projects.import_title')">
                 <div class="imd__head">
                     <div>
-                        <h2 class="ah-h2 imd__title">{{ $t('ProjectsV2.import_title') }}</h2>
-                        <p class="ah-muted ah-small imd__lead">{{ $t('ProjectsV2.import_lead') }}</p>
+                        <h2 class="ah-h2 imd__title">{{ $t('Projects.import_title') }}</h2>
+                        <p class="ah-muted ah-small imd__lead">{{ $t('Projects.import_lead') }}</p>
                     </div>
-                    <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :aria-label="$t('ProjectsV2.close')" @click="close()">
+                    <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :aria-label="$t('Projects.close')" @click="close()">
                         <ShellIcon name="x" :size="16" />
                     </button>
                 </div>
@@ -15,8 +15,8 @@
                     <button v-for="source in SOURCES" :key="source.key" type="button" class="ah-card imd__source" @click="pick(source.key)">
                         <span class="imd__mark" :style="{ background: source.tint }">{{ source.mark }}</span>
                         <span class="imd__text">
-                            <strong>{{ $t(`ProjectsV2.import_${source.key}_title`) }}</strong>
-                            <span class="ah-small ah-muted">{{ $t(`ProjectsV2.import_${source.key}_desc`) }}</span>
+                            <strong>{{ $t(`Projects.import_${source.key}_title`) }}</strong>
+                            <span class="ah-small ah-muted">{{ $t(`Projects.import_${source.key}_desc`) }}</span>
                         </span>
                         <ShellIcon name="chevronRight" :size="14" class="imd__chev" />
                     </button>

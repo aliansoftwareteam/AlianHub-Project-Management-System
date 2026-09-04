@@ -12,13 +12,13 @@
                     :aria-selected="tab === t"
                     @click="switchTab(t)"
                 >
-                    <span>{{ $t('InboxV2.tab_' + t) }}</span>
+                    <span>{{ $t('Inbox.tab_' + t) }}</span>
                     <span v-if="tabCount(t)" class="ibx__navcount">{{ tabCount(t) > 99 ? '99+' : tabCount(t) }}</span>
                 </button>
             </nav>
 
             <div class="ibx__filters">
-                <div class="ah-label ibx__label">{{ $t('InboxV2.filter_label') }}</div>
+                <div class="ah-label ibx__label">{{ $t('Inbox.filter_label') }}</div>
                 <button
                     v-for="k in KINDS"
                     :key="k"
@@ -26,10 +26,10 @@
                     class="ibx__navitem ibx__navitem--kind"
                     :class="{ 'is-active': kind === k }"
                     @click="switchKind(k)"
-                >{{ $t('InboxV2.kind_' + k) }}</button>
+                >{{ $t('Inbox.kind_' + k) }}</button>
             </div>
 
-            <div class="ibx__side-foot">{{ $t('InboxV2.footer_note') }}</div>
+            <div class="ibx__side-foot">{{ $t('Inbox.footer_note') }}</div>
         </aside>
 
         <main class="ibx__main">
@@ -44,7 +44,7 @@
                         :class="{ 'is-active': tab === t }"
                         role="tab"
                         @click="switchTab(t)"
-                    >{{ $t('InboxV2.tab_' + t) }} <span v-if="tabCount(t)" class="ibx__tabcount">{{ tabCount(t) }}</span></button>
+                    >{{ $t('Inbox.tab_' + t) }} <span v-if="tabCount(t)" class="ibx__tabcount">{{ tabCount(t) }}</span></button>
                 </div>
                 <span class="ah-toolbar__spacer"></span>
                 <span class="ibx__keys ah-mono">j k e</span>
@@ -54,7 +54,7 @@
                     class="ibx__markall"
                     :disabled="busy || !hasUnread"
                     @click="markAllRead"
-                >{{ $t('InboxV2.mark_all_read') }}</button>
+                >{{ $t('Inbox.mark_all_read') }}</button>
             </div>
 
             <div ref="listEl" class="ibx__list ah-scroll">
@@ -67,9 +67,9 @@
 
                 <div v-else-if="!rows.length" class="ibx__zero">
                     <span class="ibx__zero-mark"><ShellIcon name="check" :size="22" /></span>
-                    <div class="ibx__zero-title">{{ $t('InboxV2.zero_' + tab) }}</div>
-                    <div class="ibx__zero-sub">{{ $t('InboxV2.zero_sub_' + tab) }}</div>
-                    <button v-if="tab !== 'primary'" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="switchTab('primary')">{{ $t('InboxV2.back_to_primary') }}</button>
+                    <div class="ibx__zero-title">{{ $t('Inbox.zero_' + tab) }}</div>
+                    <div class="ibx__zero-sub">{{ $t('Inbox.zero_sub_' + tab) }}</div>
+                    <button v-if="tab !== 'primary'" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="switchTab('primary')">{{ $t('Inbox.back_to_primary') }}</button>
                 </div>
 
                 <template v-else>
@@ -92,18 +92,18 @@
 
                             <span class="ibx__what">
                                 <template v-if="it.kind === 'approval'">
-                                    <strong>{{ actorName(it) || $t('InboxV2.someone') }}</strong> {{ $t('InboxV2.requested_off', { range: dateRange(it) }) }}
-                                    <span class="ibx__dim">· {{ $t('InboxV2.needs_your_approval') }}</span>
+                                    <strong>{{ actorName(it) || $t('Inbox.someone') }}</strong> {{ $t('Inbox.requested_off', { range: dateRange(it) }) }}
+                                    <span class="ibx__dim">· {{ $t('Inbox.needs_your_approval') }}</span>
                                 </template>
                                 <template v-else-if="it.kind === 'proposal'">
-                                    <strong>{{ it.agentName }}</strong> {{ $t('InboxV2.wants_to') }} {{ it.what }}
-                                    <span class="ibx__dim">· {{ $t('InboxV2.needs_your_approval') }}</span>
+                                    <strong>{{ it.agentName }}</strong> {{ $t('Inbox.wants_to') }} {{ it.what }}
+                                    <span class="ibx__dim">· {{ $t('Inbox.needs_your_approval') }}</span>
                                 </template>
                                 <template v-else-if="it.kind === 'reminder'">
-                                    <strong>{{ $t('InboxV2.reminder') }}</strong> <span class="ibx__dim">· {{ it.unread ? $t('InboxV2.due_now') : $t('InboxV2.done') }}</span>
+                                    <strong>{{ $t('Inbox.reminder') }}</strong> <span class="ibx__dim">· {{ it.unread ? $t('Inbox.due_now') : $t('Inbox.done') }}</span>
                                 </template>
                                 <template v-else-if="it.kind === 'mention'">
-                                    <strong>{{ actorName(it) || $t('InboxV2.someone') }}</strong> {{ it.mainChat ? $t('InboxV2.mentioned_you_chat') : $t('InboxV2.mentioned_you') }}
+                                    <strong>{{ actorName(it) || $t('Inbox.someone') }}</strong> {{ it.mainChat ? $t('Inbox.mentioned_you_chat') : $t('Inbox.mentioned_you') }}
                                 </template>
                                 <template v-else>
                                     <strong v-if="actorName(it)">{{ actorName(it) }}</strong>
@@ -120,7 +120,7 @@
                                 <span v-if="it.reason" class="ibx__quote">"{{ it.reason }}"</span>
                             </template>
                             <template v-else-if="it.kind === 'proposal'">
-                                <span class="ah-chip ah-chip--agent ibx__chip">{{ $t('InboxV2.changes_n', { n: it.changes }) }}</span>
+                                <span class="ah-chip ah-chip--agent ibx__chip">{{ $t('Inbox.changes_n', { n: it.changes }) }}</span>
                                 <span v-if="it.why" class="ibx__quote">"{{ it.why }}"</span>
                             </template>
                             <template v-else-if="it.kind === 'mention'">
@@ -140,7 +140,7 @@
                                 class="ah-input ah-textarea ibx__reply-input"
                                 :class="{ 'ah-input--error': replyError }"
                                 rows="2"
-                                :placeholder="$t('InboxV2.reply_placeholder', { name: actorName(it) || $t('InboxV2.someone') })"
+                                :placeholder="$t('Inbox.reply_placeholder', { name: actorName(it) || $t('Inbox.someone') })"
                                 @keydown.stop="onReplyKey($event, it)"
                             ></textarea>
                             <div v-if="replyError" class="ah-field__error">{{ replyError }}</div>
@@ -148,39 +148,39 @@
                                 <span class="ah-small ah-mono">⌘↵</span>
                                 <span class="ah-toolbar__spacer"></span>
                                 <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="closeReply">{{ $t('Projects.cancel') }}</button>
-                                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy || !replyText.trim()" @click="sendReply(it)">{{ $t('InboxV2.send') }}</button>
+                                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy || !replyText.trim()" @click="sendReply(it)">{{ $t('Inbox.send') }}</button>
                             </div>
                         </div>
 
                         <div class="ibx__actions" @click.stop>
                             <template v-if="it.kind === 'approval'">
-                                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy" @click="decide(it, 'approved')">{{ $t('InboxV2.approve') }}</button>
-                                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="decide(it, 'rejected')">{{ $t('InboxV2.decline') }}</button>
+                                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy" @click="decide(it, 'approved')">{{ $t('Inbox.approve') }}</button>
+                                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="decide(it, 'rejected')">{{ $t('Inbox.decline') }}</button>
                             </template>
                             <template v-else-if="it.kind === 'proposal'">
-                                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy" @click="decideProposal(it, 'approve')">{{ $t('InboxV2.approve') }}</button>
-                                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="decideProposal(it, 'decline')">{{ $t('InboxV2.decline') }}</button>
-                                <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="openAiInbox">{{ $t('InboxV2.open_ai_inbox') }}</button>
+                                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy" @click="decideProposal(it, 'approve')">{{ $t('Inbox.approve') }}</button>
+                                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="decideProposal(it, 'decline')">{{ $t('Inbox.decline') }}</button>
+                                <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="openAiInbox">{{ $t('Inbox.open_ai_inbox') }}</button>
                             </template>
                             <template v-else-if="it.kind === 'reminder'">
-                                <button v-if="it.unread" type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy" @click="markDone(it)">{{ $t('InboxV2.done') }}</button>
-                                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="openReminders">{{ $t('InboxV2.open_reminders') }}</button>
+                                <button v-if="it.unread" type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy" @click="markDone(it)">{{ $t('Inbox.done') }}</button>
+                                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="openReminders">{{ $t('Inbox.open_reminders') }}</button>
                             </template>
                             <template v-else-if="it.agent">
-                                <button v-if="hasAiHub" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="reviewInAiInbox">{{ $t('InboxV2.review_ai_inbox') }}</button>
-                                <button v-if="it.unread" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="markDone(it)">{{ $t('InboxV2.mark_done') }}</button>
+                                <button v-if="hasAiHub" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="reviewInAiInbox">{{ $t('Inbox.review_ai_inbox') }}</button>
+                                <button v-if="it.unread" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="markDone(it)">{{ $t('Inbox.mark_done') }}</button>
                             </template>
                             <template v-else-if="it.kind === 'mention'">
-                                <button v-if="!isExpanded(it) && canReply(it)" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="openReply(it)">{{ $t('InboxV2.reply_here') }}</button>
-                                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="open(it)">{{ it.mainChat ? $t('InboxV2.open_chat') : $t('InboxV2.open_task') }}</button>
+                                <button v-if="!isExpanded(it) && canReply(it)" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="openReply(it)">{{ $t('Inbox.reply_here') }}</button>
+                                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="open(it)">{{ it.mainChat ? $t('Inbox.open_chat') : $t('Inbox.open_task') }}</button>
                             </template>
                             <template v-else>
-                                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="open(it)">{{ $t('InboxV2.open') }}</button>
+                                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="open(it)">{{ $t('Inbox.open') }}</button>
                             </template>
 
-                            <button v-if="it.kind !== 'approval' && tab !== 'later' && it.unread" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="snooze(it)">{{ $t('InboxV2.later') }}</button>
-                            <button v-if="tab === 'later'" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="unsnooze(it)">{{ $t('InboxV2.back_to_primary') }}</button>
-                            <button v-if="it.kind !== 'approval' && it.kind !== 'reminder' && !it.agent && it.unread" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="busy" @click="markDone(it)">{{ $t('InboxV2.mark_done') }}</button>
+                            <button v-if="it.kind !== 'approval' && tab !== 'later' && it.unread" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="snooze(it)">{{ $t('Inbox.later') }}</button>
+                            <button v-if="tab === 'later'" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="unsnooze(it)">{{ $t('Inbox.back_to_primary') }}</button>
+                            <button v-if="it.kind !== 'approval' && it.kind !== 'reminder' && !it.agent && it.unread" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="busy" @click="markDone(it)">{{ $t('Inbox.mark_done') }}</button>
                             <button v-if="!it.unread && it.kind !== 'approval'" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="busy" @click="markUnread(it)">{{ $t('Inbox.mark_unread') }}</button>
                         </div>
                     </article>
@@ -190,13 +190,13 @@
                     </button>
                 </template>
 
-                <div class="ibx__foot">{{ $t('InboxV2.footer_note') }}</div>
+                <div class="ibx__foot">{{ $t('Inbox.footer_note') }}</div>
             </div>
 
             <transition name="ah-fade">
                 <div v-if="undo" class="ibx__undo" role="status">
                     <span>{{ undo.text }}</span>
-                    <button type="button" class="ibx__undo-btn" @click="runUndo">{{ $t('InboxV2.undo') }}</button>
+                    <button type="button" class="ibx__undo-btn" @click="runUndo">{{ $t('Inbox.undo') }}</button>
                 </div>
             </transition>
         </main>
@@ -428,7 +428,7 @@ const snooze = (it) => {
     later.value = { ...later.value, [rowKey(it)]: Date.now() };
     writeLater();
     removeRow(it);
-    showUndo(t('InboxV2.undo_later'), () => { delete later.value[rowKey(it)]; writeLater(); reload(); });
+    showUndo(t('Inbox.undo_later'), () => { delete later.value[rowKey(it)]; writeLater(); reload(); });
 };
 const unsnooze = (it) => {
     delete later.value[rowKey(it)];
@@ -476,9 +476,9 @@ const decide = async (it, status) => {
     if (!(await setPtoStatus(it.sourceId, status))) return;
     removeRow(it);
     loadCounts();
-    const who = actorName(it) || t('InboxV2.someone');
+    const who = actorName(it) || t('Inbox.someone');
     showUndo(
-        status === 'approved' ? t('InboxV2.undo_approved', { who }) : t('InboxV2.undo_declined', { who }),
+        status === 'approved' ? t('Inbox.undo_approved', { who }) : t('Inbox.undo_declined', { who }),
         async () => { if (await setPtoStatus(it.sourceId, 'pending')) reload(); },
     );
 };
@@ -499,7 +499,7 @@ const onReplyKey = (e, it) => {
 const escapeHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 const sendReply = async (it) => {
     const text = replyText.value.trim();
-    if (!text) { replyError.value = t('InboxV2.reply_empty'); return; }
+    if (!text) { replyError.value = t('Inbox.reply_empty'); return; }
     busy.value = true;
     replyError.value = '';
     try {
@@ -524,7 +524,7 @@ const sendReply = async (it) => {
         if (!res?.data?.status) { replyError.value = res?.data?.statusText || t('Inbox.action_failed'); return; }
         closeReply();
         if (it.unread) await markDone(it);
-        $toast.success(t('InboxV2.reply_sent'), { position: 'top-right' });
+        $toast.success(t('Inbox.reply_sent'), { position: 'top-right' });
     } catch (e) {
         replyError.value = e?.message || t('Inbox.action_failed');
     } finally {

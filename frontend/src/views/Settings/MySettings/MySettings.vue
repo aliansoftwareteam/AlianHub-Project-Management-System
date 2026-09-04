@@ -4,16 +4,16 @@
 
         <section class="ah-card">
             <div class="ah-card__body ms__profile">
-                <button type="button" class="ms__avatar" :aria-label="$t('SettingsV2.change_photo')" @click="openCropperTool()">
+                <button type="button" class="ms__avatar" :aria-label="$t('Settings.change_photo')" @click="openCropperTool()">
                     <img v-if="previewUrl" :src="previewUrl" alt="" class="ms__avatar-img" />
                     <WasabiImage v-else-if="formData.Employee_profileImageURL" class="ms__avatar-img" :data="{ url: formData.Employee_profileImageURL }" :thumbnail="'120x120'" :userImage="true" />
                     <span v-else class="ms__avatar-initial">{{ initial }}</span>
                 </button>
                 <div class="ms__identity">
                     <div class="ms__name">{{ fullName }}</div>
-                    <div class="ah-small">{{ formData.email }} · {{ roleName }}<template v-if="joined"> · {{ $t('SettingsV2.joined', { date: joined }) }}</template></div>
+                    <div class="ah-small">{{ formData.email }} · {{ roleName }}<template v-if="joined"> · {{ $t('Settings.joined', { date: joined }) }}</template></div>
                 </div>
-                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="openCropperTool()">{{ $t('SettingsV2.change_photo') }}</button>
+                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="openCropperTool()">{{ $t('Settings.change_photo') }}</button>
             </div>
             <div class="ah-card__body ms__grid">
                 <div class="ah-field">
@@ -31,8 +31,8 @@
                     <input id="ms-email" class="ah-input" :value="formData.email" type="email" disabled />
                 </div>
                 <div class="ah-field">
-                    <label class="ah-field__label" for="ms-title">{{ $t('SettingsV2.job_title') }}<span class="ah-small">{{ $t('SettingsV2.job_title_hint') }}</span></label>
-                    <input id="ms-title" class="ah-input" :value="designationName || $t('SettingsV2.job_title_none')" type="text" disabled />
+                    <label class="ah-field__label" for="ms-title">{{ $t('Settings.job_title') }}<span class="ah-small">{{ $t('Settings.job_title_hint') }}</span></label>
+                    <input id="ms-title" class="ah-input" :value="designationName || $t('Settings.job_title_none')" type="text" disabled />
                 </div>
                 <div class="ah-field">
                     <label class="ah-field__label" for="ms-lang">{{ $t('Auth.selectLanguage') }}</label>
@@ -43,8 +43,8 @@
                 <div class="ah-field">
                     <span class="ah-field__label">{{ $t('Auth.time_format') }}</span>
                     <div class="ah-tabs ms__tabs" role="radiogroup" :aria-label="$t('Auth.time_format')">
-                        <button type="button" class="ah-tab" :class="{ 'is-active': formData.Time_Format === '24' }" role="radio" :aria-checked="formData.Time_Format === '24'" @click="formData.Time_Format = '24'">{{ $t('SettingsV2.hours_24') }}</button>
-                        <button type="button" class="ah-tab" :class="{ 'is-active': formData.Time_Format === '12' }" role="radio" :aria-checked="formData.Time_Format === '12'" @click="formData.Time_Format = '12'">{{ $t('SettingsV2.hours_12') }}</button>
+                        <button type="button" class="ah-tab" :class="{ 'is-active': formData.Time_Format === '24' }" role="radio" :aria-checked="formData.Time_Format === '24'" @click="formData.Time_Format = '24'">{{ $t('Settings.hours_24') }}</button>
+                        <button type="button" class="ah-tab" :class="{ 'is-active': formData.Time_Format === '12' }" role="radio" :aria-checked="formData.Time_Format === '12'" @click="formData.Time_Format = '12'">{{ $t('Settings.hours_12') }}</button>
                     </div>
                 </div>
             </div>
@@ -52,8 +52,8 @@
 
         <section class="ah-card">
             <div class="ah-card__head">
-                <h2 class="ah-h3">{{ $t('SettingsV2.working_hours') }}</h2>
-                <span class="ah-small">{{ $t('SettingsV2.working_hours_hint') }}</span>
+                <h2 class="ah-h3">{{ $t('Settings.working_hours') }}</h2>
+                <span class="ah-small">{{ $t('Settings.working_hours_hint') }}</span>
             </div>
             <div class="ah-card__body ms__wh">
                 <div class="ms__wh-row">
@@ -63,7 +63,7 @@
                     </select>
                 </div>
                 <div class="ms__wh-row">
-                    <span class="ms__wh-label" id="ms-days-label">{{ $t('SettingsV2.days') }}</span>
+                    <span class="ms__wh-label" id="ms-days-label">{{ $t('Settings.days') }}</span>
                     <div class="ms__days" role="group" aria-labelledby="ms-days-label">
                         <button
                             v-for="day in dayOptions"
@@ -79,14 +79,14 @@
                     </div>
                 </div>
                 <div class="ms__wh-row ms__wh-row--hours">
-                    <label class="ms__wh-label" for="ms-start">{{ $t('SettingsV2.hours') }}</label>
+                    <label class="ms__wh-label" for="ms-start">{{ $t('Settings.hours') }}</label>
                     <input id="ms-start" class="ah-input ms__time" type="time" v-model="workingHours.start" />
                     <span class="ms__arrow" aria-hidden="true">→</span>
-                    <input class="ah-input ms__time" type="time" v-model="workingHours.end" :aria-label="$t('SettingsV2.hours_end')" />
-                    <label class="ms__wh-label ms__wh-label--inline" for="ms-cap">{{ $t('SettingsV2.capacity') }}</label>
+                    <input class="ah-input ms__time" type="time" v-model="workingHours.end" :aria-label="$t('Settings.hours_end')" />
+                    <label class="ms__wh-label ms__wh-label--inline" for="ms-cap">{{ $t('Settings.capacity') }}</label>
                     <div class="ms__cap">
                         <input id="ms-cap" class="ah-input ms__cap-input" type="number" min="0" max="24" step="0.5" v-model.number="workingHours.capacity" />
-                        <span class="ah-small">{{ $t('SettingsV2.capacity_unit') }}</span>
+                        <span class="ah-small">{{ $t('Settings.capacity_unit') }}</span>
                     </div>
                 </div>
                 <div v-if="errors.workingHours" class="ah-field__error">{{ errors.workingHours }}</div>
@@ -96,10 +96,10 @@
         <section class="ah-card">
             <div class="ah-card__body ms__theme">
                 <div>
-                    <h2 class="ah-h3">{{ $t('SettingsV2.theme') }}</h2>
-                    <div class="ah-small">{{ $t('SettingsV2.theme_hint') }}</div>
+                    <h2 class="ah-h3">{{ $t('Settings.theme') }}</h2>
+                    <div class="ah-small">{{ $t('Settings.theme_hint') }}</div>
                 </div>
-                <div class="ms__theme-opts" role="radiogroup" :aria-label="$t('SettingsV2.theme')">
+                <div class="ms__theme-opts" role="radiogroup" :aria-label="$t('Settings.theme')">
                     <button
                         v-for="opt in themeOptions"
                         :key="opt.value"
@@ -118,34 +118,34 @@
 
         <section class="ah-card">
             <div class="ah-card__head">
-                <h2 class="ah-h3">{{ $t('SettingsV2.sessions') }}</h2>
-                <span class="ah-small">{{ $t('SettingsV2.sessions_hint') }}</span>
+                <h2 class="ah-h3">{{ $t('Settings.sessions') }}</h2>
+                <span class="ah-small">{{ $t('Settings.sessions_hint') }}</span>
             </div>
             <div class="ah-card__body ms__sessions">
                 <div v-if="sessionsError" class="ah-field__error">{{ sessionsError }}</div>
-                <div v-else-if="!sessions.length && !sessionsLoading" class="ah-empty">{{ $t('SettingsV2.no_sessions') }}</div>
+                <div v-else-if="!sessions.length && !sessionsLoading" class="ah-empty">{{ $t('Settings.no_sessions') }}</div>
                 <div v-for="s in sessions" :key="s._id" class="ms__session">
                     <span class="ah-dot" :class="s.current ? 'ah-dot--ok' : 'ms__dot-idle'"></span>
                     <ShellIcon :name="s.device ? 'phone' : 'monitor'" :size="15" class="ms__session-icon" />
                     <span class="ms__session-text">
                         {{ sessionLabel(s) }}
-                        <span v-if="s.current" class="ah-chip ah-chip--ok">{{ $t('SettingsV2.this_device') }}</span>
+                        <span v-if="s.current" class="ah-chip ah-chip--ok">{{ $t('Settings.this_device') }}</span>
                     </span>
-                    <span class="ah-mono ms__session-when">{{ s.current ? $t('SettingsV2.now') : whenLabel(s.lastActive) }}</span>
-                    <button v-if="!s.current" type="button" class="ms__signout" :disabled="signingOut === s._id" @click="signOutSession(s)">{{ $t('SettingsV2.sign_out') }}</button>
+                    <span class="ah-mono ms__session-when">{{ s.current ? $t('Settings.now') : whenLabel(s.lastActive) }}</span>
+                    <button v-if="!s.current" type="button" class="ms__signout" :disabled="signingOut === s._id" @click="signOutSession(s)">{{ $t('Settings.sign_out') }}</button>
                 </div>
             </div>
         </section>
 
         <div class="ms__actions">
             <button type="button" class="ah-btn ah-btn--primary" :disabled="isSpinner" @click="saveChanges()">{{ $t('Settings.save_changes') }}</button>
-            <span v-if="savedAt" class="ah-small">{{ $t('SettingsV2.saved') }}</span>
+            <span v-if="savedAt" class="ah-small">{{ $t('Settings.saved') }}</span>
         </div>
 
         <CroppingTool
             :image="{ url: formData.Employee_profileImage, name: fileName }"
             :isVisible="isCropper"
-            :title="$t('SettingsV2.change_photo')"
+            :title="$t('Settings.change_photo')"
             :stencilSize="stencilSize"
             :stencilProps="stencilProps"
             @updateVisible="(val) => isCropper = val"
@@ -202,14 +202,14 @@ const stencilSize = { width: 180, height: 180 };
 const stencilProps = { handlers: {}, movable: false, resizable: false, aspectRatio: 1 };
 
 const themeOptions = [
-    { value: "light", label: "SettingsV2.theme_light", icon: "sun" },
-    { value: "dark", label: "SettingsV2.theme_dark", icon: "moon" },
-    { value: "system", label: "SettingsV2.theme_system", icon: "monitor" }
+    { value: "light", label: "Settings.theme_light", icon: "sun" },
+    { value: "dark", label: "Settings.theme_dark", icon: "moon" },
+    { value: "system", label: "Settings.theme_system", icon: "monitor" }
 ];
 
 const dayOptions = computed(() => {
-    const letters = t("SettingsV2.days_letters").split(" ");
-    const names = t("SettingsV2.days_names").split(",");
+    const letters = t("Settings.days_letters").split(" ");
+    const names = t("Settings.days_names").split(",");
     return [1, 2, 3, 4, 5, 6, 0].map((value, i) => ({ value, letter: letters[i] || "", name: (names[i] || "").trim() }));
 });
 
@@ -258,10 +258,10 @@ function toggleDay(value) {
 
 function validate() {
     errors.value = { firstName: "", lastName: "", workingHours: "" };
-    if (!formData.value.firstName) errors.value.firstName = t("SettingsV2.required_field");
-    if (!formData.value.lastName) errors.value.lastName = t("SettingsV2.required_field");
-    if (!workingHours.value.start || !workingHours.value.end || workingHours.value.end <= workingHours.value.start) errors.value.workingHours = t("SettingsV2.hours_invalid");
-    else if (!workingHours.value.days.length) errors.value.workingHours = t("SettingsV2.days_required");
+    if (!formData.value.firstName) errors.value.firstName = t("Settings.required_field");
+    if (!formData.value.lastName) errors.value.lastName = t("Settings.required_field");
+    if (!workingHours.value.start || !workingHours.value.end || workingHours.value.end <= workingHours.value.start) errors.value.workingHours = t("Settings.hours_invalid");
+    else if (!workingHours.value.days.length) errors.value.workingHours = t("Settings.days_required");
     return !errors.value.firstName && !errors.value.lastName && !errors.value.workingHours;
 }
 
@@ -334,7 +334,7 @@ async function loadSessions() {
         const tail = myTokenTail();
         sessions.value = (res?.data?.data || []).map((s) => ({ ...s, current: !!tail && s.tokenTail === tail }));
     } catch (error) {
-        sessionsError.value = error?.response?.data?.message || t("SettingsV2.sessions_error");
+        sessionsError.value = error?.response?.data?.message || t("Settings.sessions_error");
     } finally {
         sessionsLoading.value = false;
     }
@@ -352,13 +352,13 @@ async function signOutSession(session) {
     }
 }
 
-const sessionLabel = (s) => [s.browser || s.device || t("SettingsV2.unknown_device"), s.os, s.ip].filter(Boolean).join(" · ");
+const sessionLabel = (s) => [s.browser || s.device || t("Settings.unknown_device"), s.os, s.ip].filter(Boolean).join(" · ");
 
 function whenLabel(date) {
     const d = new Date(date);
     if (Number.isNaN(d.getTime())) return "";
     const mins = Math.max(0, Math.round((Date.now() - d.getTime()) / 60000));
-    if (mins < 1) return t("SettingsV2.now");
+    if (mins < 1) return t("Settings.now");
     if (mins < 60) return `${mins}m`;
     const hours = Math.round(mins / 60);
     if (hours < 24) return `${hours}h`;

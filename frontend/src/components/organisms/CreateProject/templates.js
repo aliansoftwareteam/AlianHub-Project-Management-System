@@ -7,8 +7,8 @@ export const BLANK_TEMPLATE_ID = "blank";
 /* Mirrors Modules/createProject/blankTemplate.js — the server owns the real one. */
 export const blankTemplate = (t) => ({
     _id: BLANK_TEMPLATE_ID,
-    TemplateName: t("AuthV2.blank"),
-    Description: t("AuthV2.blank_desc"),
+    TemplateName: t("Auth.blank"),
+    Description: t("Auth.blank_desc"),
     focus: "other",
     useTemplateProj: "category",
     taskStatusData: [

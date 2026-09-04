@@ -138,3 +138,5 @@ frontend/public/firebase-messaging-sw.js
 package-lock.json
 # Backups written by Settings > Instance > Backups
 /backups
+
+.claude/worktrees/

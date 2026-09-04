@@ -3,29 +3,29 @@
         <div class="picker__main">
             <div class="picker__head">
                 <span class="ah-mono picker__key">{{ task.TaskKey || '—' }}</span>
-                <span class="ah-h3">{{ task.TaskName || $t('ParityV2.untitled_task') }}</span>
-                <span class="ah-chip">{{ task.status || task.statusType || $t('ParityV2.no_status') }}</span>
+                <span class="ah-h3">{{ task.TaskName || $t('Parity.untitled_task') }}</span>
+                <span class="ah-chip">{{ task.status || task.statusType || $t('Parity.no_status') }}</span>
             </div>
 
             <div class="picker__field">
-                <label class="picker__field-label" for="assignee-search">{{ $t('ParityV2.assignee') }}</label>
+                <label class="picker__field-label" for="assignee-search">{{ $t('Parity.assignee') }}</label>
                 <input
                     id="assignee-search"
                     v-model="query"
                     class="ah-input picker__input"
                     type="text"
                     autocomplete="off"
-                    :placeholder="$t('ParityV2.search_people_agents')"
+                    :placeholder="$t('Parity.search_people_agents')"
                 />
             </div>
 
             <div class="picker__list ah-scroll">
                 <div class="picker__group">
-                    <span class="ah-label">{{ $t('ParityV2.best_fit') }}</span>
-                    <span class="picker__group-note">{{ $t('ParityV2.ranked_by') }}</span>
+                    <span class="ah-label">{{ $t('Parity.best_fit') }}</span>
+                    <span class="picker__group-note">{{ $t('Parity.ranked_by') }}</span>
                 </div>
 
-                <p v-if="!rankedAgents.length" class="ah-empty picker__empty">{{ $t('ParityV2.no_agents_yet') }}</p>
+                <p v-if="!rankedAgents.length" class="ah-empty picker__empty">{{ $t('Parity.no_agents_yet') }}</p>
 
                 <button
                     v-for="row in rankedAgents"
@@ -48,12 +48,12 @@
                             <span>{{ estimateTime(row) }}</span>
                             <span>{{ estimateCost(row) }}</span>
                             <span>{{ willLabel(row) }}</span>
-                            <span v-if="row.coverage < 1" class="picker__row-limit">{{ $t('ParityV2.cannot_finish') }}</span>
+                            <span v-if="row.coverage < 1" class="picker__row-limit">{{ $t('Parity.cannot_finish') }}</span>
                         </span>
                     </span>
                 </button>
 
-                <div class="picker__group"><span class="ah-label">{{ $t('ParityV2.people') }}</span></div>
+                <div class="picker__group"><span class="ah-label">{{ $t('Parity.people') }}</span></div>
                 <button
                     v-for="person in filteredPeople"
                     :key="person.id"
@@ -68,29 +68,29 @@
                         <span class="picker__row-why" :class="{ 'picker__row-over': person.load > 100 }">{{ personLine(person) }}</span>
                     </span>
                 </button>
-                <p v-if="!filteredPeople.length" class="ah-empty picker__empty">{{ $t('ParityV2.no_people_match') }}</p>
+                <p v-if="!filteredPeople.length" class="ah-empty picker__empty">{{ $t('Parity.no_people_match') }}</p>
             </div>
 
             <div class="ah-card picker__explain">
-                <div class="ah-label">{{ $t('ParityV2.fit_made_of') }}</div>
-                <p>{{ $t('ParityV2.fit_explainer') }}</p>
-                <p>{{ $t('ParityV2.fit_no_history') }}</p>
+                <div class="ah-label">{{ $t('Parity.fit_made_of') }}</div>
+                <p>{{ $t('Parity.fit_explainer') }}</p>
+                <p>{{ $t('Parity.fit_no_history') }}</p>
             </div>
         </div>
 
         <aside class="picker__aside">
-            <div class="ah-label">{{ $t('ParityV2.before_confirm') }}</div>
+            <div class="ah-label">{{ $t('Parity.before_confirm') }}</div>
 
             <div v-if="selectedAgent" class="picker__confirm">
                 <AgentIdentity :name="selectedAgent.name" size="lg" />
                 <dl class="picker__facts">
-                    <div><dt>{{ $t('ParityV2.runs_as') }}</dt><dd>{{ runsAs }}</dd></div>
-                    <div><dt>{{ $t('ParityV2.cost_to_you') }}</dt><dd :class="{ 'picker__free': costToYou === '$0' }">{{ costToYou }}</dd></div>
-                    <div><dt>{{ $t('ParityV2.starts') }}</dt><dd>{{ $t('ParityV2.starts_now') }}</dd></div>
-                    <div><dt>{{ $t('ParityV2.will_set') }}</dt><dd>{{ willSet }}</dd></div>
-                    <div><dt>{{ $t('ParityV2.wont') }}</dt><dd>{{ wontLine }}</dd></div>
+                    <div><dt>{{ $t('Parity.runs_as') }}</dt><dd>{{ runsAs }}</dd></div>
+                    <div><dt>{{ $t('Parity.cost_to_you') }}</dt><dd :class="{ 'picker__free': costToYou === '$0' }">{{ costToYou }}</dd></div>
+                    <div><dt>{{ $t('Parity.starts') }}</dt><dd>{{ $t('Parity.starts_now') }}</dd></div>
+                    <div><dt>{{ $t('Parity.will_set') }}</dt><dd>{{ willSet }}</dd></div>
+                    <div><dt>{{ $t('Parity.wont') }}</dt><dd>{{ wontLine }}</dd></div>
                 </dl>
-                <p class="picker__note">{{ $t('ParityV2.handback_note') }}</p>
+                <p class="picker__note">{{ $t('Parity.handback_note') }}</p>
             </div>
 
             <div v-else-if="selectedPerson" class="picker__confirm">
@@ -98,21 +98,21 @@
                 <p class="picker__note">{{ personLine(selectedPerson) }}</p>
             </div>
 
-            <p v-else class="ah-empty picker__empty">{{ $t('ParityV2.pick_someone') }}</p>
+            <p v-else class="ah-empty picker__empty">{{ $t('Parity.pick_someone') }}</p>
 
             <div class="picker__also">
-                <div class="ah-label">{{ $t('ParityV2.also_set') }}</div>
-                <label class="picker__check"><input v-model="notifyMe" class="ah-check" type="checkbox" />{{ $t('ParityV2.notify_me') }}</label>
-                <label class="picker__check"><input v-model="capped" class="ah-check" type="checkbox" />{{ $t('ParityV2.stop_over_cap', { usd: '2' }) }}</label>
+                <div class="ah-label">{{ $t('Parity.also_set') }}</div>
+                <label class="picker__check"><input v-model="notifyMe" class="ah-check" type="checkbox" />{{ $t('Parity.notify_me') }}</label>
+                <label class="picker__check"><input v-model="capped" class="ah-check" type="checkbox" />{{ $t('Parity.stop_over_cap', { usd: '2' }) }}</label>
             </div>
 
             <p v-if="error" class="ah-field__error">{{ error }}</p>
 
             <div class="picker__actions">
                 <button type="button" class="ah-btn ah-btn--primary ah-btn--block" :disabled="!chosen || busy" @click="confirm">
-                    {{ busy ? $t('ParityV2.assigning') : $t('ParityV2.assign') }}
+                    {{ busy ? $t('Parity.assigning') : $t('Parity.assign') }}
                 </button>
-                <button type="button" class="ah-btn ah-btn--secondary" @click="$emit('close')">{{ $t('ParityV2.cancel') }}</button>
+                <button type="button" class="ah-btn ah-btn--secondary" @click="$emit('close')">{{ $t('Parity.cancel') }}</button>
             </div>
         </aside>
     </div>
@@ -177,37 +177,37 @@ const initials = (name) => String(name || "?").trim().slice(0, 1).toUpperCase();
 const badgeOf = (row) => {
     const agent = props.agents.find((a) => String(a._id) === row.agentId) || {};
     const account = agent.account === "personal" || agent.account === "local"
-        ? t("ParityV2.badge_personal")
-        : t("ParityV2.badge_workspace");
+        ? t("Parity.badge_personal")
+        : t("Parity.badge_workspace");
     return `${account} · L${Number(agent.autonomy || 0)}`;
 };
 
 const fitLabel = (row) => {
-    if (!row.eligible) return t("ParityV2.not_eligible");
-    if (row.percent === null) return t("ParityV2.no_history_yet");
-    return t("ParityV2.percent_fit", { n: row.percent });
+    if (!row.eligible) return t("Parity.not_eligible");
+    if (row.percent === null) return t("Parity.no_history_yet");
+    return t("Parity.percent_fit", { n: row.percent });
 };
 const fitClass = (row) => {
     if (!row.eligible) return "picker__fit--off";
     return row.percent !== null && row.percent >= 80 ? "picker__fit--good" : "";
 };
 
-const estimateTime = (row) => (row.estimate.minutes === null ? t("ParityV2.time_unknown") : t("ParityV2.about_minutes", { n: row.estimate.minutes }));
-const estimateCost = (row) => (row.estimate.usd === null ? t("ParityV2.cost_unknown") : t("ParityV2.about_usd", { usd: row.estimate.usd.toFixed(2) }));
-const willLabel = (row) => (row.coverage >= 1 ? row.work.label : t("ParityV2.comment_only"));
+const estimateTime = (row) => (row.estimate.minutes === null ? t("Parity.time_unknown") : t("Parity.about_minutes", { n: row.estimate.minutes }));
+const estimateCost = (row) => (row.estimate.usd === null ? t("Parity.cost_unknown") : t("Parity.about_usd", { usd: row.estimate.usd.toFixed(2) }));
+const willLabel = (row) => (row.coverage >= 1 ? row.work.label : t("Parity.comment_only"));
 
 const personLine = (person) => {
     const bits = [];
-    if (person.pto && person.pto.active) bits.push(t("ParityV2.away_until", { date: String(person.pto.to).slice(0, 10) }));
-    if (person.load > 100) bits.push(t("ParityV2.percent_loaded", { n: person.load }));
-    else bits.push(t("ParityV2.free_hours", { n: Math.max(0, Math.round((person.capacityHours || 40) - (person.loggedHours || 0))) }));
+    if (person.pto && person.pto.active) bits.push(t("Parity.away_until", { date: String(person.pto.to).slice(0, 10) }));
+    if (person.load > 100) bits.push(t("Parity.percent_loaded", { n: person.load }));
+    else bits.push(t("Parity.free_hours", { n: Math.max(0, Math.round((person.capacityHours || 40) - (person.loggedHours || 0))) }));
     return bits.join(" · ");
 };
 
 const runsAs = computed(() => {
     const agent = props.agents.find((a) => String(a._id) === chosen.value);
     if (!agent) return "";
-    return agent.account === "personal" ? t("ParityV2.runs_personal") : t("ParityV2.runs_workspace");
+    return agent.account === "personal" ? t("Parity.runs_personal") : t("Parity.runs_workspace");
 });
 
 const costToYou = computed(() => {
@@ -215,12 +215,12 @@ const costToYou = computed(() => {
     if (!agent) return "";
     if (agent.account === "personal" || agent.account === "local") return "$0";
     const est = selectedAgent.value && selectedAgent.value.estimate.usd;
-    return est === null || est === undefined ? t("ParityV2.cost_unknown") : `~$${est.toFixed(2)}`;
+    return est === null || est === undefined ? t("Parity.cost_unknown") : `~$${est.toFixed(2)}`;
 });
 
 const willSet = computed(() => (selectedAgent.value && selectedAgent.value.will.length
     ? selectedAgent.value.will.slice(0, 3).join(", ")
-    : t("ParityV2.nothing_yet")));
+    : t("Parity.nothing_yet")));
 
 const wontLine = computed(() => (selectedAgent.value ? selectedAgent.value.wont.slice(0, 4).join(", ") : ""));
 

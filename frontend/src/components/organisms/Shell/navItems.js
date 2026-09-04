@@ -48,8 +48,8 @@ export function useNavItems(companyId) {
                     { key: "portfolio", label: "Header.Portfolio", icon: "portfolio", to: to("Portfolio"), match: (r) => r.name === "Portfolio", show: ready.value },
                     { key: "automations", label: "Automations.title", icon: "automations", to: to("Automations"), match: (r) => r.name === "Automations", show: ready.value && exists("Automations") },
                     { key: "integrations", label: "Header.Integrations", icon: "integrations", to: to("IntegrationsHub"), match: (r) => r.name === "IntegrationsHub", show: ready.value && exists("IntegrationsHub") },
-                    { key: "connections", label: "ParityV2.nav_connections", icon: "key", to: to("Connections"), match: (r) => r.name === "Connections", show: ready.value && exists("Connections") },
-                    { key: "externalData", label: "ProvenanceV2.nav_external_data", icon: "globe", to: to("ExternalData"), match: (r) => r.name === "ExternalData", show: ready.value && exists("ExternalData") }
+                    { key: "connections", label: "Parity.nav_connections", icon: "key", to: to("Connections"), match: (r) => r.name === "Connections", show: ready.value && exists("Connections") },
+                    { key: "externalData", label: "Provenance.nav_external_data", icon: "globe", to: to("ExternalData"), match: (r) => r.name === "ExternalData", show: ready.value && exists("ExternalData") }
                 ]
             },
             {
@@ -75,7 +75,7 @@ export function useNavItems(companyId) {
                 label: "Shell.workspace",
                 items: [
                     { key: "settings", label: "settingslider.Settings", icon: "settings", to: to("Setting"), match: (r) => r.path.includes("/settings"), show: ready.value },
-                    { key: "trash", label: "TrashV2.title", icon: "trash", to: to("Trash"), match: (r) => r.name === "Trash", show: ready.value && exists("Trash") },
+                    { key: "trash", label: "Trash.title", icon: "trash", to: to("Trash"), match: (r) => r.name === "Trash", show: ready.value && exists("Trash") },
                     { key: "members", label: "settingslider.Members", icon: "members", to: to("Members"), match: (r) => r.name === "Members", show: ready.value && isOwnerOrAdmin.value },
                     { key: "audit", label: "Audit.title", icon: "audit", to: to("AuditLog"), match: (r) => r.name === "AuditLog", show: ready.value && isOwnerOrAdmin.value },
                     { key: "changelog", label: "Changelog.view_whats_new", icon: "changelog", to: to("Changelog"), newTab: true, show: true },

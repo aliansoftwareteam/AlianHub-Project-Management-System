@@ -1,6 +1,6 @@
 <template>
     <div v-if="variant === 'inline'" class="app-teaser-chip cursor-pointer" role="button" tabindex="0"
-        :title="$t('AppsV2.enable_under', { desc: resolvedDescription, location: resolvedLocation })" @click="goToSettings" @keyup.enter="goToSettings">
+        :title="$t('Apps.enable_under', { desc: resolvedDescription, location: resolvedLocation })" @click="goToSettings" @keyup.enter="goToSettings">
         <span class="app-teaser-chip__lock" aria-hidden="true">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="4" y="11" width="16" height="9" rx="2"></rect>
@@ -8,7 +8,7 @@
             </svg>
         </span>
         <span class="app-teaser-chip__label">{{ resolvedTitle }}</span>
-        <span class="app-teaser-chip__cta">{{ $t('AppsV2.enable') }}</span>
+        <span class="app-teaser-chip__cta">{{ $t('Apps.enable') }}</span>
     </div>
 
     <div v-else class="app-teaser-banner cursor-pointer" role="button" tabindex="0" @click="goToSettings" @keyup.enter="goToSettings">
@@ -30,7 +30,7 @@
             </span>
         </span>
         <span class="app-teaser-banner__cta">
-            {{ buttonText || $t('AppsV2.enable_in_settings') }}
+            {{ buttonText || $t('Apps.enable_in_settings') }}
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
         </span>
     </div>
@@ -54,10 +54,10 @@ const router = useRouter();
 const { t, te } = useI18n();
 const companyId = inject('$companyId', null);
 
-const copy = (part) => (te(`AppsV2.${props.appKey}_${part}`) ? t(`AppsV2.${props.appKey}_${part}`) : '');
+const copy = (part) => (te(`Apps.${props.appKey}_${part}`) ? t(`Apps.${props.appKey}_${part}`) : '');
 const resolvedTitle = computed(() => props.title || copy('title') || props.appKey);
 const resolvedDescription = computed(() => props.description || copy('desc'));
-const resolvedLocation = computed(() => props.location || t('AppsV2.location'));
+const resolvedLocation = computed(() => props.location || t('Apps.location'));
 
 function goToSettings() {
     const cid = companyId?.value || companyId;

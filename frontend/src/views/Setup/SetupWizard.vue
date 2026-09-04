@@ -1,132 +1,132 @@
 <template>
     <AuthShell :proof="false">
         <template #top-right>
-            <a :href="guide('first-run')" target="_blank" rel="noopener">{{ $t('SetupV2.guide_link') }}</a>
+            <a :href="guide('first-run')" target="_blank" rel="noopener">{{ $t('Setup.guide_link') }}</a>
         </template>
 
         <div v-if="step === 'checking'" class="setup__center">
             <span class="ah-spin"></span>
-            <p class="auth__p">{{ $t('SetupV2.checking') }}</p>
+            <p class="auth__p">{{ $t('Setup.checking') }}</p>
         </div>
 
         <div v-else-if="step === 'blocked'">
             <div class="auth__glyph auth__glyph--warn">!</div>
-            <h1 class="auth__title">{{ $t('SetupV2.db_title') }}</h1>
-            <p class="auth__lead">{{ $t('SetupV2.db_lead') }}</p>
+            <h1 class="auth__title">{{ $t('Setup.db_title') }}</h1>
+            <p class="auth__lead">{{ $t('Setup.db_lead') }}</p>
             <div class="auth__banner auth__banner--danger"><ShellIcon name="alert" :size="15" /><span class="ah-mono">{{ status.dbError }}</span></div>
             <ol class="setup__steps">
-                <li>{{ $t('SetupV2.db_step_env') }} <code class="ah-mono">MONGODB_URL</code></li>
-                <li>{{ $t('SetupV2.db_step_restart') }}</li>
-                <li>{{ $t('SetupV2.db_step_retry') }}</li>
+                <li>{{ $t('Setup.db_step_env') }} <code class="ah-mono">MONGODB_URL</code></li>
+                <li>{{ $t('Setup.db_step_restart') }}</li>
+                <li>{{ $t('Setup.db_step_retry') }}</li>
             </ol>
             <div class="auth__actions">
-                <button type="button" class="ah-btn ah-btn--primary" :disabled="busy" @click="loadStatus">{{ $t('SetupV2.retry') }}</button>
-                <a class="ah-btn ah-btn--secondary" :href="guide('install')" target="_blank" rel="noopener">{{ $t('SetupV2.open_guide') }}</a>
+                <button type="button" class="ah-btn ah-btn--primary" :disabled="busy" @click="loadStatus">{{ $t('Setup.retry') }}</button>
+                <a class="ah-btn ah-btn--secondary" :href="guide('install')" target="_blank" rel="noopener">{{ $t('Setup.open_guide') }}</a>
             </div>
         </div>
 
         <form v-else-if="step === 'form'" novalidate @submit.prevent="submit">
-            <span class="ah-chip ah-chip--mono auth__step">{{ $t('SetupV2.version', { version: status.version }) }}</span>
-            <h1 class="auth__title">{{ $t('SetupV2.title') }}</h1>
-            <p class="auth__lead">{{ $t('SetupV2.lead') }}</p>
+            <span class="ah-chip ah-chip--mono auth__step">{{ $t('Setup.version', { version: status.version }) }}</span>
+            <h1 class="auth__title">{{ $t('Setup.title') }}</h1>
+            <p class="auth__lead">{{ $t('Setup.lead') }}</p>
 
             <div v-if="banner" class="auth__banner auth__banner--danger"><ShellIcon name="alert" :size="15" /><span>{{ banner }}</span></div>
 
             <div class="auth__fields">
                 <div class="setup__row">
                     <div class="ah-field">
-                        <label class="ah-field__label" for="firstName">{{ $t('SetupV2.first_name') }}</label>
+                        <label class="ah-field__label" for="firstName">{{ $t('Setup.first_name') }}</label>
                         <input id="firstName" v-model.trim="form.firstName" type="text" maxlength="60" autocomplete="given-name" class="ah-input" :class="{ 'ah-input--error': errors.firstName }" @input="errors.firstName = ''" />
                         <div v-if="errors.firstName" class="ah-field__error"><ShellIcon name="x" :size="12" />{{ errors.firstName }}</div>
                     </div>
                     <div class="ah-field">
-                        <label class="ah-field__label" for="lastName">{{ $t('SetupV2.last_name') }}</label>
+                        <label class="ah-field__label" for="lastName">{{ $t('Setup.last_name') }}</label>
                         <input id="lastName" v-model.trim="form.lastName" type="text" maxlength="60" autocomplete="family-name" class="ah-input" :class="{ 'ah-input--error': errors.lastName }" @input="errors.lastName = ''" />
                         <div v-if="errors.lastName" class="ah-field__error"><ShellIcon name="x" :size="12" />{{ errors.lastName }}</div>
                     </div>
                 </div>
                 <div class="ah-field">
-                    <label class="ah-field__label" for="email">{{ $t('SetupV2.email') }}</label>
+                    <label class="ah-field__label" for="email">{{ $t('Setup.email') }}</label>
                     <input id="email" v-model.trim="form.email" type="email" maxlength="254" autocomplete="username" class="ah-input" :class="{ 'ah-input--error': errors.email }" @input="form.email = form.email.toLowerCase(); errors.email = ''" />
                     <div v-if="errors.email" class="ah-field__error"><ShellIcon name="x" :size="12" />{{ errors.email }}</div>
                 </div>
                 <div class="ah-field">
-                    <label class="ah-field__label" for="password">{{ $t('SetupV2.password') }}</label>
+                    <label class="ah-field__label" for="password">{{ $t('Setup.password') }}</label>
                     <div class="auth__pw">
                         <input id="password" v-model="form.password" :type="showPassword ? 'text' : 'password'" maxlength="150" autocomplete="new-password" class="ah-input" :class="{ 'ah-input--error': errors.password }" placeholder="••••••••" @input="errors.password = ''" />
-                        <button type="button" class="auth__pw-eye" :aria-label="showPassword ? $t('SetupV2.hide_password') : $t('SetupV2.show_password')" @click="showPassword = !showPassword">
+                        <button type="button" class="auth__pw-eye" :aria-label="showPassword ? $t('Setup.hide_password') : $t('Setup.show_password')" @click="showPassword = !showPassword">
                             <ShellIcon :name="showPassword ? 'eyeOff' : 'eye'" :size="15" />
                         </button>
                     </div>
                     <div v-if="errors.password" class="ah-field__error"><ShellIcon name="x" :size="12" />{{ errors.password }}</div>
-                    <span v-else class="ah-small">{{ $t('SetupV2.password_hint', { n: MIN_PASSWORD }) }}</span>
+                    <span v-else class="ah-small">{{ $t('Setup.password_hint', { n: MIN_PASSWORD }) }}</span>
                 </div>
 
                 <hr class="ah-divider" />
 
                 <div class="ah-field">
-                    <label class="ah-field__label" for="companyName">{{ $t('SetupV2.company') }}</label>
+                    <label class="ah-field__label" for="companyName">{{ $t('Setup.company') }}</label>
                     <input id="companyName" v-model.trim="form.companyName" type="text" maxlength="120" autocomplete="organization" class="ah-input" :class="{ 'ah-input--error': errors.companyName }" @input="errors.companyName = ''" />
                     <div v-if="errors.companyName" class="ah-field__error"><ShellIcon name="x" :size="12" />{{ errors.companyName }}</div>
                 </div>
                 <div class="ah-field">
-                    <label class="ah-field__label" for="teamFocus">{{ $t('SetupV2.focus') }}</label>
+                    <label class="ah-field__label" for="teamFocus">{{ $t('Setup.focus') }}</label>
                     <select id="teamFocus" v-model="form.teamFocus" class="ah-input">
-                        <option value="">{{ $t('SetupV2.focus_unsure') }}</option>
-                        <option value="software">{{ $t('SetupV2.focus_software') }}</option>
-                        <option value="marketing">{{ $t('SetupV2.focus_marketing') }}</option>
-                        <option value="design">{{ $t('SetupV2.focus_design') }}</option>
-                        <option value="support">{{ $t('SetupV2.focus_support') }}</option>
-                        <option value="hiring">{{ $t('SetupV2.focus_hiring') }}</option>
-                        <option value="other">{{ $t('SetupV2.focus_other') }}</option>
+                        <option value="">{{ $t('Setup.focus_unsure') }}</option>
+                        <option value="software">{{ $t('Setup.focus_software') }}</option>
+                        <option value="marketing">{{ $t('Setup.focus_marketing') }}</option>
+                        <option value="design">{{ $t('Setup.focus_design') }}</option>
+                        <option value="support">{{ $t('Setup.focus_support') }}</option>
+                        <option value="hiring">{{ $t('Setup.focus_hiring') }}</option>
+                        <option value="other">{{ $t('Setup.focus_other') }}</option>
                     </select>
-                    <span class="ah-small">{{ $t('SetupV2.focus_hint') }}</span>
+                    <span class="ah-small">{{ $t('Setup.focus_hint') }}</span>
                 </div>
                 <label class="setup__toggle">
                     <input v-model="form.sampleData" type="checkbox" class="ah-check" />
                     <span>
-                        <strong>{{ $t('SetupV2.sample_title') }}</strong>
-                        <span class="ah-small">{{ $t('SetupV2.sample_hint') }}</span>
+                        <strong>{{ $t('Setup.sample_title') }}</strong>
+                        <span class="ah-small">{{ $t('Setup.sample_hint') }}</span>
                     </span>
                 </label>
             </div>
 
             <div class="auth__actions">
                 <button type="submit" class="ah-btn ah-btn--primary ah-btn--lg" :disabled="busy">
-                    <span v-if="busy" class="ah-spin"></span>{{ busy ? $t('SetupV2.working') : $t('SetupV2.create') }}
+                    <span v-if="busy" class="ah-spin"></span>{{ busy ? $t('Setup.working') : $t('Setup.create') }}
                 </button>
             </div>
-            <p class="auth__hint">{{ $t('SetupV2.owner_note') }}</p>
+            <p class="auth__hint">{{ $t('Setup.owner_note') }}</p>
         </form>
 
         <div v-else-if="step === 'progress'">
-            <h2 class="auth__h">{{ $t('SetupV2.progress_title') }}</h2>
-            <p class="auth__p">{{ $t('SetupV2.progress_lead') }}</p>
+            <h2 class="auth__h">{{ $t('Setup.progress_title') }}</h2>
+            <p class="auth__p">{{ $t('Setup.progress_lead') }}</p>
             <ul class="setup__progress" aria-live="polite">
                 <li v-for="item in progressItems" :key="item.key" :class="{ 'is-done': item.done, 'is-active': item.active }">
                     <ShellIcon v-if="item.done" name="check" :size="14" />
                     <span v-else-if="item.active" class="ah-spin ah-spin--sm"></span>
                     <span v-else class="setup__dot"></span>
-                    <span>{{ $t(`SetupV2.progress_${item.key}`) }}</span>
+                    <span>{{ $t(`Setup.progress_${item.key}`) }}</span>
                 </li>
             </ul>
         </div>
 
         <div v-else-if="step === 'failed'">
             <div class="auth__glyph auth__glyph--warn">!</div>
-            <h2 class="auth__h">{{ $t('SetupV2.failed_title') }}</h2>
-            <p class="auth__p">{{ $t('SetupV2.failed_lead') }}</p>
+            <h2 class="auth__h">{{ $t('Setup.failed_title') }}</h2>
+            <p class="auth__p">{{ $t('Setup.failed_lead') }}</p>
             <div class="auth__banner auth__banner--danger"><ShellIcon name="alert" :size="15" /><span class="ah-mono">{{ banner }}</span></div>
             <div class="auth__actions">
-                <button type="button" class="ah-btn ah-btn--primary" @click="loadStatus">{{ $t('SetupV2.retry') }}</button>
-                <a class="ah-btn ah-btn--secondary" :href="guide('troubleshooting')" target="_blank" rel="noopener">{{ $t('SetupV2.open_guide') }}</a>
+                <button type="button" class="ah-btn ah-btn--primary" @click="loadStatus">{{ $t('Setup.retry') }}</button>
+                <a class="ah-btn ah-btn--secondary" :href="guide('troubleshooting')" target="_blank" rel="noopener">{{ $t('Setup.open_guide') }}</a>
             </div>
         </div>
 
         <div v-else-if="step === 'done'" class="setup__center">
             <div class="auth__glyph auth__glyph--brand">✓</div>
-            <h2 class="auth__h">{{ $t('SetupV2.done_title') }}</h2>
-            <p class="auth__p">{{ $t('SetupV2.done_lead') }}</p>
+            <h2 class="auth__h">{{ $t('Setup.done_title') }}</h2>
+            <p class="auth__p">{{ $t('Setup.done_lead') }}</p>
         </div>
     </AuthShell>
 </template>
@@ -175,15 +175,15 @@ async function loadStatus() {
     const s = await readSetupStatus({ force: true });
     busy.value = false;
     status.value = s || {};
-    if (!s) { status.value = { dbError: t("SetupV2.server_unreachable") }; step.value = "blocked"; return; }
+    if (!s) { status.value = { dbError: t("Setup.server_unreachable") }; step.value = "blocked"; return; }
     if (s.installed) { router.replace({ name: "Log-in" }); return; }
     step.value = s.dbOk ? "form" : "blocked";
 }
 
 const serverError = (key) => ({
-    required: t("SetupV2.err_required"),
-    invalid: t("SetupV2.err_invalid"),
-    [`min_${MIN_PASSWORD}`]: t("SetupV2.err_password", { n: MIN_PASSWORD }),
+    required: t("Setup.err_required"),
+    invalid: t("Setup.err_invalid"),
+    [`min_${MIN_PASSWORD}`]: t("Setup.err_password", { n: MIN_PASSWORD }),
 }[key] || key);
 
 function validate() {
@@ -222,7 +222,7 @@ async function submit() {
     try {
         const res = await apiRequestWithoutSecure("post", env.SETUP_COMPLETE, { ...form, eventId });
         const data = res?.data?.data || {};
-        if (res?.data?.status !== true || !data.userId) throw new Error(res?.data?.statusText || t("SetupV2.failed_generic"));
+        if (res?.data?.status !== true || !data.userId) throw new Error(res?.data?.statusText || t("Setup.failed_generic"));
         markInstalled();
         step.value = "done";
         await enter(data);
@@ -232,7 +232,7 @@ async function submit() {
             Object.entries(body.data.errors).forEach(([k, v]) => { if (k in errors) errors[k] = serverError(v); });
             step.value = "form";
         } else {
-            banner.value = body.statusText || error.message || t("SetupV2.failed_generic");
+            banner.value = body.statusText || error.message || t("Setup.failed_generic");
             step.value = "failed";
         }
     } finally {

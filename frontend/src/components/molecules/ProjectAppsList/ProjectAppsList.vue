@@ -36,7 +36,7 @@ const { makeUniqueId } = useCustomComposable();
 const uid = makeUniqueId(4);
 
 const label = (app, part) => {
-    const key = `AppsV2.${app.key}_${part}`;
+    const key = `Apps.${app.key}_${part}`;
     if (te(key)) return t(key);
     return part === 'title' ? (app.name || app.key) : '';
 };

@@ -2,10 +2,10 @@
     <div class="dc-body ds">
         <div class="dc-metric">
             <span class="dc-num" :class="{ 'dc-num--danger': counts.overdue > 0 }">{{ counts.overdue }}</span>
-            <span class="dc-sub">{{ $t('DashV2.due_summary', { today: counts.today, week: counts.week }) }}</span>
+            <span class="dc-sub">{{ $t('Dash.due_summary', { today: counts.today, week: counts.week }) }}</span>
         </div>
 
-        <div class="dc-spark" :aria-label="$t('DashV2.due_chart_label')">
+        <div class="dc-spark" :aria-label="$t('Dash.due_chart_label')">
             <div
                 v-for="bucket in buckets"
                 :key="bucket.key"
@@ -71,7 +71,7 @@ const counts = computed(() => {
 });
 
 const buckets = computed(() => {
-    const dayLabels = t('DashV2.due_day_labels').split(',');
+    const dayLabels = t('Dash.due_day_labels').split(',');
     const rows = [{ key: 'ovr', label: dayLabels[0], count: counts.value.overdue, tone: 'dc-spark__bar--danger' }];
     for (let d = 0; d <= 5; d += 1) {
         rows.push({
@@ -97,10 +97,10 @@ const visibleTasks = computed(() => tasks.value.slice(0, 6));
 const dueLabel = (task) => {
     const d = Number(task.daysUntil);
     if (!Number.isFinite(d)) return '—';
-    if (d < 0) return t('DashV2.due_late', { n: Math.abs(d) });
-    if (d === 0) return t('DashV2.due_today');
-    if (d === 1) return t('DashV2.due_tomorrow');
-    return t('DashV2.due_in_days', { n: d });
+    if (d < 0) return t('Dash.due_late', { n: Math.abs(d) });
+    if (d === 0) return t('Dash.due_today');
+    if (d === 1) return t('Dash.due_tomorrow');
+    return t('Dash.due_in_days', { n: d });
 };
 const dueTone = (task) => {
     const d = Number(task.daysUntil);
@@ -135,8 +135,8 @@ const load = async () => {
         const d = res && res.data && res.data.status ? (res.data.data || {}) : {};
         tasks.value = d.tasks || [];
         meta.note = tasks.value.length > visibleTasks.value.length
-            ? t('DashV2.due_note_more', { shown: visibleTasks.value.length, total: tasks.value.length })
-            : t('DashV2.due_note');
+            ? t('Dash.due_note_more', { shown: visibleTasks.value.length, total: tasks.value.length })
+            : t('Dash.due_note');
         meta.state = tasks.value.length ? 'ready' : 'empty';
     } catch (e) {
         meta.state = 'error';
