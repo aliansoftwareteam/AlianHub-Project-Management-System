@@ -80,3 +80,22 @@ for a while — I built gap-6 and gap-8 myself, sent two agents out, and that on
 through the gap. Caught on a board read, not by anything automated. A task sitting In
 Progress with nothing behind it is exactly the failure this dogfooding was meant to
 surface, and it surfaced.
+
+### 2026-09-04 (UI sweep, owner reported "many UI issues")
+Took screenshots at 1100×720 and measured layout at 1440×900 page by page. Filed AR-29..AR-32
+through `task.create`, all fixed and In Review. The headline defect was mine: the dark-mode ink
+fix added `.ah-page { flex-direction: column }`, which stacked every sidebar page vertically —
+at desktop width Home and Planner content measured 0px tall. Also fixed: tour popup ignoring
+Skip on all but the last step (owner's report), projects never loading in the new shell, root URL
+landing on the legacy dashboard, Personal List unable to save (schema lacked its fields), Docs rows
+unstyled (scoped styles vs render-function children), rail overflowing the viewport, AI sidebar
+unreachable under 1280px. Three "bugs" were tool artefacts and were not filed.
+
+Second pass (same day): project drawer opening over the selected project and not closing from its
+backdrop, board card checkbox drawn over the title, task overlay opening scrolled past the title
+(composer autofocus), Billing toolbar boxed to 220px by a duplicate `.billing__bar` rule plus a
+clipped milestone table, tablet List starving the name column. Filed AR-33..AR-37 via `task.create`,
+fixed, rebuilt, verified by measurement, In Review. Passes done: light at 1100, dark on Home, 800px
+Home and List, and child-rect measurements on every sidebar page at 1440. Still open and legacy:
+the project header/list toolbar styling (search overflows at 800px) and an unlabelled empty select
+on the Sprint report.
