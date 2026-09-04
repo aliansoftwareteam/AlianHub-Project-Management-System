@@ -75,6 +75,7 @@ export function useNavItems(companyId) {
                 label: "Shell.workspace",
                 items: [
                     { key: "settings", label: "settingslider.Settings", icon: "settings", to: to("Setting"), match: (r) => r.path.includes("/settings"), show: ready.value },
+                    { key: "trash", label: "TrashV2.title", icon: "trash", to: to("Trash"), match: (r) => r.name === "Trash", show: ready.value && exists("Trash") },
                     { key: "members", label: "settingslider.Members", icon: "members", to: to("Members"), match: (r) => r.name === "Members", show: ready.value && isOwnerOrAdmin.value },
                     { key: "audit", label: "Audit.title", icon: "audit", to: to("AuditLog"), match: (r) => r.name === "AuditLog", show: ready.value && isOwnerOrAdmin.value },
                     { key: "changelog", label: "Changelog.view_whats_new", icon: "changelog", to: to("Changelog"), newTab: true, show: true },
