@@ -89,10 +89,33 @@ export function useAgents() {
         await Promise.all([loadAgents(), loadSummary()]);
     };
 
+    // Runs still open, by agent — so a card can offer Stop instead of leaving a stuck
+    // run to sit in every "n running" count.
+    const activeRuns = ref({});
+    const loadActiveRuns = async () => {
+        try {
+            const res = await apiRequest("get", `${env.AGENT_RUNS}?limit=50`);
+            const rows = ok(res) ? (res.data.data || []) : [];
+            const map = {};
+            rows.filter((r) => ["running", "queued", "waiting_approval"].includes(r.status)).forEach((r) => { (map[r.agentId] = map[r.agentId] || []).push(r._id); });
+            activeRuns.value = map;
+        } catch (e) { activeRuns.value = {}; }
+    };
+    const stopActive = async (agentId) => {
+        const ids = activeRuns.value[agentId] || [];
+        for (const id of ids) {
+            // eslint-disable-next-line no-await-in-loop
+            await apiRequest("post", `${env.AGENT_RUNS}/${id}/stop`, {});
+        }
+        await loadActiveRuns();
+        await loadSummary();
+    };
+
     const runNow = async (agentId) => {
         const res = await apiRequest("post", env.AGENT_RUNS, { agentId, trigger: "manual" });
         if (!ok(res)) throw new Error(res?.data?.statusText || "The run did not start.");
         await loadSummary();
+        await loadActiveRuns();
         return res.data.data;
     };
 
@@ -109,6 +132,6 @@ export function useAgents() {
         agents, proposals, counts, runSummary, spend, registryManifest, loading, lastError,
         running, waiting, AUTONOMY,
         loadAll, loadAgents, loadProposals, loadSummary, loadSpend, loadRegistry,
-        decide, setPaused, pauseAll, runNow, saveAgent
+        decide, setPaused, pauseAll, runNow, saveAgent, activeRuns, loadActiveRuns, stopActive
     };
 }

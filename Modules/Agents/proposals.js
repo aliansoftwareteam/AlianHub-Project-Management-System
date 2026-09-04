@@ -13,7 +13,10 @@ const audit = require('./agentAudit');
 // token that is honoured for 30 seconds.
 
 const STATUS = Object.freeze({ PENDING: 'pending', APPROVED: 'approved', EDITED: 'edited', DECLINED: 'declined', UNDONE: 'undone' });
-const UNDO_WINDOW_MS = 30 * 1000;
+// 30s was a reflex window, not a review window: by the time a person opened the
+// Inbox to look at what an agent did, it had closed. The audit row keeps the undo
+// descriptor either way, so a longer window costs nothing.
+const UNDO_WINDOW_MS = 15 * 60 * 1000;
 const PRIMARY_AGE_MS = 24 * 60 * 60 * 1000;
 const GATE_OWNER_ADMIN = 'owner_admin';
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };

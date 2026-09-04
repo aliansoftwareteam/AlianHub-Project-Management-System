@@ -149,29 +149,30 @@ const pauseAll = async (companyId, reason) => {
 const executeSkill = async (companyId, run, agent, task, { proposals, actions, actor }) => {
     const orchestrator = require('./engine/orchestrator');
     try {
-        const result = await orchestrator.run({ skillSlug: run.skill || 'qa-review', task, budget: { maxTokens: 4000 } });
+        const result = await orchestrator.run({ skillSlug: run.skill || 'qa-review', task, companyId, budget: { maxTokens: 4000 } });
         await recordSpend(companyId, run, result.usage, result.model);
         if (result.status !== 'success') {
             await finish(companyId, run._id, { status: result.status === 'skipped' ? STATUS.DONE : STATUS.FAILED, outcome: result.reason });
             return;
         }
-        const changes = result.findings.map((f) => ({
+        const changes = Array.isArray(result.changes) ? result.changes : result.findings.map((f) => ({
             action: 'subtask.create', label: `Create subtask "[${f.severity}] ${f.title}"`, reversible: true,
             params: { taskId: String(task._id), title: `[${f.severity}] ${f.title}`, description: [f.why, f.fix ? `Fix: ${f.fix}` : '', f.evidence ? `Evidence: ${f.evidence}` : ''].filter(Boolean).join('\n') },
         }));
-        changes.push({ action: 'task.comment', label: 'Post the review summary', reversible: true, params: { taskId: String(task._id), body: result.summary } });
-        if (registry.mayActDirectly(agent.autonomy, 'subtask.create')) {
+        if (!Array.isArray(result.changes)) changes.push({ action: 'task.comment', label: 'Post the review summary', reversible: true, params: { taskId: String(task._id), body: result.summary } });
+        const mayAct = changes.length && changes.every((c) => registry.mayActDirectly(agent.autonomy, c.action));
+        if (mayAct) {
             for (const c of changes) {
                 // eslint-disable-next-line no-await-in-loop
                 const out = await actions.perform({ companyId, actor, action: c.action, params: c.params, reason: `${run.skill} finding`, allowedActions: agent.allowedActions });
                 // eslint-disable-next-line no-await-in-loop
                 await appendAction(companyId, run._id, { action: c.action, auditId: out.auditId, ok: true });
             }
-            await finish(companyId, run._id, { status: STATUS.DONE, outcome: `${result.findings.length} finding(s) filed` });
+            await finish(companyId, run._id, { status: STATUS.DONE, outcome: `${changes.length} change(s) applied` });
         } else {
             const proposal = await proposals.create(companyId, {
                 agent, runId: String(run._id), taskId: String(task._id), projectId: String(task.ProjectID),
-                what: `File ${result.findings.length} QA finding(s) on ${task.TaskKey || task.TaskName}`, why: result.summary, changes,
+                what: Array.isArray(result.changes) ? `${run.skill}: ${changes.length} change(s) on ${task.TaskKey || task.TaskName}` : `File ${result.findings.length} QA finding(s) on ${task.TaskKey || task.TaskName}`, why: result.summary, changes,
                 cost: { tokens: result.usage && result.usage.totalTokens, model: result.model },
             });
             await patch(companyId, run._id, { status: STATUS.WAITING }, { $push: { proposals: String(proposal._id) } });

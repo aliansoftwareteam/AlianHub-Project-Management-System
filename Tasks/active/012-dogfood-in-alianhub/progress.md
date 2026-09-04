@@ -148,3 +148,13 @@ approved → subtasks + summary → undo). What using it surfaced, all fixed unl
 - A run whose proposal was decided stayed "waiting_approval" forever.
 - localhost URLs are refused (SSRF guard, correct) but the skip said "no reviewable URL".
 Left as friction, not fixed: templates are only offered on the empty state; no Stop control on a Hub card; only one skill (qa-review) actually executes — the other template skills are labels.
+
+### 2026-09-04 (AR-48: the team is real)
+Three skills built on a generic orchestrator path (gather → one model call → changes), all run live
+through the mention flow at L1 and landed as proposals: Intake broke AR-48's brief into 7 estimated
+subtasks ($0.0045); Reviewer fetched PR #533's diff, summarised it correctly and flagged risk
+($0.016); Reporter read the board and wrote a digest ($0.003). Digest works without a model too
+(deterministic counts). Also: templates offered in the wizard whenever there is no template prop,
+Stop on a Hub card with an open run, undo window 30s → 15 min. Noted, not fixed: the Reporter's
+digest invented "in review for 24 days" — a fact not in its data — despite the prompt forbidding it;
+a verify step like the QA skill's would drop unsupported claims.
