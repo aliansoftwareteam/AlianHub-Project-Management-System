@@ -1,6 +1,0 @@
-[
-  "components/organisms/FilterChat/FilterChat.vue",
-  "components/organisms/MainChat/MainChatConversationIcon.vue",
-  "components/organisms/MainChat/ThreadSummary.vue",
-  "components/organisms/MainChatSidebar/MainChatSidebar.vue"
-]
