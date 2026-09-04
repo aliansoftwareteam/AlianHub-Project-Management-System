@@ -213,22 +213,22 @@ exports.importProjectPriorities = (companyName) => {
         {
             'name': "High",
             'value': "HIGH",
-            "image": 'taskPriorities/priority_high.png',
-            'statusImage': 'taskPriorities/priority_high.png',
+            "image": '',
+            'statusImage': '',
             'isDeleted': false
         },
         {
             'name': "Medium",
             'value': "MEDIUM",
-            "image": 'taskPriorities/priority_medium.png',
-            'statusImage': 'taskPriorities/priority_medium.png',
+            "image": '',
+            'statusImage': '',
             'isDeleted': false
         },
         {
             'name': "Low",
             'value': "LOW",
-            "image":'taskPriorities/priority_low.png',
-            'statusImage': 'taskPriorities/priority_low.png',
+            "image": '',
+            'statusImage': '',
             'isDeleted': false
         }
     ]

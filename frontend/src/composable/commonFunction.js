@@ -282,6 +282,9 @@ export const projectAppsIcons = (key) => {
     return result[0];
 }
 
+/* Older seeds stored a cloud path the bucket never had; those render from the bundled PNGs. */
+export const isBundledPriorityImage = (image) => !image || String(image).startsWith('taskPriorities/');
+
 export const companyPrioritiesIcons = (key) => {
 
     let data = [
