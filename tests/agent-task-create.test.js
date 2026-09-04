@@ -52,6 +52,7 @@ describe('task.create — an agent can file what it found', () => {
         const saved = {};
         MongoDbCrudOpration
             .mockResolvedValueOnce(project)
+            .mockResolvedValueOnce([])
             .mockImplementationOnce(async (_c, q) => { Object.assign(saved, q.data); return { _id: q.data._id }; })
             .mockResolvedValueOnce({ _id: 'tid', CompanyId: CID, TaskKey: 'AR-27', TaskName: 'Found it' });
         const r = await tools.createTask(CID, PID, { title: 'Found it', priority: 'high', sprintId: '' });
@@ -69,6 +70,7 @@ describe('task.create — an agent can file what it found', () => {
         const saved = {};
         MongoDbCrudOpration
             .mockResolvedValueOnce(project)
+            .mockResolvedValueOnce([])
             .mockImplementationOnce(async (_c, q) => { Object.assign(saved, q.data); return { _id: q.data._id }; })
             .mockResolvedValueOnce({ _id: 'tid', CompanyId: CID, TaskKey: 'AR-29' });
         await tools.createTask(CID, PID, { title: 'x', leaderId: 'token-owner' });
@@ -83,10 +85,25 @@ describe('task.create — an agent can file what it found', () => {
         const saved = {};
         MongoDbCrudOpration
             .mockResolvedValueOnce(project)
+            .mockResolvedValueOnce([])
             .mockImplementationOnce(async (_c, q) => { Object.assign(saved, q.data); return { _id: q.data._id }; })
             .mockResolvedValueOnce({ _id: 'tid', CompanyId: CID, TaskKey: 'AR-28' });
         await tools.createTask(CID, PID, { title: 'x', priority: 'asap' });
         expect(saved.Task_Priority).toBe('MEDIUM');
+    });
+
+    it('files into the project\'s oldest live list when none is given', async () => {
+        const saved = {};
+        MongoDbCrudOpration
+            .mockResolvedValueOnce(project)
+            .mockResolvedValueOnce([{ _id: 's1', sprintName: 'List' }])
+            .mockImplementationOnce(async (_c, q) => { Object.assign(saved, q.data); return { _id: q.data._id }; })
+            .mockResolvedValueOnce({ _id: 'tid', CompanyId: CID, TaskKey: 'AR-30' });
+        await tools.createTask(CID, PID, { title: 'Filed somewhere', sprintId: '' });
+        expect(saved.sprintId).toBe('s1');
+        expect(saved.sprintArray).toEqual({ id: 's1', name: 'List' });
+        const listQuery = MongoDbCrudOpration.mock.calls[1][1];
+        expect(listQuery.data[0].deletedStatusKey).toEqual({ $in: [0, null] });
     });
 
     it('refuses a sprint that belongs to a different project', async () => {
