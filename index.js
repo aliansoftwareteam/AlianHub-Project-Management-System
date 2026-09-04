@@ -27,95 +27,49 @@ const { corsOriginDelegate } = require('./utils/cors.js');
 const { getHealth } = require('./Modules/Instance/health.js');
 
 const app = express();
-// Trust the loopback proxy by default so X-Forwarded-For is honored when
-// nginx (or any same-host reverse proxy) sits in front of the Node
-// process. Without this, express-rate-limit logs
-// ERR_ERL_UNEXPECTED_X_FORWARDED_FOR and may key all clients by the
-// proxy IP. Override via TRUST_PROXY env (e.g. "1" for one upstream, or
-// "true" for any). Safe in dev because requests from outside loopback
-// fall back to req.connection.remoteAddress.
-// app.set('trust proxy', process.env.TRUST_PROXY || 'loopback');
+// Honour X-Forwarded-For from the reverse proxy in front of the process, so rate
+// limiting keys on the client and not on the proxy. TRUST_PROXY takes a hop count
+// or "true" for hosted setups.
+app.set('trust proxy', process.env.TRUST_PROXY || 'loopback');
 
-// CORS — BUG-002 / #56. Replace wildcard with an env-driven allow-list.
-// See utils/cors.js for the exact rules and supported env vars.
+// CORS allow-list is env-driven; see utils/cors.js.
 app.use(cors({ origin: corsOriginDelegate }));
 
-// Security headers. CSP is intentionally disabled — the Vue frontend uses
-// inline scripts/styles in production. crossOriginEmbedderPolicy is off so
-// existing third-party embeds keep working. Everything else (HSTS,
-// X-Content-Type-Options, X-Frame-Options, Referrer-Policy, etc.) is on
-// with helmet defaults.
-// app.use(helmet({
-//     contentSecurityPolicy: false,
-//     crossOriginEmbedderPolicy: false,
-//     crossOriginResourcePolicy: { policy: 'cross-origin' },
-// }));
+// CSP stays off: the Vue bundle uses inline scripts and styles in production.
+if (process.env.HELMET_ENABLED !== 'false') {
+    app.use(helmet({
+        contentSecurityPolicy: false,
+        crossOriginEmbedderPolicy: false,
+        crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }));
+}
 
-// Global rate limiting. Counts only API traffic — static assets and
-// socket.io are skipped so SPA cold-loads can't trip the limit. Set
-// GLOBAL_RATE_LIMIT_PER_MIN=0 (or "off"/"false") to disable entirely;
-// useful for internal deployments where auth-level brute-force
-// protection (Modules/Auth/helper.js#manageResetAttempt) is enough.
-// const rawGlobalLimit = String(process.env.GLOBAL_RATE_LIMIT_PER_MIN ?? '10000').trim().toLowerCase();
-// const rateLimitDisabled = ['0', 'off', 'false', 'no', 'disabled'].includes(rawGlobalLimit);
-
-// if (!rateLimitDisabled) {
-//     const GLOBAL_RATE_LIMIT = Math.max(1, Number(rawGlobalLimit) || 10000);
-//     const STATIC_ASSET_RX = /\.(js|mjs|css|map|svg|png|jpe?g|gif|ico|webp|avif|woff2?|ttf|otf|eot|html?|mp4|webm|mp3|wav|pdf)$/i;
-
-//     app.use(rateLimit({
-//         windowMs: 60 * 1000,
-//         max: GLOBAL_RATE_LIMIT,
-//         standardHeaders: true,
-//         legacyHeaders: false,
-//         // Don't count anything that isn't a real API call. Socket.io has
-//         // its own throttling; static assets are not a DoS vector here.
-//         skip: (req) => {
-//             if (req.path.startsWith('/socket.io/')) return true;
-//             if (STATIC_ASSET_RX.test(req.path)) return true;
-//             if (req.path === '/' || req.path.startsWith('/assets/') || req.path.startsWith('/static/')) return true;
-//             return false;
-//         },
-//     }));
-// }
-// BUG-037 / #91 — body limits.
-// Previously every endpoint accepted 50MB JSON/url-encoded/raw bodies,
-// so any unauthenticated POST could spend the request loop buffering
-// 50MB before validation even runs. Drop the default to 2MB (well above
-// typical JSON payloads — comments, settings, project data — but blocks
-// the trivial multi-MB DoS). File uploads use `multer` and have their
-// own limits (see Modules/storage/**), so this only constrains
-// body-parser-handled paths. Operators with bulk-import or large-form
-// use cases can raise it via the `BODY_LIMIT` env var.
+// API traffic only: static assets and socket.io are never counted, so an SPA cold
+// load cannot trip the limit. 0 / off disables it for internal deployments.
+const rawGlobalLimit = String(process.env.GLOBAL_RATE_LIMIT_PER_MIN ?? '1000').trim().toLowerCase();
+if (!['0', 'off', 'false', 'no', 'disabled'].includes(rawGlobalLimit)) {
+    const STATIC_ASSET_RX = /\.(js|mjs|css|map|svg|png|jpe?g|gif|ico|webp|avif|woff2?|ttf|otf|eot|html?|mp4|webm|mp3|wav|pdf)$/i;
+    app.use(rateLimit({
+        windowMs: 60 * 1000,
+        max: Math.max(1, Number(rawGlobalLimit) || 1000),
+        standardHeaders: true,
+        legacyHeaders: false,
+        skip: (req) => req.path.startsWith('/socket.io/') || STATIC_ASSET_RX.test(req.path)
+            || req.path === '/' || req.path.startsWith('/assets/') || req.path.startsWith('/static/'),
+    }));
+}
+// 2MB covers every JSON body the app sends; uploads go through multer with their
+// own limits. BODY_LIMIT raises it for bulk imports.
 const BODY_LIMIT = process.env.BODY_LIMIT || '2mb';
 app.use(bodyParser.urlencoded({ extended: true, limit: BODY_LIMIT }));
 app.use(bodyParser.json({ limit: BODY_LIMIT }));
 app.use(bodyParser.raw({ limit: BODY_LIMIT }));
 
-// Set Maintenance Mode
-if (!config.UNDER_MAINTENANCE || config.UNDER_MAINTENANCE == "false") {
-    app.use(express.static(path.join(__dirname, './frontend/dist')));
-    app.get("/", (req, res) => {
-        res.sendFile(path.join(__dirname, './frontend/dist/index.html'));
-    });
-} else {
-    // RUN UNDER MAINTENANCE SERVER
-    app.get("/", (req, res) => {
-        res.sendFile(path.join(__dirname, './under-maintenance/index.html'));
-    });
-
-    app.use(express.static(path.join(__dirname, 'under-maintenance')));
-    app.use(express.static(path.join(__dirname, 'log')));
-    app.use((req, res, next) => {
-        if (req.path === "/api/v1/finalupgradeprocess"
-            || req.path.indexOf("/api/v1/upgradeProcess/events") !== -1
-            || req.path.indexOf("/api/v1/realLog/events") !== -1
-        ) {
-            return next(); // Continue to the next middleware or route handler
-        }
-        res.sendFile(path.join(__dirname, './under-maintenance/index.html'));
-    })
-}
+app.use(express.static(path.join(__dirname, './frontend/dist')));
+app.get("/", (req, res) => {
+    res.sendFile(path.join(__dirname, './frontend/dist/index.html'));
+});
+app.use(require('./Modules/Instance/maintenance.js').maintenanceGuard);
 
 // ADD DEFAULT BRAND SETTINGS
 makeDefaultBrandSettings()
@@ -311,9 +265,7 @@ async function applySavedSettings() {
         }
     });
 
-    if (!config.UNDER_MAINTENANCE || config.UNDER_MAINTENANCE == "false") {
-        app.use(require('./Config/spaFallback').spaFallback(path.join(__dirname, './frontend/dist/index.html')));
-    }
+    app.use(require('./Config/spaFallback').spaFallback(path.join(__dirname, './frontend/dist/index.html')));
 
     if (process.env.MONGODB_URL) {
         await require('./migrations').runMigrationsAtBoot();

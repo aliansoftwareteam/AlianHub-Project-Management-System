@@ -7509,6 +7509,7 @@ export default {
         maintenance_off: "Leave maintenance",
         maintenance_confirm: "Every API call except health and this console answers 503 until you leave maintenance. Continue?",
         maintenance_banner: "Maintenance mode is on: members see a banner and cannot use the app until you leave it.",
+        maintenance_public: "Maintenance in progress — changes will not save for a few minutes. This page refreshes itself when the service is back.",
         card_db: "Database",
         card_storage: "Storage",
         card_mail: "Mail",
