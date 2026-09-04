@@ -2298,7 +2298,10 @@ export default {
         bulk_delete_confirm: "Delete {n} task(s)? They move to the Trash, where you can restore them.",
         remove_sample: "Remove sample data",
         remove_sample_confirm: "Move the welcome project and its tasks to the Trash? You can restore them from Workspace → Trash.",
-        remove_sample_done: "Sample data moved to the Trash."
+        remove_sample_done: "Sample data moved to the Trash.",
+        prev_month: "Previous month",
+        next_month: "Next month",
+        this_month: "This month"
     },
     TrashV2: {
         title: "Trash",

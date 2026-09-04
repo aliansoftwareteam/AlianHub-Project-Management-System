@@ -15,7 +15,7 @@
                         :value="taskSearch"
                         @input="$emit('update:taskSearch', $event.target.value)"
                     >
-                    <DropDown title="Search In" id="searchfilterdropdownoptions_driver" class="position-ab dropdown-image-horizontal" :bodyClass="{'search__in-dropdown' : true}">
+                    <DropDown :title="$t('Projects.search_in')" id="searchfilterdropdownoptions_driver" class="position-ab dropdown-image-horizontal" :bodyClass="{'search__in-dropdown' : true}">
                         <template #head>
                             <h4 class="black font-size-13 font-weight-500 p-10px m-0 search__in" :class="{'border-bottom': clientWidth > 767}">
                                 {{ $t('Projects.search_in') }}
@@ -194,15 +194,15 @@
                         />
                     </div>
                     <div class="mr-1 group_by d-flex">
-                        <button type="button" title="Previous month" class="calendar-button" @click="$emit('prevMonth')">
+                        <button type="button" :title="$t('ProjectsV2.prev_month')" class="calendar-button" @click="$emit('prevMonth')">
                             <span class="fc-icon fc-icon-chevron-left"></span>
                         </button>
-                        <button type="button" title="Next month" class="calendar-button" @click="$emit('nextMonth')">
+                        <button type="button" :title="$t('ProjectsV2.next_month')" class="calendar-button" @click="$emit('nextMonth')">
                             <span class="fc-icon fc-icon-chevron-right"></span>
                         </button>
                     </div>
                     <div class="mr-1 group_by">
-                        <button type="button" title="This month" class="calendar-button calendar-currentday-text" @click="$emit('defaultMonth')">{{ $t('Home.Today') }}</button>
+                        <button type="button" :title="$t('ProjectsV2.this_month')" class="calendar-button calendar-currentday-text" @click="$emit('defaultMonth')">{{ $t('Home.Today') }}</button>
                     </div>
                 </div>
             </div>

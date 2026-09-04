@@ -104,6 +104,8 @@
     "dev": "node scripts/dev.js --skip-install",
     "setup:reset": "node scripts/dev.js --force",
     "lint:commits": "commitlint --from ${BASE_BRANCH:-origin/staging} --to HEAD --verbose",
+    "i18n:check": "node scripts/i18n-check.js",
+    "i18n:backfill": "node scripts/i18n-backfill.js",
     "prepare": "node .husky/install.mjs || true"
   },
   "author": "Alian Software <https://alianhub.com>",
