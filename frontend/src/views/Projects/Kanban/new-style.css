@@ -12,13 +12,12 @@
     color: var(--ink);
 }
 
-/* Card-level multi-select checkbox: top-left corner — always visible. */
+/* Multi-select checkbox sits in the title row. It was absolutely positioned
+   against whichever ancestor happened to be positioned, and landed on the title. */
 .kanban-card-wrapper { position: relative; }
 .kanban-card-multi-select {
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    z-index: 5;
+    flex: 0 0 auto;
+    margin-right: 6px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -33,13 +32,6 @@
     cursor: pointer;
     accent-color: var(--brand);
     margin: 0;
-}
-/* Leading spacer where the task-type icon used to be: reserves the top-left
-   corner for the absolute multi-select checkbox so the card title stays clear. */
-.kanban-card-checkbox-space {
-    display: inline-block;
-    flex: 0 0 auto;
-    width: 18px;
 }
 
 .kanban-board .kanban-column {

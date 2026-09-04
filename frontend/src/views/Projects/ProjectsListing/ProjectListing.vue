@@ -27,7 +27,7 @@
         @update:search="handleSearchUpdate"
         @updateSearchProject="handleSearchUpdateProject"
     />
-    <Sidebar v-else v-model:visible="visible" className="z-index-6" title="Projects" :left="true" width="400px" :unMount="false" :hide-header="true">
+    <Sidebar v-else v-model:visible="visible" className="z-index-6" title="Projects" :left="true" width="400px" :unMount="false" :hide-header="true" :closeOnBackDrop="true">
         <template #body>
             <ProjectListComponent
                 :loadedProjects="loadedProjects"

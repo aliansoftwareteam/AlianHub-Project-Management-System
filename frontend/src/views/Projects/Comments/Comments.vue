@@ -562,9 +562,10 @@ async function initialize() {
     }
 
 
-    // AUTO FOCUS TEXTBOX
+    // Keyboard-ready without moving the page: a plain focus() scrolls the task
+    // overlay down to the composer, past the title and description.
     nextTick(() => {
-        document.getElementById("message-box")?.focus();
+        document.getElementById("message-box")?.focus({ preventScroll: true });
     })
 
     // ASSIGN PATHS

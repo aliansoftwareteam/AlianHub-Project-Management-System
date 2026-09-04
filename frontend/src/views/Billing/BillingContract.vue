@@ -49,7 +49,7 @@
                             <div class="billing__ms-meta" :title="m.scope === 'explicit' ? $t('BillingV2.scope_explicit') : $t('BillingV2.scope_window')">
                                 {{ metaFor(m) }}
                             </div>
-                            <div v-if="m.percentBp !== null && m.percentBp > 0 && m.percentBp < 10000" class="billing__bar">
+                            <div v-if="m.percentBp !== null && m.percentBp > 0 && m.percentBp < 10000" class="billing__progress">
                                 <span :style="{ width: `${percentFromBp(m.percentBp)}%` }"></span>
                             </div>
                         </div>
