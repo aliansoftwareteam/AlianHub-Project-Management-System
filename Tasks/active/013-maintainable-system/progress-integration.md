@@ -14,3 +14,4 @@
 | 2026-09-04 | Browser: bulk delete → Trash → restore | PASS | 2 tasks deleted with typed confirm ("Updated 2 tasks."); Trash → Tasks lists both; Restore ×2 → "Restored.", Trash empty |
 | 2026-09-04 | Merge B (last 4 commits) | 8 rename-only conflicts resolved | kept A/C logic, ran `i18n-rename-namespace.js --all` (V2 blocks 0, refs 0), `env-doc.js` regenerated with 7 new ops keys, 10 en.js keys restored, `.env.example` head reworded |
 | 2026-09-04 | Gate after B | green | jest 111 suites / 1372 tests; lint 0 errors; env-doc in sync; i18n-check 0 missing; unused-components 0; `/health` carries `X-Request-Id`; `Prefer: status-codes` → 401 on a bad call |
+| 2026-09-04 | Browser after B | PASS | header project switcher lists 6 projects and routes to the chosen one at 1440; vitest 5 files / 12 tests; no raw locale keys on Projects or Inbox after the namespace fold |
