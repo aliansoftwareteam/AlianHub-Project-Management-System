@@ -10,6 +10,7 @@ const { getCachedGlobalTemplateData } = require("../../utils/enterpriseHelper");
 const { removeCache } = require('../../utils/commonFunctions');
 const { updateCompanyFun } = require("../Company/controller/updateCompany");
 const projectTemplate = require("../../utils/projectTemplates.json");
+const { pickKnownApps } = require("./apps");
 const blankTemplate = require("./blankTemplate");
 const { focusForTemplate, normaliseFocus, sampleTaskNamesFor, SAMPLE_TASK_COUNT } = require("./sampleTasks");
 
@@ -191,6 +192,8 @@ exports.createProject = async (req) => {
                 if (rejected.length === 0) {
                     let resultsValue = results.map((x) => x.value);
                     let createProjectObject = req.body;
+                    // Same object as req.body, so the template merges below overwrite `apps`; keep the client's pick first.
+                    const clientApps = Array.isArray(req.body.apps) ? [...req.body.apps] : null;
                     let appArray = [];
                     let tabComponentsArray = [];
                     //template
@@ -487,6 +490,9 @@ exports.createProject = async (req) => {
                                 logger.error(`without category: ${err}`);
                             }
                         }
+                    }
+                    if (clientApps) {
+                        createProjectObject.apps = pickKnownApps(clientApps, appArray);
                     }
                     createProjectObject.skills = await resolveProjectSkills(req.body.CompanyId, createProjectObject.skills);
                     createProjectObject.DueDate = createProjectObject.DueDate ? new Date(createProjectObject.DueDate) : '';

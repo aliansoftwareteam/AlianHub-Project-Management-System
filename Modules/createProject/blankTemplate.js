@@ -25,6 +25,8 @@ module.exports = {
         { appStatus: true, key: 'Priority', name: 'Priority' },
         { appStatus: true, key: 'MultipleAssignees', name: 'Multiple Assignees' },
         { appStatus: true, key: 'TimeTracking', name: 'Time Tracking' },
+        { appStatus: true, key: 'tags', name: 'Tags' },
+        { appStatus: true, key: 'CustomFields', name: 'Custom Fields' },
     ],
     TemplateRequiredComponent: [
         { viewStatus: true, keyName: 'ProjectListView', value: 'list', name: 'List', setAsDefault: true },
