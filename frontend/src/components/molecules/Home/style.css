@@ -223,3 +223,13 @@
 .hc-status__dot--dnd { background: var(--danger); }
 
 .ah-denied { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--ink-2); font: var(--text-body); }
+
+/* 375px: ring, steps and buttons in one row left a 150px column of wrapped text.
+   Stack them; the ring keeps the title company. */
+@media (max-width: 767px) {
+    .hc-setup { flex-wrap: wrap; align-items: flex-start; gap: 10px 12px; }
+    .hc-setup__body { flex: 1 1 100%; order: 3; min-width: 0; }
+    .hc-setup__ring { order: 1; }
+    .hc-setup__cta { order: 2; margin-left: auto; min-height: 44px; }
+    .hc-setup__dismiss { order: 4; min-height: 44px; }
+}
