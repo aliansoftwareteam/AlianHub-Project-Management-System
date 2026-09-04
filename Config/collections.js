@@ -100,6 +100,8 @@ const dbCollections = {
     FORM_SUBMISSIONS: "form_submissions",
     PROJECT_CONTRACTS: "project_contracts",
     PROJECT_INVOICES: "project_invoices",
+    SCHEMA_VERSIONS: "schema_versions",
+    INSTANCE_SETTINGS: "instance_settings",
 }
 
 /** DOCUMENT ID'S NAME WHICH IS USED IN THE "SETTINGS" COLLECTION NAME **/

@@ -1,8 +1,6 @@
 chargebee-setup
 paddle-setup
 server-storage-setup
-migrations
-/migrate-mongo-config.js
 .DS_Store
 node_modules
 jspm_packages

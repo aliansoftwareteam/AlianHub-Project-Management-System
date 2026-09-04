@@ -298,8 +298,12 @@ if (!config.UNDER_MAINTENANCE || config.UNDER_MAINTENANCE == "false") {
     app.use(require('./Config/spaFallback').spaFallback(path.join(__dirname, './frontend/dist/index.html')));
 }
 
-// SERVER LISTEN PORT
-const server = app.listen(config.PORT, () => {
-    console.log("Server ready on "+config.PORT)
-});
-initSocket(server);
+(async () => {
+    if (process.env.MONGODB_URL) {
+        await require('./migrations').runMigrationsAtBoot();
+    }
+    const server = app.listen(config.PORT, () => {
+        console.log("Server ready on " + config.PORT);
+    });
+    initSocket(server);
+})();

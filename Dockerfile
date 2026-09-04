@@ -77,6 +77,7 @@ COPY common-storage/ ./common-storage/
 COPY docs/ ./docs/
 COPY event/ ./event/
 COPY middlewares/ ./middlewares/
+COPY migrations/ ./migrations/
 COPY public/ ./public/
 COPY scripts/ ./scripts/
 COPY socket/ ./socket/

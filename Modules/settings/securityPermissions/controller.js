@@ -1,5 +1,4 @@
 const { myCache } = require("../../../Config/config");
-const { reconcileCompanyRules } = require('./reconcileRules');
 const { removeCache } = require("../../../utils/commonFunctions");
 const { dbCollections } = require("../../../Config/collections");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
@@ -75,14 +74,7 @@ exports.getSecurityPermissions = async (req, res) => {
                 error: "Company ID is required in headers."
             });
         }
-        let response = await exports.fetchRules(companyId);
-
-        // Repair a company that predates a permission. Deliberately only here and not inside
-        // fetchRules: fetchRules is a hot path (getProjectList calls it on every load), and the
-        // repair re-seeds the rules collection, so triggering it from an ordinary page load would
-        // put a delete-then-insert in front of every user. This screen is admin-only and rarely
-        // opened, which is where that work belongs.
-        response = await reconcileCompanyRules(companyId, response);
+        const response = await exports.fetchRules(companyId);
 
         return res.status(200).json(response && response.length ? response : []);
     } catch (error) {

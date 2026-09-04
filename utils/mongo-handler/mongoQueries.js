@@ -54,6 +54,8 @@ const {
     referCodeSchema,
     refferalmapping,
     globalSettingsSchema,
+    schemaVersionsSchema,
+    instanceSettingsSchema,
     webhooksSchema,
     webhookLogsSchema,
     recentVisitsSchema,
@@ -209,6 +211,10 @@ exports.checkType = (type) => {
             return refferalmapping
         case SCHEMA_TYPE.GLOBALSETTING:
             return globalSettingsSchema
+        case SCHEMA_TYPE.SCHEMA_VERSIONS:
+            return schemaVersionsSchema
+        case SCHEMA_TYPE.INSTANCE_SETTINGS:
+            return instanceSettingsSchema
         case SCHEMA_TYPE.WEBHOOKS:
             return webhooksSchema
         case SCHEMA_TYPE.WEBHOOK_LOGS:
@@ -411,6 +417,10 @@ exports.tableType = (type) => {
             return `${dbCollections.REFFERALMAPPING}`   
         case SCHEMA_TYPE.GLOBALSETTING:
                 return `${dbCollections.GLOBALSETTING}`
+        case SCHEMA_TYPE.SCHEMA_VERSIONS:
+                return `${dbCollections.SCHEMA_VERSIONS}`
+        case SCHEMA_TYPE.INSTANCE_SETTINGS:
+                return `${dbCollections.INSTANCE_SETTINGS}`
         case SCHEMA_TYPE.WEBHOOKS:
                 return `${dbCollections.WEBHOOKS}`
         case SCHEMA_TYPE.WEBHOOK_LOGS:
