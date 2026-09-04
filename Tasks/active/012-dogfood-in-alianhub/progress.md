@@ -120,3 +120,10 @@ row from 1024px (search shrinks first), icon-collapse search under 800px, phone 
 Found on the way: the tablet List column rule (mine, yesterday) was declared after the phone rule and
 won, so at 375px the name column was 0px wide — restored. Left cosmetic: the Group-by pill's legacy
 inner box adds 2px at phone width.
+
+### 2026-09-04 (AR-42: mobile pass 2)
+Task detail, Chat, AI Inbox, Approvals and Log time measured at 375×812. All clean except the
+timesheet, whose week grid scrolls sideways inside its card and took the empty-state message with
+it. Pinned with sticky — which needed the grid wrapper's overflow:hidden lifted on phones, or the
+grid, not the scroller, owns the sticky element. Task detail is full-width with the composer above
+the tab bar; only nits left (a legacy "Scroll to bottom" link, 26px tab chips on AI Inbox).

@@ -406,5 +406,9 @@ onMounted(() => {
 @media (max-width: 767px) {
     .ut2-panel { width: 100%; }
     .ut2-row { grid-template-columns: minmax(160px, 1fr) repeat(var(--days), 56px) 64px; }
+    /* The week grid scrolls sideways inside its card; the empty-state text must not
+       scroll away with it. Sticky to the scroller's left edge, sized to the viewport. */
+    .ut2-grid { overflow: visible; } /* otherwise the grid, not the scroller, is the sticky container */
+    .ut2-empty { position: sticky; left: 0; max-width: calc(100vw - 92px); }
 }
 </style>
