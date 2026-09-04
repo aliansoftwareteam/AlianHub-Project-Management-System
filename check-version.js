@@ -22,7 +22,7 @@ function npmInstallationAdmin() {
     } else {
         console.log("All Steps is Done"); 
     }
-};
+}
 
 // npm install in installation folder
 function npmInstallationInstallation() {
@@ -41,7 +41,7 @@ function npmInstallationInstallation() {
         console.log("End NPM Install in Installation");
         npmInstallationAdmin();
     });
-};
+}
 
 
 // npm install in frontend folder
@@ -61,7 +61,7 @@ function npmInstallationFrontend() {
         console.log("End NPM Install in Frontend");
         npmInstallationInstallation();
     });
-};
+}
 
 
 // npm install in main folder (API)

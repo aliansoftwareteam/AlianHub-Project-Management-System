@@ -328,7 +328,7 @@ app.get("/health", (req, res) => {
 
 fs.watch(__dirname + "/Modules/Template/", (event_type, file_name) => {
     try {
-        delete require.cache[require.resolve(__dirname + "/Modules/Template/" + file_name)];;
+        delete require.cache[require.resolve(__dirname + "/Modules/Template/" + file_name)];
     } catch (error) {
         console.error("ERROR in remove cache", error);
     }

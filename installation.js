@@ -26,6 +26,6 @@ function generateInstallationBuild() {
     } else {
         console.log("All Steps is Done");
     }
-};
+}
 
 generateInstallationBuild();
