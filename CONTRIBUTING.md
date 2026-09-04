@@ -20,9 +20,10 @@ Please read this guide carefully before submitting issues or pull requests.
 
 ### 3. Submitting Pull Requests
 - Fork the repository (external contributors) or branch directly (maintainers)
-- Create a topic branch from the latest `staging` — **not** `main`
+- Create a topic branch from the latest `beta` — **not** `main`
 - Keep changes focused and minimal
-- Open the PR against `staging` (not `main`)
+- Open the PR against `beta` (not `main`); `beta` is promoted to `staging` and then `main`
+- CI (`.github/workflows/ci.yml`) must be green: backend lint + Jest, frontend lint + Vitest + build
 
 > 📘 See [BRANCHING.md](BRANCHING.md) for the full branching strategy, including hotfix and release workflows.
 
@@ -64,16 +65,19 @@ See [`commitlint.config.js`](commitlint.config.js) for the full configuration. R
 
 
 ## Testing Requirements
-- All new features must include tests where applicable
+- All new features must include tests where applicable — helpers in `tests/<module>-rules.test.js`, UI in `frontend/tests/*.spec.js`
 - Bug fixes should include regression coverage
 - Refactors must not break existing tests
+- Before pushing, run the same gate as CI:
+  `npm run lint && npm test && (cd frontend && npm run lint -- --no-fix && npm test && npm run build)`
+- The `conventions` Jest project fails on a new unguarded `/api/v2` prefix, a tenant id read from the request body, an undescribed environment variable, an orphaned `.vue` file, a `*V2` locale namespace or an unknown `t()` key — see [docs/DEVELOPER-GUIDE.md](docs/DEVELOPER-GUIDE.md)
 
 
 ## Code Style & Quality
-- Follow existing code style and patterns
+- Follow existing code style and patterns; `npm run lint` must report 0 errors
 - Avoid unnecessary dependencies
 - Keep functions small and readable
-- Comment complex logic where necessary
+- Comment only what the code cannot say (a non-obvious why); never narrate what the code does
 
 
 ## Pull Request Review Process

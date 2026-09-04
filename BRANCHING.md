@@ -1,6 +1,6 @@
 # Branching Strategy
 
-AlianHub uses a **two-branch model** with a clear separation between stable releases and active development. This guide documents how branches flow, what each branch is for, and how contributors should work with them.
+AlianHub uses a **three-branch model** with a clear separation between stable releases, the pre-release line and active development. This guide documents how branches flow, what each branch is for, and how contributors should work with them.
 
 ---
 
@@ -9,12 +9,16 @@ AlianHub uses a **two-branch model** with a clear separation between stable rele
 | Branch | Purpose | Stability | Direct push? |
 |---|---|---|---|
 | `main` | Stable, public-facing | Production-ready | ❌ PR + review only |
-| `staging` | Active development | Pre-release | ❌ PR + CI only |
+| `staging` | Pre-release, deployed to the demo/staging server | Release candidate | ❌ PR + CI only |
+| `beta` | Active development — where topic branches land | Work in progress, always green | ❌ PR + CI only |
 | `<type>/<desc>` | Feature / fix / chore branches | Work in progress | ✅ Your branch |
 
-- **Internal contributors** → branch off `staging` → PR back to `staging`
-- **External contributors** → fork → branch off `staging` → PR back to `staging`
-- **Production hotfixes** → branch off `main` → PR to `main` → backport to `staging`
+- **Internal contributors** → branch off `beta` → PR back to `beta`
+- **External contributors** → fork → branch off `beta` → PR back to `beta`
+- **Promotion** → `beta` → `staging` (deploys the demo server) → `main` (release)
+- **Production hotfixes** → branch off `main` → PR to `main` → backport to `staging` and `beta`
+
+**CI gate.** `.github/workflows/ci.yml` runs on every pull request and push to `beta`, `staging` and `main`: backend `npm run lint` + `npm test`, frontend lint + `npm test` (Vitest) + `npm run build`. A red check blocks the merge; see [docs/DEVELOPER-GUIDE.md](docs/DEVELOPER-GUIDE.md) for what each job checks. The sections below describe the `staging → main` promotion; `beta → staging` follows the same PR-with-merge-commit rule.
 
 ---
 

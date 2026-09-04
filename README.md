@@ -83,37 +83,17 @@ npm run setup
 
 That's it. `npm run setup` will:
 
-1. Install all dependencies (root, frontend, wizard) in parallel
+1. Install all dependencies (root and frontend) in parallel
 2. Generate a `.env` file with secure random secrets
-3. Build the installation wizard UI
-4. Start the server (the same entry production uses)
-5. Open `http://localhost:4000` in your browser
+3. Start the server (the same entry production uses)
+4. Open `http://localhost:4000` in your browser
 
-On a fresh system the server serves the **installation wizard**. Complete it
-yourself — connect MongoDB, choose storage, skip or configure optional services
-(Firebase / AI / SMTP), and create **your own** company and admin account.
-Nothing is created automatically.
-
-When it's done, you'll see this in your terminal:
-
-```
-────────────────────────────────────────────────────────────
-  ✓  Server running — finish installation in your browser
-────────────────────────────────────────────────────────────
-
-  URL:   http://localhost:4000
-  The wizard guides you to connect MongoDB, choose storage, and create
-  your own company and admin account.
-  When it finishes, the app rebuilds and the server stops (same as
-  production). Run `npm start` again, then sign in.
-  Stop:  Ctrl+C
-────────────────────────────────────────────────────────────
-```
-
-The wizard's final step rebuilds the frontend and the server exits — the same
-flow production relies on, where a process manager (e.g. pm2) restarts the app.
-Locally there's no process manager, so just run **`npm start`** again, open
-`http://localhost:4000`, and **log in with the account you created**.
+On an empty database the app opens its **first-run setup** (`/setup`): create
+your own owner account and company, optionally with sample data. Mail, storage,
+AI and sign-in providers are configured afterwards from **Settings → Instance**
+(product owners only) or through environment variables — see
+[docs/ENV.md](docs/ENV.md) for every variable and
+[docs/ADMIN-GUIDE.md](docs/ADMIN-GUIDE.md) for the operator walkthrough.
 
 **Prerequisite:** MongoDB running locally on `mongodb://localhost:27017`. If you don't have it: `docker run -d -p 27017:27017 mongo:7` or download from [mongodb.com](https://www.mongodb.com/try/download/community).
 
@@ -121,12 +101,14 @@ Locally there's no process manager, so just run **`npm start`** again, open
 
 | Command | What it does |
 |---------|--------------|
-| `npm run setup` | Install deps, prepare `.env`, build the wizard UI, and start the server |
+| `npm run setup` | Install deps, prepare `.env`, and start the server |
 | `npm run dev` | Same as setup but skips dependency install |
 | `npm run setup:reset` | Wipe `node_modules` and reinstall everything |
 | `npm run setup -- --no-open` | Start without auto-opening a browser |
+| `npm test` / `npm run lint` | Jest (unit + conventions) / ESLint — the CI gate |
+| `cd frontend && npm test` | Vitest component specs |
 
-> All existing scripts (`npm start`, `npm run nodemon`, `npm run basic-install`) are unchanged. For active development with hot-reload, run the backend (`npm run nodemon`) and the frontend dev server (`cd frontend && npm run serve`) separately once the system is installed.
+> For active development with hot-reload, run the backend (`npm run nodemon`) and the frontend dev server (`cd frontend && npm run serve`) separately. Developers: [docs/DEVELOPER-GUIDE.md](docs/DEVELOPER-GUIDE.md).
 
 ---
 
