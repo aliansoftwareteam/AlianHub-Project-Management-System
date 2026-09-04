@@ -30,7 +30,7 @@
                         <option :value="null" disabled>{{ $t('MembersV2.invite_role') }}</option>
                         <option v-for="r in inviteRoles" :key="r.key" :value="r.key">{{ r.name }}</option>
                     </select>
-                    <select v-model="designation" class="ah-input mbv__select" :class="{ 'ah-input--error': errors.designation }" :aria-label="$t('MembersV2.invite_designation')" @change="errors.designation = ''">
+                    <select v-if="designationList.length" v-model="designation" class="ah-input mbv__select" :class="{ 'ah-input--error': errors.designation }" :aria-label="$t('MembersV2.invite_designation')" @change="errors.designation = ''">
                         <option :value="null" disabled>{{ $t('MembersV2.invite_designation') }}</option>
                         <option v-for="d in designationList" :key="d.key" :value="d.key">{{ d.name }}</option>
                     </select>
@@ -154,7 +154,6 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import Swal from "sweetalert2";
-import axios from "axios";
 import AppState from "@/components/molecules/AppState/AppState.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { useCustomComposable } from "@/composable";
@@ -314,7 +313,7 @@ async function sendInvites() {
     commitEmail();
     errors.email = emails.value.length ? "" : t("MembersV2.err_email");
     errors.role = role.value === null || role.value === "" ? t("MembersV2.err_role") : "";
-    errors.designation = designation.value === null || designation.value === "" ? t("MembersV2.err_designation") : "";
+    errors.designation = designationList.value.length && (designation.value === null || designation.value === "") ? t("MembersV2.err_designation") : "";
     if (errors.email || errors.role || errors.designation) return;
 
     sending.value = true;
@@ -322,7 +321,7 @@ async function sendInvites() {
         // eslint-disable-next-line no-await-in-loop
         const allowed = await canInviteAddress(mail);
         // eslint-disable-next-line no-await-in-loop
-        if (allowed) await deliverInvite(mail, designation.value, role.value, false);
+        if (allowed) await deliverInvite(mail, designation.value ?? 0, role.value, false);
     }
     listing.value = getCompanyUsers();
     emails.value = [];
@@ -344,7 +343,7 @@ async function canInviteAddress(mail) {
 
 async function deliverInvite(mail, userDesignation, userRole, isResend) {
     try {
-        const res = await axios.post(`${env.API_URI}${env.SEND_INVITATION_EMAIL}`, {
+        const res = await apiRequest('post', env.SEND_INVITATION_EMAIL, {
             companyId: companyId.value,
             companyName: company.value.Cst_CompanyName,
             email: mail,

@@ -77,7 +77,7 @@
             v-if="showCreateChannel"
             v-model:visible="showCreateChannel"
             :project="channelProject"
-            :folders="channelFolders"
+            :folder="channelFolder"
             @created="onChannelCreated"
         />
     </div>
@@ -265,6 +265,11 @@ const channelProject = computed(() => routeProject.value && !routeProject.value.
 const channelFolders = computed(() => {
     const group = channelGroups.value.find((g) => channelProject.value && String(g.project._id) === String(channelProject.value._id));
     return group ? group.categories : [];
+});
+// The form files the channel under one project folder; a project without folders gets a loose channel.
+const channelFolder = computed(() => {
+    const first = channelFolders.value[0];
+    return first ? { folderId: first.id, name: first.name } : null;
 });
 
 function onChannelCreated(channel) {

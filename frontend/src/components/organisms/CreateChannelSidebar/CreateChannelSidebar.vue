@@ -138,7 +138,6 @@ library.add(fas);
 dom.watch();
 
 // UTILS
-const projectData = inject("selectedProject");
 const userId = inject("$userId");
 const companyId = inject("$companyId");
 const clientWidth = inject("$clientWidth");
@@ -152,7 +151,7 @@ const showWarning = ref(false);
 const warningMessage = ref("");
 
 // EMITS
-const emit = defineEmits(["update:visible", "cancel"]);
+const emit = defineEmits(["update:visible", "cancel", 'created']);
 
 //IMAGE
 const deletered = require("@/assets/images/svg/deletered.svg");
@@ -167,7 +166,13 @@ const props = defineProps({
         type: Object,
         default: null
     },
+    project: {
+        type: Object,
+        default: null
+    },
 })
+const injectedProject = inject("selectedProject", null);
+const projectData = computed(() => props.project || (injectedProject && "value" in injectedProject ? injectedProject.value : injectedProject) || null);
 
 const icons = [...new Set([...Object.keys(far).map(key => far[key]),...Object.keys(fab).map(key => fab[key]),...Object.keys(fas).map(key => fas[key])])]
 const userGetter = computed(() => {
@@ -299,6 +304,8 @@ function createChannel() {
                     $toast.success(t(`Toast.Channel_created_successfully`), { position: "top-right" })
                     resetValues();
                     inProgress.value = false;
+                    emit('created', res.data.data || null);
+                    emit('update:visible', false);
                 } else {
                     $toast.error(res.data.statusText, { position: "top-right" })
                     resetValues();
@@ -324,8 +331,8 @@ async function createChannelFun() {
     return new Promise((resolve, reject) => {
         try {
             (async () => {
-                if(!props.folder) {
-                    $toast.error(t(`Toast.Folder_not_found`), {position: "top-right"});
+                if(!projectData.value?._id) {
+                    $toast.error(t(`Toast.something_went_wrong`), {position: "top-right"});
                     inProgress.value = false;
                     return;
                 }

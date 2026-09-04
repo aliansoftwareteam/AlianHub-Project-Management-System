@@ -340,6 +340,7 @@ const save = async (enabled) => {
     saving.value = true;
     errors.value = [];
     try {
+        if (!draft.name) await onRuleEdit();
         const body = { ...currentRule(), name: draft.name || sentence.value.slice(0, 120), enabled };
         const res = editingId.value
             ? await apiRequest('put', `${env.AUTOMATIONS_V2}/${editingId.value}`, body)
