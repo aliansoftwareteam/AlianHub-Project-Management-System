@@ -99,3 +99,10 @@ fixed, rebuilt, verified by measurement, In Review. Passes done: light at 1100, 
 Home and List, and child-rect measurements on every sidebar page at 1440. Still open and legacy:
 the project header/list toolbar styling (search overflows at 800px) and an unlabelled empty select
 on the Sprint report.
+
+### 2026-09-04 (next task: 22b)
+Picked from the coverage map, which still said 42 screens were in flight. Re-verified every id against
+the filesystem: 111 built, 0 in flight, 0 not started (2 cut, 15 with no screen). The map had been
+frozen before wave 2 landed. The one real gap it exposed: the four-step import wizard existed but the
+project List toolbar still opened the legacy modal, so nobody could reach it. Toolbar wired to the
+wizard, legacy modal deleted, verified from the List (AR-38, In Review).
