@@ -1,30 +1,25 @@
 <template>
     <div class="kanban-card-wrapper">
-        <!-- Multi-select checkbox: top-left of card. Visible on card hover OR when this card is selected. -->
-        <label
-            v-if="canCardMultiSelect"
-            class="kanban-card-multi-select"
-            :class="{ 'kanban-card-multi-select--active': isCardSelected }"
-            @click.stop
-            @mousedown.stop
-        >
-            <input
-                type="checkbox"
-                :checked="isCardSelected"
-                @click.stop
-                @mousedown.stop
-                @change="handleCardCheckboxChange($event)"
-                aria-label="Select task"
-            />
-        </label>
         <div @click.stop.prevent="!showArchiveVar ? toggleTaskDetail(element) : ''">
             <div>
                 <div class="d-flex justify-content-between">
                     <div class="d-flex align-items-center mw-82">
-                        <!-- Task type removed from the Kanban card. This spacer keeps the
-                             top-left slot for the absolute multi-select checkbox so the
-                             title never sits underneath it. -->
-                        <span class="kanban-card-checkbox-space" aria-hidden="true"></span>
+                        <label
+                            v-if="canCardMultiSelect"
+                            class="kanban-card-multi-select"
+                            :class="{ 'kanban-card-multi-select--active': isCardSelected }"
+                            @click.stop
+                            @mousedown.stop
+                        >
+                            <input
+                                type="checkbox"
+                                :checked="isCardSelected"
+                                @click.stop
+                                @mousedown.stop
+                                @change="handleCardCheckboxChange($event)"
+                                aria-label="Select task"
+                            />
+                        </label>
                         <div class="list-group-kanban-item__taskName text-ellipsis font-weight-500 font-size-14 ml-5px black" :title="element.TaskName">
                             <img v-if="element.deletedStatusKey === 2" :src="inventoryIcon" alt="inventory" class="ml-5px" />
                             <img v-if="element.deletedStatusKey === 1" :src="deleteIcon" alt="delete" class="ml-5px" />

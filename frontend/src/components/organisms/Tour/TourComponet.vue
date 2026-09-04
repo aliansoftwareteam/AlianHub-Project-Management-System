@@ -41,6 +41,9 @@ import { SAMPLE_PROJECT_NAME } from "@/components/organisms/CreateProject/templa
 const SHELL_TOUR_KEY = "isShellTour";
 const LEGACY_SHELL_KEYS = ["isProjectAndNavbarTour", "isProjectLeftViewTour", "isProjectViewTour"];
 const STEP_STORAGE = "ah.tour.step";
+// Skip means "not now": the tour stops offering itself on every reload, but the
+// Getting-started card can still start it.
+const SKIP_STORAGE = "ah.tour.skipped";
 const DISMISS_STORAGE = "ah.gs.dismissed";
 
 const { t } = useI18n();
@@ -131,7 +134,7 @@ const renderStepHeader = (popover, { state }) => {
     skip.type = "button";
     skip.className = "ah-tour__skip";
     skip.textContent = t("AuthV2.tour_skip");
-    skip.addEventListener("click", () => { pauseShellTour(); driverObj?.destroy(); });
+    skip.addEventListener("click", () => { pauseShellTour(); localStorage.setItem(SKIP_STORAGE, "1"); driverObj?.destroy(); });
     const meta = document.createElement("span");
     meta.className = "ah-tour__meta";
     meta.textContent = t("AuthV2.tour_meta", { n: STEPS.length, s: 40 });
@@ -168,7 +171,7 @@ const startShellTour = () => {
 const shellTourOffered = ref(false);
 const handleTour = (key) => {
     if (LEGACY_SHELL_KEYS.includes(key)) {
-        if (shellTourDone.value || shellTourOffered.value || savedStep() > 0 || !isOwnerOrAdmin.value || clientWidth.value <= 1024) return;
+        if (shellTourDone.value || shellTourOffered.value || savedStep() > 0 || localStorage.getItem(SKIP_STORAGE) === "1" || !isOwnerOrAdmin.value || clientWidth.value <= 1024) return;
         shellTourOffered.value = true;
         setTimeout(startShellTour, 400);
         return;

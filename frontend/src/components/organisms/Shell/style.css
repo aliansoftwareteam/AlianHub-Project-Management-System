@@ -2,6 +2,7 @@
     width: var(--rail-w);
     flex: none;
     height: 100dvh;
+    box-sizing: border-box;
     background: var(--rail);
     color: var(--rail-ink);
     display: flex;

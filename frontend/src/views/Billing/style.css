@@ -34,6 +34,9 @@
     padding: 20px 24px; display: flex; flex-direction: column; gap: 12px;
     border-right: 1px solid var(--hairline);
 }
+/* The column scrolls; its cards keep their natural height. Without this the empty
+   milestone table shrank to 17px and clipped its own header. */
+.billing__main > * { flex: none; }
 .billing__body--wide .billing__main { border-right: 0; }
 
 /* ---------- billing mode cards (19a) ---------- */
@@ -65,8 +68,9 @@
 .billing__ms-name { font-weight: 600; }
 .billing__row--data.is-muted .billing__ms-name { color: var(--ink-label); }
 .billing__ms-meta { font-size: 11.5px; color: var(--ink-label); margin-top: 1px; }
-.billing__bar { height: 5px; border-radius: 99px; background: var(--surface-hover); margin-top: 6px; max-width: 220px; overflow: hidden; }
-.billing__bar span { display: block; height: 100%; border-radius: 99px; background: var(--brand); }
+/* Was .billing__bar, which is also the toolbar's class; this rule turned the toolbar into a 5px, 220px box. */
+.billing__progress { height: 5px; border-radius: 99px; background: var(--surface-hover); margin-top: 6px; max-width: 220px; overflow: hidden; }
+.billing__progress span { display: block; height: 100%; border-radius: 99px; background: var(--brand); }
 .billing__cell-due { color: var(--ink-label); font-size: 11px; }
 .billing__cell-amount { font: 600 12px/1.2 var(--font-mono); }
 .billing__cell-signoff { font-size: 11.5px; color: var(--ink-label); }

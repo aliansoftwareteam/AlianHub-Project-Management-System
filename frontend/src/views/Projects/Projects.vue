@@ -960,7 +960,10 @@ watch([() => getters['projectData/projects'], showArchivedProjects, route, filte
 }, { deep: true });
 
 onMounted(() => {
-    if (clientWidth.value <= 1300) {
+    // Under 1300px the project list is a drawer. It used to open on every load so
+    // a user could pick a project; now that the route already names one, an open
+    // drawer just dims the view the user asked for.
+    if (clientWidth.value <= 1300 && !route.params.id) {
         visible.value = true;
         projectList.value.toggleSidebar(true);
     }

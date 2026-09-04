@@ -30,7 +30,27 @@ const findListSprint = async (companyId, projectId) => {
     return null;
 };
 
-const personalProjectBody = (companyId, uid) => ({
+// The schema requires a default view. Picked from the company's own view
+// catalogue, ids as strings, because createProject matches them with === against
+// stringified catalogue ids — an ObjectId never matches and the tab loses its name.
+const PERSONAL_VIEWS = ["ProjectListView", "ProjectKanban", "Calendar"];
+const PERSONAL_DEFAULT_VIEW = "ProjectListView";
+
+const personalViews = async (companyId) => {
+    const tabs = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECT_TAB_COMPONENTS, data: [{}] }, "find").catch(() => []);
+    const list = Array.isArray(tabs) ? tabs : [];
+    let chosen = list.filter((t) => t && PERSONAL_VIEWS.includes(t.keyName));
+    if (!chosen.length) chosen = list.slice(0, 1);
+    if (!chosen.length) throw new Error("no project views are seeded for this company yet");
+    const fallback = chosen[0];
+    return {
+        ProjectRequiredComponent: chosen.map((v) => ({ _id: String(v._id), viewStatus: true, setAsDefault: v.keyName === PERSONAL_DEFAULT_VIEW || v === fallback && !chosen.some((c) => c.keyName === PERSONAL_DEFAULT_VIEW) })),
+        ProjectRequiredDefaultComponent: (chosen.find((v) => v.keyName === PERSONAL_DEFAULT_VIEW) || fallback).keyName
+    };
+};
+
+const personalProjectBody = (companyId, uid, views) => ({
+    ...views,
     _id: new mongoose.Types.ObjectId(),
     CompanyId: companyId,
     ProjectName: PERSONAL_NAME,
@@ -69,7 +89,7 @@ exports.getOrCreatePersonalProject = async (req, res) => {
         let project = await findPersonalProject(companyId, uid);
         let created = false;
         if (!project || !Object.keys(project).length) {
-            const result = await createProject({ body: personalProjectBody(companyId, uid) });
+            const result = await createProject({ body: personalProjectBody(companyId, uid, await personalViews(companyId)) });
             project = result && result.data;
             created = true;
             removeCache("UserProjectData:", true);
@@ -88,3 +108,5 @@ exports.getOrCreatePersonalProject = async (req, res) => {
         return res.status(400).send({ status: false, message });
     }
 };
+
+exports.personalViews = personalViews;

@@ -209,3 +209,9 @@
     .lv2 { --lv2-cols: 28px minmax(0, 1fr) 90px 100px 80px 70px 60px; }
     .lv2__c-done { display: none; }
 }
+/* Tablet: the name column was 186px while Est and the custom-field slot kept 130px
+   of mostly empty space. Drop them here; they are one tap away in the row. */
+@media (max-width: 1024px) {
+    .lv2 { --lv2-cols: 28px minmax(0, 1fr) 90px 100px 80px; }
+    .lv2__c-est, .lv2__c-risk { display: none; }
+}

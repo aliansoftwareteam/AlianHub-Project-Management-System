@@ -498,7 +498,10 @@ const WikiTable = defineComponent({
 });
 </script>
 
-<style scoped>
+<style>
+/* Not scoped on purpose: DocCard, DocList, AgentList and WikiTable are render-function
+   components defined in this file, and scoped rules never reach their elements. Every
+   selector here is hub__-prefixed, so nothing leaks. */
 .hub {
     display: flex; height: 100%; min-height: 0;
     background: var(--canvas); color: var(--ink); font-family: var(--font-ui);

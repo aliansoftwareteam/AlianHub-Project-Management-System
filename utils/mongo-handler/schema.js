@@ -2059,6 +2059,17 @@ const schema = {
             type: String,
             required: true
         },
+        // Personal List (Modules/PersonalList). Without these the flag was stripped on
+        // save, the list was never found again and a fresh "Personal" project was
+        // created on every visit — and shown in the team's project list.
+        isPersonal: {
+            type: Boolean,
+            default: false
+        },
+        personalOwner: {
+            type: String,
+            default: ""
+        },
         ProjectType: {
             type: String,
             required: true

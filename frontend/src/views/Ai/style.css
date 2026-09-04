@@ -2,6 +2,7 @@
 .ai-page__main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .ai-page__body { flex: 1; min-height: 0; overflow: auto; padding: 20px 24px; }
 
+
 .ai-side {
     width: var(--sidebar-w-narrow);
     flex: none;
@@ -82,8 +83,16 @@
 .ai-done__n { font: var(--text-display); color: var(--ink); }
 
 @media (max-width: 1280px) {
-    .ai-side { display: none; }
+    /* Icon rail rather than gone: Inbox, Teammates, Pipeline and Audit have no other
+       entry point at this width. Below 768 the tab bar and More menu take over. */
+    .ai-side { width: 56px; padding: 14px 6px 10px; align-items: center; }
+    .ai-side__head span, .ai-side__usage, .ai-side__item > span:not(.ai-side__count) { display: none; }
+    .ai-side__item { width: 40px; height: 40px; padding: 0; justify-content: center; position: relative; }
+    .ai-side__count { position: absolute; top: 2px; right: 2px; margin: 0; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--brand); color: #fff; font-size: 10px; line-height: 16px; text-align: center; }
     .ai-inbox { grid-template-columns: 300px 1fr; }
+}
+@media (max-width: 767px) {
+    .ai-side { display: none; }
 }
 @media (max-width: 900px) {
     .ai-inbox { grid-template-columns: 1fr; }

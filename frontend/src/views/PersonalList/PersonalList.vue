@@ -68,7 +68,7 @@
                             <span class="personal__mono" :class="{ 'personal__mono--faint': !loggedTime(task) }">{{ loggedTime(task) || '—' }}</span>
                         </div>
                         <div v-if="!visibleTasks.length" class="personal__empty">{{ $t('HomeV2.personal_empty') }}</div>
-                        <button type="button" class="personal__new" @click="focusAdd">
+                        <button v-if="visibleTasks.length" type="button" class="personal__new" @click="focusAdd">
                             <span class="hc-add__plus">+</span><span>{{ $t('HomeV2.new_task_row') }}</span>
                         </button>
                     </div>

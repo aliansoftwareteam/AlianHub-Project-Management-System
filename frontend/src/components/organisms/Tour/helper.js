@@ -27,6 +27,8 @@ export function tourHepler() {
     const mainTour = inject("$mainTour");
     const {projects} = useProjectsHelper();
     
+    // Close, Esc and the overlay must end the tour on every step, not only the last one;
+    // a popover that ignores its own close button reads as broken.
     const handleTours = (tNum = 0) => {
 
         // startProjectTour()
@@ -61,10 +63,8 @@ export function tourHepler() {
                 onNextClick: (element, step, options) => onNextClickHandler('isTaskTour',element, step, options),
                 onPrevClick: (element, step, options) => onPrevClickHanler('isTaskTour',element, step, options),
                 onDestroyStarted: () => {
-                    if (!driverObj.hasNextStep()) {
-                        closeTaskButtonClick()
-                        driverObj.destroy();
-                    }
+                    closeTaskButtonClick()
+                    driverObj.destroy();
                 },
             }
         } else if(tNum === "isProjectAndNavbarTour") {
@@ -87,10 +87,8 @@ export function tourHepler() {
                 onNextClick: (element, step, options) => onNextClickHandler('',element, step, options),
                 onPrevClick: (element, step, options) => onPrevClickHanler('',element, step, options),
                 onDestroyStarted: () => {
-                    if (!driverObj.hasNextStep()) {
-                        updateTourStatusInUser('isProjectAndNavbarTour');
-                        driverObj.destroy();
-                    }
+                    updateTourStatusInUser('isProjectAndNavbarTour');
+                    driverObj.destroy();
                 },
             }
         } else if (tNum === "isProjectTour") {
@@ -113,9 +111,7 @@ export function tourHepler() {
                 onNextClick: (element, step, options) => onNextClickHandler('createproject',element, step, options),
                 onPrevClick: (element, step, options) => onPrevClickHanler('createproject',element, step, options),
                 onDestroyStarted: () => {
-                    if (!driverObj.hasNextStep()) {
-                        driverObj.destroy();
-                    }
+                    driverObj.destroy();
                 },
             }
         } else if (tNum === 'isProjectTour1') {
@@ -138,9 +134,7 @@ export function tourHepler() {
                 onNextClick: (element, step, options) => onNextClickHandler('createprojectform',element, step, options),
                 onPrevClick: (element, step, options) => onPrevClickHanler('createprojectform',element, step, options),
                 onDestroyStarted: () => {
-                    if (!driverObj.hasNextStep()) {
-                        driverObj.destroy();
-                    }
+                    driverObj.destroy();
                 },
             }
         } else if (tNum === 'isProjectTour2') {
@@ -163,9 +157,7 @@ export function tourHepler() {
                 onNextClick: (element, step, options) => onNextClickHandler('createprojecttasktype',element, step, options),
                 onPrevClick: (element, step, options) => onPrevClickHanler('createprojecttasktype',element, step, options),
                 onDestroyStarted: () => {
-                    if (!driverObj.hasNextStep()) {
-                        driverObj.destroy();
-                    }
+                    driverObj.destroy();
                 },
             }
         } else if (tNum === 'isProjectTour3') {
@@ -188,9 +180,7 @@ export function tourHepler() {
                 onNextClick: (element, step, options) => onNextClickHandler('createprojectstepbtn',element, step, options),
                 onPrevClick: (element, step, options) => onPrevClickHanler('createprojectstepbtn',element, step, options),
                 onDestroyStarted: () => {
-                    if (!driverObj.hasNextStep()) {
-                        driverObj.destroy();
-                    }
+                    driverObj.destroy();
                 },
             }
         } else if(tNum === 'isProjectViewTour') {
@@ -213,10 +203,8 @@ export function tourHepler() {
                 onNextClick: (element, step, options) => onNextClickHandler('projectview',element, step, options),
                 onPrevClick: (element, step, options) => onPrevClickHanler('projectview',element, step, options),
                 onDestroyStarted: () => {
-                    if (!driverObj.hasNextStep()) {
-                        updateTourStatusInUser('isProjectViewTour');
-                        driverObj.destroy();
-                    }
+                    updateTourStatusInUser('isProjectViewTour');
+                    driverObj.destroy();
                 },
             }
         } else if(tNum === 'isProjectLeftViewTour') {
@@ -245,10 +233,8 @@ export function tourHepler() {
                 onNextClick: (element, step, options) => onNextClickHandler('projectlistleft',element, step, options),
                 onPrevClick: (element, step, options) => onPrevClickHanler('projectlistleft',element, step, options),
                 onDestroyStarted: () => {
-                    if (!driverObj.hasNextStep()) {
-                        updateTourStatusInUser('isProjectLeftViewTour');
-                        driverObj.destroy();
-                    }
+                    updateTourStatusInUser('isProjectLeftViewTour');
+                    driverObj.destroy();
                 },
             }
         }
