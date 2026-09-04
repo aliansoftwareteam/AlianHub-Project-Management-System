@@ -331,3 +331,9 @@ module.exports.IMPORT_CSV_PREVIEW = '/api/v2/imports/csv/preview';
 
 // Per-status WIP limit on a project's board columns
 module.exports.PROJECT_WIP_LIMIT = '/api/v1/projectSetting/taskStatus/wipLimit';
+
+// First-run setup (Modules/Setup) and the operator guide the setup and Instance pages link to
+module.exports.SETUP_STATUS = '/api/v2/setup/status';
+module.exports.SETUP_COMPLETE = '/api/v2/setup/complete';
+module.exports.SETUP_EVENTS = '/api/v2/setup/events';
+module.exports.ADMIN_GUIDE_URL = 'https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/blob/main/docs/ADMIN-GUIDE.md';

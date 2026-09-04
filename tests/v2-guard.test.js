@@ -6,7 +6,7 @@ const glob = (dir, out = []) => { for (const f of fs.readdirSync(dir)) { const p
  * /api/v2 prefix and forgets the guard list ships open — that is how imports,
  * epics, exports, reactions, recent-visits, search and the email triggers were
  * found answering anyone with a company id in a header. */
-const PUBLIC_BY_DESIGN = ['/api/v2/auth', '/api/v2/sso', '/api/v2/github-signup', '/api/v2/gitlab-signup', '/api/v2/google-signup', '/api/v2/logout', '/api/v2/session', '/api/v2/public-shares', '/api/v2/changelog', '/api/v2/sendForgotPasswordEmail', '/api/v2/scim',
+const PUBLIC_BY_DESIGN = ['/api/v2/auth', '/api/v2/setup', '/api/v2/sso', '/api/v2/github-signup', '/api/v2/gitlab-signup', '/api/v2/google-signup', '/api/v2/logout', '/api/v2/session', '/api/v2/public-shares', '/api/v2/changelog', '/api/v2/sendForgotPasswordEmail', '/api/v2/scim',
     // signup and invitation flows: nobody has a token yet
     '/api/v2/createUser', '/api/v2/sendVerificationEmail', '//api/v2/verifyEmail'.replace('//', '/'), '/api/v2/generateToken', '/api/v2/checkPermission'];
 const SELF_GUARDED = ['/api/v2/agents', '/api/v2/api-tokens', '/api/v2/automations', '/api/v2/billing', '/api/v2/intake', '/api/v2/invoices', '/api/v2/webhooks', '/api/v2/instance', '/api/v2/timesheet-approval', '/api/v2/generate'];

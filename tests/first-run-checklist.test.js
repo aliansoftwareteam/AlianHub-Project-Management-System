@@ -86,10 +86,10 @@ describe('demo project sample content', () => {
     test('the wizard offers exactly the options the backend understands', () => {
         const fs = require('fs');
         const path = require('path');
-        const src = fs.readFileSync(path.join(__dirname, '..', 'installation', 'src', 'views',
-            'InstallStep', 'CreateUserAndCompany.vue'), 'utf8');
-        const block = src.slice(src.indexOf('formData.teamFocus.value'));
-        const offered = [...block.slice(0, 900).matchAll(/<option value="([a-z]*)"/g)].map((m) => m[1]);
+        const src = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'views',
+            'Setup', 'SetupWizard.vue'), 'utf8');
+        const block = src.slice(src.indexOf('id="teamFocus"'));
+        const offered = [...block.slice(0, 1200).matchAll(/<option value="([a-z]*)"/g)].map((m) => m[1]);
         // The blank option is the "not sure" choice and is deliberately not a backend key.
         for (const value of offered.filter(Boolean)) {
             expect(st.TEAM_FOCUS_OPTIONS).toContain(value);
@@ -100,7 +100,7 @@ describe('demo project sample content', () => {
     test('createDemoProject is gated on the company and user only, never on the answer', () => {
         const fs = require('fs');
         const path = require('path');
-        const src = fs.readFileSync(path.join(__dirname, '..', 'Modules', 'CheckInstallStep',
+        const src = fs.readFileSync(path.join(__dirname, '..', 'Modules', 'Setup',
             'demoProject.js'), 'utf8');
         expect(src).toContain('if (!companyId || !userId) return false;');
         expect(src).not.toMatch(/if\s*\(\s*!teamFocus/);

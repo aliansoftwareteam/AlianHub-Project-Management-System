@@ -20,11 +20,12 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 const bodyParser = require("body-parser");
 const config =  require('./Config/config.js');
-const awsRef =  require('./Config/aws.js');
-const logger = require("./Config/loggerConfig");
-const packJOSNData = require("./package.json");
+const { loadDotEnv, applyEnvMap } = require('./Config/applyEnv.js');
+loadDotEnv();
+if (!process.env.STORAGE_TYPE) applyEnvMap({ STORAGE_TYPE: 'wasabi' });
 const { makeDefaultBrandSettings } = require("./Modules/Admin/common/controller.js");
 const { corsOriginDelegate } = require('./utils/cors.js');
+const { getHealth } = require('./Modules/Instance/health.js');
 
 const app = express();
 // Trust the loopback proxy by default so X-Forwarded-For is honored when
@@ -95,8 +96,6 @@ app.use(bodyParser.raw({ limit: BODY_LIMIT }));
 // Set Maintenance Mode
 if (!config.UNDER_MAINTENANCE || config.UNDER_MAINTENANCE == "false") {
     app.use(express.static(path.join(__dirname, './frontend/dist')));
-    app.use(express.static(path.join(__dirname, './installation/dist')));
-    // RUN FRONTEND SERVER
     app.get("/", (req, res) => {
         res.sendFile(path.join(__dirname, './frontend/dist/index.html'));
     });
@@ -133,37 +132,6 @@ app.use((req, res, next) => {
 app.use(require('./Config/strictStatus').strictStatus());
 
 function initializeControllers() {
-    const envFile = fs.readFileSync(__dirname + "/.env");
-    const envConfig = require('dotenv').parse(envFile);
-    envConfig.PORT = Number(envConfig.PORT);
-    envConfig.NOOFPRESETCOMPANY = Number(envConfig.NOOFPRESETCOMPANY);
-    const tmpStorage = envConfig.STORAGE_TYPE;
-    if (!tmpStorage) {
-        envConfig.STORAGE_TYPE = "wasabi";
-    }
-    for (const key in envConfig) {
-        process.env[key] = envConfig[key];
-        if (key === "APIKEY" || key === "AUTODOMAIN" || key === "PROJECTID" || key === "STORAGEBUCKET" || key === "MESSAGINGSENDERID" || key === "APPID" || key === "MEASUREMENTID") {
-            config["FIREBASE_"+key] = envConfig[key];
-        } else {
-            config[key] = envConfig[key];
-            if (key === "WASABI_ACCESS_KEY") {
-                awsRef.wasabiAccessKey = envConfig["WASABI_ACCESS_KEY"];
-            } else if (key === "WASABI_SECRET_ACCESS_KEY") {
-                awsRef.wasabiSecretAccessKey = envConfig["WASABI_SECRET_ACCESS_KEY"];
-            } else if (key === "WASABIENDPOINT") {
-                awsRef.wasabiEndPoint = envConfig["WASABIENDPOINT"];
-            } else if (key === "WASABI_REGION") {
-                awsRef.region = envConfig["WASABI_REGION"];
-            } else if (key === "IAM_ENDPOINT") {
-                awsRef.iamEndPoint = envConfig["IAM_ENDPOINT"];
-            } else if (key === "USERPROFILEBUCKET") {
-                awsRef.userProfileBucket = envConfig["USERPROFILEBUCKET"];
-            } else if (key === "WASABI_USERID") {
-                awsRef.wasabiUserId = envConfig["WASABI_USERID"];
-            }
-        }
-    }
     const { startInterval } = require("./middlewares/mongoConnector/helper.js");
     startInterval();
     const { currentDirectory } = require(`./common-storage/common-${process.env.STORAGE_TYPE}.js`);
@@ -224,8 +192,8 @@ function initializeControllers() {
     require('./Modules/SaasAdmin/init').init(app);
     require('./Modules/ScreenshotRetention/init').init(app);
     require('./Modules/projectClose/init').init(app);
-    if(process.env.NODE_ENV === "production") {
-        require('./cron.js')
+    if (process.env.CRON_ENABLED !== 'false') {
+        require('./cron.js');
     }
     require('./Modules/Admin/admin.js').init(app);
     require('./Modules/emailTemplate/init').init(app);
@@ -299,20 +267,12 @@ function initializeControllers() {
 require('./Config/setMiddleware.js').setMiddlewareWithCV2(app);
 require('./Config/setMiddleware.js').setMiddlewareV2(app);
 
-//CONFIGURE ENV FILE
-require('dotenv').config();
 if (process.env.MONGODB_URL) {
     initializeControllers();
 }
-// if (process.env.CANYONLICENSEKEY) {
-//     initializeControllers();
-// }
 
-if (!process.env.STORAGE_TYPE) {
-    process.env.STORAGE_TYPE = "wasabi";
-}
-
-require('./Modules/CheckInstallStep/init').init(app);
+// Registered outside initializeControllers so the wizard can report a missing database.
+require('./Modules/Setup/init').init(app);
 
 // SWAGGER CONFIGURATION
 require('./Modules/swaggerAPI/init').init(app, config.APIURL);
@@ -321,9 +281,9 @@ require('./Modules/swaggerAPI/init').init(app, config.APIURL);
 require('./Modules/common/init').init(app);
 
 const { initSocket } = require("./socket/socketinit.js");
-//FOR CHECK SERVER RUNNING OR NOT
-app.get("/health", (req, res) => {
-    res.send("Server is running in "+config.NODE_ENV);
+app.get("/health", async (req, res) => {
+    const { httpStatus, body } = await getHealth();
+    res.status(httpStatus).json(body);
 });
 
 fs.watch(__dirname + "/Modules/Template/", (event_type, file_name) => {
