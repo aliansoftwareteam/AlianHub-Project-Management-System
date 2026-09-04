@@ -8,7 +8,12 @@
  * `Prefer: status-codes`. The body is never changed, only the status line, and the
  * mapping is announced in X-Status-Mapped so it is visible in any client log. */
 
-const wantsStatusCodes = (req) => Boolean(req.apiToken) || /\bstatus-codes\b/i.test(String(req.get && req.get('Prefer') || ''));
+// An API token is recognised by its bearer prefix, not by whether some later
+// middleware resolved it: on routes outside the JWT guard req.apiToken is never set.
+const API_TOKEN_PREFIX = /^Bearer\s+ahp_/i;
+const wantsStatusCodes = (req) => Boolean(req.apiToken)
+    || API_TOKEN_PREFIX.test(String((req.get && req.get('Authorization')) || (req.headers && req.headers.authorization) || ''))
+    || /\bstatus-codes\b/i.test(String((req.get && req.get('Prefer')) || ''));
 
 const inferStatus = (body) => {
     const explicit = Number(body.statusCode || body.code);

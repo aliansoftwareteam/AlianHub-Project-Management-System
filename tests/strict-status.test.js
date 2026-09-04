@@ -31,5 +31,7 @@ describe('HTTP 200-on-failure, opt-in status codes', () => {
         expect(inferStatus({ statusText: 'Proposal is already approved.' })).toBe(409);
         expect(inferStatus({ statusText: 'Invalid token' })).toBe(401);
         expect(wantsStatusCodes({ get: () => 'return=minimal, status-codes' })).toBe(true);
+        expect(wantsStatusCodes({ get: (h) => (h === 'Authorization' ? 'Bearer ahp_abc' : '') })).toBe(true);
+        expect(wantsStatusCodes({ get: (h) => (h === 'Authorization' ? 'Bearer eyJhbGciOi' : '') })).toBe(false);
     });
 });
