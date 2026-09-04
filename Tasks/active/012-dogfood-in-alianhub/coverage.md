@@ -1,61 +1,61 @@
 # Handoff coverage map
 
-Every option id in `AlianHub Login Review.dc.html` (129 total), with its status as of 2026-09-03.
+Every option id in `AlianHub Login Review.dc.html` (129 total), with its status as of 2026-09-04 (re-verified against the filesystem after wave 2 and the dogfood pass).
 Verified against the filesystem, not assumed. This is the source for the AlianHub backlog in task.md.
 
 | id | status | screen |
 | --- | --- | --- |
-| `24d` | NOT STARTED | Planner — one day at a time, drag from the tray below |
-| `25e` | NOT STARTED | External data & coding agents — Notion 3.4's Workers/database-sync and externa |
-| `27a` | NOT STARTED | Three modes side by side. A workspace can allow more than one. |
-| `27b` | NOT STARTED | Linking a personal account: an explicit, readable boundary |
-| `27c` | NOT STARTED | Attribution: the team always knows who and what did the work |
-| `27d` | NOT STARTED | The awkward cases, decided in advance |
-| `28a` | NOT STARTED | The pipeline — one task, five stages, one hard stop |
-| `28c` | NOT STARTED | Release & deploy — the one screen where agent work meets production, and a hum |
-| `29b` | NOT STARTED | Where it appears — Done column, list column, and a filter |
-| `10a` | in flight | Projects list — health, sprint, owner; empty state becomes a template picker |
-| `10b` | in flight | Board view — views bar, WIP counts, AI Assist and agent activity in context |
-| `10c` | in flight | Members — invite by email or link, role picked per invite with its one-line me |
-| `11c` | in flight | Portfolio report — one screen for the owner: health, burn-down, capacity, what |
-| `12d` | in flight | Dashboards Hub — shared dashboards with owners, plus your 30+ cards behind "+  |
-| `12e` | in flight | Mobile — Board (columns swipe), Chat, AI Inbox with swipe-to-approve |
-| `13b` | in flight | Agents as teammates — @mention in a comment, assign a task, and they appear in |
-| `13c` | in flight | AI fields in Table view — summary, risk score, autofilled category; each cell  |
-| `13d` | in flight | Automations — describe it in a sentence; the rule it compiles to is shown and  |
-| `13e` | in flight | Connections — MCP servers, external agents, and app search sources; every conn |
-| `13g` | in flight | Planner v2 — auto focus blocks around meetings, teammate availability, time zo |
-| `13h` | in flight | Team page — who's on what right now, one-click standup, workload balance, PTO |
-| `13i` | in flight | Ask — quick-action cards, sources it can search, Research mode for long report |
-| `14a` | in flight | List — grouped by status, inline add per group, subtasks collapse, bulk bar on |
-| `14b` | in flight | Calendar — month with due dates, PTO and sprint bands; unscheduled tray on the |
-| `14c` | in flight | Gantt — dependencies, critical path, milestones, baseline vs actual, today lin |
-| `14d` | in flight | Workload — hours per person per day against capacity; PTO greyed; drag a task  |
-| `14e` | in flight | Forms — builder with field mapping to task properties, live preview, and the " |
-| `16a` | in flight | Sprint report — one page a lead can read in 30 seconds: commitment vs done, sc |
-| `16b` | in flight | Velocity & cumulative flow — six sprints of history with a forecast band, and  |
-| `16c` | in flight | Milestones — every dated commitment across projects, with what moved and why |
-| `16e` | in flight | Custom report builder — pick source, filters, grouping and a chart; save as a  |
-| `17c` | in flight | Recurring tasks — the rule, the next few occurrences, and what happens if one  |
-| `19a` | in flight | Contract setup — one screen, fixed-price or hourly, with the money maths visib |
-| `19b` | in flight | Hourly milestone — the same contract screen when billing is per hour: rates, c |
-| `19c` | in flight | Invoice — drafted from the milestone or the month, with every line traceable t |
-| `19d` | in flight | Client view — a guest-safe page: progress, what needs their sign-off, invoices |
-| `20a` | in flight | Card anatomy — every card obeys this, so 30 cards read as one product |
-| `20b` | in flight | My work — the personal family, incl. achievements and leave |
-| `20c` | in flight | Team & project — the shared family: pulse, live work, logged vs estimate, free |
-| `20d` | in flight | Chart, table and AI cards — plus the picker that keeps 30 cards findable |
-| `21d` | in flight | Relations, subtasks & quick menu — LinkedTasks, SubTasks, TaskQuickMenu, Proje |
-| `21e` | in flight | Sprints & folders — SprintsList + SideBarSprintFolderData: close a sprint and  |
-| `22a` | in flight | Field builder — all 10 types in one list, with the type picker showing what ea |
-| `22b` | in flight | CSV import — four steps; the mapping step is where every import actually goes  |
-| `22d` | in flight | Language & region — 14 locales, and the two that change layout: RTL and non-La |
-| `25c` | in flight | People directory — who does what, who's free, who reports to whom. Notion 3.2  |
-| `28b` | in flight | Where it shows on screen — five places, all live, none of them a separate "AI  |
-| `29c` | in flight | Rollups — sprint velocity and margin, split honestly |
-| `30a` | in flight | The picker — agents ranked by fit for this task, with the reason stated |
-| `30b` | in flight | Many at once — select tasks, route them, or write a rule so you stop doing it  |
-| `30c` | in flight | When it's the wrong agent — decline, hand back, reassign |
+| `24d` | built | Planner — one day at a time, drag from the tray below — `style.css` |
+| `25e` | built | External data & coding agents — Notion 3.4's Workers/database-sync and externa — `ExternalData.vue` |
+| `27a` | built | Three modes side by side. A workspace can allow more than one. — `AiAccounts.vue` |
+| `27b` | built | Linking a personal account: an explicit, readable boundary — `AiAccounts.vue` |
+| `27c` | built | Attribution: the team always knows who and what did the work — `AccountAttribution.vue` |
+| `27d` | built | The awkward cases, decided in advance — `AiAccounts.vue` |
+| `28a` | built | The pipeline — one task, five stages, one hard stop — `AiPipeline.vue` |
+| `28c` | built | Release & deploy — the one screen where agent work meets production, and a hum — `AiRelease.vue` |
+| `29b` | built | Where it appears — Done column, list column, and a filter — `ListRow.vue` |
+| `10a` | built | Projects list — health, sprint, owner; empty state becomes a template picker — `ProjectsListPage.vue` |
+| `10b` | built | Board view — views bar, WIP counts, AI Assist and agent activity in context — `BoardView.vue` |
+| `10c` | built | Members — invite by email or link, role picked per invite with its one-line me — `*.vue` |
+| `11c` | built | Portfolio report — one screen for the owner: health, burn-down, capacity, what — `*.vue` |
+| `12d` | built | Dashboards Hub — shared dashboards with owners, plus your 30+ cards behind "+ — `DashboardsHub.vue` |
+| `12e` | built | Mobile — Board (columns swipe), Chat, AI Inbox with swipe-to-approve — `MobileTabBar.vue` |
+| `13b` | built | Agents as teammates — @mention in a comment, assign a task, and they appear in — `AgentTeammates*.vue` |
+| `13c` | built | AI fields in Table view — summary, risk score, autofilled category; each cell — `TableView.vue` |
+| `13d` | built | Automations — describe it in a sentence; the rule it compiles to is shown and — `*.vue` |
+| `13e` | built | Connections — MCP servers, external agents, and app search sources; every conn — `ConnectionsPage.vue` |
+| `13g` | built | Planner v2 — auto focus blocks around meetings, teammate availability, time zo — `Planner.vue` |
+| `13h` | built | Team page — who's on what right now, one-click standup, workload balance, PTO — `*.vue` |
+| `13i` | built | Ask — quick-action cards, sources it can search, Research mode for long report — `AskPage.vue` |
+| `14a` | built | List — grouped by status, inline add per group, subtasks collapse, bulk bar on — `ListView.vue` |
+| `14b` | built | Calendar — month with due dates, PTO and sprint bands; unscheduled tray on the — `*.vue` |
+| `14c` | built | Gantt — dependencies, critical path, milestones, baseline vs actual, today lin — `*.vue` |
+| `14d` | built | Workload — hours per person per day against capacity; PTO greyed; drag a task — `*.vue` |
+| `14e` | built | Forms — builder with field mapping to task properties, live preview, and the " — `*.vue` |
+| `16a` | built | Sprint report — one page a lead can read in 30 seconds: commitment vs done, sc — `SprintReport.vue` |
+| `16b` | built | Velocity & cumulative flow — six sprints of history with a forecast band, and — `Velocity*.vue` |
+| `16c` | built | Milestones — every dated commitment across projects, with what moved and why — `MilestonesReportPage.vue` |
+| `16e` | built | Custom report builder — pick source, filters, grouping and a chart; save as a — `CustomReports.vue` |
+| `17c` | built | Recurring tasks — the rule, the next few occurrences, and what happens if one — `*.vue` |
+| `19a` | built | Contract setup — one screen, fixed-price or hourly, with the money maths visib — `BillingContract.vue` |
+| `19b` | built | Hourly milestone — the same contract screen when billing is per hour: rates, c — `BillingHourly.vue` |
+| `19c` | built | Invoice — drafted from the milestone or the month, with every line traceable t — `BillingInvoices.vue` |
+| `19d` | built | Client view — a guest-safe page: progress, what needs their sign-off, invoices — `BillingClientView.vue` |
+| `20a` | built | Card anatomy — every card obeys this, so 30 cards read as one product — `CardPicker.vue` |
+| `20b` | built | My work — the personal family, incl. achievements and leave — `DashboardView.vue` |
+| `20c` | built | Team & project — the shared family: pulse, live work, logged vs estimate, free — `DashboardView.vue` |
+| `20d` | built | Chart, table and AI cards — plus the picker that keeps 30 cards findable — `CardPicker.vue` |
+| `21d` | built | Relations, subtasks & quick menu — LinkedTasks, SubTasks, TaskQuickMenu, Proje — `TaskSubtaskList.vue` |
+| `21e` | built | Sprints & folders — SprintsList + SideBarSprintFolderData: close a sprint and — `SprintsList.vue` |
+| `22a` | built | Field builder — all 10 types in one list, with the type picker showing what ea — `FieldBuilder.vue` |
+| `22b` | built | CSV import — four steps; the mapping step is where every import actually goes — `ImportWizard.vue` |
+| `22d` | built | Language & region — 14 locales, and the two that change layout: RTL and non-La — `Language.vue` |
+| `25c` | built | People directory — who does what, who's free, who reports to whom. Notion 3.2 — `PeopleDirectory.vue` |
+| `28b` | built | Where it shows on screen — five places, all live, none of them a separate "AI — `TaskAgentStrip.vue` |
+| `29c` | built | Rollups — sprint velocity and margin, split honestly — `AiAccounts.vue` |
+| `30a` | built | The picker — agents ranked by fit for this task, with the reason stated — `AgentPicker.vue` |
+| `30b` | built | Many at once — select tasks, route them, or write a rule so you stop doing it — `AgentRouting*.vue` |
+| `30c` | built | When it's the wrong agent — decline, hand back, reassign — `AgentOutcomes.vue` |
 | `10d` | built | Chat — channels per project, agent posts marked, make-a-task from a message |
 | `10e` | built | Timesheet — your strength, in the new shell: week grid, live timer, approval s |
 | `11a` | built | Skill library — a skill is a playbook (editable prompt), its allowed actions,  |

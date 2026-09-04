@@ -166,7 +166,14 @@
                     <ExportTasksDropdown v-model="showExport" :projectData="projectData" />
                     <PublicShareModal v-model="showPublicShare" :projectData="projectData" />
                     <ImportJiraModal v-model="showImportJira" :projectData="projectData" />
-                    <ImportCsvModal v-model="showImportCsv" :projectData="projectData" />
+                    <ImportWizard
+                        :showImportModal="showImportCsv"
+                        :projectId="String(projectData?._id || '')"
+                        :taskStatus="projectData?.taskStatusData || []"
+                        :users="projectData?.isPrivateSpace ? (projectData?.AssigneeUserId || []) : users"
+                        :sprint="importSprint"
+                        @toggle-import-modal="showImportCsv = $event"
+                    />
                     <ImportTrelloModal v-model="showImportTrello" :projectData="projectData" />
                     <ImportAsanaModal v-model="showImportAsana" :projectData="projectData" />
                     <ImportMondayModal v-model="showImportMonday" :projectData="projectData" />
@@ -250,7 +257,8 @@
 </template>
 
 <script setup>
-import { ref, defineProps, defineEmits } from 'vue';
+import { ref, computed, defineProps, defineEmits } from 'vue';
+import { useRoute } from 'vue-router';
 import DropDown from '@/components/molecules/DropDown/DropDown.vue';
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
 import Toggle from '@/components/atom/Toggle/Toggle.vue';
@@ -265,7 +273,7 @@ import ExportTasksDropdown from '@/components/molecules/ExportTasks/ExportTasksD
 import PagesPanel from '@/components/molecules/Pages/PagesPanel.vue';
 import PublicShareModal from '@/components/molecules/PublicShare/PublicShareModal.vue';
 import ImportJiraModal from '@/components/molecules/ImportJira/ImportJiraModal.vue';
-import ImportCsvModal from '@/components/molecules/ImportCsv/ImportCsvModal.vue';
+import ImportWizard from '@/plugins/importTasks/components/organisms/ImportWizard/ImportWizard.vue';
 import ImportTrelloModal from '@/components/molecules/ImportTrello/ImportTrelloModal.vue';
 import ImportAsanaModal from '@/components/molecules/ImportAsana/ImportAsanaModal.vue';
 import ImportMondayModal from '@/components/molecules/ImportMonday/ImportMondayModal.vue';
@@ -291,7 +299,7 @@ import AppTeaserBlock from '@/components/molecules/AppTeaserBlock/AppTeaserBlock
 
 const { checkPermission, checkApps, getAppState } = useCustomComposable();
 
-defineProps({
+const props = defineProps({
     activeTab: { type: String, required: true },
     projectData: { type: Object, required: true },
     clientWidth: { type: Number, required: true },
@@ -313,6 +321,19 @@ defineProps({
     calendarDate: { type: String, default: '' },
     calenderSelectDate: { type: Number, default: 0 },
     rangeObject: { type: Object, default: () => ({}) },
+});
+
+const route = useRoute();
+// The wizard files rows into one sprint: the one in the route, else the project's first.
+// 22b's "into Mobile App v2" headline reads from this.
+const importSprint = computed(() => {
+    const wanted = String(route.params.sprintId || '');
+    const flat = [];
+    Object.values(props.projectData?.sprintsObj || {}).forEach((sp) => sp?.id && flat.push({ ...sp, _id: sp.id }));
+    Object.values(props.projectData?.sprintsfolders || {}).forEach((folder) => {
+        Object.values(folder?.sprintsObj || {}).forEach((sp) => sp?.id && flat.push({ ...sp, _id: sp.id, folderId: folder.folderId, folderName: folder.folderName || '' }));
+    });
+    return flat.find((sp) => String(sp.id) === wanted) || flat[0] || {};
 });
 
 defineEmits([
