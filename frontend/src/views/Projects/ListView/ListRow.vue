@@ -56,7 +56,7 @@
             <span v-if="!isSub && data.Task_Priority" class="lv2__prio" :class="priorityClass">{{ $t(priority.label) }}</span>
         </span>
 
-        <span class="lv2__est">{{ estimate }}</span>
+        <span class="lv2__est lv2__c-est">{{ estimate }}</span>
 
         <span class="lv2__c-risk">
             <span v-if="!isSub && risk.score" class="lv2__risk" :class="`lv2__risk--${risk.level}`" :title="riskTitle">

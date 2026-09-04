@@ -47,8 +47,8 @@
                         <span class="lv2__c-assignee">{{ $t('ListV2.col_assignee') }}</span>
                         <span class="lv2__c-due">{{ $t('ListV2.col_due') }}</span>
                         <span class="lv2__c-prio">{{ $t('ListV2.col_priority') }}</span>
-                        <span>{{ $t('ListV2.col_est') }}</span>
-                        <span>✦ {{ $t('ListV2.col_risk') }}</span>
+                        <span class="lv2__c-est">{{ $t('ListV2.col_est') }}</span>
+                        <span class="lv2__c-risk">✦ {{ $t('ListV2.col_risk') }}</span>
                         <span class="lv2__c-done">{{ $t('ProvenanceV2.col_done_by') }}</span>
                     </div>
 

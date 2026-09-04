@@ -34,6 +34,9 @@
     padding: 20px 24px; display: flex; flex-direction: column; gap: 12px;
     border-right: 1px solid var(--hairline);
 }
+/* The column scrolls; its cards keep their natural height. Without this the empty
+   milestone table shrank to 17px and clipped its own header. */
+.billing__main > * { flex: none; }
 .billing__body--wide .billing__main { border-right: 0; }
 
 /* ---------- billing mode cards (19a) ---------- */
