@@ -75,7 +75,7 @@ exports.makeDefaultBrandSettings = () => {
                 fs.writeFile(filePath, JSON.stringify(defaultJsonAlianHub, null, 2), (err) => {
                     if (err) {
                         logger.error('Error writing file getBrandSettingsData:', err);
-                        reject(error)
+                        reject(err)
                     } else {
                         resolve(defaultJsonAlianHub);
                     }

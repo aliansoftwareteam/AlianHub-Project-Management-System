@@ -110,7 +110,7 @@ exports.init = (app) => {
      *              description: status:true/false,statusText:message
      */
 
-   	/**
+    /**
      * Create a new Company and Add company In wasabi.
      */
 	app.post("/api/v2/company/create", upload.single("file"), ctrl.createCompanyV2);

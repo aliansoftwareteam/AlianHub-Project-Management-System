@@ -356,7 +356,6 @@ module.exports = {
     settingsSchema,
     milestone,
     mainChatSchema,
-    settingsSchema,
     appsSchema,
     notificationsSchema,
     notificationsSettingsSchema,

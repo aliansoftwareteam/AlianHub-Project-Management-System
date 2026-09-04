@@ -353,7 +353,7 @@ exports.migrateProject = (project,companyId) => {
             let folderPromise = [];
             let sprintPromise = [];
             const extractSprints = (sprints) => Object.values(sprints || {}).map(x => ({ ...x, projectId: project._id }));
-            let sprints = [...extractSprints(sprintsObj || {}), ...(Object.keys(sprintsfolders).length > 0 ? extractSprints(Object.assign(...Object.values(sprintsfolders || {})?.map(x => x.sprintsObj || {}))) : [])];
+            let sprints = [...extractSprints(sprintsObj || {}), ...(Object.keys(sprintsfolders).length > 0 ? extractSprints(Object.assign({}, ...Object.values(sprintsfolders || {}).map(x => x.sprintsObj || {}))) : [])];
             let folders = Object.values(sprintsfolders || {}).map((x) => ({...x,projectId : project._id}));
             folders = folders.map(folder => {
                 const folderObj = {
@@ -478,7 +478,7 @@ exports.updateTaksFolders = (projectId,companyId) => {
                         const updateObj = {
                             type: SCHEMA_TYPE.TASKS,
                             data: [
-                                {"sprintArray.folderId" :{ $exists: true},"sprintArray.folderId": {$in : [legacyId,folderId]} , ProjectID: new mongoose.Types.ObjectId(projectId)},
+                                {"sprintArray.folderId": {$in : [legacyId,folderId]} , ProjectID: new mongoose.Types.ObjectId(projectId)},
                                 { folderObjId : new mongoose.Types.ObjectId(folderId)}
                             ]
                         }

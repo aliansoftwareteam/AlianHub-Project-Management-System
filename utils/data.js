@@ -2229,7 +2229,7 @@ exports.importTaskTypeTemplate = (companyName) => {
     });
 }
 
-exports.importSettingTemplate = (templates, cb) =>{
+exports.importSettingTemplate = (companyId, templates, cb) =>{
     try {
         let path = `${SCHEMA_TYPE.PROJECT_TEMPLATES}`;
         let promisesArray = [];
@@ -2243,7 +2243,7 @@ exports.importSettingTemplate = (templates, cb) =>{
             promisesArray.push(
                 new Promise((resolve2, reject2) => {
                     try {
-                        MongoDbCrudOpration(companyName, obj, "findOneAndUpdate")
+                        MongoDbCrudOpration(companyId, obj, "findOneAndUpdate")
                         .then(() => {
                             resolve2();
                         })

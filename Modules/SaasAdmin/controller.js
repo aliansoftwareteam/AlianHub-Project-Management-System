@@ -1,6 +1,7 @@
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const logger = require("../../Config/loggerConfig");
 const { dbCollections } = require("../../Config/collections");
+const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { updateCompanyFun, getCompanyDataFun } = require("../Company/controller/updateCompany");
 
 /**

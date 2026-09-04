@@ -397,7 +397,6 @@ module.exports = {
                             body: {
                                 companyId: companyId,
                                 projectId: projectData.id,
-                                folderId: task?.folderObjId || null,
                                 updateObject :{$inc: { tasks: -1}},
                                 folderId: sprintObj?.folderId || null,
                             },

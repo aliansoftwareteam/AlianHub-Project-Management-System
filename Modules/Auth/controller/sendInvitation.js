@@ -88,7 +88,7 @@ async function batchUpdate(arr, eventId) {
                         logger.error(`Invitation batch ${batch} failed: ${e.message || e}`);
                         reject(new Error(`Unexpected error in batch ${batch}`));
                     }
-                };
+                }
             }
             loopFun()
         } catch (error) {

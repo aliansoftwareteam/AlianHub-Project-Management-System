@@ -193,7 +193,7 @@ function manageEmailTemplateBody(EmailDetails) {
       }
       if (requireField.includes(TemplateType.COMMENTS)) {
 
-        var createObj = []
+        createObj = []
         if (EmailDetails?.comments?.length > 0) {
           EmailDetails.comments.map(item => {
             createObj.push({
@@ -208,7 +208,7 @@ function manageEmailTemplateBody(EmailDetails) {
         body.push({ key: TemplateType.COMMENTS, data: createObj })
       }
       if (requireField.includes(TemplateType.UPDATES)) {
-        var createObj = []
+        createObj = []
         if (EmailDetails?.tasks?.length > 0) {
           EmailDetails.tasks.map(item => {
             createObj.push({
@@ -303,8 +303,6 @@ function checkRequiredDetails(type) {
       return [TemplateType.CREATE]
     case Notification_key.PROJECT_FOLDER_CREATE:
       return [TemplateType.CREATE]
-    case Notification_key.PROJECT_CLOSE:
-      return [TemplateType.UPDATES]
     default:
       return []
   }

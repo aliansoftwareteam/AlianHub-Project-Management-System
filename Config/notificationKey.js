@@ -3,9 +3,6 @@ const Notification_key = {
   //TASK
   COMMENTS_IM_MENTIONS_IN:"comments_I'm_@mentioned_in",
   CREATE_TASK:"task_create",
-  TASK_STATUS:"task_status",
-  TASK_DESCRIPTION:"task_description",
-  TASK_PRIORITY:"task_priority",
   TASK_NAME:"task_edit",
   TASK_NOTIFICATION:"task_notification",
   TASK_CREATE:"task_create",

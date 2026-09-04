@@ -312,7 +312,7 @@ module.exports = {
                         _id: new mongoose.Types.ObjectId(taskId),
                     };
                     queryObj.$pull = { watchers: userId };
-                };
+                }
 
                 let obj = {
                     type: schema,

@@ -37,6 +37,10 @@ exports.updateTrackerUsersAndUser = async (dataObj, companyId) => {
         try {
             const incValue = 1;
             const decValue = -1;
+            const handleError = (err) => {
+                logger.error(`ERROR in update updateTrackerUsersAndUser: ${err.message}`)
+                reject({ status: false, message: 'Something went wrong.' });
+            };
             const updateCompanyQuery = {
                 type: SCHEMA_TYPE.COMPANIES,
                 data: [
@@ -63,7 +67,7 @@ exports.updateTrackerUsersAndUser = async (dataObj, companyId) => {
                 }
             }).catch(handleError);
 
-            function rollbackTrackerCount (fromError=false) {
+            const rollbackTrackerCount = (fromError=false) => {
                 const rollbackCompanyQuery = {
                     type: SCHEMA_TYPE.COMPANIES,
                     data: [
@@ -80,12 +84,8 @@ exports.updateTrackerUsersAndUser = async (dataObj, companyId) => {
                         resolve({ status: false, message: 'Something went wronge' })
                     }
                 }).catch(handleError);
-            }
+            };
 
-            function handleError(err) {
-                logger.error(`ERROR in update updateTrackerUsersAndUser: ${err.message}`)
-                reject({ status: false, message: 'Something went wrong.' });
-            }
         } catch (error) {
             logger.error(`ERROR in update updateTrackerUsersAndUser: ${error.message}`)
             reject({ status: false, message: 'Something went wrong.' });

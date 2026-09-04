@@ -94,8 +94,10 @@
   },
   "scripts": {
     "test": "jest",
+    "test:unit": "jest --selectProjects unit",
+    "test:conventions": "jest --selectProjects conventions",
     "test:watch": "jest --watch",
-    "test:naming": "jest tests/naming-conventions.test.js --testPathIgnorePatterns=/node_modules/",
+    "lint": "eslint .",
     "start": "node server.js",
     "nodemon": "nodemon index.js",
     "check-version": "node check-version.js",
@@ -111,6 +113,7 @@
   "devDependencies": {
     "@commitlint/cli": "^19.5.0",
     "@commitlint/config-conventional": "^19.5.0",
+    "eslint": "^8.57.1",
     "husky": "^9.1.7",
     "jest": "^30.4.2",
     "lint-staged": "^16.4.0",

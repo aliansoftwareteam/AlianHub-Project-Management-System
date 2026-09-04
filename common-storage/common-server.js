@@ -21,8 +21,8 @@ exports.handleCreateCompanyDataStorageFun = async(cObj,companyId) => {
                 loggerConfig.error('Error handleCreateCompanyDataStorageFun' + err.message)
             });
         } catch (error) {
-            reject(err);
-            loggerConfig.error('Error handleCreateCompanyDataStorageFun' + err.message)
+            reject(error);
+            loggerConfig.error('Error handleCreateCompanyDataStorageFun' + error.message)
         }
     })
 }
@@ -44,8 +44,8 @@ exports.handleCreateCompanyDataStorageFunForUpload = async(bodyData,companyId) =
                 loggerConfig.error('Error handleCreateCompanyDataStorageFunForUpload' + err.message)
             });
         } catch (error) {
-            reject(err);
-            loggerConfig.error('Error handleCreateCompanyDataStorageFunForUpload' + err.message)
+            reject(error);
+            loggerConfig.error('Error handleCreateCompanyDataStorageFunForUpload' + error.message)
         }
     })
 }
@@ -186,7 +186,6 @@ exports.handleTaskTypeImageGet = async (req,res) => {
         }
 }
 exports.handleTaskAttachmentsDuplicateFunctionality = async (bucketId, previousPath, destinationPath) => {
-    try {
         const baseDir = newPath.join(__dirname, '../storage', bucketId);
         const fullPreviousPath = newPath.join(baseDir, newPath.dirname(previousPath));
         const destinationDir = newPath.join(baseDir, newPath.dirname(destinationPath));
@@ -206,7 +205,4 @@ exports.handleTaskAttachmentsDuplicateFunctionality = async (bucketId, previousP
         }));
 
         return true;
-    } catch (error) {
-        throw error;
-    }
 };
