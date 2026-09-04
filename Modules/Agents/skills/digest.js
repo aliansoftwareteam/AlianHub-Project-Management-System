@@ -76,6 +76,37 @@ Return ONLY JSON:
                 list('Overdue', b.overdue), list('Due in 48h', b.dueSoon), list('Blocked', b.blocked), list('In review', b.inReview), list('Unassigned', b.unassigned)].join('\n\n');
     },
 
+    /* Ground truth check. The model is asked not to invent; asking is not a boundary.
+     * A sentence that names a task key not in the lists, or a number that is not one of
+     * the counts, is dropped rather than posted. */
+    verify({ raw, context }) {
+        if (!raw) return { raw, dropped: [] };
+        const b = context.buckets;
+        const known = new Set([].concat(b.overdue, b.dueSoon, b.blocked, b.inReview, b.unassigned, b.movedToday).map((t) => String(t.TaskKey || '').toUpperCase()).filter(Boolean));
+        const counts = new Set([b.total, b.done, b.overdue.length, b.dueSoon.length, b.blocked.length, b.inReview.length, b.unassigned.length, b.movedToday.length].map(String));
+        const dropped = [];
+        // "last 24 hours" / "next 48h" are the windows the data was cut on; any other number is a claim.
+        const claims = (text) => String(text).replace(/\b(24|48)\s*(h|hrs?|hours?)\b/gi, '').replace(/\b[A-Z][A-Z0-9]+-\d+\b/g, '');
+        const okSentence = (sentence) => {
+            const keys = sentence.match(/\b[A-Z][A-Z0-9]+-\d+\b/g) || [];
+            const nums = claims(sentence).match(/\b\d+\b/g) || [];
+            const badKey = keys.find((k) => !known.has(k.toUpperCase()));
+            const badNum = nums.find((n) => !counts.has(n));
+            if (badKey) dropped.push({ reason: `mentions ${badKey}, which is not in the data`, text: sentence.trim() });
+            else if (badNum) dropped.push({ reason: `mentions ${badNum}, which is not one of the counts`, text: sentence.trim() });
+            return !badKey && !badNum;
+        };
+        const digest = String(raw.digest || '').split(/(?<=[.!?])\s+/).filter((x) => x.trim()).filter(okSentence).join(' ');
+        const lookFirst = (Array.isArray(raw.lookFirst) ? raw.lookFirst : []).filter((item) => {
+            const key = (String(item).match(/\b[A-Z][A-Z0-9]+-\d+\b/) || [])[0];
+            if (!(key && known.has(key.toUpperCase()))) { dropped.push({ reason: 'look-first item names a task not in the data', text: String(item) }); return false; }
+            const badNum = (claims(item).match(/\b\d+\b/g) || []).find((n) => !counts.has(n));
+            if (badNum) { dropped.push({ reason: `look-first item claims "${badNum}", which is not in the data`, text: String(item) }); return false; }
+            return true;
+        });
+        return { raw: { ...raw, digest: digest || null, lookFirst }, dropped };
+    },
+
     toChanges({ task, raw, context }) {
         const digest = raw && raw.digest ? String(raw.digest).slice(0, 1500) : context.fallback;
         const look = Array.isArray(raw && raw.lookFirst) ? raw.lookFirst.filter(Boolean).slice(0, 3) : [];

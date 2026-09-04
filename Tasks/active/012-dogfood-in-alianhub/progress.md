@@ -165,3 +165,10 @@ proposals are now a source of the main Inbox (Primary, owners/admins), counted i
 Approve / Decline / Open in AI Inbox on the row; deciding goes through the agent API so audit,
 undo window and run closure are identical whichever Inbox was used. Also carried usd onto
 proposals so the Inbox stops showing $0.00 for priced runs.
+
+### 2026-09-04 (AR-51: grounding)
+The Reporter kept inventing "in review for 24 days" for a real task key. Prompts are not a
+boundary, so the digest and PR skills verify like the QA skill: a sentence naming a key not in the
+data or a number that is not one of the counts is dropped (24/48 pass only as hours); a PR risk whose
+"where" is not in the diff is dropped. What was dropped is written into the proposal's reasoning so
+the reviewer sees it. Live: the claim came back, was dropped, and the record says so.
