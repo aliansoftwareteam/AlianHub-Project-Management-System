@@ -14,6 +14,9 @@ const AWS_KEYS = {
     WASABI_USERID: 'wasabiUserId',
 };
 const NUMERIC_KEYS = new Set(['PORT', 'NOOFPRESETCOMPANY']);
+/* jwt.sign refuses an undefined algorithm or expiry, so a container started with
+ * only JWT_SECRET (the documented Docker install) could set up but never log in. */
+const RUNTIME_DEFAULTS = { JWT_ALGORITHM: 'HS256', JWT_EXP: '24h' };
 
 const isSet = (value) => value !== undefined && value !== null && String(value) !== '';
 
@@ -41,10 +44,10 @@ function applyEnvMap(map, { override = true } = {}) {
 /* Docker images carry no .env: everything arrives through the environment, and
  * a variable set there beats the file even on bare metal. */
 function loadDotEnv(envPath = path.join(__dirname, '..', '.env')) {
-    if (!fs.existsSync(envPath)) return {};
-    const parsed = require('dotenv').parse(fs.readFileSync(envPath));
+    const parsed = fs.existsSync(envPath) ? require('dotenv').parse(fs.readFileSync(envPath)) : {};
     applyEnvMap(parsed, { override: false });
+    applyEnvMap(RUNTIME_DEFAULTS, { override: false });
     return parsed;
 }
 
-module.exports = { applyEnvMap, loadDotEnv, isSet };
+module.exports = { applyEnvMap, loadDotEnv, isSet, RUNTIME_DEFAULTS };

@@ -50,6 +50,10 @@ function validateManifest(manifest) {
     return null;
 }
 
+/* Pure: what exists now but not in the archive; a restore drops these so nothing
+ * created after the backup outlives it. */
+const staleCollections = (live, listed) => live.filter((name) => !listed.includes(name));
+
 const isValidName = (name) => NAME_RX.test(String(name || ''));
 const resolveBackup = (name) => (isValidName(name) ? path.join(BACKUP_DIR, path.basename(name)) : null);
 
@@ -201,10 +205,17 @@ async function restoreBackup({ name, confirm }) {
 
     const safety = await createBackup({ includeFiles: false, prefix: 'pre-restore' });
     state.maintenance = true;
-    const counters = { databases: 0, collections: 0, documents: 0, files: 0 };
+    const counters = { databases: 0, collections: 0, documents: 0, files: 0, droppedCollections: 0 };
     try {
         const dbs = new Map();
         const dbFor = async (dbName) => { if (!dbs.has(dbName)) { dbs.set(dbName, await nativeDb(dbName)); counters.databases += 1; } return dbs.get(dbName); };
+        for (const [dbName, listed] of Object.entries(manifest.databases)) {
+            const db = await dbFor(dbName);
+            for (const collection of staleCollections(await listCollections(db), listed)) {
+                await db.collection(collection).drop();
+                counters.droppedCollections += 1;
+            }
+        }
         await walkArchive(file, async (header, stream) => {
             const entry = header.name.match(ENTRY_RX);
             if (entry && manifest.databases[entry[1]]) {
@@ -235,6 +246,6 @@ function deleteBackup(name) {
 }
 
 module.exports = {
-    BACKUP_DIR, FORMAT, FORMAT_VERSION, NAME_RX, ENTRY_RX, backupName, buildManifest, validateManifest, isValidName, resolveBackup,
+    BACKUP_DIR, FORMAT, FORMAT_VERSION, NAME_RX, ENTRY_RX, backupName, buildManifest, validateManifest, staleCollections, isValidName, resolveBackup,
     createBackup, listBackups, readManifest, walkArchive, restoreBackup, deleteBackup, resetMongoConnections,
 };
