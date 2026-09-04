@@ -136,6 +136,10 @@ html, body, #app {
 :root[data-theme="dark"] .ah-app__view { color: #17161c; }
 :root[data-theme="dark"] .ah-app__view .ah-page { color: var(--ink); }
 .ah-page { color: var(--ink); min-height: 100%; display: flex; flex-direction: column; }
+/* Page roots that put a sidebar beside the content. The column above is the default for
+   toolbar-over-body pages; these need the row back, and two classes beat .ah-page whatever
+   order the chunk stylesheets load in. */
+.ah-page.acct-page, .ah-page.ai-page, .ah-page.cv, .ah-page.home, .ah-page.hub, .ah-page.ibx, .ah-page.parity-page, .ah-page.personal, .ah-page.planner, .ah-page.st { flex-direction: row; }
 
 /* ---------- primitives ---------- */
 .ah-label {
