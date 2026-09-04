@@ -469,14 +469,14 @@ const accountMeta = computed(() => {
 
 const mcpUrl = computed(() => (minted.value && minted.value.mcpUrl) || `${window.location.origin}/mcp?companyId=${companyId.value || ""}`);
 const tokenForCommand = computed(() => (minted.value ? minted.value.token : "ah_pat_••••••••"));
-const setupCommand = computed(() => `claude mcp add alianhub --url ${mcpUrl.value} --token ${tokenForCommand.value}`);
+const setupCommand = computed(() => `claude mcp add --transport http alianhub "${mcpUrl.value}" --header "Authorization: Bearer ${tokenForCommand.value}"`);
 
 const cliLines = computed(() => {
     const lines = [
         { kind: "comment", text: `# ${t("AccountsV2.cli_comment_add")}` },
-        { kind: "cmd", text: "claude mcp add alianhub \\" },
-        { kind: "indent", text: `--url ${mcpUrl.value} \\` },
-        { kind: "indent", text: `--token ${tokenForCommand.value}` }
+        { kind: "cmd", text: "claude mcp add --transport http alianhub \\" },
+        { kind: "indent", text: `"${mcpUrl.value}" \\` },
+        { kind: "indent", text: `--header "Authorization: Bearer ${tokenForCommand.value}"` }
     ];
     if (manifest.value.tools.length) {
         lines.push({ kind: "ok", text: t("AccountsV2.cli_connected", { n: manifest.value.tools.length, v: manifest.value.protocolVersion }) });
