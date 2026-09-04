@@ -94,6 +94,8 @@
     --warn-ink: #f0b06b;
     --danger-bg: rgba(193, 18, 31, .18);
     --danger-ink: #ff8f98;
+    /* Used directly as text (overdue labels, due dates); the light red is 2.8:1 on dark surfaces. */
+    --danger: #ff7b85;
     --agent-bg: rgba(168, 146, 255, .16);
     --shadow-card: 0 2px 6px rgba(0, 0, 0, .3);
 }
@@ -135,6 +137,20 @@ html, body, #app {
    redesigned views opt in with .ah-page. */
 :root[data-theme="dark"] .ah-app__view { color: #17161c; }
 :root[data-theme="dark"] .ah-app__view .ah-page { color: var(--ink); }
+/* Dark --brand is a light lavender; white text on it is 2.55:1. Dark ink reads at 9:1. */
+:root[data-theme="dark"] .ah-btn--primary,
+:root[data-theme="dark"] .ah-tbtn--primary,
+:root[data-theme="dark"] .hc-setup__cta { color: #111114; }
+:root[data-theme="dark"] .ah-btn--primary:hover:not(:disabled) { color: #111114; }
+/* Legacy Projects.vue wraps the redesigned List/Board/Table in white panels. Darken them only
+   when a redesigned page is inside; legacy views keep their light panels and dark ink. */
+:root[data-theme="dark"] .section-right.bg-white:has(.ah-page),
+:root[data-theme="dark"] .list-view-body.bg-light-gray:has(.ah-page) { background: var(--canvas) !important; }
+/* Legacy utility classes inside the redesigned project toolbars (filter trigger, mic, + View). */
+:root[data-theme="dark"] .ph2 .bg-white, :root[data-theme="dark"] .ph2 .btn-white,
+:root[data-theme="dark"] .pft .bg-white, :root[data-theme="dark"] .pft .btn-white { background: var(--surface) !important; color: var(--ink); }
+:root[data-theme="dark"] .ph2 .project-views-row, :root[data-theme="dark"] .ph2 .view-list-wrapper,
+:root[data-theme="dark"] .ph2 .view_list_scroll { background: transparent !important; color: var(--ink); }
 .ah-page { color: var(--ink); min-height: 100%; display: flex; flex-direction: column; }
 /* Page roots that put a sidebar beside the content. The column above is the default for
    toolbar-over-body pages; these need the row back, and two classes beat .ah-page whatever

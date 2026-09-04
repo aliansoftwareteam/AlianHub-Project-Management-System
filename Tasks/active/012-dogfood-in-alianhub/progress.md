@@ -127,3 +127,11 @@ timesheet, whose week grid scrolls sideways inside its card and took the empty-s
 it. Pinned with sticky — which needed the grid wrapper's overflow:hidden lifted on phones, or the
 grid, not the scroller, owns the sticky element. Task detail is full-width with the composer above
 the tab bar; only nits left (a legacy "Scroll to bottom" link, 26px tab chips on AI Inbox).
+
+### 2026-09-04 (AR-43: dark theme and contrast)
+Measured computed contrast of every visible text node on 15 pages in dark. Systemic: dark --brand
+is a light lavender and every primary button kept white text (2.55:1) — dark ink now (7.4:1);
+--danger used as text was 2.8:1 — brighter red in dark (7.1:1). The project List sat in legacy
+white wrappers in dark; darkened only when a redesigned page is inside so legacy views keep their
+light panels and dark ink. Settings › General is still legacy-light in dark by design of the compat
+rule; its own white-on-white "Task Priority" label is a legacy defect, not filed.
