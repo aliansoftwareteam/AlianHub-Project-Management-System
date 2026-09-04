@@ -5,7 +5,7 @@
             <span class="lv2__swatch" :style="{ background: swatch }"></span>
             <span class="lv2__group-name">{{ groupName }}</span>
             <span class="lv2__group-meta">{{ headMeta }}</span>
-            <span v-if="wip" class="lv2__wip" :class="{ 'lv2__wip--over': wip.over }">{{ $t('ListV2.wip', { used: wip.used, limit: wip.limit }) }}</span>
+            <span v-if="wip" class="lv2__wip" :class="{ 'lv2__wip--over': wip.over }">{{ $t('List.wip', { used: wip.used, limit: wip.limit }) }}</span>
         </button>
 
         <template v-if="item.isExpanded">
@@ -49,7 +49,7 @@
                 </template>
             </draggable>
 
-            <p v-if="!rows.length" class="lv2__empty-group">{{ $t('ListV2.group_empty') }}</p>
+            <p v-if="!rows.length" class="lv2__empty-group">{{ $t('List.group_empty') }}</p>
 
             <div v-if="creating" class="lv2__create">
                 <CreateTask
@@ -63,7 +63,7 @@
                 />
             </div>
             <button v-else-if="canCreate" type="button" class="lv2__add" @click="creating = true">
-                <span class="lv2__add-plus">+</span>{{ $t('ListV2.add_task_to', { group: groupName }) }}
+                <span class="lv2__add-plus">+</span>{{ $t('List.add_task_to', { group: groupName }) }}
             </button>
         </template>
     </section>

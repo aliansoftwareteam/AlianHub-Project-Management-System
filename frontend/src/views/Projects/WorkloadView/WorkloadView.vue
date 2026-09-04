@@ -11,8 +11,8 @@
 
     <div v-else-if="isMobile" class="ah-page wv wv--mobile">
         <div class="ah-empty wv__mobile-card">
-            <div class="wv__mobile-title">{{ $t('ViewsV2.desktop_only_title') }}</div>
-            <p class="wv__mobile-text">{{ $t('ViewsV2.desktop_only_workload') }}</p>
+            <div class="wv__mobile-title">{{ $t('Views.desktop_only_title') }}</div>
+            <p class="wv__mobile-text">{{ $t('Views.desktop_only_workload') }}</p>
         </div>
     </div>
 
@@ -44,15 +44,15 @@
             </div>
             <span v-for="id in selectedUserIds" :key="id" class="ah-chip wv__chip">
                 {{ nameOf(id) }}
-                <button type="button" :aria-label="$t('ViewsV2.remove')" @click="selectedUserIds = selectedUserIds.filter((x) => x !== id)">×</button>
+                <button type="button" :aria-label="$t('Views.remove')" @click="selectedUserIds = selectedUserIds.filter((x) => x !== id)">×</button>
             </span>
             <div class="ah-toolbar__spacer"></div>
             <div class="ah-tabs wv__mode">
-                <button type="button" class="ah-tab" :class="{ 'is-on': mode === 'estimate' }" @click="mode = 'estimate'">{{ $t('ViewsV2.by_estimate') }}</button>
-                <button type="button" class="ah-tab" :class="{ 'is-on': mode === 'logged' }" @click="mode = 'logged'">{{ $t('ViewsV2.by_logged') }}</button>
+                <button type="button" class="ah-tab" :class="{ 'is-on': mode === 'estimate' }" @click="mode = 'estimate'">{{ $t('Views.by_estimate') }}</button>
+                <button type="button" class="ah-tab" :class="{ 'is-on': mode === 'logged' }" @click="mode = 'logged'">{{ $t('Views.by_logged') }}</button>
             </div>
             <button type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="suggestBalance">
-                <span class="wv__spark">✦</span> {{ $t('ViewsV2.balance') }}
+                <span class="wv__spark">✦</span> {{ $t('Views.balance') }}
             </button>
         </div>
 
@@ -62,7 +62,7 @@
                 <div class="wv__row wv__row--head">
                     <span></span>
                     <span v-for="d in visibleDays" :key="d" :class="{ 'is-today': d === today }">{{ dayHead(d) }}</span>
-                    <span>{{ $t('ViewsV2.total') }}</span>
+                    <span>{{ $t('Views.total') }}</span>
                 </div>
 
                 <div v-for="u in rows" :key="u.userId" class="wv__row">
@@ -86,7 +86,7 @@
                         @dragleave="onDragLeave(u, d)"
                         @drop.prevent="onDrop(u, d)"
                     >
-                        <span v-if="d.pto" class="wv__pto">{{ $t('ViewsV2.pto') }}</span>
+                        <span v-if="d.pto" class="wv__pto">{{ $t('Views.pto') }}</span>
                         <template v-else>
                             <div
                                 v-if="value(d)"
@@ -116,24 +116,24 @@
                 </div>
 
                 <div v-if="!rows.length" class="ah-empty wv__empty">
-                    {{ isSpinner ? $t('ViewsV2.loading') : $t('ViewsV2.workload_empty') }}
+                    {{ isSpinner ? $t('Views.loading') : $t('Views.workload_empty') }}
                 </div>
             </div>
 
             <div class="wv__foot">
                 <div class="wv__legend">
-                    <span><i class="wv__key"></i>{{ mode === 'estimate' ? $t('ViewsV2.legend_estimated') : $t('ViewsV2.legend_logged') }}</span>
-                    <span><i class="wv__key wv__key--tentative"></i>{{ $t('ViewsV2.legend_tentative') }}</span>
-                    <span><i class="wv__key wv__key--over"></i>{{ $t('ViewsV2.legend_over') }}</span>
+                    <span><i class="wv__key"></i>{{ mode === 'estimate' ? $t('Views.legend_estimated') : $t('Views.legend_logged') }}</span>
+                    <span><i class="wv__key wv__key--tentative"></i>{{ $t('Views.legend_tentative') }}</span>
+                    <span><i class="wv__key wv__key--over"></i>{{ $t('Views.legend_over') }}</span>
                 </div>
                 <div v-if="hint" class="wv__hint">
                     <span class="wv__spark">✦</span>
                     <span>{{ hint.text }}</span>
                     <button v-if="hint.apply" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="busy" @click="applyHint">
-                        {{ $t('ViewsV2.apply') }}
+                        {{ $t('Views.apply') }}
                     </button>
                 </div>
-                <span v-else class="ah-muted wv__drag-hint">{{ $t('ViewsV2.drag_hint') }}</span>
+                <span v-else class="ah-muted wv__drag-hint">{{ $t('Views.drag_hint') }}</span>
             </div>
         </div>
         <SpinnerComp v-if="isSpinner" :is-spinner="isSpinner" />
@@ -245,15 +245,15 @@
     const fillPct = (d) => (d.capacityMinutes > 0 ? Math.min(100, (value(d) / d.capacityMinutes) * 100) : (value(d) ? 100 : 0));
     const isTentative = (date) => moment(date).isAfter(moment().endOf('isoWeek'));
     const subLabel = (u) => {
-        if (u.utilizationPct > 100) return t('ViewsV2.pct_period', { pct: u.utilizationPct });
+        if (u.utilizationPct > 100) return t('Views.pct_period', { pct: u.utilizationPct });
         const pto = u.cells.filter((d) => d.pto);
         if (pto.length) {
             const range = pto.length === 1
                 ? moment(pto[0].date).format('ddd')
                 : `${moment(pto[0].date).format('ddd')}–${moment(pto[pto.length - 1].date).format('ddd')}`;
-            return t('ViewsV2.pto_range', { range });
+            return t('Views.pto_range', { range });
         }
-        return t('ViewsV2.per_day', { h: u.hoursPerDay });
+        return t('Views.per_day', { h: u.hoursPerDay });
     };
     const pctAfter = (u, delta) => (u.capacityMinutes > 0 ? Math.round(((u.totalEstimated + delta) / u.capacityMinutes) * 100) : 0);
 
@@ -276,7 +276,7 @@
             users.value = body.data?.users || [];
             days.value = body.data?.days || [];
         } catch (e) {
-            error.value = t('ViewsV2.load_failed');
+            error.value = t('Views.load_failed');
             users.value = [];
         } finally {
             isSpinner.value = false;
@@ -317,10 +317,10 @@
                 toDate: toDay.date,
             })) || {}).data || {};
             if (!body.status) throw new Error(body.statusText || 'move_failed');
-            hint.value = { text: t('ViewsV2.moved', { task: chip.name, name: toUser.name, day: moment(toDay.date).format('ddd D') }) };
+            hint.value = { text: t('Views.moved', { task: chip.name, name: toUser.name, day: moment(toDay.date).format('ddd D') }) };
             await load();
         } catch (e) {
-            error.value = t('ViewsV2.move_failed');
+            error.value = t('Views.move_failed');
         } finally {
             busy.value = false;
         }
@@ -341,7 +341,7 @@
         const { chip, fromUser } = drag.value;
         const same = fromUser.userId === u.userId;
         hint.value = {
-            text: t('ViewsV2.dragging', {
+            text: t('Views.dragging', {
                 task: chip.name,
                 h: hLabel(chip.minutes),
                 name: u.name,
@@ -371,7 +371,7 @@
                 worst = { u, d };
             }
         }));
-        if (!worst) { hint.value = { text: t('ViewsV2.balance_none') }; return; }
+        if (!worst) { hint.value = { text: t('Views.balance_none') }; return; }
         const chip = [...worst.d.chips].sort((a, b) => b.minutes - a.minutes)[0];
         let target = null;
         rows.value.forEach((u) => {
@@ -381,9 +381,9 @@
             const room = d.capacityMinutes - d.estimated;
             if (room >= chip.minutes && (!target || room > target.room)) target = { u, d, room };
         });
-        if (!target) { hint.value = { text: t('ViewsV2.balance_none') }; return; }
+        if (!target) { hint.value = { text: t('Views.balance_none') }; return; }
         hint.value = {
-            text: t('ViewsV2.balance_hint', {
+            text: t('Views.balance_hint', {
                 task: chip.name,
                 h: hLabel(chip.minutes),
                 from: worst.u.name,

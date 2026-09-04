@@ -1,12 +1,12 @@
 <template>
-    <aside v-if="showCard" class="ah-gs" :aria-label="$t('AuthV2.gs_title')">
+    <aside v-if="showCard" class="ah-gs" :aria-label="$t('Auth.gs_title')">
         <div class="ah-gs__head">
             <div class="ah-gs__ring" :style="{ '--p': `${Math.round((doneCount / items.length) * 100)}%` }">
                 <span class="ah-gs__ring-in ah-mono">{{ doneCount }}/{{ items.length }}</span>
             </div>
             <div class="ah-gs__titles">
-                <strong>{{ $t('AuthV2.gs_title') }}</strong>
-                <span>{{ $t('AuthV2.gs_sub') }}</span>
+                <strong>{{ $t('Auth.gs_title') }}</strong>
+                <span>{{ $t('Auth.gs_sub') }}</span>
             </div>
         </div>
         <ul class="ah-gs__list">
@@ -18,14 +18,14 @@
             </li>
         </ul>
         <div class="ah-gs__foot">
-            <button type="button" class="ah-gs__dismiss" @click="dismiss">{{ $t('AuthV2.gs_dismiss') }}</button>
-            <a v-if="helpLink" :href="helpLink" target="_blank" rel="noopener">{{ $t('AuthV2.gs_docs') }}</a>
+            <button type="button" class="ah-gs__dismiss" @click="dismiss">{{ $t('Auth.gs_dismiss') }}</button>
+            <a v-if="helpLink" :href="helpLink" target="_blank" rel="noopener">{{ $t('Auth.gs_docs') }}</a>
         </div>
     </aside>
 </template>
 
 <script setup>
-import { computed, inject, onUnmounted, ref } from "vue";
+import { computed, inject, onUnmounted, ref, watch } from "vue";
 
 defineOptions({ name: "TourComponet" });
 import { useRoute, useRouter } from "vue-router";
@@ -36,113 +36,111 @@ import "driver.js/dist/driver.css";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { useGetterFunctions } from "@/composable";
 import { tourHepler } from "@/components/organisms/Tour/helper";
+import { STEPS, screenFor, doneKey } from "@/components/organisms/Tour/tourSteps";
 import { SAMPLE_PROJECT_NAME } from "@/components/organisms/CreateProject/templates";
 
-const SHELL_TOUR_KEY = "isShellTour";
-const LEGACY_SHELL_KEYS = ["isProjectAndNavbarTour", "isProjectLeftViewTour", "isProjectViewTour"];
 const STEP_STORAGE = "ah.tour.step";
-// Skip means "not now": the tour stops offering itself on every reload, but the
+// Skip means "not now": the tour stops offering itself on every visit, but the
 // Getting-started card can still start it.
 const SKIP_STORAGE = "ah.tour.skipped";
 const DISMISS_STORAGE = "ah.gs.dismissed";
+const MIN_WIDTH = 767;
 
 const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const { getters } = useStore();
 const { getUser } = useGetterFunctions();
-const { startProjectTour, hanldeProjectTour, updateTourStatusInUser } = tourHepler();
+const { updateTourStatusInUser } = tourHepler();
 const userId = inject("$userId");
 const companyId = inject("$companyId");
 const clientWidth = inject("$clientWidth");
 
 const helpLink = computed(() => getters["brandSettingTab/brandSettings"]?.helpLink || "");
-const companyUser = computed(() => getters["settings/companyUserDetail"]);
-const isOwnerOrAdmin = computed(() => [1, 2].includes(companyUser.value?.roleType));
 const tourStatus = computed(() => getUser(userId.value)?.tourStatus || {});
-const shellTourDone = computed(() => tourStatus.value[SHELL_TOUR_KEY] === true);
+const wideEnough = computed(() => clientWidth.value > MIN_WIDTH);
+const screen = computed(() => screenFor(route));
+const isDone = (which) => tourStatus.value[doneKey(which)] === true;
+const shellTourDone = computed(() => isDone("shell"));
+
+const stepKey = (which) => `${STEP_STORAGE}.${which}`;
+const skipKey = (which) => `${SKIP_STORAGE}.${which}`;
+const savedStep = (which) => Number(localStorage.getItem(stepKey(which)) || 0);
+const skipped = (which) => localStorage.getItem(skipKey(which)) === "1";
 
 const dismissed = ref(sessionStorage.getItem(DISMISS_STORAGE) === "1");
 const dismiss = () => { dismissed.value = true; sessionStorage.setItem(DISMISS_STORAGE, "1"); };
 
 const projects = computed(() => getters["projectData/allProjects"]?.data || []);
 const users = computed(() => getters["users/users"] || []);
-const savedStep = () => Number(localStorage.getItem(STEP_STORAGE) || 0);
 
 const go = (name) => router.push({ name, params: { cid: companyId.value } }).catch(() => {});
 const items = computed(() => [
-    { key: "tour", label: savedStep() > 0 && !shellTourDone.value ? t("AuthV2.gs_resume_tour") : t("AuthV2.gs_take_tour"), done: shellTourDone.value, go: () => startShellTour() },
-    { key: "invite", label: t("AuthV2.gs_invite"), done: users.value.length > 1, go: () => go("Members") },
-    { key: "project", label: t("AuthV2.gs_project"), done: projects.value.some((p) => p.ProjectName !== SAMPLE_PROJECT_NAME), go: () => go("Projects") },
-    { key: "track", label: t("AuthV2.gs_track"), done: tourStatus.value.hasTrackedTime === true, go: () => go("Home") }
+    { key: "tour", label: savedStep("shell") > 0 && !shellTourDone.value ? t("Auth.gs_resume_tour") : t("Auth.gs_take_tour"), done: shellTourDone.value, go: () => startTour("shell") },
+    { key: "invite", label: t("Auth.gs_invite"), done: users.value.length > 1, go: () => go("Members") },
+    { key: "project", label: t("Auth.gs_project"), done: projects.value.some((p) => p.ProjectName !== SAMPLE_PROJECT_NAME), go: () => go("Projects") },
+    { key: "track", label: t("Auth.gs_track"), done: tourStatus.value.hasTrackedTime === true, go: () => go("Home") }
 ]);
 const doneCount = computed(() => items.value.filter((i) => i.done).length);
-const showCard = computed(() =>
-    isOwnerOrAdmin.value && !dismissed.value && !route.meta.hideHeader && doneCount.value < items.value.length && clientWidth.value > 767
-);
+const showCard = computed(() => !dismissed.value && !route.meta.hideHeader && doneCount.value < items.value.length && wideEnough.value);
 
-/* Shell tour: four steps tied to the checklist. Elements come from the shell;
-   each step lists fallbacks so a missing anchor degrades to a centred card. */
-const STEPS = [
-    { els: [".ah-rail"], side: "right", align: "start", n: 1 },
-    { els: ['[data-tour="my-work"]', ".ah-app__view"], side: "left", align: "start", n: 2 },
-    { els: [".ah-rail__item--btn", ".ah-rail__foot"], side: "right", align: "end", n: 3 },
-    { els: ['[data-tour="timer"]', ".ah-rail__foot"], side: "right", align: "end", n: 4 }
-];
 let driverObj = null;
+let activeScreen = "";
 
 const firstPresent = (selectors) => selectors.find((s) => document.querySelector(s));
-const buildSteps = () => STEPS.map((s) => ({
+const buildSteps = (which) => STEPS[which].map((s, i, all) => ({
     element: firstPresent(s.els),
     popover: {
-        title: t(`AuthV2.tour_${s.n}_title`),
-        description: t(`AuthV2.tour_${s.n}_body`),
+        title: t(`Auth.tour_${which}_${s.key}_title`),
+        description: t(`Auth.tour_${which}_${s.key}_body`),
         side: s.side,
         align: s.align,
-        nextBtnText: s.n < STEPS.length ? t("AuthV2.tour_next", { label: t(`AuthV2.tour_${s.n}_next`) }) : t("AuthV2.tour_done")
+        nextBtnText: i < all.length - 1 ? t("Auth.tour_next", { label: t(`Auth.tour_${which}_${s.key}_next`) }) : t("Auth.tour_done")
     }
 }));
 
-const finishShellTour = () => {
-    localStorage.removeItem(STEP_STORAGE);
-    updateTourStatusInUser(SHELL_TOUR_KEY);
+const finishTour = (which) => {
+    localStorage.removeItem(stepKey(which));
+    updateTourStatusInUser(doneKey(which));
 };
-const pauseShellTour = () => {
-    if (!driverObj) return;
+const pauseTour = () => {
+    if (!driverObj || !activeScreen) return;
     const index = driverObj.getActiveIndex();
-    if (Number.isInteger(index)) localStorage.setItem(STEP_STORAGE, String(index));
+    if (Number.isInteger(index)) localStorage.setItem(stepKey(activeScreen), String(index));
 };
 
 const renderStepHeader = (popover, { state }) => {
+    const total = STEPS[activeScreen].length;
     const index = Number.isInteger(state.activeIndex) ? state.activeIndex : 0;
     const head = document.createElement("div");
     head.className = "ah-tour__head";
     const label = document.createElement("span");
     label.className = "ah-tour__step";
-    label.textContent = t("AuthV2.tour_step", { a: index + 1, b: STEPS.length });
+    label.textContent = t("Auth.tour_step", { a: index + 1, b: total });
     const bars = document.createElement("div");
     bars.className = "ah-tour__bars";
-    STEPS.forEach((_, i) => {
+    for (let i = 0; i < total; i += 1) {
         const bar = document.createElement("span");
         bar.className = `ah-tour__bar${i <= index ? " is-on" : ""}`;
         bars.appendChild(bar);
-    });
+    }
     head.append(label, bars);
     popover.wrapper.insertBefore(head, popover.wrapper.firstChild);
 
     const skip = document.createElement("button");
     skip.type = "button";
     skip.className = "ah-tour__skip";
-    skip.textContent = t("AuthV2.tour_skip");
-    skip.addEventListener("click", () => { pauseShellTour(); localStorage.setItem(SKIP_STORAGE, "1"); driverObj?.destroy(); });
+    skip.textContent = t("Auth.tour_skip");
+    skip.addEventListener("click", () => { pauseTour(); localStorage.setItem(skipKey(activeScreen), "1"); driverObj?.destroy(); });
     const meta = document.createElement("span");
     meta.className = "ah-tour__meta";
-    meta.textContent = t("AuthV2.tour_meta", { n: STEPS.length, s: 40 });
+    meta.textContent = t("Auth.tour_meta", { n: total, s: total * 10 });
     popover.footer.append(skip, meta);
 };
 
-const startShellTour = () => {
-    if (driverObj?.isActive()) return;
+const startTour = (which = screen.value || "shell") => {
+    if (!STEPS[which] || driverObj?.isActive()) return;
+    activeScreen = which;
     driverObj = driver({
         popoverClass: "ah-tour",
         showProgress: false,
@@ -152,35 +150,34 @@ const startShellTour = () => {
         stageRadius: 10,
         animate: true,
         smoothScroll: true,
-        steps: buildSteps(),
+        steps: buildSteps(which),
         onPopoverRender: renderStepHeader,
         onNextClick: () => {
-            if (driverObj.isLastStep()) { finishShellTour(); driverObj.destroy(); return; }
-            localStorage.setItem(STEP_STORAGE, String(driverObj.getActiveIndex() + 1));
+            if (driverObj.isLastStep()) { finishTour(which); driverObj.destroy(); return; }
+            localStorage.setItem(stepKey(which), String(driverObj.getActiveIndex() + 1));
             driverObj.moveNext();
         },
-        onCloseClick: () => { pauseShellTour(); driverObj.destroy(); },
-        onDestroyStarted: () => { pauseShellTour(); driverObj.destroy(); }
+        onCloseClick: () => { pauseTour(); driverObj.destroy(); },
+        onDestroyStarted: () => { pauseTour(); driverObj.destroy(); }
     });
-    driverObj.drive(Math.min(savedStep(), STEPS.length - 1));
+    driverObj.drive(Math.min(savedStep(which), STEPS[which].length - 1));
 };
+const startShellTour = () => startTour("shell");
 
-/* Legacy entry point kept for ProjectListComponent / SprintsList / useProjectTour.
-   The old header tours map onto the shell tour; the others run their driver
-   steps directly — no confirmation modal in front of them any more. */
-const shellTourOffered = ref(false);
-const handleTour = (key) => {
-    if (LEGACY_SHELL_KEYS.includes(key)) {
-        if (shellTourDone.value || shellTourOffered.value || savedStep() > 0 || localStorage.getItem(SKIP_STORAGE) === "1" || !isOwnerOrAdmin.value || clientWidth.value <= 1024) return;
-        shellTourOffered.value = true;
-        setTimeout(startShellTour, 400);
-        return;
-    }
-    if (hanldeProjectTour(key)) startProjectTour(key);
+/* Each screen offers its tour once per session, to every role, on anything wider than a phone. */
+const offered = new Set();
+const offer = (which) => {
+    if (!which || !STEPS[which] || offered.has(which) || isDone(which) || skipped(which) || savedStep(which) > 0 || !wideEnough.value) return;
+    if (which !== "shell" && !shellTourDone.value && !skipped("shell")) return;
+    offered.add(which);
+    setTimeout(() => { if (screen.value === which) startTour(which); }, 600);
 };
+watch(screen, (which) => offer(which), { immediate: true });
+
+const handleTour = () => offer(screen.value);
 
 onUnmounted(() => driverObj?.destroy());
-defineExpose({ handleTour, startShellTour });
+defineExpose({ handleTour, startShellTour, startTour });
 </script>
 
 <style>

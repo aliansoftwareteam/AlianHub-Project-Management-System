@@ -26,15 +26,9 @@ process.on('uncaughtException', (err) => {
 })
 exports.connect = (db) => {
     return new Promise(async (resolve, reject) => {
-        let MONGODB_URL = process.env.MONGODB_URL;
-        if (!process.env.MONGODB_URL) {
-            const installation = require("../../installationSteps.json");
-            MONGODB_URL = installation?.envVar?.MONGODB_URL;
-        }
-        // Before the wizard's database step both of those are empty. Saying so plainly beats the
-        // "cannot read properties of undefined" this used to throw one line further down.
+        const MONGODB_URL = process.env.MONGODB_URL;
         if (!MONGODB_URL) {
-            reject(new Error('No database configured yet. Finish the installation wizard, or set MONGODB_URL in .env.'));
+            reject(new Error('No database configured. Set MONGODB_URL in .env or the environment and restart.'));
             return;
         }
         try {

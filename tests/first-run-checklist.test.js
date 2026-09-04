@@ -12,14 +12,13 @@
 const fs = require('fs');
 const path = require('path');
 
-const HOME = path.join(__dirname, '..', 'frontend', 'src', 'views', 'Home', 'TodayOverdue.vue');
+const HOME = path.join(__dirname, '..', 'frontend', 'src', 'composable', 'useOnboardingChecklist.js');
 
 /* Rebuild Home's readers from its own source so they cannot drift from what ships. */
 function buildReaders(source) {
-    const block = source.slice(source.indexOf('<script setup>'), source.indexOf('</script>'));
     const grab = (name) => {
-        const m = block.match(new RegExp(`const ${name} = computed\\(([^;]*)\\);`));
-        if (!m) throw new Error(`${name} not found in TodayOverdue.vue`);
+        const m = source.match(new RegExp(`const ${name} = computed\\(([^;]*)\\);`));
+        if (!m) throw new Error(`${name} not found in useOnboardingChecklist.js`);
         return m[1];
     };
     // eslint-disable-next-line no-new-func
@@ -86,10 +85,10 @@ describe('demo project sample content', () => {
     test('the wizard offers exactly the options the backend understands', () => {
         const fs = require('fs');
         const path = require('path');
-        const src = fs.readFileSync(path.join(__dirname, '..', 'installation', 'src', 'views',
-            'InstallStep', 'CreateUserAndCompany.vue'), 'utf8');
-        const block = src.slice(src.indexOf('formData.teamFocus.value'));
-        const offered = [...block.slice(0, 900).matchAll(/<option value="([a-z]*)"/g)].map((m) => m[1]);
+        const src = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'views',
+            'Setup', 'SetupWizard.vue'), 'utf8');
+        const block = src.slice(src.indexOf('id="teamFocus"'));
+        const offered = [...block.slice(0, 1200).matchAll(/<option value="([a-z]*)"/g)].map((m) => m[1]);
         // The blank option is the "not sure" choice and is deliberately not a backend key.
         for (const value of offered.filter(Boolean)) {
             expect(st.TEAM_FOCUS_OPTIONS).toContain(value);
@@ -100,7 +99,7 @@ describe('demo project sample content', () => {
     test('createDemoProject is gated on the company and user only, never on the answer', () => {
         const fs = require('fs');
         const path = require('path');
-        const src = fs.readFileSync(path.join(__dirname, '..', 'Modules', 'CheckInstallStep',
+        const src = fs.readFileSync(path.join(__dirname, '..', 'Modules', 'Setup',
             'demoProject.js'), 'utf8');
         expect(src).toContain('if (!companyId || !userId) return false;');
         expect(src).not.toMatch(/if\s*\(\s*!teamFocus/);

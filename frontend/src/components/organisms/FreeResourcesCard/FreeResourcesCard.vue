@@ -2,7 +2,7 @@
     <div class="dc-body frc">
         <div class="dc-metric">
             <span class="dc-num">{{ formatMinutes(totalFreeMinutes) }}</span>
-            <span class="dc-sub">{{ $t('DashV2.free_headline', { n: freeRows.length }) }}</span>
+            <span class="dc-sub">{{ $t('Dash.free_headline', { n: freeRows.length }) }}</span>
         </div>
 
         <div class="frc__rows">
@@ -15,7 +15,7 @@
             </div>
         </div>
 
-        <p class="dc-note frc__note">{{ $t('DashV2.free_rule', { planned: thresholdHours, logged: loggedThresholdHours }) }}</p>
+        <p class="dc-note frc__note">{{ $t('Dash.free_rule', { planned: thresholdHours, logged: loggedThresholdHours }) }}</p>
     </div>
 </template>
 
@@ -129,7 +129,7 @@ const load = async () => {
         });
         const d = res && res.data && res.data.status ? (res.data.data || {}) : {};
         employees.value = d.employees || [];
-        meta.note = t('DashV2.free_note');
+        meta.note = t('Dash.free_note');
         meta.state = freeRows.value.length ? 'ready' : 'empty';
     } catch (e) {
         employees.value = [];

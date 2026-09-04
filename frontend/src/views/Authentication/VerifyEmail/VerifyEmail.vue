@@ -2,20 +2,20 @@
     <AuthShell :proof="false">
         <div v-if="stage === 'checking'" class="av2-center">
             <div class="auth__spinner"></div>
-            <p class="auth__p">{{ $t('AuthV2.checking_link') }}</p>
+            <p class="auth__p">{{ $t('Auth.checking_link') }}</p>
         </div>
 
         <div v-else-if="stage === 'ok'" class="av2-auth-card">
             <div class="auth__glyph av2-glyph-ok"><ShellIcon name="check" :size="15" /></div>
-            <h2 class="auth__h">{{ $t('AuthV2.verify_ok_title') }}</h2>
-            <p class="auth__p">{{ $t('AuthV2.verify_ok_body') }}</p>
+            <h2 class="auth__h">{{ $t('Auth.verify_ok_title') }}</h2>
+            <p class="auth__p">{{ $t('Auth.verify_ok_body') }}</p>
             <router-link :to="{ name: 'Log-in' }" class="ah-btn ah-btn--primary ah-btn--block ah-btn--lg">{{ $t('Auth.log_in') }}</router-link>
         </div>
 
         <div v-else-if="stage === 'already'" class="av2-auth-card">
             <div class="auth__glyph av2-glyph-ok"><ShellIcon name="check" :size="15" /></div>
-            <h2 class="auth__h">{{ $t('AuthV2.verify_already_title') }}</h2>
-            <p class="auth__p">{{ $t('AuthV2.verify_already_body') }}</p>
+            <h2 class="auth__h">{{ $t('Auth.verify_already_title') }}</h2>
+            <p class="auth__p">{{ $t('Auth.verify_already_body') }}</p>
             <router-link :to="{ name: 'Log-in' }" class="ah-btn ah-btn--primary ah-btn--block ah-btn--lg">{{ $t('Auth.log_in') }}</router-link>
         </div>
 
@@ -23,13 +23,13 @@
             <div class="auth__glyph auth__glyph--brand">✉</div>
             <h2 class="auth__h">{{ $t('Auth.magic_sent_title') }}</h2>
             <i18n-t keypath="Auth.verify_first_body" tag="p" class="auth__p"><template #email><strong>{{ email }}</strong></template></i18n-t>
-            <div class="auth__links" style="margin-top:28px"><router-link :to="{ name: 'Log-in' }">{{ $t('AuthV2.back_to_login') }}</router-link></div>
+            <div class="auth__links" style="margin-top:28px"><router-link :to="{ name: 'Log-in' }">{{ $t('Auth.back_to_login') }}</router-link></div>
         </div>
 
         <div v-else class="av2-auth-card">
             <div class="auth__glyph auth__glyph--warn">!</div>
-            <h2 class="auth__h">{{ $t('AuthV2.verify_expired_title') }}</h2>
-            <p class="auth__p">{{ message || $t('AuthV2.verify_expired_body') }}</p>
+            <h2 class="auth__h">{{ $t('Auth.verify_expired_title') }}</h2>
+            <p class="auth__p">{{ message || $t('Auth.verify_expired_body') }}</p>
             <template v-if="canResend">
                 <button type="button" class="ah-btn ah-btn--secondary ah-btn--block ah-btn--lg" :disabled="busy" @click="resend">
                     <span v-if="busy" class="ah-spin"></span>{{ busy ? $t('Auth.loading') : $t('Auth.resend_email') }}
@@ -37,7 +37,7 @@
                 <div v-if="resendError" class="ah-field__error" style="margin-top:8px"><ShellIcon name="x" :size="12" />{{ resendError }}</div>
             </template>
             <div class="auth__links" style="margin-top:28px">
-                <span class="ah-small">{{ $t('Auth.wrong_address') }} <router-link :to="{ name: 'Log-in' }">{{ $t('AuthV2.back_to_login') }}</router-link></span>
+                <span class="ah-small">{{ $t('Auth.wrong_address') }} <router-link :to="{ name: 'Log-in' }">{{ $t('Auth.back_to_login') }}</router-link></span>
             </div>
         </div>
     </AuthShell>

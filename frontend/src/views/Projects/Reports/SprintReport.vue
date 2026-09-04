@@ -1,7 +1,7 @@
 <template>
   <div class="agile-report">
     <div class="agile-report__bar">
-      <select v-model="sprintId" class="sr__picker">
+      <select v-model="sprintId" class="sr__picker" :aria-label="$t('Reports.sprint')">
         <option value="">{{ $t('Scrum.report_pick_sprint') }}</option>
         <option v-for="s in options" :key="s._id" :value="s._id">{{ s.name }}</option>
       </select>

@@ -1,7 +1,7 @@
 <template>
     <div>
         <Sidebar
-            :title="$t('MembersV2.watchers')"
+            :title="$t('Members.watchers')"
             :visible="openSidebar"
             @update:visible="$emit('update:openSidebar', !openSidebar)"
         >
@@ -26,7 +26,7 @@
                             <span>{{ $t(mode.label) }}</span>
                         </label>
                     </div>
-                    <p v-if="!canChange" class="ah-small pw__note">{{ $t('MembersV2.watch_note') }}</p>
+                    <p v-if="!canChange" class="ah-small pw__note">{{ $t('Members.watch_note') }}</p>
 
                     <input type="text" v-model="search" class="ah-input" :placeholder="$t('PlaceHolder.search_here')">
 
@@ -54,18 +54,18 @@
                                             <template v-else>{{ designations.find((x) => x.key === getUser(user.id)?.designation)?.name }}</template>
                                         </span>
                                     </div>
-                                    <span v-if="user.watcher" class="ah-chip ah-chip--brand">{{ $t('MembersV2.watching') }}</span>
+                                    <span v-if="user.watcher" class="ah-chip ah-chip--brand">{{ $t('Members.watching') }}</span>
                                     <button
                                         v-if="user.id === userId && user?.watcher"
                                         type="button"
                                         class="pw__x"
-                                        :aria-label="$t('MembersV2.remove')"
+                                        :aria-label="$t('Members.remove')"
                                         @click.stop="addWatchers(user.id, 'remove')"
                                     >&#215;</button>
                                 </div>
                             </TransitionGroup>
                         </template>
-                        <p v-else class="ah-empty">{{ $t('MembersV2.no_watchers') }}</p>
+                        <p v-else class="ah-empty">{{ $t('Members.no_watchers') }}</p>
                     </div>
                 </div>
             </template>
@@ -95,9 +95,9 @@ const {debounce} = useCustomComposable();
 const $toast = useToast();
 
 const watchModes = [
-    { value: 'all_activity', label: 'MembersV2.watch_all' },
-    { value: 'participating_mentions', label: 'MembersV2.watch_participating' },
-    { value: 'ignore', label: 'MembersV2.watch_ignore' },
+    { value: 'all_activity', label: 'Members.watch_all' },
+    { value: 'participating_mentions', label: 'Members.watch_participating' },
+    { value: 'ignore', label: 'Members.watch_ignore' },
 ];
 
 const designations = computed(() => getters["settings/designations"]);

@@ -1,5 +1,7 @@
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
+const { tenantOf } = require("../../Config/tenant");
+const { fail } = require("../../Config/respond");
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { validateWebhookInput, isObjectIdString, generateSecret, EVENT_TYPES } = require('./helpers/webhookRules');
@@ -61,7 +63,7 @@ exports.listEvents = (req, res) => {
 /* POST /api/v2/webhooks  body: { name, url, events, format } */
 exports.createWebhook = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         const { name, url, events, format } = req.body || {};
         const uid = callerId(req);
         if (!companyId) {
@@ -94,14 +96,14 @@ exports.createWebhook = async (req, res) => {
         return res.send({ status: true, statusText: 'Webhook created. Store the secret now — it is not shown again.', data: { ...maskHook(created), secret } });
     } catch (error) {
         logger.error(`ERROR in create webhook: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
 /* GET /api/v2/webhooks */
 exports.listWebhooks = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         if (!companyId) {
             return res.send({ status: false, statusText: 'companyId is required.' });
         }
@@ -112,14 +114,14 @@ exports.listWebhooks = async (req, res) => {
         return res.send({ status: true, statusText: 'Webhooks fetched.', data: (hooks || []).map(maskHook) });
     } catch (error) {
         logger.error(`ERROR in list webhooks: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
 /* PUT /api/v2/webhooks/:id  body: { name?, url?, events?, active? } */
 exports.updateWebhook = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         const { id } = req.params;
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid webhook id are required.' });
@@ -164,14 +166,14 @@ exports.updateWebhook = async (req, res) => {
         return res.send({ status: true, statusText: 'Webhook updated.', data: maskHook(updated) });
     } catch (error) {
         logger.error(`ERROR in update webhook: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
 /* DELETE /api/v2/webhooks/:id */
 exports.deleteWebhook = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         const { id } = req.params;
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid webhook id are required.' });
@@ -198,7 +200,7 @@ exports.deleteWebhook = async (req, res) => {
         return res.send({ status: true, statusText: 'Webhook deleted.' });
     } catch (error) {
         logger.error(`ERROR in delete webhook: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
@@ -211,7 +213,7 @@ exports.deleteWebhook = async (req, res) => {
  */
 exports.listWebhookLogs = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         const { id } = req.params;
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid webhook id are required.' });
@@ -245,6 +247,6 @@ exports.listWebhookLogs = async (req, res) => {
         });
     } catch (error) {
         logger.error(`ERROR in list webhook logs: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };

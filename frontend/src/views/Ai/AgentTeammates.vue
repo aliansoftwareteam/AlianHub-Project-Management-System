@@ -3,26 +3,26 @@
         <AiSidebar />
         <div class="parity-page__main">
             <div class="ah-toolbar">
-                <div class="ah-toolbar__title">{{ $t('ParityV2.teammates_title') }}</div>
+                <div class="ah-toolbar__title">{{ $t('Parity.teammates_title') }}</div>
                 <div class="ah-toolbar__spacer"></div>
                 <router-link class="ah-btn ah-btn--secondary ah-btn--sm" :to="{ name: 'AgentRouting', params: { cid: companyId } }">
-                    {{ $t('ParityV2.bulk_route') }}
+                    {{ $t('Parity.bulk_route') }}
                 </router-link>
             </div>
 
             <div class="parity-page__body ah-scroll">
-                <p class="parity-lead">{{ $t('ParityV2.teammates_lead') }}</p>
+                <p class="parity-lead">{{ $t('Parity.teammates_lead') }}</p>
 
                 <div class="parity-grid">
                     <section class="ah-card">
                         <div class="ah-card__head">
-                            <span class="ah-h3">{{ $t('ParityV2.assign_to_agent') }}</span>
+                            <span class="ah-h3">{{ $t('Parity.assign_to_agent') }}</span>
                             <span v-if="task" class="parity-count">{{ task.TaskKey || '' }}</span>
                         </div>
                         <div class="ah-card__body">
                             <div class="ah-field">
-                                <label class="ah-field__label" for="task-find">{{ $t('ParityV2.find_task') }}</label>
-                                <input id="task-find" v-model="taskQuery" class="ah-input" type="search" :placeholder="$t('ParityV2.find_task_hint')" @keyup.enter="findTasks" />
+                                <label class="ah-field__label" for="task-find">{{ $t('Parity.find_task') }}</label>
+                                <input id="task-find" v-model="taskQuery" class="ah-input" type="search" :placeholder="$t('Parity.find_task_hint')" @keyup.enter="findTasks" />
                             </div>
 
                             <div v-if="taskResults.length" class="ah-pop" style="margin-top:8px">
@@ -30,11 +30,11 @@
                                     <span class="ah-mono">{{ found.TaskKey || '—' }}</span><span>{{ found.TaskName }}</span>
                                 </button>
                             </div>
-                            <p v-else-if="searched && !task" class="ah-empty" style="margin-top:8px">{{ $t('ParityV2.no_tasks_found') }}</p>
+                            <p v-else-if="searched && !task" class="ah-empty" style="margin-top:8px">{{ $t('Parity.no_tasks_found') }}</p>
 
                             <div v-if="task" style="margin-top:14px">
-                                <div class="ah-label">{{ $t('ParityV2.what_happens') }}</div>
-                                <p class="parity-lead" style="margin-top:6px">{{ $t('ParityV2.what_happens_body') }}</p>
+                                <div class="ah-label">{{ $t('Parity.what_happens') }}</div>
+                                <p class="parity-lead" style="margin-top:6px">{{ $t('Parity.what_happens_body') }}</p>
 
                                 <AgentMentionBox
                                     :agents="agents"
@@ -57,28 +57,28 @@
                                     </div>
                                 </div>
                             </div>
-                            <p v-else class="ah-empty" style="margin-top:12px">{{ $t('ParityV2.pick_a_task') }}</p>
+                            <p v-else class="ah-empty" style="margin-top:12px">{{ $t('Parity.pick_a_task') }}</p>
                         </div>
                     </section>
 
                     <section class="ah-card">
                         <div class="ah-card__head">
-                            <span class="ah-h3">{{ $t('ParityV2.members') }}</span>
-                            <span class="parity-count">{{ $t('ParityV2.people_agents', { p: people.length, a: agents.length }) }}</span>
+                            <span class="ah-h3">{{ $t('Parity.members') }}</span>
+                            <span class="parity-count">{{ $t('Parity.people_agents', { p: people.length, a: agents.length }) }}</span>
                         </div>
                         <div class="ah-card__body" style="padding-top:10px">
                             <div class="ah-tabs" style="margin-bottom:10px">
                                 <button v-for="tab in tabs" :key="tab" type="button" class="ah-tab" :class="{ 'is-active': view === tab }" @click="view = tab">
-                                    {{ $t(`ParityV2.tab_${tab}`) }}
+                                    {{ $t(`Parity.tab_${tab}`) }}
                                 </button>
                             </div>
 
                             <div class="parity-table">
                                 <div class="member-row member-row__head">
-                                    <span>{{ $t('ParityV2.col_member') }}</span>
-                                    <span>{{ $t('ParityV2.col_role') }}</span>
-                                    <span>{{ $t('ParityV2.col_access') }}</span>
-                                    <span>{{ $t('ParityV2.col_active') }}</span>
+                                    <span>{{ $t('Parity.col_member') }}</span>
+                                    <span>{{ $t('Parity.col_role') }}</span>
+                                    <span>{{ $t('Parity.col_access') }}</span>
+                                    <span>{{ $t('Parity.col_active') }}</span>
                                 </div>
 
                                 <template v-if="view !== 'agents'">
@@ -91,7 +91,7 @@
                                             </span>
                                         </span>
                                         <span class="member-row__role">{{ roleName(person.roleType) }}</span>
-                                        <span class="member-row__access">{{ $t('ParityV2.everything') }}</span>
+                                        <span class="member-row__access">{{ $t('Parity.everything') }}</span>
                                         <span class="member-row__active ah-mono">{{ person.status }}</span>
                                     </div>
                                 </template>
@@ -106,18 +106,18 @@
                                     />
                                 </template>
 
-                                <p v-if="!people.length && !agents.length" class="ah-empty">{{ $t('ParityV2.no_members') }}</p>
+                                <p v-if="!people.length && !agents.length" class="ah-empty">{{ $t('Parity.no_members') }}</p>
                             </div>
 
-                            <p class="parity-lead" style="margin-top:10px">{{ $t('ParityV2.no_seat') }}</p>
+                            <p class="parity-lead" style="margin-top:10px">{{ $t('Parity.no_seat') }}</p>
                         </div>
                     </section>
                 </div>
 
                 <section v-if="task" class="ah-card" style="padding:0;overflow:hidden">
                     <div class="ah-card__head">
-                        <span class="ah-h3">{{ $t('ParityV2.picker_title') }}</span>
-                        <span class="parity-count">{{ $t('ParityV2.picker_note') }}</span>
+                        <span class="ah-h3">{{ $t('Parity.picker_title') }}</span>
+                        <span class="parity-count">{{ $t('Parity.picker_note') }}</span>
                     </div>
                     <AgentPicker
                         :task="task"
@@ -177,7 +177,7 @@ const assignError = ref("");
 const stopping = ref("");
 const declines = ref([]);
 
-const roleName = (roleType) => t(`ParityV2.role_${ROLE_NAMES[Number(roleType)] || "member"}`);
+const roleName = (roleType) => t(`Parity.role_${ROLE_NAMES[Number(roleType)] || "member"}`);
 
 const ownerNameOf = (agent) => {
     const owner = people.value.find((p) => p.id === String(agent.ownerId || ""));
@@ -210,7 +210,7 @@ const chooseTask = (found) => {
 const onMention = async ({ body, agent }) => {
     mentionError.value = "";
     thread.value.push({
-        who: t("ParityV2.you"),
+        who: t("Parity.you"),
         initial: "•",
         at: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         parts: mentionParts(body)
@@ -219,7 +219,7 @@ const onMention = async ({ body, agent }) => {
     mentionBusy.value = true;
     try {
         await startRun({ agentId: agent._id, taskId: task.value._id, note: body, trigger: "mention" });
-        $toast.success(t("ParityV2.run_started", { name: agent.name }), { position: "top-right" });
+        $toast.success(t("Parity.run_started", { name: agent.name }), { position: "top-right" });
     } catch (error) {
         mentionError.value = error.message;
         declines.value = [{ agentName: agent.name, reason: error.message }, ...declines.value].slice(0, 3);
@@ -231,13 +231,13 @@ const onMention = async ({ body, agent }) => {
 const onAssign = async ({ kind, id, fit }) => {
     assignError.value = "";
     if (kind !== "agent") {
-        $toast.success(t("ParityV2.person_assigned"), { position: "top-right" });
+        $toast.success(t("Parity.person_assigned"), { position: "top-right" });
         return;
     }
     assignBusy.value = true;
     try {
         await startRun({ agentId: id, taskId: task.value._id, trigger: "assignment", note: fit ? fit.reason : "" });
-        $toast.success(t("ParityV2.run_started", { name: fit ? fit.name : "" }), { position: "top-right" });
+        $toast.success(t("Parity.run_started", { name: fit ? fit.name : "" }), { position: "top-right" });
     } catch (error) {
         assignError.value = error.message;
         declines.value = [{ agentName: fit ? fit.name : "", reason: error.message }, ...declines.value].slice(0, 3);
@@ -250,7 +250,7 @@ const onStop = async (run) => {
     stopping.value = run._id;
     try {
         await stopRun(run._id);
-        $toast.success(t("ParityV2.run_stopped"), { position: "top-right" });
+        $toast.success(t("Parity.run_stopped"), { position: "top-right" });
     } catch (error) {
         $toast.error(error.message, { position: "top-right" });
     } finally {

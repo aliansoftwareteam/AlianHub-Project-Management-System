@@ -102,8 +102,8 @@ export function deriveHealth(project, snap) {
     if (agentSet && ["on-track", "at-risk", "blocked"].includes(String(agentSet))) {
         return {
             key: String(agentSet),
-            label: t(`ProjectsV2.health_${String(agentSet).replace("-", "_")}`),
-            bySource: t("ProjectsV2.health_by_agent"),
+            label: t(`Projects.health_${String(agentSet).replace("-", "_")}`),
+            bySource: t("Projects.health_by_agent"),
             reasons: project.healthReason ? [String(project.healthReason)] : []
         };
     }
@@ -112,7 +112,7 @@ export function deriveHealth(project, snap) {
     let key = "on-track";
 
     if (!snap || !snap.loaded) {
-        return { key: "unknown", label: t("ProjectsV2.health_unknown"), bySource: "", reasons: [] };
+        return { key: "unknown", label: t("Projects.health_unknown"), bySource: "", reasons: [] };
     }
 
     const open = Math.max(0, snap.total - snap.done);
@@ -120,7 +120,7 @@ export function deriveHealth(project, snap) {
 
     if (snap.overdue > 0) {
         key = "at-risk";
-        reasons.push(t("ProjectsV2.why_overdue", { n: snap.overdue }));
+        reasons.push(t("Projects.why_overdue", { n: snap.overdue }));
     }
     if (snap.overdue > 0 && (snap.progressPct < 50 || overdueShare >= 0.25)) {
         key = "blocked";
@@ -131,19 +131,19 @@ export function deriveHealth(project, snap) {
         const drift = snap.progressPct - win.elapsedPct;
         if (win.over && snap.progressPct < 100) {
             key = "blocked";
-            reasons.push(t("ProjectsV2.why_sprint_over"));
+            reasons.push(t("Projects.why_sprint_over"));
         } else if (drift <= -20) {
             if (key === "on-track") key = "at-risk";
-            reasons.push(t("ProjectsV2.why_burndown", { drift: Math.abs(drift), elapsed: win.elapsedPct, done: snap.progressPct }));
+            reasons.push(t("Projects.why_burndown", { drift: Math.abs(drift), elapsed: win.elapsedPct, done: snap.progressPct }));
         }
     }
 
-    if (!reasons.length) reasons.push(t("ProjectsV2.why_clear"));
+    if (!reasons.length) reasons.push(t("Projects.why_clear"));
 
     return {
         key,
-        label: t(`ProjectsV2.health_${key.replace("-", "_")}`),
-        bySource: t("ProjectsV2.health_by_signals"),
+        label: t(`Projects.health_${key.replace("-", "_")}`),
+        bySource: t("Projects.health_by_signals"),
         reasons
     };
 }

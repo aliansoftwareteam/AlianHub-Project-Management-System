@@ -5,21 +5,21 @@
                 <span v-if="kind === 'notfound'" class="ah-state__code">404</span>
                 <ShellIcon v-else :name="ICON[kind]" :size="16" />
             </span>
-            <h2 class="ah-state__title">{{ title || $t(`InboxV2.state_${kind}_title`) }}</h2>
-            <p class="ah-state__body">{{ body || $t(`InboxV2.state_${kind}_body`) }}</p>
+            <h2 class="ah-state__title">{{ title || $t(`Inbox.state_${kind}_title`) }}</h2>
+            <p class="ah-state__body">{{ body || $t(`Inbox.state_${kind}_body`) }}</p>
             <div v-if="kind === 'unreachable'" class="ah-state__meta">
-                {{ $t('InboxV2.state_retrying', { s: retryIn, n: attempt }) }}
+                {{ $t('Inbox.state_retrying', { s: retryIn, n: attempt }) }}
             </div>
             <div class="ah-state__actions">
                 <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="primary">
-                    {{ primaryLabel || $t(`InboxV2.state_${kind}_primary`) }}
+                    {{ primaryLabel || $t(`Inbox.state_${kind}_primary`) }}
                 </button>
                 <button
                     v-if="secondaryLabel || SECONDARY[kind]"
                     type="button"
                     class="ah-btn ah-btn--secondary ah-btn--sm"
                     @click="secondary"
-                >{{ secondaryLabel || $t(`InboxV2.state_${kind}_secondary`) }}</button>
+                >{{ secondaryLabel || $t(`Inbox.state_${kind}_secondary`) }}</button>
             </div>
         </div>
     </section>

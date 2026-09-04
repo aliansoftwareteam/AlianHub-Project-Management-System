@@ -22,7 +22,7 @@
                 type="button"
                 class="lv2__disclose"
                 :aria-expanded="expanded"
-                :aria-label="$t('ListV2.toggle_subtasks')"
+                :aria-label="$t('List.toggle_subtasks')"
                 @click.stop="$emit('toggle-subtasks')"
             >{{ expanded ? '▾' : '▸' }}</button>
             <input
@@ -37,7 +37,7 @@
             />
             <button type="button" class="lv2__name" :title="data.TaskName" @click.stop="open">{{ data.TaskName }}</button>
             <span v-if="!isSub" class="lv2__key">{{ metaText }}</span>
-            <span v-if="tracking" class="lv2__timer" :title="$t('ListV2.tracking_now')">● {{ timerText }}</span>
+            <span v-if="tracking" class="lv2__timer" :title="$t('List.tracking_now')">● {{ timerText }}</span>
             <button v-if="agentLine" type="button" class="lv2__agent-line" :title="agentLine" @click.stop="$emit('review-agent', proposal)">
                 ✦ {{ agentLine }}
             </button>
@@ -134,7 +134,7 @@ const risk = computed(() => taskRisk(props.data));
 const riskTitle = computed(() => {
     const top = risk.value.top;
     if (!top) return "";
-    return `${t("ListV2.risk_score", { score: risk.value.score })} — ${t(`ListV2.risk_factor_${top.key}`, {
+    return `${t("List.risk_score", { score: risk.value.score })} — ${t(`List.risk_factor_${top.key}`, {
         days: top.days || 0,
         pct: top.overPct || 0,
         done: top.done || 0,
@@ -153,7 +153,7 @@ const timerText = computed(() => {
 
 const agentLine = computed(() => {
     if (props.proposal) return `${props.proposal.agentName}: ${props.proposal.what}`;
-    if (props.run) return `${props.run.agentName}: ${t("ListV2.agent_working")}`;
+    if (props.run) return `${props.run.agentName}: ${t("List.agent_working")}`;
     return "";
 });
 

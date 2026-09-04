@@ -213,22 +213,22 @@ exports.importProjectPriorities = (companyName) => {
         {
             'name': "High",
             'value': "HIGH",
-            "image": 'taskPriorities/priority_high.png',
-            'statusImage': 'taskPriorities/priority_high.png',
+            "image": '',
+            'statusImage': '',
             'isDeleted': false
         },
         {
             'name': "Medium",
             'value': "MEDIUM",
-            "image": 'taskPriorities/priority_medium.png',
-            'statusImage': 'taskPriorities/priority_medium.png',
+            "image": '',
+            'statusImage': '',
             'isDeleted': false
         },
         {
             'name': "Low",
             'value': "LOW",
-            "image":'taskPriorities/priority_low.png',
-            'statusImage': 'taskPriorities/priority_low.png',
+            "image": '',
+            'statusImage': '',
             'isDeleted': false
         }
     ]
@@ -2229,7 +2229,7 @@ exports.importTaskTypeTemplate = (companyName) => {
     });
 }
 
-exports.importSettingTemplate = (templates, cb) =>{
+exports.importSettingTemplate = (companyId, templates, cb) =>{
     try {
         let path = `${SCHEMA_TYPE.PROJECT_TEMPLATES}`;
         let promisesArray = [];
@@ -2243,7 +2243,7 @@ exports.importSettingTemplate = (templates, cb) =>{
             promisesArray.push(
                 new Promise((resolve2, reject2) => {
                     try {
-                        MongoDbCrudOpration(companyName, obj, "findOneAndUpdate")
+                        MongoDbCrudOpration(companyId, obj, "findOneAndUpdate")
                         .then(() => {
                             resolve2();
                         })

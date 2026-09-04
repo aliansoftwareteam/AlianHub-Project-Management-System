@@ -2,11 +2,11 @@
     <div class="ah-page cn">
         <div class="ah-toolbar">
             <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="goBack">
-                <ShellIcon name="chevronLeft" :size="15" />{{ $t('ChatV2.back_to_chat') }}
+                <ShellIcon name="chevronLeft" :size="15" />{{ $t('Chat.back_to_chat') }}
             </button>
             <div class="ah-toolbar__title">
                 <ShellIcon name="mic" :size="16" />
-                <span>{{ notes.title || $t('ChatV2.meeting_notes') }}</span>
+                <span>{{ notes.title || $t('Chat.meeting_notes') }}</span>
                 <span v-if="notes.durationSec" class="ah-chip ah-chip--mono">{{ duration }}</span>
             </div>
             <div class="ah-toolbar__spacer"></div>
@@ -15,38 +15,38 @@
             </div>
         </div>
 
-        <div v-if="loading" class="cn__body"><div class="ah-empty">{{ $t('ChatV2.loading_notes') }}</div></div>
+        <div v-if="loading" class="cn__body"><div class="ah-empty">{{ $t('Chat.loading_notes') }}</div></div>
         <div v-else-if="error" class="cn__body"><div class="ah-empty">{{ error }}</div></div>
 
         <div v-else class="cn__body ah-scroll">
             <div class="cn__note ah-small">
                 <ShellIcon name="lock" :size="13" />
-                <span>{{ $t('ChatV2.notes_private') }}</span>
+                <span>{{ $t('Chat.notes_private') }}</span>
             </div>
 
             <div class="ah-tabs cn__tabs">
-                <button type="button" class="ah-tab" :class="{ 'is-active': tab === 'summary' }" @click="tab = 'summary'">{{ $t('ChatV2.live_notes') }}</button>
-                <button type="button" class="ah-tab" :class="{ 'is-active': tab === 'transcript' }" @click="tab = 'transcript'">{{ $t('ChatV2.transcript') }}</button>
+                <button type="button" class="ah-tab" :class="{ 'is-active': tab === 'summary' }" @click="tab = 'summary'">{{ $t('Chat.live_notes') }}</button>
+                <button type="button" class="ah-tab" :class="{ 'is-active': tab === 'transcript' }" @click="tab = 'transcript'">{{ $t('Chat.transcript') }}</button>
                 <button type="button" class="ah-tab" :class="{ 'is-active': tab === 'actions' }" @click="tab = 'actions'">
-                    {{ $t('ChatV2.action_items') }}<span v-if="items.length" class="cn__count ah-mono">{{ items.length }}</span>
+                    {{ $t('Chat.action_items') }}<span v-if="items.length" class="cn__count ah-mono">{{ items.length }}</span>
                 </button>
             </div>
 
             <template v-if="tab === 'summary'">
-                <div class="ah-label">{{ $t('ChatV2.summary_so_far') }}</div>
+                <div class="ah-label">{{ $t('Chat.summary_so_far') }}</div>
                 <p v-if="notes.summary" class="cn__summary">{{ notes.summary }}</p>
-                <div v-else class="ah-empty">{{ $t('ChatV2.summary_empty') }}</div>
+                <div v-else class="ah-empty">{{ $t('Chat.summary_empty') }}</div>
             </template>
 
             <template v-else-if="tab === 'transcript'">
-                <div class="ah-label">{{ $t('ChatV2.transcript') }}</div>
+                <div class="ah-label">{{ $t('Chat.transcript') }}</div>
                 <pre v-if="notes.transcript" class="cn__transcript">{{ notes.transcript }}</pre>
-                <div v-else class="ah-empty">{{ $t('ChatV2.transcript_empty') }}</div>
+                <div v-else class="ah-empty">{{ $t('Chat.transcript_empty') }}</div>
             </template>
 
             <template v-else>
-                <div class="ah-label">{{ $t('ChatV2.action_items') }}</div>
-                <div v-if="!items.length" class="ah-empty">{{ $t('ChatV2.no_action_items') }}</div>
+                <div class="ah-label">{{ $t('Chat.action_items') }}</div>
+                <div v-if="!items.length" class="ah-empty">{{ $t('Chat.no_action_items') }}</div>
                 <ul v-else class="cn__items">
                     <li v-for="(item, i) in items" :key="i" class="cn__item">
                         <div class="cn__item-main">
@@ -54,14 +54,14 @@
                             <span class="cn__item-meta ah-mono">
                                 <template v-if="item.owner">{{ item.owner }}</template>
                                 <template v-if="item.due"> · {{ item.due }}</template>
-                                <template v-if="item.at"> · {{ $t('ChatV2.from_timestamp', { at: item.at }) }}</template>
+                                <template v-if="item.at"> · {{ $t('Chat.from_timestamp', { at: item.at }) }}</template>
                             </span>
                         </div>
                         <router-link v-if="item.taskId" class="ah-chip ah-chip--ok" :to="taskRoute(item)">
-                            <ShellIcon name="check" :size="12" />{{ $t('ChatV2.created') }}
+                            <ShellIcon name="check" :size="12" />{{ $t('Chat.created') }}
                         </router-link>
                         <button v-else type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="draft = { index: i, title: item.title }">
-                            {{ $t('ChatV2.create_task') }}
+                            {{ $t('Chat.create_task') }}
                         </button>
                     </li>
                 </ul>
@@ -71,7 +71,7 @@
         <MakeTaskSheet
             v-if="draft"
             :initialTitle="draft.title"
-            :sourceLabel="notes.title || $t('ChatV2.meeting_notes')"
+            :sourceLabel="notes.title || $t('Chat.meeting_notes')"
             :sourceUrl="pageUrl"
             :defaultProjectId="notes.projectId"
             @close="draft = null"
@@ -148,13 +148,13 @@ onMounted(async () => {
     try {
         const res = await apiRequest('get', `${env.CALL_NOTES}/${route.params.noteId}`);
         if (!res?.data?.status) {
-            error.value = res?.data?.statusText || t('ChatV2.notes_not_found');
+            error.value = res?.data?.statusText || t('Chat.notes_not_found');
             return;
         }
         notes.value = res.data.data || {};
         if (!notes.value.summary && items.value.length) tab.value = 'actions';
     } catch (e) {
-        error.value = t('ChatV2.notes_not_found');
+        error.value = t('Chat.notes_not_found');
     } finally {
         loading.value = false;
     }

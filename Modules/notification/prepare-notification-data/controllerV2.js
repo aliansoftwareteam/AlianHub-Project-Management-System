@@ -90,7 +90,7 @@ exports.handleNotificationtFun = (req) => {
   }
   catch (error) {
     logger.error(`Prepare Notification Handler of single notification Catch error Data: ${error.message}`)
-    reject({status:false, message: error?.message?error?.message:error })
+    return Promise.reject({status:false, message: error?.message?error?.message:error })
   }
 }
 

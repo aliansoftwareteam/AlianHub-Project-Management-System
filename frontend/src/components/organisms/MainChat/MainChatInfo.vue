@@ -2,7 +2,7 @@
     <aside class="mc-info">
         <div class="mc-info-top">
             <span class="mc-info-title">{{ isChannel ? $t('MainChat.channel_info') : $t('MainChat.user_info') }}</span>
-            <button type="button" class="mc-icon-btn" :title="$t('ChatV2.close_details')" @click="$emit('close')"><MainChatIcon name="close" :size="15" /></button>
+            <button type="button" class="mc-icon-btn" :title="$t('Chat.close_details')" @click="$emit('close')"><MainChatIcon name="close" :size="15" /></button>
         </div>
 
         <div class="mc-info-body ah-scroll">
@@ -17,7 +17,7 @@
                 <div v-if="isChannel && (linkedProject || (channel && channel.slackMirror && channel.slackMirror.enabled) || (channel && channel.private))" class="mc-info-chips">
                     <span v-if="linkedProject" class="ah-chip ah-chip--brand"><ShellIcon name="projects" :size="11" /> {{ linkedProject.ProjectName }}</span>
                     <span v-if="channel && channel.private" class="ah-chip"><ShellIcon name="lock" :size="11" /> {{ $t('MainChat.private_channel') }}</span>
-                    <span v-if="channel && channel.slackMirror && channel.slackMirror.enabled" class="ah-chip ah-chip--ok">{{ $t('ChatV2.details_slack') }}</span>
+                    <span v-if="channel && channel.slackMirror && channel.slackMirror.enabled" class="ah-chip ah-chip--ok">{{ $t('Chat.details_slack') }}</span>
                 </div>
             </div>
 
@@ -30,7 +30,7 @@
 
             <div v-if="isChannel" class="mc-info-section">
                 <div class="mc-info-section-head">
-                    <span class="ah-label">{{ $t('ChatV2.members') }}</span>
+                    <span class="ah-label">{{ $t('Chat.members') }}</span>
                     <span class="mc-info-count">{{ members.length }}</span>
                 </div>
                 <ul v-if="members.length" class="mc-info-members">
@@ -39,15 +39,15 @@
                         <span class="mc-info-member-name">{{ member.name }}</span>
                     </li>
                 </ul>
-                <p v-else class="mc-info-none">{{ $t('ChatV2.no_members') }}</p>
+                <p v-else class="mc-info-none">{{ $t('Chat.no_members') }}</p>
                 <button v-if="members.length > MEMBER_LIMIT" type="button" class="mc-info-more" @click="showAllMembers = !showAllMembers">
-                    {{ showAllMembers ? $t('ChatV2.close_details') : `+${members.length - MEMBER_LIMIT}` }}
+                    {{ showAllMembers ? $t('Chat.close_details') : `+${members.length - MEMBER_LIMIT}` }}
                 </button>
             </div>
 
             <div class="mc-info-section">
                 <div class="mc-info-section-head">
-                    <span class="ah-label">{{ $t('ChatV2.pinned') }}</span>
+                    <span class="ah-label">{{ $t('Chat.pinned') }}</span>
                     <span class="mc-info-count">{{ pinned.length }}</span>
                 </div>
                 <div v-if="pinned.length" class="mc-info-pins">
@@ -56,12 +56,12 @@
                         <span>{{ snippet(item) }}</span>
                     </button>
                 </div>
-                <p v-else class="mc-info-none">{{ pinnedLoading ? $t('MainChat.loading') : $t('ChatV2.no_pinned') }}</p>
+                <p v-else class="mc-info-none">{{ pinnedLoading ? $t('MainChat.loading') : $t('Chat.no_pinned') }}</p>
             </div>
 
             <div class="mc-info-section">
                 <div class="mc-info-section-head">
-                    <span class="ah-label">{{ $t('ChatV2.files') }}</span>
+                    <span class="ah-label">{{ $t('Chat.files') }}</span>
                     <span class="mc-info-count">{{ shared.length }}</span>
                 </div>
                 <div v-if="media.length" class="mc-info-grid">
@@ -85,7 +85,7 @@
                         <span class="mc-info-doc-name">{{ item.mediaOriginalName || item.mediaName }}</span>
                     </li>
                 </ul>
-                <p v-if="!shared.length" class="mc-info-none">{{ $t('ChatV2.no_files') }}</p>
+                <p v-if="!shared.length" class="mc-info-none">{{ $t('Chat.no_files') }}</p>
             </div>
         </div>
     </aside>

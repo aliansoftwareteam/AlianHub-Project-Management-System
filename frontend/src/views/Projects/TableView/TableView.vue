@@ -17,7 +17,7 @@
                 class="tv2__add"
                 @click.stop="createTask = true"
             >+ {{ $t('Projects.new_task') }}</button>
-            <span class="tv2__note">{{ $t('ListV2.ai_fields_note') }}</span>
+            <span class="tv2__note">{{ $t('List.ai_fields_note') }}</span>
         </div>
         <div v-if="createTask" class="tv2__bar">
             <CreateTask
@@ -35,10 +35,10 @@
                     <span></span>
                     <button type="button" class="tv2__sort" @click="sortByColumns(globalSortKey === `TaskName: ${1}` ? `TaskName: ${-1}` : `TaskName: ${1}`)">{{ $t('Projects.tasks') }}</button>
                     <button type="button" class="tv2__sort" @click="sortByColumns(globalSortKey === `statusKey: ${1}` ? `statusKey: ${-1}` : `statusKey: ${1}`)">{{ $t('Projects.status') }}</button>
-                    <span>{{ $t('ListV2.col_owner') }}</span>
-                    <span class="tv2__head-ai">✦ {{ $t('ListV2.col_summary') }}</span>
-                    <span class="tv2__head-ai">✦ {{ $t('ListV2.col_risk') }}</span>
-                    <span class="tv2__head-ai">✦ {{ $t('ListV2.col_area') }}</span>
+                    <span>{{ $t('List.col_owner') }}</span>
+                    <span class="tv2__head-ai">✦ {{ $t('List.col_summary') }}</span>
+                    <span class="tv2__head-ai">✦ {{ $t('List.col_risk') }}</span>
+                    <span class="tv2__head-ai">✦ {{ $t('List.col_area') }}</span>
                 </div>
 
                 <TableViewTable
@@ -63,8 +63,8 @@
             </div>
 
             <div class="tv2__foot">
-                <span>{{ $t('ListV2.ai_source_hint') }}</span>
-                <span>{{ $t('ListV2.risk_formula') }}</span>
+                <span>{{ $t('List.ai_source_hint') }}</span>
+                <span>{{ $t('List.risk_formula') }}</span>
             </div>
         </div>
     </div>

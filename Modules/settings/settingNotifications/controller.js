@@ -3,6 +3,7 @@ const { removeCache } = require("../../../utils/commonFunctions");
 const { dbCollections } = require("../../../Config/collections");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose");
+const { ensureNotificationDefaults } = require("../../notification/defaults");
 
 exports.updateNotifications = async (req, res) => {
     try {
@@ -86,7 +87,7 @@ exports.getNotifications = async (req, res) => {
             ]
         };
 
-        const response = await MongoDbCrudOpration(companyId, query, "findOne");
+        const response = (await MongoDbCrudOpration(companyId, query, "findOne")) || (await ensureNotificationDefaults(companyId, id));
         myCache.set( cacheKey, JSON.stringify(response || {}), 604800 );
         return res.status(200).json(response || {});
     } catch (error) {

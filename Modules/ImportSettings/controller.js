@@ -60,7 +60,7 @@ async function batchUpdate(arr) {
                         console.error(`UPDATE failed batch: ${batch}`);
                         reject(new Error(`Unexpected error in batch ${batch}`));
                     }
-                };
+                }
             }
             loopFun()
         } catch (error) {
@@ -142,7 +142,7 @@ exports.importSettingsFunction = (req, cb) => {
                     obj.params = [companyId, uid]
                     break;
 
-                case "importCompanyUserOwner":
+                case "importCompanyUserOwner": {
                     const dataObj = {
                         companyId: companyId,
                         userId: uid,
@@ -162,6 +162,7 @@ exports.importSettingsFunction = (req, cb) => {
                     }
                     obj.params = [companyId, queryObj]
                     break;
+                }
 
                 default:
                     obj.params = [companyId]
@@ -244,7 +245,7 @@ exports.importSettingsV2Function = (req, cb) => {
                     obj.params = [companyId, uid]
                     break;
 
-                case "importCompanyUserOwner":
+                case "importCompanyUserOwner": {
                     const dataObj = {
                         companyId: companyId,
                         userId: uid,
@@ -264,6 +265,7 @@ exports.importSettingsV2Function = (req, cb) => {
                     }
                     obj.params = [companyId, queryObj]
                     break;
+                }
 
                 default:
                     obj.params = [companyId]
@@ -352,7 +354,7 @@ exports.importTemplate = (req, res) => {
         return;
     }
     try {
-        importData.importSettingTemplate(req.body.templates, (data) => {
+        importData.importSettingTemplate(req.body.companyId, req.body.templates, (data) => {
             res.json(data)
         });
     } catch (error) {

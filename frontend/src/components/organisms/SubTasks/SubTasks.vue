@@ -1,7 +1,7 @@
 <template>
     <section class="stx">
         <header class="stx__head">
-            <span class="stx__title">{{ $t('MembersV2.subtasks') }}</span>
+            <span class="stx__title">{{ $t('Members.subtasks') }}</span>
             <span v-if="rollup.total" class="ah-mono stx__rollup">{{ rollupText }}</span>
             <div v-if="rollup.total" class="stx__bar"><div class="stx__bar-fill" :style="{ width: `${rollup.percent}%` }"></div></div>
             <button
@@ -10,9 +10,9 @@
                 class="stx__ai"
                 :disabled="isSpinnerSuggest"
                 @click="sugestSubTask()"
-            >✦ {{ $t('MembersV2.suggest_subtasks') }}</button>
+            >✦ {{ $t('Members.suggest_subtasks') }}</button>
             <button v-if="rollup.total" type="button" class="stx__link" @click="collapsed = !collapsed">
-                {{ collapsed ? $t('MembersV2.expand') : $t('MembersV2.collapse') }}
+                {{ collapsed ? $t('Members.expand') : $t('Members.collapse') }}
             </button>
         </header>
 
@@ -38,7 +38,7 @@
                     <span class="ah-mono stx__hours">{{ hours(sub.totalEstimatedTime) }}</span>
                 </div>
             </div>
-            <p v-else-if="!createSubTask" class="stx__empty">{{ $t('MembersV2.no_subtasks') }}</p>
+            <p v-else-if="!createSubTask" class="stx__empty">{{ $t('Members.no_subtasks') }}</p>
 
             <div v-if="subTasksList && subTasksList.length" class="stx__ai-list">
                 <label v-for="(sub, index) in subTasksList" :key="'ai-sub-' + index" class="stx__ai-row">
@@ -46,7 +46,7 @@
                     <span>✦ {{ sub.title }}</span>
                 </label>
                 <div class="stx__ai-actions">
-                    <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="subTasksList = []">{{ $t('MembersV2.cancel') }}</button>
+                    <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="subTasksList = []">{{ $t('Members.cancel') }}</button>
                     <button
                         v-if="selectedAiCount"
                         type="button"
@@ -61,8 +61,8 @@
             <p v-if="isError" class="ah-field__error">{{ $t('Toast.something_went_wrong') }}</p>
 
             <button v-if="canCreate && !createSubTask" type="button" class="stx__add" @click="createSubTask = true">
-                <span class="stx__add-plus">+</span>{{ $t('MembersV2.add_subtask') }}
-                <span class="stx__add-hint">· <span class="ah-kbd">Tab</span> {{ $t('MembersV2.add_subtask_hint') }} <span class="ah-kbd">↵</span> {{ $t('MembersV2.add_subtask_hint_end') }}</span>
+                <span class="stx__add-plus">+</span>{{ $t('Members.add_subtask') }}
+                <span class="stx__add-hint">· <span class="ah-kbd">Tab</span> {{ $t('Members.add_subtask_hint') }} <span class="ah-kbd">↵</span> {{ $t('Members.add_subtask_hint_end') }}</span>
             </button>
         </template>
 
@@ -172,10 +172,10 @@ const rollup = computed(() => {
 });
 
 const rollupText = computed(() => {
-    const base = t("MembersV2.subtasks_count", { done: rollup.value.done, total: rollup.value.total });
+    const base = t("Members.subtasks_count", { done: rollup.value.done, total: rollup.value.total });
     if (!rollup.value.minutes) return base;
     const asHours = (minutes) => Math.round((Number(minutes) || 0) / 60);
-    return `${base} · ${t("MembersV2.subtasks_hours", { done: asHours(rollup.value.doneMinutes), total: asHours(rollup.value.minutes) })}`;
+    return `${base} · ${t("Members.subtasks_hours", { done: asHours(rollup.value.doneMinutes), total: asHours(rollup.value.minutes) })}`;
 });
 
 function hours(minutes) {

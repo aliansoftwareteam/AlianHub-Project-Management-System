@@ -37,7 +37,7 @@ exports.createConnection = (db) => {
         try {
             let retries = 0;
 
-            function handleMongoConnection() {
+            const handleMongoConnection = () => {
                 connect(db)
                 .then((connection) => {
                     retries=0;

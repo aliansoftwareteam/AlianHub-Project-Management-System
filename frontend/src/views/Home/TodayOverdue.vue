@@ -4,25 +4,25 @@
 
         <div class="ah-page__main">
             <header class="ah-toolbar">
-                <button type="button" class="ah-tbtn ah-tbtn--icon home__sidebar-toggle" :title="$t('HomeV2.show_sidebar')" @click="homeState.sidebarOpen = !homeState.sidebarOpen">
+                <button type="button" class="ah-tbtn ah-tbtn--icon home__sidebar-toggle" :title="$t('Home.show_sidebar')" @click="homeState.sidebarOpen = !homeState.sidebarOpen">
                     <ShellIcon name="sidebar" :size="15" />
                 </button>
-                <div class="ah-toolbar__title">{{ $t('HomeV2.today_overdue') }}</div>
+                <div class="ah-toolbar__title">{{ $t('Home.today_overdue') }}</div>
                 <span class="ah-toolbar__date">{{ todayLabel }}</span>
                 <div class="ah-toolbar__actions">
                     <StatusChip />
-                    <router-link v-if="router.hasRoute('Dashboards')" class="ah-tbtn ah-tbtn--strong home__manage" :to="{ name: 'Dashboards', params: { cid: companyId } }">{{ $t('HomeV2.manage_cards') }}</router-link>
+                    <router-link v-if="router.hasRoute('Dashboards')" class="ah-tbtn ah-tbtn--strong home__manage" :to="{ name: 'Dashboards', params: { cid: companyId } }">{{ $t('Home.manage_cards') }}</router-link>
                     <div class="ah-pop-anchor" @click.stop>
-                        <button type="button" class="ah-tbtn ah-tbtn--primary" :aria-expanded="newOpen" aria-haspopup="menu" @click="newOpen = !newOpen">{{ $t('HomeV2.new') }}</button>
+                        <button type="button" class="ah-tbtn ah-tbtn--primary" :aria-expanded="newOpen" aria-haspopup="menu" @click="newOpen = !newOpen">{{ $t('Home.new') }}</button>
                         <transition name="ah-fade">
                             <div v-if="newOpen" class="ah-pop" role="menu">
-                                <button type="button" class="ah-pop__item" role="menuitem" @click="focusAdd"><ShellIcon name="plus" :size="14" /><span>{{ $t('HomeV2.new_task') }}</span></button>
-                                <button v-if="canCreateProject" type="button" class="ah-pop__item" role="menuitem" @click="newOpen = false; createProjectOpen = true"><ShellIcon name="projects" :size="14" /><span>{{ $t('HomeV2.new_project') }}</span></button>
-                                <button type="button" class="ah-pop__item" role="menuitem" @click="newOpen = false; openPanel('reminders')"><ShellIcon name="reminder" :size="14" /><span>{{ $t('HomeV2.new_reminder') }}</span></button>
+                                <button type="button" class="ah-pop__item" role="menuitem" @click="focusAdd"><ShellIcon name="plus" :size="14" /><span>{{ $t('Home.new_task') }}</span></button>
+                                <button v-if="canCreateProject" type="button" class="ah-pop__item" role="menuitem" @click="newOpen = false; createProjectOpen = true"><ShellIcon name="projects" :size="14" /><span>{{ $t('Home.new_project') }}</span></button>
+                                <button type="button" class="ah-pop__item" role="menuitem" @click="newOpen = false; openPanel('reminders')"><ShellIcon name="reminder" :size="14" /><span>{{ $t('Home.new_reminder') }}</span></button>
                             </div>
                         </transition>
                     </div>
-                    <button type="button" class="ah-tbtn ah-tbtn--icon home__planner-toggle" :class="{ 'is-active': homeState.plannerOpen }" :title="homeState.plannerOpen ? $t('HomeV2.hide_planner') : $t('HomeV2.show_planner')" @click="homeState.plannerOpen = !homeState.plannerOpen">
+                    <button type="button" class="ah-tbtn ah-tbtn--icon home__planner-toggle" :class="{ 'is-active': homeState.plannerOpen }" :title="homeState.plannerOpen ? $t('Home.hide_planner') : $t('Home.show_planner')" @click="homeState.plannerOpen = !homeState.plannerOpen">
                         <ShellIcon name="panel" :size="15" />
                     </button>
                 </div>
@@ -33,9 +33,21 @@
                     <SetupChecklist
                         v-if="showChecklist"
                         :company-name="companyName"
+                        :title="isOwnerOrAdmin ? '' : $t('Home.member_setup_title')"
                         :steps="checklistSteps"
                         @action="onChecklistAction"
                         @dismiss="dismissChecklist"
+                    />
+                    <ConfirmationSidebar
+                        v-if="confirmRemoveSample"
+                        v-model="confirmRemoveSample"
+                        :title="$t('Projects.remove_sample')"
+                        :message="$t('Projects.remove_sample_confirm')"
+                        confirmationString="remove"
+                        acceptButtonClass="btn-danger"
+                        :acceptButton="$t('Projects.remove_sample')"
+                        :showSpinner="onboarding.removingSample.value"
+                        @confirm="removeSampleConfirmed"
                     />
                     <div class="home__grid">
                         <MyWorkCard
@@ -57,9 +69,9 @@
                         <div class="home__side">
                             <AgendaCard :day="agendaDay" :items="agendaItems" :connected="agenda.connected.value" :first-run="firstRun" @shift="shiftAgenda" />
                             <section v-if="firstRun && !timer.active" class="hc-card">
-                                <div class="hc-personal__title">{{ $t('HomeV2.personal_list') }}</div>
-                                <p class="hc-hint" style="margin: 0">{{ $t('HomeV2.personal_hint') }}</p>
-                                <router-link class="hc-personal__open" :to="{ name: 'PersonalList', params: { cid: companyId } }">{{ $t('HomeV2.open') }}</router-link>
+                                <div class="hc-personal__title">{{ $t('Home.personal_list') }}</div>
+                                <p class="hc-hint" style="margin: 0">{{ $t('Home.personal_hint') }}</p>
+                                <router-link class="hc-personal__open" :to="{ name: 'PersonalList', params: { cid: companyId } }">{{ $t('Home.open') }}</router-link>
                             </section>
                             <TimerChip />
                         </div>
@@ -97,7 +109,7 @@
             @closeSidebar="createProjectOpen = false"
         />
     </div>
-    <div v-else class="ah-denied">{{ $t('HomeV2.access_denied') }}</div>
+    <div v-else class="ah-denied">{{ $t('Home.access_denied') }}</div>
 </template>
 
 <script setup>
@@ -117,15 +129,14 @@ import AgendaCard from "@/components/molecules/Home/AgendaCard.vue";
 import PlannerPanel from "@/components/molecules/Home/PlannerPanel.vue";
 import TimerChip from "@/components/molecules/Home/TimerChip.vue";
 import SetupChecklist from "@/components/molecules/Home/SetupChecklist.vue";
-import { isFirstRunStepDone, FIRST_RUN_STEPS } from "@/composable/firstRunProgress";
+import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue";
+import { useOnboardingChecklist } from "@/composable/useOnboardingChecklist";
 import StatusChip from "@/components/molecules/Home/StatusChip.vue";
 import { homeState } from "@/components/molecules/Home/homeState";
 import { useMyWork } from "@/components/molecules/Home/useMyWork";
 import { useTimer } from "@/components/molecules/Home/useTimer";
 import { useAgenda } from "@/components/molecules/Home/useAgenda";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
-import { apiRequestWithoutCompnay } from "@/services";
-import * as env from "@/config/env";
 import "@/components/molecules/Home/style.css";
 import "./style.css";
 
@@ -160,32 +171,18 @@ const pendingDateTask = ref(null);
 
 const todayLabel = computed(() => moment().format("ddd MMM D"));
 const projects = computed(() => getters["projectData/projects"]?.data || []);
-const companyUsers = computed(() => getters["settings/companyUsers"] || []);
-const companyUser = computed(() => getters["settings/companyUserDetail"] || {});
 const companyName = computed(() => getters["settings/selectedCompany"]?.Cst_CompanyName || "");
 const sampleProject = computed(() => projects.value[0] || null);
 
-const checklist = ref({ dismissed: false, reviewedPermissions: false });
-const firstRunSteps = computed(() => {
-    void route.fullPath;
-    return {
-        board: isFirstRunStepDone(FIRST_RUN_STEPS.BOARD_VIEW),
-        notifications: isFirstRunStepDone(FIRST_RUN_STEPS.NOTIFICATIONS)
-    };
+const mainTour = inject("$mainTour", null);
+const onboarding = useOnboardingChecklist({
+    openCreateProject: () => { createProjectOpen.value = true; },
+    startTour: (which) => mainTour?.value?.startTour?.(which),
+    routeVersion: () => route.fullPath
 });
-const checklistSteps = computed(() => [
-    { key: "company", label: "HomeV2.step_company", done: true, cta: "HomeV2.step_company" },
-    { key: "sample", label: "HomeV2.step_sample", done: projects.value.length > 0, cta: "HomeV2.create_project" },
-    { key: "invite", label: "HomeV2.step_invite", done: companyUsers.value.length > 1, cta: "HomeV2.invite_team" },
-    { key: "project", label: "HomeV2.step_project", done: projects.value.length > 1, cta: "HomeV2.create_project" },
-    { key: "permissions", label: "HomeV2.step_permissions", note: "HomeV2.step_permissions_note", done: checklist.value.reviewedPermissions, cta: "HomeV2.review_permissions" },
-    { key: "board", label: "HomeV2.step_board", done: firstRunSteps.value.board, cta: "HomeV2.step_board" },
-    { key: "notifications", label: "HomeV2.step_notifications", done: firstRunSteps.value.notifications, cta: "HomeV2.step_notifications" }
-]);
-const checklistComplete = computed(() => checklistSteps.value.every((s) => s.done));
-const isOwnerOrAdmin = computed(() => [1, 2].includes(companyUser.value.roleType));
+const { steps: checklistSteps, show: showChecklist, complete: checklistComplete, isOwnerOrAdmin, dismiss: dismissChecklist } = onboarding;
 const firstRun = computed(() => projects.value.length <= 1 || !checklistComplete.value);
-const showChecklist = computed(() => firstRun.value && isOwnerOrAdmin.value && !checklist.value.dismissed && !checklistComplete.value);
+const confirmRemoveSample = ref(false);
 
 const agendaItems = computed(() => agenda.itemsFor(agendaDay.value, work.mine.value));
 
@@ -193,29 +190,25 @@ function shiftAgenda(delta) {
     agendaDay.value = delta === 0 ? moment() : moment(agendaDay.value).add(delta, "day");
 }
 
-function saveChecklist(patch) {
-    checklist.value = { ...checklist.value, ...patch };
-    apiRequestWithoutCompnay("put", env.USER_UPATE, {
-        userId: userId.value,
-        updateObject: { $set: { homeChecklist: checklist.value } }
-    }).catch((error) => console.error("checklist save failed", error));
-}
-const dismissChecklist = () => saveChecklist({ dismissed: true });
-
 function onChecklistAction(key) {
-    if (key === "invite") router.push({ name: "Members", params: { cid: companyId.value } });
-    else if (key === "sample" || key === "project") createProjectOpen.value = true;
-    else if (key === "permissions") {
-        saveChecklist({ reviewedPermissions: true });
-        router.push({ name: router.hasRoute("Security & Permissions") ? "Security & Permissions" : "Setting", params: { cid: companyId.value } });
-    }
-    // Both tick themselves once the screen opens (firstRunProgress), so the CTA
-    // only has to get the owner there.
-    else if (key === "board") {
-        if (!sampleProject.value) createProjectOpen.value = true;
-        else router.push({ name: "Project", params: { cid: companyId.value, id: sampleProject.value._id }, query: { tab: "ProjectKanban" } });
-    } else if (key === "notifications") router.push({ name: "Notifications", params: { cid: companyId.value } });
+    if (!onboarding.onAction(key)) confirmRemoveSample.value = true;
 }
+
+async function removeSampleConfirmed() {
+    try {
+        await onboarding.removeSample();
+        $toast.success(t("Projects.remove_sample_done"), { position: "top-right" });
+    } catch (error) {
+        console.error("remove sample failed", error);
+        $toast.error(t("Toast.something_went_wrong"), { position: "top-right" });
+    } finally {
+        confirmRemoveSample.value = false;
+    }
+}
+
+watch(() => timer.active, (now, before) => {
+    if (before && !now) onboarding.mark("log_time");
+});
 
 function openTask(task) {
     detail.value = { open: true, taskId: task._id, projectId: task.ProjectID, sprintId: task.sprintId };
@@ -225,16 +218,18 @@ function closeTask() {
     work.fetchOpen().catch(() => {});
 }
 function goProject(project) {
+    onboarding.mark("open_project");
     router.push({ name: "Project", params: { cid: companyId.value, id: project._id } });
 }
 
 async function onComplete(task) {
     try {
         await work.complete(task);
-        $toast.success(t("HomeV2.task_done"), { position: "top-right" });
+        onboarding.mark("complete_task");
+        $toast.success(t("Home.task_done"), { position: "top-right" });
     } catch (error) {
         console.error("complete failed", error);
-        $toast.error(t("HomeV2.task_update_failed"), { position: "top-right" });
+        $toast.error(t("Home.task_update_failed"), { position: "top-right" });
     }
 }
 async function onReopen(task) {
@@ -242,7 +237,7 @@ async function onReopen(task) {
         await work.reopen(task);
     } catch (error) {
         console.error("reopen failed", error);
-        $toast.error(t("HomeV2.task_update_failed"), { position: "top-right" });
+        $toast.error(t("Home.task_update_failed"), { position: "top-right" });
     }
 }
 
@@ -255,10 +250,10 @@ async function onTimer(task) {
         const previous = timer.active.taskName;
         try {
             await stop({ companyId: companyId.value, userId: userId.value });
-            $toast.info(t("HomeV2.timer_switched", { task: previous }), { position: "top-right" });
+            $toast.info(t("Home.timer_switched", { task: previous }), { position: "top-right" });
         } catch (error) {
             console.error("timer stop failed", error);
-            $toast.error(t("HomeV2.timer_log_failed"), { position: "top-right" });
+            $toast.error(t("Home.timer_log_failed"), { position: "top-right" });
             return;
         }
     }
@@ -282,7 +277,7 @@ async function onDatePicked(event) {
         await work.setDueDate(task, moment(value, "YYYY-MM-DD").endOf("day").toDate());
     } catch (error) {
         console.error("due date failed", error);
-        $toast.error(t("HomeV2.task_update_failed"), { position: "top-right" });
+        $toast.error(t("Home.task_update_failed"), { position: "top-right" });
     }
 }
 
@@ -290,10 +285,10 @@ async function onAdd(name) {
     adding.value = true;
     try {
         await work.addPersonalTask(name, moment().endOf("day").toDate());
-        $toast.success(t("HomeV2.task_added"), { position: "top-right" });
+        $toast.success(t("Home.task_added"), { position: "top-right" });
     } catch (error) {
         console.error("add failed", error);
-        $toast.error(t("HomeV2.task_update_failed"), { position: "top-right" });
+        $toast.error(t("Home.task_update_failed"), { position: "top-right" });
     } finally {
         adding.value = false;
     }
@@ -309,10 +304,10 @@ async function onSchedule({ taskId, start: begin, end }) {
     if (!task) return;
     try {
         await work.schedule(task, begin.toDate(), end.toDate());
-        $toast.success(t("HomeV2.scheduled", { task: task.TaskName, when: begin.format("ddd HH:mm") }), { position: "top-right" });
+        $toast.success(t("Home.scheduled", { task: task.TaskName, when: begin.format("ddd HH:mm") }), { position: "top-right" });
     } catch (error) {
         console.error("schedule failed", error);
-        $toast.error(t("HomeV2.schedule_failed"), { position: "top-right" });
+        $toast.error(t("Home.schedule_failed"), { position: "top-right" });
     }
 }
 
@@ -321,7 +316,7 @@ const onVisible = () => { if (document.visibilityState === "visible") work.fetch
 
 onMounted(() => {
     const me = getUser(userId.value, "all") || {};
-    if (me.homeChecklist) checklist.value = { ...checklist.value, ...me.homeChecklist };
+    onboarding.load();
     if (me.presence) homeState.presence = { ...homeState.presence, ...me.presence };
     work.fetchOpen().catch((error) => console.error("my work failed", error));
     agenda.load().catch(() => {});

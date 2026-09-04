@@ -35,13 +35,13 @@
             <span class="dcard__title" :title="title">{{ title }}</span>
             <span v-if="scope" class="dcard__scope">{{ scope }}</span>
             <span class="dcard__grow"></span>
-            <span v-if="live" class="dcard__live"><i class="ah-dot ah-dot--ok"></i>{{ $t('DashV2.live') }}</span>
+            <span v-if="live" class="dcard__live"><i class="ah-dot ah-dot--ok"></i>{{ $t('Dash.live') }}</span>
             <slot name="actions"></slot>
             <select
                 v-if="periodOptions.length"
                 class="dcard__period"
                 :value="periodValue"
-                :title="$t('DashV2.period')"
+                :title="$t('Dash.period')"
                 @click.stop
                 @mousedown.stop
                 @change="$emit('period-change', Number($event.target.value))"
@@ -49,13 +49,13 @@
                 <option v-for="opt in periodOptions" :key="opt.id" :value="opt.id">{{ opt.label }}</option>
             </select>
             <div class="dcard__tools">
-                <button v-if="showRefresh" type="button" class="dcard__tool" :title="$t('DashV2.refresh')" @click.stop="$emit('refresh')" @mousedown.stop>
+                <button v-if="showRefresh" type="button" class="dcard__tool" :title="$t('Dash.refresh')" @click.stop="$emit('refresh')" @mousedown.stop>
                     <ShellIcon name="refresh" :size="13" />
                 </button>
-                <button v-if="showSettings" type="button" class="dcard__tool" :title="$t('DashV2.card_settings')" @click.stop="$emit('settings')" @mousedown.stop>
+                <button v-if="showSettings" type="button" class="dcard__tool" :title="$t('Dash.card_settings')" @click.stop="$emit('settings')" @mousedown.stop>
                     <ShellIcon name="settings" :size="13" />
                 </button>
-                <button v-if="showRemove" type="button" class="dcard__tool dcard__tool--danger" :title="$t('DashV2.remove_card')" @click.stop="$emit('remove')" @mousedown.stop>
+                <button v-if="showRemove" type="button" class="dcard__tool dcard__tool--danger" :title="$t('Dash.remove_card')" @click.stop="$emit('remove')" @mousedown.stop>
                     <ShellIcon name="x" :size="13" />
                 </button>
             </div>
@@ -72,8 +72,8 @@
                 <span class="dcard__sk dcard__sk--short"></span>
             </div>
             <div v-else-if="resolvedState === 'error'" class="dcard__state">
-                <p class="dcard__state-text">{{ meta.error || $t('DashV2.card_error') }}</p>
-                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="$emit('retry')">{{ $t('DashV2.try_again') }}</button>
+                <p class="dcard__state-text">{{ meta.error || $t('Dash.card_error') }}</p>
+                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="$emit('retry')">{{ $t('Dash.try_again') }}</button>
             </div>
             <div v-else-if="resolvedState === 'empty'" class="dcard__state">
                 <slot name="empty">
@@ -139,10 +139,10 @@ onMounted(() => { tick = setInterval(() => { now.value = Date.now(); }, 60000); 
 onBeforeUnmount(() => clearInterval(tick));
 
 const freshness = computed(() => {
-    if (props.live) return t('DashV2.live_data');
+    if (props.live) return t('Dash.live_data');
     if (!loadedAt.value) return '';
     const mins = Math.floor((now.value - loadedAt.value) / 60000);
-    return mins < 1 ? t('DashV2.updated_just_now') : t('DashV2.updated_min', { n: mins });
+    return mins < 1 ? t('Dash.updated_just_now') : t('Dash.updated_min', { n: mins });
 });
 const footerLeft = computed(() => [freshness.value, meta.note || props.footerNote].filter(Boolean).join(' · '));
 </script>

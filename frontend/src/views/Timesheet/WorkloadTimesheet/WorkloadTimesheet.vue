@@ -9,26 +9,26 @@
     />
 </div>
 <NotFound v-else-if="!allowed" />
-<div v-else-if="isMobile" class="ah-page tv-page"><div class="tv-empty"><span>{{ $t('TimeV2.desktop_only') }}</span></div></div>
+<div v-else-if="isMobile" class="ah-page tv-page"><div class="tv-empty"><span>{{ $t('Time.desktop_only') }}</span></div></div>
 <div v-else class="wl">
     <div class="ah-toolbar wl__bar">
         <span class="tv-sq" :style="{ background: activeProject && activeProject.color ? activeProject.color : 'var(--brand)' }"></span>
         <select v-model="projectId" class="tv-select wl__project">
-            <option value="">{{ $t('TimeV2.all_projects') }}</option>
+            <option value="">{{ $t('Time.all_projects') }}</option>
             <option v-for="p in projectList" :key="p._id" :value="String(p._id)">{{ p.ProjectName }}</option>
         </select>
         <TimesheetTabs active="workload" />
         <span class="tv-range wl__range">
-            <button type="button" :aria-label="$t('TimeV2.prev_week')" @click="shift(-7)">‹</button>
+            <button type="button" :aria-label="$t('Time.prev_week')" @click="shift(-7)">‹</button>
             <span>{{ rangeLabel }}</span>
-            <button type="button" :aria-label="$t('TimeV2.next_week')" @click="shift(7)">›</button>
+            <button type="button" :aria-label="$t('Time.next_week')" @click="shift(7)">›</button>
         </span>
         <div class="ah-toolbar__spacer"></div>
         <select v-model="mode" class="tv-select">
-            <option value="estimate">{{ $t('TimeV2.by_estimate') }}</option>
-            <option value="logged">{{ $t('TimeV2.by_logged') }}</option>
+            <option value="estimate">{{ $t('Time.by_estimate') }}</option>
+            <option value="logged">{{ $t('Time.by_logged') }}</option>
         </select>
-        <button type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="suggestBalance">{{ $t('TimeV2.balance') }}</button>
+        <button type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="suggestBalance">{{ $t('Time.balance') }}</button>
     </div>
 
     <div class="wl__body">
@@ -38,7 +38,7 @@
             <div class="wl__row wl__row--head">
                 <span></span>
                 <span v-for="d in visibleDays" :key="d" :class="{ 'is-today': d === today }">{{ dayHead(d) }}</span>
-                <span>{{ $t('TimeV2.col_total') }}</span>
+                <span>{{ $t('Time.col_total') }}</span>
             </div>
             <div v-for="u in users" :key="u.userId" class="wl__row">
                 <div class="wl__person">
@@ -60,7 +60,7 @@
                     @dragleave="onDragLeave(u, d)"
                     @drop.prevent="onDrop(u, d)"
                 >
-                    <template v-if="d.pto"><span class="wl__pto">{{ $t('TimeV2.pto') }}</span></template>
+                    <template v-if="d.pto"><span class="wl__pto">{{ $t('Time.pto') }}</span></template>
                     <template v-else>
                         <div class="wl__fill" :class="{ 'is-over': isOver(d), 'is-tentative': isTentative(d.date) }" :style="{ height: `${fillPct(d)}%` }">
                             <span v-if="value(d)">{{ hLabel(value(d)) }}</span>
@@ -83,20 +83,20 @@
                     {{ hLabel(mode === 'estimate' ? u.totalEstimated : u.totalLogged) }}<small>/{{ Math.round(u.capacityMinutes / 60) }}</small>
                 </div>
             </div>
-            <div v-if="!users.length" class="tv-empty wl__empty"><span>{{ loading ? $t('TimeV2.loading') : $t('TimeV2.workload_empty') }}</span></div>
+            <div v-if="!users.length" class="tv-empty wl__empty"><span>{{ loading ? $t('Time.loading') : $t('Time.workload_empty') }}</span></div>
         </div>
 
         <div class="wl__foot">
             <div class="tv-legend">
-                <span><i style="background: var(--brand)"></i>{{ mode === 'estimate' ? $t('TimeV2.legend_estimated') : $t('TimeV2.legend_logged') }}</span>
-                <span><i style="background: var(--brand); opacity: .5"></i>{{ $t('TimeV2.legend_tentative') }}</span>
-                <span><i style="background: var(--danger)"></i>{{ $t('TimeV2.legend_over') }}</span>
-                <span v-if="!hint" class="ah-muted">{{ $t('TimeV2.drag_hint') }}</span>
+                <span><i style="background: var(--brand)"></i>{{ mode === 'estimate' ? $t('Time.legend_estimated') : $t('Time.legend_logged') }}</span>
+                <span><i style="background: var(--brand); opacity: .5"></i>{{ $t('Time.legend_tentative') }}</span>
+                <span><i style="background: var(--danger)"></i>{{ $t('Time.legend_over') }}</span>
+                <span v-if="!hint" class="ah-muted">{{ $t('Time.drag_hint') }}</span>
             </div>
             <div v-if="hint" class="wl__hint">
                 <span class="tv-spark">✦</span>
                 <span>{{ hint.text }}</span>
-                <button v-if="hint.apply" type="button" class="tv-link" :disabled="busy" @click="applyHint">{{ $t('TimeV2.apply') }}</button>
+                <button v-if="hint.apply" type="button" class="tv-link" :disabled="busy" @click="applyHint">{{ $t('Time.apply') }}</button>
             </div>
         </div>
     </div>
@@ -169,10 +169,10 @@ const isOver = (d) => (d.capacityMinutes > 0 ? value(d) > d.capacityMinutes : va
 const fillPct = (d) => (d.capacityMinutes > 0 ? Math.min(100, (value(d) / d.capacityMinutes) * 100) : (value(d) ? 100 : 0));
 const isTentative = (date) => moment(date).isAfter(moment().endOf('isoWeek'));
 const subLabel = (u) => {
-    if (u.utilizationPct > 100) return t('TimeV2.pct_period', { pct: u.utilizationPct });
+    if (u.utilizationPct > 100) return t('Time.pct_period', { pct: u.utilizationPct });
     const pto = u.days.filter((d) => d.pto && visibleDays.value.includes(d.date));
-    if (pto.length) return t('TimeV2.pto_range', { range: pto.length === 1 ? moment(pto[0].date).format('ddd') : `${moment(pto[0].date).format('ddd')}–${moment(pto[pto.length - 1].date).format('ddd')}` });
-    return t('TimeV2.per_day', { h: u.hoursPerDay });
+    if (pto.length) return t('Time.pto_range', { range: pto.length === 1 ? moment(pto[0].date).format('ddd') : `${moment(pto[0].date).format('ddd')}–${moment(pto[pto.length - 1].date).format('ddd')}` });
+    return t('Time.per_day', { h: u.hoursPerDay });
 };
 const pctAfter = (u, delta) => (u.capacityMinutes > 0 ? Math.round(((u.totalEstimated + delta) / u.capacityMinutes) * 100) : 0);
 
@@ -187,7 +187,7 @@ const load = async () => {
         users.value = body.data.users || [];
         days.value = body.data.days || [];
     } catch (e) {
-        error.value = t('TimeV2.load_failed');
+        error.value = t('Time.load_failed');
     } finally {
         loading.value = false;
     }
@@ -212,11 +212,11 @@ const move = async ({ chip, fromUser, fromDay, toUser, toDay }) => {
             taskId: chip.taskId, estimateId: chip.estimateId, fromUserId: fromUser.userId, toUserId: toUser.userId, fromDate: fromDay.date, toDate: toDay.date,
         })) || {}).data || {};
         if (!body.status) throw new Error(body.statusText || 'move_failed');
-        flash(t('TimeV2.moved', { task: chip.name, name: toUser.name, day: moment(toDay.date).format('ddd D') }));
+        flash(t('Time.moved', { task: chip.name, name: toUser.name, day: moment(toDay.date).format('ddd D') }));
         hint.value = null;
         await load();
     } catch (e) {
-        error.value = t('TimeV2.move_failed');
+        error.value = t('Time.move_failed');
     } finally {
         busy.value = false;
     }
@@ -235,7 +235,7 @@ const onDragOver = (u, d) => {
     const { chip, fromUser } = drag.value;
     const same = fromUser.userId === u.userId;
     hint.value = {
-        text: t('TimeV2.dragging', {
+        text: t('Time.dragging', {
             task: chip.name, h: formatHm(chip.minutes), name: u.name, day: moment(d.date).format('ddd'),
             from: fromUser.name, fromPct: pctAfter(fromUser, same ? 0 : -chip.minutes), toPct: pctAfter(u, same ? 0 : chip.minutes),
         }),
@@ -257,7 +257,7 @@ const suggestBalance = () => {
     users.value.forEach((u) => u.days.forEach((d) => {
         if (!d.pto && d.chips.length && d.capacityMinutes > 0 && d.estimated > d.capacityMinutes && (!worst || d.estimated - d.capacityMinutes > worst.d.estimated - worst.d.capacityMinutes)) worst = { u, d };
     }));
-    if (!worst) { hint.value = { text: t('TimeV2.balance_none') }; return; }
+    if (!worst) { hint.value = { text: t('Time.balance_none') }; return; }
     const chip = [...worst.d.chips].sort((a, b) => b.minutes - a.minutes)[0];
     let target = null;
     users.value.forEach((u) => {
@@ -267,9 +267,9 @@ const suggestBalance = () => {
         const room = d.capacityMinutes - d.estimated;
         if (room >= chip.minutes && (!target || room > target.room)) target = { u, d, room };
     });
-    if (!target) { hint.value = { text: t('TimeV2.balance_none') }; return; }
+    if (!target) { hint.value = { text: t('Time.balance_none') }; return; }
     hint.value = {
-        text: t('TimeV2.balance_hint', {
+        text: t('Time.balance_hint', {
             task: chip.name, h: formatHm(chip.minutes), from: worst.u.name, day: moment(worst.d.date).format('ddd'), to: target.u.name,
             fromPct: pctAfter(worst.u, -chip.minutes), toPct: pctAfter(target.u, chip.minutes),
         }),

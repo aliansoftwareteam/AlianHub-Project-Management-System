@@ -11,11 +11,11 @@
 <NotFound v-else-if="!allowed" />
 <div v-else class="ah-page tv-page ut2">
     <div class="tv-head">
-        <h1 class="tv-title">{{ $t('TimeV2.my_timesheet') }}</h1>
+        <h1 class="tv-title">{{ $t('Time.my_timesheet') }}</h1>
         <span class="tv-range">
-            <button type="button" :aria-label="$t('TimeV2.prev_week')" @click="shiftWeek(-1)">‹</button>
+            <button type="button" :aria-label="$t('Time.prev_week')" @click="shiftWeek(-1)">‹</button>
             <span>{{ rangeLabel }}</span>
-            <button type="button" :aria-label="$t('TimeV2.next_week')" @click="shiftWeek(1)">›</button>
+            <button type="button" :aria-label="$t('Time.next_week')" @click="shiftWeek(1)">›</button>
         </span>
         <span class="ah-chip" :class="statusChip.cls" :title="statusChip.title">{{ statusChip.label }}</span>
         <TimesheetTabs active="mine" />
@@ -24,26 +24,26 @@
                 <span class="ah-dot ah-dot--ok"></span>
                 <span class="tv-mono">{{ formatClock(timer.elapsed.value, true) }}</span>
                 <span class="ut2-timer__task" :title="timer.active.value.taskName">{{ timer.active.value.taskName }}</span>
-                <button type="button" class="tv-link" :disabled="busy.timer" @click="stopTimer">{{ $t('TimeV2.stop') }}</button>
+                <button type="button" class="tv-link" :disabled="busy.timer" @click="stopTimer">{{ $t('Time.stop') }}</button>
             </span>
-            <span v-else-if="liveSession" class="ah-chip ah-chip--ok ut2-timer" :title="$t('TimeV2.running_desktop')">
+            <span v-else-if="liveSession" class="ah-chip ah-chip--ok ut2-timer" :title="$t('Time.running_desktop')">
                 <span class="ah-dot ah-dot--ok"></span>
                 <span class="ut2-timer__task">{{ liveSession.taskName }}</span>
             </span>
-            <select v-if="isEveryone" v-model="personId" class="tv-select" :title="$t('TimeV2.me')">
-                <option value="">{{ $t('TimeV2.me') }}</option>
+            <select v-if="isEveryone" v-model="personId" class="tv-select" :title="$t('Time.me')">
+                <option value="">{{ $t('Time.me') }}</option>
                 <option v-for="u in otherUsers" :key="u._id" :value="u._id">{{ u.Employee_Name }}</option>
             </select>
-            <select v-model="projectId" class="tv-select" :title="$t('TimeV2.all_projects')">
-                <option value="">{{ $t('TimeV2.all_projects') }}</option>
+            <select v-model="projectId" class="tv-select" :title="$t('Time.all_projects')">
+                <option value="">{{ $t('Time.all_projects') }}</option>
                 <option v-for="p in projectList" :key="p._id" :value="String(p._id)">{{ p.ProjectName }}</option>
             </select>
-            <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="openLog()">{{ $t('TimeV2.log_time') }}</button>
+            <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="openLog()">{{ $t('Time.log_time') }}</button>
             <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy.export" @click="exportCsv">
-                {{ busy.export ? $t('TimeV2.exporting') : $t('TimeV2.export') }}
+                {{ busy.export ? $t('Time.exporting') : $t('Time.export') }}
             </button>
             <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="!canSubmit || busy.submit" @click="submitWeek">
-                {{ busy.submit ? $t('TimeV2.submitting') : (isRejected ? $t('TimeV2.resubmit_week') : $t('TimeV2.submit_week')) }}
+                {{ busy.submit ? $t('Time.submitting') : (isRejected ? $t('Time.resubmit_week') : $t('Time.submit_week')) }}
             </button>
         </div>
     </div>
@@ -54,15 +54,15 @@
     <div class="ut2-scroll ah-scroll">
         <div class="tv-card ut2-grid" :style="{ '--days': days.length || 7 }" :class="{ 'is-loading': loading }">
             <div class="ut2-row ut2-row--head">
-                <span class="ut2-task">{{ $t('TimeV2.col_task') }}</span>
-                <span v-for="d in days" :key="d.date" :class="{ 'is-today': d.date === today, 'is-off': d.weekend || d.pto }" :title="d.pto ? $t('TimeV2.pto') : ''">{{ dayLabel(d) }}</span>
-                <span>{{ $t('TimeV2.col_total') }}</span>
+                <span class="ut2-task">{{ $t('Time.col_task') }}</span>
+                <span v-for="d in days" :key="d.date" :class="{ 'is-today': d.date === today, 'is-off': d.weekend || d.pto }" :title="d.pto ? $t('Time.pto') : ''">{{ dayLabel(d) }}</span>
+                <span>{{ $t('Time.col_total') }}</span>
             </div>
             <div v-if="!displayRows.length" class="ut2-empty">
-                <div v-if="loading" class="ah-small">{{ $t('TimeV2.loading') }}</div>
+                <div v-if="loading" class="ah-small">{{ $t('Time.loading') }}</div>
                 <div v-else class="tv-empty">
-                    <span>{{ $t('TimeV2.empty_week') }}</span>
-                    <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="openLog()">{{ $t('TimeV2.log_time') }}</button>
+                    <span>{{ $t('Time.empty_week') }}</span>
+                    <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="openLog()">{{ $t('Time.log_time') }}</button>
                 </div>
             </div>
             <div v-for="row in displayRows" :key="row.taskId" class="ut2-row">
@@ -73,10 +73,10 @@
                         type="button"
                         class="ut2-bill"
                         :class="{ 'is-on': row.billable }"
-                        :title="$t('TimeV2.toggle_billable')"
+                        :title="$t('Time.toggle_billable')"
                         :disabled="busy.billable === row.taskId || !row.entryIds.length"
                         @click="toggleBillable(row)"
-                    >{{ row.billable ? $t('TimeV2.billable') : $t('TimeV2.non_billable') }}</button>
+                    >{{ row.billable ? $t('Time.billable') : $t('Time.non_billable') }}</button>
                 </div>
                 <button
                     v-for="d in days"
@@ -90,7 +90,7 @@
                 <span class="ut2-total">{{ formatMinutes(rowTotal(row)) }}</span>
             </div>
             <div class="ut2-row ut2-row--total">
-                <span class="ut2-task">{{ $t('TimeV2.total_capacity', { h: hoursPerDay }) }}</span>
+                <span class="ut2-task">{{ $t('Time.total_capacity', { h: hoursPerDay }) }}</span>
                 <span v-for="d in days" :key="d.date" :class="{ 'is-today': d.date === today, 'is-empty': !dayTotal(d), 'is-off': d.weekend || d.pto }">{{ dayTotal(d) ? formatMinutes(dayTotal(d)) : '—' }}</span>
                 <span>{{ formatMinutes(weekTotal) }}</span>
             </div>
@@ -100,12 +100,12 @@
     <div class="tv-note">
         <div class="tv-card">
             <span class="ah-dot" :class="previous.dot"></span>
-            <span class="ut2-prev">{{ $t('TimeV2.last_week') }} <strong>{{ previous.label }}</strong><span v-if="previous.detail">, {{ previous.detail }}</span><span v-if="previous.hours"> · {{ previous.hours }}</span></span>
+            <span class="ut2-prev">{{ $t('Time.last_week') }} <strong>{{ previous.label }}</strong><span v-if="previous.detail">, {{ previous.detail }}</span><span v-if="previous.hours"> · {{ previous.hours }}</span></span>
         </div>
         <div v-if="underHint" class="tv-card">
             <span class="tv-spark">✦</span>
             <span class="ut2-hint">{{ underHint.text }}</span>
-            <button type="button" class="tv-link ut2-hint__cta" @click="openLog(null, underHint.day, underHint.minutes)">{{ $t('TimeV2.add_hours', { h: formatHm(underHint.minutes) }) }}</button>
+            <button type="button" class="tv-link ut2-hint__cta" @click="openLog(null, underHint.day, underHint.minutes)">{{ $t('Time.add_hours', { h: formatHm(underHint.minutes) }) }}</button>
         </div>
     </div>
 
@@ -213,8 +213,8 @@ const statusChip = computed(() => {
     const doc = approval.value.current;
     const status = statusOf(doc);
     const cls = { submitted: 'ah-chip--warn', approved: 'ah-chip--ok', rejected: 'ah-chip--danger' }[status] || '';
-    const label = t(`TimeV2.status_${status}`);
-    const title = status === 'rejected' && doc.rejectionReason ? t('TimeV2.reason', { reason: doc.rejectionReason }) : '';
+    const label = t(`Time.status_${status}`);
+    const title = status === 'rejected' && doc.rejectionReason ? t('Time.reason', { reason: doc.rejectionReason }) : '';
     return { cls, label: title ? `${label} · ${doc.rejectionReason}` : label, title };
 });
 const isRejected = computed(() => statusOf(approval.value.current) === 'rejected');
@@ -224,10 +224,10 @@ const previous = computed(() => {
     const status = statusOf(doc);
     const hours = doc ? formatHm(doc.totalMinutes) : '';
     const who = doc && doc.reviewerName;
-    if (status === 'submitted') return { dot: 'ah-dot--warn', label: t('TimeV2.status_submitted').toLowerCase(), detail: who ? t('TimeV2.awaiting_named', { name: who }) : t('TimeV2.awaiting_approval'), hours };
-    if (status === 'approved') return { dot: 'ah-dot--ok', label: t('TimeV2.status_approved').toLowerCase(), detail: who ? t('TimeV2.approved_by', { name: who }) : '', hours };
-    if (status === 'rejected') return { dot: 'ah-dot--danger', label: t('TimeV2.status_rejected').toLowerCase(), detail: doc.rejectionReason ? t('TimeV2.reason', { reason: doc.rejectionReason }) : (who ? t('TimeV2.rejected_by', { name: who }) : ''), hours };
-    return { dot: 'ut2-dot--none', label: t('TimeV2.not_submitted'), detail: '', hours: '' };
+    if (status === 'submitted') return { dot: 'ah-dot--warn', label: t('Time.status_submitted').toLowerCase(), detail: who ? t('Time.awaiting_named', { name: who }) : t('Time.awaiting_approval'), hours };
+    if (status === 'approved') return { dot: 'ah-dot--ok', label: t('Time.status_approved').toLowerCase(), detail: who ? t('Time.approved_by', { name: who }) : '', hours };
+    if (status === 'rejected') return { dot: 'ah-dot--danger', label: t('Time.status_rejected').toLowerCase(), detail: doc.rejectionReason ? t('Time.reason', { reason: doc.rejectionReason }) : (who ? t('Time.rejected_by', { name: who }) : ''), hours };
+    return { dot: 'ut2-dot--none', label: t('Time.not_submitted'), detail: '', hours: '' };
 });
 const underHint = computed(() => {
     if (!isMe.value || !underCapacity.value.length) return null;
@@ -235,8 +235,8 @@ const underHint = computed(() => {
     const gap = list.reduce((s, d) => s + d.gapMinutes, 0);
     const names = list.map((d) => moment(d.date).format('ddd'));
     const text = list.length === 1
-        ? t('TimeV2.under_capacity_one', { day: names[0], h: formatHm(gap) })
-        : t('TimeV2.under_capacity_many', { days: `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`, h: formatHm(gap) });
+        ? t('Time.under_capacity_one', { day: names[0], h: formatHm(gap) })
+        : t('Time.under_capacity_many', { days: `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`, h: formatHm(gap) });
     return { text, day: list[list.length - 1].date, minutes: list[list.length - 1].gapMinutes };
 });
 const recentTasks = computed(() => rows.value.map((r) => ({ taskId: r.taskId, taskName: r.taskName, projectId: r.projectId, projectName: r.projectName, sprintId: r.sprintId, projectColor: r.projectColor })));
@@ -256,7 +256,7 @@ const load = async () => {
         underCapacity.value = d.underCapacity || [];
         hoursPerDay.value = d.hoursPerDay || 8;
     } catch (e) {
-        error.value = t('TimeV2.load_failed');
+        error.value = t('Time.load_failed');
     } finally {
         loading.value = false;
     }
@@ -285,9 +285,9 @@ const submitWeek = async () => {
         })) || {}).data || {};
         if (!body.status) throw new Error(body.statusText || 'submit_failed');
         approval.value = { ...approval.value, current: body.data };
-        flash(t('TimeV2.submitted_ok'));
+        flash(t('Time.submitted_ok'));
     } catch (e) {
-        error.value = e.message || t('TimeV2.action_failed');
+        error.value = e.message || t('Time.action_failed');
     } finally {
         busy.value.submit = false;
     }
@@ -312,7 +312,7 @@ const exportCsv = async () => {
         a.remove();
         URL.revokeObjectURL(url);
     } catch (e) {
-        error.value = t('TimeV2.action_failed');
+        error.value = t('Time.action_failed');
     } finally {
         busy.value.export = false;
     }
@@ -327,7 +327,7 @@ const toggleBillable = async (row) => {
         if (target) target.billable = !row.billable;
         totals.value.billableMinutes = rows.value.reduce((s, r) => s + (r.billable ? r.total : 0), 0);
     } catch (e) {
-        error.value = t('TimeV2.action_failed');
+        error.value = t('Time.action_failed');
     } finally {
         busy.value.billable = '';
     }
@@ -337,10 +337,10 @@ const stopTimer = async () => {
     busy.value.timer = true;
     try {
         const stopped = await timer.stop();
-        if (stopped) flash(t('TimeV2.logged_ok', { h: formatHm(stopped.minutes), task: stopped.taskName }));
+        if (stopped) flash(t('Time.logged_ok', { h: formatHm(stopped.minutes), task: stopped.taskName }));
         await load();
     } catch (e) {
-        error.value = t('TimeV2.log_failed');
+        error.value = t('Time.log_failed');
     } finally {
         busy.value.timer = false;
     }

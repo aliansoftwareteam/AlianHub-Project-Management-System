@@ -1,6 +1,6 @@
 <template>
-    <div v-if="selection.hasSelection.value" class="lv2-bulk" role="region" :aria-label="$t('ListV2.bulk_region')">
-        <span class="lv2-bulk__count">{{ $t('ListV2.selected', { n: selection.count.value }) }}</span>
+    <div v-if="selection.hasSelection.value" class="lv2-bulk" role="region" :aria-label="$t('List.bulk_region')">
+        <span class="lv2-bulk__count">{{ $t('List.selected', { n: selection.count.value }) }}</span>
 
         <span v-for="menu in menus" :key="menu.key" class="lv2-bulk__menu-wrap">
             <button
@@ -14,20 +14,34 @@
                     <span v-if="option.color" class="lv2-bulk__dot" :style="{ background: option.color }"></span>
                     {{ option.label }}
                 </button>
-                <p v-if="!menu.options.length" class="lv2-bulk__note">{{ $t('ListV2.bulk_no_options') }}</p>
+                <p v-if="!menu.options.length" class="lv2-bulk__note">{{ $t('List.bulk_no_options') }}</p>
             </div>
         </span>
 
         <span class="lv2-bulk__menu-wrap">
-            <button type="button" class="lv2-bulk__btn lv2-bulk__btn--ai" :disabled="working" @click.stop="toggle('ai')">✦ {{ $t('ListV2.ask_ai') }}</button>
+            <button type="button" class="lv2-bulk__btn lv2-bulk__btn--ai" :disabled="working" @click.stop="toggle('ai')">✦ {{ $t('List.ask_ai') }}</button>
             <div v-if="open === 'ai'" class="lv2-bulk__menu" @click.stop>
-                <button type="button" class="lv2-bulk__item" @click="summarise">{{ $t('ListV2.ai_summarise') }}</button>
-                <p class="lv2-bulk__note">{{ $t('ListV2.ai_scope_note') }}</p>
+                <button type="button" class="lv2-bulk__item" @click="summarise">{{ $t('List.ai_summarise') }}</button>
+                <p class="lv2-bulk__note">{{ $t('List.ai_scope_note') }}</p>
             </div>
         </span>
 
-        <span class="lv2-bulk__esc">{{ $t('ListV2.esc') }}</span>
+        <button v-if="canArchive" type="button" class="lv2-bulk__btn" :disabled="working" @click.stop="ask('bulkArchive')">{{ $t('Projects.bulk_archive') }}</button>
+        <button v-if="canDelete" type="button" class="lv2-bulk__btn lv2-bulk__btn--danger" :disabled="working" @click.stop="ask('bulkTrash')">{{ $t('Projects.bulk_delete') }}</button>
+
+        <span class="lv2-bulk__esc">{{ $t('List.esc') }}</span>
     </div>
+    <ConfirmationSidebar
+        v-if="confirmOpen"
+        v-model="confirmOpen"
+        :title="pending === 'bulkTrash' ? $t('Projects.bulk_delete') : $t('Projects.bulk_archive')"
+        :message="$t(pending === 'bulkTrash' ? 'Projects.bulk_delete_confirm' : 'Projects.bulk_archive_confirm', { n: selection.count.value })"
+        :confirmationString="pending === 'bulkTrash' ? 'delete' : 'archive'"
+        :acceptButtonClass="pending === 'bulkTrash' ? 'btn-danger' : 'btn-primary'"
+        :acceptButton="pending === 'bulkTrash' ? $t('Projects.bulk_delete') : $t('Projects.bulk_archive')"
+        :showSpinner="working"
+        @confirm="runConfirmed"
+    />
 </template>
 
 <script setup>
@@ -40,6 +54,7 @@ import * as env from "@/config/env";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { useTaskSelection } from "@/composable/useTaskSelection.js";
 import { useTaskSummaries } from "@/views/Projects/TableView/useTaskSummaries.js";
+import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue";
 
 defineOptions({ name: "ListBulkBar" });
 
@@ -61,6 +76,20 @@ const working = ref(false);
 
 const canStatus = computed(() => checkPermission("task.task_status", props.project?.isGlobalPermission) === true);
 const canAssign = computed(() => checkPermission("task.task_assignee", props.project?.isGlobalPermission) === true);
+const canArchive = computed(() => checkPermission("task.task_archive", props.project?.isGlobalPermission) === true);
+const canDelete = computed(() => checkPermission("task.task_delete", props.project?.isGlobalPermission) === true);
+
+const confirmOpen = ref(false);
+const pending = ref("");
+function ask(action) {
+    open.value = "";
+    pending.value = action;
+    confirmOpen.value = true;
+}
+async function runConfirmed() {
+    await run(pending.value, {});
+    confirmOpen.value = false;
+}
 
 const statuses = computed(() => (props.project?.taskStatusData || []).map((status) => ({
     id: status.key, label: status.name, color: status.textColor, raw: status
@@ -96,10 +125,10 @@ const tags = computed(() => (props.project?.tagsArray || []).map((tag) => ({
 })));
 
 const menus = computed(() => [
-    { key: "status", label: t("ListV2.status"), enabled: canStatus.value, options: statuses.value, pick: pickStatus },
-    { key: "assignee", label: t("ListV2.assignee"), enabled: canAssign.value, options: people.value, pick: pickAssignee },
-    { key: "sprint", label: t("ListV2.sprint"), enabled: canStatus.value, options: sprints.value, pick: pickSprint },
-    { key: "tags", label: t("ListV2.tags"), enabled: canStatus.value, options: tags.value, pick: pickTag }
+    { key: "status", label: t("List.status"), enabled: canStatus.value, options: statuses.value, pick: pickStatus },
+    { key: "assignee", label: t("List.assignee"), enabled: canAssign.value, options: people.value, pick: pickAssignee },
+    { key: "sprint", label: t("List.sprint"), enabled: canStatus.value, options: sprints.value, pick: pickSprint },
+    { key: "tags", label: t("List.tags"), enabled: canStatus.value, options: tags.value, pick: pickTag }
 ]);
 
 function toggle(key) {
@@ -127,14 +156,14 @@ async function run(action, payload) {
             ...payload
         });
         if (response?.data?.status === false) {
-            $toast.error(response.data.statusText || t("ListV2.bulk_failed"));
+            $toast.error(response.data.statusText || t("List.bulk_failed"));
             return;
         }
         const totals = response?.data?.data?.totals || {};
-        $toast.success(t("ListV2.bulk_done", { n: totals.updated ?? selection.count.value }));
+        $toast.success(t("List.bulk_done", { n: totals.updated ?? selection.count.value }));
         selection.clear();
     } catch (error) {
-        $toast.error(error?.message || t("ListV2.bulk_failed"));
+        $toast.error(error?.message || t("List.bulk_failed"));
     } finally {
         working.value = false;
     }
@@ -171,8 +200,8 @@ async function summarise() {
     open.value = "";
     const ids = [...selection.selectedTaskIds.value];
     const result = await summaries.generateMany(ids);
-    if (result.failed && !result.done) $toast.error(t("ListV2.ai_unavailable"));
-    else $toast.success(t("ListV2.ai_summarised", { n: result.done }));
+    if (result.failed && !result.done) $toast.error(t("List.ai_unavailable"));
+    else $toast.success(t("List.ai_summarised", { n: result.done }));
 }
 
 function onKey(event) {
@@ -219,6 +248,8 @@ onBeforeUnmount(() => {
 .lv2-bulk__btn:hover:not(:disabled) { color: #fff; }
 .lv2-bulk__btn:disabled { opacity: .4; cursor: not-allowed; }
 .lv2-bulk__btn--ai { color: #a892ff; font-weight: 600; }
+.lv2-bulk__btn--danger { color: #ff9b9b; }
+.lv2-bulk__btn--danger:hover:not(:disabled) { color: #ffc2c2; }
 .lv2-bulk__esc { margin-left: auto; color: rgba(255, 255, 255, .5); }
 .lv2-bulk__menu-wrap { position: relative; }
 .lv2-bulk__menu {

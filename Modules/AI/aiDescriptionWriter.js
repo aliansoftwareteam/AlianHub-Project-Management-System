@@ -49,7 +49,7 @@ const MAX_QUESTIONS = 3;
 const SYSTEM_PROMPT = (() => {
     const promptPath = path.join(__dirname, 'prompts', 'write-description.md');
     const raw = fs.readFileSync(promptPath, 'utf8');
-    return raw.replace(/^﻿/, '').replace(/\r\n/g, '\n').trim();
+    return raw.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').trim();
 })();
 
 function clampStr(value, cap) {

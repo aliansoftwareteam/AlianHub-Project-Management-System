@@ -148,6 +148,7 @@ const decodeForSchemeCheck = (value) => String(value || '')
     .replace(/&colon;/gi, ':')
     .replace(/&Tab;|&NewLine;/gi, '')
     // Control characters, whitespace and DEL are ignored inside a scheme.
+    // eslint-disable-next-line no-control-regex
     .replace(new RegExp('[\\u0000-\\u0020\\u007f]', 'g'), '')
     .trim();
 

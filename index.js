@@ -7,117 +7,70 @@ const rateLimit = require('express-rate-limit');
 
 // Global error handlers — catch crashes and log before Render kills the process
 process.on('uncaughtException', (err) => {
-    console.error('[FATAL] uncaughtException:', err.message);
-    console.error(err.stack);
+    require('./Config/loggerConfig').error(`[FATAL] uncaughtException: ${err && err.stack ? err.stack : err}`);
+    console.error('[FATAL] uncaughtException:', err);
     process.exit(1);
 });
 // Log and keep serving. Exiting here turned every handler that forgot to answer
 // (an unhandled rejection from a bad request body) into a process kill anyone
 // could trigger over HTTP. uncaughtException still exits: that is corrupted state.
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('[unhandledRejection] at:', promise);
-    console.error('[unhandledRejection] reason:', reason && reason.stack ? reason.stack : reason);
+process.on('unhandledRejection', (reason) => {
+    require('./Config/loggerConfig').error(`[unhandledRejection] ${reason && reason.stack ? reason.stack : reason}`);
+    console.error('[unhandledRejection]', reason);
 });
 const bodyParser = require("body-parser");
 const config =  require('./Config/config.js');
-const awsRef =  require('./Config/aws.js');
-const logger = require("./Config/loggerConfig");
-const packJOSNData = require("./package.json");
+const { loadDotEnv, applyEnvMap } = require('./Config/applyEnv.js');
+loadDotEnv();
 const { makeDefaultBrandSettings } = require("./Modules/Admin/common/controller.js");
 const { corsOriginDelegate } = require('./utils/cors.js');
+const { getHealth } = require('./Modules/Instance/health.js');
 
 const app = express();
-// Trust the loopback proxy by default so X-Forwarded-For is honored when
-// nginx (or any same-host reverse proxy) sits in front of the Node
-// process. Without this, express-rate-limit logs
-// ERR_ERL_UNEXPECTED_X_FORWARDED_FOR and may key all clients by the
-// proxy IP. Override via TRUST_PROXY env (e.g. "1" for one upstream, or
-// "true" for any). Safe in dev because requests from outside loopback
-// fall back to req.connection.remoteAddress.
-// app.set('trust proxy', process.env.TRUST_PROXY || 'loopback');
+// Honour X-Forwarded-For from the reverse proxy in front of the process, so rate
+// limiting keys on the client and not on the proxy. TRUST_PROXY takes a hop count
+// or "true" for hosted setups.
+app.set('trust proxy', process.env.TRUST_PROXY || 'loopback');
 
-// CORS — BUG-002 / #56. Replace wildcard with an env-driven allow-list.
-// See utils/cors.js for the exact rules and supported env vars.
+// CORS allow-list is env-driven; see utils/cors.js.
 app.use(cors({ origin: corsOriginDelegate }));
 
-// Security headers. CSP is intentionally disabled — the Vue frontend uses
-// inline scripts/styles in production. crossOriginEmbedderPolicy is off so
-// existing third-party embeds keep working. Everything else (HSTS,
-// X-Content-Type-Options, X-Frame-Options, Referrer-Policy, etc.) is on
-// with helmet defaults.
-// app.use(helmet({
-//     contentSecurityPolicy: false,
-//     crossOriginEmbedderPolicy: false,
-//     crossOriginResourcePolicy: { policy: 'cross-origin' },
-// }));
+// CSP stays off: the Vue bundle uses inline scripts and styles in production.
+if (process.env.HELMET_ENABLED !== 'false') {
+    app.use(helmet({
+        contentSecurityPolicy: false,
+        crossOriginEmbedderPolicy: false,
+        crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }));
+}
 
-// Global rate limiting. Counts only API traffic — static assets and
-// socket.io are skipped so SPA cold-loads can't trip the limit. Set
-// GLOBAL_RATE_LIMIT_PER_MIN=0 (or "off"/"false") to disable entirely;
-// useful for internal deployments where auth-level brute-force
-// protection (Modules/Auth/helper.js#manageResetAttempt) is enough.
-// const rawGlobalLimit = String(process.env.GLOBAL_RATE_LIMIT_PER_MIN ?? '10000').trim().toLowerCase();
-// const rateLimitDisabled = ['0', 'off', 'false', 'no', 'disabled'].includes(rawGlobalLimit);
-
-// if (!rateLimitDisabled) {
-//     const GLOBAL_RATE_LIMIT = Math.max(1, Number(rawGlobalLimit) || 10000);
-//     const STATIC_ASSET_RX = /\.(js|mjs|css|map|svg|png|jpe?g|gif|ico|webp|avif|woff2?|ttf|otf|eot|html?|mp4|webm|mp3|wav|pdf)$/i;
-
-//     app.use(rateLimit({
-//         windowMs: 60 * 1000,
-//         max: GLOBAL_RATE_LIMIT,
-//         standardHeaders: true,
-//         legacyHeaders: false,
-//         // Don't count anything that isn't a real API call. Socket.io has
-//         // its own throttling; static assets are not a DoS vector here.
-//         skip: (req) => {
-//             if (req.path.startsWith('/socket.io/')) return true;
-//             if (STATIC_ASSET_RX.test(req.path)) return true;
-//             if (req.path === '/' || req.path.startsWith('/assets/') || req.path.startsWith('/static/')) return true;
-//             return false;
-//         },
-//     }));
-// }
-// BUG-037 / #91 — body limits.
-// Previously every endpoint accepted 50MB JSON/url-encoded/raw bodies,
-// so any unauthenticated POST could spend the request loop buffering
-// 50MB before validation even runs. Drop the default to 2MB (well above
-// typical JSON payloads — comments, settings, project data — but blocks
-// the trivial multi-MB DoS). File uploads use `multer` and have their
-// own limits (see Modules/storage/**), so this only constrains
-// body-parser-handled paths. Operators with bulk-import or large-form
-// use cases can raise it via the `BODY_LIMIT` env var.
+// API traffic only: static assets and socket.io are never counted, so an SPA cold
+// load cannot trip the limit. 0 / off disables it for internal deployments.
+const rawGlobalLimit = String(process.env.GLOBAL_RATE_LIMIT_PER_MIN ?? '1000').trim().toLowerCase();
+if (!['0', 'off', 'false', 'no', 'disabled'].includes(rawGlobalLimit)) {
+    const STATIC_ASSET_RX = /\.(js|mjs|css|map|svg|png|jpe?g|gif|ico|webp|avif|woff2?|ttf|otf|eot|html?|mp4|webm|mp3|wav|pdf)$/i;
+    app.use(rateLimit({
+        windowMs: 60 * 1000,
+        max: Math.max(1, Number(rawGlobalLimit) || 1000),
+        standardHeaders: true,
+        legacyHeaders: false,
+        skip: (req) => req.path.startsWith('/socket.io/') || STATIC_ASSET_RX.test(req.path)
+            || req.path === '/' || req.path.startsWith('/assets/') || req.path.startsWith('/static/'),
+    }));
+}
+// 2MB covers every JSON body the app sends; uploads go through multer with their
+// own limits. BODY_LIMIT raises it for bulk imports.
 const BODY_LIMIT = process.env.BODY_LIMIT || '2mb';
 app.use(bodyParser.urlencoded({ extended: true, limit: BODY_LIMIT }));
 app.use(bodyParser.json({ limit: BODY_LIMIT }));
 app.use(bodyParser.raw({ limit: BODY_LIMIT }));
+app.use(require('./Config/requestLog').requestLog());
 
-// Set Maintenance Mode
-if (!config.UNDER_MAINTENANCE || config.UNDER_MAINTENANCE == "false") {
-    app.use(express.static(path.join(__dirname, './frontend/dist')));
-    app.use(express.static(path.join(__dirname, './installation/dist')));
-    // RUN FRONTEND SERVER
-    app.get("/", (req, res) => {
-        res.sendFile(path.join(__dirname, './frontend/dist/index.html'));
-    });
-} else {
-    // RUN UNDER MAINTENANCE SERVER
-    app.get("/", (req, res) => {
-        res.sendFile(path.join(__dirname, './under-maintenance/index.html'));
-    });
-
-    app.use(express.static(path.join(__dirname, 'under-maintenance')));
-    app.use(express.static(path.join(__dirname, 'log')));
-    app.use((req, res, next) => {
-        if (req.path === "/api/v1/finalupgradeprocess"
-            || req.path.indexOf("/api/v1/upgradeProcess/events") !== -1
-            || req.path.indexOf("/api/v1/realLog/events") !== -1
-        ) {
-            return next(); // Continue to the next middleware or route handler
-        }
-        res.sendFile(path.join(__dirname, './under-maintenance/index.html'));
-    })
-}
+app.use(express.static(path.join(__dirname, './frontend/dist')));
+app.get("/", (req, res) => {
+    res.sendFile(path.join(__dirname, './frontend/dist/index.html'));
+});
+app.use(require('./Modules/Instance/maintenance.js').maintenanceGuard);
 
 // ADD DEFAULT BRAND SETTINGS
 makeDefaultBrandSettings()
@@ -133,37 +86,6 @@ app.use((req, res, next) => {
 app.use(require('./Config/strictStatus').strictStatus());
 
 function initializeControllers() {
-    const envFile = fs.readFileSync(__dirname + "/.env");
-    const envConfig = require('dotenv').parse(envFile);
-    envConfig.PORT = Number(envConfig.PORT);
-    envConfig.NOOFPRESETCOMPANY = Number(envConfig.NOOFPRESETCOMPANY);
-    const tmpStorage = envConfig.STORAGE_TYPE;
-    if (!tmpStorage) {
-        envConfig.STORAGE_TYPE = "wasabi";
-    }
-    for (const key in envConfig) {
-        process.env[key] = envConfig[key];
-        if (key === "APIKEY" || key === "AUTODOMAIN" || key === "PROJECTID" || key === "STORAGEBUCKET" || key === "MESSAGINGSENDERID" || key === "APPID" || key === "MEASUREMENTID") {
-            config["FIREBASE_"+key] = envConfig[key];
-        } else {
-            config[key] = envConfig[key];
-            if (key === "WASABI_ACCESS_KEY") {
-                awsRef.wasabiAccessKey = envConfig["WASABI_ACCESS_KEY"];
-            } else if (key === "WASABI_SECRET_ACCESS_KEY") {
-                awsRef.wasabiSecretAccessKey = envConfig["WASABI_SECRET_ACCESS_KEY"];
-            } else if (key === "WASABIENDPOINT") {
-                awsRef.wasabiEndPoint = envConfig["WASABIENDPOINT"];
-            } else if (key === "WASABI_REGION") {
-                awsRef.region = envConfig["WASABI_REGION"];
-            } else if (key === "IAM_ENDPOINT") {
-                awsRef.iamEndPoint = envConfig["IAM_ENDPOINT"];
-            } else if (key === "USERPROFILEBUCKET") {
-                awsRef.userProfileBucket = envConfig["USERPROFILEBUCKET"];
-            } else if (key === "WASABI_USERID") {
-                awsRef.wasabiUserId = envConfig["WASABI_USERID"];
-            }
-        }
-    }
     const { startInterval } = require("./middlewares/mongoConnector/helper.js");
     startInterval();
     const { currentDirectory } = require(`./common-storage/common-${process.env.STORAGE_TYPE}.js`);
@@ -221,11 +143,11 @@ function initializeControllers() {
     require('./Modules/notification-count/init').init(app);
     require('./Modules/notification/sendEmail/init').init(app);
     require('./Modules/trackerUserPermission/init').init(app);
-    require('./Modules/SaasAdmin/init').init(app);
+    require('./Modules/Instance/init').init(app);
     require('./Modules/ScreenshotRetention/init').init(app);
     require('./Modules/projectClose/init').init(app);
-    if(process.env.NODE_ENV === "production") {
-        require('./cron.js')
+    if (process.env.CRON_ENABLED !== 'false') {
+        require('./cron.js');
     }
     require('./Modules/Admin/admin.js').init(app);
     require('./Modules/emailTemplate/init').init(app);
@@ -250,6 +172,7 @@ function initializeControllers() {
     require('./Modules/ExportJobs/init').init(app);
     require('./Modules/ApiTokens/init').init(app);
     require('./Modules/Pages/init').init(app);
+    require('./Modules/Trash/init').init(app);
     require('./Modules/Forms/init').init(app);
     require('./Modules/PublicShares/init').init(app);
     require('./Modules/Importers/init').init(app);
@@ -299,47 +222,59 @@ function initializeControllers() {
 require('./Config/setMiddleware.js').setMiddlewareWithCV2(app);
 require('./Config/setMiddleware.js').setMiddlewareV2(app);
 
-//CONFIGURE ENV FILE
-require('dotenv').config();
-if (process.env.MONGODB_URL) {
-    initializeControllers();
-}
-// if (process.env.CANYONLICENSEKEY) {
-//     initializeControllers();
-// }
-
-if (!process.env.STORAGE_TYPE) {
-    process.env.STORAGE_TYPE = "wasabi";
-}
-
-require('./Modules/CheckInstallStep/init').init(app);
-
-// SWAGGER CONFIGURATION
-require('./Modules/swaggerAPI/init').init(app, config.APIURL);
-
-// COMMON CODE 
-require('./Modules/common/init').init(app);
-
-const { initSocket } = require("./socket/socketinit.js");
-//FOR CHECK SERVER RUNNING OR NOT
-app.get("/health", (req, res) => {
-    res.send("Server is running in "+config.NODE_ENV);
-});
-
-fs.watch(__dirname + "/Modules/Template/", (event_type, file_name) => {
+/* Settings saved in the database are applied before any module loads, because the
+ * storage driver and the AWS clients are chosen at require time. A database that
+ * is down is skipped within seconds so the setup page can say so. */
+async function applySavedSettings() {
+    if (!process.env.MONGODB_URL) return;
+    const { checkDb } = require('./Modules/Instance/health.js');
+    const db = await checkDb();
+    if (!db.ok) { console.error(`instance settings: skipped, ${db.error}`); return; }
     try {
-        delete require.cache[require.resolve(__dirname + "/Modules/Template/" + file_name)];;
+        await require('./Config/instanceSettings.js').loadInstanceSettings(require('./Config/loggerConfig'));
     } catch (error) {
-        console.error("ERROR in remove cache", error);
+        console.error(`instance settings: could not load, ${error.message}`);
     }
-});
-
-if (!config.UNDER_MAINTENANCE || config.UNDER_MAINTENANCE == "false") {
-    app.use(require('./Config/spaFallback').spaFallback(path.join(__dirname, './frontend/dist/index.html')));
 }
 
-// SERVER LISTEN PORT
-const server = app.listen(config.PORT, () => {
-    console.log("Server ready on "+config.PORT)
-});
-initSocket(server);
+(async () => {
+    await applySavedSettings();
+    if (!process.env.STORAGE_TYPE) applyEnvMap({ STORAGE_TYPE: 'wasabi' });
+    if (process.env.MONGODB_URL) {
+        initializeControllers();
+    }
+
+    // Registered outside initializeControllers so the wizard can report a missing database.
+    require('./Modules/Setup/init').init(app);
+
+    // SWAGGER CONFIGURATION
+    require('./Modules/swaggerAPI/init').init(app, config.APIURL);
+
+    // COMMON CODE 
+    require('./Modules/common/init').init(app);
+
+    const { initSocket } = require("./socket/socketinit.js");
+    app.get("/health", async (req, res) => {
+        const { httpStatus, body } = await getHealth();
+        res.status(httpStatus).json(body);
+    });
+
+    fs.watch(__dirname + "/Modules/Template/", (event_type, file_name) => {
+        try {
+            delete require.cache[require.resolve(__dirname + "/Modules/Template/" + file_name)];
+        } catch (error) {
+            console.error("ERROR in remove cache", error);
+        }
+    });
+
+    app.use(require('./Config/spaFallback').spaFallback(path.join(__dirname, './frontend/dist/index.html')));
+    app.use(require('./Config/errorHandler').errorHandler());
+
+    if (process.env.MONGODB_URL) {
+        await require('./migrations').runMigrationsAtBoot();
+    }
+    const server = app.listen(config.PORT, () => {
+        console.log("Server ready on " + config.PORT);
+    });
+    initSocket(server);
+})();

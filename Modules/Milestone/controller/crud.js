@@ -168,12 +168,12 @@ exports.updateMilestone = async (req, res) => {
             });
             req.body.milestoneObject.statusId = req.body.milestoneObject.statusArray[req.body.milestoneObject.statusArray.length - 1].milestoneStatusColor;
             req.body.milestoneObject.statusDate = req.body.milestoneObject.statusArray[req.body.milestoneObject.statusArray.length - 1].statusDateValue;
-        };
+        }
         if(req.body.milestoneObject.refundedAmount && req.body.milestoneObject.refundedAmount.length){
             req.body.milestoneObject.refundedAmount.forEach((e)=>{
                 e.date = e.date ? e.date.seconds ? new Date(e.date.seconds * 1000) : new Date(e.date) : '' 
             });
-        };
+        }
         let typsObj = {};
         if(req.body?.fixOrHourlyMilCheck === false){
             typsObj = {

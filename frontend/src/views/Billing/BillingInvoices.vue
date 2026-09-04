@@ -2,21 +2,21 @@
     <div class="billing__body billing__body--wide">
         <div class="billing__main ah-scroll">
             <div class="billing__invoice-bar">
-                <span class="ah-h3">{{ $t('BillingV2.invoices_title') }}</span>
+                <span class="ah-h3">{{ $t('Billing.invoices_title') }}</span>
                 <span class="ah-toolbar__spacer"></span>
                 <select class="ah-input billing__pick" :value="pickedMilestone" @change="onPickMilestone($event.target.value)">
-                    <option value="">{{ $t('BillingV2.new_from_milestone') }}</option>
+                    <option value="">{{ $t('Billing.new_from_milestone') }}</option>
                     <option v-for="m in invoiceableMilestones" :key="m.id" :value="m.id" :disabled="m.blocked">
-                        {{ m.name }}{{ m.blocked ? ` — ${$t('BillingV2.milestone_not_invoiceable')}` : '' }}
+                        {{ m.name }}{{ m.blocked ? ` — ${$t('Billing.milestone_not_invoiceable')}` : '' }}
                     </option>
                 </select>
                 <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="draftMonth">
-                    {{ $t('BillingV2.new_from_month') }}
+                    {{ $t('Billing.new_from_month') }}
                 </button>
             </div>
 
-            <p v-if="invoices.loading && !invoices.list.length" class="billing__state">{{ $t('BillingV2.loading') }}</p>
-            <div v-else-if="!invoices.list.length" class="ah-empty">{{ $t('BillingV2.no_invoices') }}</div>
+            <p v-if="invoices.loading && !invoices.list.length" class="billing__state">{{ $t('Billing.loading') }}</p>
+            <div v-else-if="!invoices.list.length" class="ah-empty">{{ $t('Billing.no_invoices') }}</div>
 
             <div v-else class="billing__invoice-list">
                 <button
@@ -29,7 +29,7 @@
                 >
                     <span class="billing__invoice-no ah-mono">{{ inv.number }}</span>
                     <span class="billing__invoice-label">{{ lineSummary(inv) }}</span>
-                    <span class="ah-chip" :class="statusChip(inv.status)">{{ $t(`BillingV2.invoice_${inv.status}`) }}</span>
+                    <span class="ah-chip" :class="statusChip(inv.status)">{{ $t(`Billing.invoice_${inv.status}`) }}</span>
                     <span class="billing__figure">{{ money(inv.totalMinor, inv.currencySymbol) }}</span>
                 </button>
             </div>
@@ -86,7 +86,7 @@ const open = async (inv) => {
     openId.value = inv._id;
     const loaded = await props.billing.loadInvoice(inv._id);
     if (!loaded) {
-        $toast.error(t("BillingV2.load_failed"));
+        $toast.error(t("Billing.load_failed"));
         return;
     }
     sheet.value = loaded;

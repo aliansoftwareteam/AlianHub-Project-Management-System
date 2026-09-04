@@ -1,7 +1,7 @@
 <template>
     <NewPasswordCard
-        :title="$t('AuthV2.set_password_title')"
-        :submit-label="$t('AuthV2.save_password')"
+        :title="$t('Auth.set_password_title')"
+        :submit-label="$t('Auth.save_password')"
         success-toast="Toast.Password_set_new_has_been_successfully"
     />
 </template>

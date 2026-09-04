@@ -43,13 +43,13 @@
                 <div class="lv2__scroll ah-scroll" id="list_scroll">
                     <div class="lv2__cols">
                         <span></span>
-                        <span>{{ $t('ListV2.col_task') }}</span>
-                        <span class="lv2__c-assignee">{{ $t('ListV2.col_assignee') }}</span>
-                        <span class="lv2__c-due">{{ $t('ListV2.col_due') }}</span>
-                        <span class="lv2__c-prio">{{ $t('ListV2.col_priority') }}</span>
-                        <span class="lv2__c-est">{{ $t('ListV2.col_est') }}</span>
-                        <span class="lv2__c-risk">✦ {{ $t('ListV2.col_risk') }}</span>
-                        <span class="lv2__c-done">{{ $t('ProvenanceV2.col_done_by') }}</span>
+                        <span>{{ $t('List.col_task') }}</span>
+                        <span class="lv2__c-assignee">{{ $t('List.col_assignee') }}</span>
+                        <span class="lv2__c-due">{{ $t('List.col_due') }}</span>
+                        <span class="lv2__c-prio">{{ $t('List.col_priority') }}</span>
+                        <span class="lv2__c-est">{{ $t('List.col_est') }}</span>
+                        <span class="lv2__c-risk">✦ {{ $t('List.col_risk') }}</span>
+                        <span class="lv2__c-done">{{ $t('Provenance.col_done_by') }}</span>
                     </div>
 
                     <section v-for="sprint in groupedTasks" :key="sprint?.id" class="lv2__sprint" :id="`sprint_${sprint?.id}`">

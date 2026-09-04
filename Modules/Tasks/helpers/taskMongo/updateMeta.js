@@ -45,7 +45,7 @@ module.exports = {
                 } else {
                     queryFilter = { _id: new mongoose.Types.ObjectId(taskId) };
                     queryObj.$pull = { tagsArray: tagId };
-                };
+                }
 
                 let obj = {
                     type: schema,
@@ -133,7 +133,7 @@ module.exports = {
                         _id: new mongoose.Types.ObjectId(taskId),
                     };
                     queryObj.$pull = { attachments: { id: data.id } };
-                };
+                }
 
                 let obj = {
                     type: schema,

@@ -10,8 +10,8 @@
                     @click="$emit('mode', 'fixed')"
                 >
                     <span class="billing__radio" :class="{ 'is-on': mode === 'fixed' }"></span>
-                    <span class="billing__mode-name">{{ $t('BillingV2.mode_fixed') }}</span>
-                    <span class="billing__mode-help">{{ $t('BillingV2.mode_fixed_help') }}</span>
+                    <span class="billing__mode-name">{{ $t('Billing.mode_fixed') }}</span>
+                    <span class="billing__mode-help">{{ $t('Billing.mode_fixed_help') }}</span>
                 </button>
                 <button
                     type="button"
@@ -21,8 +21,8 @@
                     @click="$emit('mode', 'hourly')"
                 >
                     <span class="billing__radio" :class="{ 'is-on': mode === 'hourly' }"></span>
-                    <span class="billing__mode-name">{{ $t('BillingV2.mode_hourly') }}</span>
-                    <span class="billing__mode-help">{{ $t('BillingV2.mode_hourly_help') }}</span>
+                    <span class="billing__mode-name">{{ $t('Billing.mode_hourly') }}</span>
+                    <span class="billing__mode-help">{{ $t('Billing.mode_hourly_help') }}</span>
                 </button>
             </div>
 
@@ -31,13 +31,13 @@
             <template v-else>
                 <div class="ah-card billing__table">
                     <div class="billing__row billing__row--head">
-                        <span>{{ $t('BillingV2.col_milestone') }}</span>
-                        <span>{{ $t('BillingV2.col_due') }}</span>
-                        <span>{{ $t('BillingV2.col_amount') }}</span>
-                        <span>{{ $t('BillingV2.col_signoff') }}</span>
-                        <span>{{ $t('BillingV2.col_state') }}</span>
+                        <span>{{ $t('Billing.col_milestone') }}</span>
+                        <span>{{ $t('Billing.col_due') }}</span>
+                        <span>{{ $t('Billing.col_amount') }}</span>
+                        <span>{{ $t('Billing.col_signoff') }}</span>
+                        <span>{{ $t('Billing.col_state') }}</span>
                     </div>
-                    <div v-if="!milestones.length" class="ah-empty billing__empty">{{ $t('BillingV2.no_milestones') }}</div>
+                    <div v-if="!milestones.length" class="ah-empty billing__empty">{{ $t('Billing.no_milestones') }}</div>
                     <div
                         v-for="m in milestones"
                         :key="m.id"
@@ -46,7 +46,7 @@
                     >
                         <div class="billing__cell-name">
                             <div class="billing__ms-name">{{ m.name }}</div>
-                            <div class="billing__ms-meta" :title="m.scope === 'explicit' ? $t('BillingV2.scope_explicit') : $t('BillingV2.scope_window')">
+                            <div class="billing__ms-meta" :title="m.scope === 'explicit' ? $t('Billing.scope_explicit') : $t('Billing.scope_window')">
                                 {{ metaFor(m) }}
                             </div>
                             <div v-if="m.percentBp !== null && m.percentBp > 0 && m.percentBp < 10000" class="billing__progress">
@@ -57,7 +57,7 @@
                         <span class="billing__cell-amount">{{ money(m.amountMinor, symbol) }}</span>
                         <span class="billing__cell-signoff">{{ signOffName(m) }}</span>
                         <div class="billing__cell-state">
-                            <span class="ah-chip" :class="stateChip(m.billingState)">{{ $t(`BillingV2.state_${m.billingState}`) }}</span>
+                            <span class="ah-chip" :class="stateChip(m.billingState)">{{ $t(`Billing.state_${m.billingState}`) }}</span>
                             <button
                                 v-if="m.billingState === 'ready'"
                                 type="button"
@@ -65,7 +65,7 @@
                                 :disabled="busy"
                                 @click="$emit('invoice-milestone', m.id)"
                             >
-                                {{ $t('BillingV2.tab_invoices') }}
+                                {{ $t('Billing.tab_invoices') }}
                             </button>
                         </div>
                     </div>
@@ -73,48 +73,48 @@
 
                 <form v-if="adding" class="ah-card billing__add" @submit.prevent="submitMilestone">
                     <div class="ah-field">
-                        <label class="ah-field__label" for="ms-name">{{ $t('BillingV2.milestone_name') }}</label>
+                        <label class="ah-field__label" for="ms-name">{{ $t('Billing.milestone_name') }}</label>
                         <input id="ms-name" v-model="draft.milestoneName" class="ah-input" :class="{ 'ah-input--error': errors.milestoneName }" maxlength="160" />
                         <span v-if="errors.milestoneName" class="ah-field__error">{{ errors.milestoneName }}</span>
                     </div>
                     <div class="ah-field">
-                        <label class="ah-field__label" for="ms-amount">{{ $t('BillingV2.milestone_amount') }}</label>
+                        <label class="ah-field__label" for="ms-amount">{{ $t('Billing.milestone_amount') }}</label>
                         <input id="ms-amount" v-model="draft.amount" class="ah-input" :class="{ 'ah-input--error': errors.amount }" type="number" min="0" step="0.01" />
                         <span v-if="errors.amount" class="ah-field__error">{{ errors.amount }}</span>
                     </div>
                     <div class="ah-field">
-                        <label class="ah-field__label" for="ms-due">{{ $t('BillingV2.milestone_due') }}</label>
+                        <label class="ah-field__label" for="ms-due">{{ $t('Billing.milestone_due') }}</label>
                         <input id="ms-due" v-model="draft.dueDate" class="ah-input" type="date" />
                     </div>
                     <div class="billing__add-actions">
-                        <button type="submit" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy">{{ $t('BillingV2.save') }}</button>
-                        <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="adding = false">{{ $t('BillingV2.cancel') }}</button>
+                        <button type="submit" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy">{{ $t('Billing.save') }}</button>
+                        <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="adding = false">{{ $t('Billing.cancel') }}</button>
                     </div>
                 </form>
                 <button v-else type="button" class="billing__add-open" @click="openAdd">
-                    <span class="billing__add-plus">+</span>{{ $t('BillingV2.add_milestone') }}
+                    <span class="billing__add-plus">+</span>{{ $t('Billing.add_milestone') }}
                 </button>
 
                 <div class="ah-card billing__rules">
-                    <div class="ah-h3">{{ $t('BillingV2.rules') }}</div>
+                    <div class="ah-h3">{{ $t('Billing.rules') }}</div>
                     <label class="billing__rule">
                         <input type="checkbox" class="ah-check" :checked="contract.requireTasksDoneToInvoice" @change="toggleRule('requireTasksDoneToInvoice', $event)" />
-                        <span>{{ $t('BillingV2.rule_tasks_done') }}</span>
+                        <span>{{ $t('Billing.rule_tasks_done') }}</span>
                     </label>
                     <label class="billing__rule">
                         <input type="checkbox" class="ah-check" :checked="contract.signOffIsTask" @change="toggleRule('signOffIsTask', $event)" />
-                        <span>{{ $t('BillingV2.rule_signoff_task') }}</span>
+                        <span>{{ $t('Billing.rule_signoff_task') }}</span>
                     </label>
                     <label class="billing__rule">
                         <input type="checkbox" class="ah-check" :checked="contract.warnWhenHoursExceedValue" @change="toggleRule('warnWhenHoursExceedValue', $event)" />
-                        <span>{{ $t('BillingV2.rule_warn_hours') }}</span>
+                        <span>{{ $t('Billing.rule_warn_hours') }}</span>
                     </label>
                 </div>
             </template>
         </div>
 
         <aside class="billing__panel ah-scroll">
-            <div class="ah-label">{{ $t('BillingV2.contract_total') }}</div>
+            <div class="ah-label">{{ $t('Billing.contract_total') }}</div>
             <div>
                 <div class="billing__total">{{ money(rollup.totalMinor, symbol) }}</div>
                 <div class="ah-small">{{ spanLabel }}</div>
@@ -122,15 +122,15 @@
 
             <div class="billing__money">
                 <div class="billing__money-row">
-                    <span class="ah-muted">{{ $t('BillingV2.paid') }}</span>
+                    <span class="ah-muted">{{ $t('Billing.paid') }}</span>
                     <span class="billing__figure billing__figure--ok">{{ money(rollup.paidMinor, symbol) }}</span>
                 </div>
                 <div class="billing__money-row">
-                    <span class="ah-muted">{{ $t('BillingV2.invoiced_unpaid') }}</span>
+                    <span class="ah-muted">{{ $t('Billing.invoiced_unpaid') }}</span>
                     <span class="billing__figure billing__figure--warn">{{ money(rollup.invoicedUnpaidMinor, symbol) }}</span>
                 </div>
                 <div class="billing__money-row">
-                    <span class="ah-muted">{{ $t('BillingV2.remaining') }}</span>
+                    <span class="ah-muted">{{ $t('Billing.remaining') }}</span>
                     <span class="billing__figure">{{ money(rollup.remainingMinor, symbol) }}</span>
                 </div>
                 <div class="billing__split">
@@ -140,40 +140,40 @@
             </div>
 
             <div class="billing__profit">
-                <div class="ah-label">{{ $t('BillingV2.profitability') }}</div>
+                <div class="ah-label">{{ $t('Billing.profitability') }}</div>
                 <div class="billing__money-row">
-                    <span class="ah-muted">{{ $t('BillingV2.hours_logged_label') }}</span>
+                    <span class="ah-muted">{{ $t('Billing.hours_logged_label') }}</span>
                     <span class="billing__figure">{{ Math.round(profit.hours) }}h</span>
                 </div>
                 <template v-if="profit.hasCostRate">
                     <div class="billing__money-row">
-                        <span class="ah-muted">{{ $t('BillingV2.cost_at_blended', { rate: money(contract.blendedCostRateMinor, symbol) }) }}</span>
+                        <span class="ah-muted">{{ $t('Billing.cost_at_blended', { rate: money(contract.blendedCostRateMinor, symbol) }) }}</span>
                         <span class="billing__figure">{{ money(profit.costMinor, symbol) }}</span>
                     </div>
                     <div class="billing__money-row">
-                        <span class="ah-muted">{{ $t('BillingV2.billed_to_date') }}</span>
+                        <span class="ah-muted">{{ $t('Billing.billed_to_date') }}</span>
                         <span class="billing__figure">{{ money(profit.billedMinor, symbol) }}</span>
                     </div>
                     <div class="billing__money-row billing__money-row--total">
-                        <span class="billing__margin-label">{{ $t('BillingV2.margin') }}</span>
+                        <span class="billing__margin-label">{{ $t('Billing.margin') }}</span>
                         <span class="billing__figure billing__figure--lg" :class="marginTone">{{ percentFromBp(profit.marginBp) }}%</span>
                     </div>
                 </template>
                 <div v-else class="billing__rate-empty">
-                    <p class="ah-small">{{ $t('BillingV2.no_cost_rate') }}</p>
+                    <p class="ah-small">{{ $t('Billing.no_cost_rate') }}</p>
                     <form v-if="rateEditing" class="ah-field" @submit.prevent="submitRate">
-                        <label class="ah-field__label" for="cost-rate">{{ $t('BillingV2.cost_rate_label') }}</label>
+                        <label class="ah-field__label" for="cost-rate">{{ $t('Billing.cost_rate_label') }}</label>
                         <input id="cost-rate" v-model="rateDraft" class="ah-input" type="number" min="0" step="0.01" />
-                        <span class="ah-field__hint">{{ $t('BillingV2.cost_rate_hint') }}</span>
-                        <button type="submit" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy">{{ $t('BillingV2.save') }}</button>
+                        <span class="ah-field__hint">{{ $t('Billing.cost_rate_hint') }}</span>
+                        <button type="submit" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy">{{ $t('Billing.save') }}</button>
                     </form>
-                    <button v-else type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="rateEditing = true">{{ $t('BillingV2.set_cost_rate') }}</button>
+                    <button v-else type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="rateEditing = true">{{ $t('Billing.set_cost_rate') }}</button>
                 </div>
             </div>
 
             <div v-if="watchRow" class="billing__watch">
-                <strong>{{ $t('BillingV2.watch') }}</strong>
-                {{ $t('BillingV2.watch_body', {
+                <strong>{{ $t('Billing.watch') }}</strong>
+                {{ $t('Billing.watch_body', {
                     name: watchRow.name,
                     done: percentFromBp(watchRow.percentBp),
                     burn: percentFromBp(watchRow.burnBp),
@@ -217,8 +217,8 @@ const marginTone = computed(() => {
 
 const spanLabel = computed(() => {
     const stamps = milestones.value.map((m) => m.dueDate).filter(Boolean).map((d) => new Date(d).getTime()).filter((n) => !Number.isNaN(n));
-    if (!stamps.length) return t("BillingV2.contract_span_undated", { count: milestones.value.length });
-    return t("BillingV2.contract_span", {
+    if (!stamps.length) return t("Billing.contract_span_undated", { count: milestones.value.length });
+    return t("Billing.contract_span", {
         count: milestones.value.length,
         from: dayLabel(data.value.project.startDate) || dayLabel(Math.min(...stamps)),
         to: dayLabel(Math.max(...stamps)),
@@ -226,11 +226,11 @@ const spanLabel = computed(() => {
 });
 
 const metaFor = (m) => {
-    const parts = [t("BillingV2.tasks_count", { count: m.taskCount })];
-    if (m.percentBp !== null && m.percentBp > 0) parts.push(t("BillingV2.percent_done", { percent: percentFromBp(m.percentBp) }));
-    if (m.loggedMinutes > 0) parts.push(t("BillingV2.hours_logged", { hours: hoursFromMinutes(m.loggedMinutes) }));
-    else if (!m.taskCount) return t("BillingV2.no_tasks_linked");
-    else if (!m.percentBp) parts.push(t("BillingV2.not_started"));
+    const parts = [t("Billing.tasks_count", { count: m.taskCount })];
+    if (m.percentBp !== null && m.percentBp > 0) parts.push(t("Billing.percent_done", { percent: percentFromBp(m.percentBp) }));
+    if (m.loggedMinutes > 0) parts.push(t("Billing.hours_logged", { hours: hoursFromMinutes(m.loggedMinutes) }));
+    else if (!m.taskCount) return t("Billing.no_tasks_linked");
+    else if (!m.percentBp) parts.push(t("Billing.not_started"));
     return parts.join(" · ");
 };
 
@@ -260,9 +260,9 @@ const openAdd = () => {
 };
 
 const submitMilestone = async () => {
-    errors.milestoneName = draft.milestoneName.trim() ? "" : t("BillingV2.milestone_name_required");
+    errors.milestoneName = draft.milestoneName.trim() ? "" : t("Billing.milestone_name_required");
     const amount = Number(draft.amount);
-    errors.amount = Number.isFinite(amount) && amount >= 0 && draft.amount !== "" ? "" : t("BillingV2.milestone_amount_required");
+    errors.amount = Number.isFinite(amount) && amount >= 0 && draft.amount !== "" ? "" : t("Billing.milestone_amount_required");
     if (errors.milestoneName || errors.amount) return;
     const result = await props.billing.addMilestone({
         milestoneName: draft.milestoneName.trim(),
@@ -270,7 +270,7 @@ const submitMilestone = async () => {
         dueDate: draft.dueDate || null,
     });
     if (result.ok) adding.value = false;
-    else errors.milestoneName = result.message || t("BillingV2.save_failed");
+    else errors.milestoneName = result.message || t("Billing.save_failed");
 };
 
 const toggleRule = (key, event) => props.billing.saveContract({ [key]: event.target.checked });

@@ -18,9 +18,9 @@ cd AlianHub-Project-Management-System
 ```
 
 ### 2. Install Root Dependencies
-This installs backend + frontend + installation UI dependencies:
 ```bash
 npm install
+cd frontend && npm install && npm run build && cd ..
 ```
 
 **Note:** This may take 2-5 minutes depending on network speed.
@@ -67,11 +67,8 @@ Database connected to mongodb://localhost:27017
 
 Visit `http://localhost:4000` in your browser.
 
-### 6. Access Installation Wizard (First Time)
-If this is a fresh instance, you'll see the installation wizard at `http://localhost:4000`. Follow the steps to:
-- Create initial company
-- Set admin user credentials
-- Configure basic settings
+### 6. First run
+A fresh database redirects every address to `http://localhost:4000/#/setup`, where you create the owner account and the first workspace. Mail, storage, AI and sign-in providers are configured afterwards under **Settings › Instance** — see [docs/ADMIN-GUIDE.md](../docs/ADMIN-GUIDE.md#first-run).
 
 ---
 
@@ -82,7 +79,8 @@ If this is a fresh instance, you'll see the installation wizard at `http://local
 | `npm start` | Run production server (node server.js) |
 | `npm run nodemon` | Run dev server with hot-reload |
 | `npm run check-version` | Verify app version |
-| `npm run basic-install` | Install deps + start (one-shot) |
+| `npm run setup` | Install deps, write `.env`, build the web app, start |
+| `npm run migrate:status` / `npm run migrate` | Inspect / apply database migrations by hand (they also run at boot) |
 
 ## Frontend Build
 
@@ -96,15 +94,9 @@ npm run build      # Outputs to frontend/dist/
 
 The built files are served from `http://localhost:4000` in production.
 
-## Installation UI Build
+## Operations
 
-The setup wizard (installation/) can also be built separately:
-
-```bash
-cd installation
-npm install        # (if not already done)
-npm run build      # Outputs to installation/dist/
-```
+Configuration, HTTPS, upgrades, backup/restore and troubleshooting live in [docs/ADMIN-GUIDE.md](../docs/ADMIN-GUIDE.md); the in-app Instance console (Settings › Instance, instance owner only) links to each section.
 
 ---
 
@@ -117,7 +109,6 @@ Create a `.env` file in the project root with these critical variables:
 PORT=4000                             # API port
 NODE_ENV=development                  # development | production
 APP_NAME="AlianHub"
-UNDER_MAINTENANCE="false"
 ```
 
 ### Database (REQUIRED)

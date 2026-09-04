@@ -1,13 +1,13 @@
 <template>
     <div class="pev">
         <div class="ah-toolbar">
-            <button type="button" class="pev__back" :title="$t('DocsV2.back_to_docs')" @click="back">
+            <button type="button" class="pev__back" :title="$t('Docs.back_to_docs')" @click="back">
                 <ShellIcon name="arrowLeft" :size="15" />
             </button>
             <span class="pev__crumb">
-                <template v-if="projectName">{{ projectName }} / </template>{{ $t('DocsV2.breadcrumb_docs') }} /
+                <template v-if="projectName">{{ projectName }} / </template>{{ $t('Docs.breadcrumb_docs') }} /
             </span>
-            <span class="pev__crumb-title">{{ title || $t('DocsV2.untitled') }}</span>
+            <span class="pev__crumb-title">{{ title || $t('Docs.untitled') }}</span>
             <span v-if="page && page.isWiki" class="ah-chip" :class="reviewChipClass(page.reviewState)">{{ $t(reviewLabelKey(page.reviewState)) }}</span>
             <span class="ah-toolbar__spacer"></span>
             <span v-if="editorName" class="pev__editing">
@@ -15,13 +15,13 @@
                 <span class="ah-small">{{ $t('Projects.page_edited_by', { who: editorName, when: relativeTime(page.updatedAt, t) }) }}</span>
             </span>
             <button type="button" class="ah-btn ah-btn--sm ah-btn--outline" @click="doc && doc.askAi()">
-                <ShellIcon name="ai" :size="13" />{{ $t('DocsV2.ask_about_doc') }}
+                <ShellIcon name="ai" :size="13" />{{ $t('Docs.ask_about_doc') }}
             </button>
             <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="doc && doc.present()">
-                <ShellIcon name="play" :size="11" />{{ $t('DocsV2.present') }}
+                <ShellIcon name="play" :size="11" />{{ $t('Docs.present') }}
             </button>
             <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="doc && doc.openShare()">
-                <ShellIcon name="share" :size="13" />{{ $t('DocsV2.share') }}
+                <ShellIcon name="share" :size="13" />{{ $t('Docs.share') }}
             </button>
         </div>
 
@@ -39,8 +39,8 @@
                 />
             </div>
             <aside class="pev__aside">
-                <div class="ah-label">{{ $t('DocsV2.on_this_page') }}</div>
-                <div v-if="!outline.length" class="ah-small">{{ $t('DocsV2.no_headings') }}</div>
+                <div class="ah-label">{{ $t('Docs.on_this_page') }}</div>
+                <div v-if="!outline.length" class="ah-small">{{ $t('Docs.no_headings') }}</div>
                 <nav v-else class="pev__outline">
                     <button
                         v-for="(heading, index) in outline"

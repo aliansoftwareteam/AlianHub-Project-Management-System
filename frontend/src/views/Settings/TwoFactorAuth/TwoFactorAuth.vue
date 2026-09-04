@@ -5,17 +5,17 @@
         <section class="ah-card tfa__card">
             <div class="ah-card__body tfa__body">
                 <div>
-                    <h2 class="ah-h3 tfa__title">{{ $t('SettingsV2.tfa_title') }}</h2>
-                    <div class="ah-small">{{ $t('SettingsV2.tfa_subtitle') }}</div>
+                    <h2 class="ah-h3 tfa__title">{{ $t('Settings.tfa_title') }}</h2>
+                    <div class="ah-small">{{ $t('Settings.tfa_subtitle') }}</div>
                 </div>
 
                 <template v-if="step === 'idle'">
                     <div class="tfa__status">
-                        <span class="ah-chip" :class="enabled ? 'ah-chip--ok' : ''">{{ enabled ? $t('SettingsV2.tfa_on') : $t('SettingsV2.tfa_off') }}</span>
-                        <span class="ah-small">{{ enabled ? $t('SettingsV2.tfa_on_hint') : $t('SettingsV2.tfa_off_hint') }}</span>
+                        <span class="ah-chip" :class="enabled ? 'ah-chip--ok' : ''">{{ enabled ? $t('Settings.tfa_on') : $t('Settings.tfa_off') }}</span>
+                        <span class="ah-small">{{ enabled ? $t('Settings.tfa_on_hint') : $t('Settings.tfa_off_hint') }}</span>
                     </div>
                     <div v-if="!enabled" class="tfa__actions">
-                        <button type="button" class="ah-btn ah-btn--primary" :disabled="isSpinner" @click="startEnroll()">{{ $t('SettingsV2.tfa_set_up') }}</button>
+                        <button type="button" class="ah-btn ah-btn--primary" :disabled="isSpinner" @click="startEnroll()">{{ $t('Settings.tfa_set_up') }}</button>
                     </div>
                     <form v-else class="tfa__disable" @submit.prevent="disable2fa()">
                         <div class="ah-field">
@@ -24,7 +24,7 @@
                             <div v-if="disableError" class="ah-field__error">{{ disableError }}</div>
                         </div>
                         <div class="tfa__actions">
-                            <button type="submit" class="ah-btn ah-btn--danger" :disabled="isSpinner">{{ $t('SettingsV2.tfa_turn_off') }}</button>
+                            <button type="submit" class="ah-btn ah-btn--danger" :disabled="isSpinner">{{ $t('Settings.tfa_turn_off') }}</button>
                         </div>
                     </form>
                 </template>
@@ -32,16 +32,16 @@
                 <template v-else-if="step === 'enrolling'">
                     <div class="tfa__setup">
                         <div class="tfa__qr">
-                            <img v-if="setupData.qrDataUrl" :src="setupData.qrDataUrl" :alt="$t('SettingsV2.tfa_qr_alt')" />
-                            <div v-else class="ah-empty tfa__qr-empty">{{ $t('SettingsV2.tfa_qr_missing') }}</div>
+                            <img v-if="setupData.qrDataUrl" :src="setupData.qrDataUrl" :alt="$t('Settings.tfa_qr_alt')" />
+                            <div v-else class="ah-empty tfa__qr-empty">{{ $t('Settings.tfa_qr_missing') }}</div>
                         </div>
                         <ol class="tfa__steps">
-                            <li><strong>1.</strong> {{ $t('SettingsV2.tfa_step_scan') }}</li>
+                            <li><strong>1.</strong> {{ $t('Settings.tfa_step_scan') }}</li>
                             <li>
-                                <strong>2.</strong> {{ $t('SettingsV2.tfa_step_key') }}
+                                <strong>2.</strong> {{ $t('Settings.tfa_step_key') }}
                                 <div class="tfa__key">
                                     <span class="ah-mono">{{ groupedSecret }}</span>
-                                    <button type="button" class="tfa__copy" @click="copyText(setupData.secret, 'SettingsV2.tfa_key_copied')">{{ $t('SettingsV2.copy') }}</button>
+                                    <button type="button" class="tfa__copy" @click="copyText(setupData.secret, 'Settings.tfa_key_copied')">{{ $t('Settings.copy') }}</button>
                                 </div>
                             </li>
                         </ol>
@@ -60,7 +60,7 @@
                                     inputmode="numeric"
                                     maxlength="1"
                                     autocomplete="one-time-code"
-                                    :aria-label="$t('SettingsV2.tfa_digit', { n: i + 1 })"
+                                    :aria-label="$t('Settings.tfa_digit', { n: i + 1 })"
                                     :value="d"
                                     @input="onDigitInput(i, $event)"
                                     @keydown="onDigitKey(i, $event)"
@@ -70,27 +70,27 @@
                             <div v-if="enrollError" class="ah-field__error">{{ enrollError }}</div>
                         </div>
                         <div class="tfa__warn">
-                            <strong>{{ $t('SettingsV2.tfa_recovery_warn_title') }}</strong> {{ $t('SettingsV2.tfa_recovery_warn') }}
+                            <strong>{{ $t('Settings.tfa_recovery_warn_title') }}</strong> {{ $t('Settings.tfa_recovery_warn') }}
                         </div>
                         <div class="tfa__actions">
-                            <button type="submit" class="ah-btn ah-btn--primary" :disabled="isSpinner || code.length < 6">{{ $t('SettingsV2.tfa_turn_on') }}</button>
+                            <button type="submit" class="ah-btn ah-btn--primary" :disabled="isSpinner || code.length < 6">{{ $t('Settings.tfa_turn_on') }}</button>
                             <button type="button" class="ah-btn ah-btn--secondary" :disabled="isSpinner" @click="cancelEnroll()">{{ $t('Settings.two_factor_cancel') }}</button>
-                            <span class="ah-small tfa__fallback">{{ $t('SettingsV2.tfa_owner_fallback') }}</span>
+                            <span class="ah-small tfa__fallback">{{ $t('Settings.tfa_owner_fallback') }}</span>
                         </div>
                     </form>
                 </template>
 
                 <template v-else-if="step === 'showCodes'">
                     <div class="tfa__warn">
-                        <strong>{{ $t('SettingsV2.tfa_recovery_warn_title') }}</strong> {{ $t('SettingsV2.tfa_recovery_warn') }}
+                        <strong>{{ $t('Settings.tfa_recovery_warn_title') }}</strong> {{ $t('Settings.tfa_recovery_warn') }}
                     </div>
                     <ul class="tfa__codes">
                         <li v-for="(c, i) in recoveryCodes" :key="i" class="ah-mono">{{ c }}</li>
                     </ul>
                     <div class="tfa__actions">
-                        <button type="button" class="ah-btn ah-btn--secondary" @click="copyText(recoveryCodes.join('\n'), 'Toast.two_factor_codes_copied')"><ShellIcon name="copy" :size="14" />{{ $t('SettingsV2.copy_codes') }}</button>
-                        <button type="button" class="ah-btn ah-btn--secondary" @click="downloadCodes()"><ShellIcon name="download" :size="14" />{{ $t('SettingsV2.download_codes') }}</button>
-                        <button type="button" class="ah-btn ah-btn--primary" @click="finishEnroll()">{{ $t('SettingsV2.tfa_saved_them') }}</button>
+                        <button type="button" class="ah-btn ah-btn--secondary" @click="copyText(recoveryCodes.join('\n'), 'Toast.two_factor_codes_copied')"><ShellIcon name="copy" :size="14" />{{ $t('Settings.copy_codes') }}</button>
+                        <button type="button" class="ah-btn ah-btn--secondary" @click="downloadCodes()"><ShellIcon name="download" :size="14" />{{ $t('Settings.download_codes') }}</button>
+                        <button type="button" class="ah-btn ah-btn--primary" @click="finishEnroll()">{{ $t('Settings.tfa_saved_them') }}</button>
                     </div>
                 </template>
             </div>
@@ -98,12 +98,12 @@
 
         <section class="ah-card tfa__card">
             <div class="ah-card__head">
-                <h2 class="ah-h3">{{ $t('SettingsV2.tfa_lost_title') }}</h2>
+                <h2 class="ah-h3">{{ $t('Settings.tfa_lost_title') }}</h2>
             </div>
             <div class="ah-card__body tfa__lost">
-                <p>{{ $t('SettingsV2.tfa_lost_1') }}</p>
-                <p>{{ $t('SettingsV2.tfa_lost_2') }}</p>
-                <p>{{ $t('SettingsV2.tfa_lost_3') }}</p>
+                <p>{{ $t('Settings.tfa_lost_1') }}</p>
+                <p>{{ $t('Settings.tfa_lost_2') }}</p>
+                <p>{{ $t('Settings.tfa_lost_3') }}</p>
                 <router-link class="ah-btn ah-btn--secondary ah-btn--sm tfa__pw" :to="{ name: 'changePassword', params: { cid: companyId } }">
                     <ShellIcon name="key" :size="14" />{{ $t('settingslider.Change Password') }}
                 </router-link>

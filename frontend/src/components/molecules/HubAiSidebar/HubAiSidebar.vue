@@ -61,7 +61,7 @@
                                     </div>
                                     <span v-if="item.content?.title" class="black font-weight-bold">{{$t('AI.title')}}: </span>
                                     <p v-if="item.content?.title">{{item.content?.title}}</p>
-                                    <span v-if="item.content?.description" class="black font-weight-bold">{{$t('ProjectDetails.Description')}}: </span> 
+                                    <span v-if="item.content?.description" class="black font-weight-bold">{{$t('ProjectDetails.description')}}: </span> 
                                     <div v-if="item.content?.description" class="p15x-0px" id="description-multi" v-html="renderHtmlFun(item.content.description)"></div>
                                     <span class="error_class" v-if="item.error">{{item.error}}</span>
                                     <template v-if="!isSendMessage && !isErrorGenerate">

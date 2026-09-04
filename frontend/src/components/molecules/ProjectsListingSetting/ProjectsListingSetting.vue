@@ -107,29 +107,17 @@
             <div class="p_erpApp">
                 <div class="p__erpApp-wrapper">
                     <span class="sub-title-span d-block font-roboto-sans font-weight-400 gray81 font-size-13">{{$t('Templates.apps')}}</span>
-                    <ul 
-                        class="pro_block d-flex align-items-center justify-content-start flex-wrap" 
+                    <ProjectAppsList
                         v-if="appref.length > 0"
-                    >
-                        <li 
-                            class="image_apps cursor_pointer projectDataColorli black" 
-                            :class="{ 'cursor-pointer': activeTab === 0 }" 
-                            v-for="(appObj, appKey) in appref" 
-                            :key="appKey"
-                        >
-                            <div class="icon-wrapper">
-                                <img 
-                                    :src="processedApps?.includes(appObj.key) ? appIcons[appObj.key]?.afterIcon : appIcons[appObj.key]?.beforeIcon" 
-                                    @click="!item.isRestrict ? updateApp(item, { key: appObj.key }) : ''" 
-                                    :title="appObj.name || 'N/A'" 
-                                    class="erp_app mr-4px"
-                                />
-                            </div>
-                        </li>
-                    </ul>
+                        class="pls__apps"
+                        :apps="appref"
+                        :modelValue="processedApps"
+                        :disabled="!!item.isRestrict || activeTab === 1 || settingPermission !== true || projectDetailPremission !== true"
+                        @toggle="(key) => updateApp(item, { key })"
+                    />
                     <ul class="d-flex" v-else>
                         <li class="projectDataColorli black font-size-13">
-                            N/A
+                            {{ $t('Apps.none') }}
                         </li>
                     </ul>
                 </div>
@@ -180,7 +168,8 @@ const userId = inject("$userId");
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
 import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
-import { projectComponentsIcons, projectAppsIcons } from '@/composable/commonFunction';
+import { projectComponentsIcons } from '@/composable/commonFunction';
+import ProjectAppsList from "@/components/molecules/ProjectAppsList/ProjectAppsList.vue";
 import { apiRequest } from "@/services";
 import * as env from '@/config/env';
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue"
@@ -369,29 +358,14 @@ async function updateApp (item,appObj) {
 }
 
 const appref = ref([]);
-const appIcons = ref({});
 const data = async () => {
     const response = await apiRequest("get", env.PROJECTS_APPS);
     appref.value = response.data;
-
-    const icons = {};
-    for (const app of appref.value) {
-        icons[app.key] = await getAppIcon(app.key);
-    }
-    appIcons.value = icons;
 };
 
 onMounted(()=>{
     data();
 })
-const getAppIcon = async(appKey) => {
-    const icons = projectAppsIcons(appKey) || {};
-    
-    return {
-        beforeIcon: icons.beforeIcon || "default-icon.png", 
-        afterIcon: icons.afterIcon || "default-icon.png"
-    };
-};
 
 const getAppKeys = (apps) => {
     if (!Array.isArray(apps)) return [];

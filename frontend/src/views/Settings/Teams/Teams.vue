@@ -12,10 +12,10 @@
         <template v-else>
             <div class="tm__head">
                 <h2 class="ah-h3 tm__title">{{ $t('Filters.teams') }}</h2>
-                <span class="ah-label">{{ teams.length }} · {{ $t('SettingsV2.people_count', { n: peopleCount }) }}</span>
+                <span class="ah-label">{{ teams.length }} · {{ $t('Settings.people_count', { n: peopleCount }) }}</span>
             </div>
 
-            <div v-if="!teams.length" class="ah-empty">{{ $t('SettingsV2.teams_empty') }}</div>
+            <div v-if="!teams.length" class="ah-empty">{{ $t('Settings.teams_empty') }}</div>
 
             <div v-else class="tm__grid">
                 <div v-for="row in teams" :key="row._id" class="ah-card tm__card">
@@ -25,7 +25,7 @@
                                 type="button"
                                 class="tm__mark"
                                 :style="{ color: row.teamColor?.color || '#fff', background: row.teamColor?.bgColor || 'var(--brand)' }"
-                                :aria-label="$t('SettingsV2.team_color')"
+                                :aria-label="$t('Settings.team_color')"
                                 :disabled="editPermission !== true"
                                 @click="row.isPopupOpen = !row.isPopupOpen"
                             >{{ row.name.charAt(0).toUpperCase() }}</button>
@@ -35,10 +35,10 @@
                         </div>
                         <div class="tm__name-wrap">
                             <template v-if="row.isEdit && editPermission === true">
-                                <input class="ah-input tm__name-input" v-model.trim="existingValue" :aria-label="$t('SettingsV2.team_name')" @keydown.enter.prevent="saveTeamName(row)" @keydown.esc="row.isEdit = false" @blur="row.isEdit = false" v-focus />
+                                <input class="ah-input tm__name-input" v-model.trim="existingValue" :aria-label="$t('Settings.team_name')" @keydown.enter.prevent="saveTeamName(row)" @keydown.esc="row.isEdit = false" @blur="row.isEdit = false" v-focus />
                             </template>
                             <button v-else type="button" class="tm__name" :disabled="editPermission !== true" @click="openInput(row)">{{ row.name }}</button>
-                            <div class="ah-small">{{ $t('SettingsV2.people_count', { n: (row.assigneeUsersArray || []).length }) }}</div>
+                            <div class="ah-small">{{ $t('Settings.people_count', { n: (row.assigneeUsersArray || []).length }) }}</div>
                         </div>
                     </div>
                     <Assignee
@@ -57,10 +57,10 @@
                 </div>
             </div>
 
-            <div class="ah-card tm__note">{{ $t('SettingsV2.teams_note') }}</div>
+            <div class="ah-card tm__note">{{ $t('Settings.teams_note') }}</div>
         </template>
     </div>
-    <div v-else class="ah-empty">{{ $t('SettingsV2.access_denied') }}</div>
+    <div v-else class="ah-empty">{{ $t('Settings.access_denied') }}</div>
 </template>
 
 <script setup>

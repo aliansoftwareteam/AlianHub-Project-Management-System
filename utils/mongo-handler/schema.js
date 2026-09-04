@@ -2128,11 +2128,6 @@ const schema = {
             required: false,
             default: 0
         },
-        milestoneAmount: {
-            type: Number,
-            required: false,
-            default: 0
-        },
         projectCreatedBy: {
             type: String,
             required: true,
@@ -2959,10 +2954,6 @@ const schema = {
             type: Array,
             required: false
         },
-        status: {
-            type: Number,
-            required: false
-        },
         planName: {
             type: String,
             required: true
@@ -3150,11 +3141,6 @@ const schema = {
             type: Boolean,
             required: false,
             default: false
-        },
-        projectId: {
-            type:Array,
-            required: false,
-            default:''
         },
         type: {
             type:String,
@@ -3624,6 +3610,25 @@ const schema = {
             type: Date,
             required: true
         }
+    },
+    // One row per migration id, plus the "__lock" row the runner holds while it works.
+    schemaVersions: {
+        _id: { type: String, required: true },
+        appliedAt: { type: Date, required: false },
+        durationMs: { type: Number, required: false },
+        appVersion: { type: String, required: false },
+        ok: { type: Boolean, required: false },
+        error: { type: String, required: false },
+        companies: { type: Object, required: false },
+        owner: { type: String, required: false },
+        expiresAt: { type: Date, required: false },
+    },
+    // A single document (_id "instance") holding what Settings > Instance saves; secrets encrypted.
+    instanceSettings: {
+        _id: { type: String, required: true },
+        values: { type: Object, required: false },
+        updatedAt: { type: Date, required: false },
+        updatedBy: { type: String, required: false },
     },
     globalSettings: {
         name: {

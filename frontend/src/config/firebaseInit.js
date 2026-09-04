@@ -1,4 +1,6 @@
 import { initializeApp } from 'firebase/app'
 import firebaseConfig from './firebaseConfig'
 
-export default initializeApp(firebaseConfig)
+const configured = Boolean(firebaseConfig.apiKey) && firebaseConfig.apiKey !== 'placeholder'
+
+export default configured ? initializeApp(firebaseConfig) : null

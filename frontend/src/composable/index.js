@@ -7,6 +7,7 @@ import { useToast } from "vue-toast-notification";
 import Store from '@/store/index'
 import { storageQueryBuilder } from "@/utils/storageQueryBuild";
 import { i18n } from "@/locales/main";
+import { isBundledPriorityImage } from "@/composable/commonFunction";
 const t = i18n.global.t;
 const urlRegex = ref(/(https?|ftp):\/\/[^\s/$.?#].[^\s]*/g)
 
@@ -698,7 +699,7 @@ export function useGetterFunctions() {
             const priorityIndex = priorities.value.findIndex((x) => x.value === val)
 
             if(priorityIndex !== -1) {
-                obj.image = priorities.value[priorityIndex].statusImage
+                obj.image = isBundledPriorityImage(priorities.value[priorityIndex].statusImage) ? '' : priorities.value[priorityIndex].statusImage
                 obj.name = priorities.value[priorityIndex].name
                 obj.value = priorities.value[priorityIndex].value
             }

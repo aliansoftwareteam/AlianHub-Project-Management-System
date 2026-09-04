@@ -7,6 +7,7 @@
 </template>
 
 <script setup>
+import { publicConfig } from "@/config/publicConfig";
 import { onMounted, ref, defineProps } from "vue";
 import Cookies from 'js-cookie';
 import { useToast } from 'vue-toast-notification';
@@ -72,10 +73,10 @@ onMounted(async () => {
 // Trigger GitLab OAuth (GitLab requires response_type=code in the authorize URL).
 function loginWithGitLab() {
     localStorage.setItem("gitlabAuthMode", props.mode);
-    const clientId = process.env.VUE_APP_GITLAB_CLIENT_ID;
+    const clientId = publicConfig.auth.gitlab.clientId;
     const scope = "read_user";
     const redirectUri = window.location.origin;
-    const base = process.env.VUE_APP_GITLAB_BASE_OAUTH_URL || 'https://gitlab.com/oauth';
+    const base = publicConfig.auth.gitlab.baseUrl || 'https://gitlab.com/oauth';
     const gitlabAuthUrl = `${base}/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}`;
     window.location.href = gitlabAuthUrl;
 }

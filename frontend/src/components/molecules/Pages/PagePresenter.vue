@@ -2,7 +2,7 @@
     <Teleport to="body">
         <div ref="root" class="pp" tabindex="-1">
             <div class="pp__stage">
-                <div v-if="!slides.length" class="pp__empty">{{ $t('DocsV2.nothing_to_present') }}</div>
+                <div v-if="!slides.length" class="pp__empty">{{ $t('Docs.nothing_to_present') }}</div>
                 <div v-else class="pp__slide">
                     <div class="pp__kicker">{{ kicker }}</div>
                     <h1 class="pp__heading">{{ current.heading || title }}</h1>
@@ -11,13 +11,13 @@
             </div>
             <div class="pp__bar">
                 <span class="pp__from">
-                    {{ $t('DocsV2.presenting_from') }} <strong>{{ title }}</strong> · {{ $t('DocsV2.headings_became_slides') }}
+                    {{ $t('Docs.presenting_from') }} <strong>{{ title }}</strong> · {{ $t('Docs.headings_became_slides') }}
                 </span>
                 <div class="pp__ctrl">
-                    <span class="pp__count">{{ $t('DocsV2.slide_of', { n: slides.length ? index + 1 : 0, total: slides.length }) }}</span>
+                    <span class="pp__count">{{ $t('Docs.slide_of', { n: slides.length ? index + 1 : 0, total: slides.length }) }}</span>
                     <button type="button" class="pp__btn" :disabled="index <= 0" @click="prev"><ShellIcon name="arrowLeft" :size="14" /></button>
                     <button type="button" class="pp__btn" :disabled="index >= slides.length - 1" @click="next"><ShellIcon name="arrowRight" :size="14" /></button>
-                    <button type="button" class="pp__btn pp__btn--strong" @click="$emit('close')">{{ $t('DocsV2.exit_present') }} <span class="ah-kbd pp__kbd">Esc</span></button>
+                    <button type="button" class="pp__btn pp__btn--strong" @click="$emit('close')">{{ $t('Docs.exit_present') }} <span class="ah-kbd pp__kbd">Esc</span></button>
                 </div>
             </div>
         </div>

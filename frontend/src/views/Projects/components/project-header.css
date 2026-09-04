@@ -50,6 +50,16 @@
 }
 
 .ph2__sep { color: var(--ink-3); }
+.ph2__switch {
+    max-width: 220px;
+    height: 28px;
+    padding: 0 8px;
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--ink);
+    font: var(--text-small);
+}
 .ph2__sprint { white-space: nowrap; }
 
 .ph2__range {

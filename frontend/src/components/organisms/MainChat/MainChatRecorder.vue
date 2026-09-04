@@ -10,8 +10,8 @@
                 :class="{ 'is-live': index >= levels.length - LIVE_BARS }"
             ></span>
         </div>
-        <span class="mc-rec-hint">{{ $t('ChatV2.recording') }}</span>
-        <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="stop()">{{ $t('ChatV2.send') }}</button>
+        <span class="mc-rec-hint">{{ $t('Chat.recording') }}</span>
+        <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="stop()">{{ $t('Chat.send') }}</button>
     </div>
     <p v-else-if="error" class="ah-field__error">{{ error }}</p>
 </template>

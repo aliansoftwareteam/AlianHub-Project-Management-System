@@ -41,6 +41,7 @@
         </template>
         <template v-else>
             <template v-if="processedBoardData.length && sprints?.length">
+                <ListBulkBar v-if="projectData?._id" :project="projectData" />
                 <KanbanBoard :data="processedBoardData" :group="grouped" :sprintId="sprintId" />
             </template>
             <template v-else>
@@ -66,6 +67,7 @@ import isEqual from 'lodash/isEqual';
 
 // Components
 import KanbanBoard from '@/views/Projects/Kanban/KanbanBoard.vue';
+import ListBulkBar from '@/views/Projects/ListView/ListBulkBar.vue';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 

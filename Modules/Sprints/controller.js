@@ -184,7 +184,7 @@ exports.addSprintFun = (req) => {
         })
     } catch (error) {
         logger.error(`ERROR : ${error.message}`);
-        reject({ status: false, statusText:error });
+        return Promise.reject({ status: false, statusText:error });
     }
 };
 

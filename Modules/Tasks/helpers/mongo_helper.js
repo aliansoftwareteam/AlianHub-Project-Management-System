@@ -226,8 +226,8 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                 else if (JSON.parse(JSON.stringify(convertTask)).ProjectID !== JSON.parse(JSON.stringify(task)).ProjectID) {
                     let Ind = oldProject.taskStatusData.findIndex((x) => { return x.key === convertTask.statusKey });
                     let typeInd = oldProject.taskTypeCounts.findIndex((x) => { return x.value === convertTask.TaskType });
-                    statusData = oldProject.taskStatusData[Ind];
-                    typeData = oldProject.taskTypeCounts[typeInd];
+                    const statusData = oldProject.taskStatusData[Ind];
+                    const typeData = oldProject.taskTypeCounts[typeInd];
                     obj = {
                         ...obj,
                         ProjectID: task.ProjectID,
@@ -396,8 +396,8 @@ exports.moveTaskFunction = (companyId, projectData, sprintObj, moveTask, oldSpri
                 if (JSON.parse(JSON.stringify(moveTask.ProjectID)) !== JSON.parse(JSON.stringify(projectData.id))) {
                     let Ind = oldProject.taskStatusData.findIndex((x) => { return x.key === moveTask.statusKey });
                     let typeInd = oldProject.taskTypeCounts.findIndex((x) => { return x.value === moveTask.TaskType });
-                    statusData = oldProject.taskStatusData[Ind];
-                    typeData = oldProject.taskTypeCounts[typeInd];
+                    const statusData = oldProject.taskStatusData[Ind];
+                    const typeData = oldProject.taskTypeCounts[typeInd];
                     obj = {
                         ProjectID: projectData.id,
                         sprintId: sprintObj.id,
@@ -632,8 +632,8 @@ exports.mergeSubTask = (companyId, subTask, mergeTask, projectData, oldProject) 
             if (subTask.ProjectID !== mergeTask.ProjectID) {
                 let Ind = oldProject.taskStatusData.findIndex((x) => { return x.key === subTask.statusKey });
                 let typeInd = oldProject.taskTypeCounts.findIndex((x) => { return x.value === subTask.TaskType });
-                statusData = oldProject.taskStatusData[Ind];
-                typeData = oldProject.taskTypeCounts[typeInd];
+                const statusData = oldProject.taskStatusData[Ind];
+                const typeData = oldProject.taskTypeCounts[typeInd];
                 obj = {
                     sprintId: mergeTask.sprintId,
                     sprintArray: {

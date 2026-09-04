@@ -1,16 +1,16 @@
 <template>
     <div class="pd ah-page">
         <header class="ah-toolbar pd__bar">
-            <h1 class="ah-toolbar__title">{{ $t('MembersV2.people') }}</h1>
-            <span class="ah-mono pd__count">{{ $t('MembersV2.people_count', { count: people.length, teams: teams.length }) }}</span>
+            <h1 class="ah-toolbar__title">{{ $t('Members.people') }}</h1>
+            <span class="ah-mono pd__count">{{ $t('Members.people_count', { count: people.length, teams: teams.length }) }}</span>
             <div class="ah-toolbar__spacer"></div>
             <div v-if="mode === 'directory'" class="pd__search">
                 <ShellIcon name="search" :size="15" />
-                <input v-model.trim="search" class="pd__search-input" type="search" :placeholder="$t('MembersV2.people_search_ph')" />
+                <input v-model.trim="search" class="pd__search-input" type="search" :placeholder="$t('Members.people_search_ph')" />
             </div>
             <div class="ah-tabs">
-                <button type="button" class="ah-tab" :class="{ 'is-active': mode === 'directory' }" @click="mode = 'directory'">{{ $t('OrgV2.tab_directory') }}</button>
-                <button type="button" class="ah-tab" :class="{ 'is-active': mode === 'org' }" @click="mode = 'org'">{{ $t('OrgV2.tab_org') }}</button>
+                <button type="button" class="ah-tab" :class="{ 'is-active': mode === 'directory' }" @click="mode = 'directory'">{{ $t('Org.tab_directory') }}</button>
+                <button type="button" class="ah-tab" :class="{ 'is-active': mode === 'org' }" @click="mode = 'org'">{{ $t('Org.tab_org') }}</button>
             </div>
         </header>
 
@@ -27,20 +27,20 @@
                             <span class="org__name">{{ row.person.name }}</span>
                             <span class="ah-small">{{ row.person.subtitle }}</span>
                         </span>
-                        <span v-if="row.reports" class="ah-chip ah-chip--mono">{{ $t('OrgV2.reports_count', { count: row.reports }) }}</span>
+                        <span v-if="row.reports" class="ah-chip ah-chip--mono">{{ $t('Org.reports_count', { count: row.reports }) }}</span>
                     </div>
                 </div>
             </section>
 
-            <div v-if="!people.length" class="ah-empty">{{ $t('MembersV2.no_people') }}</div>
+            <div v-if="!people.length" class="ah-empty">{{ $t('Members.no_people') }}</div>
             <div v-else-if="!managedCount" class="ah-card">
                 <div class="ah-card__body org__empty">
-                    <div class="ah-label">{{ $t('OrgV2.empty_title') }}</div>
-                    <p class="ah-small org__empty-note">{{ canEditManager ? $t('OrgV2.empty_editable') : $t('OrgV2.empty_readonly') }}</p>
-                    <button v-if="canEditManager" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="mode = 'directory'">{{ $t('OrgV2.empty_action') }}</button>
+                    <div class="ah-label">{{ $t('Org.empty_title') }}</div>
+                    <p class="ah-small org__empty-note">{{ canEditManager ? $t('Org.empty_editable') : $t('Org.empty_readonly') }}</p>
+                    <button v-if="canEditManager" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="mode = 'directory'">{{ $t('Org.empty_action') }}</button>
                 </div>
             </div>
-            <p class="ah-small pd__privacy">{{ $t('OrgV2.org_note') }}</p>
+            <p class="ah-small pd__privacy">{{ $t('Org.org_note') }}</p>
         </div>
 
         <div v-else class="pd__body ah-scroll">
@@ -62,25 +62,25 @@
                         <div v-if="selected.skills.length" class="pd__skills">
                             <span v-for="skill in selected.skills" :key="skill.slug" class="pd__skill">{{ skill.name }}</span>
                         </div>
-                        <p v-else class="ah-small">{{ $t('MembersV2.no_skills') }}</p>
+                        <p v-else class="ah-small">{{ $t('Members.no_skills') }}</p>
 
                         <div class="pd__stats">
                             <div v-if="canSeeLoad && selected.loadPct !== null" class="pd__stat">
                                 <div class="pd__stat-n">{{ selected.loadPct }}%</div>
-                                <div class="ah-small">{{ $t('MembersV2.loaded') }}</div>
+                                <div class="ah-small">{{ $t('Members.loaded') }}</div>
                             </div>
                             <div class="pd__stat">
                                 <div class="pd__stat-n">{{ selected.openTasks }}</div>
-                                <div class="ah-small">{{ $t('MembersV2.open_tasks') }}</div>
+                                <div class="ah-small">{{ $t('Members.open_tasks') }}</div>
                             </div>
                             <div class="pd__stat">
                                 <div class="pd__stat-n">{{ selected.projects }}</div>
-                                <div class="ah-small">{{ $t('MembersV2.in_projects') }}</div>
+                                <div class="ah-small">{{ $t('Members.in_projects') }}</div>
                             </div>
                         </div>
 
                         <div v-if="canEditManager" class="ah-field">
-                            <label class="ah-field__label" :for="`pd-manager-${selected.id}`">{{ $t('OrgV2.reports_to') }}</label>
+                            <label class="ah-field__label" :for="`pd-manager-${selected.id}`">{{ $t('Org.reports_to') }}</label>
                             <select
                                 :id="`pd-manager-${selected.id}`"
                                 class="ah-input"
@@ -89,16 +89,16 @@
                                 :disabled="savingManager"
                                 @change="setManager(selected, $event.target.value)"
                             >
-                                <option value="">{{ $t('OrgV2.no_manager') }}</option>
+                                <option value="">{{ $t('Org.no_manager') }}</option>
                                 <option v-for="option in managerOptions" :key="option.id" :value="option.id">{{ option.name }}</option>
                             </select>
                             <span v-if="managerError" class="ah-field__error">{{ managerError }}</span>
                         </div>
-                        <p v-else-if="selected.managerName" class="ah-small">{{ $t('OrgV2.reports_to_name', { name: selected.managerName }) }}</p>
+                        <p v-else-if="selected.managerName" class="ah-small">{{ $t('Org.reports_to_name', { name: selected.managerName }) }}</p>
 
                         <div class="pd__actions">
-                            <button v-if="hasChat" type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="goChat()">{{ $t('MembersV2.message') }}</button>
-                            <button v-if="canSeeLoad" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="goWorkload()">{{ $t('MembersV2.their_work') }}</button>
+                            <button v-if="hasChat" type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="goChat()">{{ $t('Members.message') }}</button>
+                            <button v-if="canSeeLoad" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="goWorkload()">{{ $t('Members.their_work') }}</button>
                         </div>
                     </div>
                 </section>
@@ -122,13 +122,13 @@
                         </span>
                         <span class="ah-dot" :class="dotClass(person)" :title="statusTitle(person)"></span>
                     </button>
-                    <div v-if="!filtered.length" class="ah-empty">{{ $t('MembersV2.no_people') }}</div>
+                    <div v-if="!filtered.length" class="ah-empty">{{ $t('Members.no_people') }}</div>
                 </div>
             </div>
 
             <section v-if="allSkills.length" class="ah-card">
                 <div class="ah-card__body pd__find">
-                    <div class="ah-label">{{ $t('MembersV2.find_someone') }}</div>
+                    <div class="ah-label">{{ $t('Members.find_someone') }}</div>
                     <div class="pd__find-chips">
                         <button
                             v-for="skill in allSkills"
@@ -139,11 +139,11 @@
                             @click="search = search.toLowerCase() === skill.name.toLowerCase() ? '' : skill.name"
                         >{{ skill.name }}</button>
                     </div>
-                    <p class="ah-small pd__note">{{ $t('MembersV2.skills_note') }}</p>
+                    <p class="ah-small pd__note">{{ $t('Members.skills_note') }}</p>
                 </div>
             </section>
 
-            <p class="ah-small pd__privacy">{{ $t('MembersV2.privacy_note') }}</p>
+            <p class="ah-small pd__privacy">{{ $t('Members.privacy_note') }}</p>
         </div>
     </div>
 </template>
@@ -231,7 +231,7 @@ const people = computed(() => listing.value
         const parts = [designationName(u.designation) || roleName(u.roleType)];
         const team = teamsFor(id)[0];
         if (team) parts.push(team);
-        if (pto) parts.push(t("MembersV2.on_pto", { date: pto }));
+        if (pto) parts.push(t("Members.on_pto", { date: pto }));
         return {
             id,
             requestId: String(u.requestId || u._id || ""),
@@ -362,7 +362,7 @@ async function setManager(person, nextManagerId) {
     try {
         const response = await apiRequest("put", env.API_MEMBERS, { id: person.requestId, data: { managerId: nextManagerId } });
         if (!response.data?.status) {
-            managerError.value = response.data?.statusText || t("OrgV2.save_failed");
+            managerError.value = response.data?.statusText || t("Org.save_failed");
             return;
         }
         const saved = response.data.data;
@@ -374,7 +374,7 @@ async function setManager(person, nextManagerId) {
             });
         }
     } catch (error) {
-        managerError.value = error?.response?.data?.statusText || t("OrgV2.save_failed");
+        managerError.value = error?.response?.data?.statusText || t("Org.save_failed");
     } finally {
         savingManager.value = false;
     }
@@ -389,7 +389,7 @@ function dotClass(person) {
 }
 
 function statusTitle(person) {
-    if (person.onPto) return t("MembersV2.on_pto", { date: "" }).trim();
+    if (person.onPto) return t("Members.on_pto", { date: "" }).trim();
     return person.loadPct === null ? "" : `${person.loadPct}%`;
 }
 

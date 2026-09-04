@@ -1,25 +1,5 @@
 <template>
     <div class="d-flex flex-row h-100 overflow-hidden project__components" v-if="(isRuleData === false ? rulePermission !== null : true) && checkPermission('project.project_list',projectData.isGlobalPermission) !== null">
-        <div :class="[{'section-left' : clientWidth && clientWidth > 1300}]" v-if="checkPermission('project.project_list',projectData.isGlobalPermission) !== null">
-            <ProjectListing
-                ref="projectList"
-                v-if="checkPermission('project.project_list',projectData.isGlobalPermission) !== null"
-                v-model:projectData="projectData"
-                v-model:showArchivedProjects="showArchivedProjects"
-                v-model:isFilterHasData="isFilterHasData"
-                v-model:isAdvanceFilterApplied="isAdvanceFilterApplied"
-                @update:showArchivedProjects="showArchived = showArchivedProjects"
-                @showArchived="showArchived = $event"
-                :filterFavorites="filterFavorites"
-                @update:filterFavorites="filterFavorites = $event"
-                @update:searchData="projectSearchText = $event"
-                @createProject="openSidebar()"
-                @createAiProject="openAiCreator()"
-                :loadingProjects="loadingProjects"
-                @changeAvatar="showColorAvatar = true, assignAvatarData($event)"
-                v-model:sprintLoading="sprintLoading"
-            />
-        </div>
         <template v-if="!loadingProjects && !isRuleData">
             <template v-if="projects?.length && projectData && !isFilterHasData">
                 <template v-if="isRuleData === false ? checkPermission('task.task_list',projectData.isGlobalPermission) !== null && !projectData.isRestrict : !projectData.isRestrict">
@@ -27,6 +7,7 @@
                         <ProjectHeader
                             ref="projectHeader"
                             :project="projectData"
+                            :projects="projects"
                             :sprint="headerSprint"
                             :activeView="activeTab"
                             :favourite="isProjectFavourite"
@@ -34,12 +15,12 @@
                             :showAiAssist="canAiAssist"
                             :showAddTask="canAddTask"
                             @toggle-favourite="markProjectFavourite()"
+                            @select-project="selectProject({ _id: $event }, true)"
                             @filter="$refs.filtersToolbar && $refs.filtersToolbar.openFilter()"
                             @ai-assist="openAiTaskCreator()"
                             @add-task="addTaskRequest++"
                         >
                             <template #title>
-                                    <img :src="sidebarArrowIcon" alt="sidebarArrowIcon" class="cursor-pointer mr-10px" @click="$refs.projectList.toggleSidebar(true)" v-if="clientWidth <= responseWidth" :class="[{'z-index-5' : projectData?.deletedStatusKey === 2}]">
                                     <img :src="projectData?.favouriteTasks?.filter((x) => x.userId === userId)?.length ? projectStar : blankStar" alt="projectStar" class="cursor-pointer mark__project-favourite" @click="markProjectFavourite()"/>
                                     <div v-if="clientWidth > 767">
                                         <span v-if="projectData?.projectIcon && projectData?.projectIcon.type === 'color'" class="d-flex align-items-center justify-content-center ml-9px" :class="{'inital-box' : clientWidth > 767 , 'project-firtsleeter-box' : clientWidth <=767}" :style="[{'background-color': projectData?.projectIcon.data}]">{{ projectData?.ProjectName.charAt(0).toUpperCase()}}</span>
@@ -242,6 +223,7 @@
                                 </div>
                             </template>
                             <template #actions>
+                            <NewInProjectMenu :projectData="projectData" />
                             <ProjectActionsBar
                                 :projectData="projectData"
                                 :clientWidth="clientWidth"
@@ -462,7 +444,6 @@ import { projectComponentsIcons } from '@/composable/commonFunction';
 import ConfirmationSidebar from '@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue';
 import BulkActionBar from '@/components/molecules/BulkActionBar/BulkActionBar.vue';
 import WasabiImage from '@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue';
-import ProjectListing from './ProjectsListing/ProjectListing.vue';
 import ViewsDropdown from '@/components/molecules/ProjectViews/ViewsDropdown.vue';
 import UpgradYourPlanComponent from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import ProjectDetailRightSide from '@/components/organisms/ProjectDetailRightSide/ProjectDetailRightSide.vue';
@@ -498,6 +479,7 @@ import NotFound from '../NotFound.vue';
 // EXTRACTED PIECES
 import ProjectActionsBar from './components/ProjectActionsBar.vue';
 import ProjectHeader from './components/ProjectHeader.vue';
+import NewInProjectMenu from './components/NewInProjectMenu.vue';
 import ProjectFiltersToolbar from './components/ProjectFiltersToolbar.vue';
 import { useProjectAgents } from './Kanban/useProjectAgents';
 import AiTaskCreator from '@/components/organisms/AiTaskCreator/AiTaskCreator.vue';
@@ -512,7 +494,7 @@ import { useEmbedViews } from './composables/useEmbedViews';
 import { useProjectLifecycle } from './composables/useProjectLifecycle';
 import { useProjectAvatar } from './composables/useProjectAvatar';
 import { useProjectSearch } from './composables/useProjectSearch';
-import { useProjectTour } from './composables/useProjectTour';
+import { useProjectTree } from './composables/useProjectTree';
 
 import { useProjectsHelper } from './helper';
 
@@ -526,7 +508,6 @@ const { projects, filteredProjects, dispatchProjects } = useProjectsHelper();
 const showArchivedProjects = ref(false);
 const isAdvanceFilterApplied = ref(false);
 const isFilterHasData = ref(false);
-const sprintLoading = ref(false);
 provide('showArchivedProjects', showArchivedProjects);
 
 const currentVideoUrl = ref(0);
@@ -673,13 +654,10 @@ const filterFavorites = ref(localStorage.getItem('favoriteFilter') == 'true');
 const clientWidth = inject('$clientWidth');
 const route = useRoute();
 const router = useRouter();
-const responseWidth = 1300;
-const sidebarArrowIcon = require('@/assets/images/svg/sidebarclose_arrow.svg');
 const projectStar = require('@/assets/images/svg/start13.svg');
 const blankStar = require('@/assets/images/svg/blankStar.svg');
 const viewDefaultIcon = require('@/assets/images/svg/list_home_icon.svg');
 const viewDefaultActive = require('@/assets/images/svg/blue_tick.svg');
-const projectList = ref();
 
 const companyId = inject('$companyId');
 const { checkPermission, checkApps, makeUniqueId } = useCustomComposable();
@@ -710,7 +688,7 @@ const { changeAssignee } = useProjectAssignee(projectData);
 const { archive, showSidebar, showSpinner, updateProject, markProjectFavourite } = useProjectLifecycle(projectData);
 const { showColorAvatar, savingAvatar, formData, resetFormData, assignAvatarData, updateImageValue, saveProjectAvatar } = useProjectAvatar(projectData);
 const { taskSearch, taskNameSearch, taskKeySearch, taskDescriptionSearch, filterUsers, searchTask, collapsed, groupBy, userSidebar, resetFilters, toggleSearch, searchMongoDB, manageFilterUsers, applyFilter, clearFilter } = useProjectSearch(projectData, showArchived);
-const { runProjectStartupTours, hanldeBlankProjectTour, hanldeProjectTaktypeTour, hanldeProjectLastStep } = useProjectTour();
+const { sprintLoading, loadSprintFolderData, selectProject } = useProjectTree(projectData);
 
 const Uid = ref('embed' + makeUniqueId(6));
 const renameValue = ref('');
@@ -837,7 +815,7 @@ const openAiCreator = () => {
 // (totals.sprints from the 'done' event); each rendered sprint loads its tasks.
 async function onAiTasksCreated(totals) {
     const proj = projectData.value;
-    if (!proj || !proj._id || !projectList.value || typeof projectList.value.getSprintFolderData !== 'function') return;
+    if (!proj || !proj._id) return;
     const pid = String(proj._id);
     const sprintCount = () => {
         const p = getters['projectData/projects']?.data?.find((x) => x._id === pid);
@@ -847,7 +825,7 @@ async function onAiTasksCreated(totals) {
     const target = sprintCount() + expectedNew;
     let prev = -1;
     for (let attempt = 0; attempt < 10; attempt++) {
-        await projectList.value.getSprintFolderData(pid, true, true);
+        await loadSprintFolderData(pid, true, true);
         const fresh = getters['projectData/projects']?.data?.find((p) => p._id === pid);
         if (fresh) projectData.value = { ...fresh };
         const now = sprintCount();
@@ -874,26 +852,11 @@ async function onAiProjectCreated({ projectId }) {
         const projectsData = (getters['projectData/projects'] && getters['projectData/projects'].data) || [];
         const newProject = projectsData.find((p) => String(p._id) === String(projectId));
 
-        // Re-use the sidebar's selection flow. `mutateCurrentProjectDetails`
-        // does ALL the work clicking a project in the left sidebar does:
-        //   - expands the project in the sidebar
-        //   - computes the correct `?tab=` query from the project's
-        //     ProjectRequiredComponent (falls back to 'ProjectListView')
-        //   - pushes the route with full params + query
-        //   - commits the project to Vuex (`projectData/mutateCurrentProjectDetails`)
-        //   - emits `update:projectData` up to this component, whose existing
-        //     watcher then loads sprints + tasks
-        //
-        // Plain `router.push` alone skips the Vuex commit and the
-        // update:projectData emit, so the main panel renders before the
-        // active-project state is set and the user sees "No Data Found"
-        // until they manually click the project in the sidebar.
-        if (newProject && projectList.value && typeof projectList.value.mutateCurrentProjectDetails === 'function') {
-            projectList.value.mutateCurrentProjectDetails(newProject, true, true);
+        // A plain router.push skips the Vuex commit, and the panel would show
+        // "No Data Found" until the project is selected by hand.
+        if (newProject) {
+            selectProject(newProject, true);
         } else {
-            // Defensive fallback: at minimum get the user to the right URL
-            // with the tab query even if we couldn't reach the sidebar
-            // component (e.g. it failed to mount).
             const cid = (currentCompany.value && currentCompany.value._id) || route.params.cid;
             router.push({
                 name: 'Project',
@@ -960,13 +923,6 @@ watch([() => getters['projectData/projects'], showArchivedProjects, route, filte
 }, { deep: true });
 
 onMounted(() => {
-    // Under 1300px the project list is a drawer. It used to open on every load so
-    // a user could pick a project; now that the route already names one, an open
-    // drawer just dims the view the user asked for.
-    if (clientWidth.value <= 1300 && !route.params.id) {
-        visible.value = true;
-        projectList.value.toggleSidebar(true);
-    }
     loadingProjects.value = true;
     dispatchProjects()
         .then(() => {
@@ -998,7 +954,6 @@ onMounted(() => {
         assignProjects(getters['projectData/projects'].data);
     }
     setTimeout(() => {
-        runProjectStartupTours(projects.value.length);
     }, 1500);
 });
 onUnmounted(() => {
@@ -1056,7 +1011,7 @@ const isProjectFavourite = computed(() => Boolean((projectData.value?.favouriteT
 const canAiAssist = computed(() => checkApps('AI', projectData.value) && checkPermission('task.task_create', projectData.value?.isGlobalPermission) === true);
 // Only shown where a view actually answers the request (the board injects
 // `addTaskRequest`); other views opt in by injecting it too.
-const OWN_BULK_BAR_VIEWS = ['ProjectListView', 'TableView'];
+const OWN_BULK_BAR_VIEWS = ['ProjectListView', 'TableView', 'ProjectKanban'];
 const hasOwnBulkBar = computed(() => OWN_BULK_BAR_VIEWS.includes(activeTab.value));
 const ADD_TASK_VIEWS = ['ProjectKanban'];
 const canAddTask = computed(() => ADD_TASK_VIEWS.includes(activeTab.value) && checkPermission('task.task_create', projectData.value?.isGlobalPermission) === true);
@@ -1289,9 +1244,6 @@ const toggleTaskDetail = (task, close = false, isComment = false) => {
 };
 provide('toggleTaskDetail', toggleTaskDetail);
 provide('isRouteRequired', true);
-provide('hanldeBlankProjectTour', hanldeBlankProjectTour);
-provide('hanldeProjectTaktypeTour', hanldeProjectTaktypeTour);
-provide('hanldeProjectLastStep', hanldeProjectLastStep);
 
 const users = computed(() => getters['users/users']);
 const teams = computed(() => getters['settings/teams']);

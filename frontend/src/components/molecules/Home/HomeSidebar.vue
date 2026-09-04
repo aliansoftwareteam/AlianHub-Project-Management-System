@@ -8,54 +8,54 @@
 
         <nav class="hs-group" :aria-label="$t('Inbox.title')">
             <router-link class="hs-item" :class="{ 'is-active': route.name === 'inbox' && !route.query.tab }" :to="to('inbox')">
-                <span class="hs-item__text">{{ $t('HomeV2.inbox') }}</span>
+                <span class="hs-item__text">{{ $t('Home.inbox') }}</span>
                 <span v-if="counts.all" class="hs-item__badge">{{ counts.all }}</span>
             </router-link>
             <router-link class="hs-item" :to="to('inbox', { tab: 'primary' })">
-                <span class="hs-item__text">{{ $t('HomeV2.replies_mentions') }}</span>
+                <span class="hs-item__text">{{ $t('Home.replies_mentions') }}</span>
                 <span v-if="counts.mentions" class="hs-item__count">{{ counts.mentions }}</span>
             </router-link>
             <router-link v-if="router.hasRoute('chats')" class="hs-item" :to="to('chats')">
-                <span class="hs-item__text">{{ $t('HomeV2.chat_activity') }}</span>
+                <span class="hs-item__text">{{ $t('Home.chat_activity') }}</span>
             </router-link>
         </nav>
 
-        <nav class="hs-group" :aria-label="$t('HomeV2.my_tasks')">
-            <div class="hs-label">{{ $t('HomeV2.my_tasks') }}</div>
+        <nav class="hs-group" :aria-label="$t('Home.my_tasks')">
+            <div class="hs-label">{{ $t('Home.my_tasks') }}</div>
             <router-link class="hs-item" :class="{ 'is-active': route.name === 'Home' && route.query.filter === 'assigned' }" :to="to('Home', { filter: 'assigned' })">
-                <span class="hs-item__text">{{ $t('HomeV2.assigned_to_me') }}</span>
+                <span class="hs-item__text">{{ $t('Home.assigned_to_me') }}</span>
                 <span class="hs-item__count">{{ assignedCount }}</span>
             </router-link>
             <router-link class="hs-item" :class="{ 'is-active': route.name === 'Home' && !route.query.filter }" :to="to('Home')">
-                <span class="hs-item__text">{{ $t('HomeV2.today_overdue') }}</span>
+                <span class="hs-item__text">{{ $t('Home.today_overdue') }}</span>
             </router-link>
             <router-link class="hs-item" :class="{ 'is-active': route.name === 'PersonalList' }" :to="to('PersonalList')">
-                <span class="hs-item__text">{{ $t('HomeV2.personal_list') }}</span>
-                <span v-if="!personalProject" class="hs-item__tag">{{ $t('HomeV2.new_tag') }}</span>
-                <span v-else class="hs-item__lock" :title="$t('HomeV2.only_you')"><ShellIcon name="lock" :size="12" /></span>
+                <span class="hs-item__text">{{ $t('Home.personal_list') }}</span>
+                <span v-if="!personalProject" class="hs-item__tag">{{ $t('Home.new_tag') }}</span>
+                <span v-else class="hs-item__lock" :title="$t('Home.only_you')"><ShellIcon name="lock" :size="12" /></span>
             </router-link>
         </nav>
 
-        <nav v-if="!hidden.includes('favorites')" class="hs-group" :aria-label="$t('HomeV2.favorites')">
-            <div class="hs-label">{{ $t('HomeV2.favorites') }}</div>
+        <nav v-if="!hidden.includes('favorites')" class="hs-group" :aria-label="$t('Home.favorites')">
+            <div class="hs-label">{{ $t('Home.favorites') }}</div>
             <router-link v-for="fav in pinned" :key="fav.id" class="hs-item" :to="fav.to">
                 <span class="hs-item__star">★</span>
                 <span class="hs-item__text">{{ fav.label }}</span>
-                <button type="button" class="hs-item__action" :title="$t('HomeV2.unpin')" @click.prevent.stop="unpin(fav.id)"><ShellIcon name="x" :size="12" /></button>
+                <button type="button" class="hs-item__action" :title="$t('Home.unpin')" @click.prevent.stop="unpin(fav.id)"><ShellIcon name="x" :size="12" /></button>
             </router-link>
-            <div v-if="!pinned.length" class="hs-empty">{{ $t('HomeV2.no_favorites') }}</div>
+            <div v-if="!pinned.length" class="hs-empty">{{ $t('Home.no_favorites') }}</div>
         </nav>
 
-        <nav v-if="!hidden.includes('projects')" class="hs-group" :aria-label="$t('HomeV2.projects')">
+        <nav v-if="!hidden.includes('projects')" class="hs-group" :aria-label="$t('Home.projects')">
             <div class="hs-label">
-                {{ $t('HomeV2.projects') }}
-                <button v-if="canCreate" type="button" class="hs-label__btn" :title="$t('HomeV2.new_project')" @click="$emit('create-project')"><ShellIcon name="plus" :size="13" /></button>
+                {{ $t('Home.projects') }}
+                <button v-if="canCreate" type="button" class="hs-label__btn" :title="$t('Home.new_project')" @click="$emit('create-project')"><ShellIcon name="plus" :size="13" /></button>
             </div>
             <template v-for="project in projects" :key="project._id">
                 <div class="hs-item" :class="{ 'is-active': isProjectActive(project) }" role="link" tabindex="0" @click="goProject(project)" @keydown.enter="goProject(project)">
                     <span class="hs-item__dot" :style="{ background: projectColor(project) }"></span>
                     <span class="hs-item__text">{{ project.ProjectName }}</span>
-                    <button type="button" class="hs-item__action" :class="{ 'is-on': isPinned(project._id) }" :title="isPinned(project._id) ? $t('HomeV2.unpin') : $t('HomeV2.pin')" @click.stop="togglePin(project)">
+                    <button type="button" class="hs-item__action" :class="{ 'is-on': isPinned(project._id) }" :title="isPinned(project._id) ? $t('Home.unpin') : $t('Home.pin')" @click.stop="togglePin(project)">
                         <ShellIcon name="star" :size="12" />
                     </button>
                     <button type="button" class="hs-item__chev" :class="{ 'is-open': expanded[project._id] }" :aria-expanded="!!expanded[project._id]" @click.stop="toggleExpand(project)">
@@ -68,18 +68,18 @@
                     </router-link>
                 </template>
             </template>
-            <div v-if="!projects.length" class="hs-empty">{{ $t('HomeV2.no_projects') }}</div>
+            <div v-if="!projects.length" class="hs-empty">{{ $t('Home.no_projects') }}</div>
         </nav>
 
         <div class="hs-foot__wrap" @click.stop>
             <transition name="ah-fade">
                 <div v-if="customizeOpen" class="ah-pop hs-foot__pop">
-                    <label class="hs-toggle"><input type="checkbox" class="ah-check" :checked="!hidden.includes('favorites')" @change="toggleSection('favorites')" />{{ $t('HomeV2.show_favorites') }}</label>
-                    <label class="hs-toggle"><input type="checkbox" class="ah-check" :checked="!hidden.includes('projects')" @change="toggleSection('projects')" />{{ $t('HomeV2.show_projects') }}</label>
+                    <label class="hs-toggle"><input type="checkbox" class="ah-check" :checked="!hidden.includes('favorites')" @change="toggleSection('favorites')" />{{ $t('Home.show_favorites') }}</label>
+                    <label class="hs-toggle"><input type="checkbox" class="ah-check" :checked="!hidden.includes('projects')" @change="toggleSection('projects')" />{{ $t('Home.show_projects') }}</label>
                 </div>
             </transition>
             <div class="hs-foot">
-                <button type="button" @click="customizeOpen = !customizeOpen">{{ $t('HomeV2.customize_sidebar') }}</button>
+                <button type="button" @click="customizeOpen = !customizeOpen">{{ $t('Home.customize_sidebar') }}</button>
                 <span>·</span>
                 <button type="button" @click="toggleTheme()">{{ shellState.theme === 'dark' ? $t('Shell.theme_light') : $t('Shell.theme_dark') }}</button>
             </div>

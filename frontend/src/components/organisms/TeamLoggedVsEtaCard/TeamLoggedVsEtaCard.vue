@@ -146,7 +146,7 @@ const load = async () => {
         });
         const d = res && res.data && res.data.status ? (res.data.data || {}) : {};
         teams.value = d.teams || [];
-        meta.note = t('DashV2.lve_note');
+        meta.note = t('Dash.lve_note');
         meta.state = teams.value.length ? 'ready' : 'empty';
     } catch (e) {
         teams.value = [];

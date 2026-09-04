@@ -58,21 +58,13 @@ This prevents:
 - Data scoping bugs (missing companyId)
 
 ### Company-Scoped Multi-Tenancy
-Every operation includes `companyId` for strict data isolation:
-- **Database level:** All queries filtered by companyId
-- **API level:** companyId comes from JWT or request params
-- **Security:** Prevents accidental cross-company data access
+Each company has its own MongoDB database (`${MONGODB_URL}/<companyId>`); users, companies and sessions live in `global`. `MongoDbCrudOpration(companyId, mongoObj, method)` opens (and pools) the connection for that database, so the first argument decides which tenant a query touches. Handlers take it from `tenantOf(req)` (`Config/tenant.js`): the `companyid` header, validated as an ObjectId and checked against the token's audience (`req.aud`).
 
-### Error Propagation via Middleware
-Errors don't throw — they're set on `req.errorMessageObject` and `next()` is called:
-```javascript
-try {
-  // logic
-} catch (error) {
-  req.errorMessageObject = { message: error.message, statusCode: 400 };
-  next();  // Passes to centralized error handler
-}
-```
+### Request pipeline
+`index.js` mounts, in order: CORS → `Config/requestLog.js` (assigns `X-Request-Id`, opens the async context, logs one line on finish) → body parsers (`BODY_LIMIT`) → static `frontend/dist` → `strictStatus` (real 4xx for API tokens and `Prefer: status-codes`) → the JWT guard lists from `Config/setMiddleware.js` (`verifyJWTTokenV2` then `requireCompanyAud`) → every module's `routes.js` → `spaFallback` → `Config/errorHandler.js`.
+
+### Errors
+A handler answers `{ status: false, statusText }` with HTTP 200 (`Config/respond.js` `fail` adds `statusCode` for callers that want it). Anything thrown or passed to `next(err)` reaches `errorHandler`, which logs the stack under the request id and answers `{ status: false, statusText, requestId }`. Process-level `uncaughtException`/`unhandledRejection` go through winston too.
 
 ### Cache Invalidation Pattern
 In-memory cache (node-cache) is invalidated after mutations:
@@ -127,15 +119,15 @@ Socket.io enables live updates when tasks/projects change:
 
 AlianHub supports running a single instance for multiple companies:
 
-1. **Database Isolation:** All collections include `companyId` field
-2. **Request Scoping:** companyId extracted from JWT or request params
-3. **Query Filtering:** Every MongoDB query filtered by companyId
-4. **Storage Scoping:** File uploads organized under company directory
-5. **API Scoping:** Each endpoint validates user belongs to that company
+1. **Database isolation:** one MongoDB database per company, named by its id; `global` holds users, companies, sessions and instance settings
+2. **Request scoping:** `tenantOf(req)` resolves the `companyid` header (params, query, body as fallbacks) and rejects anything outside the token's audience with a `TenantError` (403)
+3. **Query scoping:** `MongoDbCrudOpration(companyId, …)` or `tenantDb(req)(mongoObj, method)`; ESLint rejects a literal or `undefined` tenant in a controller, and `tests/conventions/tenant-scoping` keeps body/query tenant reads from growing
+4. **Storage scoping:** uploads live under the company's bucket or directory
+5. **Membership:** `Config/jwt.js` re-checks the user still belongs to the company (cached `MEMBERSHIP_CACHE_TTL_SECONDS`)
 
-**Security Critical:**
-- Missing `companyId` in query → data leak
-- Hardcoded `companyId` → wrong company access
+**Security critical:**
+- A query against the wrong first argument reads another tenant's database
+- A tenant id taken from the body instead of the header trusts the client
 - JWT validation failure → authentication bypass
 
 ## State Management Layers

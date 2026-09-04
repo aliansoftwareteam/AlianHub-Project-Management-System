@@ -166,6 +166,21 @@ export default [
                 component: () => import(/* webpackChunkName: Notifications */ '@/views/Settings/Notifications/Notifications.vue')
             },
             {
+                path: "instance",
+                name: "Instance",
+                redirect: { name: "InstanceHealth" },
+                meta: { title: "Instance", requiresAuth: true },
+                component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceShell.vue'),
+                children: [
+                    { path: "health", name: "InstanceHealth", meta: { title: "Instance health", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceHealth.vue') },
+                    { path: "settings", name: "InstanceSettings", meta: { title: "Instance settings", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceSettings.vue') },
+                    { path: "backups", name: "InstanceBackups", meta: { title: "Backups", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceBackups.vue') },
+                    { path: "upgrade", name: "InstanceUpgrade", meta: { title: "Upgrade", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceUpgrade.vue') },
+                    { path: "logs", name: "InstanceLogs", meta: { title: "Logs", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceLogs.vue') },
+                    { path: "stats", name: "InstanceStats", meta: { title: "Instance stats", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceStats.vue') },
+                ]
+            },
+            {
                 path: "time-tracking",
                 name: "Time Tracking",
                 meta: {

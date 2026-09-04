@@ -1,14 +1,14 @@
 <template>
     <div class="ah-page rp-page">
         <div class="rp-head">
-            <h1 class="rp-title">{{ sprintName || $t('ReportsV2.sprint_title') }}</h1>
+            <h1 class="rp-title">{{ sprintName || $t('Reports.sprint_title') }}</h1>
             <span v-if="headline" class="rp-meta">{{ headline }}</span>
             <ReportsTabs />
             <div class="rp-actions">
-                <select v-model="projectId" class="rp-select" :aria-label="$t('ReportsV2.project')">
-                    <option v-for="p in projects" :key="p._id" :value="String(p._id)">{{ p.ProjectName || $t('ReportsV2.untitled_project') }}</option>
+                <select v-model="projectId" class="rp-select" :aria-label="$t('Reports.project')">
+                    <option v-for="p in projects" :key="p._id" :value="String(p._id)">{{ p.ProjectName || $t('Reports.untitled_project') }}</option>
                 </select>
-                <select v-model="sprintId" class="rp-select" :aria-label="$t('ReportsV2.sprint')">
+                <select v-model="sprintId" class="rp-select" :aria-label="$t('Reports.sprint')">
                     <option v-for="s in sprintOptions" :key="s._id" :value="s._id">{{ s.name }}</option>
                 </select>
             </div>
@@ -17,8 +17,8 @@
         <p v-if="error" class="rp-error">{{ error }}</p>
 
         <div v-if="!loading && !report" class="rp-empty">
-            <strong>{{ $t('ReportsV2.sprint_none_title') }}</strong>
-            <span>{{ $t('ReportsV2.sprint_none_body') }}</span>
+            <strong>{{ $t('Reports.sprint_none_title') }}</strong>
+            <span>{{ $t('Reports.sprint_none_body') }}</span>
         </div>
 
         <template v-else-if="report">
@@ -40,11 +40,11 @@
             <div class="rp-two">
                 <div class="rp-card">
                     <div class="rp-card__head">
-                        {{ $t('ReportsV2.burndown') }}
-                        <span class="rp-card__note">{{ $t('ReportsV2.burndown_note') }}</span>
+                        {{ $t('Reports.burndown') }}
+                        <span class="rp-card__note">{{ $t('Reports.burndown_note') }}</span>
                     </div>
                     <ApexChart v-if="burndownDays.length" type="line" height="260" :options="burndownOptions" :series="burndownSeries" />
-                    <div v-else class="rp-empty"><span>{{ $t('ReportsV2.burndown_empty') }}</span></div>
+                    <div v-else class="rp-empty"><span>{{ $t('Reports.burndown_empty') }}</span></div>
                 </div>
 
                 <div class="rp-col">
@@ -61,25 +61,25 @@
                             <span class="rp-row__name">{{ row.name }}</span>
                             <span class="rp-row__data">{{ row.meta }}</span>
                         </button>
-                        <span v-if="!focusList.length" class="ah-small">{{ $t('ReportsV2.nothing_here') }}</span>
+                        <span v-if="!focusList.length" class="ah-small">{{ $t('Reports.nothing_here') }}</span>
                     </div>
 
                     <div v-if="blockers.length" class="rp-card">
                         <div class="rp-card__head">
-                            {{ $t('ReportsV2.blocked') }}
-                            <span class="rp-card__note">{{ $t('ReportsV2.blocked_note') }}</span>
+                            {{ $t('Reports.blocked') }}
+                            <span class="rp-card__note">{{ $t('Reports.blocked_note') }}</span>
                         </div>
                         <button v-for="b in blockers" :key="b.taskId" type="button" class="rp-row" @click="open(b)">
                             <span class="rp-dot is-danger"></span>
                             <span class="rp-row__name">{{ b.name }}</span>
-                            <span class="rp-row__data">{{ $t('ReportsV2.blocked_days', { days: b.blockedDays }) }}</span>
+                            <span class="rp-row__data">{{ $t('Reports.blocked_days', { days: b.blockedDays }) }}</span>
                         </button>
                     </div>
 
                     <div class="rp-dark">
                         <div class="rp-dark__head">
                             <span class="rp-dark__mark"><ShellIcon name="reports" :size="13" /></span>
-                            <span>{{ $t('ReportsV2.retro_title') }}</span>
+                            <span>{{ $t('Reports.retro_title') }}</span>
                         </div>
                         <div class="rp-dark__body">
                             <span v-for="(line, i) in retroLines" :key="i">{{ line }} </span>
@@ -121,7 +121,7 @@ const focus = ref('carry');
 
 const sprintOptions = computed(() => (sprints.value || [])
     .filter((s) => s && s.isScrum === true && !s.isBacklog && s.mainChat !== true)
-    .map((s) => ({ _id: String(s._id || s.id), name: s.name || t('ReportsV2.sprint'), startDate: s.startDate }))
+    .map((s) => ({ _id: String(s._id || s.id), name: s.name || t('Reports.sprint'), startDate: s.startDate }))
     .sort((a, b) => new Date(b.startDate || 0) - new Date(a.startDate || 0)));
 
 const sprintName = computed(() => (report.value ? report.value.sprintName : ''));
@@ -140,7 +140,7 @@ const projectName = computed(() => {
 const headline = computed(() => {
     if (!report.value) return '';
     const range = [shortDate(report.value.startDate), shortDate(report.value.endDate)].filter(Boolean).join('–');
-    return [projectName.value, range, t(`ReportsV2.state_${report.value.state || 'planned'}`)].filter(Boolean).join(' · ').toUpperCase();
+    return [projectName.value, range, t(`Reports.state_${report.value.state || 'planned'}`)].filter(Boolean).join(' · ').toUpperCase();
 });
 
 const pts = (group) => Number(group && group.points) || 0;
@@ -157,11 +157,11 @@ const cards = computed(() => {
     if (!report.value) return [];
     const r = report.value;
     return [
-        { key: 'committed', label: t('ReportsV2.committed'), value: pts(r.committed), unit: t('ReportsV2.pts'), tone: '', focusable: true },
-        { key: 'completed', label: t('ReportsV2.completed'), value: pts(r.completed), unit: `${completionPct.value}%`, tone: 'is-ok', focusable: true },
-        { key: 'added', label: t('ReportsV2.added_mid'), value: `+${pts(r.addedAfterStart)}`, unit: t('ReportsV2.n_tasks', { n: tasksOf(r.addedAfterStart) }), tone: 'is-warn', focusable: true },
-        { key: 'carry', label: t('ReportsV2.carry_over'), value: pts(r.unfinished), unit: t('ReportsV2.n_tasks', { n: tasksOf(r.unfinished) }), tone: 'is-danger', focusable: true },
-        { key: 'hours', label: t('ReportsV2.logged_est'), value: `${loggedHours.value}`, unit: `/${plannedHours.value}h`, tone: '', focusable: false },
+        { key: 'committed', label: t('Reports.committed'), value: pts(r.committed), unit: t('Reports.pts'), tone: '', focusable: true },
+        { key: 'completed', label: t('Reports.completed'), value: pts(r.completed), unit: `${completionPct.value}%`, tone: 'is-ok', focusable: true },
+        { key: 'added', label: t('Reports.added_mid'), value: `+${pts(r.addedAfterStart)}`, unit: t('Reports.n_tasks', { n: tasksOf(r.addedAfterStart) }), tone: 'is-warn', focusable: true },
+        { key: 'carry', label: t('Reports.carry_over'), value: pts(r.unfinished), unit: t('Reports.n_tasks', { n: tasksOf(r.unfinished) }), tone: 'is-danger', focusable: true },
+        { key: 'hours', label: t('Reports.logged_est'), value: `${loggedHours.value}`, unit: `/${plannedHours.value}h`, tone: '', focusable: false },
     ];
 });
 
@@ -177,7 +177,7 @@ const scopeAddById = computed(() => {
     return map;
 });
 
-const focusTitle = computed(() => t(`ReportsV2.focus_${focus.value}`));
+const focusTitle = computed(() => t(`Reports.focus_${focus.value}`));
 
 const sprintTasks = computed(() => (insights.value && insights.value.tasks) || []);
 
@@ -190,17 +190,17 @@ const focusList = computed(() => {
             return {
                 ...task,
                 tone: 'is-warn',
-                meta: add && add.by ? t(`ReportsV2.scope_${add.action}_by`, { who: add.by }) : t('ReportsV2.scope_added'),
+                meta: add && add.by ? t(`Reports.scope_${add.action}_by`, { who: add.by }) : t('Reports.scope_added'),
             };
         });
     }
     if (focus.value === 'completed') {
         return sprintTasks.value.filter((task) => task.done)
-            .map((task) => ({ ...task, tone: 'is-ok', meta: t('ReportsV2.points_n', { n: task.points }) }));
+            .map((task) => ({ ...task, tone: 'is-ok', meta: t('Reports.points_n', { n: task.points }) }));
     }
     if (focus.value === 'committed') {
         return sprintTasks.value.filter((task) => task.committed)
-            .map((task) => ({ ...task, tone: task.done ? 'is-ok' : '', meta: t('ReportsV2.points_n', { n: task.points }) }));
+            .map((task) => ({ ...task, tone: task.done ? 'is-ok' : '', meta: t('Reports.points_n', { n: task.points }) }));
     }
     return (r.unfinishedList || []).map((task) => {
         const blocked = blockerById.value[String(task._id)];
@@ -209,8 +209,8 @@ const focusList = computed(() => {
             name: task.TaskName || task.TaskKey || '',
             tone: blocked ? 'is-danger' : (task.movedOut ? 'is-warn' : ''),
             meta: blocked
-                ? t('ReportsV2.blocked_days', { days: blocked.blockedDays })
-                : (task.movedOut ? t('ReportsV2.moved_out') : t('ReportsV2.not_started')),
+                ? t('Reports.blocked_days', { days: blocked.blockedDays })
+                : (task.movedOut ? t('Reports.moved_out') : t('Reports.not_started')),
         };
     });
 });
@@ -218,8 +218,8 @@ const focusList = computed(() => {
 const burndownDays = computed(() => ((burndown.value && burndown.value.days) || []).filter((d) => d));
 
 const burndownSeries = computed(() => [
-    { name: t('ReportsV2.remaining'), data: burndownDays.value.map((d) => (d.remainingPoints === null ? null : Number(d.remainingPoints) || 0)) },
-    { name: t('ReportsV2.ideal'), data: burndownDays.value.map((d) => Number(d.idealPoints) || 0) },
+    { name: t('Reports.remaining'), data: burndownDays.value.map((d) => (d.remainingPoints === null ? null : Number(d.remainingPoints) || 0)) },
+    { name: t('Reports.ideal'), data: burndownDays.value.map((d) => Number(d.idealPoints) || 0) },
 ]);
 
 const scopeMarkers = computed(() => {
@@ -262,7 +262,7 @@ const scopeGrowthPct = computed(() => {
 
 const takeaway = computed(() => {
     if (!report.value) return '';
-    return t('ReportsV2.takeaway', {
+    return t('Reports.takeaway', {
         done: pts(report.value.completed),
         committed: pts(report.value.committed),
         pct: `${completionPct.value}%`,
@@ -276,16 +276,16 @@ const retroLines = computed(() => {
     const lines = [];
     if (blockers.value.length) {
         const oldest = blockers.value[0];
-        lines.push(t('ReportsV2.retro_blocked', { n: blockers.value.length, days: oldest.blockedDays || 0 }));
+        lines.push(t('Reports.retro_blocked', { n: blockers.value.length, days: oldest.blockedDays || 0 }));
     }
     if (pts(report.value.addedAfterStart)) {
-        lines.push(t('ReportsV2.retro_scope', { pct: `${scopeGrowthPct.value}%`, points: pts(report.value.addedAfterStart) }));
+        lines.push(t('Reports.retro_scope', { pct: `${scopeGrowthPct.value}%`, points: pts(report.value.addedAfterStart) }));
     }
     if (plannedHours.value) {
         const delta = Math.round(((loggedHours.value - plannedHours.value) / plannedHours.value) * 100);
-        lines.push(delta >= 0 ? t('ReportsV2.retro_over_hours', { pct: `${delta}%` }) : t('ReportsV2.retro_under_hours', { pct: `${Math.abs(delta)}%` }));
+        lines.push(delta >= 0 ? t('Reports.retro_over_hours', { pct: `${delta}%` }) : t('Reports.retro_under_hours', { pct: `${Math.abs(delta)}%` }));
     }
-    if (!lines.length) lines.push(t('ReportsV2.retro_clean'));
+    if (!lines.length) lines.push(t('Reports.retro_clean'));
     return lines;
 });
 
@@ -335,7 +335,7 @@ const loadReport = async () => {
         apiRequest('post', env.SPRINT_HOURS, { sprintId: sprintId.value }),
     ]);
     if (rep.status === 'fulfilled' && rep.value?.data?.status) report.value = rep.value.data.data;
-    else error.value = (rep.status === 'fulfilled' && rep.value?.data?.statusText) || t('ReportsV2.load_failed');
+    else error.value = (rep.status === 'fulfilled' && rep.value?.data?.statusText) || t('Reports.load_failed');
     if (ins.status === 'fulfilled' && ins.value?.data?.status) insights.value = ins.value.data.data;
     if (burn.status === 'fulfilled' && burn.value?.data?.status) burndown.value = burn.value.data.data;
     if (hrs.status === 'fulfilled' && hrs.value?.data?.status) hours.value = hrs.value.data.data;

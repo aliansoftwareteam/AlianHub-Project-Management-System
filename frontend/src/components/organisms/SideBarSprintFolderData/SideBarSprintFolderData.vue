@@ -27,7 +27,7 @@
             </button>
 
             <span class="sbf__name" :title="data.name">{{ data.name }}</span>
-            <span v-if="allData.isTaskExpanded && items.length" class="ah-mono sbf__count">{{ $t('MembersV2.sprint_tasks', { count: items.length }) }}</span>
+            <span v-if="allData.isTaskExpanded && items.length" class="ah-mono sbf__count">{{ $t('Members.sprint_tasks', { count: items.length }) }}</span>
         </div>
         <div v-if="data.isExpanded && data.sprintsObj && Object.keys(data.sprintsObj).length > 0" class="sbf__children">
             <SideBarSprintFolderData

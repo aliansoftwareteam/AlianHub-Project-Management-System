@@ -15,7 +15,7 @@
                         :value="taskSearch"
                         @input="$emit('update:taskSearch', $event.target.value)"
                     >
-                    <DropDown title="Search In" id="searchfilterdropdownoptions_driver" class="position-ab dropdown-image-horizontal" :bodyClass="{'search__in-dropdown' : true}">
+                    <DropDown :title="$t('Projects.search_in')" id="searchfilterdropdownoptions_driver" class="position-ab dropdown-image-horizontal" :bodyClass="{'search__in-dropdown' : true}">
                         <template #head>
                             <h4 class="black font-size-13 font-weight-500 p-10px m-0 search__in" :class="{'border-bottom': clientWidth > 767}">
                                 {{ $t('Projects.search_in') }}
@@ -107,9 +107,6 @@
                             </DropDownOption>
                         </template>
                     </DropDown>
-                    <!-- All newer features live behind one "…" menu (matches
-                         the task context-menu pattern) instead of nine
-                         separate toolbar buttons. -->
                     <DropDown id="more_features" class="mr-1" :zIndex="10">
                         <template #button>
                             <button class="text-nowrap btn-white border-groupBy border-radius-6-px cursor-pointer" ref="more_features_trigger" :title="$t('Projects.more_features')">
@@ -117,48 +114,13 @@
                             </button>
                         </template>
                         <template #options>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showGlobalSearch = true">
-                                <div><span class="dropdown-label">{{ $t('Projects.global_search') }}</span></div>
-                            </DropDownOption>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showRecent = true">
-                                <div><span class="dropdown-label">{{ $t('Projects.recent_tasks') }}</span></div>
-                            </DropDownOption>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showBurndown = true">
-                                <div><span class="dropdown-label">{{ $t('Projects.burndown') }}</span></div>
-                            </DropDownOption>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showEpics = true">
-                                <div><span class="dropdown-label">{{ $t('Projects.epics') }}</span></div>
-                            </DropDownOption>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showPages = true">
-                                <div><span class="dropdown-label">{{ $t('Projects.pages') }}</span></div>
-                            </DropDownOption>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showExport = true">
-                                <div><span class="dropdown-label">{{ $t('Projects.export_tasks') }}</span></div>
-                            </DropDownOption>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showPublicShare = true">
-                                <div><span class="dropdown-label">{{ $t('Projects.public_link') }}</span></div>
-                            </DropDownOption>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showImportJira = true">
-                                <div><span class="dropdown-label">{{ $t('Projects.import_jira') }}</span></div>
-                            </DropDownOption>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showImportCsv = true">
-                                <div><span class="dropdown-label">{{ $t('Projects.import_csv') }}</span></div>
-                            </DropDownOption>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showImportTrello = true">
-                                <div><span class="dropdown-label">{{ $t('Projects.import_trello') }}</span></div>
-                            </DropDownOption>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showImportAsana = true">
-                                <div><span class="dropdown-label">{{ $t('Projects.import_asana') }}</span></div>
-                            </DropDownOption>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showImportMonday = true">
-                                <div><span class="dropdown-label">{{ $t('Projects.import_monday') }}</span></div>
-                            </DropDownOption>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showAutoArchive = true">
-                                <div><span class="dropdown-label">{{ $t('Projects.auto_archive') }}</span></div>
-                            </DropDownOption>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showEstimationScale = true">
-                                <div><span class="dropdown-label">Estimation scale</span></div>
-                            </DropDownOption>
+                            <template v-for="(group, gi) in moreGroups" :key="group.key">
+                                <div v-if="gi" class="ah-pop__sep"></div>
+                                <div class="ah-label ah-pop__label">{{ $t(`Projects.menu_${group.key}`) }}</div>
+                                <DropDownOption v-for="item in group.items" :key="item.key" @click="$refs.more_features_trigger.click(); item.open()">
+                                    <div><span class="dropdown-label">{{ $t(item.label) }}</span></div>
+                                </DropDownOption>
+                            </template>
                         </template>
                     </DropDown>
                     <GlobalSearchModal v-model="showGlobalSearch" />
@@ -168,18 +130,7 @@
                     <PagesPanel v-model="showPages" :projectData="projectData" />
                     <ExportTasksDropdown v-model="showExport" :projectData="projectData" />
                     <PublicShareModal v-model="showPublicShare" :projectData="projectData" />
-                    <ImportJiraModal v-model="showImportJira" :projectData="projectData" />
-                    <ImportWizard
-                        :showImportModal="showImportCsv"
-                        :projectId="String(projectData?._id || '')"
-                        :taskStatus="projectData?.taskStatusData || []"
-                        :users="projectData?.isPrivateSpace ? (projectData?.AssigneeUserId || []) : users"
-                        :sprint="importSprint"
-                        @toggle-import-modal="showImportCsv = $event"
-                    />
-                    <ImportTrelloModal v-model="showImportTrello" :projectData="projectData" />
-                    <ImportAsanaModal v-model="showImportAsana" :projectData="projectData" />
-                    <ImportMondayModal v-model="showImportMonday" :projectData="projectData" />
+                    <ImportDialog v-model="showImport" :projectData="projectData" :users="users" :sprint="importSprint" />
                     <AutoArchiveModal v-model="showAutoArchive" :projectData="projectData" />
                     <EstimationScaleModal v-model="showEstimationScale" :projectData="projectData" />
                     <div class="mr-1 border-groupBy border-radius-6-px d-flex align-items-center assignee-filter manage__filter-users">
@@ -243,15 +194,15 @@
                         />
                     </div>
                     <div class="mr-1 group_by d-flex">
-                        <button type="button" title="Previous month" class="calendar-button" @click="$emit('prevMonth')">
+                        <button type="button" :title="$t('Projects.prev_month')" class="calendar-button" @click="$emit('prevMonth')">
                             <span class="fc-icon fc-icon-chevron-left"></span>
                         </button>
-                        <button type="button" title="Next month" class="calendar-button" @click="$emit('nextMonth')">
+                        <button type="button" :title="$t('Projects.next_month')" class="calendar-button" @click="$emit('nextMonth')">
                             <span class="fc-icon fc-icon-chevron-right"></span>
                         </button>
                     </div>
                     <div class="mr-1 group_by">
-                        <button type="button" title="This month" class="calendar-button calendar-currentday-text" @click="$emit('defaultMonth')">{{ $t('Home.Today') }}</button>
+                        <button type="button" :title="$t('Projects.this_month')" class="calendar-button calendar-currentday-text" @click="$emit('defaultMonth')">{{ $t('Home.Today') }}</button>
                     </div>
                 </div>
             </div>
@@ -276,11 +227,7 @@ import EpicsPanel from '@/components/molecules/Epics/EpicsPanel.vue';
 import ExportTasksDropdown from '@/components/molecules/ExportTasks/ExportTasksDropdown.vue';
 import PagesPanel from '@/components/molecules/Pages/PagesPanel.vue';
 import PublicShareModal from '@/components/molecules/PublicShare/PublicShareModal.vue';
-import ImportJiraModal from '@/components/molecules/ImportJira/ImportJiraModal.vue';
-import ImportWizard from '@/plugins/importTasks/components/organisms/ImportWizard/ImportWizard.vue';
-import ImportTrelloModal from '@/components/molecules/ImportTrello/ImportTrelloModal.vue';
-import ImportAsanaModal from '@/components/molecules/ImportAsana/ImportAsanaModal.vue';
-import ImportMondayModal from '@/components/molecules/ImportMonday/ImportMondayModal.vue';
+import ImportDialog from '@/components/organisms/ImportDialog/ImportDialog.vue';
 import AutoArchiveModal from '@/components/molecules/AutoArchive/AutoArchiveModal.vue';
 import EstimationScaleModal from '@/components/molecules/EstimationScale/EstimationScaleModal.vue';
 
@@ -289,15 +236,35 @@ const showGlobalSearch = ref(false);
 const showEpics = ref(false);
 const showPages = ref(false);
 const showPublicShare = ref(false);
-const showImportJira = ref(false);
-const showImportCsv = ref(false);
-const showImportTrello = ref(false);
-const showImportAsana = ref(false);
-const showImportMonday = ref(false);
+const showImport = ref(false);
 const showAutoArchive = ref(false);
 const showEstimationScale = ref(false);
 const showRecent = ref(false);
 const showExport = ref(false);
+
+const opener = (flag) => () => { flag.value = true; };
+const moreGroups = [
+    { key: 'find', items: [
+        { key: 'search', label: 'Projects.global_search', open: opener(showGlobalSearch) },
+        { key: 'recent', label: 'Projects.recent_tasks', open: opener(showRecent) }
+    ] },
+    { key: 'insights', items: [
+        { key: 'burndown', label: 'Projects.burndown', open: opener(showBurndown) },
+        { key: 'epics', label: 'Projects.epics', open: opener(showEpics) },
+        { key: 'pages', label: 'Projects.pages', open: opener(showPages) }
+    ] },
+    { key: 'share', items: [
+        { key: 'export', label: 'Projects.export_tasks', open: opener(showExport) },
+        { key: 'public', label: 'Projects.public_link', open: opener(showPublicShare) }
+    ] },
+    { key: 'import', items: [
+        { key: 'import', label: 'Projects.import_any', open: opener(showImport) }
+    ] },
+    { key: 'settings', items: [
+        { key: 'autoArchive', label: 'Projects.auto_archive', open: opener(showAutoArchive) },
+        { key: 'estimation', label: 'Projects.estimation_scale', open: opener(showEstimationScale) }
+    ] }
+];
 import { useCustomComposable } from '@/composable';
 import AppTeaserBlock from '@/components/molecules/AppTeaserBlock/AppTeaserBlock.vue';
 

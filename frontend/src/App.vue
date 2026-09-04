@@ -2,6 +2,7 @@
 	<div v-if="!underMaintainance">
 		<OfflineBanner/>
 		<DemoBanner/>
+		<MaintenanceBanner/>
 		<template v-if="$route.meta.requiresAuth">
 			<template v-if="logged && (rules && Object.keys(rules).length && companyUserDetail && Object.keys(companyUserDetail).length) && socket">
                 <!-- Mounted at the root so an incoming call rings wherever the user is,
@@ -108,6 +109,7 @@
 import { computed, defineComponent, onMounted, provide, ref, watch, inject} from 'vue'
 // COMPONENTS
 import TourCom from "@/components/organisms/Tour/TourComponet.vue"
+import MaintenanceBanner from "@/views/Settings/Instance/MaintenanceBanner.vue"
 import HeaderComponent from '@/components/organisms/Header/Header.vue'
 import GlobalRail from '@/components/organisms/Shell/GlobalRail.vue'
 import MobileTabBar from '@/components/organisms/Shell/MobileTabBar.vue'
@@ -824,6 +826,7 @@ onMounted(() => {
             console.error('ERROR in set Set Brand Settings',error)
         })
     }
+    dispatch('brandSettingTab/setPublicConfig');
     getFirebaseData();
     initOffline();
     userId.value = localStorage.getItem("userId") !== null ? localStorage.getItem("userId") :  '';

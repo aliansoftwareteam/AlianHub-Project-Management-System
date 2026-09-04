@@ -397,7 +397,7 @@ exports.updateUnReadCommentsCountFun = (req) => {
                                     }]
                                 }
                         
-                                mongoCm.MongoDbCrudOpration(companyId, obj, "find").then((data) => {
+                                mongoCm.MongoDbCrudOpration(req.body.companyId, obj, "find").then((data) => {
                                     if (!(data && data.length)) {
                                         return;
                                     }
@@ -422,7 +422,7 @@ exports.updateUnReadCommentsCountFun = (req) => {
                                             ]
                                         }
                         
-                                        mongoCm.MongoDbCrudOpration(companyId, updateObj, "findOneAndUpdate")
+                                        mongoCm.MongoDbCrudOpration(req.body.companyId, updateObj, "findOneAndUpdate")
                                         .then((updatedDoc) => {
                                             socketEmitter.emit('update', { 
                                                 type: "update", 
@@ -453,7 +453,7 @@ exports.updateUnReadCommentsCountFun = (req) => {
                                         }]
                                     }
                             
-                                    mongoCm.MongoDbCrudOpration(companyId, obj, "find").then((data) => {
+                                    mongoCm.MongoDbCrudOpration(req.body.companyId, obj, "find").then((data) => {
                                         if (!(data && data.length)) {
                                             return;
                                         }
@@ -478,7 +478,7 @@ exports.updateUnReadCommentsCountFun = (req) => {
                                                 ]
                                             }
                             
-                                            mongoCm.MongoDbCrudOpration(companyId, updateObj, "findOneAndUpdate")
+                                            mongoCm.MongoDbCrudOpration(req.body.companyId, updateObj, "findOneAndUpdate")
                                             .then((updatedDoc) => {
                                                 socketEmitter.emit('update', { 
                                                     type: "update", 
@@ -616,7 +616,7 @@ exports.updateUnReadCommentsCountFun = (req) => {
             }
         })
     } catch (error) {
-        reject({
+        return Promise.reject({
             status: false,
             err: error
         })

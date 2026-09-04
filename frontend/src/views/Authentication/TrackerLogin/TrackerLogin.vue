@@ -2,9 +2,9 @@
     <AuthShell :proof="false">
         <div class="av2-auth-card">
             <div class="auth__glyph auth__glyph--brand"><ShellIcon name="time" :size="15" /></div>
-            <h2 class="auth__h">{{ $t('AuthV2.tracker_title') }}</h2>
-            <p class="auth__p">{{ $t('AuthV2.tracker_body') }}</p>
-            <button type="button" class="ah-btn ah-btn--primary ah-btn--block ah-btn--lg" @click="redirect">{{ $t('AuthV2.tracker_continue') }}</button>
+            <h2 class="auth__h">{{ $t('Auth.tracker_title') }}</h2>
+            <p class="auth__p">{{ $t('Auth.tracker_body') }}</p>
+            <button type="button" class="ah-btn ah-btn--primary ah-btn--block ah-btn--lg" @click="redirect">{{ $t('Auth.tracker_continue') }}</button>
         </div>
     </AuthShell>
 </template>

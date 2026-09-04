@@ -1,6 +1,7 @@
 const { SCHEMA_TYPE } = require("../../Config/schemaType.js");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries.js");
 const iCtr = require('../ImportSettings/controller.js');
+const { ensureNotificationDefaults } = require('../notification/defaults');
 const helperCtr = require('../Auth/controller/helper.js');
 const logger = require('../../Config/loggerConfig.js');
 const { addAndRemoveUserInMongodbNotificationCount } = require("../Auth/controller.js");
@@ -463,7 +464,7 @@ exports.sendMailAfterCompanyCreation = (allSettledRes, companyId, req) => {
         serviceCtr.sendAttachMail(subject, html, toMail, null, () => {
             logger.info(`Company Creation Error Email Send Successfully (${companyId}).`);
         });
-    };
+    }
 };
 
 /**
@@ -574,6 +575,7 @@ exports.createCompanyV2 = (req, res) => {
                     if (process.env.PAYMENTMETHOD) {
                         paymentObj = allSettledRes[4].status === "fulfilled" ? allSettledRes[4].value : {}
                     }
+                    await ensureNotificationDefaults(companyId, bodyData.userId).catch((error) => logger.error(`notification defaults: ${error.message}`));
                     await storeRefferalCode(companyId,bodyData.userId);
                     if (req.body.refferalCode && req.body.refferalCode !== '') {
                        await checkAndStoreRefferalCode(req.body.refferalCode,companyId,bodyData.userId);
@@ -745,7 +747,7 @@ exports.deleteCompany = (req, res) => {
                     });
                 })
             } catch (err) {
-                res.send({ status: false, statusText: error});
+                res.send({ status: false, statusText: err});
                 console.error(err,"ERROR IN CLOSE CONNECTION");
             }
         }).catch((error) => {

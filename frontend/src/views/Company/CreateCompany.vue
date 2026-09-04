@@ -4,16 +4,16 @@
     </div>
     <AuthShell v-else :proof="false">
         <template #top-right>
-            <span v-if="stage !== 'creating'" class="av2-step">{{ $t('AuthV2.step', { a: stage === 'name' ? 2 : 3, b: 3 }) }}</span>
+            <span v-if="stage !== 'creating'" class="av2-step">{{ $t('Auth.step', { a: stage === 'name' ? 2 : 3, b: 3 }) }}</span>
         </template>
 
         <form v-if="stage === 'name'" class="av2-auth-card" novalidate @submit.prevent="toFocus">
-            <h2 class="auth__h">{{ $t('AuthV2.name_workspace') }}</h2>
-            <p class="auth__p">{{ $t('AuthV2.name_workspace_lead') }}</p>
+            <h2 class="auth__h">{{ $t('Auth.name_workspace') }}</h2>
+            <p class="auth__p">{{ $t('Auth.name_workspace_lead') }}</p>
             <div class="av2-ws">
                 <span class="av2-ws-mark">{{ initial }}</span>
                 <div class="ah-field">
-                    <label class="ah-field__label ah-sr-only" for="ws-name">{{ $t('AuthV2.name_workspace') }}</label>
+                    <label class="ah-field__label ah-sr-only" for="ws-name">{{ $t('Auth.name_workspace') }}</label>
                     <input
                         id="ws-name"
                         ref="nameInput"
@@ -23,7 +23,7 @@
                         :class="{ 'ah-input--error': errors.name }"
                         maxlength="60"
                         autocomplete="organization"
-                        :placeholder="$t('AuthV2.workspace_placeholder')"
+                        :placeholder="$t('Auth.workspace_placeholder')"
                         :aria-invalid="!!errors.name"
                         @input="errors.name = ''"
                     />
@@ -32,7 +32,7 @@
             <div v-if="errors.name" class="ah-field__error" style="margin:-8px 0 12px"><ShellIcon name="x" :size="12" />{{ errors.name }}</div>
 
             <div class="ah-field" style="margin-bottom:16px">
-                <span class="ah-field__label">{{ $t('AuthV2.team_size') }}</span>
+                <span class="ah-field__label">{{ $t('Auth.team_size') }}</span>
                 <div class="av2-chips" role="radiogroup">
                     <button
                         v-for="size in TEAM_SIZES"
@@ -48,7 +48,7 @@
             </div>
 
             <div v-if="affiliateOn" class="ah-field" style="margin-bottom:16px">
-                <label class="ah-field__label" for="ws-ref">{{ $t('AuthV2.referral_code') }}</label>
+                <label class="ah-field__label" for="ws-ref">{{ $t('Auth.referral_code') }}</label>
                 <input
                     id="ws-ref"
                     v-model.trim="form.referral"
@@ -64,14 +64,14 @@
 
             <button type="submit" class="ah-btn ah-btn--primary ah-btn--block ah-btn--lg">{{ $t('Auth.continue') }}</button>
             <div class="auth__links" style="margin-top:28px">
-                <span class="ah-small">{{ $t('AuthV2.joining_team') }} <button type="button" class="av2-link-btn" @click="logOut()">{{ $t('AuthV2.use_invite_link') }}</button></span>
+                <span class="ah-small">{{ $t('Auth.joining_team') }} <button type="button" class="av2-link-btn" @click="logOut()">{{ $t('Auth.use_invite_link') }}</button></span>
                 <button type="button" class="av2-link-btn av2-link-btn--muted" @click="logOut()">{{ $t('Auth.backlogin') }}</button>
             </div>
         </form>
 
         <div v-else-if="stage === 'focus'" class="av2-auth-card">
-            <h2 class="auth__h">{{ $t('AuthV2.focus_title') }}</h2>
-            <p class="auth__p" style="margin-bottom:16px">{{ $t('AuthV2.focus_lead') }}</p>
+            <h2 class="auth__h">{{ $t('Auth.focus_title') }}</h2>
+            <p class="auth__p" style="margin-bottom:16px">{{ $t('Auth.focus_lead') }}</p>
             <div v-if="banner" class="auth__banner auth__banner--danger"><ShellIcon name="alert" :size="15" /><span>{{ banner }}</span></div>
             <div class="av2-grid" role="radiogroup">
                 <button
@@ -83,11 +83,11 @@
                     role="radio"
                     :aria-checked="form.focus === f"
                     @click="form.focus = f"
-                >{{ $t(`AuthV2.focus_${f}`) }}</button>
+                >{{ $t(`Auth.focus_${f}`) }}</button>
             </div>
-            <button type="button" class="ah-btn ah-btn--primary ah-btn--block ah-btn--lg" style="margin-top:14px" :disabled="!form.focus" @click="create(true)">{{ $t('AuthV2.open_workspace') }}</button>
+            <button type="button" class="ah-btn ah-btn--primary ah-btn--block ah-btn--lg" style="margin-top:14px" :disabled="!form.focus" @click="create(true)">{{ $t('Auth.open_workspace') }}</button>
             <div class="auth__links" style="margin-top:28px">
-                <button type="button" class="av2-link-btn av2-link-btn--muted" @click="create(false)">{{ $t('AuthV2.skip_blank') }}</button>
+                <button type="button" class="av2-link-btn av2-link-btn--muted" @click="create(false)">{{ $t('Auth.skip_blank') }}</button>
                 <button type="button" class="av2-link-btn av2-link-btn--muted" @click="stage = 'name'">{{ $t('Auth.back') }}</button>
             </div>
         </div>
@@ -125,7 +125,7 @@ const userId = inject("$userId");
 const companyId = inject("$companyId");
 
 const TEAM_SIZES = [
-    { value: "1", label: t("AuthV2.size_just_me") },
+    { value: "1", label: t("Auth.size_just_me") },
     { value: "2-15", label: "2–15" },
     { value: "16-50", label: "16–50" },
     { value: "50+", label: "50+" }
@@ -184,9 +184,9 @@ const checkReferral = debounce(async () => {
 
 const toFocus = () => {
     const name = form.name.trim();
-    errors.name = !name ? t("AuthV2.workspace_required")
-        : name.length < 3 ? t("AuthV2.workspace_short")
-        : companies.value.some((x) => (x.Cst_CompanyName || "").toLowerCase().trim() === name.toLowerCase()) ? t("AuthV2.workspace_taken")
+    errors.name = !name ? t("Auth.workspace_required")
+        : name.length < 3 ? t("Auth.workspace_short")
+        : companies.value.some((x) => (x.Cst_CompanyName || "").toLowerCase().trim() === name.toLowerCase()) ? t("Auth.workspace_taken")
         : "";
     if (errors.name || errors.referral) return;
     stage.value = "focus";
@@ -202,20 +202,20 @@ const create = (withSample) => {
     banner.value = "";
     stage.value = "creating";
     progress.value = 8;
-    statusText.value = t("AuthV2.creating_workspace");
+    statusText.value = t("Auth.creating_workspace");
     const evId = `ev_${makeUniqueId(12)}`;
     const source = new EventSource(`${env.API_URI}/company-create/events/${evId}`);
     let done = false;
     source.onmessage = (event) => {
         const data = JSON.parse(event.data)?.data;
-        if (data?.step === 1) { progress.value = 35; statusText.value = t("AuthV2.creating_workspace"); return; }
-        if (data?.step === 2) { progress.value = 70; statusText.value = t("AuthV2.seeding_sample"); return; }
+        if (data?.step === 1) { progress.value = 35; statusText.value = t("Auth.creating_workspace"); return; }
+        if (data?.step === 2) { progress.value = 70; statusText.value = t("Auth.seeding_sample"); return; }
         source.close();
         if (done) return;
         done = true;
-        if (data?.error) { fail(data.freeCompanyLimitReached ? t("AuthV2.free_limit") : t("AuthV2.workspace_failed")); return; }
+        if (data?.error) { fail(data.freeCompanyLimitReached ? t("Auth.free_limit") : t("Auth.workspace_failed")); return; }
         progress.value = 100;
-        statusText.value = t("AuthV2.workspace_ready");
+        statusText.value = t("Auth.workspace_ready");
         localStorage.setItem("selectedCompany", data?.companyId || "");
         localStorage.removeItem("isLogging");
         Cookies.remove("refferCode");
@@ -223,7 +223,7 @@ const create = (withSample) => {
             router.push({ name: "Home", params: { cid: data?.companyId || "" } }).then(() => window.location.reload());
         }, 600);
     };
-    source.onerror = () => { source.close(); if (!done) { done = true; fail(t("AuthV2.workspace_failed")); } };
+    source.onerror = () => { source.close(); if (!done) { done = true; fail(t("Auth.workspace_failed")); } };
 
     apiRequestWithoutCompnay("post", env.CREATE_COMPANY, {
         userId: userId.value,
@@ -250,11 +250,11 @@ const create = (withSample) => {
     }).then((res) => {
         if (res.data.status === true) return;
         source.close();
-        if (!done) { done = true; fail(res.data?.freeCompanyLimitReached ? t("AuthV2.free_limit") : t("AuthV2.workspace_failed")); }
+        if (!done) { done = true; fail(res.data?.freeCompanyLimitReached ? t("Auth.free_limit") : t("Auth.workspace_failed")); }
     }).catch((err) => {
         console.error("ERROR IN CREATE COMPANY", err);
         source.close();
-        if (!done) { done = true; fail(t("AuthV2.workspace_failed")); }
+        if (!done) { done = true; fail(t("Auth.workspace_failed")); }
     });
 };
 </script>

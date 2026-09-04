@@ -5,7 +5,7 @@
                 <span class="ah-avatar ah-avatar--lg st__company" :title="companyName">{{ companyInitial }}</span>
                 <span class="st__company-name" :title="companyName">{{ companyName }}</span>
             </div>
-            <nav class="st__nav ah-scroll" :aria-label="$t('SettingsV2.nav_aria')">
+            <nav class="st__nav ah-scroll" :aria-label="$t('Settings.nav_aria')">
                 <div v-for="group in groups" :key="group.key" class="st__group">
                     <div class="ah-label st__group-label">{{ $t(group.label) }}</div>
                     <router-link
@@ -27,11 +27,11 @@
             <div v-if="narrow && drawer" class="st__scrim" @click="drawer = false"></div>
         </transition>
         <transition name="st-drawer">
-            <aside v-if="narrow && drawer" class="st__side st__side--drawer" role="dialog" :aria-label="$t('SettingsV2.nav_aria')">
+            <aside v-if="narrow && drawer" class="st__side st__side--drawer" role="dialog" :aria-label="$t('Settings.nav_aria')">
                 <div class="st__side-head">
                     <span class="ah-avatar ah-avatar--lg st__company">{{ companyInitial }}</span>
                     <span class="st__company-name">{{ companyName }}</span>
-                    <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm st__close" :aria-label="$t('SettingsV2.close')" @click="drawer = false"><ShellIcon name="x" :size="16" /></button>
+                    <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm st__close" :aria-label="$t('Settings.close')" @click="drawer = false"><ShellIcon name="x" :size="16" /></button>
                 </div>
                 <nav class="st__nav ah-scroll">
                     <div v-for="group in groups" :key="group.key" class="st__group">
@@ -47,14 +47,14 @@
 
         <div class="st__main">
             <header class="ah-toolbar st__toolbar">
-                <button v-if="narrow" type="button" class="ah-btn ah-btn--ghost ah-btn--sm st__menu" :aria-label="$t('SettingsV2.open_menu')" @click="drawer = true">
+                <button v-if="narrow" type="button" class="ah-btn ah-btn--ghost ah-btn--sm st__menu" :aria-label="$t('Settings.open_menu')" @click="drawer = true">
                     <ShellIcon name="menu" :size="18" />
                 </button>
                 <h1 class="ah-toolbar__title">{{ pageTitle }}</h1>
                 <div class="ah-toolbar__spacer"></div>
                 <div id="top_section" class="st__toolbar-slot"></div>
                 <button v-if="route.name === 'Teams' && canCreateTeam" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="openTeamSidebar = true">
-                    <ShellIcon name="plus" :size="14" /> {{ $t('SettingsV2.new_team') }}
+                    <ShellIcon name="plus" :size="14" /> {{ $t('Settings.new_team') }}
                 </button>
                 <button v-if="route.name === 'Settings-Projects' && canCreateProject" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="isActiveCreateSidebar = true">
                     <ShellIcon name="plus" :size="14" /> {{ $t('Settings.add_new_projects') }}
@@ -82,6 +82,8 @@ import CreateProjectSidebar from "@/components/organisms/CreateProject/CreatePro
 import { customField } from "@/plugins/customFieldView/helper.js";
 import chargebeeRouter from "@/plugins/chargebee/router";
 import paddleRouter from "@/plugins/paddle/router.js";
+import { apiRequestWithoutCompnay } from "@/services";
+import * as env from "@/config/env";
 
 defineOptions({ name: "SettingsShell" });
 
@@ -119,38 +121,59 @@ const membersVisible = () => checkPermission("settings.settings_role_management"
 
 const hasBilling = computed(() => !!(chargebeeRouter.upgradeTab || paddleRouter.upgradeTab) && isOwner.value && router.hasRoute("Upgrade"));
 
+// The Instance group belongs to the account that set the instance up (users.isProductOwner),
+// which the server decides; a member never sees it.
+const instanceAdmin = ref(false);
+onMounted(() => {
+    apiRequestWithoutCompnay("get", env.INSTANCE_ACCESS)
+        .then((res) => { instanceAdmin.value = res?.data?.data?.allowed === true; })
+        .catch(() => { instanceAdmin.value = false; });
+});
+
 const to = (name) => ({ name, params: { cid: companyId.value } });
 const label = (key) => (te(key) ? t(key) : key);
 
 const rawGroups = computed(() => [
     {
         key: "personal",
-        label: "SettingsV2.group_personal",
+        label: "Settings.group_personal",
         items: [
-            { key: "profile", text: t("SettingsV2.nav_my_settings"), icon: "user", to: to("My Profile"), names: ["My Profile"], show: true },
-            { key: "notifications", text: t("SettingsV2.nav_notifications"), icon: "bell", to: to("Notifications"), names: ["Notifications"], show: true },
-            { key: "signin", text: t("SettingsV2.nav_signin_security"), icon: "lock", to: to("twoFactorAuth"), names: ["twoFactorAuth", "changePassword"], show: true },
+            { key: "profile", text: t("Settings.nav_my_settings"), icon: "user", to: to("My Profile"), names: ["My Profile"], show: true },
+            { key: "notifications", text: t("Settings.nav_notifications"), icon: "bell", to: to("Notifications"), names: ["Notifications"], show: true },
+            { key: "signin", text: t("Settings.nav_signin_security"), icon: "lock", to: to("twoFactorAuth"), names: ["twoFactorAuth", "changePassword"], show: true },
             { key: "company", text: label("settingslider.Company"), icon: "switch", to: to("Company"), names: ["Company"], show: true }
         ]
     },
     {
         key: "workspace",
-        label: "SettingsV2.group_workspace",
+        label: "Settings.group_workspace",
         items: [
-            { key: "general", text: t("SettingsV2.nav_general"), icon: "settings", to: to("Setting"), names: ["Setting"], show: anyVisible(["settings.settings_edit_company", "settings.settings_task_priority", "settings.settings_file_extensions", "settings.settings_project_milestone_status"]) },
+            { key: "general", text: t("Settings.nav_general"), icon: "settings", to: to("Setting"), names: ["Setting"], show: anyVisible(["settings.settings_edit_company", "settings.settings_task_priority", "settings.settings_file_extensions", "settings.settings_project_milestone_status"]) },
             { key: "members", text: label("settingslider.Members"), icon: "members", to: to("Members"), names: ["Members"], show: membersVisible() },
             { key: "teams", text: label("settingslider.Teams"), icon: "members", to: to("Teams"), names: ["Teams"], show: checkPermission("settings.settings_team_list") !== null },
             { key: "projects", text: label("settingslider.Projects"), icon: "projects", to: to("Settings-Projects"), names: ["Settings-Projects"], show: checkPermission("settings.settings_project_list") !== null },
             ...tabRouteHelper().map((tab) => ({ key: tab.to.name, text: label(`settingslider.${tab.label}`), icon: "automations", to: to(tab.to.name), names: [tab.to.name], show: tab.permissions ? anyVisible(tab.permissions) : !!tab.isVisible })),
-            { key: "security", text: t("SettingsV2.nav_security_permissions"), icon: "shield", to: to("Security & Permissions"), names: ["Security & Permissions"], show: checkPermission("settings.settings_security_permissions") !== null },
-            { key: "sso", text: t("SettingsV2.nav_signin_sso"), icon: "key", to: to("SsoSettings"), names: ["SsoSettings"], show: isOwnerOrAdmin.value },
+            { key: "security", text: t("Settings.nav_security_permissions"), icon: "shield", to: to("Security & Permissions"), names: ["Security & Permissions"], show: checkPermission("settings.settings_security_permissions") !== null },
+            { key: "sso", text: t("Settings.nav_signin_sso"), icon: "key", to: to("SsoSettings"), names: ["SsoSettings"], show: isOwnerOrAdmin.value },
             { key: "scim", text: label("settingslider.SCIM"), icon: "integrations", to: to("ScimSettings"), names: ["ScimSettings"], show: isOwnerOrAdmin.value },
             { key: "integrations", text: label("settingslider.Integrations"), icon: "integrations", to: to("Integrations"), names: ["Integrations"], show: true },
             { key: "templates", text: label("settingslider.Templates"), icon: "template", to: to("Template"), names: ["Template"], show: true },
             { key: "timeoff", text: label("settingslider.Time Off"), icon: "planner", to: to("TimeOff"), names: ["TimeOff"], show: true },
             { key: "timetracking", text: label("settingslider.Time Tracking"), icon: "time", to: to("Time Tracking"), names: ["Time Tracking"], show: true },
             { key: "audit", text: label("settingslider.Audit Log"), icon: "audit", to: to("AuditLog"), names: ["AuditLog"], show: isOwnerOrAdmin.value },
-            { key: "billing", text: t("SettingsV2.nav_billing"), icon: "billing", to: to("Upgrade"), names: ["Upgrade"], show: hasBilling.value }
+            { key: "billing", text: t("Settings.nav_billing"), icon: "billing", to: to("Upgrade"), names: ["Upgrade"], show: hasBilling.value }
+        ]
+    },
+    {
+        key: "instance",
+        label: "Instance.group",
+        items: [
+            { key: "instance-health", text: t("Instance.nav_health"), icon: "monitor", to: to("InstanceHealth"), names: ["InstanceHealth"], show: instanceAdmin.value },
+            { key: "instance-settings", text: t("Instance.nav_settings"), icon: "settings", to: to("InstanceSettings"), names: ["InstanceSettings"], show: instanceAdmin.value },
+            { key: "instance-backups", text: t("Instance.nav_backups"), icon: "download", to: to("InstanceBackups"), names: ["InstanceBackups"], show: instanceAdmin.value },
+            { key: "instance-upgrade", text: t("Instance.nav_upgrade"), icon: "refresh", to: to("InstanceUpgrade"), names: ["InstanceUpgrade"], show: instanceAdmin.value },
+            { key: "instance-logs", text: t("Instance.nav_logs"), icon: "file", to: to("InstanceLogs"), names: ["InstanceLogs"], show: instanceAdmin.value },
+            { key: "instance-stats", text: t("Instance.nav_stats"), icon: "reports", to: to("InstanceStats"), names: ["InstanceStats"], show: instanceAdmin.value }
         ]
     }
 ]);

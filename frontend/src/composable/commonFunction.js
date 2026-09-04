@@ -2,6 +2,7 @@ import { WASABI_RETRIVE_OBJECT, WASABI_RETRIVE_USER_PROFILE } from "@/config/env
 import { apiRequest, apiRequestWithoutCompnay } from "@/services";
 import { getMessaging, getToken } from "firebase/messaging";
 import Store from '@/store/index'
+import { enabledProviders } from '@/config/publicConfig'
 import { computed } from "vue";
 import * as env from '@/config/env';
 import moment from 'moment';
@@ -281,6 +282,9 @@ export const projectAppsIcons = (key) => {
     const result = data.filter(x => x.key === key);
     return result[0];
 }
+
+/* Older seeds stored a cloud path the bucket never had; those render from the bundled PNGs. */
+export const isBundledPriorityImage = (image) => !image || String(image).startsWith('taskPriorities/');
 
 export const companyPrioritiesIcons = (key) => {
 
@@ -947,8 +951,5 @@ export const escapeCSVValue = (value) => {
 }
 
 export const isAuthDeviderShow = () => {
-    const isAuthWithGoogle = process.env.VUE_APP_IS_GOOGLE_LOGIN || null;
-    const isAuthWithGithub = process.env.VUE_APP_IS_GITHUB_LOGIN || null;
-    const isAuthWithGitlab = process.env.VUE_APP_IS_GITLAB_LOGIN || null;
-    return (isAuthWithGoogle && isAuthWithGoogle === 'true') || (isAuthWithGithub && isAuthWithGithub === 'true') || (isAuthWithGitlab && isAuthWithGitlab === 'true')
+    return enabledProviders().length > 0;
 }

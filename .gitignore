@@ -1,16 +1,10 @@
 chargebee-setup
 paddle-setup
 server-storage-setup
-migrations
-/migrate-mongo-config.js
 .DS_Store
 node_modules
 jspm_packages
 /frontend/dist
-/installation/dist
-/admin/dist
-installation-saas-backup
-checkinstallstep-saas-backup
 
 # local env files
 .env.local
@@ -27,6 +21,7 @@ log/
 *.log
 
 # Runtime generated upload/storage directories
+/storage/
 wasabiUploads/
 wasabiUploadsLocal/
 thumbnails/
@@ -141,3 +136,7 @@ frontend/public/firebase-messaging-sw.js
 /storage/firebase-adminsdk.json
 /firebase-adminsdk.json
 package-lock.json
+# Backups written by Settings > Instance > Backups
+/backups
+
+.claude/worktrees/

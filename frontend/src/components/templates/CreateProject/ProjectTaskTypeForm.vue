@@ -98,7 +98,7 @@ const { t } = useI18n();
     const isTaskSidebarOpen = ref(false);
     const statusOPtion = ref([]);
     const isDelete = ref(false);
-    const hanldeProjectTaktypeTour = inject("hanldeProjectTaktypeTour");
+    const hanldeProjectTaktypeTour = inject("hanldeProjectTaktypeTour", null);
     onMounted(() => {
         taskTypeTemplates.value = JSON.parse(JSON.stringify(getters['settings/taskType']));
         emit('update:modelValue', theModel.value);
