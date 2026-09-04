@@ -1,6 +1,7 @@
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const { tenantOf } = require("../../Config/tenant");
+const { fail } = require("../../Config/respond");
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const socketEmitter = require("../../event/socketEventEmitter");
@@ -148,7 +149,7 @@ exports.createPage = async (req, res) => {
         return res.send({ status: true, statusText: 'Page created.', data: created });
     } catch (error) {
         logger.error(`ERROR in create page: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
@@ -199,7 +200,7 @@ exports.listPages = async (req, res) => {
         return res.send({ status: true, statusText: 'Pages fetched.', data: (pages || []).map(toListRow) });
     } catch (error) {
         logger.error(`ERROR in list pages: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
@@ -228,7 +229,7 @@ exports.getPage = async (req, res) => {
         return res.send({ status: true, statusText: 'Page fetched.', data });
     } catch (error) {
         logger.error(`ERROR in get page: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
@@ -311,7 +312,7 @@ exports.updatePage = async (req, res) => {
         return res.send({ status: true, statusText: 'Page saved.', data: updated });
     } catch (error) {
         logger.error(`ERROR in update page: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
@@ -365,7 +366,7 @@ exports.markReviewed = async (req, res) => {
         return res.send({ status: true, statusText: 'Page marked as reviewed.', data });
     } catch (error) {
         logger.error(`ERROR in mark page reviewed: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
@@ -390,7 +391,7 @@ exports.approvePage = async (req, res) => {
         return res.send({ status: true, statusText: 'Page approved.', data: updated });
     } catch (error) {
         logger.error(`ERROR in approve page: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
@@ -413,7 +414,7 @@ exports.restorePage = async (req, res) => {
         return res.send({ status: true, statusText: 'Page restored.', data: updated });
     } catch (error) {
         logger.error(`ERROR in restore page: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
@@ -464,7 +465,7 @@ exports.deletePage = async (req, res) => {
         return res.send({ status: true, statusText: 'Page deleted.', data: { deleted: doomed.length } });
     } catch (error) {
         logger.error(`ERROR in delete page: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
@@ -519,6 +520,6 @@ exports.composeWithAi = async (req, res) => {
         return res.send({ status: true, statusText: 'Composed.', data: result.data });
     } catch (error) {
         logger.error(`ERROR in page AI compose: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };

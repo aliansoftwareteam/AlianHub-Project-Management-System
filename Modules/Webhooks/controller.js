@@ -1,6 +1,7 @@
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const { tenantOf } = require("../../Config/tenant");
+const { fail } = require("../../Config/respond");
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { validateWebhookInput, isObjectIdString, generateSecret, EVENT_TYPES } = require('./helpers/webhookRules');
@@ -95,7 +96,7 @@ exports.createWebhook = async (req, res) => {
         return res.send({ status: true, statusText: 'Webhook created. Store the secret now — it is not shown again.', data: { ...maskHook(created), secret } });
     } catch (error) {
         logger.error(`ERROR in create webhook: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
@@ -113,7 +114,7 @@ exports.listWebhooks = async (req, res) => {
         return res.send({ status: true, statusText: 'Webhooks fetched.', data: (hooks || []).map(maskHook) });
     } catch (error) {
         logger.error(`ERROR in list webhooks: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
@@ -165,7 +166,7 @@ exports.updateWebhook = async (req, res) => {
         return res.send({ status: true, statusText: 'Webhook updated.', data: maskHook(updated) });
     } catch (error) {
         logger.error(`ERROR in update webhook: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
@@ -199,7 +200,7 @@ exports.deleteWebhook = async (req, res) => {
         return res.send({ status: true, statusText: 'Webhook deleted.' });
     } catch (error) {
         logger.error(`ERROR in delete webhook: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
@@ -246,6 +247,6 @@ exports.listWebhookLogs = async (req, res) => {
         });
     } catch (error) {
         logger.error(`ERROR in list webhook logs: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };

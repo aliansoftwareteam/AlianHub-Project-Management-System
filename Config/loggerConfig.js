@@ -1,9 +1,11 @@
 const { createLogger, format, transports } = require('winston');
 const DailyRotateFile = require('winston-daily-rotate-file');
 const { combine, timestamp, label, printf } = format;
+const { requestId } = require('./requestContext');
 
 const myFormat = printf(({ level, message, label, timestamp }) => {
-    return `${timestamp} [${label}] ${level}: ${message}`;
+    const rid = requestId();
+    return `${timestamp} [${label}] ${level}:${rid ? ` [${rid}]` : ''} ${message}`;
 });
 
 // BUG-034 / #88 — rotate log files so they don't grow unbounded and fill
