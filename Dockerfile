@@ -35,9 +35,14 @@ RUN ln -sf /app/brandSettings.json /app/frontend/brandSettings.json
 #   "Can't resolve '../../../../../package.json'"
 COPY package.json /app/package.json
 
-# Build the SPA bundle
+# vue.config.js aliases @pageContent to this backend helper so the block
+# editor and the API share one content model.
+COPY Modules/Pages/helpers/pageContent.js /app/Modules/Pages/helpers/pageContent.js
+
+# Build the SPA bundle. webpack needs more than Node's default ~2 GB heap for
+# this bundle (same setting as ci.yml).
 COPY frontend/ ./
-RUN npm run build
+RUN NODE_OPTIONS=--max-old-space-size=4096 npm run build
 
 
 # ─── Stage 2: Backend production deps ────────────────────────────────
@@ -69,8 +74,8 @@ COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 # Copy backend source — order matters for layer caching, but at this
 # stage we're only running, not installing.
 COPY package.json CHANGELOG.md ./
-COPY brandSettings.json ./
-COPY index.js server.js cron.js check-version.js ./
+COPY brandSettings.json thumbnail.json ./
+COPY index.js server.js cron.js ./
 COPY Config/ ./Config/
 COPY Modules/ ./Modules/
 COPY common-storage/ ./common-storage/
@@ -93,9 +98,13 @@ USER node
 
 EXPOSE 4000
 
+# Config/jwt.js passes JWT_ALGORITHM and JWT_EXP straight to jwt.sign, which
+# rejects undefined options — without them no session can be created.
 ENV NODE_ENV=production \
     PORT=4000 \
-    STORAGE_TYPE=server
+    STORAGE_TYPE=server \
+    JWT_ALGORITHM=HS256 \
+    JWT_EXP=24h
 
 # /health answers 200 only when the database is reachable, 503 otherwise.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
