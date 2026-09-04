@@ -49,6 +49,7 @@
                         <div class="ai-agent__foot">
                             <router-link class="ah-btn ah-btn--secondary ah-btn--sm" :to="{ name: 'AiAgent', params: { cid: companyId, id: agent._id } }">{{ $t('AiV2.open') }}</router-link>
                             <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="agent.paused || busyId === agent._id" @click="onRunNow(agent)">{{ $t('AiV2.run_now') }}</button>
+                            <button v-if="activeRuns[agent._id]" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="busyId === agent._id" @click="onStop(agent)">{{ $t('AiV2.stop') }}</button>
                             <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="setPaused(agent._id, !agent.paused)">
                                 {{ agent.paused ? $t('AiV2.resume') : $t('AiV2.pause') }}
                             </button>
@@ -83,23 +84,24 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import AiSidebar from "./AiSidebar.vue";
 import AgentWizard from "./AgentWizard.vue";
 import { useAgents, autonomyOf } from "./useAgents";
+import { AGENT_TEMPLATES } from "./agentTemplates";
 
 defineOptions({ name: "AiHubPage" });
 
 const { t } = useI18n();
 const $toast = useToast();
 const companyId = inject("$companyId");
-const { agents, spend, registryManifest, loading, lastError, AUTONOMY, loadAll, setPaused, runNow } = useAgents();
+const { agents, spend, registryManifest, loading, lastError, AUTONOMY, loadAll, setPaused, runNow, activeRuns, loadActiveRuns, stopActive } = useAgents();
 
 const creating = ref(false);
 const wizardTemplate = ref(null);
 const busyId = ref("");
+const onStop = async (agent) => {
+    busyId.value = agent._id;
+    try { await stopActive(agent._id); } finally { busyId.value = ""; }
+};
 
-const templates = [
-    { slug: "intake", name: "Intake", skills: ["brief.parse", "project.plan"] },
-    { slug: "reviewer", name: "Reviewer", skills: ["pr.summary", "risk.flags"] },
-    { slug: "reporter", name: "Reporter", skills: ["digest.ceo", "risk.today"] }
-];
+const templates = AGENT_TEMPLATES;
 
 const neverList = computed(() => (registryManifest.value.never || []).join(" · "));
 
@@ -137,6 +139,7 @@ const onCreated = () => {
     creating.value = false;
     wizardTemplate.value = null;
     loadAll();
+    loadActiveRuns();
 };
 
 const onRunNow = async (agent) => {

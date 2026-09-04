@@ -3,6 +3,7 @@ const { getProvider, isAnyProviderConfigured } = require('../../AIProjectGenerat
 const { emptyUsage, usageFromResult, addUsage } = require('../../AIProjectGenerator/usage');
 const { audit, extractUrl } = require('./pageAudit');
 const qaReview = require('../skills/qaReview');
+const skillIndex = require('../skills');
 
 // A deterministic five-phase pipeline, not a free-roaming agent loop:
 //
@@ -15,9 +16,9 @@ const qaReview = require('../skills/qaReview');
 // factId was not measured.
 
 const LOG_PREFIX = '[agent]';
-const SKILLS = new Map([[qaReview.slug, qaReview]]);
+const SKILLS = skillIndex.BY_SLUG;
 
-const getSkill = (slug) => SKILLS.get(String(slug)) || null;
+const getSkill = (slug) => skillIndex.getSkill(slug);
 
 const SEVERITY = ['high', 'medium', 'low'];
 const rank = (s) => { const i = SEVERITY.indexOf(String(s).toLowerCase()); return i === -1 ? 2 : i; };
@@ -80,9 +81,48 @@ function findingsWithoutModel(auditResult, skill) {
     }));
 }
 
-async function run({ skillSlug = 'qa-review', task, budget = {} }) {
+/* Skills other than the page audit: gather their own input, ask the model once,
+ * and hand back a summary plus the changes the run should propose or apply. */
+async function runGeneric(skill, { task, companyId, budget = {} }) {
+    const started = Date.now();
+    let usage = emptyUsage();
+    const context = await skill.gather({ task, companyId });
+    if (!context || context.skip) {
+        return { status: 'skipped', reason: (context && context.skip) || 'nothing to work on', skill: skill.slug, usage, durationMs: Date.now() - started };
+    }
+    let raw = null; let modelUsed = null; let degraded = null;
+    if (isAnyProviderConfigured() && budget.allowModel !== false) {
+        try {
+            const provider = getProvider();
+            const result = await provider.chat({
+                systemPrompt: skill.systemPrompt,
+                messages: [{ role: 'user', content: skill.buildUserPrompt({ task, context }) }],
+                maxTokens: Math.min(skill.maxTokens, budget.maxTokens || skill.maxTokens),
+                temperature: 0.2,
+                jsonMode: true,
+            });
+            usage = addUsage(usage, usageFromResult(result));
+            modelUsed = result.model || null;
+            const parsed = parseModelJson(result.content);
+            if (parsed.ok) raw = parsed.value; else degraded = parsed.error;
+        } catch (error) {
+            degraded = `model call failed: ${error.message}`;
+            logger.error(`${LOG_PREFIX} ${degraded}`);
+        }
+    } else {
+        degraded = 'no LLM provider configured';
+    }
+    if (!raw && !context.fallback) {
+        return { status: 'failed', reason: degraded || 'the model returned nothing usable', skill: skill.slug, usage, model: modelUsed, durationMs: Date.now() - started };
+    }
+    const { summary, changes } = skill.toChanges({ task, raw, context });
+    return { status: 'success', skill: skill.slug, model: modelUsed, degraded, summary, changes, findings: [], usage, durationMs: Date.now() - started };
+}
+
+async function run({ skillSlug = 'qa-review', task, companyId, budget = {} }) {
     const skill = getSkill(skillSlug);
     if (!skill) throw Object.assign(new Error(`unknown skill "${skillSlug}"`), { deterministic: true });
+    if (skill.kind === 'generic') return runGeneric(skill, { task, companyId, budget });
 
     const started = Date.now();
     let usage = emptyUsage();
@@ -165,4 +205,4 @@ async function run({ skillSlug = 'qa-review', task, budget = {} }) {
     };
 }
 
-module.exports = { run, verify, parseModelJson, findingsWithoutModel, getSkill, SKILLS };
+module.exports = { run, runGeneric, verify, parseModelJson, findingsWithoutModel, getSkill, SKILLS };

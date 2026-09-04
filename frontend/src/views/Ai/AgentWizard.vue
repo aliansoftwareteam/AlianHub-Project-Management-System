@@ -16,6 +16,13 @@
                             <input id="aw-name" ref="nameField" v-model.trim="form.name" type="text" class="ah-input" :class="{ 'ah-input--error': errors.name }" maxlength="80" />
                             <div v-if="errors.name" class="ah-field__error">{{ errors.name }}</div>
                         </div>
+                        <div v-if="!props.template" class="ah-field">
+                            <label class="ah-field__label" for="aw-template">{{ $t('AiV2.start_from') }}</label>
+                            <select id="aw-template" v-model="chosenSlug" class="ah-input">
+                                <option value="">{{ $t('AiV2.no_template') }}</option>
+                                <option v-for="tpl in AGENT_TEMPLATES" :key="tpl.slug" :value="tpl.slug">{{ tpl.name }} — {{ tpl.skills.join(', ') }}</option>
+                            </select>
+                        </div>
                         <div class="ah-field">
                             <label class="ah-field__label" for="aw-desc">{{ $t('AiV2.job_desc') }}</label>
                             <textarea id="aw-desc" v-model.trim="form.description" class="ah-input ah-textarea" maxlength="500" :placeholder="$t('AiV2.job_desc_hint')"></textarea>
@@ -79,6 +86,7 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { useAgents } from "./useAgents";
 
 defineOptions({ name: "AgentWizard" });
+import { AGENT_TEMPLATES } from "./agentTemplates";
 
 const props = defineProps({ template: { type: Object, default: null } });
 const emit = defineEmits(["close", "created"]);
@@ -87,6 +95,8 @@ const { t } = useI18n();
 const { registryManifest, loadRegistry, saveAgent } = useAgents();
 
 const step = ref(1);
+const chosenSlug = ref("");
+const effectiveTemplate = computed(() => props.template || AGENT_TEMPLATES.find((t) => t.slug === chosenSlug.value) || null);
 const busy = ref(false);
 const nameField = ref(null);
 const errors = reactive({ name: "", form: "" });
@@ -120,7 +130,7 @@ const create = async () => {
             allowedActions: form.allowedActions,
             autonomy: form.autonomy,
             spendCapUsd: form.spendCapUsd,
-            skills: (props.template?.skills || []).map((key) => ({ key, name: key, actions: form.allowedActions, enabled: true }))
+            skills: (effectiveTemplate.value?.skills || []).map((key) => ({ key, name: key, actions: form.allowedActions, enabled: true }))
         });
         emit("created");
     } catch (e) {
