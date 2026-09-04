@@ -62,7 +62,7 @@ curl -O https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Man
 # Set JWT_SECRET (required) — see .env.example for full env-var reference
 echo "JWT_SECRET=$(openssl rand -hex 32)" > .env
 docker compose up -d
-# AlianHub running at http://localhost:4000
+# AlianHub running at http://localhost:4000 — the first visit opens the setup page
 ```
 
 Update to a newer version later:
@@ -81,39 +81,10 @@ cd AlianHub-Project-Management-System
 npm run setup
 ```
 
-That's it. `npm run setup` will:
-
-1. Install all dependencies (root, frontend, wizard) in parallel
-2. Generate a `.env` file with secure random secrets
-3. Build the installation wizard UI
-4. Start the server (the same entry production uses)
-5. Open `http://localhost:4000` in your browser
-
-On a fresh system the server serves the **installation wizard**. Complete it
-yourself — connect MongoDB, choose storage, skip or configure optional services
-(Firebase / AI / SMTP), and create **your own** company and admin account.
-Nothing is created automatically.
-
-When it's done, you'll see this in your terminal:
-
-```
-────────────────────────────────────────────────────────────
-  ✓  Server running — finish installation in your browser
-────────────────────────────────────────────────────────────
-
-  URL:   http://localhost:4000
-  The wizard guides you to connect MongoDB, choose storage, and create
-  your own company and admin account.
-  When it finishes, the app rebuilds and the server stops (same as
-  production). Run `npm start` again, then sign in.
-  Stop:  Ctrl+C
-────────────────────────────────────────────────────────────
-```
-
-The wizard's final step rebuilds the frontend and the server exits — the same
-flow production relies on, where a process manager (e.g. pm2) restarts the app.
-Locally there's no process manager, so just run **`npm start`** again, open
-`http://localhost:4000`, and **log in with the account you created**.
+That's it. `npm run setup` installs dependencies, writes a `.env` with random
+secrets, builds the web app once, starts the server and opens
+`http://localhost:4000/#/setup`, where you create **your own** owner account and
+workspace. Afterwards `npm start` is all you need.
 
 **Prerequisite:** MongoDB running locally on `mongodb://localhost:27017`. If you don't have it: `docker run -d -p 27017:27017 mongo:7` or download from [mongodb.com](https://www.mongodb.com/try/download/community).
 
@@ -121,12 +92,14 @@ Locally there's no process manager, so just run **`npm start`** again, open
 
 | Command | What it does |
 |---------|--------------|
-| `npm run setup` | Install deps, prepare `.env`, build the wizard UI, and start the server |
+| `npm run setup` | Install deps, prepare `.env`, build the web app, and start the server |
 | `npm run dev` | Same as setup but skips dependency install |
 | `npm run setup:reset` | Wipe `node_modules` and reinstall everything |
 | `npm run setup -- --no-open` | Start without auto-opening a browser |
 
-> All existing scripts (`npm start`, `npm run nodemon`, `npm run basic-install`) are unchanged. For active development with hot-reload, run the backend (`npm run nodemon`) and the frontend dev server (`cd frontend && npm run serve`) separately once the system is installed.
+> For active development with hot-reload, run the backend (`npm run nodemon`) and the frontend dev server (`cd frontend && npm run serve`) separately once the system is installed.
+>
+> Configuration (mail, storage, AI, sign-in), HTTPS, upgrades, backups and troubleshooting are covered in the **[admin guide](docs/ADMIN-GUIDE.md)**; the same pages are linked from **Settings › Instance** inside the app.
 
 ---
 
