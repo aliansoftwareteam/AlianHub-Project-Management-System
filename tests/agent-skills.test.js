@@ -77,3 +77,32 @@ describe('digest.ceo (Reporter)', () => {
         expect(out.degraded).toBe('no LLM provider configured');
     });
 });
+
+describe('grounding — what the model was not given is dropped', () => {
+    const digest = getSkill('digest.ceo');
+    const rows = [
+        { TaskKey: 'AR-1', TaskName: 'Late', statusType: 'active', status: { text: 'In Progress' }, DueDate: '2026-09-01', AssigneeUserId: [] },
+        { TaskKey: 'AR-2', TaskName: 'Stuck', statusType: 'active', status: { text: 'On Hold' }, AssigneeUserId: ['u'] },
+    ];
+    it('drops a digest sentence that invents a number or a task key, keeps the rest', () => {
+        const context = { buckets: digest.buckets(rows, Date.parse('2026-09-04T12:00:00Z')) };
+        const raw = { digest: 'There are 2 open tasks moved in the last 24 hours. AR-1 is overdue. AR-17 has been in review for 24 days. Nothing else moved.', lookFirst: ['AR-1 — overdue', 'AR-99 — invented', 'AR-2 — blocked for 24 days'] };
+        const { raw: cleaned, dropped } = digest.verify({ raw, context });
+        expect(cleaned.digest).toBe('There are 2 open tasks moved in the last 24 hours. AR-1 is overdue. Nothing else moved.');
+        expect(cleaned.lookFirst).toEqual(['AR-1 — overdue']);
+        expect(dropped.map((d) => d.reason)).toEqual(['mentions AR-17, which is not in the data', 'look-first item names a task not in the data', 'look-first item claims "24", which is not in the data']);
+    });
+    it('drops a PR risk that cites a file the diff never touched', () => {
+        const pr = getSkill('pr.summary');
+        const context = { diff: 'diff --git a/Modules/Agents/runs.js b/Modules/Agents/runs.js\n+const x = 1;', url: 'u' };
+        const raw = { summary: 's', risks: [{ title: 'Real', where: 'Modules/Agents/runs.js' }, { title: 'Invented', where: 'frontend/src/App.vue' }, { title: 'Unlocated' }] };
+        const { raw: cleaned, dropped } = pr.verify({ raw, context });
+        expect(cleaned.risks.map((r) => r.title)).toEqual(['Real', 'Unlocated']);
+        expect(dropped[0].text).toBe('Invented');
+    });
+    it('is applied by the orchestrator, which reports what it dropped', async () => {
+        MongoDbCrudOpration.mockResolvedValueOnce(rows);
+        const out = await orchestrator.run({ skillSlug: 'digest.ceo', task, companyId: 'c1', budget: { allowModel: false } });
+        expect(out.dropped).toEqual([]);
+    });
+});

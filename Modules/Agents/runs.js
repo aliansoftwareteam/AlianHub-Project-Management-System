@@ -172,7 +172,10 @@ const executeSkill = async (companyId, run, agent, task, { proposals, actions, a
         } else {
             const proposal = await proposals.create(companyId, {
                 agent, runId: String(run._id), taskId: String(task._id), projectId: String(task.ProjectID),
-                what: Array.isArray(result.changes) ? `${run.skill}: ${changes.length} change(s) on ${task.TaskKey || task.TaskName}` : `File ${result.findings.length} QA finding(s) on ${task.TaskKey || task.TaskName}`, why: result.summary, changes,
+                what: Array.isArray(result.changes) ? `${run.skill}: ${changes.length} change(s) on ${task.TaskKey || task.TaskName}` : `File ${result.findings.length} QA finding(s) on ${task.TaskKey || task.TaskName}`,
+                // What the grounding check removed is part of the record a person reviews.
+                why: [result.summary, Array.isArray(result.dropped) && result.dropped.length ? `Dropped as unsupported by the data: ${result.dropped.map((d) => `"${String(d.text).slice(0, 80)}" (${d.reason})`).join('; ')}` : ''].filter(Boolean).join('\n\n'),
+                changes,
                 cost: { tokens: result.usage && result.usage.totalTokens, model: result.model, usd: spent && spent.usd },
             });
             await patch(companyId, run._id, { status: STATUS.WAITING }, { $push: { proposals: String(proposal._id) } });

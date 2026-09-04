@@ -115,8 +115,10 @@ async function runGeneric(skill, { task, companyId, budget = {} }) {
     if (!raw && !context.fallback) {
         return { status: 'failed', reason: degraded || 'the model returned nothing usable', skill: skill.slug, usage, model: modelUsed, durationMs: Date.now() - started };
     }
+    let dropped = [];
+    if (raw && typeof skill.verify === 'function') ({ raw, dropped } = skill.verify({ raw, context }));
     const { summary, changes } = skill.toChanges({ task, raw, context });
-    return { status: 'success', skill: skill.slug, model: modelUsed, degraded, summary, changes, findings: [], usage, durationMs: Date.now() - started };
+    return { status: 'success', skill: skill.slug, model: modelUsed, degraded, summary, changes, dropped, findings: [], usage, durationMs: Date.now() - started };
 }
 
 async function run({ skillSlug = 'qa-review', task, companyId, budget = {} }) {

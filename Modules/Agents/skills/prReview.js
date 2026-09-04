@@ -55,6 +55,23 @@ Return ONLY JSON:
         return `TASK: ${task.TaskName || ''}\nLINK: ${context.url}${context.truncated ? ' (diff truncated)' : ''}\n\nCHANGE TEXT:\n${context.diff}`;
     },
 
+    /* A risk must point at something in the change text; "where" that does not appear
+     * in the diff is dropped, so the review cannot cite files the PR never touched. */
+    verify({ raw, context }) {
+        if (!raw || !Array.isArray(raw.risks)) return { raw, dropped: [] };
+        const hay = String(context.diff || '').toLowerCase();
+        const dropped = [];
+        const risks = raw.risks.filter((r) => {
+            const where = String((r && r.where) || '').trim();
+            if (!where) return true;
+            const needle = where.toLowerCase().split(/[\s,;:()]+/).filter((w) => w.length > 3);
+            const ok = needle.length === 0 || needle.some((w) => hay.includes(w));
+            if (!ok) dropped.push({ reason: `"${where}" does not appear in the change`, text: String(r.title || '') });
+            return ok;
+        });
+        return { raw: { ...raw, risks }, dropped };
+    },
+
     toChanges({ task, raw, context }) {
         const risks = Array.isArray(raw && raw.risks) ? raw.risks.filter((r) => r && r.title).slice(0, 6) : [];
         const summary = String((raw && raw.summary) || `Reviewed ${context.url}.`).slice(0, 2000);
