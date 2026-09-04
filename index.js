@@ -11,10 +11,12 @@ process.on('uncaughtException', (err) => {
     console.error(err.stack);
     process.exit(1);
 });
+// Log and keep serving. Exiting here turned every handler that forgot to answer
+// (an unhandled rejection from a bad request body) into a process kill anyone
+// could trigger over HTTP. uncaughtException still exits: that is corrupted state.
 process.on('unhandledRejection', (reason, promise) => {
-    console.error('[FATAL] unhandledRejection at:', promise);
-    console.error('[FATAL] Reason:', reason);
-    process.exit(1);
+    console.error('[unhandledRejection] at:', promise);
+    console.error('[unhandledRejection] reason:', reason && reason.stack ? reason.stack : reason);
 });
 const bodyParser = require("body-parser");
 const config =  require('./Config/config.js');
