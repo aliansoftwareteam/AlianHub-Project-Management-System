@@ -3,37 +3,37 @@
         <template v-if="page">
             <div v-if="needsAttention" class="pd__banner" :class="`pd__banner--${reviewStateValue}`">
                 <ShellIcon name="alert" :size="14" />
-                <span class="pd__banner-text">{{ $t('DocsV2.stale_banner') }}</span>
-                <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="markReviewed">{{ $t('DocsV2.mark_reviewed') }}</button>
+                <span class="pd__banner-text">{{ $t('Docs.stale_banner') }}</span>
+                <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="markReviewed">{{ $t('Docs.mark_reviewed') }}</button>
             </div>
 
             <div class="pd__head">
                 <div class="pd__title-row">
-                    <input v-model="draftTitle" type="text" class="pd__title" :placeholder="$t('DocsV2.untitled')" />
+                    <input v-model="draftTitle" type="text" class="pd__title" :placeholder="$t('Docs.untitled')" />
                     <div class="pd__actions">
                         <div class="ah-tabs">
-                            <button type="button" class="ah-tab" :class="{ 'is-active': mode === 'edit' }" @click="openEditor">{{ $t('DocsV2.edit') }}</button>
-                            <button type="button" class="ah-tab" :class="{ 'is-active': mode === 'preview' }" @click="openPreview">{{ $t('DocsV2.preview') }}</button>
+                            <button type="button" class="ah-tab" :class="{ 'is-active': mode === 'edit' }" @click="openEditor">{{ $t('Docs.edit') }}</button>
+                            <button type="button" class="ah-tab" :class="{ 'is-active': mode === 'preview' }" @click="openPreview">{{ $t('Docs.preview') }}</button>
                         </div>
                         <button v-if="projectId" type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="showLinker = !showLinker">
-                            <ShellIcon name="link" :size="13" />{{ $t('DocsV2.link_tasks') }}
+                            <ShellIcon name="link" :size="13" />{{ $t('Docs.link_tasks') }}
                             <span v-if="linkedTasks.length" class="pd__count">{{ linkedTasks.length }}</span>
                         </button>
                         <template v-if="layout === 'panel'">
                             <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="present">
-                                <ShellIcon name="play" :size="11" />{{ $t('DocsV2.present') }}
+                                <ShellIcon name="play" :size="11" />{{ $t('Docs.present') }}
                             </button>
                             <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="openShare">
-                                <ShellIcon name="share" :size="13" />{{ $t('DocsV2.share') }}
+                                <ShellIcon name="share" :size="13" />{{ $t('Docs.share') }}
                             </button>
                         </template>
                         <button type="button" class="ah-btn ah-btn--sm ah-btn--primary" :disabled="!isDirty || isSaving" @click="savePage">
-                            {{ isSaving ? $t('DocsV2.saving') : $t('DocsV2.save') }}
+                            {{ isSaving ? $t('Docs.saving') : $t('Docs.save') }}
                         </button>
-                        <button type="button" class="pd__icon pd__icon--danger" :title="$t('DocsV2.delete')" @click="deletePage">
+                        <button type="button" class="pd__icon pd__icon--danger" :title="$t('Docs.delete')" @click="deletePage">
                             <ShellIcon name="trash" :size="15" />
                         </button>
-                        <button v-if="closable" type="button" class="pd__icon" :title="$t('DocsV2.close')" @click="requestClose">
+                        <button v-if="closable" type="button" class="pd__icon" :title="$t('Docs.close')" @click="requestClose">
                             <ShellIcon name="x" :size="15" />
                         </button>
                     </div>
@@ -41,40 +41,40 @@
 
                 <div class="pd__props">
                     <label class="pd__prop">
-                        <span class="pd__k">{{ $t('DocsV2.owner') }}</span>
+                        <span class="pd__k">{{ $t('Docs.owner') }}</span>
                         <select class="pd__select" :value="page.ownerId || ''" @change="setOwner($event.target.value)">
-                            <option value="">{{ $t('DocsV2.no_owner') }}</option>
+                            <option value="">{{ $t('Docs.no_owner') }}</option>
                             <option v-for="user in users" :key="'own-' + user._id" :value="user._id">{{ user.Employee_Name }}</option>
                         </select>
                     </label>
                     <span class="pd__prop">
-                        <span class="pd__k">{{ $t('DocsV2.project') }}</span>
+                        <span class="pd__k">{{ $t('Docs.project') }}</span>
                         <span class="ah-chip">{{ projectName }}</span>
                     </span>
                     <button type="button" class="pd__prop pd__prop--btn" :title="isPrivate ? $t('Projects.doc_private_hint') : $t('Projects.doc_shared_hint')" @click="togglePrivate">
-                        <span class="pd__k">{{ $t('DocsV2.visibility') }}</span>
+                        <span class="pd__k">{{ $t('Docs.visibility') }}</span>
                         <span class="ah-chip" :class="{ 'ah-chip--warn': isPrivate }">
-                            <ShellIcon :name="isPrivate ? 'lock' : 'members'" :size="11" />{{ isPrivate ? $t('DocsV2.private') : $t('DocsV2.shared') }}
+                            <ShellIcon :name="isPrivate ? 'lock' : 'members'" :size="11" />{{ isPrivate ? $t('Docs.private') : $t('Docs.shared') }}
                         </span>
                     </button>
-                    <label class="pd__prop" :title="$t('DocsV2.wiki_toggle_hint')">
+                    <label class="pd__prop" :title="$t('Docs.wiki_toggle_hint')">
                         <input type="checkbox" class="ah-check" :checked="isWiki" @change="toggleWiki($event.target.checked)" />
-                        <span class="pd__k pd__k--strong">{{ $t('DocsV2.wiki_page') }}</span>
+                        <span class="pd__k pd__k--strong">{{ $t('Docs.wiki_page') }}</span>
                     </label>
                     <label v-if="isWiki" class="pd__prop">
-                        <span class="pd__k">{{ $t('DocsV2.review_date') }}</span>
+                        <span class="pd__k">{{ $t('Docs.review_date') }}</span>
                         <input type="date" class="pd__date" :value="toDateInput(page.reviewDate)" @change="setReviewDate($event.target.value)" />
                     </label>
                     <span v-if="linkedTasks.length" class="pd__prop pd__prop--wrap">
-                        <span class="pd__k">{{ $t('DocsV2.linked_to') }}</span>
+                        <span class="pd__k">{{ $t('Docs.linked_to') }}</span>
                         <span v-for="task in linkedTasks" :key="'lt-' + task.id" class="ah-chip ah-chip--brand ah-chip--mono">
                             {{ task.key || task.id.slice(-6) }}
-                            <button type="button" class="pd__unlink" :title="$t('DocsV2.unlink')" @click="unlinkTask(task.id)">✕</button>
+                            <button type="button" class="pd__unlink" :title="$t('Docs.unlink')" @click="unlinkTask(task.id)">✕</button>
                         </span>
                     </span>
                     <span class="pd__prop pd__prop--muted">
                         <span class="ah-dot" :class="isDirty ? 'ah-dot--warn' : 'ah-dot--ok'"></span>
-                        {{ isDirty ? $t('DocsV2.unsaved') : $t('DocsV2.updated', { when: relativeTime(page.updatedAt, t) }) }}
+                        {{ isDirty ? $t('Docs.unsaved') : $t('Docs.updated', { when: relativeTime(page.updatedAt, t) }) }}
                     </span>
                 </div>
 
@@ -85,7 +85,7 @@
                         {{ $t(reviewLabelKey(reviewStateValue)) }}
                     </span>
                     <span class="pd__review-text">{{ reviewLine }}</span>
-                    <button v-if="!needsAttention" type="button" class="ah-btn ah-btn--sm ah-btn--ghost" @click="markReviewed">{{ $t('DocsV2.mark_reviewed') }}</button>
+                    <button v-if="!needsAttention" type="button" class="ah-btn ah-btn--sm ah-btn--ghost" @click="markReviewed">{{ $t('Docs.mark_reviewed') }}</button>
                 </div>
 
                 <TaskChipPicker
@@ -124,14 +124,14 @@
                 <div class="ah-card pd__share">
                     <div class="ah-card__head">
                         <h3 class="ah-h3">{{ $t('Projects.doc_share_title') }}</h3>
-                        <button type="button" class="pd__icon" :title="$t('DocsV2.close')" @click="showShare = false"><ShellIcon name="x" :size="15" /></button>
+                        <button type="button" class="pd__icon" :title="$t('Docs.close')" @click="showShare = false"><ShellIcon name="x" :size="15" /></button>
                     </div>
                     <div class="ah-card__body pd__share-body">
-                        <p class="pd__share-sub"><ShellIcon name="docs" :size="14" /><b>{{ draftTitle || $t('DocsV2.untitled') }}</b></p>
+                        <p class="pd__share-sub"><ShellIcon name="docs" :size="14" /><b>{{ draftTitle || $t('Docs.untitled') }}</b></p>
                         <div class="pd__share-row">
                             <ShellIcon :name="isPrivate ? 'lock' : 'members'" :size="16" class="pd__share-ico" />
                             <div class="pd__share-copy">
-                                <div class="pd__share-label">{{ isPrivate ? $t('DocsV2.private') : $t('DocsV2.shared') }}</div>
+                                <div class="pd__share-label">{{ isPrivate ? $t('Docs.private') : $t('Docs.shared') }}</div>
                                 <div class="ah-small">{{ isPrivate ? $t('Projects.doc_private_hint') : $t('Projects.doc_shared_hint') }}</div>
                             </div>
                             <button type="button" class="pd__switch" :class="{ 'is-on': !isPrivate }" @click="togglePrivate"><i></i></button>
@@ -161,7 +161,7 @@
             />
         </template>
         <div v-else-if="loadFailed" class="pd__missing">
-            <div class="ah-empty">{{ $t('DocsV2.page_missing') }}</div>
+            <div class="ah-empty">{{ $t('Docs.page_missing') }}</div>
         </div>
     </div>
 </template>
@@ -227,7 +227,7 @@ const projectName = computed(() => {
     if (props.projectData && props.projectData.ProjectName) return props.projectData.ProjectName;
     const all = store.getters['projectData/allProjects'];
     const found = ((all && all.data) || []).find((p) => String(p._id) === projectId.value);
-    return found ? found.ProjectName : t('DocsV2.workspace');
+    return found ? found.ProjectName : t('Docs.workspace');
 });
 const users = computed(() => (store.getters['users/users'] || []).filter((u) => u && u.Employee_Name));
 const rawDraft = computed(() => blocksToRawText(contentBlocks.value) || contentHtml.value || '');
@@ -247,9 +247,9 @@ const reviewLine = computed(() => {
     if (!page.value) return '';
     const owner = nameOf(page.value.ownerId);
     if (page.value.reviewedAt) {
-        return t('DocsV2.reviewed_by_next', { who: nameOf(page.value.reviewedBy), when: shortDate(page.value.reviewDate) });
+        return t('Docs.reviewed_by_next', { who: nameOf(page.value.reviewedBy), when: shortDate(page.value.reviewDate) });
     }
-    return t('DocsV2.review_due_line', { when: shortDate(page.value.reviewDate), who: owner });
+    return t('Docs.review_due_line', { when: shortDate(page.value.reviewDate), who: owner });
 });
 
 watch(isDirty, (dirty) => emit('dirty', dirty));
@@ -383,7 +383,7 @@ function markReviewed() {
                 const saved = { ...response.data.data };
                 delete saved.content;
                 page.value = { ...page.value, ...saved };
-                $toast.success(t('DocsV2.marked_reviewed'), { position: 'top-right' });
+                $toast.success(t('Docs.marked_reviewed'), { position: 'top-right' });
                 emit('saved', page.value);
             } else {
                 $toast.error(response.data?.statusText || t('Toast.something_went_wrong'), { position: 'top-right' });

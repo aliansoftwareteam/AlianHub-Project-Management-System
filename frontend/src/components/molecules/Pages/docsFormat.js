@@ -6,11 +6,11 @@ export function relativeTime(value, t, now = Date.now()) {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '—';
     const diff = Math.max(0, now - date.getTime());
-    if (diff < MINUTE) return t('DocsV2.just_now');
-    if (diff < HOUR) return t('DocsV2.minutes_ago', { n: Math.floor(diff / MINUTE) });
-    if (diff < DAY) return t('DocsV2.hours_ago', { n: Math.floor(diff / HOUR) });
-    if (diff < 2 * DAY) return t('DocsV2.yesterday');
-    if (diff < 14 * DAY) return t('DocsV2.days_ago', { n: Math.floor(diff / DAY) });
+    if (diff < MINUTE) return t('Docs.just_now');
+    if (diff < HOUR) return t('Docs.minutes_ago', { n: Math.floor(diff / MINUTE) });
+    if (diff < DAY) return t('Docs.hours_ago', { n: Math.floor(diff / HOUR) });
+    if (diff < 2 * DAY) return t('Docs.yesterday');
+    if (diff < 14 * DAY) return t('Docs.days_ago', { n: Math.floor(diff / DAY) });
     return shortDate(date);
 }
 
@@ -42,10 +42,10 @@ export function reviewChipClass(state) {
 }
 
 export function reviewLabelKey(state) {
-    if (state === 'verified') return 'DocsV2.verified';
-    if (state === 'due') return 'DocsV2.due_now';
-    if (state === 'stale') return 'DocsV2.stale';
-    return 'DocsV2.not_reviewed';
+    if (state === 'verified') return 'Docs.verified';
+    if (state === 'due') return 'Docs.due_now';
+    if (state === 'stale') return 'Docs.stale';
+    return 'Docs.not_reviewed';
 }
 
 export function headingsOf(editorData) {

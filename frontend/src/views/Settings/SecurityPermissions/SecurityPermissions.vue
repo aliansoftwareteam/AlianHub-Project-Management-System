@@ -14,19 +14,19 @@
             <div class="sp__body" :class="{ 'sp__body--locked': !planAllowed }">
                 <div class="sp__head">
                     <div>
-                        <h1 class="ah-h1">{{ props.from ? $t('Permissions.advanced_permission') : $t('SettingsV2.security_title') }}</h1>
-                        <div class="ah-small">{{ $t('SettingsV2.security_subtitle', { permissions: totalRules, objects: totalObjects }) }}</div>
+                        <h1 class="ah-h1">{{ props.from ? $t('Permissions.advanced_permission') : $t('Settings.security_title') }}</h1>
+                        <div class="ah-small">{{ $t('Settings.security_subtitle', { permissions: totalRules, objects: totalObjects }) }}</div>
                     </div>
                     <div class="ah-tabs sp__mode" role="tablist">
-                        <button type="button" class="ah-tab" :class="{ 'is-active': mode === 'simple' }" role="tab" :aria-selected="mode === 'simple'" @click="mode = 'simple'">{{ $t('SettingsV2.mode_simple') }} · <span class="ah-mono">{{ simpleCount }}</span></button>
-                        <button type="button" class="ah-tab" :class="{ 'is-active': mode === 'advanced' }" role="tab" :aria-selected="mode === 'advanced'" @click="mode = 'advanced'">{{ $t('SettingsV2.mode_advanced') }} · <span class="ah-mono">{{ totalRules }}</span></button>
+                        <button type="button" class="ah-tab" :class="{ 'is-active': mode === 'simple' }" role="tab" :aria-selected="mode === 'simple'" @click="mode = 'simple'">{{ $t('Settings.mode_simple') }} · <span class="ah-mono">{{ simpleCount }}</span></button>
+                        <button type="button" class="ah-tab" :class="{ 'is-active': mode === 'advanced' }" role="tab" :aria-selected="mode === 'advanced'" @click="mode = 'advanced'">{{ $t('Settings.mode_advanced') }} · <span class="ah-mono">{{ totalRules }}</span></button>
                     </div>
                 </div>
 
                 <div v-if="!props.from" class="sp__roles">
                     <div v-for="card in roleCards" :key="card.key" class="ah-card sp__role" :class="{ 'is-highlight': card.key === 3 }">
                         <div class="sp__role-name">{{ card.name }}</div>
-                        <div class="ah-small sp__role-desc">{{ card.desc }} {{ $t('SettingsV2.people_count', { n: card.count }) }}</div>
+                        <div class="ah-small sp__role-desc">{{ card.desc }} {{ $t('Settings.people_count', { n: card.count }) }}</div>
                     </div>
                 </div>
 
@@ -46,12 +46,12 @@
                 />
 
                 <div class="sp__foot">
-                    <span class="ah-small">{{ $t('SettingsV2.destructive_note') }}</span>
-                    <button v-if="checkPermission('settings.settings_security_permissions') === true || props.from" type="button" class="ah-btn ah-btn--primary" :disabled="!planAllowed || isSpinner" @click="updateRules">{{ $t('SettingsV2.save_changes') }}</button>
+                    <span class="ah-small">{{ $t('Settings.destructive_note') }}</span>
+                    <button v-if="checkPermission('settings.settings_security_permissions') === true || props.from" type="button" class="ah-btn ah-btn--primary" :disabled="!planAllowed || isSpinner" @click="updateRules">{{ $t('Settings.save_changes') }}</button>
                 </div>
             </div>
         </template>
-        <div v-else class="ah-empty">{{ $t('SettingsV2.access_denied') }}</div>
+        <div v-else class="ah-empty">{{ $t('Settings.access_denied') }}</div>
     </div>
 </template>
 

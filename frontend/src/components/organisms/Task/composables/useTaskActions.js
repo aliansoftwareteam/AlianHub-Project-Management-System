@@ -129,7 +129,7 @@ export function useTaskActions({ projectData, task, props }) {
                 $toast.success(t(`Toast.Queue list ${action == 'add' ? 'added' : 'removed'} successfully`), { position: 'top-right' });
             }).catch((error) => {
                 console.error('ERROR in update addToQueue: ', error);
-                $toast.error(t('Toast.Queue_list_not_updated'), { position: 'top-right' });
+                $toast.error(t('Toast.queue_list_not_updated'), { position: 'top-right' });
             });
         } catch (error) {
             console.error('ERROR in update addToQueue: ', error);

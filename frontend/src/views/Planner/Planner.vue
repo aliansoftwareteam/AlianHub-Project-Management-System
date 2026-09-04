@@ -1,15 +1,15 @@
 <template>
     <div class="ah-page planner">
-        <ContextSidebar v-if="!isMobile" width="250px" :open="homeState.sidebarOpen" :label="$t('HomeV2.unscheduled')" @close="homeState.sidebarOpen = false">
+        <ContextSidebar v-if="!isMobile" width="250px" :open="homeState.sidebarOpen" :label="$t('Home.unscheduled')" @close="homeState.sidebarOpen = false">
             <PlannerTray
-                :title="$t('HomeV2.unscheduled')"
+                :title="$t('Home.unscheduled')"
                 :tabs="trayTabs"
                 :active="tray"
                 :items="trayItems"
                 :loading="!work.loaded.value"
-                :loadingText="$t('HomeV2.loading')"
-                :emptyText="$t('HomeV2.tray_empty')"
-                :footer="$t('HomeV2.tray_footer')"
+                :loadingText="$t('Home.loading')"
+                :emptyText="$t('Home.tray_empty')"
+                :footer="$t('Home.tray_footer')"
                 @tab="tray = $event"
                 @select="openTask"
                 @dragstart="onDragStart"
@@ -19,10 +19,10 @@
 
         <div class="ah-page__main">
             <header class="ah-toolbar">
-                <button type="button" class="ah-tbtn ah-tbtn--icon planner__sidebar-toggle" :title="$t('HomeV2.show_sidebar')" @click="homeState.sidebarOpen = !homeState.sidebarOpen">
+                <button type="button" class="ah-tbtn ah-tbtn--icon planner__sidebar-toggle" :title="$t('Home.show_sidebar')" @click="homeState.sidebarOpen = !homeState.sidebarOpen">
                     <ShellIcon name="sidebar" :size="15" />
                 </button>
-                <div class="ah-toolbar__title">{{ $t('HomeV2.planner') }}</div>
+                <div class="ah-toolbar__title">{{ $t('Home.planner') }}</div>
                 <span class="ah-toolbar__date planner__range">
                     <button type="button" @click="shift(-1)">‹</button>
                     <button type="button" @click="goToday">{{ rangeLabel }}</button>
@@ -30,15 +30,15 @@
                 </span>
                 <div class="ah-toolbar__actions">
                     <div class="ah-tabs">
-                        <button type="button" class="ah-tab" :class="{ 'is-active': mode === 'week' }" @click="mode = 'week'">{{ $t('HomeV2.week') }}</button>
-                        <button type="button" class="ah-tab" :class="{ 'is-active': mode === 'day' }" @click="mode = 'day'">{{ $t('HomeV2.day') }}</button>
+                        <button type="button" class="ah-tab" :class="{ 'is-active': mode === 'week' }" @click="mode = 'week'">{{ $t('Home.week') }}</button>
+                        <button type="button" class="ah-tab" :class="{ 'is-active': mode === 'day' }" @click="mode = 'day'">{{ $t('Home.day') }}</button>
                     </div>
                     <router-link class="ah-tbtn planner__cal" :to="calendarTo">
                         <span class="ah-dot" :class="agenda.connected.value ? 'ah-dot--ok' : 'ah-dot--warn'"></span>
-                        {{ agenda.connected.value ? $t('HomeV2.calendar_synced') : $t('HomeV2.calendar_not_connected') }}
+                        {{ agenda.connected.value ? $t('Home.calendar_synced') : $t('Home.calendar_not_connected') }}
                     </router-link>
-                    <button type="button" class="ah-tbtn planner__hours" @click="toggleHours">{{ $t('HomeV2.working_hours', { from: startHour, to: endHour }) }}</button>
-                    <button type="button" class="ah-tbtn ah-tbtn--strong" @click="addFocusNow"><ShellIcon name="plus" :size="13" />{{ $t('HomeV2.focus_block') }}</button>
+                    <button type="button" class="ah-tbtn planner__hours" @click="toggleHours">{{ $t('Home.working_hours', { from: startHour, to: endHour }) }}</button>
+                    <button type="button" class="ah-tbtn ah-tbtn--strong" @click="addFocusNow"><ShellIcon name="plus" :size="13" />{{ $t('Home.focus_block') }}</button>
                 </div>
             </header>
 
@@ -85,12 +85,12 @@
                             :title="item.title"
                             @click.stop="onBlockClick(item)"
                         >
-                            {{ item.title || $t('HomeV2.focus') }}
+                            {{ item.title || $t('Home.focus') }}
                             <span v-if="item.sub" class="planner__block-sub">{{ item.sub }}</span>
                         </div>
                         <div v-if="overKey === d.key && dragging" class="planner__block planner__block--ghost" :style="{ top: `${ghostTop}px`, height: `${ghostHeight}px` }">
                             {{ dragging.TaskName }}
-                            <span class="planner__block-sub">{{ $t('HomeV2.dropping', { range: ghostRange }) }}</span>
+                            <span class="planner__block-sub">{{ $t('Home.dropping', { range: ghostRange }) }}</span>
                         </div>
                         <div v-if="d.isToday && nowTop !== null" class="planner__now" :style="{ top: `${nowTop}px` }"></div>
                     </div>
@@ -99,18 +99,18 @@
 
             <div v-if="isMobile" class="planner__sheet">
                 <div v-if="pending" class="planner__pick">
-                    <span>{{ $t('ProvenanceV2.mob_tap_slot', { task: pending.TaskName }) }}</span>
-                    <button type="button" class="planner__pick-cancel" @click="pending = null">{{ $t('ProvenanceV2.mob_cancel') }}</button>
+                    <span>{{ $t('Provenance.mob_tap_slot', { task: pending.TaskName }) }}</span>
+                    <button type="button" class="planner__pick-cancel" @click="pending = null">{{ $t('Provenance.mob_cancel') }}</button>
                 </div>
                 <PlannerTray
-                    :title="$t('HomeV2.unscheduled')"
+                    :title="$t('Home.unscheduled')"
                     :tabs="trayTabs"
                     :active="tray"
                     :items="trayItems"
                     :selectedId="pending ? pending._id : ''"
                     :loading="!work.loaded.value"
-                    :loadingText="$t('HomeV2.loading')"
-                    :emptyText="$t('HomeV2.tray_empty')"
+                    :loadingText="$t('Home.loading')"
+                    :emptyText="$t('Home.tray_empty')"
                     @tab="tray = $event"
                     @select="pickTask"
                     @dragstart="onDragStart"
@@ -204,8 +204,8 @@ const overdue = computed(() => work.mine.value.filter((task) => dueBucket(task) 
 const trayTasks = computed(() => (tray.value === "mine" ? unscheduled.value : overdue.value));
 
 const trayTabs = computed(() => [
-    { key: "mine", label: t("HomeV2.mine"), count: unscheduled.value.length },
-    { key: "overdue", label: t("HomeV2.overdue_tab"), count: overdue.value.length }
+    { key: "mine", label: t("Home.mine"), count: unscheduled.value.length },
+    { key: "overdue", label: t("Home.overdue_tab"), count: overdue.value.length }
 ]);
 
 const trayItems = computed(() => trayTasks.value.map((task) => ({
@@ -213,8 +213,8 @@ const trayItems = computed(() => trayTasks.value.map((task) => ({
     title: task.TaskName,
     danger: tray.value === "overdue",
     meta: tray.value === "overdue"
-        ? t("HomeV2.overdue_since", { date: moment(task.DueDate).format("MMM D") })
-        : [work.projectOf(task)?.ProjectName, task.totalEstimatedTime ? t("HomeV2.est", { value: fmtEstimate(task.totalEstimatedTime) }) : t("HomeV2.no_estimate")].filter(Boolean).join(" · "),
+        ? t("Home.overdue_since", { date: moment(task.DueDate).format("MMM D") })
+        : [work.projectOf(task)?.ProjectName, task.totalEstimatedTime ? t("Home.est", { value: fmtEstimate(task.totalEstimatedTime) }) : t("Home.no_estimate")].filter(Boolean).join(" · "),
     task
 })));
 
@@ -243,7 +243,7 @@ function blocksFor(day) {
             top: Math.max(0, (startMin / 60) * HOUR_PX + 2),
             height: Math.max(24, (durMin / 60) * HOUR_PX - 4),
             done: item.task ? ["done", "close"].includes(item.task.statusType) : false,
-            sub: tracking ? t("HomeV2.tracking_short", { time: fmtShortClock(elapsedMs.value) }) : (item.kind === "task" ? work.projectOf(item.task)?.ProjectName : "")
+            sub: tracking ? t("Home.tracking_short", { time: fmtShortClock(elapsedMs.value) }) : (item.kind === "task" ? work.projectOf(item.task)?.ProjectName : "")
         };
     });
 }
@@ -286,10 +286,10 @@ async function place(task, begin) {
     const end = begin.clone().add(estimateMinutes(task), "minutes");
     try {
         await work.schedule(task, begin.toDate(), end.toDate());
-        $toast.success(t("HomeV2.scheduled", { task: task.TaskName, when: begin.format("ddd HH:mm") }), { position: "top-right" });
+        $toast.success(t("Home.scheduled", { task: task.TaskName, when: begin.format("ddd HH:mm") }), { position: "top-right" });
     } catch (error) {
         console.error("schedule failed", error);
-        $toast.error(t("HomeV2.schedule_failed"), { position: "top-right" });
+        $toast.error(t("Home.schedule_failed"), { position: "top-right" });
     }
 }
 

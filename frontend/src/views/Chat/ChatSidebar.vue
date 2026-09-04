@@ -1,12 +1,12 @@
 <template>
     <aside class="cs">
         <div class="cs-top">
-            <span class="cs-title">{{ $t('ChatV2.title') }}</span>
+            <span class="cs-title">{{ $t('Chat.title') }}</span>
             <button
                 v-if="canCreateChannel"
                 type="button"
                 class="cs-icon"
-                :title="$t('ChatV2.new_channel')"
+                :title="$t('Chat.new_channel')"
                 @click="$emit('new-channel')"
             ><ShellIcon name="plus" :size="15" /></button>
         </div>
@@ -17,21 +17,21 @@
                 v-model="query"
                 type="search"
                 class="cs-search-input"
-                :placeholder="$t('ChatV2.search')"
-                :aria-label="$t('ChatV2.search')"
+                :placeholder="$t('Chat.search')"
+                :aria-label="$t('Chat.search')"
             />
         </label>
 
         <div class="cs-list ah-scroll">
             <section class="cs-group">
                 <div class="cs-group-head">
-                    <span class="ah-label">{{ $t('ChatV2.direct') }}</span>
+                    <span class="ah-label">{{ $t('Chat.direct') }}</span>
                     <button
                         v-if="people.length"
                         type="button"
                         class="cs-icon cs-icon--sm"
                         :class="{ 'is-on': showPeople }"
-                        :title="$t('ChatV2.new_message')"
+                        :title="$t('Chat.new_message')"
                         @click="showPeople = !showPeople"
                     ><ShellIcon name="plus" :size="13" /></button>
                 </div>
@@ -64,13 +64,13 @@
                 </template>
 
                 <p v-if="!visibleDirect.length && !visiblePeople.length" class="cs-empty">
-                    {{ query.trim() ? $t('ChatV2.no_matches') : $t('ChatV2.no_direct') }}
+                    {{ query.trim() ? $t('Chat.no_matches') : $t('Chat.no_direct') }}
                 </p>
             </section>
 
             <section v-for="group in visibleGroups" :key="group.project._id" class="cs-group">
                 <div class="cs-group-head">
-                    <span class="ah-label">{{ groups.length > 1 ? group.project.ProjectName : $t('ChatV2.channels') }}</span>
+                    <span class="ah-label">{{ groups.length > 1 ? group.project.ProjectName : $t('Chat.channels') }}</span>
                 </div>
 
                 <template v-for="category in group.categories" :key="category.id">
@@ -95,7 +95,7 @@
                 />
 
                 <p v-if="!group.all.length" class="cs-empty">
-                    {{ query.trim() ? $t('ChatV2.no_matches') : $t('ChatV2.no_channels') }}
+                    {{ query.trim() ? $t('Chat.no_matches') : $t('Chat.no_channels') }}
                 </p>
             </section>
 
@@ -104,9 +104,9 @@
                 type="button"
                 class="cs-new"
                 @click="$emit('new-channel')"
-            ><ShellIcon name="plus" :size="14" /> {{ $t('ChatV2.new_channel') }}</button>
+            ><ShellIcon name="plus" :size="14" /> {{ $t('Chat.new_channel') }}</button>
 
-            <p v-else-if="!groups.length && !loading" class="cs-empty">{{ $t('ChatV2.no_channels') }}</p>
+            <p v-else-if="!groups.length && !loading" class="cs-empty">{{ $t('Chat.no_channels') }}</p>
         </div>
     </aside>
 </template>

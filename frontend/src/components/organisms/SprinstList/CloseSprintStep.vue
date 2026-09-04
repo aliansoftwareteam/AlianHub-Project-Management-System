@@ -4,26 +4,26 @@
             <div class="css" role="dialog" aria-modal="true" :aria-label="title">
                 <h2 class="ah-h3 css__title">{{ title }}</h2>
 
-                <p v-if="loading" class="ah-small">{{ $t('MembersV2.loading') }}</p>
+                <p v-if="loading" class="ah-small">{{ $t('Members.loading') }}</p>
                 <p v-else-if="loadError" class="ah-field__error">{{ loadError }}</p>
 
                 <template v-else-if="preview">
                     <p class="css__lead">
-                        {{ $t('MembersV2.close_lead', { done: donePoints, total: committedPoints }) }}
+                        {{ $t('Members.close_lead', { done: donePoints, total: committedPoints }) }}
                         <template v-if="unfinished.length">
-                            <strong>{{ $t('MembersV2.close_unfinished', { count: unfinished.length }) }}</strong>
-                            {{ $t('MembersV2.close_decide') }}
+                            <strong>{{ $t('Members.close_unfinished', { count: unfinished.length }) }}</strong>
+                            {{ $t('Members.close_decide') }}
                         </template>
-                        <template v-else>{{ $t('MembersV2.close_all_done') }}</template>
+                        <template v-else>{{ $t('Members.close_all_done') }}</template>
                     </p>
 
                     <div v-if="unfinished.length" class="css__options">
                         <label class="css__option" :class="{ 'is-on': choice === 'next' }">
                             <input type="radio" value="next" v-model="choice" />
                             <span class="css__option-text">
-                                <span class="css__option-title">{{ nextSprint ? $t('MembersV2.dest_next', { name: nextSprint.name }) : $t('MembersV2.dest_next_new') }}</span>
+                                <span class="css__option-title">{{ nextSprint ? $t('Members.dest_next', { name: nextSprint.name }) : $t('Members.dest_next_new') }}</span>
                                 <span class="css__option-hint">
-                                    {{ $t('MembersV2.dest_next_hint') }}
+                                    {{ $t('Members.dest_next_hint') }}
                                     <template v-if="!nextSprint && preview.suggestedNext"> · {{ preview.suggestedNext.name }} {{ dateRange(preview.suggestedNext) }}</template>
                                 </span>
                             </span>
@@ -32,7 +32,7 @@
                         <label class="css__option" :class="{ 'is-on': choice === 'backlog' }">
                             <input type="radio" value="backlog" v-model="choice" />
                             <span class="css__option-text">
-                                <span class="css__option-title">{{ $t('MembersV2.dest_backlog') }}</span>
+                                <span class="css__option-title">{{ $t('Members.dest_backlog') }}</span>
                             </span>
                         </label>
 
@@ -40,8 +40,8 @@
                             <input type="radio" value="pick" v-model="choice" />
                             <span class="css__option-text">
                                 <span class="css__option-title">
-                                    {{ $t('MembersV2.dest_pick') }}
-                                    <span class="css__option-hint">· {{ $t('MembersV2.dest_pick_hint', { count: unfinished.length }) }}</span>
+                                    {{ $t('Members.dest_pick') }}
+                                    <span class="css__option-hint">· {{ $t('Members.dest_pick_hint', { count: unfinished.length }) }}</span>
                                 </span>
                                 <select v-if="choice === 'pick'" v-model="pickedSprintId" class="ah-input css__select">
                                     <option v-for="option in openSprints" :key="option.id" :value="option.id">{{ option.name }}</option>
@@ -51,7 +51,7 @@
                     </div>
 
                     <div v-if="unfinished.length" class="css__moving">
-                        <span class="ah-label">{{ $t('MembersV2.moving_these') }}</span>
+                        <span class="ah-label">{{ $t('Members.moving_these') }}</span>
                         <ul class="css__list ah-scroll">
                             <li v-for="item in unfinished" :key="item._id">
                                 <span class="ah-mono css__key">{{ item.TaskKey }}</span>{{ item.TaskName }}
@@ -59,16 +59,16 @@
                         </ul>
                     </div>
 
-                    <p v-if="stranded.length" class="ah-small css__stranded">{{ $t('MembersV2.stranded_note') }}</p>
+                    <p v-if="stranded.length" class="ah-small css__stranded">{{ $t('Members.stranded_note') }}</p>
                     <p v-if="problem" class="ah-field__error">{{ problem }}</p>
                 </template>
 
                 <div class="css__actions">
                     <button type="button" class="ah-btn ah-btn--primary" :disabled="busy || loading || !preview" @click="confirm()">
-                        {{ busy ? $t('MembersV2.close_working') : $t('MembersV2.close_confirm') }}
+                        {{ busy ? $t('Members.close_working') : $t('Members.close_confirm') }}
                     </button>
-                    <button type="button" class="ah-btn ah-btn--secondary" @click="$emit('close')">{{ $t('MembersV2.cancel') }}</button>
-                    <span class="ah-small css__final">{{ $t('MembersV2.close_reversible') }}</span>
+                    <button type="button" class="ah-btn ah-btn--secondary" @click="$emit('close')">{{ $t('Members.cancel') }}</button>
+                    <span class="ah-small css__final">{{ $t('Members.close_reversible') }}</span>
                 </div>
             </div>
         </div>
@@ -101,7 +101,7 @@ const choice = ref("next");
 const pickedSprintId = ref("");
 
 const sprintId = computed(() => props.sprint?.id || props.sprint?._id);
-const title = computed(() => t("MembersV2.close_title", { name: props.sprint?.name || "" }));
+const title = computed(() => t("Members.close_title", { name: props.sprint?.name || "" }));
 const unfinished = computed(() => preview.value?.notDone?.list || []);
 const stranded = computed(() => preview.value?.strandedSubtasks?.list || []);
 const donePoints = computed(() => preview.value?.done?.points || 0);

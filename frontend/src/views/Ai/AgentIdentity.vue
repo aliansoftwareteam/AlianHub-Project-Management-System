@@ -4,7 +4,7 @@
         <span class="agent-id__text">
             <span class="agent-id__name">
                 <strong>{{ name }}</strong>
-                <span class="ah-chip ah-chip--agent ah-chip--mono agent-id__tag">{{ $t('ParityV2.agent_tag') }}</span>
+                <span class="ah-chip ah-chip--agent ah-chip--mono agent-id__tag">{{ $t('Parity.agent_tag') }}</span>
             </span>
             <span v-if="sub" class="agent-id__sub">{{ sub }}</span>
         </span>

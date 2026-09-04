@@ -3,10 +3,10 @@
         <AiSidebar />
         <div class="ai-page__main">
             <div class="ah-toolbar">
-                <div class="ah-toolbar__title">{{ $t('PipelineV2.title') }}</div>
+                <div class="ah-toolbar__title">{{ $t('Pipeline.title') }}</div>
                 <div class="ah-toolbar__spacer"></div>
                 <label v-if="tasks.length" class="pipe-pick">
-                    <span class="ah-label">{{ $t('PipelineV2.pick_task') }}</span>
+                    <span class="ah-label">{{ $t('Pipeline.pick_task') }}</span>
                     <select v-model="taskId" class="ah-input pipe-pick__select">
                         <option v-for="row in tasks" :key="row._id" :value="row._id">
                             {{ row.taskKey ? `${row.taskKey} · ${row.name}` : row.name }}
@@ -16,27 +16,27 @@
             </div>
 
             <div class="ai-page__body ah-scroll">
-                <p class="ai-lead">{{ $t('PipelineV2.lead') }}</p>
+                <p class="ai-lead">{{ $t('Pipeline.lead') }}</p>
 
-                <div v-if="loading" class="ah-empty">{{ $t('PipelineV2.loading') }}</div>
+                <div v-if="loading" class="ah-empty">{{ $t('Pipeline.loading') }}</div>
 
                 <div v-else-if="!tasks.length" class="ah-card ah-card__body pipe-empty">
-                    <h3 class="ah-h3">{{ $t('PipelineV2.empty_title') }}</h3>
-                    <p class="ah-small">{{ $t('PipelineV2.empty_body') }}</p>
+                    <h3 class="ah-h3">{{ $t('Pipeline.empty_title') }}</h3>
+                    <p class="ah-small">{{ $t('Pipeline.empty_body') }}</p>
                     <router-link class="ah-btn ah-btn--primary ah-btn--sm" :to="{ name: 'AiHub', params: { cid: companyId } }">
-                        {{ $t('PipelineV2.empty_cta') }}
+                        {{ $t('Pipeline.empty_cta') }}
                     </router-link>
                 </div>
 
                 <template v-else>
                     <div class="pipe-task ah-card">
                         <div class="ah-card__body pipe-task__body">
-                            <span class="ah-mono pipe-task__key">{{ task.taskKey || $t('PipelineV2.no_key') }}</span>
+                            <span class="ah-mono pipe-task__key">{{ task.taskKey || $t('Pipeline.no_key') }}</span>
                             <strong class="pipe-task__name">{{ task.name }}</strong>
                             <span v-if="task.status" class="ah-chip">{{ task.status }}</span>
-                            <span class="ah-mono pipe-task__meta">{{ $t('PipelineV2.activity_meta', { runs: task.runs, proposals: task.proposals }) }}</span>
+                            <span class="ah-mono pipe-task__meta">{{ $t('Pipeline.activity_meta', { runs: task.runs, proposals: task.proposals }) }}</span>
                             <button v-if="task.sprintId" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="openThisTask">
-                                {{ $t('PipelineV2.open_task') }}
+                                {{ $t('Pipeline.open_task') }}
                             </button>
                         </div>
                     </div>
@@ -48,7 +48,7 @@
                             class="pipe-stage"
                             :class="[`pipe-stage--${stage.tone}`, { 'is-stop': stage.beyondRegistry, 'is-idle': !stage.reached }]"
                         >
-                            <div v-if="stage.beyondRegistry" class="pipe-stage__stop ah-label">{{ $t('PipelineV2.hard_stop') }}</div>
+                            <div v-if="stage.beyondRegistry" class="pipe-stage__stop ah-label">{{ $t('Pipeline.hard_stop') }}</div>
                             <header class="pipe-stage__head">
                                 <span class="pipe-stage__n">{{ stage.n }}</span>
                                 <h3 class="ah-h3">{{ stage.title }}</h3>
@@ -72,7 +72,7 @@
                                     </span>
                                     <span class="pipe-evidence__text">
                                         <strong>{{ row.who }}</strong>
-                                        <span v-if="row.agent" class="ah-chip ah-chip--agent ah-chip--mono pipe-tag">{{ $t('PipelineV2.agent_tag') }}</span>
+                                        <span v-if="row.agent" class="ah-chip ah-chip--agent ah-chip--mono pipe-tag">{{ $t('Pipeline.agent_tag') }}</span>
                                         {{ row.what }}
                                     </span>
                                     <span v-if="row.at" class="ah-mono pipe-evidence__at">{{ row.at }}</span>
@@ -81,7 +81,7 @@
                             <p v-else class="pipe-none">{{ stage.none }}</p>
 
                             <div v-if="stage.audit.length" class="pipe-audit">
-                                <div class="ah-label">{{ $t('PipelineV2.audit') }}</div>
+                                <div class="ah-label">{{ $t('Pipeline.audit') }}</div>
                                 <div v-for="row in stage.audit" :key="row._id" class="pipe-audit__row ah-mono">
                                     {{ row.line }}
                                 </div>
@@ -89,17 +89,17 @@
                         </section>
                     </div>
 
-                    <p v-if="!auditVisible" class="pipe-none pipe-audit-note">{{ $t('PipelineV2.audit_restricted') }}</p>
+                    <p v-if="!auditVisible" class="pipe-none pipe-audit-note">{{ $t('Pipeline.audit_restricted') }}</p>
 
                     <div class="pipe-notes">
                         <div class="pipe-note">
-                            <strong>{{ $t('PipelineV2.note_a_title') }}</strong>
-                            {{ $t('PipelineV2.note_a_body') }}
+                            <strong>{{ $t('Pipeline.note_a_title') }}</strong>
+                            {{ $t('Pipeline.note_a_body') }}
                         </div>
                         <div class="pipe-note">
-                            <strong>{{ $t('PipelineV2.note_b_title') }}</strong>
-                            {{ $t('PipelineV2.note_b_body') }}
-                            <router-link v-if="hasIntegrationsRoute" :to="{ name: 'IntegrationsHub', params: { cid: companyId } }">{{ $t('PipelineV2.note_b_link') }}</router-link>
+                            <strong>{{ $t('Pipeline.note_b_title') }}</strong>
+                            {{ $t('Pipeline.note_b_body') }}
+                            <router-link v-if="hasIntegrationsRoute" :to="{ name: 'IntegrationsHub', params: { cid: companyId } }">{{ $t('Pipeline.note_b_link') }}</router-link>
                         </div>
                     </div>
                 </template>
@@ -152,11 +152,11 @@ const workRuns = computed(() => runs.value.filter((r) => r.taskId === task.value
 const linkRows = computed(() => (auditVisible.value ? auditRows.value : []).filter((row) => auditAction(row) === "task.link"));
 
 const proposalOutcome = (p) => {
-    if (p.status === "pending") return t("PipelineV2.awaiting", { gate: gateLabel(p.gate) });
-    return t("PipelineV2.decided", { status: p.status, at: at(p.decidedAt) });
+    if (p.status === "pending") return t("Pipeline.awaiting", { gate: gateLabel(p.gate) });
+    return t("Pipeline.decided", { status: p.status, at: at(p.decidedAt) });
 };
 
-const gateLabel = (gate) => (gate === "owner_admin" ? t("PipelineV2.gate_owner_admin") : gate || t("PipelineV2.gate_human"));
+const gateLabel = (gate) => (gate === "owner_admin" ? t("Pipeline.gate_owner_admin") : gate || t("Pipeline.gate_human"));
 
 const stages = computed(() => {
     const gated = gatedActions.value;
@@ -166,15 +166,15 @@ const stages = computed(() => {
     const stage1 = {
         n: 1,
         tone: "brand",
-        title: t("PipelineV2.s1_title"),
-        body: t("PipelineV2.s1_body"),
-        actor: t("PipelineV2.actor_person"),
-        actorDetail: task.value.taskKey ? `${task.value.taskKey} → ${runs.value[0]?.agentName || t("PipelineV2.unassigned_agent")}` : "",
+        title: t("Pipeline.s1_title"),
+        body: t("Pipeline.s1_body"),
+        actor: t("Pipeline.actor_person"),
+        actorDetail: task.value.taskKey ? `${task.value.taskKey} → ${runs.value[0]?.agentName || t("Pipeline.unassigned_agent")}` : "",
         reached: Boolean(task.value._id),
         beyondRegistry: false,
-        none: t("PipelineV2.s1_none"),
+        none: t("Pipeline.s1_none"),
         evidence: task.value._id
-            ? [{ agent: false, who: t("PipelineV2.brief_written"), what: t("PipelineV2.status_now", { status: task.value.status || task.value.statusType || "—" }), at: at(task.value.createdAt) }]
+            ? [{ agent: false, who: t("Pipeline.brief_written"), what: t("Pipeline.status_now", { status: task.value.status || task.value.statusType || "—" }), at: at(task.value.createdAt) }]
             : [],
         audit: auditFor(["task.update", "task.assign"])
     };
@@ -182,17 +182,17 @@ const stages = computed(() => {
     const stage2 = {
         n: 2,
         tone: "ink",
-        title: t("PipelineV2.s2_title"),
-        body: t("PipelineV2.s2_body"),
-        actor: t("PipelineV2.actor_agent"),
+        title: t("Pipeline.s2_title"),
+        body: t("Pipeline.s2_body"),
+        actor: t("Pipeline.actor_agent"),
         actorDetail: workRuns.value[0]?.skill || "",
         reached: workRuns.value.length > 0,
         beyondRegistry: false,
-        none: t("PipelineV2.s2_none"),
+        none: t("Pipeline.s2_none"),
         evidence: workRuns.value.slice(0, 4).map((run) => ({
             agent: true,
             who: run.agentName,
-            what: t("PipelineV2.run_line", { status: run.status, elapsed: runElapsed(run), usd: Number(run.spend?.usd || 0).toFixed(2) }),
+            what: t("Pipeline.run_line", { status: run.status, elapsed: runElapsed(run), usd: Number(run.spend?.usd || 0).toFixed(2) }),
             at: at(run.startedAt)
         })),
         audit: auditFor(["task.status.set", "timelog", "subtask.create", "task.comment"])
@@ -201,17 +201,17 @@ const stages = computed(() => {
     const stage3 = {
         n: 3,
         tone: "ink",
-        title: t("PipelineV2.s3_title"),
-        body: t("PipelineV2.s3_body"),
-        actor: t("PipelineV2.actor_agent"),
-        actorDetail: t("PipelineV2.link_action"),
+        title: t("Pipeline.s3_title"),
+        body: t("Pipeline.s3_body"),
+        actor: t("Pipeline.actor_agent"),
+        actorDetail: t("Pipeline.link_action"),
         reached: linkRows.value.length > 0,
         beyondRegistry: false,
-        none: t("PipelineV2.s3_none"),
+        none: t("Pipeline.s3_none"),
         evidence: linkRows.value.slice(0, 4).map((row) => ({
             agent: true,
             who: row.actorName || "",
-            what: t("PipelineV2.linked", { what: row.meta?.params?.label || row.meta?.params?.url || row.entityName || "" }),
+            what: t("Pipeline.linked", { what: row.meta?.params?.label || row.meta?.params?.url || row.entityName || "" }),
             at: at(row.createdAt)
         })),
         audit: auditFor(["task.link"])
@@ -220,15 +220,15 @@ const stages = computed(() => {
     const stage4 = {
         n: 4,
         tone: "warn",
-        title: t("PipelineV2.s4_title"),
+        title: t("Pipeline.s4_title"),
         body: gated.length
-            ? t("PipelineV2.s4_body", { actions: gated.map((a) => a.key).join(", "), gate: gateLabel(gated[0].gate) })
-            : t("PipelineV2.s4_body_none"),
-        actor: gated.length ? t("PipelineV2.actor_proposes") : t("PipelineV2.actor_none"),
-        actorDetail: gated.length ? t("PipelineV2.human_approves") : "",
+            ? t("Pipeline.s4_body", { actions: gated.map((a) => a.key).join(", "), gate: gateLabel(gated[0].gate) })
+            : t("Pipeline.s4_body_none"),
+        actor: gated.length ? t("Pipeline.actor_proposes") : t("Pipeline.actor_none"),
+        actorDetail: gated.length ? t("Pipeline.human_approves") : "",
         reached: gatedProposals.value.length > 0,
         beyondRegistry: false,
-        none: gated.length ? t("PipelineV2.s4_none") : t("PipelineV2.s4_none_registry"),
+        none: gated.length ? t("Pipeline.s4_none") : t("Pipeline.s4_none_registry"),
         evidence: gatedProposals.value.slice(0, 4).map((p) => ({
             agent: true,
             who: p.agentName,
@@ -244,15 +244,15 @@ const stages = computed(() => {
     const stage5 = {
         n: 5,
         tone: "danger",
-        title: t("PipelineV2.s5_title"),
+        title: t("Pipeline.s5_title"),
         body: shipBlocked.length
-            ? t("PipelineV2.s5_body", { keys: shipBlocked.join(", ") })
-            : t("PipelineV2.s5_body_reachable"),
-        actor: t("PipelineV2.actor_person_only"),
-        actorDetail: t("PipelineV2.attempts_logged"),
+            ? t("Pipeline.s5_body", { keys: shipBlocked.join(", ") })
+            : t("Pipeline.s5_body_reachable"),
+        actor: t("Pipeline.actor_person_only"),
+        actorDetail: t("Pipeline.attempts_logged"),
         reached: true,
         beyondRegistry: shipBlocked.length > 0,
-        none: t("PipelineV2.s5_none", { n: never.length }),
+        none: t("Pipeline.s5_none", { n: never.length }),
         keys: never,
         evidence: [],
         audit: auditRefusals.value

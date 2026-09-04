@@ -6,10 +6,10 @@ export const priorityKey = (value) => String(value || "").toUpperCase();
 
 export function priorityMeta(value) {
     const key = priorityKey(value);
-    if (key === "URGENT") return { key, label: "HomeV2.priority_urgent", cls: "ah-chip--danger" };
-    if (key === "HIGH") return { key, label: "HomeV2.priority_high", cls: "ah-chip--warn" };
-    if (key === "LOW") return { key, label: "HomeV2.priority_low", cls: "" };
-    return { key: "MEDIUM", label: "HomeV2.priority_medium", cls: "" };
+    if (key === "URGENT") return { key, label: "Home.priority_urgent", cls: "ah-chip--danger" };
+    if (key === "HIGH") return { key, label: "Home.priority_high", cls: "ah-chip--warn" };
+    if (key === "LOW") return { key, label: "Home.priority_low", cls: "" };
+    return { key: "MEDIUM", label: "Home.priority_medium", cls: "" };
 }
 
 export function dueBucket(task) {
@@ -25,8 +25,8 @@ export function dueLabel(date, t) {
     if (!date) return "";
     const d = moment(date);
     const today = moment().startOf("day");
-    if (d.isSame(today, "day")) return t("HomeV2.today");
-    if (d.isSame(today.clone().add(1, "day"), "day")) return t("HomeV2.tomorrow");
+    if (d.isSame(today, "day")) return t("Home.today");
+    if (d.isSame(today.clone().add(1, "day"), "day")) return t("Home.tomorrow");
     const diff = d.startOf("day").diff(today, "days");
     if (diff > 1 && diff < 7) return d.format("ddd");
     return d.format("MMM D");

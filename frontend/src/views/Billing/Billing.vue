@@ -1,29 +1,29 @@
 <template>
     <div class="ah-page billing">
         <header class="ah-toolbar billing__bar">
-            <h1 class="billing__title">{{ $t('BillingV2.title') }} · {{ projectName }}</h1>
+            <h1 class="billing__title">{{ $t('Billing.title') }} · {{ projectName }}</h1>
             <span v-if="clientLine" class="billing__client ah-mono">{{ clientLine }}</span>
             <nav class="billing__tabs" aria-label="Billing views">
                 <button type="button" class="billing__tab" :class="{ 'is-active': tab === 'contract' }" @click="setTab('contract')">
-                    {{ $t('BillingV2.tab_contract') }}
+                    {{ $t('Billing.tab_contract') }}
                 </button>
                 <button type="button" class="billing__tab" :class="{ 'is-active': tab === 'invoices' }" @click="setTab('invoices')">
-                    {{ $t('BillingV2.tab_invoices') }}
+                    {{ $t('Billing.tab_invoices') }}
                     <span v-if="invoiceCount" class="billing__count ah-mono">{{ invoiceCount }}</span>
                 </button>
                 <button type="button" class="billing__tab" :class="{ 'is-active': tab === 'client' }" @click="setTab('client')">
-                    {{ $t('BillingV2.tab_client_view') }}
+                    {{ $t('Billing.tab_client_view') }}
                 </button>
             </nav>
             <span class="ah-toolbar__spacer"></span>
             <button v-if="tab === 'contract'" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="settingsOpen = !settingsOpen">
                 <ShellIcon name="settings" :size="14" />
-                {{ $t('BillingV2.settings') }}
+                {{ $t('Billing.settings') }}
             </button>
         </header>
 
-        <p v-if="contract.loading && !contract.data" class="billing__state">{{ $t('BillingV2.loading') }}</p>
-        <div v-else-if="contract.error" class="ah-empty billing__state">{{ $t('BillingV2.load_failed') }}</div>
+        <p v-if="contract.loading && !contract.data" class="billing__state">{{ $t('Billing.loading') }}</p>
+        <div v-else-if="contract.error" class="ah-empty billing__state">{{ $t('Billing.load_failed') }}</div>
 
         <template v-else-if="contract.data">
             <BillingSettings
@@ -95,7 +95,7 @@ const setTab = (next) => {
 
 const onMode = async (mode) => {
     const result = await billing.saveContract({ billingMode: mode });
-    if (!result.ok) $toast.error(result.message || t("BillingV2.save_failed"));
+    if (!result.ok) $toast.error(result.message || t("Billing.save_failed"));
     else if (mode === "hourly") billing.loadHourly();
 };
 
@@ -103,16 +103,16 @@ const onSaveContract = async (patch) => {
     const result = await billing.saveContract(patch);
     if (result.ok) {
         settingsOpen.value = false;
-        $toast.success(t("BillingV2.saved"));
+        $toast.success(t("Billing.saved"));
     } else {
-        $toast.error(result.message || t("BillingV2.save_failed"));
+        $toast.error(result.message || t("Billing.save_failed"));
     }
 };
 
 const onInvoiceMilestone = async (milestoneId) => {
     const result = await billing.draftFromMilestone(milestoneId);
     if (!result.ok) {
-        $toast.error(result.message || t("BillingV2.save_failed"));
+        $toast.error(result.message || t("Billing.save_failed"));
         return;
     }
     await billing.loadContract();

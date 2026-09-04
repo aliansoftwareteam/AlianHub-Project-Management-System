@@ -9,7 +9,7 @@
         </template>
         <template #options>
             <div id="taskquickmenu_driver" class="tqm__list">
-                <div class="ah-label tqm__label">{{ $t('MembersV2.quick_menu') }}</div>
+                <div class="ah-label tqm__label">{{ $t('Members.quick_menu') }}</div>
                 <DropDownOption @click="closeAnd($emit('copyLink'))" v-if="!showArchiveVar">
                     <span class="tqm__item">{{ $t('ProjectDetails.copy_task_link') }}</span>
                 </DropDownOption>
@@ -41,7 +41,7 @@
                     <span class="tqm__item">{{ $t('ProjectDetails.merge') }}</span>
                 </DropDownOption>
                 <DropDownOption @click="closeAnd($emit('askAi'))" v-if="hasAiListener">
-                    <span class="tqm__item tqm__item--ai">✦ {{ $t('MembersV2.ask_ai') }}</span>
+                    <span class="tqm__item tqm__item--ai">✦ {{ $t('Members.ask_ai') }}</span>
                 </DropDownOption>
                 <DropDownOption v-if="(task.deletedStatusKey === undefined || task.deletedStatusKey === 0) && !showArchiveVar && checkPermission('task.task_archive',projectData.isGlobalPermission) == true" @click="closeAnd($emit('confirmArchive'))">
                     <span class="tqm__item">{{ $t('Projects.archive') }}</span>
@@ -53,7 +53,7 @@
                 <DropDownOption @click="closeAnd($emit('confirmDelete'))" v-if="checkPermission('task.task_delete',projectData.isGlobalPermission) == true">
                     <span class="tqm__item tqm__item--danger">
                         {{ $t('Projects.delete') }}
-                        <span class="tqm__hint">{{ $t('MembersV2.admin_only') }}</span>
+                        <span class="tqm__hint">{{ $t('Members.admin_only') }}</span>
                     </span>
                 </DropDownOption>
             </div>

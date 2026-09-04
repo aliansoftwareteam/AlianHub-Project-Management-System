@@ -1,35 +1,35 @@
 <template>
     <div class="mention">
-        <label class="ah-field__label" for="mention-body">{{ $t('ParityV2.comment_label') }}</label>
+        <label class="ah-field__label" for="mention-body">{{ $t('Parity.comment_label') }}</label>
         <textarea
             id="mention-body"
             ref="box"
             v-model="draft"
             class="mention__box"
-            :placeholder="$t('ParityV2.comment_placeholder')"
+            :placeholder="$t('Parity.comment_placeholder')"
             @keydown.esc="open = false"
         ></textarea>
 
         <div v-if="open && suggestions.length" class="ah-pop mention__pop">
-            <div class="ah-pop__label ah-label">{{ $t('ParityV2.agents') }}</div>
+            <div class="ah-pop__label ah-label">{{ $t('Parity.agents') }}</div>
             <button v-for="agent in suggestions" :key="agent._id" type="button" class="ah-pop__item" @click="pick(agent)">
                 <span class="ah-avatar ah-avatar--agent ah-avatar--sm"><ShellIcon name="agent" :size="11" /></span>
                 <span>
                     <span class="mention__who">{{ agent.name }}</span>
-                    <span class="ah-chip ah-chip--agent ah-chip--mono agent-id__tag" style="margin-left:6px">{{ $t('ParityV2.agent_tag') }}</span>
+                    <span class="ah-chip ah-chip--agent ah-chip--mono agent-id__tag" style="margin-left:6px">{{ $t('Parity.agent_tag') }}</span>
                 </span>
             </button>
         </div>
 
-        <p v-if="mentioned" class="mention__hint">{{ $t('ParityV2.mention_will_run', { name: mentioned.name }) }}</p>
-        <p v-else-if="draft.includes('@')" class="mention__hint">{{ $t('ParityV2.mention_no_match') }}</p>
+        <p v-if="mentioned" class="mention__hint">{{ $t('Parity.mention_will_run', { name: mentioned.name }) }}</p>
+        <p v-else-if="draft.includes('@')" class="mention__hint">{{ $t('Parity.mention_no_match') }}</p>
         <p v-if="error" class="ah-field__error">{{ error }}</p>
 
         <div class="mention__foot">
             <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="!canSend || busy" @click="send">
-                {{ busy ? $t('ParityV2.starting') : (mentioned ? $t('ParityV2.comment_and_run') : $t('ParityV2.comment')) }}
+                {{ busy ? $t('Parity.starting') : (mentioned ? $t('Parity.comment_and_run') : $t('Parity.comment')) }}
             </button>
-            <span class="mention__hint">{{ $t('ParityV2.mention_hint') }}</span>
+            <span class="mention__hint">{{ $t('Parity.mention_hint') }}</span>
         </div>
     </div>
 </template>

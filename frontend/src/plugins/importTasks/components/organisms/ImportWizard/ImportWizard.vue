@@ -1,10 +1,10 @@
 <template>
     <transition name="ah-fade">
-        <div v-if="open" class="iw__scrim ah-page" role="dialog" aria-modal="true" :aria-label="$t('ImportV2.title')" @click.self="close">
+        <div v-if="open" class="iw__scrim ah-page" role="dialog" aria-modal="true" :aria-label="$t('Import.title')" @click.self="close">
             <div class="iw">
                 <header class="iw__head">
                     <div>
-                        <div class="iw__title">{{ $t('ImportV2.title') }}<span v-if="fileName"> · {{ fileName }}</span></div>
+                        <div class="iw__title">{{ $t('Import.title') }}<span v-if="fileName"> · {{ fileName }}</span></div>
                         <div class="iw__sub">{{ headline }}</div>
                     </div>
                     <div class="iw__steps">
@@ -18,7 +18,7 @@
                             @click="goTo(index)"
                         >{{ index + 1 }} {{ label }}</button>
                     </div>
-                    <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm iw__close" :aria-label="$t('ImportV2.close')" @click="close">
+                    <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm iw__close" :aria-label="$t('Import.close')" @click="close">
                         <ShellIcon name="x" :size="16" />
                     </button>
                 </header>
@@ -34,16 +34,16 @@
                                 @drop.prevent="onDrop"
                             >
                                 <ShellIcon name="file" :size="26" />
-                                <span class="iw__drop-title">{{ $t('ImportV2.drop_title') }}</span>
-                                <span>{{ $t('ImportV2.drop_hint') }}</span>
+                                <span class="iw__drop-title">{{ $t('Import.drop_title') }}</span>
+                                <span>{{ $t('Import.drop_hint') }}</span>
                                 <input type="file" accept=".csv,text/csv" class="ah-sr-only" @change="onPick" />
                             </label>
                             <p v-if="fileError" class="ah-field__error">{{ fileError }}</p>
-                            <p class="iw__hint">{{ $t('ImportV2.file_note') }}</p>
+                            <p class="iw__hint">{{ $t('Import.file_note') }}</p>
                         </template>
 
                         <template v-else-if="step === 1">
-                            <div class="ah-label">{{ $t('ImportV2.header_row') }}</div>
+                            <div class="ah-label">{{ $t('Import.header_row') }}</div>
                             <div class="iw__rows">
                                 <div
                                     v-for="(row, index) in rawRows.slice(0, 8)"
@@ -55,16 +55,16 @@
                                     <span class="iw__rowline-name">{{ row.slice(0, 4).join(' · ') }}</span>
                                     <span>
                                         <button type="button" class="ah-btn ah-btn--sm" :class="headerRowIndex === index ? 'ah-btn--outline' : 'ah-btn--secondary'" @click="setHeaderRow(index)">
-                                            {{ headerRowIndex === index ? $t('ImportV2.header_is_this') : $t('ImportV2.header_use_this') }}
+                                            {{ headerRowIndex === index ? $t('Import.header_is_this') : $t('Import.header_use_this') }}
                                         </button>
                                     </span>
                                 </div>
                             </div>
-                            <p class="iw__hint">{{ $t('ImportV2.header_note') }}</p>
+                            <p class="iw__hint">{{ $t('Import.header_note') }}</p>
                         </template>
 
                         <template v-else-if="step === 2">
-                            <div class="ah-label">{{ $t('ImportV2.columns_found', { found: headers.length, mapped: mappedCount }) }}</div>
+                            <div class="ah-label">{{ $t('Import.columns_found', { found: headers.length, mapped: mappedCount }) }}</div>
                             <div class="iw__map">
                                 <div
                                     v-for="column in headers"
@@ -77,36 +77,36 @@
                                         <div class="iw__col-sample">{{ sampleOf(column) }}</div>
                                     </div>
                                     <span class="iw__arrow" aria-hidden="true">→</span>
-                                    <select v-model="columnTarget[column]" class="ah-input iw__select" :aria-label="$t('ImportV2.map_column', { column })">
-                                        <option value="">{{ $t('ImportV2.skip_column') }}</option>
+                                    <select v-model="columnTarget[column]" class="ah-input iw__select" :aria-label="$t('Import.map_column', { column })">
+                                        <option value="">{{ $t('Import.skip_column') }}</option>
                                         <option v-for="target in targets" :key="target.key" :value="target.key" :disabled="takenBy(target.key, column)">{{ target.label }}</option>
                                     </select>
                                     <p v-if="columnErrors[column]" class="iw__col-error">{{ columnErrors[column] }}</p>
                                 </div>
                             </div>
                             <div class="iw__note" v-if="unmappedCount">
-                                <strong>{{ $t('ImportV2.unmapped_count', { count: unmappedCount }) }}</strong> {{ $t('ImportV2.unmapped_note') }}
+                                <strong>{{ $t('Import.unmapped_count', { count: unmappedCount }) }}</strong> {{ $t('Import.unmapped_note') }}
                             </div>
                         </template>
 
                         <template v-else>
-                            <div class="ah-label">{{ $t('ImportV2.review') }}</div>
+                            <div class="ah-label">{{ $t('Import.review') }}</div>
                             <div class="iw__summary">
                                 <div class="iw__stat">
                                     <span class="iw__stat-value">{{ report.importable }}</span>
-                                    <span class="iw__stat-label">{{ $t('ImportV2.stat_importable') }}</span>
+                                    <span class="iw__stat-label">{{ $t('Import.stat_importable') }}</span>
                                 </div>
                                 <div class="iw__stat">
                                     <span class="iw__stat-value">{{ report.skipped }}</span>
-                                    <span class="iw__stat-label">{{ $t('ImportV2.stat_skipped') }}</span>
+                                    <span class="iw__stat-label">{{ $t('Import.stat_skipped') }}</span>
                                 </div>
                                 <div class="iw__stat">
                                     <span class="iw__stat-value">{{ report.issues.length }}</span>
-                                    <span class="iw__stat-label">{{ $t('ImportV2.stat_rows_with_errors') }}</span>
+                                    <span class="iw__stat-label">{{ $t('Import.stat_rows_with_errors') }}</span>
                                 </div>
                             </div>
 
-                            <div v-if="running || result" class="iw__progress" :aria-label="$t('ImportV2.progress')">
+                            <div v-if="running || result" class="iw__progress" :aria-label="$t('Import.progress')">
                                 <div class="iw__progress-fill" :style="{ width: progress + '%' }"></div>
                             </div>
                             <div v-if="result" class="iw__note" :class="{ 'iw__note--ok': !result.failed }">{{ result.message }}</div>
@@ -118,67 +118,67 @@
                                     <span class="iw__rowline-err">{{ issue.errors.map((e) => e.message).join(' ') }}</span>
                                 </div>
                             </div>
-                            <div v-else class="ah-empty">{{ $t('ImportV2.no_issues') }}</div>
+                            <div v-else class="ah-empty">{{ $t('Import.no_issues') }}</div>
                         </template>
                     </div>
 
                     <div v-if="step === 2" class="iw__side">
                         <div>
-                            <div class="ah-label" style="margin-bottom: 7px">{{ $t('ImportV2.statuses_heading', { from: sourceStatuses.length, to: projectStatuses.length }) }}</div>
+                            <div class="ah-label" style="margin-bottom: 7px">{{ $t('Import.statuses_heading', { from: sourceStatuses.length, to: projectStatuses.length }) }}</div>
                             <div class="iw__group">
                                 <div v-for="source in sourceStatuses" :key="'st' + source.value" class="iw__pair">
                                     <span class="iw__pair-src" :title="source.value">{{ source.value }} ({{ source.count }})</span>
                                     <span class="iw__arrow" aria-hidden="true">→</span>
                                     <span class="iw__pair-dst">
                                         <select v-model="statusMap[source.value]" class="ah-input">
-                                            <option value="">{{ createMissingStatuses ? $t('ImportV2.create_missing') : $t('ImportV2.status_default') }}</option>
+                                            <option value="">{{ createMissingStatuses ? $t('Import.create_missing') : $t('Import.status_default') }}</option>
                                             <option v-for="status in projectStatuses" :key="status" :value="status">{{ status }}</option>
                                         </select>
                                     </span>
                                 </div>
-                                <div v-if="!sourceStatuses.length" class="ah-small ah-muted">{{ $t('ImportV2.no_status_column') }}</div>
+                                <div v-if="!sourceStatuses.length" class="ah-small ah-muted">{{ $t('Import.no_status_column') }}</div>
                             </div>
                             <label class="ah-small" style="display: flex; gap: 6px; align-items: center; margin-top: 7px">
                                 <input v-model="createMissingStatuses" type="checkbox" class="ah-check" />
-                                {{ $t('ImportV2.create_missing_statuses') }}
+                                {{ $t('Import.create_missing_statuses') }}
                             </label>
                         </div>
 
                         <div>
-                            <div class="ah-label" style="margin-bottom: 7px">{{ $t('ImportV2.people_heading', { from: sourcePeople.length, matched: matchedPeopleCount }) }}</div>
+                            <div class="ah-label" style="margin-bottom: 7px">{{ $t('Import.people_heading', { from: sourcePeople.length, matched: matchedPeopleCount }) }}</div>
                             <div class="iw__group">
                                 <div v-for="person in sourcePeople" :key="'pp' + person.value" class="iw__pair">
                                     <span class="iw__pair-src" :title="person.value">{{ person.value }}</span>
                                     <span class="iw__arrow" aria-hidden="true">→</span>
                                     <span class="iw__pair-dst">
                                         <select v-model="userMap[person.value]" class="ah-input">
-                                            <option value="">{{ $t('ImportV2.leave_unassigned') }}</option>
+                                            <option value="">{{ $t('Import.leave_unassigned') }}</option>
                                             <option v-for="user in users" :key="user._id || user.id" :value="user._id || user.id">{{ user.Employee_Name || user.name }}</option>
                                         </select>
                                     </span>
                                 </div>
-                                <div v-if="!sourcePeople.length" class="ah-small ah-muted">{{ $t('ImportV2.no_people_column') }}</div>
+                                <div v-if="!sourcePeople.length" class="ah-small ah-muted">{{ $t('Import.no_people_column') }}</div>
                             </div>
                         </div>
 
                         <div v-if="columnTargetHasTags">
-                            <div class="ah-label" style="margin-bottom: 7px">{{ $t('ImportV2.tags_heading') }}</div>
+                            <div class="ah-label" style="margin-bottom: 7px">{{ $t('Import.tags_heading') }}</div>
                             <div class="iw__group">
                                 <label class="ah-small" style="display: flex; gap: 6px; align-items: center">
                                     <input v-model="createMissingTags" type="checkbox" class="ah-check" />
-                                    {{ $t('ImportV2.create_missing_tags') }}
+                                    {{ $t('Import.create_missing_tags') }}
                                 </label>
                             </div>
                         </div>
 
-                        <p class="iw__hint">{{ $t('ImportV2.preset_note') }}</p>
+                        <p class="iw__hint">{{ $t('Import.preset_note') }}</p>
                     </div>
                 </div>
 
                 <footer class="iw__foot">
-                    <span class="iw__foot-note">{{ step === 3 ? $t('ImportV2.foot_review') : $t('ImportV2.foot_nothing_written') }}</span>
+                    <span class="iw__foot-note">{{ step === 3 ? $t('Import.foot_review') : $t('Import.foot_nothing_written') }}</span>
                     <div class="iw__foot-actions">
-                        <button type="button" class="ah-btn ah-btn--secondary" :disabled="running" @click="back">{{ $t('ImportV2.back') }}</button>
+                        <button type="button" class="ah-btn ah-btn--secondary" :disabled="running" @click="back">{{ $t('Import.back') }}</button>
                         <button type="button" class="ah-btn ah-btn--primary" :disabled="!canAdvance || running" @click="next">{{ primaryLabel }}</button>
                     </div>
                 </footer>
@@ -229,23 +229,23 @@ const userMap = reactive({});
 const createMissingStatuses = ref(false);
 const createMissingTags = ref(true);
 const targets = ref([
-    { key: "taskName", label: t("ImportV2.target_task_title"), required: true },
-    { key: "description", label: t("ImportV2.target_description") },
-    { key: "status", label: t("ImportV2.target_status") },
-    { key: "priority", label: t("ImportV2.target_priority") },
-    { key: "assignee", label: t("ImportV2.target_assignee") },
-    { key: "dueDate", label: t("ImportV2.target_due_date") },
-    { key: "startDate", label: t("ImportV2.target_start_date") },
-    { key: "estimate", label: t("ImportV2.target_estimate") },
-    { key: "loggedTime", label: t("ImportV2.target_logged_time") },
-    { key: "tags", label: t("ImportV2.target_tags") }
+    { key: "taskName", label: t("Import.target_task_title"), required: true },
+    { key: "description", label: t("Import.target_description") },
+    { key: "status", label: t("Import.target_status") },
+    { key: "priority", label: t("Import.target_priority") },
+    { key: "assignee", label: t("Import.target_assignee") },
+    { key: "dueDate", label: t("Import.target_due_date") },
+    { key: "startDate", label: t("Import.target_start_date") },
+    { key: "estimate", label: t("Import.target_estimate") },
+    { key: "loggedTime", label: t("Import.target_logged_time") },
+    { key: "tags", label: t("Import.target_tags") }
 ]);
 const report = ref({ total: 0, importable: 0, skipped: 0, issues: [], unknownStatuses: [], unknownUsers: [] });
 const running = ref(false);
 const progress = ref(0);
 const result = ref(null);
 
-const stepLabels = computed(() => [t("ImportV2.step_file"), t("ImportV2.step_header"), t("ImportV2.step_map"), t("ImportV2.step_review")]);
+const stepLabels = computed(() => [t("Import.step_file"), t("Import.step_header"), t("Import.step_map"), t("Import.step_review")]);
 
 const headers = computed(() => (rawRows.value[headerRowIndex.value] || []).map((cell, index) => String(cell || `Column ${index + 1}`).trim()));
 const dataRows = computed(() => rawRows.value
@@ -257,9 +257,9 @@ const project = computed(() => ((getters["projectData/allProjects"] || {}).data 
 const projectStatuses = computed(() => (props.taskStatus || []).map((status) => status.name).filter(Boolean));
 
 const headline = computed(() => {
-    if (!rawRows.value.length) return t("ImportV2.headline_empty");
+    if (!rawRows.value.length) return t("Import.headline_empty");
     const name = project.value.ProjectName || props.sprint?.name || "";
-    return t("ImportV2.headline", { rows: dataRows.value.length, target: name });
+    return t("Import.headline", { rows: dataRows.value.length, target: name });
 });
 
 const mapping = computed(() => {
@@ -314,16 +314,16 @@ const canAdvance = computed(() => {
 });
 
 const primaryLabel = computed(() => {
-    if (step.value === 2) return t("ImportV2.review_rows", { count: dataRows.value.length });
-    if (step.value === 3) return running.value ? t("ImportV2.importing") : t("ImportV2.import_rows", { count: report.value.importable });
-    return t("ImportV2.next");
+    if (step.value === 2) return t("Import.review_rows", { count: dataRows.value.length });
+    if (step.value === 3) return running.value ? t("Import.importing") : t("Import.import_rows", { count: report.value.importable });
+    return t("Import.next");
 });
 
 const sampleOf = (column) => {
     const hit = dataRows.value.find((row) => String(row[column] === undefined ? "" : row[column]).trim() !== "");
     const value = hit ? String(hit[column]).trim() : "";
     const filled = dataRows.value.filter((row) => String(row[column] === undefined ? "" : row[column]).trim() !== "").length;
-    return value ? `"${value.slice(0, 40)}" · ${t("ImportV2.filled", { count: filled })}` : t("ImportV2.empty_column");
+    return value ? `"${value.slice(0, 40)}" · ${t("Import.filled", { count: filled })}` : t("Import.empty_column");
 };
 
 const takenBy = (targetKey, column) => Object.keys(columnTarget).some((entry) => entry !== column && columnTarget[entry] === targetKey);
@@ -331,7 +331,7 @@ const takenBy = (targetKey, column) => Object.keys(columnTarget).some((entry) =>
 const titleOfRow = (rowNumber) => {
     const column = columnOf("taskName");
     const row = dataRows.value[rowNumber - 1];
-    return column && row ? String(row[column] || "").slice(0, 60) : `${t("ImportV2.row")} ${rowNumber}`;
+    return column && row ? String(row[column] || "").slice(0, 60) : `${t("Import.row")} ${rowNumber}`;
 };
 
 function reset() {
@@ -358,7 +358,7 @@ function readFile(file) {
     fileError.value = "";
     if (!file) return;
     if (!/\.csv$/i.test(file.name) && file.type !== "text/csv") {
-        fileError.value = t("ImportV2.error_not_csv");
+        fileError.value = t("Import.error_not_csv");
         return;
     }
     fileName.value = file.name;
@@ -368,14 +368,14 @@ function readFile(file) {
             const workbook = XLSX.read(event.target.result, { type: "binary", codepage: 65001 });
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
             const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false });
-            if (!rows.length) { fileError.value = t("ImportV2.error_empty"); return; }
-            if (rows.length - 1 > MAX_ROWS) { fileError.value = t("ImportV2.error_too_many", { max: MAX_ROWS }); return; }
+            if (!rows.length) { fileError.value = t("Import.error_empty"); return; }
+            if (rows.length - 1 > MAX_ROWS) { fileError.value = t("Import.error_too_many", { max: MAX_ROWS }); return; }
             rawRows.value = rows.map((row) => (Array.isArray(row) ? row : []));
             headerRowIndex.value = 0;
             autoMap();
             step.value = 1;
         } catch (error) {
-            fileError.value = t("ImportV2.error_unreadable");
+            fileError.value = t("Import.error_unreadable");
         }
     };
     reader.readAsBinaryString(file);
@@ -477,11 +477,11 @@ async function runImport() {
 
     running.value = false;
     if (failure) {
-        result.value = { failed: true, message: t("ImportV2.import_failed", { reason: failure }) };
+        result.value = { failed: true, message: t("Import.import_failed", { reason: failure }) };
         return;
     }
     progress.value = 100;
-    result.value = { failed: false, message: t("ImportV2.import_done", { created, skipped }) };
+    result.value = { failed: false, message: t("Import.import_done", { created, skipped }) };
     emit("imported", { created, skipped });
 }
 

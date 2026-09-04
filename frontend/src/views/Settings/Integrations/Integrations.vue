@@ -3,10 +3,10 @@
         <SpinnerComp :is-spinner="isSpinner" />
         <div class="ig__head">
             <h2 class="ah-h3 ig__title">{{ $t('Integrations.title') }}</h2>
-            <span class="ah-label">{{ $t('SettingsV2.connected_count', { n: connectedCount }) }}</span>
+            <span class="ah-label">{{ $t('Settings.connected_count', { n: connectedCount }) }}</span>
             <div class="ig__head-actions">
-                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="toggleWebhookForm()"><ShellIcon name="plus" :size="14" />{{ $t('SettingsV2.webhook') }}</button>
-                <router-link v-if="apiTokensRoute" class="ah-btn ah-btn--secondary ah-btn--sm" :to="apiTokensRoute">{{ $t('SettingsV2.api_keys') }}</router-link>
+                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="toggleWebhookForm()"><ShellIcon name="plus" :size="14" />{{ $t('Settings.webhook') }}</button>
+                <router-link v-if="apiTokensRoute" class="ah-btn ah-btn--secondary ah-btn--sm" :to="apiTokensRoute">{{ $t('Settings.api_keys') }}</router-link>
             </div>
         </div>
 
@@ -83,7 +83,7 @@
                     <div class="ig__row-actions">
                         <button v-if="p.oauth && !p.connected" type="button" class="ig__link" @click="connectCloud(p)">{{ $t('Integrations.cloud_connect') }}</button>
                         <button v-if="p.oauth && p.connected" type="button" class="ig__link ig__link--danger" @click="disconnectCloud(p)">{{ $t('Integrations.cloud_disconnect') }}</button>
-                        <button type="button" class="ig__link" @click="toggleCloudForm(p)">{{ cloudEditing === p.provider ? $t('Integrations.cancel') : $t('SettingsV2.configure') }}</button>
+                        <button type="button" class="ig__link" @click="toggleCloudForm(p)">{{ cloudEditing === p.provider ? $t('Integrations.cancel') : $t('Settings.configure') }}</button>
                         <button type="button" class="ig__link ig__link--danger" @click="removeCloud(p)">{{ $t('Integrations.delete') }}</button>
                     </div>
                 </div>
@@ -125,18 +125,18 @@
                 </div>
             </div>
 
-            <div v-if="!connectedProviders.length && !webhooks.length && !isSpinner" class="ah-empty">{{ $t('SettingsV2.integrations_empty') }}</div>
+            <div v-if="!connectedProviders.length && !webhooks.length && !isSpinner" class="ah-empty">{{ $t('Settings.integrations_empty') }}</div>
         </div>
 
-        <div class="ah-label">{{ $t('SettingsV2.available') }}</div>
+        <div class="ah-label">{{ $t('Settings.available') }}</div>
         <div class="ig__chips">
             <button v-for="p in availableProviders" :key="p.provider" type="button" class="ig__chip" :class="{ 'is-active': cloudEditing === p.provider }" @click="toggleCloudForm(p)"><span aria-hidden="true">{{ p.icon }}</span> {{ p.name }}</button>
-            <button v-for="opt in formatOptions" :key="opt.value" type="button" class="ig__chip" @click="toggleWebhookForm(opt.value)">{{ opt.label }} {{ $t('SettingsV2.webhook').toLowerCase() }}</button>
+            <button v-for="opt in formatOptions" :key="opt.value" type="button" class="ig__chip" @click="toggleWebhookForm(opt.value)">{{ opt.label }} {{ $t('Settings.webhook').toLowerCase() }}</button>
         </div>
 
         <section v-if="editingProvider" class="ah-card">
             <div class="ah-card__head">
-                <h3 class="ah-h3">{{ $t('SettingsV2.set_up_provider', { provider: editingProvider.name }) }}</h3>
+                <h3 class="ah-h3">{{ $t('Settings.set_up_provider', { provider: editingProvider.name }) }}</h3>
                 <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :aria-label="$t('Integrations.cancel')" @click="cloudEditing = ''"><ShellIcon name="x" :size="16" /></button>
             </div>
             <div class="ah-card__body ig__form">
@@ -164,7 +164,7 @@
 
         <div class="ah-card ig__note">
             <ShellIcon name="agent" :size="16" class="ig__note-icon" />
-            <span>{{ $t('SettingsV2.integrations_agent_note') }}</span>
+            <span>{{ $t('Settings.integrations_agent_note') }}</span>
         </div>
     </div>
 </template>

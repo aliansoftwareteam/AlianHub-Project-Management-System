@@ -1,11 +1,11 @@
 <template>
     <div class="ah-page al">
         <div class="ah-toolbar">
-            <div class="ah-toolbar__title">{{ $t('AuditV2.title') }}</div>
+            <div class="ah-toolbar__title">{{ $t('Audit.title') }}</div>
             <span class="ah-chip ah-chip--mono">{{ todayLabel }}</span>
             <div class="ah-toolbar__spacer"></div>
             <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="exportCsv">
-                <ShellIcon name="docs" :size="14" />{{ $t('AuditV2.export_csv') }}
+                <ShellIcon name="docs" :size="14" />{{ $t('Audit.export_csv') }}
             </button>
         </div>
 
@@ -17,26 +17,26 @@
             </div>
             <div class="al__search">
                 <ShellIcon name="search" :size="14" />
-                <input v-model.trim="search" type="search" class="al__search-input" :placeholder="$t('AuditV2.search')" @keyup.enter="reload" />
+                <input v-model.trim="search" type="search" class="al__search-input" :placeholder="$t('Audit.search')" @keyup.enter="reload" />
             </div>
             <span v-if="projectFilter" class="ah-chip ah-chip--brand">
                 {{ projectFilter.name }}
-                <button type="button" class="al__chip-x" :aria-label="$t('AuditV2.clear_filter')" @click="clearProject">×</button>
+                <button type="button" class="al__chip-x" :aria-label="$t('Audit.clear_filter')" @click="clearProject">×</button>
             </span>
         </div>
 
         <div class="al__body ah-scroll">
             <div v-if="error" class="ah-empty">{{ error }}</div>
-            <div v-else-if="busy && !rows.length" class="ah-empty">{{ $t('AuditV2.loading') }}</div>
-            <div v-else-if="!rows.length" class="ah-empty">{{ $t('AuditV2.none') }}</div>
+            <div v-else-if="busy && !rows.length" class="ah-empty">{{ $t('Audit.loading') }}</div>
+            <div v-else-if="!rows.length" class="ah-empty">{{ $t('Audit.none') }}</div>
 
             <table v-else class="al__table">
                 <thead>
                     <tr>
-                        <th>{{ $t('AuditV2.col_time') }}</th>
-                        <th>{{ $t('AuditV2.col_actor') }}</th>
-                        <th>{{ $t('AuditV2.col_event') }}</th>
-                        <th>{{ $t('AuditV2.col_reason') }}</th>
+                        <th>{{ $t('Audit.col_time') }}</th>
+                        <th>{{ $t('Audit.col_actor') }}</th>
+                        <th>{{ $t('Audit.col_event') }}</th>
+                        <th>{{ $t('Audit.col_reason') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -46,32 +46,32 @@
                             <span class="al__actor">
                                 <span class="ah-avatar ah-avatar--sm" :class="{ 'ah-avatar--agent': isAgent(row) }">{{ initial(row) }}</span>
                                 <span class="al__actor-name">{{ actorName(row) }}</span>
-                                <span v-if="isAgent(row)" class="ah-chip ah-chip--agent ah-chip--mono">{{ $t('AuditV2.agent') }}</span>
+                                <span v-if="isAgent(row)" class="ah-chip ah-chip--agent ah-chip--mono">{{ $t('Audit.agent') }}</span>
                             </span>
                         </td>
                         <td>
                             <div class="al__event">
-                                <span v-if="row.action === 'agent.action_refused'" class="al__blocked">{{ $t('AuditV2.blocked_by_policy') }}</span>
+                                <span v-if="row.action === 'agent.action_refused'" class="al__blocked">{{ $t('Audit.blocked_by_policy') }}</span>
                                 <span class="ah-mono al__action">{{ eventAction(row) }}</span>
                                 <span v-if="row.entityName || row.entityId" class="al__entity">{{ row.entityName || row.entityId }}</span>
                             </div>
                             <div v-if="row.meta && row.meta.cost && (row.meta.cost.tokens || row.meta.cost.usd)" class="al__cost ah-mono">
-                                {{ $t('AuditV2.cost', { tokens: row.meta.cost.tokens || 0, usd: Number(row.meta.cost.usd || 0).toFixed(2) }) }}
+                                {{ $t('Audit.cost', { tokens: row.meta.cost.tokens || 0, usd: Number(row.meta.cost.usd || 0).toFixed(2) }) }}
                             </div>
                         </td>
                         <td>
                             <div class="al__reason">{{ (row.meta && row.meta.reason) || '—' }}</div>
                             <div class="al__meta">
-                                <span v-if="row.meta && row.meta.runId" class="ah-mono al__run">{{ $t('AuditV2.run_n', { n: String(row.meta.runId).slice(-4) }) }}</span>
-                                <span v-if="row.meta && row.meta.undoneAt" class="ah-chip ah-chip--warn">{{ $t('AuditV2.undone_at', { t: time(row.meta.undoneAt) }) }}</span>
+                                <span v-if="row.meta && row.meta.runId" class="ah-mono al__run">{{ $t('Audit.run_n', { n: String(row.meta.runId).slice(-4) }) }}</span>
+                                <span v-if="row.meta && row.meta.undoneAt" class="ah-chip ah-chip--warn">{{ $t('Audit.undone_at', { t: time(row.meta.undoneAt) }) }}</span>
                                 <button
                                     v-else-if="row.meta && row.meta.undoable"
                                     type="button"
                                     class="ah-btn ah-btn--ghost ah-btn--sm"
                                     :disabled="undoingId === row._id"
                                     @click="undo(row)"
-                                >{{ undoingId === row._id ? $t('AuditV2.undoing') : $t('AuditV2.undo') }}</button>
-                                <span v-else-if="row.action === 'agent.action_refused'" class="ah-small">{{ $t('AuditV2.nothing_ran') }}</span>
+                                >{{ undoingId === row._id ? $t('Audit.undoing') : $t('Audit.undo') }}</button>
+                                <span v-else-if="row.action === 'agent.action_refused'" class="ah-small">{{ $t('Audit.nothing_ran') }}</span>
                             </div>
                         </td>
                     </tr>
@@ -79,9 +79,9 @@
             </table>
 
             <div v-if="rows.length && page < totalPages" class="al__more">
-                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="loadMore">{{ $t('AuditV2.load_more') }}</button>
+                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="loadMore">{{ $t('Audit.load_more') }}</button>
             </div>
-            <p v-if="rows.length" class="al__note ah-small">{{ $t('AuditV2.retention') }}</p>
+            <p v-if="rows.length" class="al__note ah-small">{{ $t('Audit.retention') }}</p>
         </div>
     </div>
 </template>
@@ -113,23 +113,23 @@ const error = ref("");
 const scope = ref("all");
 const search = ref("");
 const undoingId = ref("");
-const projectFilter = ref(route.query.projectId ? { id: route.query.projectId, name: route.query.projectName || t("AuditV2.this_project") } : null);
+const projectFilter = ref(route.query.projectId ? { id: route.query.projectId, name: route.query.projectName || t("Audit.this_project") } : null);
 
 const tabs = [
-    { key: "all", label: "AuditV2.tab_all" },
-    { key: "agent", label: "AuditV2.tab_agents" },
-    { key: "gated", label: "AuditV2.tab_gated" },
-    { key: "undone", label: "AuditV2.tab_undone" }
+    { key: "all", label: "Audit.tab_all" },
+    { key: "agent", label: "Audit.tab_agents" },
+    { key: "gated", label: "Audit.tab_gated" },
+    { key: "undone", label: "Audit.tab_undone" }
 ];
 
 const todayCount = computed(() => rows.value.filter((r) => moment(r.createdAt).isSame(moment(), "day")).length || total.value);
-const todayLabel = computed(() => t("AuditV2.today_events", {
+const todayLabel = computed(() => t("Audit.today_events", {
     n: todayCount.value,
-    unit: t(todayCount.value === 1 ? "AuditV2.event_one" : "AuditV2.event_other")
+    unit: t(todayCount.value === 1 ? "Audit.event_one" : "Audit.event_other")
 }));
 
 const isAgent = (row) => row.meta && row.meta.actorType === "agent";
-const actorName = (row) => (isAgent(row) ? row.meta.agentName || t("AuditV2.an_agent") : row.actorName || getUser(row.actorId)?.Employee_Name || t("AuditV2.someone"));
+const actorName = (row) => (isAgent(row) ? row.meta.agentName || t("Audit.an_agent") : row.actorName || getUser(row.actorId)?.Employee_Name || t("Audit.someone"));
 const initial = (row) => actorName(row).charAt(0).toUpperCase();
 const eventAction = (row) => (row.meta && row.meta.action) || row.action;
 const time = (at) => (at ? moment(at).format("HH:mm") : "");
@@ -150,7 +150,7 @@ const load = async ({ append = false } = {}) => {
     try {
         const res = await apiRequest("get", `${env.AUDIT_LOGS}?${query()}`);
         if (!res?.data?.status) {
-            error.value = res?.data?.statusText || t("AuditV2.failed");
+            error.value = res?.data?.statusText || t("Audit.failed");
             return;
         }
         rows.value = append ? [...rows.value, ...(res.data.data || [])] : res.data.data || [];
@@ -173,8 +173,8 @@ const undo = async (row) => {
     undoingId.value = row._id;
     try {
         const res = await apiRequest("post", `${env.AUDIT_LOGS}/${row._id}/undo`, {});
-        if (!res?.data?.status) throw new Error(res?.data?.statusText || t("AuditV2.undo_failed"));
-        $toast.success(t("AuditV2.undone_toast"), { position: "top-right" });
+        if (!res?.data?.status) throw new Error(res?.data?.statusText || t("Audit.undo_failed"));
+        $toast.success(t("Audit.undone_toast"), { position: "top-right" });
         reload();
     } catch (e) {
         $toast.error(e.message, { position: "top-right" });
@@ -195,7 +195,7 @@ const exportCsv = async () => {
         a.click();
         URL.revokeObjectURL(url);
     } catch (e) {
-        $toast.error(t("AuditV2.export_failed"), { position: "top-right" });
+        $toast.error(t("Audit.export_failed"), { position: "top-right" });
     } finally {
         busy.value = false;
     }

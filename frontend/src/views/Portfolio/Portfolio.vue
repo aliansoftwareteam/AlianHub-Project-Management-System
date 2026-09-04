@@ -1,41 +1,41 @@
 <template>
     <div class="ah-page rp-page">
         <div class="rp-head">
-            <h1 class="rp-title">{{ $t('ReportsV2.portfolio_title') }}</h1>
+            <h1 class="rp-title">{{ $t('Reports.portfolio_title') }}</h1>
             <span class="rp-meta">{{ headline }}</span>
             <ReportsTabs />
             <div class="rp-actions">
-                <select v-model="selectedId" class="rp-select" :aria-label="$t('ReportsV2.portfolio_pick')">
+                <select v-model="selectedId" class="rp-select" :aria-label="$t('Reports.portfolio_pick')">
                     <option v-for="p in portfolios" :key="p._id" :value="String(p._id)">{{ p.name }}</option>
                 </select>
-                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="!selected" @click="openEdit">{{ $t('ReportsV2.edit') }}</button>
-                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="openCreate">{{ $t('ReportsV2.new_portfolio') }}</button>
+                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="!selected" @click="openEdit">{{ $t('Reports.edit') }}</button>
+                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="openCreate">{{ $t('Reports.new_portfolio') }}</button>
             </div>
         </div>
 
         <div v-if="!portfolios.length && !loading" class="rp-empty">
-            <strong>{{ $t('ReportsV2.portfolio_none_title') }}</strong>
-            <span>{{ $t('ReportsV2.portfolio_none_body') }}</span>
-            <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="openCreate">{{ $t('ReportsV2.new_portfolio') }}</button>
+            <strong>{{ $t('Reports.portfolio_none_title') }}</strong>
+            <span>{{ $t('Reports.portfolio_none_body') }}</span>
+            <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="openCreate">{{ $t('Reports.new_portfolio') }}</button>
         </div>
 
         <div v-else-if="rollup" class="rp-two">
             <div class="rp-col">
                 <div class="rp-stats rp-stats--4">
                     <div class="rp-stat">
-                        <span class="rp-stat__label">{{ $t('ReportsV2.on_track') }}</span>
+                        <span class="rp-stat__label">{{ $t('Reports.on_track') }}</span>
                         <span class="rp-stat__value is-ok">{{ rollup.totals.onTrack }}</span>
                     </div>
                     <div class="rp-stat">
-                        <span class="rp-stat__label">{{ $t('ReportsV2.at_risk') }}</span>
+                        <span class="rp-stat__label">{{ $t('Reports.at_risk') }}</span>
                         <span class="rp-stat__value is-warn">{{ rollup.totals.atRisk }}</span>
                     </div>
                     <div class="rp-stat">
-                        <span class="rp-stat__label">{{ $t('ReportsV2.off_track') }}</span>
+                        <span class="rp-stat__label">{{ $t('Reports.off_track') }}</span>
                         <span class="rp-stat__value is-danger">{{ rollup.totals.offTrack }}</span>
                     </div>
                     <div class="rp-stat">
-                        <span class="rp-stat__label">{{ $t('ReportsV2.team_load') }}</span>
+                        <span class="rp-stat__label">{{ $t('Reports.team_load') }}</span>
                         <span class="rp-stat__value">{{ capacity ? `${capacity.totals.utilizationPct}%` : '—' }}</span>
                     </div>
                 </div>
@@ -46,22 +46,22 @@
                         <span v-if="burndownNote" class="rp-card__note">{{ burndownNote }}</span>
                     </div>
                     <ApexChart v-if="burndownDays.length" type="line" height="230" :options="burndownOptions" :series="burndownSeries" />
-                    <div v-else class="rp-empty"><span>{{ $t('ReportsV2.no_active_sprint') }}</span></div>
+                    <div v-else class="rp-empty"><span>{{ $t('Reports.no_active_sprint') }}</span></div>
                 </div>
 
                 <div class="rp-card">
                     <div class="rp-card__head">
-                        {{ $t('ReportsV2.at_risk_now') }}
+                        {{ $t('Reports.at_risk_now') }}
                         <span class="rp-card__note">{{ atRisk.length }}</span>
                     </div>
                     <div v-for="p in atRisk" :key="p.projectId" class="rp-meter">
                         <span class="rp-meter__name" :title="p.name">{{ p.name }}</span>
                         <span class="rp-meter__track"><span class="rp-meter__fill" :class="{ 'is-over': p.health === 'off-track' }" :style="{ width: `${p.progressPct}%` }"></span></span>
                         <span class="rp-meter__pct">{{ p.progressPct }}%</span>
-                        <span class="ah-chip" :class="p.health === 'off-track' ? 'ah-chip--danger' : 'ah-chip--warn'">{{ $t(`ReportsV2.h_${p.health.replace('-', '_')}`) }}</span>
-                        <span class="rp-row__data">{{ $t('ReportsV2.n_overdue', { n: p.overdue }) }}</span>
+                        <span class="ah-chip" :class="p.health === 'off-track' ? 'ah-chip--danger' : 'ah-chip--warn'">{{ $t(`Reports.h_${p.health.replace('-', '_')}`) }}</span>
+                        <span class="rp-row__data">{{ $t('Reports.n_overdue', { n: p.overdue }) }}</span>
                     </div>
-                    <span v-if="!atRisk.length" class="ah-small">{{ $t('ReportsV2.nothing_at_risk') }}</span>
+                    <span v-if="!atRisk.length" class="ah-small">{{ $t('Reports.nothing_at_risk') }}</span>
                 </div>
             </div>
 
@@ -69,17 +69,17 @@
                 <div class="rp-dark">
                     <div class="rp-dark__head">
                         <span class="rp-dark__mark"><ShellIcon name="ai" :size="13" /></span>
-                        <span>{{ $t('ReportsV2.digest_title') }}</span>
+                        <span>{{ $t('Reports.digest_title') }}</span>
                         <span v-if="summaryModel" class="rp-dark__meta">{{ summaryModel }}</span>
                     </div>
                     <div v-if="summary" class="rp-dark__body">{{ summary }}</div>
-                    <div v-else class="rp-dark__body">{{ $t(`ReportsV2.digest_${summaryReason}`) }}</div>
+                    <div v-else class="rp-dark__body">{{ $t(`Reports.digest_${summaryReason}`) }}</div>
                 </div>
 
                 <div class="rp-card">
                     <div class="rp-card__head">
-                        {{ $t('ReportsV2.capacity_week') }}
-                        <span class="rp-card__note">{{ capacity ? $t('ReportsV2.n_people', { n: capacity.totals.users }) : '' }}</span>
+                        {{ $t('Reports.capacity_week') }}
+                        <span class="rp-card__note">{{ capacity ? $t('Reports.n_people', { n: capacity.totals.users }) : '' }}</span>
                     </div>
                     <div v-for="u in capacityRows" :key="u.userId" class="rp-meter">
                         <span class="rp-meter__name" :title="u.name">{{ u.name }}</span>
@@ -87,33 +87,33 @@
                             <span class="rp-meter__fill" :class="{ 'is-over': u.status === 'over' }" :style="{ width: `${Math.min(100, u.utilizationPct)}%` }"></span>
                         </span>
                         <span class="rp-meter__pct" :class="{ 'is-over': u.status === 'over' }">{{ u.utilizationPct }}%</span>
-                        <span v-if="u.ptoHours" class="rp-row__data">{{ $t('ReportsV2.pto_h', { h: Math.round(u.ptoHours) }) }}</span>
+                        <span v-if="u.ptoHours" class="rp-row__data">{{ $t('Reports.pto_h', { h: Math.round(u.ptoHours) }) }}</span>
                     </div>
-                    <span v-if="!capacityRows.length" class="ah-small">{{ $t('ReportsV2.no_capacity') }}</span>
+                    <span v-if="!capacityRows.length" class="ah-small">{{ $t('Reports.no_capacity') }}</span>
                 </div>
             </div>
         </div>
 
         <div v-if="showForm" class="rp-modal-bg" @click.self="showForm = false">
             <div class="rp-modal">
-                <h2 class="ah-h2">{{ editing ? $t('ReportsV2.edit_portfolio') : $t('ReportsV2.new_portfolio') }}</h2>
+                <h2 class="ah-h2">{{ editing ? $t('Reports.edit_portfolio') : $t('Reports.new_portfolio') }}</h2>
                 <label class="ah-field">
-                    <span class="ah-field__label">{{ $t('ReportsV2.portfolio_name') }}</span>
-                    <input v-model="form.name" class="ah-input" :placeholder="$t('ReportsV2.portfolio_name_ph')" />
+                    <span class="ah-field__label">{{ $t('Reports.portfolio_name') }}</span>
+                    <input v-model="form.name" class="ah-input" :placeholder="$t('Reports.portfolio_name_ph')" />
                 </label>
                 <div class="rp-modal__list ah-scroll">
                     <label v-for="pr in allProjects" :key="pr._id" class="rp-row">
                         <input type="checkbox" :value="String(pr._id)" v-model="form.projectIds" />
-                        <span class="rp-row__name">{{ pr.ProjectName || $t('ReportsV2.untitled_project') }}</span>
+                        <span class="rp-row__name">{{ pr.ProjectName || $t('Reports.untitled_project') }}</span>
                     </label>
-                    <span v-if="!allProjects.length" class="ah-small">{{ $t('ReportsV2.no_company_projects') }}</span>
+                    <span v-if="!allProjects.length" class="ah-small">{{ $t('Reports.no_company_projects') }}</span>
                 </div>
                 <div class="rp-modal__actions">
                     <button type="button" class="ah-btn ah-btn--primary" :disabled="busy || !form.name.trim()" @click="savePortfolio">
-                        {{ busy ? $t('ReportsV2.saving') : $t('ReportsV2.save') }}
+                        {{ busy ? $t('Reports.saving') : $t('Reports.save') }}
                     </button>
-                    <button type="button" class="ah-btn ah-btn--ghost" @click="showForm = false">{{ $t('ReportsV2.cancel') }}</button>
-                    <button v-if="editing" type="button" class="ah-btn ah-btn--ghost" @click="removeSelected">{{ $t('ReportsV2.delete') }}</button>
+                    <button type="button" class="ah-btn ah-btn--ghost" @click="showForm = false">{{ $t('Reports.cancel') }}</button>
+                    <button v-if="editing" type="button" class="ah-btn ah-btn--ghost" @click="removeSelected">{{ $t('Reports.delete') }}</button>
                 </div>
             </div>
         </div>
@@ -153,7 +153,7 @@ const selected = computed(() => portfolios.value.find((p) => String(p._id) === s
 
 const headline = computed(() => {
     const count = rollup.value ? rollup.value.totals.projects : 0;
-    return t('ReportsV2.portfolio_head', { n: count, week: moment().startOf('week').format('MMM D') }).toUpperCase();
+    return t('Reports.portfolio_head', { n: count, week: moment().startOf('week').format('MMM D') }).toUpperCase();
 });
 
 const atRisk = computed(() => (rollup.value ? rollup.value.projects : [])
@@ -165,16 +165,16 @@ const capacityRows = computed(() => ((capacity.value && capacity.value.users) ||
 const burndownDays = computed(() => ((burndown.value && burndown.value.days) || []));
 const burndownTitle = computed(() => (burndown.value && burndown.value.sprintName
     ? `${burndown.value.sprintName} · ${burndownProject.value}`
-    : t('ReportsV2.burndown')));
+    : t('Reports.burndown')));
 const burndownNote = computed(() => {
     if (!burndown.value || !burndown.value.endDate) return '';
     const left = moment(burndown.value.endDate).diff(moment(), 'days');
-    return left >= 0 ? t('ReportsV2.days_left', { n: left }).toUpperCase() : t('ReportsV2.sprint_over').toUpperCase();
+    return left >= 0 ? t('Reports.days_left', { n: left }).toUpperCase() : t('Reports.sprint_over').toUpperCase();
 });
 
 const burndownSeries = computed(() => [
-    { name: t('ReportsV2.remaining'), data: burndownDays.value.map((d) => (d.remainingPoints === null ? null : Number(d.remainingPoints) || 0)) },
-    { name: t('ReportsV2.ideal'), data: burndownDays.value.map((d) => Number(d.idealPoints) || 0) },
+    { name: t('Reports.remaining'), data: burndownDays.value.map((d) => (d.remainingPoints === null ? null : Number(d.remainingPoints) || 0)) },
+    { name: t('Reports.ideal'), data: burndownDays.value.map((d) => Number(d.idealPoints) || 0) },
 ]);
 
 const burndownOptions = computed(() => ({

@@ -1,8 +1,8 @@
 <template>
     <AuthShell :proof="false">
         <form v-if="stage === 'form'" class="av2-auth-card" novalidate @submit.prevent="submit">
-            <h2 class="auth__h">{{ $t('AuthV2.forgot_title') }}</h2>
-            <p class="auth__p">{{ $t('AuthV2.forgot_lead') }}</p>
+            <h2 class="auth__h">{{ $t('Auth.forgot_title') }}</h2>
+            <p class="auth__p">{{ $t('Auth.forgot_lead') }}</p>
             <div class="ah-field" style="margin-bottom:16px">
                 <label class="ah-field__label" for="fp-email">{{ $t('Auth.email') }}</label>
                 <input
@@ -21,24 +21,24 @@
                 <div v-if="error" class="ah-field__error"><ShellIcon name="x" :size="12" />{{ error }}</div>
             </div>
             <button type="submit" class="ah-btn ah-btn--primary ah-btn--block ah-btn--lg" :disabled="busy">
-                <span v-if="busy" class="ah-spin"></span>{{ busy ? $t('Auth.loading') : $t('AuthV2.send_reset_link') }}
+                <span v-if="busy" class="ah-spin"></span>{{ busy ? $t('Auth.loading') : $t('Auth.send_reset_link') }}
             </button>
             <div class="auth__links" style="margin-top:28px">
-                <span class="ah-small">{{ $t('AuthV2.remembered') }} <router-link :to="{ name: 'Log-in' }" @click="rememberEmail">{{ $t('Auth.log_in') }}</router-link></span>
+                <span class="ah-small">{{ $t('Auth.remembered') }} <router-link :to="{ name: 'Log-in' }" @click="rememberEmail">{{ $t('Auth.log_in') }}</router-link></span>
             </div>
         </form>
 
         <div v-else class="av2-auth-card">
             <div class="auth__glyph auth__glyph--brand">✉</div>
-            <h2 class="auth__h">{{ $t('AuthV2.reset_sent_title') }}</h2>
-            <i18n-t keypath="AuthV2.reset_sent_body" tag="p" class="auth__p"><template #email><strong>{{ email }}</strong></template></i18n-t>
+            <h2 class="auth__h">{{ $t('Auth.reset_sent_title') }}</h2>
+            <i18n-t keypath="Auth.reset_sent_body" tag="p" class="auth__p"><template #email><strong>{{ email }}</strong></template></i18n-t>
             <div class="auth__note">
                 {{ $t('Auth.magic_nothing_yet') }}
                 <button type="button" class="av2-link-btn" :disabled="busy || resendWait > 0" @click="submit">{{ $t('Auth.send_again') }}</button>
                 <span v-if="resendWait > 0" class="ah-mono"> {{ fmtSeconds(resendWait) }}</span>
             </div>
             <div class="auth__links" style="margin-top:28px">
-                <router-link :to="{ name: 'Log-in' }">{{ $t('AuthV2.back_to_login') }}</router-link>
+                <router-link :to="{ name: 'Log-in' }">{{ $t('Auth.back_to_login') }}</router-link>
             </div>
         </div>
     </AuthShell>

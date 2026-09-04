@@ -1,17 +1,17 @@
 <template>
-    <div class="dpick" role="dialog" aria-modal="true" :aria-label="$t('DashV2.add_card')" @click.self="$emit('close')">
+    <div class="dpick" role="dialog" aria-modal="true" :aria-label="$t('Dash.add_card')" @click.self="$emit('close')">
         <div class="dpick__panel">
             <header class="dpick__head">
-                <h2 class="ah-h2">{{ $t('DashV2.add_card') }}</h2>
-                <p class="dpick__lede">{{ $t('DashV2.picker_lede', { built: builtCount, total: totalCount }) }}</p>
+                <h2 class="ah-h2">{{ $t('Dash.add_card') }}</h2>
+                <p class="dpick__lede">{{ $t('Dash.picker_lede', { built: builtCount, total: totalCount }) }}</p>
                 <input
                     ref="searchInput"
                     v-model="search"
                     type="search"
                     class="ah-input dpick__search"
-                    :placeholder="$t('DashV2.search_cards')"
+                    :placeholder="$t('Dash.search_cards')"
                 />
-                <button type="button" class="dpick__close" :title="$t('DashV2.close')" @click="$emit('close')">
+                <button type="button" class="dpick__close" :title="$t('Dash.close')" @click="$emit('close')">
                     <ShellIcon name="x" :size="15" />
                 </button>
             </header>
@@ -38,17 +38,17 @@
                                     type="button"
                                     class="ah-btn ah-btn--outline ah-btn--sm dpick__add"
                                     @click="$emit('add', entry)"
-                                >{{ added.includes(entry.key) ? $t('DashV2.add_again') : $t('DashV2.add') }}</button>
-                                <span v-else class="ah-chip dpick__soon">{{ $t('DashV2.not_built') }}</span>
+                                >{{ added.includes(entry.key) ? $t('Dash.add_again') : $t('Dash.add') }}</button>
+                                <span v-else class="ah-chip dpick__soon">{{ $t('Dash.not_built') }}</span>
                             </div>
                         </article>
                     </div>
                 </section>
 
-                <p v-if="!families.length" class="ah-empty dpick__none">{{ $t('DashV2.no_cards_match', { q: search }) }}</p>
+                <p v-if="!families.length" class="ah-empty dpick__none">{{ $t('Dash.no_cards_match', { q: search }) }}</p>
             </div>
 
-            <footer class="dpick__foot">{{ $t('DashV2.picker_footer') }}</footer>
+            <footer class="dpick__foot">{{ $t('Dash.picker_footer') }}</footer>
         </div>
     </div>
 </template>

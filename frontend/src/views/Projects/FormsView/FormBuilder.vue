@@ -54,15 +54,15 @@
 
         <div v-else-if="isMobile" class="fb__mobile">
             <div class="ah-empty fb__mobile-card">
-                <div class="fb__mobile-title">{{ $t('ViewsV2.desktop_only_title') }}</div>
-                <p class="fb__mobile-text">{{ $t('ViewsV2.desktop_only_forms') }}</p>
+                <div class="fb__mobile-title">{{ $t('Views.desktop_only_title') }}</div>
+                <p class="fb__mobile-text">{{ $t('Views.desktop_only_forms') }}</p>
             </div>
         </div>
 
         <div v-else class="fb__body">
             <aside class="fb__palette ah-scroll">
                 <input v-model="search" class="ah-input fb__search" :placeholder="$t('Projects.search')" />
-                <div class="ah-label fb__palette-head">{{ $t('ViewsV2.fields_drag_in') }}</div>
+                <div class="ah-label fb__palette-head">{{ $t('Views.fields_drag_in') }}</div>
                 <div class="fb__types">
                     <button
                         v-for="c in paletteTypes"
@@ -76,7 +76,7 @@
                     >{{ c.title }}</button>
                 </div>
                 <template v-if="settings.createTask && paletteProps.length">
-                    <div class="ah-label fb__palette-head">{{ $t('ViewsV2.task_properties') }}</div>
+                    <div class="ah-label fb__palette-head">{{ $t('Views.task_properties') }}</div>
                     <div class="fb__props">
                         <button
                             v-for="p in paletteProps"
@@ -91,7 +91,7 @@
                         >{{ p.title }}</button>
                     </div>
                 </template>
-                <p class="fb__palette-note ah-small">{{ $t('ViewsV2.mapped_fields_note') }}</p>
+                <p class="fb__palette-note ah-small">{{ $t('Views.mapped_fields_note') }}</p>
             </aside>
 
             <div class="fb__canvas-wrap ah-scroll">
@@ -213,13 +213,13 @@
                             @dragover.prevent="dropActive = true"
                             @dragleave="dropActive = false"
                             @drop.prevent="dropField"
-                        >{{ $t('ViewsV2.drop_field_here') }}</div>
+                        >{{ $t('Views.drop_field_here') }}</div>
                     </template>
                 </div>
             </div>
 
             <aside class="fb__side ah-scroll">
-                <div class="fb__side-title">{{ $t('ViewsV2.on_submit') }}</div>
+                <div class="fb__side-title">{{ $t('Views.on_submit') }}</div>
                 <label class="ah-check fb__rule">
                     <input v-model="settings.createTask" type="checkbox" />
                     <span>{{ $t('Projects.form_create_task') }}</span>
@@ -245,57 +245,57 @@
                     <span>{{ $t(`Projects.form_${tog}`) }}</span>
                 </label>
 
-                <div class="fb__side-title fb__side-title--sub">{{ $t('GapsV2.on_submit_rules') }}</div>
+                <div class="fb__side-title fb__side-title--sub">{{ $t('Gaps.on_submit_rules') }}</div>
                 <div v-for="rule in submitRules" :key="rule._id" class="fb__rule fb__rule--auto">
                     <span class="ah-dot" :class="rule.enabled ? 'ah-dot--ok' : ''"></span>
                     <span class="fb__rule-name" :title="rule.summary || rule.name">{{ rule.summary || rule.name }}</span>
                     <button type="button" class="fb__rule-btn" @click="toggleRule(rule)">
-                        {{ rule.enabled ? $t('GapsV2.submit_rule_on') : $t('GapsV2.submit_rule_off') }}
+                        {{ rule.enabled ? $t('Gaps.submit_rule_on') : $t('Gaps.submit_rule_off') }}
                     </button>
                     <button type="button" class="fb__rule-btn fb__rule-btn--danger" @click="removeRule(rule)">
-                        {{ $t('GapsV2.submit_rule_remove') }}
+                        {{ $t('Gaps.submit_rule_remove') }}
                     </button>
                 </div>
-                <p v-if="!submitRules.length && !draft" class="ah-small fb__side-note">{{ $t('GapsV2.no_submit_rules_v2') }}</p>
+                <p v-if="!submitRules.length && !draft" class="ah-small fb__side-note">{{ $t('Gaps.no_submit_rules_v2') }}</p>
 
                 <div v-if="draft" class="fb__rule fb__rule--field">
-                    <span class="fb__rule-label">{{ $t('GapsV2.submit_rule_when') }}</span>
+                    <span class="fb__rule-label">{{ $t('Gaps.submit_rule_when') }}</span>
                     <select v-model="draft.questionId" class="ah-input fb__select">
-                        <option value="">{{ $t('GapsV2.submit_rule_any') }}</option>
+                        <option value="">{{ $t('Gaps.submit_rule_any') }}</option>
                         <option v-for="q in visible" :key="q.id" :value="q.id">{{ q.label }}</option>
                     </select>
                     <template v-if="draft.questionId">
-                        <span class="fb__rule-label">{{ $t('GapsV2.submit_rule_is') }}</span>
-                        <input v-model="draft.answer" class="ah-input" type="text" :placeholder="$t('GapsV2.submit_rule_value')" />
+                        <span class="fb__rule-label">{{ $t('Gaps.submit_rule_is') }}</span>
+                        <input v-model="draft.answer" class="ah-input" type="text" :placeholder="$t('Gaps.submit_rule_value')" />
                     </template>
-                    <span class="fb__rule-label">{{ $t('GapsV2.submit_rule_then') }}</span>
+                    <span class="fb__rule-label">{{ $t('Gaps.submit_rule_then') }}</span>
                     <select v-model="draft.action" class="ah-input fb__select">
                         <option v-for="a in ruleActions" :key="a.key" :value="a.key">{{ a.label }}</option>
                     </select>
                     <select v-if="draftOptions.length" v-model="draft.value" class="ah-input fb__select">
                         <option v-for="opt in draftOptions" :key="opt" :value="opt">{{ opt }}</option>
                     </select>
-                    <input v-else v-model="draft.value" class="ah-input" type="text" :placeholder="$t('GapsV2.submit_rule_value')" />
+                    <input v-else v-model="draft.value" class="ah-input" type="text" :placeholder="$t('Gaps.submit_rule_value')" />
                     <p v-if="ruleErr" class="ah-field__error">{{ ruleErr }}</p>
                     <div class="fb__rule-actions">
-                        <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="ruleBusy" @click="saveRule">{{ $t('GapsV2.submit_rule_save') }}</button>
-                        <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="draft = null">{{ $t('GapsV2.submit_rule_cancel') }}</button>
+                        <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="ruleBusy" @click="saveRule">{{ $t('Gaps.submit_rule_save') }}</button>
+                        <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="draft = null">{{ $t('Gaps.submit_rule_cancel') }}</button>
                     </div>
                 </div>
-                <button v-else-if="canAddRule" type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="startRule">{{ $t('GapsV2.add_submit_rule') }}</button>
+                <button v-else-if="canAddRule" type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="startRule">{{ $t('Gaps.add_submit_rule') }}</button>
                 <p v-else class="ah-small fb__side-note">{{ ruleBlockedReason }}</p>
 
-                <router-link class="fb__side-link" :to="{ name: 'Automations', params: { cid: companyId } }">{{ $t('ViewsV2.open_automations') }}</router-link>
+                <router-link class="fb__side-link" :to="{ name: 'Automations', params: { cid: companyId } }">{{ $t('Views.open_automations') }}</router-link>
 
-                <div class="fb__side-title fb__side-title--sub">{{ $t('ViewsV2.sharing') }}</div>
+                <div class="fb__side-title fb__side-title--sub">{{ $t('Views.sharing') }}</div>
                 <div v-if="publicUrl" class="fb__url">
                     <span class="fb__url-text">{{ publicUrl }}</span>
-                    <button type="button" class="fb__url-copy" @click="copyUrl">{{ copied ? $t('ViewsV2.copied') : $t('ViewsV2.copy') }}</button>
+                    <button type="button" class="fb__url-copy" @click="copyUrl">{{ copied ? $t('Views.copied') : $t('Views.copy') }}</button>
                 </div>
-                <p class="ah-small fb__side-note">{{ publicUrl ? $t('ViewsV2.share_note') : $t('ViewsV2.publish_to_share') }}</p>
+                <p class="ah-small fb__side-note">{{ publicUrl ? $t('Views.share_note') : $t('Views.publish_to_share') }}</p>
 
                 <div v-if="form.submissionCount" class="fb__stats">
-                    {{ $t('ViewsV2.submission_count', { n: form.submissionCount }) }}
+                    {{ $t('Views.submission_count', { n: form.submissionCount }) }}
                 </div>
 
                 <div class="fb__side-title fb__side-title--sub">{{ $t('Projects.form_colors') }}</div>
@@ -569,9 +569,9 @@ const draftOptions = computed(() => {
 
 const canAddRule = computed(() => !!props.form._id && !!props.projectData?._id && settings.value.createTask !== false);
 const ruleBlockedReason = computed(() => {
-    if (!props.projectData?._id) return t('GapsV2.submit_rule_needs_project');
-    if (settings.value.createTask === false) return t('GapsV2.submit_rule_needs_task');
-    return t('ViewsV2.publish_to_share');
+    if (!props.projectData?._id) return t('Gaps.submit_rule_needs_project');
+    if (settings.value.createTask === false) return t('Gaps.submit_rule_needs_task');
+    return t('Views.publish_to_share');
 });
 
 const bindsToThisForm = (rule) => {
@@ -619,14 +619,14 @@ const saveRule = async () => {
     if (!draft.value) return;
     ruleErr.value = '';
     if (!String(draft.value.value || '').trim()) {
-        ruleErr.value = t('GapsV2.submit_rule_value');
+        ruleErr.value = t('Gaps.submit_rule_value');
         return;
     }
     ruleBusy.value = true;
     try {
         const label = ruleActions.value.find((a) => a.key === draft.value.action)?.label || draft.value.action;
         const body = (await apiRequest('post', env.AUTOMATIONS_V2, {
-            name: t('GapsV2.submit_rule_name', { action: label }),
+            name: t('Gaps.submit_rule_name', { action: label }),
             trigger: { type: 'event', event: SUBMIT_TRIGGER },
             scope: { allProjects: false, projectIds: [String(props.projectData._id)] },
             conditions: buildConditions(),
@@ -634,14 +634,14 @@ const saveRule = async () => {
             enabled: true,
         }))?.data;
         if (!body || body.status !== true) {
-            ruleErr.value = (body && body.statusText) || t('GapsV2.submit_rule_failed');
+            ruleErr.value = (body && body.statusText) || t('Gaps.submit_rule_failed');
             return;
         }
         draft.value = null;
-        toast.success(t('GapsV2.submit_rule_saved'));
+        toast.success(t('Gaps.submit_rule_saved'));
         await loadSubmitRules();
     } catch (e) {
-        ruleErr.value = t('GapsV2.submit_rule_failed');
+        ruleErr.value = t('Gaps.submit_rule_failed');
     } finally {
         ruleBusy.value = false;
     }
@@ -651,14 +651,14 @@ const toggleRule = async (rule) => {
     try {
         await apiRequest('patch', `${env.AUTOMATIONS_V2}/${rule._id}/enabled`, { enabled: !rule.enabled });
         await loadSubmitRules();
-    } catch (e) { ruleErr.value = t('GapsV2.submit_rule_failed'); }
+    } catch (e) { ruleErr.value = t('Gaps.submit_rule_failed'); }
 };
 
 const removeRule = async (rule) => {
     try {
         await apiRequest('delete', `${env.AUTOMATIONS_V2}/${rule._id}`);
         await loadSubmitRules();
-    } catch (e) { ruleErr.value = t('GapsV2.submit_rule_failed'); }
+    } catch (e) { ruleErr.value = t('Gaps.submit_rule_failed'); }
 };
 
 onMounted(() => { hydrate(); loadCatalogue(); loadRegistry(); loadSubmitRules(); });

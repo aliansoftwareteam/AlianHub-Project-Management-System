@@ -21,12 +21,12 @@ const cid = computed(() => String(route.params.cid || ''));
 const current = computed(() => String(route.name || ''));
 
 const ALL = [
-    { name: 'Portfolio', label: 'ReportsV2.tab_portfolio' },
-    { name: 'SprintReport', label: 'ReportsV2.tab_sprint' },
-    { name: 'VelocityFlow', label: 'ReportsV2.tab_velocity' },
-    { name: 'MilestonesReport', label: 'ReportsV2.tab_milestones' },
-    { name: 'VarianceReport', label: 'ReportsV2.tab_variance' },
-    { name: 'CustomReport', label: 'ReportsV2.tab_custom' },
+    { name: 'Portfolio', label: 'Reports.tab_portfolio' },
+    { name: 'SprintReport', label: 'Reports.tab_sprint' },
+    { name: 'VelocityFlow', label: 'Reports.tab_velocity' },
+    { name: 'MilestonesReport', label: 'Reports.tab_milestones' },
+    { name: 'VarianceReport', label: 'Reports.tab_variance' },
+    { name: 'CustomReport', label: 'Reports.tab_custom' },
 ];
 
 const tabs = computed(() => ALL.filter((tab) => router.hasRoute(tab.name)));

@@ -16,7 +16,7 @@
                 <span v-else>{{ part.text }}</span>
             </template>
         </span>
-        <span class="ah-chip pv-badge" :class="chipClass" :title="$t(`ProvenanceV2.badge_${badge.toLowerCase()}_hint`)">{{ $t(`ProvenanceV2.badge_${badge.toLowerCase()}`) }}</span>
+        <span class="ah-chip pv-badge" :class="chipClass" :title="$t(`Provenance.badge_${badge.toLowerCase()}_hint`)">{{ $t(`Provenance.badge_${badge.toLowerCase()}`) }}</span>
     </span>
 </template>
 
@@ -47,7 +47,7 @@ const record = computed(() => normalize(props.task ? props.task.completion : pro
 const badge = computed(() => (props.task ? badgeOf(props.task) : (props.done ? deriveBadge(props.completion) : null)));
 const chipClass = computed(() => CHIP_CLASS[badge.value] || "");
 
-const nameOfActor = (actorId) => personName(actorId) || t("ProvenanceV2.someone");
+const nameOfActor = (actorId) => personName(actorId) || t("Provenance.someone");
 
 /* "Ken via Claude Code" for a personal CLI run, the agent's own name for a
  * workspace agent, the person's name otherwise. */
@@ -55,14 +55,14 @@ const labelOf = (entry) => {
     if (entry.actorType !== "agent") return nameOfActor(entry.actorId);
     const named = agentName(entry);
     if (entry.viaAccount === "personal") {
-        return t("ProvenanceV2.via", { name: nameOfActor(entry.actorId), agent: named || t("ProvenanceV2.cli_agent") });
+        return t("Provenance.via", { name: nameOfActor(entry.actorId), agent: named || t("Provenance.cli_agent") });
     }
-    return named || t("ProvenanceV2.an_agent");
+    return named || t("Provenance.an_agent");
 };
 
 const stack = computed(() => record.value.workBy.slice(0, 3).map((entry, index) => {
     const isAgent = entry.actorType === "agent";
-    const short = isAgent ? (agentName(entry) || t("ProvenanceV2.an_agent")) : nameOfActor(entry.actorId);
+    const short = isAgent ? (agentName(entry) || t("Provenance.an_agent")) : nameOfActor(entry.actorId);
     return {
         key: `${entry.actorId}-${entry.agentId || ""}-${index}`,
         name: labelOf(entry),
@@ -75,11 +75,11 @@ const stack = computed(() => record.value.workBy.slice(0, 3).map((entry, index) 
  * record actually holds. */
 const lineParts = computed(() => {
     const parts = [];
-    const worked = record.value.workBy.slice(0, 2).map(labelOf).join(t("ProvenanceV2.work_join"));
+    const worked = record.value.workBy.slice(0, 2).map(labelOf).join(t("Provenance.work_join"));
     if (worked) parts.push({ text: worked });
-    if (record.value.checkedBy) parts.push({ text: t("ProvenanceV2.checked_by", { name: nameOfActor(record.value.checkedBy.actorId) }) });
-    else if (badge.value === BADGES.UNCHECKED) parts.push({ text: t("ProvenanceV2.not_checked"), strong: true });
-    if (record.value.closedBy) parts.push({ text: t("ProvenanceV2.closed_by", { name: nameOfActor(record.value.closedBy.actorId) }) });
+    if (record.value.checkedBy) parts.push({ text: t("Provenance.checked_by", { name: nameOfActor(record.value.checkedBy.actorId) }) });
+    else if (badge.value === BADGES.UNCHECKED) parts.push({ text: t("Provenance.not_checked"), strong: true });
+    if (record.value.closedBy) parts.push({ text: t("Provenance.closed_by", { name: nameOfActor(record.value.closedBy.actorId) }) });
     return parts;
 });
 

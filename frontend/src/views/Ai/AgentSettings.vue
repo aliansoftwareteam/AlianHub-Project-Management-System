@@ -4,28 +4,28 @@
         <div class="ai-page__main">
             <div class="ah-toolbar">
                 <router-link class="ah-btn ah-btn--ghost ah-btn--sm" :to="{ name: 'AiHub', params: { cid: companyId } }">
-                    <ShellIcon name="chevronLeft" :size="14" />{{ $t('AiV2.agents') }}
+                    <ShellIcon name="chevronLeft" :size="14" />{{ $t('Ai.agents') }}
                 </router-link>
                 <div class="ah-toolbar__title">
                     <span class="ah-avatar ah-avatar--agent"><ShellIcon name="agent" :size="13" /></span>
-                    <span>{{ agent.name || $t('AiV2.agent') }}</span>
+                    <span>{{ agent.name || $t('Ai.agent') }}</span>
                 </div>
                 <div class="ah-toolbar__spacer"></div>
-                <button type="button" class="ah-btn ah-btn--danger ah-btn--sm" :disabled="busy" @click="stop">{{ $t('AiV2.stop_agent') }}</button>
+                <button type="button" class="ah-btn ah-btn--danger ah-btn--sm" :disabled="busy" @click="stop">{{ $t('Ai.stop_agent') }}</button>
             </div>
 
             <div class="ai-page__body ah-scroll">
-                <div v-if="loadingAgent" class="ah-empty">{{ $t('AiV2.loading') }}</div>
+                <div v-if="loadingAgent" class="ah-empty">{{ $t('Ai.loading') }}</div>
                 <template v-else>
                     <section class="ah-card ai-agent">
-                        <div class="ah-label">{{ $t('AiV2.skills_actions') }}</div>
-                        <p class="ai-lead" style="margin:6px 0 12px">{{ $t('AiV2.skills_lead') }}</p>
+                        <div class="ah-label">{{ $t('Ai.skills_actions') }}</div>
+                        <p class="ai-lead" style="margin:6px 0 12px">{{ $t('Ai.skills_lead') }}</p>
 
                         <div v-for="skill in skills" :key="skill.key" class="ai-skill">
                             <div class="ai-skill__head">
                                 <input :id="`sk-${skill.key}`" v-model="skill.enabled" type="checkbox" class="ah-check" />
                                 <label :for="`sk-${skill.key}`" class="ai-skill__name">{{ skill.name }}</label>
-                                <span v-if="!skill.enabled" class="ah-chip">{{ $t('AiV2.off') }}</span>
+                                <span v-if="!skill.enabled" class="ah-chip">{{ $t('Ai.off') }}</span>
                             </div>
                             <div class="ai-skill__actions">
                                 <span v-for="a in skill.actions" :key="a" class="ah-chip ah-chip--mono">{{ a }}</span>
@@ -33,60 +33,60 @@
                         </div>
 
                         <p class="ai-never">
-                            <strong>{{ $t('AiV2.never_label') }}</strong>
+                            <strong>{{ $t('Ai.never_label') }}</strong>
                             <span class="ah-mono">{{ never }}</span>
-                            <span class="ah-small">{{ $t('AiV2.never_note') }}</span>
+                            <span class="ah-small">{{ $t('Ai.never_note') }}</span>
                         </p>
                     </section>
 
                     <section class="ah-card ai-agent">
-                        <div class="ah-label">{{ $t('AiV2.autonomy') }}</div>
+                        <div class="ah-label">{{ $t('Ai.autonomy') }}</div>
                         <div class="ai-radios">
                             <label v-for="step in AUTONOMY.slice(0, 4)" :key="step.level" class="ai-radio" :class="{ 'is-on': form.autonomy === step.level }">
                                 <input v-model.number="form.autonomy" type="radio" :value="step.level" class="ah-check" />
-                                <span><strong>{{ step.key }}</strong> · {{ $t(`AiV2.autonomy_${step.level}`) }}</span>
+                                <span><strong>{{ step.key }}</strong> · {{ $t(`Ai.autonomy_${step.level}`) }}</span>
                             </label>
                         </div>
-                        <p class="ai-ladder__rule">{{ $t('AiV2.low_risk_note') }}</p>
+                        <p class="ai-ladder__rule">{{ $t('Ai.low_risk_note') }}</p>
                     </section>
 
                     <section class="ah-card ai-agent">
-                        <div class="ah-label">{{ $t('AiV2.runs_schedule') }}</div>
+                        <div class="ah-label">{{ $t('Ai.runs_schedule') }}</div>
                         <div class="ai-fields">
                             <div class="ah-field">
-                                <label class="ah-field__label" for="sched">{{ $t('AiV2.schedule') }}</label>
-                                <input id="sched" v-model.trim="form.scheduleAt" type="text" class="ah-input" :placeholder="$t('AiV2.schedule_hint')" />
+                                <label class="ah-field__label" for="sched">{{ $t('Ai.schedule') }}</label>
+                                <input id="sched" v-model.trim="form.scheduleAt" type="text" class="ah-input" :placeholder="$t('Ai.schedule_hint')" />
                             </div>
                             <div class="ah-field">
-                                <label class="ah-field__label" for="rate">{{ $t('AiV2.rate_limit') }}</label>
+                                <label class="ah-field__label" for="rate">{{ $t('Ai.rate_limit') }}</label>
                                 <input id="rate" v-model.number="form.rateLimitPerDay" type="number" min="1" max="500" class="ah-input" />
                             </div>
                             <div class="ah-field">
-                                <label class="ah-field__label" for="cap">{{ $t('AiV2.spend_cap') }}</label>
+                                <label class="ah-field__label" for="cap">{{ $t('Ai.spend_cap') }}</label>
                                 <input id="cap" v-model.number="form.spendCapUsd" type="number" min="0" step="1" class="ah-input" />
-                                <span class="ah-field__hint">{{ $t('AiV2.cap_hint') }}</span>
+                                <span class="ah-field__hint">{{ $t('Ai.cap_hint') }}</span>
                             </div>
                         </div>
-                        <p v-if="spendRow" class="ai-ladder__rule ah-mono">{{ $t('AiV2.spent_this_month', { usd: spendRow.usd.toFixed(2), runs: spendRow.runs }) }}</p>
+                        <p v-if="spendRow" class="ai-ladder__rule ah-mono">{{ $t('Ai.spent_this_month', { usd: spendRow.usd.toFixed(2), runs: spendRow.runs }) }}</p>
                     </section>
 
                     <section class="ah-card ai-agent">
-                        <div class="ah-label">{{ $t('AiV2.recent_audit') }}</div>
-                        <div v-if="!recentRuns.length" class="ah-empty" style="margin-top:8px">{{ $t('AiV2.no_runs') }}</div>
+                        <div class="ah-label">{{ $t('Ai.recent_audit') }}</div>
+                        <div v-if="!recentRuns.length" class="ah-empty" style="margin-top:8px">{{ $t('Ai.no_runs') }}</div>
                         <ul v-else class="ai-audit">
                             <li v-for="run in recentRuns" :key="run._id" class="ai-audit__row">
                                 <span class="ah-mono ai-audit__at">{{ time(run.startedAt) }}</span>
-                                <span class="ai-audit__what">{{ run.skill || run.trigger || $t('AiV2.run') }}</span>
+                                <span class="ai-audit__what">{{ run.skill || run.trigger || $t('Ai.run') }}</span>
                                 <span class="ah-chip" :class="runChip(run)">{{ run.status }}</span>
-                                <span v-if="run.refusals && run.refusals.length" class="ah-chip ah-chip--warn">{{ $t('AiV2.refused_n', { n: run.refusals.length }) }}</span>
+                                <span v-if="run.refusals && run.refusals.length" class="ah-chip ah-chip--warn">{{ $t('Ai.refused_n', { n: run.refusals.length }) }}</span>
                             </li>
                         </ul>
                     </section>
 
                     <div v-if="error" class="ah-field__error">{{ error }}</div>
                     <div class="ai-actions">
-                        <button type="button" class="ah-btn ah-btn--primary" :disabled="busy" @click="save">{{ busy ? $t('AiV2.saving') : $t('AiV2.save') }}</button>
-                        <router-link class="ah-btn ah-btn--secondary" :to="{ name: 'AiHub', params: { cid: companyId } }">{{ $t('AiV2.cancel') }}</router-link>
+                        <button type="button" class="ah-btn ah-btn--primary" :disabled="busy" @click="save">{{ busy ? $t('Ai.saving') : $t('Ai.save') }}</button>
+                        <router-link class="ah-btn ah-btn--secondary" :to="{ name: 'AiHub', params: { cid: companyId } }">{{ $t('Ai.cancel') }}</router-link>
                     </div>
                 </template>
             </div>
@@ -166,7 +166,7 @@ const save = async () => {
             schedule: form.scheduleAt ? { at: form.scheduleAt } : {},
             skills: skills.value.map((s) => ({ key: s.key, name: s.name, actions: s.actions, enabled: s.enabled }))
         });
-        $toast.success(t("AiV2.saved"), { position: "top-right" });
+        $toast.success(t("Ai.saved"), { position: "top-right" });
     } catch (e) {
         error.value = e.message;
     } finally {
@@ -178,7 +178,7 @@ const stop = async () => {
     busy.value = true;
     try {
         await setPaused(agent.value._id, true);
-        $toast.success(t("AiV2.stopped"), { position: "top-right" });
+        $toast.success(t("Ai.stopped"), { position: "top-right" });
         router.push({ name: "AiHub", params: { cid: companyId.value } });
     } finally {
         busy.value = false;

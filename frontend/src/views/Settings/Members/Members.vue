@@ -2,9 +2,9 @@
     <div class="mbv">
         <template v-if="canSeeMembers">
             <Teleport v-if="toolbarReady" to="#top_section">
-                <span class="ah-mono mbv__seats">{{ $t('MembersV2.seats', { count: activeCount, plan: seatLabel }) }}</span>
+                <span class="ah-mono mbv__seats">{{ $t('Members.seats', { count: activeCount, plan: seatLabel }) }}</span>
                 <button v-if="canInvite" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="inviteOpen = !inviteOpen">
-                    <ShellIcon name="plus" :size="14" /> {{ $t('MembersV2.invite') }}
+                    <ShellIcon name="plus" :size="14" /> {{ $t('Members.invite') }}
                 </button>
             </Teleport>
 
@@ -13,29 +13,29 @@
                     <div class="mbv__chips" :class="{ 'is-error': errors.email }" @click="focusEmail">
                         <span v-for="mail in emails" :key="mail" class="ah-chip">
                             {{ mail }}
-                            <button type="button" class="mbv__chip-x" :aria-label="$t('MembersV2.remove')" @click.stop="removeEmail(mail)">×</button>
+                            <button type="button" class="mbv__chip-x" :aria-label="$t('Members.remove')" @click.stop="removeEmail(mail)">×</button>
                         </span>
                         <input
                             ref="emailInput"
                             v-model.trim="emailDraft"
                             class="mbv__chip-input"
                             type="email"
-                            :placeholder="emails.length ? '' : $t('MembersV2.invite_emails_ph')"
+                            :placeholder="emails.length ? '' : $t('Members.invite_emails_ph')"
                             @keydown="onEmailKey"
                             @blur="commitEmail()"
                             @input="errors.email = ''"
                         />
                     </div>
-                    <select v-model="role" class="ah-input mbv__select" :class="{ 'ah-input--error': errors.role }" :aria-label="$t('MembersV2.invite_role')" @change="onRolePicked">
-                        <option :value="null" disabled>{{ $t('MembersV2.invite_role') }}</option>
+                    <select v-model="role" class="ah-input mbv__select" :class="{ 'ah-input--error': errors.role }" :aria-label="$t('Members.invite_role')" @change="onRolePicked">
+                        <option :value="null" disabled>{{ $t('Members.invite_role') }}</option>
                         <option v-for="r in inviteRoles" :key="r.key" :value="r.key">{{ r.name }}</option>
                     </select>
-                    <select v-if="designationList.length" v-model="designation" class="ah-input mbv__select" :class="{ 'ah-input--error': errors.designation }" :aria-label="$t('MembersV2.invite_designation')" @change="errors.designation = ''">
-                        <option :value="null" disabled>{{ $t('MembersV2.invite_designation') }}</option>
+                    <select v-if="designationList.length" v-model="designation" class="ah-input mbv__select" :class="{ 'ah-input--error': errors.designation }" :aria-label="$t('Members.invite_designation')" @change="errors.designation = ''">
+                        <option :value="null" disabled>{{ $t('Members.invite_designation') }}</option>
                         <option v-for="d in designationList" :key="d.key" :value="d.key">{{ d.name }}</option>
                     </select>
                     <button type="button" class="ah-btn ah-btn--primary" :disabled="sending" @click="sendInvites()">
-                        {{ sending ? $t('MembersV2.invite_sending') : $t('MembersV2.invite_send') }}
+                        {{ sending ? $t('Members.invite_sending') : $t('Members.invite_send') }}
                     </button>
                 </div>
 
@@ -46,34 +46,34 @@
                 <p class="mbv__meaning">
                     <template v-if="roleMeaning"><strong>{{ roleName(role) }}:</strong> {{ roleMeaning }}</template>
                     <span v-if="lastInviteLink" class="mbv__link-wrap">
-                        {{ $t('MembersV2.invite_or_link') }}
+                        {{ $t('Members.invite_or_link') }}
                         <button type="button" class="mbv__link" @click="copyLink(lastInviteLink)">{{ shortLink(lastInviteLink) }}</button>
                     </span>
-                    <span v-else class="mbv__muted">{{ $t('MembersV2.no_link_yet') }}</span>
+                    <span v-else class="mbv__muted">{{ $t('Members.no_link_yet') }}</span>
                 </p>
             </section>
 
             <div class="mbv__bar">
                 <div class="ah-tabs">
                     <button type="button" class="ah-tab" :class="{ 'is-active': tab === 0 }" @click="tab = 0">
-                        {{ $t('MembersV2.tab_all') }}<span class="ah-mono mbv__tab-n">{{ activeList.length }}</span>
+                        {{ $t('Members.tab_all') }}<span class="ah-mono mbv__tab-n">{{ activeList.length }}</span>
                     </button>
                     <button type="button" class="ah-tab" :class="{ 'is-active': tab === 1 }" @click="tab = 1">
-                        {{ $t('MembersV2.tab_removed') }}<span class="ah-mono mbv__tab-n">{{ removedList.length }}</span>
+                        {{ $t('Members.tab_removed') }}<span class="ah-mono mbv__tab-n">{{ removedList.length }}</span>
                     </button>
                 </div>
                 <div class="mbv__search">
                     <ShellIcon name="search" :size="15" />
-                    <input v-model.trim="search" class="mbv__search-input" type="search" :placeholder="$t('MembersV2.search_ph')" />
+                    <input v-model.trim="search" class="mbv__search-input" type="search" :placeholder="$t('Members.search_ph')" />
                 </div>
             </div>
 
             <section class="ah-card mbv__table">
                 <div class="mbv__row mbv__row--head" :style="gridStyle">
-                    <span class="ah-label">{{ $t('MembersV2.col_person') }}</span>
-                    <span class="ah-label">{{ $t('MembersV2.col_role') }}</span>
-                    <span v-if="ssoOn" class="ah-label">{{ $t('MembersV2.col_signin') }}</span>
-                    <span class="ah-label">{{ $t('MembersV2.col_last_active') }}</span>
+                    <span class="ah-label">{{ $t('Members.col_person') }}</span>
+                    <span class="ah-label">{{ $t('Members.col_role') }}</span>
+                    <span v-if="ssoOn" class="ah-label">{{ $t('Members.col_signin') }}</span>
+                    <span class="ah-label">{{ $t('Members.col_last_active') }}</span>
                     <span></span>
                 </div>
 
@@ -86,8 +86,8 @@
                             <div class="mbv__name">{{ item.Employee_Name || item.userEmail }}</div>
                             <div v-if="item.status === 2" class="mbv__mail">{{ item.userEmail }}</div>
                             <div v-else class="mbv__mail">
-                                {{ $t('MembersV2.invited_on', { date: invitedOn(item) }) }} ·
-                                <button type="button" class="mbv__link" @click="resend(item)">{{ $t('MembersV2.resend') }}</button>
+                                {{ $t('Members.invited_on', { date: invitedOn(item) }) }} ·
+                                <button type="button" class="mbv__link" @click="resend(item)">{{ $t('Members.resend') }}</button>
                             </div>
                         </div>
                     </div>
@@ -97,7 +97,7 @@
                             v-if="canChangeRole(item)"
                             class="mbv__role-select"
                             :value="item.roleType"
-                            :aria-label="$t('MembersV2.role_of', { name: item.Employee_Name || item.userEmail })"
+                            :aria-label="$t('Members.role_of', { name: item.Employee_Name || item.userEmail })"
                             @change="changeRole(item, Number($event.target.value))"
                         >
                             <option v-for="r in inviteRoles" :key="r.key" :value="r.key">{{ r.name }}</option>
@@ -108,7 +108,7 @@
                     <div v-if="ssoOn" class="mbv__signin">
                         <template v-if="item.status === 2">
                             <span class="ah-dot" :class="usesSso(item) ? 'ah-dot--ok' : 'ah-dot--warn'"></span>
-                            <span>{{ usesSso(item) ? $t('MembersV2.signin_sso', { name: ssoName }) : $t('MembersV2.signin_password') }}</span>
+                            <span>{{ usesSso(item) ? $t('Members.signin_sso', { name: ssoName }) : $t('Members.signin_password') }}</span>
                         </template>
                         <span v-else class="mbv__muted">—</span>
                     </div>
@@ -120,27 +120,27 @@
                             v-if="canRemove(item)"
                             type="button"
                             class="ah-btn ah-btn--ghost ah-btn--sm mbv__dots"
-                            :aria-label="$t('MembersV2.remove')"
+                            :aria-label="$t('Members.remove')"
                             @click.stop="menuFor = menuFor === item.requestId ? '' : item.requestId"
                         >
                             <ShellIcon name="dots" :size="16" />
                         </button>
                         <div v-if="menuFor === item.requestId" class="ah-pop mbv__pop" @click.stop>
                             <button v-if="item.status !== 2" type="button" class="ah-pop__item" @click="copyLink(inviteLink(item)), menuFor = ''">
-                                <ShellIcon name="link" :size="15" /> {{ $t('MembersV2.copy_link') }}
+                                <ShellIcon name="link" :size="15" /> {{ $t('Members.copy_link') }}
                             </button>
                             <button v-if="tab === 1" type="button" class="ah-pop__item" @click="resend(item), menuFor = ''">
-                                <ShellIcon name="mail" :size="15" /> {{ $t('MembersV2.resend') }}
+                                <ShellIcon name="mail" :size="15" /> {{ $t('Members.resend') }}
                             </button>
                             <button v-else type="button" class="ah-pop__item mbv__danger" @click="removeMember(item)">
-                                <ShellIcon name="trash" :size="15" /> {{ $t('MembersV2.remove') }}
+                                <ShellIcon name="trash" :size="15" /> {{ $t('Members.remove') }}
                             </button>
                         </div>
                     </div>
                 </div>
 
                 <div v-if="!visibleList.length" class="ah-empty mbv__empty">
-                    {{ search ? $t('MembersV2.empty_search') : $t('MembersV2.empty_all') }}
+                    {{ search ? $t('Members.empty_search') : $t('Members.empty_all') }}
                 </div>
             </section>
         </template>
@@ -208,7 +208,7 @@ const removedList = computed(() => listing.value.filter((u) => u.isDelete));
 const activeCount = computed(() => activeList.value.length);
 const seatLabel = computed(() => {
     const seats = currentCompany.value?.planFeature?.users;
-    return typeof seats === "number" && seats > 0 ? String(seats) : t("MembersV2.unlimited");
+    return typeof seats === "number" && seats > 0 ? String(seats) : t("Members.unlimited");
 });
 
 const visibleList = computed(() => {
@@ -243,7 +243,7 @@ function lastActive(item) {
     if (item.status !== 2 || item.lastActive === null || item.lastActive === undefined) return "—";
     const minutes = Math.floor((Date.now() - Number(item.lastActive) * 1000) / 60000);
     if (!Number.isFinite(minutes) || minutes < 0) return "—";
-    if (minutes < 1) return t("MembersV2.last_active_now");
+    if (minutes < 1) return t("Members.last_active_now");
     if (minutes < 60) return `${minutes}m`;
     if (minutes < 1440) return `${Math.floor(minutes / 60)}h`;
     return `${Math.floor(minutes / 1440)}d`;
@@ -277,11 +277,11 @@ function commitEmail() {
     const value = emailDraft.value.replace(/,$/, "").trim().toLowerCase();
     if (!value) return;
     if (!EMAIL_RE.test(value)) {
-        errors.email = t("MembersV2.err_email");
+        errors.email = t("Members.err_email");
         return;
     }
     if (emails.value.includes(value)) {
-        errors.email = t("MembersV2.err_duplicate");
+        errors.email = t("Members.err_duplicate");
         return;
     }
     emails.value.push(value);
@@ -311,9 +311,9 @@ async function onRolePicked() {
 
 async function sendInvites() {
     commitEmail();
-    errors.email = emails.value.length ? "" : t("MembersV2.err_email");
-    errors.role = role.value === null || role.value === "" ? t("MembersV2.err_role") : "";
-    errors.designation = designationList.value.length && (designation.value === null || designation.value === "") ? t("MembersV2.err_designation") : "";
+    errors.email = emails.value.length ? "" : t("Members.err_email");
+    errors.role = role.value === null || role.value === "" ? t("Members.err_role") : "";
+    errors.designation = designationList.value.length && (designation.value === null || designation.value === "") ? t("Members.err_designation") : "";
     if (errors.email || errors.role || errors.designation) return;
 
     sending.value = true;
@@ -480,7 +480,7 @@ async function cancelInvitation(item) {
 async function copyLink(link) {
     try {
         await navigator.clipboard.writeText(link);
-        $toast.success(t("MembersV2.copied"), { position: "top-right" });
+        $toast.success(t("Members.copied"), { position: "top-right" });
     } catch (error) {
         console.error("ERROR in copy invite link: ", error);
     }

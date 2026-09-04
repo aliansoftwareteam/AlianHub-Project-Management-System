@@ -3,27 +3,27 @@
         <AiSidebar />
         <div class="parity-page__main">
             <div class="ah-toolbar">
-                <div class="ah-toolbar__title">{{ $t('ParityV2.routing_title') }}</div>
-                <span class="parity-count">{{ $t('ParityV2.n_selected', { n: selected.length }) }}</span>
+                <div class="ah-toolbar__title">{{ $t('Parity.routing_title') }}</div>
+                <span class="parity-count">{{ $t('Parity.n_selected', { n: selected.length }) }}</span>
                 <div class="ah-toolbar__spacer"></div>
                 <button type="button" class="ah-btn ah-btn--dark ah-btn--sm" :disabled="!selected.length" @click="propose">
-                    {{ $t('ParityV2.route_to_agents') }}
+                    {{ $t('Parity.route_to_agents') }}
                 </button>
             </div>
 
             <div class="parity-page__body ah-scroll">
-                <p class="parity-lead">{{ $t('ParityV2.routing_lead') }}</p>
+                <p class="parity-lead">{{ $t('Parity.routing_lead') }}</p>
 
                 <section class="ah-card">
                     <div class="ah-card__head">
-                        <span class="ah-h3">{{ $t('ParityV2.open_tasks') }}</span>
+                        <span class="ah-h3">{{ $t('Parity.open_tasks') }}</span>
                         <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="toggleAll">
-                            {{ selected.length === routable.length ? $t('ParityV2.clear_all') : $t('ParityV2.select_all') }}
+                            {{ selected.length === routable.length ? $t('Parity.clear_all') : $t('Parity.select_all') }}
                         </button>
                     </div>
                     <div class="ah-card__body">
-                        <p v-if="loading" class="ah-empty">{{ $t('ParityV2.loading') }}</p>
-                        <p v-else-if="!routable.length" class="ah-empty">{{ $t('ParityV2.nothing_open') }}</p>
+                        <p v-if="loading" class="ah-empty">{{ $t('Parity.loading') }}</p>
+                        <p v-else-if="!routable.length" class="ah-empty">{{ $t('Parity.nothing_open') }}</p>
                         <label v-for="item in routable" :key="item._id" class="route__row">
                             <input class="ah-check" type="checkbox" :value="String(item._id)" :checked="selected.includes(String(item._id))" @change="toggle(item)" />
                             <span class="route__title">{{ item.TaskName }}</span>
@@ -34,7 +34,7 @@
 
                 <section v-if="proposed && rows.length" class="ah-card">
                     <div class="ah-card__head">
-                        <span class="ah-label">{{ $t('ParityV2.proposed_routing') }}</span>
+                        <span class="ah-label">{{ $t('Parity.proposed_routing') }}</span>
                     </div>
                     <div class="ah-card__body">
                         <div v-for="row in rows" :key="row.taskId" class="route__row" :class="{ 'route__row--refused': !row.routed }">
@@ -53,7 +53,7 @@
 
                         <div class="route__foot">
                             <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="!accepted.length || assigning" @click="assign">
-                                {{ assigning ? $t('ParityV2.assigning') : $t('ParityV2.assign_n', { n: accepted.length }) }}
+                                {{ assigning ? $t('Parity.assigning') : $t('Parity.assign_n', { n: accepted.length }) }}
                             </button>
                             <span class="route__cost">{{ costLine }}</span>
                         </div>
@@ -63,26 +63,26 @@
 
                 <section v-if="proposed && rows.length" class="ah-card route__rule">
                     <div class="ah-card__head">
-                        <span class="ah-h3">{{ $t('ParityV2.stop_by_hand') }}</span>
-                        <span class="ah-chip ah-chip--brand ah-chip--mono">{{ $t('ParityV2.rule_tag') }}</span>
+                        <span class="ah-h3">{{ $t('Parity.stop_by_hand') }}</span>
+                        <span class="ah-chip ah-chip--brand ah-chip--mono">{{ $t('Parity.rule_tag') }}</span>
                     </div>
                     <div class="ah-card__body">
                         <p class="route__rule-sentence">{{ ruleSentence }}</p>
                         <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">
                             <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="savingRule" @click="saveRule">
-                                {{ savingRule ? $t('ParityV2.saving') : $t('ParityV2.save_rule') }}
+                                {{ savingRule ? $t('Parity.saving') : $t('Parity.save_rule') }}
                             </button>
                             <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="testing" @click="testRule">
-                                {{ backtest ? $t('ParityV2.backtest_result', { n: backtest.matched, days: backtest.windowDays }) : $t('ParityV2.test_30_days') }}
+                                {{ backtest ? $t('Parity.backtest_result', { n: backtest.matched, days: backtest.windowDays }) : $t('Parity.test_30_days') }}
                             </button>
                         </div>
                         <p v-if="ruleErrors.length" class="ah-field__error">{{ ruleErrors[0] }}</p>
-                        <p v-if="ruleSaved" class="parity-lead">{{ $t('ParityV2.rule_saved') }}</p>
-                        <p class="route__note">{{ $t('ParityV2.rules_live_with') }}</p>
+                        <p v-if="ruleSaved" class="parity-lead">{{ $t('Parity.rule_saved') }}</p>
+                        <p class="route__note">{{ $t('Parity.rules_live_with') }}</p>
                     </div>
                 </section>
 
-                <p class="parity-lead">{{ $t('ParityV2.router_trust') }}</p>
+                <p class="parity-lead">{{ $t('Parity.router_trust') }}</p>
             </div>
         </div>
     </div>
@@ -131,8 +131,8 @@ const rows = computed(() => routeTasks({
 const totals = computed(() => routingTotals(rows.value));
 
 const costLine = computed(() => {
-    const priced = totals.value.priced ? t("ParityV2.about_usd", { usd: totals.value.usd.toFixed(2) }) : t("ParityV2.cost_unknown");
-    return t("ParityV2.route_cost_line", { cost: priced, n: totals.value.forPeople });
+    const priced = totals.value.priced ? t("Parity.about_usd", { usd: totals.value.usd.toFixed(2) }) : t("Parity.cost_unknown");
+    return t("Parity.route_cost_line", { cost: priced, n: totals.value.forPeople });
 });
 
 const propose = () => {
@@ -166,10 +166,10 @@ const assign = async () => {
             await startRun({ agentId: row.agent.agentId, taskId: row.taskId, trigger: "assignment", note: row.agent.reason });
             done += 1;
         }
-        $toast.success(t("ParityV2.routed_n", { n: done }), { position: "top-right" });
+        $toast.success(t("Parity.routed_n", { n: done }), { position: "top-right" });
         accepted.value = [];
     } catch (error) {
-        assignError.value = t("ParityV2.routed_partial", { n: done, error: error.message });
+        assignError.value = t("Parity.routed_partial", { n: done, error: error.message });
     } finally {
         assigning.value = false;
     }
@@ -179,15 +179,15 @@ const assign = async () => {
  * work it just matched, and the agent it matched it to. */
 const ruleSentence = computed(() => {
     const first = rows.value.find((r) => r.routed);
-    if (!first) return t("ParityV2.no_rule_yet");
+    if (!first) return t("Parity.no_rule_yet");
     const agent = agents.value.find((a) => String(a._id) === first.agent.agentId) || {};
     const skill = (agent.skills || [])[0] || "qa-review";
     return `When a task is created, if the title contains "${first.work.kind}", run the ${String(skill).replace(/[^a-z0-9-]/gi, "-").toLowerCase()} agent.`;
 });
 
 const compile = async () => {
-    const res = await apiRequest("post", env.AUTOMATIONS_COMPILE, { sentence: ruleSentence.value, name: t("ParityV2.rule_name") });
-    if (!res?.data?.status) { ruleErrors.value = [res?.data?.statusText || t("ParityV2.compile_failed")]; return null; }
+    const res = await apiRequest("post", env.AUTOMATIONS_COMPILE, { sentence: ruleSentence.value, name: t("Parity.rule_name") });
+    if (!res?.data?.status) { ruleErrors.value = [res?.data?.statusText || t("Parity.compile_failed")]; return null; }
     ruleErrors.value = res.data.data.errors || [];
     compiled.value = res.data.data.rule;
     return compiled.value;
@@ -211,7 +211,7 @@ const saveRule = async () => {
     try {
         const rule = await compile();
         if (!rule) return;
-        const res = await apiRequest("post", env.AUTOMATIONS_V2, { ...rule, name: t("ParityV2.rule_name"), enabled: false });
+        const res = await apiRequest("post", env.AUTOMATIONS_V2, { ...rule, name: t("Parity.rule_name"), enabled: false });
         if (!res?.data?.status) { ruleErrors.value = res?.data?.errors || [res?.data?.statusText]; return; }
         ruleSaved.value = true;
     } finally {

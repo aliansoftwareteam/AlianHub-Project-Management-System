@@ -118,7 +118,7 @@
             <template #body>
                 <UpgradePlan
                     :buttonText="$t('Upgrades.upgrade_your_plan')"
-                    :lastTitle="$t('ViewList.to_unlock_list_views')"
+                    :lastTitle="$t('ViewList.to_unlock_list_view')"
                     :secondTitle="$t('Upgrades.unlimited')"
                     :firstTitle="$t('Upgrades.upgrade_to')"
                     :message="$t('Upgrades.the_feature_not_available')"

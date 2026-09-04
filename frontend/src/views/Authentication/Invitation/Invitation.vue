@@ -2,23 +2,23 @@
     <AuthShell :proof="false">
         <div v-if="stage === 'checking'" class="av2-center">
             <div class="auth__spinner"></div>
-            <p class="auth__p">{{ $t('AuthV2.invite_checking') }}</p>
+            <p class="auth__p">{{ $t('Auth.invite_checking') }}</p>
         </div>
 
         <form v-else-if="stage === 'form'" class="av2-auth-card" novalidate @submit.prevent="submit">
-            <h2 class="auth__h">{{ $t('AuthV2.create_account') }}</h2>
-            <p class="auth__p">{{ workspaceName ? $t('AuthV2.join_lead', { workspace: workspaceName }) : $t('AuthV2.create_account_lead') }}</p>
+            <h2 class="auth__h">{{ $t('Auth.create_account') }}</h2>
+            <p class="auth__p">{{ workspaceName ? $t('Auth.join_lead', { workspace: workspaceName }) : $t('Auth.create_account_lead') }}</p>
 
             <div v-if="banner" class="auth__banner auth__banner--danger"><ShellIcon name="alert" :size="15" /><span>{{ banner }}</span></div>
 
             <div v-if="providers.length" class="auth__providers">
                 <ProviderButton v-for="p in providers" :key="p" :provider="p" mode="register" :companyID="companyIdRoute" :companyUserDocID="requestId" />
             </div>
-            <div v-if="providers.length" class="auth__or">{{ $t('AuthV2.or') }}</div>
+            <div v-if="providers.length" class="auth__or">{{ $t('Auth.or') }}</div>
 
             <div class="auth__fields" style="gap:9px">
                 <div class="ah-field">
-                    <label class="ah-field__label ah-sr-only" for="inv-name">{{ $t('AuthV2.full_name') }}</label>
+                    <label class="ah-field__label ah-sr-only" for="inv-name">{{ $t('Auth.full_name') }}</label>
                     <input
                         id="inv-name"
                         ref="nameInput"
@@ -28,7 +28,7 @@
                         :class="{ 'ah-input--error': errors.name }"
                         autocomplete="name"
                         maxlength="50"
-                        :placeholder="$t('AuthV2.name_placeholder')"
+                        :placeholder="$t('Auth.name_placeholder')"
                         :aria-invalid="!!errors.name"
                         @input="errors.name = ''"
                     />
@@ -49,7 +49,7 @@
                             :class="{ 'ah-input--error': errors.password }"
                             autocomplete="new-password"
                             maxlength="150"
-                            :placeholder="$t('AuthV2.password_placeholder')"
+                            :placeholder="$t('Auth.password_placeholder')"
                             :aria-invalid="!!errors.password"
                             @input="errors.password = ''"
                         />
@@ -58,25 +58,25 @@
                         </button>
                     </div>
                     <div v-if="errors.password" class="ah-field__error"><ShellIcon name="x" :size="12" />{{ errors.password }}</div>
-                    <div v-else class="ah-field__hint">{{ $t('AuthV2.password_rules') }}</div>
+                    <div v-else class="ah-field__hint">{{ $t('Auth.password_rules') }}</div>
                 </div>
                 <button type="submit" class="ah-btn ah-btn--primary ah-btn--block ah-btn--lg" :disabled="busy">
                     <span v-if="busy" class="ah-spin"></span>{{ busy ? $t('Auth.loading') : $t('Auth.continue') }}
                 </button>
             </div>
 
-            <i18n-t keypath="AuthV2.terms_line" tag="p" class="av2-terms">
+            <i18n-t keypath="Auth.terms_line" tag="p" class="av2-terms">
                 <template #terms><a v-if="termsLink" :href="termsLink" target="_blank" rel="noopener">{{ $t('Auth.tearm') }}</a><span v-else>{{ $t('Auth.tearm') }}</span></template>
                 <template #privacy><a v-if="privacyLink" :href="privacyLink" target="_blank" rel="noopener">{{ $t('Auth.Privacy_Policy') }}</a><span v-else>{{ $t('Auth.Privacy_Policy') }}</span></template>
             </i18n-t>
-            <p class="av2-terms" style="margin-top:4px">{{ $t('AuthV2.have_account') }} <strong><router-link :to="{ name: 'Log-in' }">{{ $t('Auth.log_in') }}</router-link></strong></p>
+            <p class="av2-terms" style="margin-top:4px">{{ $t('Auth.have_account') }} <strong><router-link :to="{ name: 'Log-in' }">{{ $t('Auth.log_in') }}</router-link></strong></p>
         </form>
 
         <div v-else class="av2-auth-card">
             <div class="auth__glyph auth__glyph--warn">!</div>
-            <h2 class="auth__h">{{ $t('AuthV2.invite_invalid_title') }}</h2>
-            <p class="auth__p">{{ invalidMessage || $t('AuthV2.invite_invalid_body') }}</p>
-            <router-link :to="{ name: 'Log-in' }" class="ah-btn ah-btn--secondary ah-btn--block ah-btn--lg">{{ $t('AuthV2.back_to_login') }}</router-link>
+            <h2 class="auth__h">{{ $t('Auth.invite_invalid_title') }}</h2>
+            <p class="auth__p">{{ invalidMessage || $t('Auth.invite_invalid_body') }}</p>
+            <router-link :to="{ name: 'Log-in' }" class="ah-btn ah-btn--secondary ah-btn--block ah-btn--lg">{{ $t('Auth.back_to_login') }}</router-link>
         </div>
     </AuthShell>
 </template>
@@ -151,7 +151,7 @@ onMounted(async () => {
             stage.value = "form";
             setTimeout(() => nameInput.value?.focus(), 50);
         } else {
-            invalidMessage.value = user.status === 3 ? t("AuthV2.invite_cancelled") : t("AuthV2.invite_used");
+            invalidMessage.value = user.status === 3 ? t("Auth.invite_cancelled") : t("Auth.invite_used");
             stage.value = "invalid";
         }
     } catch (error) {
@@ -162,10 +162,10 @@ onMounted(async () => {
 });
 
 const validate = () => {
-    errors.name = !form.name ? t("AuthV2.name_required") : "";
+    errors.name = !form.name ? t("Auth.name_required") : "";
     errors.password = !form.password || form.password.length < 8
-        ? t("AuthV2.password_short")
-        : !PASSWORD_RE.test(form.password) ? t("AuthV2.password_weak") : "";
+        ? t("Auth.password_short")
+        : !PASSWORD_RE.test(form.password) ? t("Auth.password_weak") : "";
     return !errors.name && !errors.password;
 };
 
@@ -187,7 +187,7 @@ const submit = async () => {
             isInvitation: true
         });
         if (!response.data.status) {
-            banner.value = response.data.statusText?.status == 409 ? t("AuthV2.email_in_use") : t("Auth.server_error");
+            banner.value = response.data.statusText?.status == 409 ? t("Auth.email_in_use") : t("Auth.server_error");
             return;
         }
         const user = await apiRequestWithoutSecure("post", env.LOGIN, { email: email.value, password: form.password });

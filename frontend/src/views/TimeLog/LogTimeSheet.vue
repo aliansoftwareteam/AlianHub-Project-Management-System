@@ -2,18 +2,18 @@
     <div class="lt" :class="`lt--${mode}`">
         <header class="lt__head">
             <div>
-                <div class="lt__title">{{ $t('TimeV2.log_time') }}</div>
-                <div class="lt__sub">{{ $t('TimeV2.so_far', { day: todayLabel, h: formatMinutes(todayMinutes) }) }}</div>
+                <div class="lt__title">{{ $t('Time.log_time') }}</div>
+                <div class="lt__sub">{{ $t('Time.so_far', { day: todayLabel, h: formatMinutes(todayMinutes) }) }}</div>
             </div>
-            <button v-if="mode === 'panel'" type="button" class="ah-btn ah-btn--ghost ah-btn--sm lt__close" :aria-label="$t('TimeV2.close')" @click="$emit('close')">
+            <button v-if="mode === 'panel'" type="button" class="ah-btn ah-btn--ghost ah-btn--sm lt__close" :aria-label="$t('Time.close')" @click="$emit('close')">
                 <ShellIcon name="x" :size="16" />
             </button>
         </header>
 
         <div class="lt__body ah-scroll">
             <section v-for="s in overnightSessions" :key="s.key" class="lt__alert">
-                <div class="lt__alert-title">{{ $t('TimeV2.overnight_title') }}</div>
-                <i18n-t keypath="TimeV2.overnight_body" tag="div" class="lt__alert-body">
+                <div class="lt__alert-title">{{ $t('Time.overnight_title') }}</div>
+                <i18n-t keypath="Time.overnight_body" tag="div" class="lt__alert-body">
                     <template #start>{{ s.startClock }}</template>
                     <template #when>{{ s.whenLabel }}</template>
                     <template #task><strong>{{ s.taskName }}</strong></template>
@@ -21,38 +21,38 @@
                 </i18n-t>
                 <div class="tv-row-actions">
                     <button type="button" class="ah-btn ah-btn--primary ah-btn--grow" :disabled="busy" @click="trimSession(s)">
-                        {{ busy === s.key ? $t('TimeV2.trimming') : $t('TimeV2.trim_to') }}
+                        {{ busy === s.key ? $t('Time.trimming') : $t('Time.trim_to') }}
                     </button>
-                    <button type="button" class="ah-btn ah-btn--secondary" :disabled="busy" @click="editSession(s)">{{ $t('TimeV2.edit') }}</button>
+                    <button type="button" class="ah-btn ah-btn--secondary" :disabled="busy" @click="editSession(s)">{{ $t('Time.edit') }}</button>
                 </div>
                 <p v-if="s.error" class="tv-error">{{ s.error }}</p>
             </section>
 
             <section class="tv-card lt__form">
                 <div class="ah-field">
-                    <label class="ah-field__label">{{ $t('TimeV2.task') }}</label>
+                    <label class="ah-field__label">{{ $t('Time.task') }}</label>
                     <div class="lt__picker">
                         <button type="button" class="lt__task-btn" :class="{ 'ah-input--error': errors.task }" @click="togglePicker">
                             <span class="tv-sq" :style="{ background: task && task.projectColor ? task.projectColor : 'var(--brand)' }"></span>
-                            <span class="lt__task-name" :class="{ 'is-placeholder': !task }">{{ task ? task.taskName : $t('TimeV2.pick_task') }}</span>
+                            <span class="lt__task-name" :class="{ 'is-placeholder': !task }">{{ task ? task.taskName : $t('Time.pick_task') }}</span>
                             <ShellIcon name="chevronDown" :size="14" />
                         </button>
                         <div v-if="pickerOpen" class="ah-pop lt__pop">
-                            <input ref="searchInput" v-model="search" class="ah-input lt__search" :placeholder="$t('TimeV2.search_tasks')" @input="searchTasks" />
+                            <input ref="searchInput" v-model="search" class="ah-input lt__search" :placeholder="$t('Time.search_tasks')" @input="searchTasks" />
                             <div class="lt__pop-list ah-scroll">
                                 <template v-if="recentList.length">
-                                    <div class="ah-label ah-pop__label">{{ $t('TimeV2.recent') }}</div>
+                                    <div class="ah-label ah-pop__label">{{ $t('Time.recent') }}</div>
                                     <button v-for="opt in recentList" :key="`r-${opt.taskId}`" type="button" class="ah-pop__item" @click="chooseTask(opt)">
                                         <span class="tv-sq" :style="{ background: opt.projectColor || 'var(--brand)' }"></span>
                                         <span class="lt__opt">{{ opt.taskName }}<small v-if="opt.projectName">{{ opt.projectName }}</small></span>
                                     </button>
                                 </template>
-                                <div class="ah-label ah-pop__label">{{ $t('TimeV2.assigned') }}</div>
+                                <div class="ah-label ah-pop__label">{{ $t('Time.assigned') }}</div>
                                 <button v-for="opt in assignedList" :key="`a-${opt.taskId}`" type="button" class="ah-pop__item" @click="chooseTask(opt)">
                                     <span class="tv-sq" :style="{ background: opt.projectColor || 'var(--brand)' }"></span>
                                     <span class="lt__opt">{{ opt.taskName }}<small v-if="opt.projectName">{{ opt.projectName }}</small></span>
                                 </button>
-                                <div v-if="!assignedList.length && !recentList.length" class="ah-pop__item is-disabled">{{ searching ? $t('TimeV2.loading') : $t('TimeV2.no_tasks') }}</div>
+                                <div v-if="!assignedList.length && !recentList.length" class="ah-pop__item is-disabled">{{ searching ? $t('Time.loading') : $t('Time.no_tasks') }}</div>
                             </div>
                         </div>
                     </div>
@@ -61,16 +61,16 @@
 
                 <div class="lt__two">
                     <div class="ah-field">
-                        <label class="ah-field__label" for="lt-hours">{{ $t('TimeV2.hours') }}</label>
+                        <label class="ah-field__label" for="lt-hours">{{ $t('Time.hours') }}</label>
                         <input id="lt-hours" v-model="hoursText" class="ah-input tv-input-mono lt__hours" :class="{ 'ah-input--error': errors.hours }" inputmode="decimal" placeholder="0:00" @blur="normalizeHours" />
                         <p v-if="errors.hours" class="ah-field__error">{{ errors.hours }}</p>
                     </div>
                     <div class="ah-field">
-                        <label class="ah-field__label" for="lt-when">{{ $t('TimeV2.when') }}</label>
+                        <label class="ah-field__label" for="lt-when">{{ $t('Time.when') }}</label>
                         <select id="lt-when" v-model="whenChoice" class="ah-input">
-                            <option value="today">{{ $t('TimeV2.when_today') }}</option>
-                            <option value="yesterday">{{ $t('TimeV2.when_yesterday') }}</option>
-                            <option value="custom">{{ $t('TimeV2.when_custom') }}</option>
+                            <option value="today">{{ $t('Time.when_today') }}</option>
+                            <option value="yesterday">{{ $t('Time.when_yesterday') }}</option>
+                            <option value="custom">{{ $t('Time.when_custom') }}</option>
                         </select>
                         <input v-if="whenChoice === 'custom'" v-model="customDate" type="date" class="ah-input" :max="todayIso" />
                     </div>
@@ -80,28 +80,28 @@
                     <button type="button" class="lt__chip" @click="addMinutes(15)">+15m</button>
                     <button type="button" class="lt__chip" @click="addMinutes(30)">+30m</button>
                     <button type="button" class="lt__chip" @click="addMinutes(60)">+1h</button>
-                    <button type="button" class="lt__chip lt__chip--grey" @click="roundTo15">{{ $t('TimeV2.round_15') }}</button>
+                    <button type="button" class="lt__chip lt__chip--grey" @click="roundTo15">{{ $t('Time.round_15') }}</button>
                 </div>
 
                 <div class="ah-field">
-                    <label class="ah-field__label" for="lt-note">{{ $t('TimeV2.note') }} <span class="ah-muted">{{ $t('TimeV2.optional') }}</span></label>
-                    <textarea id="lt-note" v-model="note" class="ah-input ah-textarea lt__note" :placeholder="$t('TimeV2.note_ph')"></textarea>
+                    <label class="ah-field__label" for="lt-note">{{ $t('Time.note') }} <span class="ah-muted">{{ $t('Time.optional') }}</span></label>
+                    <textarea id="lt-note" v-model="note" class="ah-input ah-textarea lt__note" :placeholder="$t('Time.note_ph')"></textarea>
                 </div>
 
                 <label class="lt__bill">
                     <input v-model="billable" type="checkbox" class="ah-check" />
-                    <span>{{ $t('TimeV2.billable') }}</span>
+                    <span>{{ $t('Time.billable') }}</span>
                 </label>
             </section>
 
             <p v-if="error" class="tv-error">{{ error }}</p>
             <p v-else-if="success" class="tv-ok">{{ success }}</p>
-            <p class="lt__hint">{{ $t('TimeV2.entries_editable') }}</p>
+            <p class="lt__hint">{{ $t('Time.entries_editable') }}</p>
         </div>
 
         <footer class="lt__foot">
             <button type="button" class="ah-btn ah-btn--primary ah-btn--lg ah-btn--block" :disabled="!!busy" @click="submit">
-                {{ busy === 'submit' ? $t('TimeV2.logging') : $t('TimeV2.log_btn', { h: hoursText || '0:00' }) }}
+                {{ busy === 'submit' ? $t('Time.logging') : $t('Time.log_btn', { h: hoursText || '0:00' }) }}
             </button>
         </footer>
     </div>
@@ -187,7 +187,7 @@ const overnightSessions = computed(() => {
     }
     return list.map((s) => {
         const started = moment(s.startedAt);
-        const when = started.isSame(moment(), 'day') ? t('TimeV2.today') : (started.isSame(moment().subtract(1, 'day'), 'day') ? t('TimeV2.yesterday') : started.format('MMM D'));
+        const when = started.isSame(moment(), 'day') ? t('Time.today') : (started.isSame(moment().subtract(1, 'day'), 'day') ? t('Time.yesterday') : started.format('MMM D'));
         return { ...s, startClock: started.format('HH:mm'), whenLabel: when, error: sessionErrors.value[s.key] || '' };
     });
 });
@@ -292,11 +292,11 @@ const trimSession = async (s) => {
     try {
         if (s.local) await timer.stop({ minutes: s.suggestedMinutes || 180 });
         else await timer.trim(s, s.suggestedMinutes || 180);
-        success.value = t('TimeV2.trimmed');
+        success.value = t('Time.trimmed');
         emit('logged', { message: success.value });
         loadToday();
     } catch (e) {
-        sessionErrors.value = { ...sessionErrors.value, [s.key]: t('TimeV2.trim_failed') };
+        sessionErrors.value = { ...sessionErrors.value, [s.key]: t('Time.trim_failed') };
     } finally {
         busy.value = '';
     }
@@ -312,8 +312,8 @@ const editSession = (s) => {
 
 const validate = () => {
     errors.value = { task: '', hours: '' };
-    if (!task.value) errors.value.task = t('TimeV2.task_required');
-    if (Number.isNaN(minutes.value) || minutes.value <= 0) errors.value.hours = t('TimeV2.hours_required');
+    if (!task.value) errors.value.task = t('Time.task_required');
+    if (Number.isNaN(minutes.value) || minutes.value <= 0) errors.value.hours = t('Time.hours_required');
     return !errors.value.task && !errors.value.hours;
 };
 const submit = async () => {
@@ -330,13 +330,13 @@ const submit = async () => {
         } else {
             await timer.logTime({ task: task.value, minutes: m, date: selectedDate.value, note: note.value.trim(), billable: billable.value });
         }
-        success.value = t('TimeV2.logged_ok', { h: formatHm(m), task: task.value.taskName });
+        success.value = t('Time.logged_ok', { h: formatHm(m), task: task.value.taskName });
         emit('logged', { message: success.value });
         hoursText.value = '';
         note.value = '';
         loadToday();
     } catch (e) {
-        error.value = t('TimeV2.log_failed');
+        error.value = t('Time.log_failed');
     } finally {
         busy.value = '';
     }

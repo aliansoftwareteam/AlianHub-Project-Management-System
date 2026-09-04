@@ -140,7 +140,7 @@ function initEditor() {
         tools,
         data: seedData(),
         readOnly: props.readOnly,
-        placeholder: t('DocsV2.slash_hint'),
+        placeholder: t('Docs.slash_hint'),
         minHeight: 200,
         onChange: () => { emitChange(); },
         onReady: () => { emit('ready'); },

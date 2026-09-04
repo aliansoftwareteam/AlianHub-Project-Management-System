@@ -1,36 +1,36 @@
 <template>
     <div class="ah-page rp-page rp-page--flush">
         <div class="rp-desktop-only rp-empty">
-            <strong>{{ $t('ReportsV2.desktop_only_title') }}</strong>
-            <span>{{ $t('ReportsV2.desktop_only_body') }}</span>
+            <strong>{{ $t('Reports.desktop_only_title') }}</strong>
+            <span>{{ $t('Reports.desktop_only_body') }}</span>
         </div>
 
         <div class="rp-split rp-builder">
             <aside class="rp-side">
-                <div class="rp-card__head">{{ $t('ReportsV2.new_report') }}</div>
+                <div class="rp-card__head">{{ $t('Reports.new_report') }}</div>
 
                 <div class="rp-side__group">
-                    <span class="rp-side__label">{{ $t('ReportsV2.source') }}</span>
+                    <span class="rp-side__label">{{ $t('Reports.source') }}</span>
                     <select v-model="cfg.source" class="rp-select" style="max-width: none" @change="onSourceChange">
-                        <option value="tasks">{{ $t('ReportsV2.src_tasks') }}</option>
-                        <option value="timelogs">{{ $t('ReportsV2.src_timelogs') }}</option>
+                        <option value="tasks">{{ $t('Reports.src_tasks') }}</option>
+                        <option value="timelogs">{{ $t('Reports.src_timelogs') }}</option>
                     </select>
                 </div>
 
                 <div class="rp-side__group">
-                    <span class="rp-side__label">{{ $t('ReportsV2.filters') }}</span>
+                    <span class="rp-side__label">{{ $t('Reports.filters') }}</span>
                     <div v-for="f in activeFilters" :key="f.key" class="rp-filter">
                         <span>{{ f.label }}</span>
-                        <button type="button" class="rp-filter__x" :aria-label="$t('ReportsV2.remove_filter')" @click="clearFilter(f.key)">×</button>
+                        <button type="button" class="rp-filter__x" :aria-label="$t('Reports.remove_filter')" @click="clearFilter(f.key)">×</button>
                     </div>
                     <select v-model="filterDraft" class="rp-select" style="max-width: none" @change="addFilter">
-                        <option value="">{{ $t('ReportsV2.add_filter') }}</option>
+                        <option value="">{{ $t('Reports.add_filter') }}</option>
                         <option v-for="opt in filterOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                     </select>
                 </div>
 
                 <div class="rp-side__group">
-                    <span class="rp-side__label">{{ $t('ReportsV2.group_by') }}</span>
+                    <span class="rp-side__label">{{ $t('Reports.group_by') }}</span>
                     <div class="rp-seg">
                         <button
                             v-for="d in dimensions" :key="d.key" type="button"
@@ -41,31 +41,31 @@
                 </div>
 
                 <div class="rp-side__group">
-                    <span class="rp-side__label">{{ $t('ReportsV2.measure') }}</span>
+                    <span class="rp-side__label">{{ $t('Reports.measure') }}</span>
                     <select v-model="cfg.metric" class="rp-select" style="max-width: none" @change="runPreview">
                         <option v-for="m in metrics" :key="m.key" :value="m.key">{{ m.label }}</option>
                     </select>
                 </div>
 
                 <div class="rp-side__group">
-                    <span class="rp-side__label">{{ $t('ReportsV2.chart') }}</span>
+                    <span class="rp-side__label">{{ $t('Reports.chart') }}</span>
                     <div class="rp-seg">
                         <button
                             v-for="c in CHARTS" :key="c" type="button"
                             class="rp-seg__btn" :class="{ 'is-active': cfg.chartType === c }"
                             @click="cfg.chartType = c"
-                        >{{ $t(`ReportsV2.chart_${c}`) }}</button>
+                        >{{ $t(`Reports.chart_${c}`) }}</button>
                     </div>
                 </div>
 
                 <div class="rp-side__group">
-                    <span class="rp-side__label">{{ $t('ReportsV2.saved') }}</span>
+                    <span class="rp-side__label">{{ $t('Reports.saved') }}</span>
                     <select v-model="savedPick" class="rp-select" style="max-width: none" @change="loadSaved">
-                        <option value="">{{ $t('ReportsV2.saved_pick') }}</option>
+                        <option value="">{{ $t('Reports.saved_pick') }}</option>
                         <option v-for="s in saved" :key="s._id" :value="String(s._id)">{{ s.name }}</option>
                     </select>
                     <select v-model="tplPick" class="rp-select" style="max-width: none" @change="applyTemplate">
-                        <option value="">{{ $t('ReportsV2.template_pick') }}</option>
+                        <option value="">{{ $t('Reports.template_pick') }}</option>
                         <option v-for="tp in templates" :key="tp.key" :value="tp.key">{{ tp.name }}</option>
                     </select>
                 </div>
@@ -73,15 +73,15 @@
 
             <main class="rp-split__main">
                 <div class="rp-head">
-                    <input v-model="reportName" class="rp-name" :placeholder="$t('ReportsV2.name_ph')" />
+                    <input v-model="reportName" class="rp-name" :placeholder="$t('Reports.name_ph')" />
                     <span class="rp-meta">{{ previewMeta }}</span>
                     <ReportsTabs />
                     <div class="rp-actions">
                         <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="!currentSavedId" @click="showSchedule = !showSchedule">
-                            {{ $t('ReportsV2.schedule_email') }}
+                            {{ $t('Reports.schedule_email') }}
                         </button>
                         <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy || !reportName.trim()" @click="save">
-                            {{ busy ? $t('ReportsV2.saving') : $t('ReportsV2.save') }}
+                            {{ busy ? $t('Reports.saving') : $t('Reports.save') }}
                         </button>
                     </div>
                 </div>
@@ -89,45 +89,45 @@
                 <p v-if="message" class="rp-note">{{ message }}</p>
 
                 <div v-if="showSchedule" class="rp-card">
-                    <div class="rp-card__head">{{ $t('ReportsV2.schedule_email') }}</div>
+                    <div class="rp-card__head">{{ $t('Reports.schedule_email') }}</div>
                     <div class="rp-sched">
                         <select v-model="sched.cadence" class="rp-select">
-                            <option value="daily">{{ $t('ReportsV2.daily') }}</option>
-                            <option value="weekly">{{ $t('ReportsV2.weekly') }}</option>
-                            <option value="monthly">{{ $t('ReportsV2.monthly') }}</option>
+                            <option value="daily">{{ $t('Reports.daily') }}</option>
+                            <option value="weekly">{{ $t('Reports.weekly') }}</option>
+                            <option value="monthly">{{ $t('Reports.monthly') }}</option>
                         </select>
-                        <input v-model="sched.recipients" class="ah-input" :class="{ 'ah-input--error': scheduleError }" :placeholder="$t('ReportsV2.recipients_ph')" />
+                        <input v-model="sched.recipients" class="ah-input" :class="{ 'ah-input--error': scheduleError }" :placeholder="$t('Reports.recipients_ph')" />
                         <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="!sched.recipients.trim()" @click="createSchedule">
-                            {{ $t('ReportsV2.schedule_it') }}
+                            {{ $t('Reports.schedule_it') }}
                         </button>
                     </div>
                     <span v-if="scheduleError" class="ah-field__error">{{ scheduleError }}</span>
                     <div v-for="sc in schedules" :key="sc._id" class="rp-row">
                         <span class="rp-row__name">{{ sc.reportName || reportName }}</span>
-                        <span class="rp-row__data">{{ $t(`ReportsV2.${sc.cadence}`) }} · {{ (sc.recipients || []).length }}</span>
-                        <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="removeSchedule(sc)">{{ $t('ReportsV2.remove') }}</button>
+                        <span class="rp-row__data">{{ $t(`Reports.${sc.cadence}`) }} · {{ (sc.recipients || []).length }}</span>
+                        <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="removeSchedule(sc)">{{ $t('Reports.remove') }}</button>
                     </div>
                 </div>
 
                 <div class="rp-card rp-preview">
                     <div v-if="rows.length" class="rp-totals">
                         <div>
-                            <span class="rp-stat__label">{{ $t('ReportsV2.total') }}</span>
+                            <span class="rp-stat__label">{{ $t('Reports.total') }}</span>
                             <span class="rp-stat__value">{{ formatValue(total) }}</span>
                         </div>
                         <div>
-                            <span class="rp-stat__label">{{ $t('ReportsV2.groups') }}</span>
+                            <span class="rp-stat__label">{{ $t('Reports.groups') }}</span>
                             <span class="rp-stat__value">{{ rows.length }}</span>
                         </div>
                         <div>
-                            <span class="rp-stat__label">{{ $t('ReportsV2.largest') }}</span>
+                            <span class="rp-stat__label">{{ $t('Reports.largest') }}</span>
                             <span class="rp-stat__value">{{ formatValue(rows[0].value) }}</span>
                         </div>
                     </div>
 
                     <div v-if="!rows.length" class="rp-empty">
-                        <strong>{{ $t('ReportsV2.no_data_title') }}</strong>
-                        <span>{{ $t('ReportsV2.no_data_body') }}</span>
+                        <strong>{{ $t('Reports.no_data_title') }}</strong>
+                        <span>{{ $t('Reports.no_data_body') }}</span>
                     </div>
 
                     <div v-else-if="cfg.chartType === 'table'" class="rp-table">
@@ -152,7 +152,7 @@
 
                     <div class="rp-preview__foot">
                         <span>{{ drillHint }}</span>
-                        <span class="ah-small">{{ $t('ReportsV2.preview_source', { source: sourceLabel }) }}</span>
+                        <span class="ah-small">{{ $t('Reports.preview_source', { source: sourceLabel }) }}</span>
                     </div>
                 </div>
             </main>
@@ -204,27 +204,27 @@ const projectLabel = (id) => {
     return found ? (found.ProjectName || '') : String(id);
 };
 
-const dimensions = computed(() => DIMENSIONS[cfg.source].map((key) => ({ key, label: t(`ReportsV2.dim_${key}`) })));
-const metrics = computed(() => METRICS[cfg.source].map((key) => ({ key, label: t(`ReportsV2.metric_${key}`) })));
-const dimensionLabel = computed(() => t(`ReportsV2.dim_${cfg.dimension}`));
-const metricLabel = computed(() => t(`ReportsV2.metric_${cfg.metric}`));
-const sourceLabel = computed(() => t(`ReportsV2.src_${cfg.source}`));
+const dimensions = computed(() => DIMENSIONS[cfg.source].map((key) => ({ key, label: t(`Reports.dim_${key}`) })));
+const metrics = computed(() => METRICS[cfg.source].map((key) => ({ key, label: t(`Reports.metric_${key}`) })));
+const dimensionLabel = computed(() => t(`Reports.dim_${cfg.dimension}`));
+const metricLabel = computed(() => t(`Reports.metric_${cfg.metric}`));
+const sourceLabel = computed(() => t(`Reports.src_${cfg.source}`));
 
 const filterOptions = computed(() => {
-    const options = projects.value.map((p) => ({ value: `project:${p._id}`, label: `${t('ReportsV2.dim_project')} = ${p.ProjectName || ''}` }));
+    const options = projects.value.map((p) => ({ value: `project:${p._id}`, label: `${t('Reports.dim_project')} = ${p.ProjectName || ''}` }));
     if (cfg.source === 'timelogs') {
-        RANGES.forEach((r) => options.push({ value: `range:${r}`, label: `${t('ReportsV2.f_date')} = ${t(`ReportsV2.range_${r}`)}` }));
-        options.push({ value: 'billable:yes', label: `${t('ReportsV2.f_billable')} = ${t('ReportsV2.yes')}` });
-        options.push({ value: 'billable:no', label: `${t('ReportsV2.f_billable')} = ${t('ReportsV2.no')}` });
+        RANGES.forEach((r) => options.push({ value: `range:${r}`, label: `${t('Reports.f_date')} = ${t(`Reports.range_${r}`)}` }));
+        options.push({ value: 'billable:yes', label: `${t('Reports.f_billable')} = ${t('Reports.yes')}` });
+        options.push({ value: 'billable:no', label: `${t('Reports.f_billable')} = ${t('Reports.no')}` });
     }
     return options;
 });
 
 const activeFilters = computed(() => Object.keys(cfg.filters).map((key) => {
     const value = cfg.filters[key];
-    if (key === 'project') return { key, label: `${t('ReportsV2.dim_project')} = ${projectLabel(value)}` };
-    if (key === 'range') return { key, label: `${t('ReportsV2.f_date')} = ${t(`ReportsV2.range_${value}`)}` };
-    if (key === 'billable') return { key, label: `${t('ReportsV2.f_billable')} = ${t(value === 'yes' ? 'ReportsV2.yes' : 'ReportsV2.no')}` };
+    if (key === 'project') return { key, label: `${t('Reports.dim_project')} = ${projectLabel(value)}` };
+    if (key === 'range') return { key, label: `${t('Reports.f_date')} = ${t(`Reports.range_${value}`)}` };
+    if (key === 'billable') return { key, label: `${t('Reports.f_billable')} = ${t(value === 'yes' ? 'Reports.yes' : 'Reports.no')}` };
     return { key, label: `${key} = ${value}` };
 }));
 
@@ -249,12 +249,12 @@ const formatValue = (value) => {
 
 const previewMeta = computed(() => {
     if (!rows.value.length) return '';
-    return t('ReportsV2.preview_meta', { groups: rows.value.length, metric: metricLabel.value }).toUpperCase();
+    return t('Reports.preview_meta', { groups: rows.value.length, metric: metricLabel.value }).toUpperCase();
 });
 
 const drillHint = computed(() => (cfg.dimension === 'project'
-    ? t('ReportsV2.drill_hint')
-    : t('ReportsV2.drill_hint_none')));
+    ? t('Reports.drill_hint')
+    : t('Reports.drill_hint_none')));
 
 const chartSeries = computed(() => (cfg.chartType === 'pie'
     ? rows.value.map((r) => Math.round((r.value || 0) * 100) / 100)
@@ -344,7 +344,7 @@ const loadSaved = async () => {
         currentSavedId.value = String(id);
         rows.value = body.data.result || [];
         unit.value = body.data.unit || 'count';
-    } catch (e) { message.value = t('ReportsV2.load_failed'); }
+    } catch (e) { message.value = t('Reports.load_failed'); }
 };
 
 const loadTemplates = async () => {
@@ -378,10 +378,10 @@ const save = async () => {
             ? (await apiRequest('put', `${env.CUSTOM_REPORT}/${currentSavedId.value}`, { name: reportName.value.trim(), ...payload() }))?.data
             : (await apiRequest('post', env.CUSTOM_REPORT, { name: reportName.value.trim(), ...payload() }))?.data;
         if (body && body.status && body.data && body.data._id) currentSavedId.value = String(body.data._id);
-        message.value = t('ReportsV2.saved_ok');
+        message.value = t('Reports.saved_ok');
         await listSaved();
     } catch (e) {
-        message.value = t('ReportsV2.save_failed');
+        message.value = t('Reports.save_failed');
     } finally { busy.value = false; }
 };
 
@@ -394,17 +394,17 @@ const loadSchedules = async () => {
 
 const createSchedule = async () => {
     scheduleError.value = '';
-    if (!currentSavedId.value) { scheduleError.value = t('ReportsV2.save_first'); return; }
+    if (!currentSavedId.value) { scheduleError.value = t('Reports.save_first'); return; }
     try {
         const body = (await apiRequest('post', env.REPORT_SCHEDULES, {
             savedReportId: currentSavedId.value,
             cadence: sched.cadence,
             recipients: sched.recipients,
         }))?.data;
-        if (body && body.status === false) { scheduleError.value = body.statusText || t('ReportsV2.save_failed'); return; }
+        if (body && body.status === false) { scheduleError.value = body.statusText || t('Reports.save_failed'); return; }
         sched.recipients = '';
         await loadSchedules();
-    } catch (e) { scheduleError.value = t('ReportsV2.save_failed'); }
+    } catch (e) { scheduleError.value = t('Reports.save_failed'); }
 };
 
 const removeSchedule = async (sc) => {

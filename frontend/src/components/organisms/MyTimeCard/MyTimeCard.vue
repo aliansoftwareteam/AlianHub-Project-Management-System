@@ -12,15 +12,15 @@
         <div class="dc-stats mt__stats">
             <div>
                 <div class="dc-stat__num dc-stat__num--sm">{{ formatMinutes(data.loggedMinutes) }}</div>
-                <div class="dc-stat__label">{{ $t('DashV2.logged') }}</div>
+                <div class="dc-stat__label">{{ $t('Dash.logged') }}</div>
             </div>
             <div>
                 <div class="dc-stat__num dc-stat__num--sm">{{ data.plannedMinutes ? formatMinutes(data.plannedMinutes) : '—' }}</div>
-                <div class="dc-stat__label">{{ $t('DashV2.planned') }}</div>
+                <div class="dc-stat__label">{{ $t('Dash.planned') }}</div>
             </div>
             <div>
                 <div class="dc-stat__num dc-stat__num--sm" :class="overPlan ? 'dc-stat__num--danger' : 'dc-stat__num--ok'">{{ deltaText }}</div>
-                <div class="dc-stat__label">{{ $t('DashV2.vs_plan') }}</div>
+                <div class="dc-stat__label">{{ $t('Dash.vs_plan') }}</div>
             </div>
         </div>
     </div>
@@ -70,8 +70,8 @@ const progress = computed(() => {
 });
 const overPlan = computed(() => data.value.plannedMinutes > 0 && data.value.loggedMinutes > data.value.plannedMinutes);
 const plannedLabel = computed(() => (data.value.plannedMinutes
-    ? t('DashV2.of_planned', { hours: formatMinutes(data.value.plannedMinutes) })
-    : t('DashV2.no_plan_set')));
+    ? t('Dash.of_planned', { hours: formatMinutes(data.value.plannedMinutes) })
+    : t('Dash.no_plan_set')));
 const deltaText = computed(() => {
     const plan = data.value.plannedMinutes;
     if (!plan) return '—';
@@ -86,7 +86,7 @@ const load = async () => {
         const res = await apiRequest('post', `${env.MY_TIME}`, { dateFrom, dateTo });
         const d = res && res.data && res.data.status ? (res.data.data || {}) : {};
         data.value = { plannedMinutes: d.plannedMinutes || 0, loggedMinutes: d.loggedMinutes || 0 };
-        meta.note = t('DashV2.my_time_note');
+        meta.note = t('Dash.my_time_note');
         meta.state = (data.value.plannedMinutes || data.value.loggedMinutes) ? 'ready' : 'empty';
     } catch (e) {
         data.value = { plannedMinutes: 0, loggedMinutes: 0 };

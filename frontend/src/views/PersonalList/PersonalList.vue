@@ -4,29 +4,29 @@
 
         <div class="ah-page__main">
             <header class="ah-toolbar">
-                <button type="button" class="ah-tbtn ah-tbtn--icon personal__sidebar-toggle" :title="$t('HomeV2.show_sidebar')" @click="homeState.sidebarOpen = !homeState.sidebarOpen">
+                <button type="button" class="ah-tbtn ah-tbtn--icon personal__sidebar-toggle" :title="$t('Home.show_sidebar')" @click="homeState.sidebarOpen = !homeState.sidebarOpen">
                     <ShellIcon name="sidebar" :size="15" />
                 </button>
                 <div class="ah-toolbar__title">
-                    {{ $t('HomeV2.personal_list') }}
-                    <span class="personal__only">{{ $t('HomeV2.only_you') }}</span>
+                    {{ $t('Home.personal_list') }}
+                    <span class="personal__only">{{ $t('Home.only_you') }}</span>
                 </div>
                 <nav class="personal__views" aria-label="Views">
-                    <button type="button" class="personal__view" :class="{ 'is-active': view === 'list' }" @click="view = 'list'">{{ $t('HomeV2.list') }}</button>
-                    <button type="button" class="personal__view" :class="{ 'is-active': view === 'board' }" @click="view = 'board'">{{ $t('HomeV2.board') }}</button>
-                    <router-link class="personal__view" :to="{ name: 'Planner', params: { cid: companyId } }">{{ $t('HomeV2.calendar') }}</router-link>
-                    <span class="personal__view personal__view--muted">{{ $t('HomeV2.add_view') }}</span>
+                    <button type="button" class="personal__view" :class="{ 'is-active': view === 'list' }" @click="view = 'list'">{{ $t('Home.list') }}</button>
+                    <button type="button" class="personal__view" :class="{ 'is-active': view === 'board' }" @click="view = 'board'">{{ $t('Home.board') }}</button>
+                    <router-link class="personal__view" :to="{ name: 'Planner', params: { cid: companyId } }">{{ $t('Home.calendar') }}</router-link>
+                    <span class="personal__view personal__view--muted">{{ $t('Home.add_view') }}</span>
                 </nav>
                 <div class="ah-toolbar__actions">
-                    <button type="button" class="ah-tbtn" :class="{ 'is-active': hideDone }" @click="hideDone = !hideDone">{{ $t('HomeV2.filter') }}</button>
-                    <button type="button" class="ah-tbtn personal__group" disabled>{{ $t('HomeV2.group_none') }}</button>
-                    <button type="button" class="ah-tbtn ah-tbtn--primary" @click="focusAdd">{{ $t('HomeV2.add_task') }}</button>
+                    <button type="button" class="ah-tbtn" :class="{ 'is-active': hideDone }" @click="hideDone = !hideDone">{{ $t('Home.filter') }}</button>
+                    <button type="button" class="ah-tbtn personal__group" disabled>{{ $t('Home.group_none') }}</button>
+                    <button type="button" class="ah-tbtn ah-tbtn--primary" @click="focusAdd">{{ $t('Home.add_task') }}</button>
                 </div>
             </header>
 
             <div class="ah-page__content ah-scroll personal__content">
-                <p v-if="personal.loading && !personal.project" class="hc-loading">{{ $t('HomeV2.personal_loading') }}</p>
-                <div v-else-if="personal.error" class="ah-empty">{{ $t('HomeV2.personal_failed') }}</div>
+                <p v-if="personal.loading && !personal.project" class="hc-loading">{{ $t('Home.personal_loading') }}</p>
+                <div v-else-if="personal.error" class="ah-empty">{{ $t('Home.personal_failed') }}</div>
 
                 <template v-else>
                     <form class="personal__add" :class="{ 'is-focused': addFocused }" @submit.prevent="submitAdd">
@@ -35,7 +35,7 @@
                             ref="addInput"
                             v-model="draft"
                             type="text"
-                            :placeholder="$t('HomeV2.new_task_row')"
+                            :placeholder="$t('Home.new_task_row')"
                             :disabled="adding"
                             maxlength="250"
                             @focus="addFocused = true"
@@ -43,18 +43,18 @@
                             @keydown.tab.prevent="pickDate"
                         />
                         <span v-if="draftDue" class="hc-row__meta">{{ dueLabel(draftDue, $t) }}</span>
-                        <span class="hc-add__hint">{{ $t('HomeV2.add_hint') }}</span>
+                        <span class="hc-add__hint">{{ $t('Home.add_hint') }}</span>
                         <input ref="dateInput" type="date" class="personal__date" @change="onDraftDate" />
                     </form>
 
                     <div v-if="view === 'list'" class="hc-card personal__table">
                         <div class="personal__head">
                             <span></span>
-                            <span>{{ $t('HomeV2.col_name') }}</span>
-                            <span>{{ $t('HomeV2.col_due') }}</span>
-                            <span>{{ $t('HomeV2.col_priority') }}</span>
-                            <span>{{ $t('HomeV2.col_status') }}</span>
-                            <span>{{ $t('HomeV2.col_time') }}</span>
+                            <span>{{ $t('Home.col_name') }}</span>
+                            <span>{{ $t('Home.col_due') }}</span>
+                            <span>{{ $t('Home.col_priority') }}</span>
+                            <span>{{ $t('Home.col_status') }}</span>
+                            <span>{{ $t('Home.col_time') }}</span>
                         </div>
                         <div v-for="task in visibleTasks" :key="task._id" class="personal__row" :class="{ 'is-done': isDone(task) }">
                             <input type="checkbox" class="ah-check hc-row__check" :checked="isDone(task)" :aria-label="task.TaskName" @change="toggleDone(task)" />
@@ -67,9 +67,9 @@
                             </span>
                             <span class="personal__mono" :class="{ 'personal__mono--faint': !loggedTime(task) }">{{ loggedTime(task) || '—' }}</span>
                         </div>
-                        <div v-if="!visibleTasks.length" class="personal__empty">{{ $t('HomeV2.personal_empty') }}</div>
+                        <div v-if="!visibleTasks.length" class="personal__empty">{{ $t('Home.personal_empty') }}</div>
                         <button v-if="visibleTasks.length" type="button" class="personal__new" @click="focusAdd">
-                            <span class="hc-add__plus">+</span><span>{{ $t('HomeV2.new_task_row') }}</span>
+                            <span class="hc-add__plus">+</span><span>{{ $t('Home.new_task_row') }}</span>
                         </button>
                     </div>
 
@@ -102,11 +102,11 @@
                                     <span v-if="task.DueDate" class="personal__mono" :class="{ 'personal__mono--danger': dueBucket(task) === 'overdue' }">{{ dueLabel(task.DueDate, $t) }}</span>
                                 </div>
                             </article>
-                            <div v-if="!byStatus(status).length" class="personal__col-empty">{{ $t('HomeV2.board_empty') }}</div>
+                            <div v-if="!byStatus(status).length" class="personal__col-empty">{{ $t('Home.board_empty') }}</div>
                         </section>
                     </div>
 
-                    <p class="personal__foot">{{ $t('HomeV2.personal_footer') }} {{ $t('HomeV2.personal_footer_short') }}</p>
+                    <p class="personal__foot">{{ $t('Home.personal_footer') }} {{ $t('Home.personal_footer_short') }}</p>
                 </template>
             </div>
         </div>
@@ -220,7 +220,7 @@ async function submitAdd() {
         draftDue.value = null;
     } catch (error) {
         console.error("create failed", error);
-        $toast.error(t("HomeV2.task_update_failed"), { position: "top-right" });
+        $toast.error(t("Home.task_update_failed"), { position: "top-right" });
     } finally {
         adding.value = false;
         addInput.value?.focus();
@@ -236,7 +236,7 @@ async function applyStatus(task, status) {
     } catch (error) {
         console.error("status failed", error);
         patch(task, previous);
-        $toast.error(t("HomeV2.task_update_failed"), { position: "top-right" });
+        $toast.error(t("Home.task_update_failed"), { position: "top-right" });
     }
 }
 function patch(task, fields) {

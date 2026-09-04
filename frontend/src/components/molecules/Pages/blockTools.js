@@ -58,13 +58,13 @@ const isDone = (ctx, task) => {
 const taskRowHtml = (ctx, task) => `
     <span class="pb-task__check${isDone(ctx, task) ? ' is-done' : ''}">${ICONS.check}</span>
     <span class="ah-chip ah-chip--mono pb-task__key">${escape(task.TaskKey)}</span>
-    <button type="button" class="pb-task__open${isDone(ctx, task) ? ' is-done' : ''}" title="${escape(ctx.t('DocsV2.open_task'))}">${escape(task.TaskName)}</button>
+    <button type="button" class="pb-task__open${isDone(ctx, task) ? ' is-done' : ''}" title="${escape(ctx.t('Docs.open_task'))}">${escape(task.TaskName)}</button>
     ${statusChipHtml(ctx, task)}
     ${avatarHtml(ctx, (task.AssigneeUserId || [])[0])}`;
 
 const projectSelect = (ctx, selected) => {
     const select = el('select', 'ah-input pb-select');
-    const blank = el('option', '', ctx.t('DocsV2.task_pick_project'));
+    const blank = el('option', '', ctx.t('Docs.task_pick_project'));
     blank.value = '';
     select.appendChild(blank);
     ctx.projects().forEach((project) => {
@@ -79,7 +79,7 @@ const projectSelect = (ctx, selected) => {
 
 function makeCallout(ctx) {
     return class Callout {
-        static get toolbox() { return { title: ctx.t('DocsV2.block_callout'), icon: ICONS.callout }; }
+        static get toolbox() { return { title: ctx.t('Docs.block_callout'), icon: ICONS.callout }; }
         static get isReadOnlySupported() { return true; }
         static get enableLineBreaks() { return true; }
         static get sanitize() { return { text: { b: true, i: true, a: { href: true }, br: true, code: true, mark: true } }; }
@@ -96,7 +96,7 @@ function makeCallout(ctx) {
             this.text = el('div', 'pb-callout__text');
             this.text.contentEditable = String(!this.readOnly);
             this.text.innerHTML = this.data.text;
-            this.text.dataset.placeholder = ctx.t('DocsV2.callout_placeholder');
+            this.text.dataset.placeholder = ctx.t('Docs.callout_placeholder');
             this.wrapper.append(icon, this.text);
             if (!this.readOnly) {
                 const tones = el('div', 'pb-callout__tones');
@@ -121,7 +121,7 @@ function makeCallout(ctx) {
 
 function makeDelimiter(ctx) {
     return class Delimiter {
-        static get toolbox() { return { title: ctx.t('DocsV2.block_delimiter'), icon: ICONS.delimiter }; }
+        static get toolbox() { return { title: ctx.t('Docs.block_delimiter'), icon: ICONS.delimiter }; }
         static get isReadOnlySupported() { return true; }
         static get contentless() { return true; }
         render() { return el('div', 'pb-delimiter'); }
@@ -131,7 +131,7 @@ function makeDelimiter(ctx) {
 
 function makeQuote(ctx) {
     return class Quote {
-        static get toolbox() { return { title: ctx.t('DocsV2.block_quote'), icon: ICONS.quote }; }
+        static get toolbox() { return { title: ctx.t('Docs.block_quote'), icon: ICONS.quote }; }
         static get isReadOnlySupported() { return true; }
         static get enableLineBreaks() { return true; }
         static get sanitize() { return { text: { b: true, i: true, a: { href: true }, br: true } }; }
@@ -145,7 +145,7 @@ function makeQuote(ctx) {
             this.text = el('blockquote', 'pb-quote');
             this.text.contentEditable = String(!this.readOnly);
             this.text.innerHTML = this.data.text;
-            this.text.dataset.placeholder = ctx.t('DocsV2.quote_placeholder');
+            this.text.dataset.placeholder = ctx.t('Docs.quote_placeholder');
             return this.text;
         }
 
@@ -155,7 +155,7 @@ function makeQuote(ctx) {
 
 function makeImage(ctx) {
     return class ImageByUrl {
-        static get toolbox() { return { title: ctx.t('DocsV2.block_image'), icon: ICONS.image }; }
+        static get toolbox() { return { title: ctx.t('Docs.block_image'), icon: ICONS.image }; }
         static get isReadOnlySupported() { return true; }
 
         constructor({ data, readOnly }) {
@@ -175,7 +175,7 @@ function makeImage(ctx) {
             const form = el('div', 'pb-image__form');
             const input = el('input', 'ah-input');
             input.type = 'url';
-            input.placeholder = ctx.t('DocsV2.image_url');
+            input.placeholder = ctx.t('Docs.image_url');
             isolateKeys(input);
             const commit = () => {
                 const url = input.value.trim();
@@ -185,7 +185,7 @@ function makeImage(ctx) {
             };
             input.addEventListener('keydown', (event) => { if (event.key === 'Enter') commit(); });
             input.addEventListener('blur', commit);
-            form.append(el('span', 'ah-label', ctx.t('DocsV2.block_image_hint')), input);
+            form.append(el('span', 'ah-label', ctx.t('Docs.block_image_hint')), input);
             this.wrapper.appendChild(form);
             setTimeout(() => input.focus(), 0);
         }
@@ -198,7 +198,7 @@ function makeImage(ctx) {
             this.caption = el('figcaption', 'pb-image__caption');
             this.caption.contentEditable = String(!this.readOnly);
             this.caption.textContent = this.data.caption;
-            this.caption.dataset.placeholder = ctx.t('DocsV2.image_caption');
+            this.caption.dataset.placeholder = ctx.t('Docs.image_caption');
             this.wrapper.append(img, this.caption);
         }
 
@@ -210,7 +210,7 @@ function makeImage(ctx) {
 
 function makeTask(ctx) {
     return class TaskBlock {
-        static get toolbox() { return { title: ctx.t('DocsV2.block_task'), icon: ICONS.task }; }
+        static get toolbox() { return { title: ctx.t('Docs.block_task'), icon: ICONS.task }; }
         static get isReadOnlySupported() { return true; }
 
         constructor({ data, readOnly }) {
@@ -230,10 +230,10 @@ function makeTask(ctx) {
             const box = el('div', 'pb-picker');
             const head = el('div', 'pb-picker__head');
             const select = projectSelect(ctx, ctx.defaultProjectId);
-            head.append(el('span', 'ah-label', ctx.t('DocsV2.block_task')), select);
+            head.append(el('span', 'ah-label', ctx.t('Docs.block_task')), select);
             const input = el('input', 'ah-input');
             input.type = 'text';
-            input.placeholder = ctx.t('DocsV2.task_search');
+            input.placeholder = ctx.t('Docs.task_search');
             isolateKeys(input);
             const results = el('div', 'pb-picker__results');
             let timer = null;
@@ -253,7 +253,7 @@ function makeTask(ctx) {
             if (!query.trim()) return;
             const list = await ctx.searchTasks(query, projectId);
             if (!list.length) {
-                results.appendChild(el('div', 'pb-picker__empty', ctx.t('DocsV2.task_no_results')));
+                results.appendChild(el('div', 'pb-picker__empty', ctx.t('Docs.task_no_results')));
                 return;
             }
             list.forEach((task) => {
@@ -273,12 +273,12 @@ function makeTask(ctx) {
             const row = el('div', 'pb-task__row');
             row.innerHTML = `<span class="ah-chip ah-chip--mono pb-task__key">${escape(this.data.taskKey)}</span>`
                 + `<span class="pb-task__open">${escape(this.data.title)}</span>`
-                + `<span class="ah-small pb-task__meta">${escape(ctx.t('DocsV2.task_loading'))}</span>`;
+                + `<span class="ah-small pb-task__meta">${escape(ctx.t('Docs.task_loading'))}</span>`;
             this.wrapper.appendChild(row);
             const task = preloaded || await ctx.fetchTask(this.data.taskId);
             if (!task) {
                 row.classList.add('is-missing');
-                row.querySelector('.pb-task__meta').textContent = ctx.t('DocsV2.task_missing');
+                row.querySelector('.pb-task__meta').textContent = ctx.t('Docs.task_missing');
                 return;
             }
             this.data.taskKey = task.TaskKey || this.data.taskKey;
@@ -293,7 +293,7 @@ function makeTask(ctx) {
 
 function makeTaskList(ctx) {
     return class TaskListBlock {
-        static get toolbox() { return { title: ctx.t('DocsV2.block_task_list'), icon: ICONS.taskList }; }
+        static get toolbox() { return { title: ctx.t('Docs.block_task_list'), icon: ICONS.taskList }; }
         static get isReadOnlySupported() { return true; }
 
         constructor({ data, readOnly }) {
@@ -317,8 +317,8 @@ function makeTaskList(ctx) {
             const box = el('div', 'pb-picker');
             const head = el('div', 'pb-picker__head');
             const select = projectSelect(ctx, ctx.defaultProjectId);
-            head.append(el('span', 'ah-label', ctx.t('DocsV2.block_task_list')), select);
-            box.append(head, el('div', 'ah-small', ctx.t('DocsV2.block_task_list_hint')));
+            head.append(el('span', 'ah-label', ctx.t('Docs.block_task_list')), select);
+            box.append(head, el('div', 'ah-small', ctx.t('Docs.block_task_list_hint')));
             select.addEventListener('change', () => {
                 if (!select.value) return;
                 this.data.projectId = select.value;
@@ -331,7 +331,7 @@ function makeTaskList(ctx) {
         statusSelect() {
             const select = el('select', 'pb-tasklist__filter');
             STATUS_TYPES.forEach((type) => {
-                const option = el('option', '', ctx.t(`DocsV2.task_list_status_${type}`));
+                const option = el('option', '', ctx.t(`Docs.task_list_status_${type}`));
                 option.value = type;
                 option.selected = type === this.data.statusType;
                 select.appendChild(option);
@@ -347,24 +347,24 @@ function makeTaskList(ctx) {
         async renderList() {
             this.wrapper.innerHTML = '';
             const head = el('div', 'pb-tasklist__head');
-            head.append(el('span', 'ah-label', ctx.t('DocsV2.block_task_list')));
+            head.append(el('span', 'ah-label', ctx.t('Docs.block_task_list')));
             const project = el('span', 'pb-tasklist__project', this.data.projectName);
             const count = el('span', 'ah-label pb-tasklist__count');
             head.append(project, count);
             if (this.readOnly) {
-                head.appendChild(el('span', 'ah-chip', ctx.t(`DocsV2.task_list_status_${this.data.statusType}`)));
+                head.appendChild(el('span', 'ah-chip', ctx.t(`Docs.task_list_status_${this.data.statusType}`)));
             } else {
                 head.appendChild(this.statusSelect());
             }
             const rows = el('div', 'pb-tasklist__rows');
-            rows.appendChild(el('div', 'ah-small', ctx.t('DocsV2.task_loading')));
+            rows.appendChild(el('div', 'ah-small', ctx.t('Docs.task_loading')));
             this.wrapper.append(head, rows);
 
             const tasks = await ctx.fetchTasks(this.data.projectId, this.data.statusType);
             rows.innerHTML = '';
-            count.textContent = ctx.t('DocsV2.task_list_count', { n: tasks.length });
+            count.textContent = ctx.t('Docs.task_list_count', { n: tasks.length });
             if (!tasks.length) {
-                rows.appendChild(el('div', 'ah-small pb-tasklist__empty', ctx.t('DocsV2.task_list_empty')));
+                rows.appendChild(el('div', 'ah-small pb-tasklist__empty', ctx.t('Docs.task_list_empty')));
                 return;
             }
             tasks.forEach((task) => {

@@ -4,33 +4,33 @@
             <div class="ah-card aw" role="dialog" aria-modal="true">
                 <div class="aw__head">
                     <span class="ah-avatar ah-avatar--agent"><ShellIcon name="agent" :size="13" /></span>
-                    <span class="ah-h3">{{ $t('AiV2.new_agent') }}</span>
-                    <span class="ah-chip ah-chip--mono">{{ $t('AiV2.step_of', { a: step, b: 3 }) }}</span>
+                    <span class="ah-h3">{{ $t('Ai.new_agent') }}</span>
+                    <span class="ah-chip ah-chip--mono">{{ $t('Ai.step_of', { a: step, b: 3 }) }}</span>
                     <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="$emit('close')"><ShellIcon name="x" :size="15" /></button>
                 </div>
 
                 <div class="aw__body">
                     <template v-if="step === 1">
                         <div class="ah-field">
-                            <label class="ah-field__label" for="aw-name">{{ $t('AiV2.job_name') }}</label>
+                            <label class="ah-field__label" for="aw-name">{{ $t('Ai.job_name') }}</label>
                             <input id="aw-name" ref="nameField" v-model.trim="form.name" type="text" class="ah-input" :class="{ 'ah-input--error': errors.name }" maxlength="80" />
                             <div v-if="errors.name" class="ah-field__error">{{ errors.name }}</div>
                         </div>
                         <div v-if="!props.template" class="ah-field">
-                            <label class="ah-field__label" for="aw-template">{{ $t('AiV2.start_from') }}</label>
+                            <label class="ah-field__label" for="aw-template">{{ $t('Ai.start_from') }}</label>
                             <select id="aw-template" v-model="chosenSlug" class="ah-input">
-                                <option value="">{{ $t('AiV2.no_template') }}</option>
+                                <option value="">{{ $t('Ai.no_template') }}</option>
                                 <option v-for="tpl in AGENT_TEMPLATES" :key="tpl.slug" :value="tpl.slug">{{ tpl.name }} — {{ tpl.skills.join(', ') }}</option>
                             </select>
                         </div>
                         <div class="ah-field">
-                            <label class="ah-field__label" for="aw-desc">{{ $t('AiV2.job_desc') }}</label>
-                            <textarea id="aw-desc" v-model.trim="form.description" class="ah-input ah-textarea" maxlength="500" :placeholder="$t('AiV2.job_desc_hint')"></textarea>
+                            <label class="ah-field__label" for="aw-desc">{{ $t('Ai.job_desc') }}</label>
+                            <textarea id="aw-desc" v-model.trim="form.description" class="ah-input ah-textarea" maxlength="500" :placeholder="$t('Ai.job_desc_hint')"></textarea>
                         </div>
                     </template>
 
                     <template v-else-if="step === 2">
-                        <p class="ai-lead">{{ $t('AiV2.actions_lead') }}</p>
+                        <p class="ai-lead">{{ $t('Ai.actions_lead') }}</p>
                         <div class="aw__actions">
                             <label v-for="action in writeActions" :key="action.key" class="aw__action">
                                 <input v-model="form.allowedActions" type="checkbox" :value="action.key" class="ah-check" />
@@ -42,24 +42,24 @@
                             </label>
                         </div>
                         <p class="ai-never">
-                            <strong>{{ $t('AiV2.never_label') }}</strong>
+                            <strong>{{ $t('Ai.never_label') }}</strong>
                             <span class="ah-mono">{{ never }}</span>
                         </p>
                     </template>
 
                     <template v-else>
                         <div class="ah-field">
-                            <span class="ah-field__label">{{ $t('AiV2.autonomy') }}</span>
+                            <span class="ah-field__label">{{ $t('Ai.autonomy') }}</span>
                             <div class="ai-radios">
                                 <label v-for="level in [0, 1, 2]" :key="level" class="ai-radio" :class="{ 'is-on': form.autonomy === level }">
                                     <input v-model.number="form.autonomy" type="radio" :value="level" class="ah-check" />
-                                    <span><strong>L{{ level }}</strong> · {{ $t(`AiV2.autonomy_${level}`) }}</span>
+                                    <span><strong>L{{ level }}</strong> · {{ $t(`Ai.autonomy_${level}`) }}</span>
                                 </label>
                             </div>
-                            <span class="ah-field__hint">{{ $t('AiV2.start_low') }}</span>
+                            <span class="ah-field__hint">{{ $t('Ai.start_low') }}</span>
                         </div>
                         <div class="ah-field">
-                            <label class="ah-field__label" for="aw-cap">{{ $t('AiV2.spend_cap') }}</label>
+                            <label class="ah-field__label" for="aw-cap">{{ $t('Ai.spend_cap') }}</label>
                             <input id="aw-cap" v-model.number="form.spendCapUsd" type="number" min="0" step="1" class="ah-input" />
                         </div>
                     </template>
@@ -68,11 +68,11 @@
                 </div>
 
                 <div class="aw__foot">
-                    <button v-if="step > 1" type="button" class="ah-btn ah-btn--ghost" @click="step -= 1">{{ $t('AiV2.back') }}</button>
+                    <button v-if="step > 1" type="button" class="ah-btn ah-btn--ghost" @click="step -= 1">{{ $t('Ai.back') }}</button>
                     <div class="ah-toolbar__spacer"></div>
-                    <button type="button" class="ah-btn ah-btn--secondary" @click="$emit('close')">{{ $t('AiV2.cancel') }}</button>
-                    <button v-if="step < 3" type="button" class="ah-btn ah-btn--primary" @click="next">{{ $t('AiV2.next') }}</button>
-                    <button v-else type="button" class="ah-btn ah-btn--primary" :disabled="busy" @click="create">{{ busy ? $t('AiV2.creating') : $t('AiV2.create_agent') }}</button>
+                    <button type="button" class="ah-btn ah-btn--secondary" @click="$emit('close')">{{ $t('Ai.cancel') }}</button>
+                    <button v-if="step < 3" type="button" class="ah-btn ah-btn--primary" @click="next">{{ $t('Ai.next') }}</button>
+                    <button v-else type="button" class="ah-btn ah-btn--primary" :disabled="busy" @click="create">{{ busy ? $t('Ai.creating') : $t('Ai.create_agent') }}</button>
                 </div>
             </div>
         </div>
@@ -114,7 +114,7 @@ const never = computed(() => (registryManifest.value.never || []).join(" · "));
 const next = () => {
     errors.name = "";
     if (step.value === 1 && !form.name) {
-        errors.name = t("AiV2.name_required");
+        errors.name = t("Ai.name_required");
         return;
     }
     step.value += 1;

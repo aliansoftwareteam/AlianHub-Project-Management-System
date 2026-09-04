@@ -7,7 +7,7 @@
                     class="ah-check"
                     :checked="groupCheckboxState === 'all'"
                     :indeterminate.prop="groupCheckboxState === 'some'"
-                    :aria-label="$t('ListV2.select_group')"
+                    :aria-label="$t('List.select_group')"
                     @click.stop
                     @change="selection.toggleGroup(groupTaskIds)"
                 />

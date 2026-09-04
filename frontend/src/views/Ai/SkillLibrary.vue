@@ -3,20 +3,20 @@
         <AiSidebar />
         <div class="ai-page__main">
             <div class="ah-toolbar">
-                <div class="ah-toolbar__title">{{ $t('AiV2.skills') }}</div>
+                <div class="ah-toolbar__title">{{ $t('Ai.skills') }}</div>
             </div>
             <div class="ai-page__body ah-scroll">
-                <p class="ai-lead">{{ $t('AiV2.skills_library_lead') }}</p>
+                <p class="ai-lead">{{ $t('Ai.skills_library_lead') }}</p>
 
                 <div class="ah-card ai-agent">
-                    <div class="ah-label">{{ $t('AiV2.available_actions') }}</div>
+                    <div class="ah-label">{{ $t('Ai.available_actions') }}</div>
                     <table class="ai-table">
                         <thead>
                             <tr>
-                                <th>{{ $t('AiV2.action') }}</th>
-                                <th>{{ $t('AiV2.what_it_does') }}</th>
-                                <th>{{ $t('AiV2.risk') }}</th>
-                                <th>{{ $t('AiV2.undoable') }}</th>
+                                <th>{{ $t('Ai.action') }}</th>
+                                <th>{{ $t('Ai.what_it_does') }}</th>
+                                <th>{{ $t('Ai.risk') }}</th>
+                                <th>{{ $t('Ai.undoable') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -27,25 +27,25 @@
                                     <div v-if="action.constraint" class="ah-small">{{ action.constraint }}</div>
                                 </td>
                                 <td><span class="ah-chip" :class="riskChip(action.risk)">{{ action.risk }}</span></td>
-                                <td><span class="ah-chip" :class="action.undoable ? 'ah-chip--ok' : ''">{{ action.undoable ? $t('AiV2.yes') : $t('AiV2.no') }}</span></td>
+                                <td><span class="ah-chip" :class="action.undoable ? 'ah-chip--ok' : ''">{{ action.undoable ? $t('Ai.yes') : $t('Ai.no') }}</span></td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
 
                 <div class="ah-card ai-agent">
-                    <div class="ah-label">{{ $t('AiV2.never_available') }}</div>
-                    <p class="ai-lead" style="margin:6px 0 10px">{{ $t('AiV2.never_note') }}</p>
+                    <div class="ah-label">{{ $t('Ai.never_available') }}</div>
+                    <p class="ai-lead" style="margin:6px 0 10px">{{ $t('Ai.never_note') }}</p>
                     <div class="ai-agent__skills">
                         <span v-for="key in never" :key="key" class="ah-chip ah-chip--danger ah-chip--mono">{{ key }}</span>
                     </div>
                 </div>
 
                 <div class="ah-card ai-agent">
-                    <div class="ah-label">{{ $t('AiV2.cli_agents') }}</div>
-                    <p class="ai-lead" style="margin:6px 0 10px">{{ $t('AiV2.cli_lead') }}</p>
+                    <div class="ah-label">{{ $t('Ai.cli_agents') }}</div>
+                    <p class="ai-lead" style="margin:6px 0 10px">{{ $t('Ai.cli_lead') }}</p>
                     <pre class="ai-code">{{ cliCommand }}</pre>
-                    <p class="ah-small">{{ $t('AiV2.cli_tools', { tools: mcpTools }) }}</p>
+                    <p class="ah-small">{{ $t('Ai.cli_tools', { tools: mcpTools }) }}</p>
                 </div>
             </div>
         </div>

@@ -4,25 +4,25 @@
 
         <div class="ah-page__main">
             <header class="ah-toolbar">
-                <button type="button" class="ah-tbtn ah-tbtn--icon home__sidebar-toggle" :title="$t('HomeV2.show_sidebar')" @click="homeState.sidebarOpen = !homeState.sidebarOpen">
+                <button type="button" class="ah-tbtn ah-tbtn--icon home__sidebar-toggle" :title="$t('Home.show_sidebar')" @click="homeState.sidebarOpen = !homeState.sidebarOpen">
                     <ShellIcon name="sidebar" :size="15" />
                 </button>
-                <div class="ah-toolbar__title">{{ $t('HomeV2.today_overdue') }}</div>
+                <div class="ah-toolbar__title">{{ $t('Home.today_overdue') }}</div>
                 <span class="ah-toolbar__date">{{ todayLabel }}</span>
                 <div class="ah-toolbar__actions">
                     <StatusChip />
-                    <router-link v-if="router.hasRoute('Dashboards')" class="ah-tbtn ah-tbtn--strong home__manage" :to="{ name: 'Dashboards', params: { cid: companyId } }">{{ $t('HomeV2.manage_cards') }}</router-link>
+                    <router-link v-if="router.hasRoute('Dashboards')" class="ah-tbtn ah-tbtn--strong home__manage" :to="{ name: 'Dashboards', params: { cid: companyId } }">{{ $t('Home.manage_cards') }}</router-link>
                     <div class="ah-pop-anchor" @click.stop>
-                        <button type="button" class="ah-tbtn ah-tbtn--primary" :aria-expanded="newOpen" aria-haspopup="menu" @click="newOpen = !newOpen">{{ $t('HomeV2.new') }}</button>
+                        <button type="button" class="ah-tbtn ah-tbtn--primary" :aria-expanded="newOpen" aria-haspopup="menu" @click="newOpen = !newOpen">{{ $t('Home.new') }}</button>
                         <transition name="ah-fade">
                             <div v-if="newOpen" class="ah-pop" role="menu">
-                                <button type="button" class="ah-pop__item" role="menuitem" @click="focusAdd"><ShellIcon name="plus" :size="14" /><span>{{ $t('HomeV2.new_task') }}</span></button>
-                                <button v-if="canCreateProject" type="button" class="ah-pop__item" role="menuitem" @click="newOpen = false; createProjectOpen = true"><ShellIcon name="projects" :size="14" /><span>{{ $t('HomeV2.new_project') }}</span></button>
-                                <button type="button" class="ah-pop__item" role="menuitem" @click="newOpen = false; openPanel('reminders')"><ShellIcon name="reminder" :size="14" /><span>{{ $t('HomeV2.new_reminder') }}</span></button>
+                                <button type="button" class="ah-pop__item" role="menuitem" @click="focusAdd"><ShellIcon name="plus" :size="14" /><span>{{ $t('Home.new_task') }}</span></button>
+                                <button v-if="canCreateProject" type="button" class="ah-pop__item" role="menuitem" @click="newOpen = false; createProjectOpen = true"><ShellIcon name="projects" :size="14" /><span>{{ $t('Home.new_project') }}</span></button>
+                                <button type="button" class="ah-pop__item" role="menuitem" @click="newOpen = false; openPanel('reminders')"><ShellIcon name="reminder" :size="14" /><span>{{ $t('Home.new_reminder') }}</span></button>
                             </div>
                         </transition>
                     </div>
-                    <button type="button" class="ah-tbtn ah-tbtn--icon home__planner-toggle" :class="{ 'is-active': homeState.plannerOpen }" :title="homeState.plannerOpen ? $t('HomeV2.hide_planner') : $t('HomeV2.show_planner')" @click="homeState.plannerOpen = !homeState.plannerOpen">
+                    <button type="button" class="ah-tbtn ah-tbtn--icon home__planner-toggle" :class="{ 'is-active': homeState.plannerOpen }" :title="homeState.plannerOpen ? $t('Home.hide_planner') : $t('Home.show_planner')" @click="homeState.plannerOpen = !homeState.plannerOpen">
                         <ShellIcon name="panel" :size="15" />
                     </button>
                 </div>
@@ -57,9 +57,9 @@
                         <div class="home__side">
                             <AgendaCard :day="agendaDay" :items="agendaItems" :connected="agenda.connected.value" :first-run="firstRun" @shift="shiftAgenda" />
                             <section v-if="firstRun && !timer.active" class="hc-card">
-                                <div class="hc-personal__title">{{ $t('HomeV2.personal_list') }}</div>
-                                <p class="hc-hint" style="margin: 0">{{ $t('HomeV2.personal_hint') }}</p>
-                                <router-link class="hc-personal__open" :to="{ name: 'PersonalList', params: { cid: companyId } }">{{ $t('HomeV2.open') }}</router-link>
+                                <div class="hc-personal__title">{{ $t('Home.personal_list') }}</div>
+                                <p class="hc-hint" style="margin: 0">{{ $t('Home.personal_hint') }}</p>
+                                <router-link class="hc-personal__open" :to="{ name: 'PersonalList', params: { cid: companyId } }">{{ $t('Home.open') }}</router-link>
                             </section>
                             <TimerChip />
                         </div>
@@ -97,7 +97,7 @@
             @closeSidebar="createProjectOpen = false"
         />
     </div>
-    <div v-else class="ah-denied">{{ $t('HomeV2.access_denied') }}</div>
+    <div v-else class="ah-denied">{{ $t('Home.access_denied') }}</div>
 </template>
 
 <script setup>
@@ -174,13 +174,13 @@ const firstRunSteps = computed(() => {
     };
 });
 const checklistSteps = computed(() => [
-    { key: "company", label: "HomeV2.step_company", done: true, cta: "HomeV2.step_company" },
-    { key: "sample", label: "HomeV2.step_sample", done: projects.value.length > 0, cta: "HomeV2.create_project" },
-    { key: "invite", label: "HomeV2.step_invite", done: companyUsers.value.length > 1, cta: "HomeV2.invite_team" },
-    { key: "project", label: "HomeV2.step_project", done: projects.value.length > 1, cta: "HomeV2.create_project" },
-    { key: "permissions", label: "HomeV2.step_permissions", note: "HomeV2.step_permissions_note", done: checklist.value.reviewedPermissions, cta: "HomeV2.review_permissions" },
-    { key: "board", label: "HomeV2.step_board", done: firstRunSteps.value.board, cta: "HomeV2.step_board" },
-    { key: "notifications", label: "HomeV2.step_notifications", done: firstRunSteps.value.notifications, cta: "HomeV2.step_notifications" }
+    { key: "company", label: "Home.step_company", done: true, cta: "Home.step_company" },
+    { key: "sample", label: "Home.step_sample", done: projects.value.length > 0, cta: "Home.create_project" },
+    { key: "invite", label: "Home.step_invite", done: companyUsers.value.length > 1, cta: "Home.invite_team" },
+    { key: "project", label: "Home.step_project", done: projects.value.length > 1, cta: "Home.create_project" },
+    { key: "permissions", label: "Home.step_permissions", note: "Home.step_permissions_note", done: checklist.value.reviewedPermissions, cta: "Home.review_permissions" },
+    { key: "board", label: "Home.step_board", done: firstRunSteps.value.board, cta: "Home.step_board" },
+    { key: "notifications", label: "Home.step_notifications", done: firstRunSteps.value.notifications, cta: "Home.step_notifications" }
 ]);
 const checklistComplete = computed(() => checklistSteps.value.every((s) => s.done));
 const isOwnerOrAdmin = computed(() => [1, 2].includes(companyUser.value.roleType));
@@ -231,10 +231,10 @@ function goProject(project) {
 async function onComplete(task) {
     try {
         await work.complete(task);
-        $toast.success(t("HomeV2.task_done"), { position: "top-right" });
+        $toast.success(t("Home.task_done"), { position: "top-right" });
     } catch (error) {
         console.error("complete failed", error);
-        $toast.error(t("HomeV2.task_update_failed"), { position: "top-right" });
+        $toast.error(t("Home.task_update_failed"), { position: "top-right" });
     }
 }
 async function onReopen(task) {
@@ -242,7 +242,7 @@ async function onReopen(task) {
         await work.reopen(task);
     } catch (error) {
         console.error("reopen failed", error);
-        $toast.error(t("HomeV2.task_update_failed"), { position: "top-right" });
+        $toast.error(t("Home.task_update_failed"), { position: "top-right" });
     }
 }
 
@@ -255,10 +255,10 @@ async function onTimer(task) {
         const previous = timer.active.taskName;
         try {
             await stop({ companyId: companyId.value, userId: userId.value });
-            $toast.info(t("HomeV2.timer_switched", { task: previous }), { position: "top-right" });
+            $toast.info(t("Home.timer_switched", { task: previous }), { position: "top-right" });
         } catch (error) {
             console.error("timer stop failed", error);
-            $toast.error(t("HomeV2.timer_log_failed"), { position: "top-right" });
+            $toast.error(t("Home.timer_log_failed"), { position: "top-right" });
             return;
         }
     }
@@ -282,7 +282,7 @@ async function onDatePicked(event) {
         await work.setDueDate(task, moment(value, "YYYY-MM-DD").endOf("day").toDate());
     } catch (error) {
         console.error("due date failed", error);
-        $toast.error(t("HomeV2.task_update_failed"), { position: "top-right" });
+        $toast.error(t("Home.task_update_failed"), { position: "top-right" });
     }
 }
 
@@ -290,10 +290,10 @@ async function onAdd(name) {
     adding.value = true;
     try {
         await work.addPersonalTask(name, moment().endOf("day").toDate());
-        $toast.success(t("HomeV2.task_added"), { position: "top-right" });
+        $toast.success(t("Home.task_added"), { position: "top-right" });
     } catch (error) {
         console.error("add failed", error);
-        $toast.error(t("HomeV2.task_update_failed"), { position: "top-right" });
+        $toast.error(t("Home.task_update_failed"), { position: "top-right" });
     } finally {
         adding.value = false;
     }
@@ -309,10 +309,10 @@ async function onSchedule({ taskId, start: begin, end }) {
     if (!task) return;
     try {
         await work.schedule(task, begin.toDate(), end.toDate());
-        $toast.success(t("HomeV2.scheduled", { task: task.TaskName, when: begin.format("ddd HH:mm") }), { position: "top-right" });
+        $toast.success(t("Home.scheduled", { task: task.TaskName, when: begin.format("ddd HH:mm") }), { position: "top-right" });
     } catch (error) {
         console.error("schedule failed", error);
-        $toast.error(t("HomeV2.schedule_failed"), { position: "top-right" });
+        $toast.error(t("Home.schedule_failed"), { position: "top-right" });
     }
 }
 

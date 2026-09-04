@@ -4,7 +4,7 @@
             <span>{{ doneCount }}/{{ steps.length }}</span>
         </div>
         <div class="hc-setup__body">
-            <div class="hc-setup__title">{{ $t('HomeV2.setup_title', { company: companyName }) }}</div>
+            <div class="hc-setup__title">{{ $t('Home.setup_title', { company: companyName }) }}</div>
             <div class="hc-setup__steps">
                 <template v-for="(step, i) in steps" :key="step.key">
                     <span v-if="i > 0"> · </span>
@@ -16,7 +16,7 @@
             </div>
         </div>
         <button v-if="active" type="button" class="hc-setup__cta" @click="$emit('action', active.key)">{{ $t(active.cta) }}</button>
-        <button type="button" class="hc-setup__dismiss" @click="$emit('dismiss')">{{ $t('HomeV2.dismiss') }}</button>
+        <button type="button" class="hc-setup__dismiss" @click="$emit('dismiss')">{{ $t('Home.dismiss') }}</button>
     </section>
 </template>
 

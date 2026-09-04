@@ -19,7 +19,7 @@
             type="button"
             class="hc-row__act"
             :class="{ 'is-on': tracking }"
-            :title="$t('HomeV2.start_timer')"
+            :title="$t('Home.start_timer')"
             @click="$emit('timer', task)"
         >
             <ShellIcon :name="tracking ? 'pause' : 'play'" :size="13" />
@@ -27,7 +27,7 @@
         <span v-if="showProject && projectName" class="hc-row__meta" :title="projectName">{{ projectName }}</span>
         <template v-if="!done">
             <span v-if="task.DueDate" class="hc-row__meta" :class="{ 'hc-row__meta--danger': overdue }">{{ due }}</span>
-            <button v-else-if="setDate" type="button" class="hc-row__meta hc-row__meta--brand" @click="$emit('set-date', task)">{{ $t('HomeV2.set_date') }}</button>
+            <button v-else-if="setDate" type="button" class="hc-row__meta hc-row__meta--brand" @click="$emit('set-date', task)">{{ $t('Home.set_date') }}</button>
         </template>
         <span v-if="draggable" class="hc-row__grip" aria-hidden="true"><ShellIcon name="grip" :size="13" /></span>
     </div>

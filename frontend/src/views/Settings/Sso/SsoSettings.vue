@@ -2,37 +2,37 @@
     <div class="sso">
         <div class="sso__main">
             <div>
-                <h1 class="ah-h1">{{ $t('SettingsV2.sso_title') }}</h1>
-                <div class="ah-small">{{ $t('SettingsV2.sso_subtitle', { host }) }}</div>
+                <h1 class="ah-h1">{{ $t('Settings.sso_title') }}</h1>
+                <div class="ah-small">{{ $t('Settings.sso_subtitle', { host }) }}</div>
             </div>
 
             <section class="ah-card sso__providers">
                 <div class="sso__provider">
-                    <AhSwitch :modelValue="true" disabled :label="$t('SettingsV2.sso_email_password')" />
+                    <AhSwitch :modelValue="true" disabled :label="$t('Settings.sso_email_password')" />
                     <ShellIcon name="mail" :size="16" class="sso__provider-icon" />
-                    <span class="sso__provider-name">{{ $t('SettingsV2.sso_email_password') }}</span>
-                    <span class="ah-small">{{ $t('SettingsV2.sso_email_hint') }}</span>
+                    <span class="sso__provider-name">{{ $t('Settings.sso_email_password') }}</span>
+                    <span class="ah-small">{{ $t('Settings.sso_email_hint') }}</span>
                 </div>
                 <div v-for="p in oauthProviders" :key="p.key" class="sso__provider" :class="{ 'is-off': !p.on }">
                     <AhSwitch :modelValue="p.on" disabled :label="p.name" />
                     <ShellIcon :name="p.icon" :size="16" class="sso__provider-icon" />
                     <span class="sso__provider-name">{{ p.name }}</span>
                     <span class="ah-small sso__provider-status">
-                        <template v-if="p.on">{{ $t('SettingsV2.sso_env_on') }} · <code class="ah-mono">{{ p.env }}</code></template>
-                        <template v-else>{{ $t('SettingsV2.sso_hidden_from_login') }} · <code class="ah-mono">{{ p.env }}</code></template>
+                        <template v-if="p.on">{{ $t('Settings.sso_env_on') }} · <code class="ah-mono">{{ p.env }}</code></template>
+                        <template v-else>{{ $t('Settings.sso_hidden_from_login') }} · <code class="ah-mono">{{ p.env }}</code></template>
                     </span>
                 </div>
-                <div class="sso__env-hint ah-small">{{ $t('SettingsV2.sso_env_hint') }}</div>
+                <div class="sso__env-hint ah-small">{{ $t('Settings.sso_env_hint') }}</div>
             </section>
 
             <section class="ah-card">
                 <div class="ah-card__body sso__idp">
                     <div class="sso__idp-head">
-                        <AhSwitch v-model="form.isEnabled" :label="$t('SettingsV2.sso_enable')" />
-                        <span class="sso__provider-name">{{ $t('SettingsV2.sso_card_title') }}</span>
-                        <span v-if="savedConfig && savedConfig.isEnabled" class="ah-chip ah-chip--ok ah-chip--mono">{{ (savedConfig.displayName || savedConfig.provider || '').toUpperCase() }} · {{ $t('SettingsV2.sso_connected') }}</span>
-                        <span v-else class="ah-chip ah-chip--mono">{{ $t('SettingsV2.sso_not_configured') }}</span>
-                        <button type="button" class="sso__link" :disabled="!savedConfig" @click="testSignIn()">{{ $t('SettingsV2.sso_test') }}</button>
+                        <AhSwitch v-model="form.isEnabled" :label="$t('Settings.sso_enable')" />
+                        <span class="sso__provider-name">{{ $t('Settings.sso_card_title') }}</span>
+                        <span v-if="savedConfig && savedConfig.isEnabled" class="ah-chip ah-chip--ok ah-chip--mono">{{ (savedConfig.displayName || savedConfig.provider || '').toUpperCase() }} · {{ $t('Settings.sso_connected') }}</span>
+                        <span v-else class="ah-chip ah-chip--mono">{{ $t('Settings.sso_not_configured') }}</span>
+                        <button type="button" class="sso__link" :disabled="!savedConfig" @click="testSignIn()">{{ $t('Settings.sso_test') }}</button>
                     </div>
 
                     <div class="sso__form-grid">
@@ -44,8 +44,8 @@
                             </select>
                         </div>
                         <div class="ah-field">
-                            <label class="ah-field__label" for="sso-name">{{ $t('SettingsV2.sso_display_name') }}</label>
-                            <input id="sso-name" class="ah-input" v-model.trim="form.displayName" maxlength="80" :placeholder="$t('SettingsV2.sso_display_name_ph')" />
+                            <label class="ah-field__label" for="sso-name">{{ $t('Settings.sso_display_name') }}</label>
+                            <input id="sso-name" class="ah-input" v-model.trim="form.displayName" maxlength="80" :placeholder="$t('Settings.sso_display_name_ph')" />
                         </div>
 
                         <template v-if="form.provider === 'oidc'">
@@ -90,22 +90,22 @@
                             <div v-for="v in copyValues" :key="v.label" class="sso__value">
                                 <span class="sso__value-label">{{ v.label }}</span>
                                 <span class="sso__value-text">{{ v.value }}</span>
-                                <button type="button" class="sso__link" @click="copy(v.value)">{{ $t('SettingsV2.copy') }}</button>
+                                <button type="button" class="sso__link" @click="copy(v.value)">{{ $t('Settings.copy') }}</button>
                             </div>
                             <div class="sso__value">
-                                <span class="sso__value-label">{{ $t('SettingsV2.sso_attributes') }}</span>
+                                <span class="sso__value-label">{{ $t('Settings.sso_attributes') }}</span>
                                 <span class="sso__value-text">email · firstName · lastName</span>
                             </div>
                         </div>
 
                         <div class="ah-field sso__span">
-                            <label class="ah-field__label" for="sso-domain">{{ $t('SettingsV2.sso_domains') }}<span class="ah-small">{{ $t('SettingsV2.sso_domains_hint') }}</span></label>
+                            <label class="ah-field__label" for="sso-domain">{{ $t('Settings.sso_domains') }}<span class="ah-small">{{ $t('Settings.sso_domains_hint') }}</span></label>
                             <div class="sso__chips">
                                 <span v-for="d in form.domains" :key="d" class="ah-chip ah-chip--brand">
                                     {{ d }}
-                                    <button type="button" class="sso__chip-x" :aria-label="$t('SettingsV2.sso_remove', { d })" @click="removeDomain(d)">×</button>
+                                    <button type="button" class="sso__chip-x" :aria-label="$t('Settings.sso_remove', { d })" @click="removeDomain(d)">×</button>
                                 </span>
-                                <input id="sso-domain" class="sso__chip-input" v-model.trim="domainDraft" :placeholder="$t('SettingsV2.sso_domain_ph')" @keydown.enter.prevent="addDomain()" @input="onDomainInput" @blur="addDomain()" />
+                                <input id="sso-domain" class="sso__chip-input" v-model.trim="domainDraft" :placeholder="$t('Settings.sso_domain_ph')" @keydown.enter.prevent="addDomain()" @input="onDomainInput" @blur="addDomain()" />
                             </div>
                             <div v-if="errors.domains" class="ah-field__error">{{ errors.domains }}</div>
                         </div>
@@ -117,7 +117,7 @@
         <aside class="sso__side">
             <section class="ah-card">
                 <div class="ah-card__body sso__enf">
-                    <h2 class="ah-h3">{{ $t('SettingsV2.sso_enforcement') }}</h2>
+                    <h2 class="ah-h3">{{ $t('Settings.sso_enforcement') }}</h2>
                     <label v-for="opt in enforcementOptions" :key="opt.value" class="sso__radio" :class="{ 'is-active': form.enforcement === opt.value }">
                         <input type="radio" name="sso-enforcement" :value="opt.value" v-model="form.enforcement" />
                         <span>
@@ -125,19 +125,19 @@
                             <span class="ah-small sso__radio-hint">{{ $t(opt.hint) }}</span>
                         </span>
                     </label>
-                    <div v-if="form.enforcement !== 'optional'" class="sso__warn">{{ $t('SettingsV2.sso_enf_warn') }}</div>
+                    <div v-if="form.enforcement !== 'optional'" class="sso__warn">{{ $t('Settings.sso_enf_warn') }}</div>
                 </div>
             </section>
 
             <section class="ah-card">
                 <div class="ah-card__body sso__prov">
-                    <h2 class="ah-h3">{{ $t('SettingsV2.sso_provisioning') }}</h2>
+                    <h2 class="ah-h3">{{ $t('Settings.sso_provisioning') }}</h2>
                     <label class="sso__prov-row">
                         <span>{{ $t('Sso.auto_provision') }}</span>
                         <AhSwitch v-model="form.autoProvisionUsers" :label="$t('Sso.auto_provision')" />
                     </label>
                     <div class="sso__prov-row">
-                        <label for="sso-role">{{ $t('SettingsV2.sso_default_role') }}</label>
+                        <label for="sso-role">{{ $t('Settings.sso_default_role') }}</label>
                         <select id="sso-role" class="ah-input sso__role" v-model.number="form.defaultRoleType" :disabled="!form.autoProvisionUsers">
                             <option v-for="r in assignableRoles" :key="r.key" :value="r.key">{{ r.name }}</option>
                         </select>
@@ -147,10 +147,10 @@
 
             <div class="sso__actions">
                 <button type="button" class="ah-btn ah-btn--primary sso__save" :disabled="busy" @click="save()">{{ busy ? $t('Sso.saving') : $t('Projects.save') }}</button>
-                <a class="ah-btn ah-btn--secondary" :href="loginPreviewUrl" target="_blank" rel="noopener">{{ $t('SettingsV2.sso_preview_login') }}</a>
+                <a class="ah-btn ah-btn--secondary" :href="loginPreviewUrl" target="_blank" rel="noopener">{{ $t('Settings.sso_preview_login') }}</a>
             </div>
             <div v-if="saveError" class="ah-field__error">{{ saveError }}</div>
-            <div v-else-if="saveOk" class="ah-small sso__ok"><ShellIcon name="check" :size="14" />{{ $t('SettingsV2.sso_saved') }}</div>
+            <div v-else-if="saveOk" class="ah-small sso__ok"><ShellIcon name="check" :size="14" />{{ $t('Settings.sso_saved') }}</div>
         </aside>
     </div>
 </template>
@@ -195,21 +195,21 @@ const oauthProviders = computed(() => [
 ]);
 
 const enforcementOptions = [
-    { value: "optional", label: "SettingsV2.sso_enf_optional", hint: "SettingsV2.sso_enf_optional_hint" },
-    { value: "required_except_guests", label: "SettingsV2.sso_enf_required_except", hint: "SettingsV2.sso_enf_required_except_hint" },
-    { value: "required", label: "SettingsV2.sso_enf_required", hint: "SettingsV2.sso_enf_required_hint" }
+    { value: "optional", label: "Settings.sso_enf_optional", hint: "Settings.sso_enf_optional_hint" },
+    { value: "required_except_guests", label: "Settings.sso_enf_required_except", hint: "Settings.sso_enf_required_except_hint" },
+    { value: "required", label: "Settings.sso_enf_required", hint: "Settings.sso_enf_required_hint" }
 ];
 
 const assignableRoles = computed(() => (getters["settings/roles"] || []).filter((r) => r.key !== 1 && !r.isDelete));
 
 const copyValues = computed(() => {
     if (form.provider === "oidc") {
-        return [{ label: t("SettingsV2.sso_callback_url"), value: `${origin}/api/v2/sso/oidc/callback` }];
+        return [{ label: t("Settings.sso_callback_url"), value: `${origin}/api/v2/sso/oidc/callback` }];
     }
     return [
-        { label: t("SettingsV2.sso_acs_url"), value: `${origin}/api/v2/sso/saml/acs?companyId=${cid.value}` },
-        { label: t("SettingsV2.sso_metadata_url"), value: `${origin}/api/v2/sso/saml/metadata?companyId=${cid.value}` },
-        { label: t("SettingsV2.sso_entity_id"), value: `${origin}/api/v2/sso/saml/metadata?companyId=${cid.value}` }
+        { label: t("Settings.sso_acs_url"), value: `${origin}/api/v2/sso/saml/acs?companyId=${cid.value}` },
+        { label: t("Settings.sso_metadata_url"), value: `${origin}/api/v2/sso/saml/metadata?companyId=${cid.value}` },
+        { label: t("Settings.sso_entity_id"), value: `${origin}/api/v2/sso/saml/metadata?companyId=${cid.value}` }
     ];
 });
 
@@ -219,7 +219,7 @@ const loginPreviewUrl = computed(() => `${origin}/#/login`);
 function addDomain() {
     const d = domainDraft.value.replace(/,+$/, "").trim().toLowerCase();
     if (!d) return;
-    if (!DOMAIN_RE.test(d)) { errors.domains = t("SettingsV2.sso_domain_invalid", { d }); return; }
+    if (!DOMAIN_RE.test(d)) { errors.domains = t("Settings.sso_domain_invalid", { d }); return; }
     errors.domains = "";
     if (!form.domains.includes(d)) form.domains.push(d);
     domainDraft.value = "";
@@ -229,7 +229,7 @@ const onDomainInput = () => { if (domainDraft.value.includes(",")) addDomain(); 
 
 function validate() {
     Object.keys(errors).forEach((k) => { errors[k] = ""; });
-    const req = t("SettingsV2.required_field");
+    const req = t("Settings.required_field");
     if (form.provider === "oidc") {
         if (!form.oidc.discoveryUrl && !form.oidc.issuer) errors.discoveryUrl = req;
         if (!form.oidc.clientId) errors.clientId = req;
@@ -297,7 +297,7 @@ function testSignIn() {
 async function copy(text) {
     try {
         await navigator.clipboard.writeText(text);
-        $toast.success(t("SettingsV2.copied"), { position: "top-right" });
+        $toast.success(t("Settings.copied"), { position: "top-right" });
     } catch (error) {
         $toast.error(t("Toast.something_went_wrong"), { position: "top-right" });
     }

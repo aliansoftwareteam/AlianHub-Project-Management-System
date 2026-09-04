@@ -1,13 +1,13 @@
 <template>
     <div v-if="timer.active" class="hc-timer" role="status">
-        <div class="hc-timer__label" :title="timer.active.taskName">{{ $t('HomeV2.tracking', { task: timer.active.taskName }) }}</div>
+        <div class="hc-timer__label" :title="timer.active.taskName">{{ $t('Home.tracking', { task: timer.active.taskName }) }}</div>
         <div class="hc-timer__row">
             <span class="hc-timer__clock">{{ clock }}</span>
             <button type="button" class="hc-timer__btn" @click="timer.active.running ? pause() : resume()">
                 <ShellIcon :name="timer.active.running ? 'pause' : 'play'" :size="12" />
-                {{ timer.active.running ? $t('HomeV2.pause') : $t('HomeV2.resume') }}
+                {{ timer.active.running ? $t('Home.pause') : $t('Home.resume') }}
             </button>
-            <button type="button" class="hc-timer__btn hc-timer__btn--icon" :title="$t('HomeV2.stop_log')" :disabled="stopping" @click="finish">
+            <button type="button" class="hc-timer__btn hc-timer__btn--icon" :title="$t('Home.stop_log')" :disabled="stopping" @click="finish">
                 <ShellIcon name="stop" :size="12" />
             </button>
         </div>
@@ -38,11 +38,11 @@ async function finish() {
     try {
         const result = await stop({ companyId: companyId.value, userId: userId.value });
         if (result) {
-            $toast.success(t("HomeV2.timer_logged", { duration: fmtEstimate(Math.max(1, Math.round(result.elapsedMs / 60000))), task: result.taskName }), { position: "top-right" });
+            $toast.success(t("Home.timer_logged", { duration: fmtEstimate(Math.max(1, Math.round(result.elapsedMs / 60000))), task: result.taskName }), { position: "top-right" });
         }
     } catch (error) {
         console.error("timer log failed", error);
-        $toast.error(t("HomeV2.timer_log_failed"), { position: "top-right" });
+        $toast.error(t("Home.timer_log_failed"), { position: "top-right" });
     } finally {
         stopping.value = false;
     }

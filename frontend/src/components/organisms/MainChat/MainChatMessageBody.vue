@@ -26,7 +26,7 @@
                 @make-task="$emit('make-task', $event)"
                 @transcribed="$emit('transcribed', $event)"
             />
-            <div v-if="gallery.length > 1" class="mc-gallery-hint">{{ $t('ChatV2.lightbox_hint') }}</div>
+            <div v-if="gallery.length > 1" class="mc-gallery-hint">{{ $t('Chat.lightbox_hint') }}</div>
         </template>
 
         <span v-else v-html="renderedBody"></span>

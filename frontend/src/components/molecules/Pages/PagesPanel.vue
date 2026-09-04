@@ -3,14 +3,14 @@
         <div class="pg__shell">
             <aside class="pg__side">
                 <div class="pg__side-head">
-                    <span class="pg__side-title">{{ $t('DocsV2.pages') }}</span>
+                    <span class="pg__side-title">{{ $t('Docs.pages') }}</span>
                     <button type="button" class="pg__icon" :title="$t('Projects.add_page')" @click="createPage(null)">
                         <ShellIcon name="plus" :size="15" />
                     </button>
                 </div>
                 <div class="pg__search">
                     <ShellIcon name="search" :size="14" class="pg__search-icon" />
-                    <input v-model="query" type="search" class="ah-input pg__search-input" :placeholder="$t('DocsV2.find_a_page')" />
+                    <input v-model="query" type="search" class="ah-input pg__search-input" :placeholder="$t('Docs.find_a_page')" />
                 </div>
                 <div class="pg__tree ah-scroll">
                     <div v-if="!rows.length" class="pg__empty">
@@ -30,9 +30,9 @@
                             @click.stop="row.hasChildren && toggle(row._id)"
                         ><ShellIcon v-if="row.hasChildren" name="chevron" :size="11" /></span>
                         <ShellIcon :name="row.isWiki ? 'book' : 'file'" :size="13" class="pg__row-icon" />
-                        <span class="pg__row-title" :title="row.title">{{ row.title || $t('DocsV2.untitled') }}</span>
+                        <span class="pg__row-title" :title="row.title">{{ row.title || $t('Docs.untitled') }}</span>
                         <span v-if="row.isWiki && (row.reviewState === 'due' || row.reviewState === 'stale')" class="ah-dot" :class="row.reviewState === 'stale' ? 'ah-dot--danger' : 'ah-dot--warn'"></span>
-                        <button type="button" class="pg__row-add" :title="$t('DocsV2.add_nested_page')" @click.stop="createPage(row._id)">
+                        <button type="button" class="pg__row-add" :title="$t('Docs.add_nested_page')" @click.stop="createPage(row._id)">
                             <ShellIcon name="plus" :size="12" />
                         </button>
                     </div>
@@ -53,7 +53,7 @@
                     @close="requestClose"
                 />
                 <div v-else class="pg__blank">
-                    <button v-if="!embedded && !workspace" type="button" class="pg__icon pg__blank-close" :title="$t('DocsV2.close')" @click="requestClose">
+                    <button v-if="!embedded && !workspace" type="button" class="pg__icon pg__blank-close" :title="$t('Docs.close')" @click="requestClose">
                         <ShellIcon name="x" :size="15" />
                     </button>
                     <ShellIcon name="docs" :size="40" class="pg__blank-icon" />
@@ -191,7 +191,7 @@ function openPage(id) {
 function createPage(parentPageId) {
     if (!confirmDiscard()) return;
     apiRequest('post', env.PAGES, {
-        title: t('DocsV2.untitled'),
+        title: t('Docs.untitled'),
         ...(projectId.value ? { projectId: projectId.value } : {}),
         ...(parentPageId ? { parentPageId: String(parentPageId) } : {}),
     }).then((response) => {

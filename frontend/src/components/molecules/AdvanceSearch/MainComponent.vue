@@ -7,7 +7,7 @@
                 v-model="query"
                 type="text"
                 class="pal__input"
-                :placeholder="$t('InboxV2.search_placeholder')"
+                :placeholder="$t('Inbox.search_placeholder')"
                 autocomplete="off"
                 spellcheck="false"
                 @input="onInput"
@@ -19,7 +19,7 @@
         <div ref="bodyEl" class="pal__body ah-scroll">
             <template v-if="flat.length">
                 <template v-for="g in groups" :key="g.key">
-                    <div v-if="g.rows.length" class="pal__group">{{ $t('InboxV2.group_' + g.key) }}</div>
+                    <div v-if="g.rows.length" class="pal__group">{{ $t('Inbox.group_' + g.key) }}</div>
                     <button
                         v-for="row in g.rows"
                         :key="row.id"
@@ -47,24 +47,24 @@
 
             <div v-else-if="query.trim().length >= 2 && !searching" class="pal__empty">
                 <span class="pal__icon pal__icon--brand"><ShellIcon name="search" :size="13" /></span>
-                <div class="pal__empty-title">{{ $t('InboxV2.search_nothing', { q: query.trim() }) }}</div>
-                <div class="pal__empty-sub">{{ $t('InboxV2.search_nothing_sub', { n: sourceCount }) }}</div>
+                <div class="pal__empty-title">{{ $t('Inbox.search_nothing', { q: query.trim() }) }}</div>
+                <div class="pal__empty-sub">{{ $t('Inbox.search_nothing_sub', { n: sourceCount }) }}</div>
                 <div class="pal__empty-actions">
-                    <button v-if="hasAi" type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="askAi">✦ {{ $t('InboxV2.ask_ai') }}</button>
-                    <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="clearQuery">{{ $t('InboxV2.clear_search') }}</button>
+                    <button v-if="hasAi" type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="askAi">✦ {{ $t('Inbox.ask_ai') }}</button>
+                    <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="clearQuery">{{ $t('Inbox.clear_search') }}</button>
                 </div>
             </div>
 
             <div v-else class="pal__empty pal__empty--idle">
-                <div class="pal__empty-sub">{{ $t('InboxV2.search_idle') }}</div>
+                <div class="pal__empty-sub">{{ $t('Inbox.search_idle') }}</div>
             </div>
         </div>
 
         <div class="pal__foot">
-            <span>↑↓ {{ $t('InboxV2.hint_move') }}</span>
-            <span>↵ {{ $t('InboxV2.hint_open') }}</span>
-            <span>⌘↵ {{ $t('InboxV2.hint_command') }}</span>
-            <span class="pal__foot-right">{{ $t('InboxV2.searching_sources', { n: sourceCount }) }}</span>
+            <span>↑↓ {{ $t('Inbox.hint_move') }}</span>
+            <span>↵ {{ $t('Inbox.hint_open') }}</span>
+            <span>⌘↵ {{ $t('Inbox.hint_command') }}</span>
+            <span class="pal__foot-right">{{ $t('Inbox.searching_sources', { n: sourceCount }) }}</span>
         </div>
     </div>
 </template>
@@ -126,20 +126,20 @@ const NAV = computed(() => [
     { key: 'time', label: t('Shell.time'), icon: 'time', route: timesheetRoute() },
     { key: 'settings', label: t('settingslider.Settings'), icon: 'settings', route: 'Setting' },
     { key: 'members', label: t('settingslider.Members'), icon: 'members', route: 'Members', sub: t('settingslider.Settings') },
-    { key: 'teams', label: t('InboxV2.nav_teams'), icon: 'members', route: 'Teams', sub: t('settingslider.Settings') },
+    { key: 'teams', label: t('Inbox.nav_teams'), icon: 'members', route: 'Teams', sub: t('settingslider.Settings') },
     { key: 'integrations', label: t('Header.Integrations'), icon: 'integrations', route: 'Integrations', sub: t('settingslider.Settings') },
-    { key: 'notifications', label: t('InboxV2.nav_notifications'), icon: 'bell', route: 'Notifications', sub: t('settingslider.Settings') },
-    { key: 'tracking', label: t('InboxV2.nav_time_tracking'), icon: 'time', route: 'Time Tracking', sub: t('settingslider.Settings') },
+    { key: 'notifications', label: t('Inbox.nav_notifications'), icon: 'bell', route: 'Notifications', sub: t('settingslider.Settings') },
+    { key: 'tracking', label: t('Inbox.nav_time_tracking'), icon: 'time', route: 'Time Tracking', sub: t('settingslider.Settings') },
     { key: 'profile', label: t('Shell.my_profile'), icon: 'user', route: 'My Profile', sub: t('settingslider.Settings') },
-    { key: 'security', label: t('InboxV2.nav_security'), icon: 'shield', route: 'Security & Permissions', sub: t('settingslider.Settings') },
+    { key: 'security', label: t('Inbox.nav_security'), icon: 'shield', route: 'Security & Permissions', sub: t('settingslider.Settings') },
     { key: 'audit', label: t('Audit.title'), icon: 'audit', route: 'AuditLog' },
     { key: 'changelog', label: t('Changelog.whats_new'), icon: 'changelog', route: 'Changelog' },
 ].filter((n) => n.route && router.hasRoute(n.route) && n.show !== false));
 
 const COMMANDS = computed(() => [
-    { key: 'new-task', label: t('InboxV2.cmd_new_task'), icon: 'plus', hint: '⌘⏎', show: allowed('project.project_list') },
-    { key: 'new-project', label: t('InboxV2.cmd_new_project'), icon: 'projects', show: allowed('project.project_list') },
-    { key: 'start-timer', label: t('InboxV2.cmd_start_timer'), icon: 'play', show: !!timesheetRoute() },
+    { key: 'new-task', label: t('Inbox.cmd_new_task'), icon: 'plus', hint: '⌘⏎', show: allowed('project.project_list') },
+    { key: 'new-project', label: t('Inbox.cmd_new_project'), icon: 'projects', show: allowed('project.project_list') },
+    { key: 'start-timer', label: t('Inbox.cmd_start_timer'), icon: 'play', show: !!timesheetRoute() },
     { key: 'toggle-theme', label: shellState.theme === 'dark' ? t('Shell.theme_light') : t('Shell.theme_dark'), icon: shellState.theme === 'dark' ? 'sun' : 'moon' },
     { key: 'logout', label: t('Shell.logout'), icon: 'logout' },
 ].filter((c) => c.show !== false));
@@ -181,11 +181,11 @@ const groups = computed(() => {
         const apps = connections.value.filter((c) => matches(c.name, c.type)).slice(0, MAX_PER_GROUP);
         out.push({ key: 'apps', rows: apps.map((c) => row({
             id: `app:${c._id}`, kind: 'app', icon: /github|gitlab/i.test(c.type) ? 'github' : 'integrations', iconClass: 'pal__icon--dark',
-            title: c.name, sub: t('InboxV2.app_connected'), app: c,
+            title: c.name, sub: t('Inbox.app_connected'), app: c,
         })) });
 
         if (hasAi.value) {
-            out.push({ key: 'ask', rows: [row({ id: 'ask', kind: 'ask', icon: 'ai', iconClass: 'pal__icon--brand', bold: true, title: t('InboxV2.ask_query', { q: query.value.trim() }), hint: '↵' })] });
+            out.push({ key: 'ask', rows: [row({ id: 'ask', kind: 'ask', icon: 'ai', iconClass: 'pal__icon--brand', bold: true, title: t('Inbox.ask_query', { q: query.value.trim() }), hint: '↵' })] });
         }
     }
 
@@ -200,7 +200,7 @@ const sourceCount = computed(() => 2 + (connections.value.length ? 1 : 0) + (has
 const projectName = (id) => (getters['projectData/projects']?.data || []).find((p) => String(p._id) === String(id))?.ProjectName || '';
 const pageSub = (p) => {
     const who = users.value.find((u) => String(u._id) === String(p.updatedBy))?.Employee_Name;
-    return [t('Shell.docs'), who ? t('InboxV2.edited_by', { who }) : ''].filter(Boolean).join(' · ');
+    return [t('Shell.docs'), who ? t('Inbox.edited_by', { who }) : ''].filter(Boolean).join(' · ');
 };
 
 const loadRecent = () => { try { recent.value = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]').slice(0, MAX_RECENT); } catch (e) { recent.value = []; } };

@@ -119,7 +119,7 @@
                 </div>
                 <div v-else-if="agentProposal" class="agent-proposal">
                     <span class="agent-proposal__who">✦ {{ agentProposal.agentName }}:</span> {{ agentProposal.what }}
-                    <button type="button" class="agent-proposal__review" @click.stop="openAiInbox()">{{ $t('ProjectsV2.review') }}</button>
+                    <button type="button" class="agent-proposal__review" @click.stop="openAiInbox()">{{ $t('Projects.review') }}</button>
                 </div>
                 <div v-if="showCardMeta" class="card-meta">
                     <span v-if="taskKey" class="card-key">{{ taskKey }}</span>

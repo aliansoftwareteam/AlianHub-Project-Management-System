@@ -17,7 +17,7 @@
         <div class="mc-msg-stack">
             <div v-if="!continuation" class="mc-msg-meta">
                 <span class="mc-msg-name">{{ displayName }}</span>
-                <span v-if="isAgent" class="mc-agent-tag">{{ $t('ChatV2.agent') }}</span>
+                <span v-if="isAgent" class="mc-agent-tag">{{ $t('Chat.agent') }}</span>
                 <span class="mc-msg-time">· {{ shortTime }}</span>
                 <span v-if="message.pinnedMessage" class="mc-msg-pin"><MainChatIcon name="pin" :size="10" />{{ $t('MainChat.pinned') }}</span>
             </div>
@@ -37,10 +37,10 @@
             </div>
 
             <div v-if="actionable" class="mc-msg-acts">
-                <button type="button" class="mc-act" @click="$emit('reply', message)">{{ $t('ChatV2.reply') }}</button>
-                <button v-if="isText" type="button" class="mc-act mc-act--task" @click="$emit('make-task', { message, text: plainText })">{{ $t('ChatV2.make_task') }}</button>
+                <button type="button" class="mc-act" @click="$emit('reply', message)">{{ $t('Chat.reply') }}</button>
+                <button v-if="isText" type="button" class="mc-act mc-act--task" @click="$emit('make-task', { message, text: plainText })">{{ $t('Chat.make_task') }}</button>
                 <button type="button" class="mc-act" :class="{ 'is-on': message.pinnedMessage }" @click="$emit('save-later', message)">
-                    {{ message.pinnedMessage ? $t('ChatV2.saved_later') : $t('ChatV2.save_later') }}
+                    {{ message.pinnedMessage ? $t('Chat.saved_later') : $t('Chat.save_later') }}
                 </button>
             </div>
 

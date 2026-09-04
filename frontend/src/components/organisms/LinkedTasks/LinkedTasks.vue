@@ -1,14 +1,14 @@
 <template>
     <section class="lt">
         <header class="lt__head">
-            <span class="lt__title">{{ $t('MembersV2.relations') }}</span>
+            <span class="lt__title">{{ $t('Members.relations') }}</span>
             <span v-if="linkedItems.length" class="ah-mono lt__count">{{ linkedItems.length }}</span>
-            <button v-if="!isAdding" type="button" class="lt__link" @click="startAdding">+ {{ $t('MembersV2.add_link') }}</button>
+            <button v-if="!isAdding" type="button" class="lt__link" @click="startAdding">+ {{ $t('Members.add_link') }}</button>
         </header>
 
         <div v-if="openBlockers.length" class="lt__blocked">
             <ShellIcon name="alert" :size="14" />
-            <span>{{ $t('MembersV2.blocked_warning', { count: openBlockers.length }) }} <strong class="ah-mono">{{ openBlockerKeys }}</strong></span>
+            <span>{{ $t('Members.blocked_warning', { count: openBlockers.length }) }} <strong class="ah-mono">{{ openBlockerKeys }}</strong></span>
         </div>
 
         <div v-if="linkedItems.length" class="lt__list">
@@ -28,13 +28,13 @@
                     type="button"
                     class="lt__x"
                     :disabled="isSaving"
-                    :title="$t('MembersV2.remove_link')"
-                    :aria-label="$t('MembersV2.remove_link')"
+                    :title="$t('Members.remove_link')"
+                    :aria-label="$t('Members.remove_link')"
                     @click="removeRelation(item)"
                 >×</button>
             </div>
         </div>
-        <p v-else-if="!isAdding && !isLoading" class="lt__empty">{{ $t('MembersV2.no_relations') }}</p>
+        <p v-else-if="!isAdding && !isLoading" class="lt__empty">{{ $t('Members.no_relations') }}</p>
 
         <div v-if="isAdding" class="lt__add">
             <div class="lt__add-row">
@@ -45,12 +45,12 @@
                     v-model="searchQuery"
                     type="text"
                     class="ah-input lt__add-search"
-                    :placeholder="$t('MembersV2.search_task_ph')"
+                    :placeholder="$t('Members.search_task_ph')"
                     @input="onSearchInput"
                 />
-                <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="cancelAdding">{{ $t('MembersV2.cancel') }}</button>
+                <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="cancelAdding">{{ $t('Members.cancel') }}</button>
             </div>
-            <p v-if="isSearching" class="lt__empty">{{ $t('MembersV2.searching') }}</p>
+            <p v-if="isSearching" class="lt__empty">{{ $t('Members.searching') }}</p>
             <div v-else-if="searchResults.length" class="lt__results">
                 <button
                     v-for="result in searchResults"
@@ -64,7 +64,7 @@
                     <span class="lt__name">{{ result.TaskName }}</span>
                 </button>
             </div>
-            <p v-else-if="searchQuery.trim().length" class="lt__empty">{{ $t('MembersV2.no_task_found') }}</p>
+            <p v-else-if="searchQuery.trim().length" class="lt__empty">{{ $t('Members.no_task_found') }}</p>
         </div>
     </section>
 </template>
@@ -167,7 +167,7 @@ onMounted(() => {
 });
 
 function typeLabel(type) {
-    const key = `MembersV2.relation_${type}`;
+    const key = `Members.relation_${type}`;
     const label = t(key);
     return label === key ? String(type).replace(/_/g, ' ').toUpperCase() : label;
 }
