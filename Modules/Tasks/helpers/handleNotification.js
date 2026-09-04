@@ -109,7 +109,7 @@ exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId
                         ...watchers
                     ]));
                 } else {
-                    users = Array.from(new Set([...taskData.AssigneeUserId, ...doc.data().LeadUserId, ...watchers]));
+                    users = Array.from(new Set([...taskData.AssigneeUserId, ...(taskData.LeadUserId || []), ...watchers]));
                 }
 
                 var leaderId = ""
@@ -201,7 +201,7 @@ exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId
                             const hasCache = myCache.get(cacheKey);
 
                             if (hasCache) {
-                                userArray = JSON.parse(hasCache);
+                                const userArray = JSON.parse(hasCache);
                                 if (userArray?.length) {
                                     chatData.watchers = userArray.filter(x => x.status === 2).map(x => x?._id ? x?.userId : '');
                                 }
@@ -212,7 +212,7 @@ exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId
                                 myCache.set(cacheKey, JSON.stringify(response), 604800);
                             }
                         } else {
-                            chatData.watchers = chatData.watchers && chatData.watchers.length ? chatData.watchers : chatData?.AssigneeUserId && chatData?.AssigneeUserId?.length ? [...chatData?.AssigneeUserId] : []
+                            chatData.watchers = chatData.watchers && chatData.watchers.length ? chatData.watchers : chatData?.AssigneeUserId && chatData?.AssigneeUserId?.length ? [...chatData.AssigneeUserId] : []
                         }
 
                     } catch (error) {

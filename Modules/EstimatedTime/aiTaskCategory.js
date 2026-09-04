@@ -47,7 +47,7 @@ const SYSTEM_PROMPT = (() => {
     );
     try {
         const raw = fs.readFileSync(promptPath, 'utf8');
-        return raw.replace(/^﻿/, '').replace(/\r\n/g, '\n').trim();
+        return raw.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').trim();
     } catch (_e) {
         // Inline fallback — only used if the partial file is missing.
         return [

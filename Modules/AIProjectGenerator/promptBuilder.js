@@ -28,7 +28,7 @@ const PROMPTS_DIR = path.join(__dirname, 'prompts');
 function readPartial(...segments) {
     const fullPath = path.join(PROMPTS_DIR, ...segments);
     const raw = fs.readFileSync(fullPath, 'utf8');
-    return raw.replace(/^﻿/, '').replace(/\r\n/g, '\n').trim();
+    return raw.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').trim();
 }
 
 // Compose a stage's system prompt from a list of partials, joined by blank

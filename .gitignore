@@ -7,10 +7,6 @@ migrations
 node_modules
 jspm_packages
 /frontend/dist
-/installation/dist
-/admin/dist
-installation-saas-backup
-checkinstallstep-saas-backup
 
 # local env files
 .env.local
@@ -27,6 +23,7 @@ log/
 *.log
 
 # Runtime generated upload/storage directories
+/storage/
 wasabiUploads/
 wasabiUploadsLocal/
 thumbnails/

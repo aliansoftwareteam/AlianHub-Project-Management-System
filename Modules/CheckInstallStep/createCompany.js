@@ -108,7 +108,7 @@ exports.importSettingsFun = (axiosData) => {
                     logger.info(`${axiosData.companyId} >> ADD SETTINGS FAILED`);
                     reject({
                         status: false,
-                        error: error,
+                        error: null,
                         statusText: `${axiosData.companyId} >> ADD SETTINGS FAILED`
                     });
                 }

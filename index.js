@@ -4,24 +4,23 @@ var cors = require('cors');
 const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const logger = require("./Config/loggerConfig");
 
-// Global error handlers — catch crashes and log before Render kills the process
 process.on('uncaughtException', (err) => {
-    console.error('[FATAL] uncaughtException:', err.message);
-    console.error(err.stack);
+    logger.error(`[FATAL] uncaughtException: ${err && err.stack ? err.stack : err}`);
+    console.error('[FATAL] uncaughtException:', err);
     process.exit(1);
 });
 // Log and keep serving. Exiting here turned every handler that forgot to answer
 // (an unhandled rejection from a bad request body) into a process kill anyone
 // could trigger over HTTP. uncaughtException still exits: that is corrupted state.
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('[unhandledRejection] at:', promise);
-    console.error('[unhandledRejection] reason:', reason && reason.stack ? reason.stack : reason);
+process.on('unhandledRejection', (reason) => {
+    logger.error(`[unhandledRejection] ${reason && reason.stack ? reason.stack : reason}`);
+    console.error('[unhandledRejection]', reason);
 });
 const bodyParser = require("body-parser");
 const config =  require('./Config/config.js');
 const awsRef =  require('./Config/aws.js');
-const logger = require("./Config/loggerConfig");
 const packJOSNData = require("./package.json");
 const { makeDefaultBrandSettings } = require("./Modules/Admin/common/controller.js");
 const { corsOriginDelegate } = require('./utils/cors.js');
@@ -88,6 +87,7 @@ app.use(cors({ origin: corsOriginDelegate }));
 // body-parser-handled paths. Operators with bulk-import or large-form
 // use cases can raise it via the `BODY_LIMIT` env var.
 const BODY_LIMIT = process.env.BODY_LIMIT || '2mb';
+app.use(require('./Config/requestLog').requestLog());
 app.use(bodyParser.urlencoded({ extended: true, limit: BODY_LIMIT }));
 app.use(bodyParser.json({ limit: BODY_LIMIT }));
 app.use(bodyParser.raw({ limit: BODY_LIMIT }));
@@ -95,7 +95,6 @@ app.use(bodyParser.raw({ limit: BODY_LIMIT }));
 // Set Maintenance Mode
 if (!config.UNDER_MAINTENANCE || config.UNDER_MAINTENANCE == "false") {
     app.use(express.static(path.join(__dirname, './frontend/dist')));
-    app.use(express.static(path.join(__dirname, './installation/dist')));
     // RUN FRONTEND SERVER
     app.get("/", (req, res) => {
         res.sendFile(path.join(__dirname, './frontend/dist/index.html'));
@@ -328,7 +327,7 @@ app.get("/health", (req, res) => {
 
 fs.watch(__dirname + "/Modules/Template/", (event_type, file_name) => {
     try {
-        delete require.cache[require.resolve(__dirname + "/Modules/Template/" + file_name)];;
+        delete require.cache[require.resolve(__dirname + "/Modules/Template/" + file_name)];
     } catch (error) {
         console.error("ERROR in remove cache", error);
     }
@@ -337,6 +336,7 @@ fs.watch(__dirname + "/Modules/Template/", (event_type, file_name) => {
 if (!config.UNDER_MAINTENANCE || config.UNDER_MAINTENANCE == "false") {
     app.use(require('./Config/spaFallback').spaFallback(path.join(__dirname, './frontend/dist/index.html')));
 }
+app.use(require('./Config/errorHandler').errorHandler());
 
 // SERVER LISTEN PORT
 const server = app.listen(config.PORT, () => {

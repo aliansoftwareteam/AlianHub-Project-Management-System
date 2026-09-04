@@ -66,10 +66,10 @@ exports.handleCreateCompanyDataStorageFun = async(cObj,companyId) => {
             .catch((err) => {
                 reject(err);
                 loggerConfig.error('Error handleCreateCompanyDataStorageFun' + err.message)
-            });;
+            });
         } catch (error) {
-            reject(err);
-            loggerConfig.error('Error handleCreateCompanyDataStorageFun' + err.message)
+            reject(error);
+            loggerConfig.error('Error handleCreateCompanyDataStorageFun' + error.message)
         }
     })
 }

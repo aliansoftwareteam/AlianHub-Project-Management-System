@@ -2128,11 +2128,6 @@ const schema = {
             required: false,
             default: 0
         },
-        milestoneAmount: {
-            type: Number,
-            required: false,
-            default: 0
-        },
         projectCreatedBy: {
             type: String,
             required: true,
@@ -2959,10 +2954,6 @@ const schema = {
             type: Array,
             required: false
         },
-        status: {
-            type: Number,
-            required: false
-        },
         planName: {
             type: String,
             required: true
@@ -3150,11 +3141,6 @@ const schema = {
             type: Boolean,
             required: false,
             default: false
-        },
-        projectId: {
-            type:Array,
-            required: false,
-            default:''
         },
         type: {
             type:String,

@@ -52,11 +52,6 @@ logs
 /storage
 /common-storage/uploads
 
-# Installation artifacts (one-time setup, not needed in image)
-/installation
-/installation-single
-/installation-saas
-
 # Documentation / metadata (not used at runtime)
 *.md
 !brandSettings.json

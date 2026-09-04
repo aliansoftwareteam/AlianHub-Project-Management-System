@@ -1,5 +1,7 @@
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
+const { tenantOf } = require("../../Config/tenant");
+const { fail } = require("../../Config/respond");
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const socketEmitter = require("../../event/socketEventEmitter");
@@ -85,7 +87,7 @@ const callerId = (req) => String((req && req.uid) || '');
  *   contentBlocks?, isWiki?, ownerId?, reviewDate?, createdByAgent?, agentName? } */
 exports.createPage = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         const {
             title, projectId, parentPageId, visibility, linkedTasks, contentBlocks,
             isWiki, ownerId, reviewDate, createdByAgent, agentName,
@@ -147,7 +149,7 @@ exports.createPage = async (req, res) => {
         return res.send({ status: true, statusText: 'Page created.', data: created });
     } catch (error) {
         logger.error(`ERROR in create page: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
@@ -156,7 +158,7 @@ exports.createPage = async (req, res) => {
  * company-wide docs, i.e. those with no ProjectID. */
 exports.listPages = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         if (!companyId) {
             return res.send({ status: false, statusText: 'companyId is required.' });
         }
@@ -198,14 +200,14 @@ exports.listPages = async (req, res) => {
         return res.send({ status: true, statusText: 'Pages fetched.', data: (pages || []).map(toListRow) });
     } catch (error) {
         logger.error(`ERROR in list pages: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
 /* GET /api/v2/pages/:id — full page. */
 exports.getPage = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         const { id } = req.params;
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid page id are required.' });
@@ -227,7 +229,7 @@ exports.getPage = async (req, res) => {
         return res.send({ status: true, statusText: 'Page fetched.', data });
     } catch (error) {
         logger.error(`ERROR in get page: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
@@ -235,7 +237,7 @@ exports.getPage = async (req, res) => {
  *   isWiki?, ownerId?, reviewDate?, agentStatus? } */
 exports.updatePage = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         const { id } = req.params;
         const {
             title, contentHtml, contentBlocks, visibility, linkedTasks, isWiki, ownerId, reviewDate, agentStatus,
@@ -310,7 +312,7 @@ exports.updatePage = async (req, res) => {
         return res.send({ status: true, statusText: 'Page saved.', data: updated });
     } catch (error) {
         logger.error(`ERROR in update page: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
@@ -334,7 +336,7 @@ const patchPage = async (companyId, id, update) => MongoDbCrudOpration(companyId
  * the page is still right; the next review is three months out unless a date is given. */
 exports.markReviewed = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         const { id } = req.params;
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid page id are required.' });
@@ -364,14 +366,14 @@ exports.markReviewed = async (req, res) => {
         return res.send({ status: true, statusText: 'Page marked as reviewed.', data });
     } catch (error) {
         logger.error(`ERROR in mark page reviewed: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
 /* PUT /api/v2/pages/:id/approve — a person signs off an agent-drafted page. */
 exports.approvePage = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         const { id } = req.params;
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid page id are required.' });
@@ -389,7 +391,7 @@ exports.approvePage = async (req, res) => {
         return res.send({ status: true, statusText: 'Page approved.', data: updated });
     } catch (error) {
         logger.error(`ERROR in approve page: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
@@ -397,7 +399,7 @@ exports.approvePage = async (req, res) => {
  * restored under a still-deleted parent is re-rooted by the tree, so nothing is lost. */
 exports.restorePage = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         const { id } = req.params;
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid page id are required.' });
@@ -412,14 +414,14 @@ exports.restorePage = async (req, res) => {
         return res.send({ status: true, statusText: 'Page restored.', data: updated });
     } catch (error) {
         logger.error(`ERROR in restore page: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
 /* DELETE /api/v2/pages/:id — soft delete, together with everything nested under it. */
 exports.deletePage = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         const { id } = req.params;
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid page id are required.' });
@@ -463,7 +465,7 @@ exports.deletePage = async (req, res) => {
         return res.send({ status: true, statusText: 'Page deleted.', data: { deleted: doomed.length } });
     } catch (error) {
         logger.error(`ERROR in delete page: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
@@ -477,7 +479,7 @@ exports.aiStatus = (req, res) => {
 /* POST /api/v2/pages/ai  body: { action, title?, instruction?, currentText?, pageId? } */
 exports.composeWithAi = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         if (!companyId) {
             return res.send({ status: false, statusText: 'companyId is required.' });
         }
@@ -518,6 +520,6 @@ exports.composeWithAi = async (req, res) => {
         return res.send({ status: true, statusText: 'Composed.', data: result.data });
     } catch (error) {
         logger.error(`ERROR in page AI compose: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };

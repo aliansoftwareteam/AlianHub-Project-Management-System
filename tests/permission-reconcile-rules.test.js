@@ -12,7 +12,6 @@ const MODULE = path.join(__dirname, '..', 'Modules', 'settings', 'securityPermis
 
 const load = () => {
     delete require.cache[require.resolve(MODULE)];
-    // eslint-disable-next-line global-require, import/no-dynamic-require
     return require(MODULE);
 };
 

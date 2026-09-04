@@ -463,7 +463,7 @@ exports.sendMailAfterCompanyCreation = (allSettledRes, companyId, req) => {
         serviceCtr.sendAttachMail(subject, html, toMail, null, () => {
             logger.info(`Company Creation Error Email Send Successfully (${companyId}).`);
         });
-    };
+    }
 };
 
 /**
@@ -745,7 +745,7 @@ exports.deleteCompany = (req, res) => {
                     });
                 })
             } catch (err) {
-                res.send({ status: false, statusText: error});
+                res.send({ status: false, statusText: err});
                 console.error(err,"ERROR IN CLOSE CONNECTION");
             }
         }).catch((error) => {

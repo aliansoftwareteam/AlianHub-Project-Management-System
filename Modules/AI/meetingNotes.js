@@ -17,7 +17,7 @@ const MAX_ACTION_ITEMS = 12;
 
 const SYSTEM_PROMPT = (() => {
     const promptPath = path.join(__dirname, 'prompts', 'meeting-notes.md');
-    return fs.readFileSync(promptPath, 'utf8').replace(/^﻿/, '').replace(/\r\n/g, '\n').trim();
+    return fs.readFileSync(promptPath, 'utf8').replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').trim();
 })();
 
 const clamp = (value, cap) => {

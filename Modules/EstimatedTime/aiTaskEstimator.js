@@ -142,7 +142,7 @@ const SYSTEM_PROMPT = (() => {
         'task-time-estimate.md',
     );
     const raw = fs.readFileSync(promptPath, 'utf8');
-    const cleaned = raw.replace(/^﻿/, '').replace(/\r\n/g, '\n').trim();
+    const cleaned = raw.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').trim();
     const frag = TARGET_FRAGMENTS[ESTIMATE_TARGET] || TARGET_FRAGMENTS.human;
     return cleaned
         .replace(/\{\{ESTIMATE_TARGET_LABEL\}\}/g, frag.label)

@@ -962,10 +962,10 @@ exports.checkinstallstep = (req, res) => {
                 const envData = {};
                 for (const key in envConfig) {
                     envData[key] = envConfig[key];
-                };
+                }
                 for (const key in exports.envVar) {
                     process.env[key] = exports.envVar[key];
-                };
+                }
     
                 const finalEnvData = {...envData, ...exports.envVar};
                 fs.writeFile(filePath, convertToEnv(finalEnvData), (err, data) => {

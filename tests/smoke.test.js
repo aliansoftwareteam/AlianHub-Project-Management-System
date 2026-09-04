@@ -22,6 +22,9 @@ describe('jest harness smoke', () => {
         const cfgPath = path.resolve(__dirname, '../jest.config.js');
         expect(fs.existsSync(cfgPath)).toBe(true);
         const cfg = require(cfgPath);
-        expect(cfg.roots).toEqual(expect.arrayContaining([expect.stringContaining('tests')]));
+        expect(cfg.projects.map((p) => p.displayName)).toEqual(['unit', 'conventions']);
+        for (const project of cfg.projects) {
+            expect(project.testMatch).toEqual(expect.arrayContaining([expect.stringContaining('tests')]));
+        }
     });
 });

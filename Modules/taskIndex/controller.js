@@ -363,12 +363,12 @@ exports.updateTaskIndexWhenLoad = (req,res) => {
                           $match: {
                             ProjectID: rep.ProjectID,
                             TaskKey: {$ne: rep.TaskKey},
-                            [indexObj.indexName]: { $exists: true },
+                            [req.body.taskUpdate.item.indexName]: { $exists: true },
                             // sprintId: rep.sprintId,
                             AssigneeUserId: { $size: 0 }
                           }
                         },
-                        { $sort: { [indexObj.indexName]: 1 } },
+                        { $sort: { [req.body.taskUpdate.item.indexName]: 1 } },
                         {
                           $group: {
                             _id: "$AssigneeUserId",
@@ -384,7 +384,7 @@ exports.updateTaskIndexWhenLoad = (req,res) => {
                     }
                     MongoDbCrudOpration(req.body.companyId, objSh, 'aggregate').then((resp)=>{
                         if (resp && resp[0].results && resp[0].results.length) {
-                            exports.updateIndex(req.body.taskUpdate,req.body.companyId,rep,typsenseTask).then((response)=>{
+                            exports.updateIndex(req.body.taskUpdate,req.body.companyId,rep,resp[0].results[0]).then((response)=>{
                                 res.send(response)
                             }).catch((error)=>{
                                 res.send(error)
@@ -450,7 +450,7 @@ exports.updateTaskIndexWhenLoad = (req,res) => {
             })
         })
     } catch (error) {
-        reject(error);
+        res.send({ status: false, statusText: error.message });
     }
 }
 
