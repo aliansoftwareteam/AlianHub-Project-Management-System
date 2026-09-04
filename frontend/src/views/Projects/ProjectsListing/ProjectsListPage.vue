@@ -79,7 +79,7 @@
                         type="button"
                         class="pl2__delete"
                         @click="askDelete(project)"
-                    >{{ $t('ProjectsV2.delete') }}</button>
+                    >{{ $t('ProjectsV2.remove_sample') }}</button>
                     <template v-else>
                         <button type="button" class="pl2__dots" :aria-label="$t('ProjectsV2.row_menu')" @click.stop="filterOpen = false; menuFor = menuFor === project._id ? '' : project._id">
                             <ShellIcon name="more" :size="15" />

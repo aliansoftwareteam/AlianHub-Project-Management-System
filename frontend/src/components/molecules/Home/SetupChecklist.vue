@@ -4,7 +4,7 @@
             <span>{{ doneCount }}/{{ steps.length }}</span>
         </div>
         <div class="hc-setup__body">
-            <div class="hc-setup__title">{{ $t('HomeV2.setup_title', { company: companyName }) }}</div>
+            <div class="hc-setup__title">{{ title || $t('HomeV2.setup_title', { company: companyName }) }}</div>
             <div class="hc-setup__steps">
                 <template v-for="(step, i) in steps" :key="step.key">
                     <span v-if="i > 0"> · </span>
@@ -27,6 +27,7 @@ defineOptions({ name: "SetupChecklist" });
 
 const props = defineProps({
     companyName: { type: String, default: "" },
+    title: { type: String, default: "" },
     steps: { type: Array, default: () => [] }
 });
 defineEmits(["action", "dismiss"]);
