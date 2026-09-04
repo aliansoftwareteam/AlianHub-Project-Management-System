@@ -50,7 +50,8 @@ const companyId = inject("$companyId");
 const entry = computed(() => timerState.entry);
 const runningHere = computed(() => isTimerFor(props.task?._id));
 const clock = computed(() => formatClock(elapsedSeconds.value));
-const elsewhereTitle = computed(() => entry.value ? t("TaskPanel.timer_running_elsewhere", { key: entry.value.taskKey || "" }) : "");
+// A disabled button with no reason reads as broken. Say why: a timer elsewhere, or not assigned here.
+const elsewhereTitle = computed(() => entry.value ? t("TaskPanel.timer_running_elsewhere", { key: entry.value.taskKey || "" }) : (!props.canStart ? t("TaskPanel.timer_assignee_only") : ""));
 
 async function start() {
     const user = getUser(userId.value) || {};

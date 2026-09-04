@@ -232,7 +232,10 @@ function searchTasks() {
             $match: {
                 ProjectID: { objId: { $in: [props.task.ProjectID] } },
                 deletedStatusKey: { $in: [0, undefined] },
-                TaskName: { $regex: escaped, $options: 'i' },
+                $or: [
+                    { TaskName: { $regex: escaped, $options: 'i' } },
+                    { TaskKey: { $regex: escaped, $options: 'i' } },
+                ],
             }
         },
         { $project: { TaskName: 1, TaskKey: 1, status: 1 } },

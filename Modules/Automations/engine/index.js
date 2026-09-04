@@ -7,10 +7,8 @@ const { createAgendaDriver } = require('./queue/agendaDriver');
 
 // Wires the five stages together: ingest (the bus) → match → enqueue → execute → record.
 //
-// Off by default. AUTOMATION_ENGINE=true opts in, because until the builder UI
-// exists the only rules that can reach this are ones written directly into the
-// database, and a half-configured rule executing against real tasks on somebody's
-// self-hosted instance is not a surprise they should get from upgrading.
+// On unless AUTOMATION_ENGINE=false: the builder UI now saves rules, and a rule
+// that silently never runs is a worse surprise than one that does.
 
 const LOG_PREFIX = '[automation-engine]';
 const JOB_NAME = 'automation.run';
@@ -18,7 +16,7 @@ const JOB_NAME = 'automation.run';
 let driver = null;
 let started = false;
 
-const enabled = () => String(process.env.AUTOMATION_ENGINE || '').toLowerCase() === 'true';
+const enabled = () => String(process.env.AUTOMATION_ENGINE || 'true').toLowerCase() !== 'false';
 
 const selectDriver = () => {
     const choice = String(process.env.AUTOMATION_QUEUE_DRIVER || 'agenda').toLowerCase();

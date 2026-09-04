@@ -167,11 +167,13 @@ exports.sendInvitationEmailFun = (bodyData) => {
                                 data
                             });
                         } else {
-                            reject({
+                            // The invite row is already saved and its link works, so hand it
+                            // back: the person can copy the link when mail is not configured.
+                            resolve({
                                 status: false,
-                                statusText: result.error
+                                statusText: result.error,
+                                data
                             });
-                            exports.decreaseUserCount(companyId);
                         }
                     });
                 } catch (error) {
@@ -389,11 +391,13 @@ exports.sendInvitationEmail = (req,res) => {
                         data
                     });
                 } else {
+                    // The invite row is saved and its link works, so hand it back:
+                    // the person can copy the link when mail is not configured.
                     res.send({
                         status: false,
-                        statusText: result.error
+                        statusText: result.error,
+                        data
                     });
-                    exports.decreaseUserCount(companyId);
                 }
             });
         };

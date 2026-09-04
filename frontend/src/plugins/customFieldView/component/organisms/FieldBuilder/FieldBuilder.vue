@@ -259,8 +259,13 @@ const shownIn = (field) => {
     return surfaces.map((surface) => t(`FieldsV2.surface_${surface}`)).join(" · ");
 };
 
+// The global type catalogue is empty on a fresh install, and the legacy drawer
+// renders nothing without a cfType, so fall back to the picker's own entry.
 function detailFor(fieldType) {
-    return typeCatalogue.value.find((entry) => entry.cfType === fieldType) || {};
+    const known = typeCatalogue.value.find((entry) => entry.cfType === fieldType);
+    if (known) return known;
+    const option = typeOptions.find((entry) => entry.key === fieldType);
+    return option ? { cfType: fieldType, cfTitle: option.label, cfDescrption: option.hint, cfIcon: '', cfIconGrey: '' } : {};
 }
 
 function startNew(fieldType) {

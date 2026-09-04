@@ -1841,6 +1841,7 @@ export default {
         resume: "Resume",
         stop_and_log: "Stop and log time",
         timer_log_description: "Timer",
+        timer_assignee_only: "Only an assignee can track time on this task — assign yourself first.",
         timer_running_elsewhere: "A timer is already running on {key}. Starting here stops it.",
         timer_stopped_previous: "Stopped the timer on {key}",
         timer_logged: "Time logged",
@@ -4722,7 +4723,7 @@ export default {
     },
     Checklist: {
         checklist: "Checklist",
-        add_checklist: "Add an Checklist",
+        add_checklist: "Add a checklist",
         suggest_checklists: "Suggest Checklists",
         Checklists: "Checklists",
         to_unlock_checklist: "To Unlock Checklist",

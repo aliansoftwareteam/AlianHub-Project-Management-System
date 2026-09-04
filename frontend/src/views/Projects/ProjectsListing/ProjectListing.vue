@@ -154,8 +154,9 @@ watch(projects, () => {
         if(props.projectData && !Object.keys(props.projectData).length) {
             if(route.params && route.params.id) {
                 const projectIndex = projects.value.findIndex((item) => item._id === route.params.id);
-                if(projectIndex !== -1) {
-                    mutateCurrentProjectDetails(projects.value[projectIndex]);
+                const routed = projectIndex !== -1 ? projects.value[projectIndex] : storeProject(route.params.id);
+                if(routed) {
+                    mutateCurrentProjectDetails(routed);
                 } else {
                     reportUnreachableRouteProject();
                     mutateCurrentProjectDetails(projects.value[0], true);
@@ -218,6 +219,16 @@ watch(() => route.params,(newVal, oldVal) => {
  * the dashboard's milestone card, a notification or a bookmark all landed this way and
  * looked like they had opened what was clicked. Say so instead.
  */
+// The sidebar list only carries projects whose sprints have loaded, so a
+// project created seconds ago is absent from it while the store already has it.
+function storeProject(id) {
+    if (!id) return null;
+    const known = getters["projectData/projects"];
+    const list = Array.isArray(known) ? known : (known?.data || []);
+    const item = list.find((x) => String(x._id || x.id) === String(id));
+    return item ? { ...item, _id: item._id || item.id } : null;
+}
+
 function reportUnreachableRouteProject() {
     $toast.info(t('Toast.The_project_not_found'), { position: 'top-right' });
 }
@@ -322,9 +333,10 @@ onMounted(async() => {
             const routeIndex = route.params?.id
                 ? projects.value.findIndex((item) => item._id === route.params.id)
                 : -1;
-            const target = routeIndex !== -1 ? projects.value[routeIndex] : projects.value[0];
-            if(route.params?.id && routeIndex === -1) reportUnreachableRouteProject();
-            mutateCurrentProjectDetails(target, routeIndex === -1);
+            const routed = routeIndex !== -1 ? projects.value[routeIndex] : storeProject(route.params?.id);
+            const target = routed || projects.value[0];
+            if(route.params?.id && !routed) reportUnreachableRouteProject();
+            mutateCurrentProjectDetails(target, !routed);
             if(target?.isGlobalPermission === false) {
                 getSprintFolderData(target?._id);
             }

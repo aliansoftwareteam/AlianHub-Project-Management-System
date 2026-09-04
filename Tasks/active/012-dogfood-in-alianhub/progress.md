@@ -189,3 +189,9 @@ handler rejected a promise nobody awaited and index.js exited on unhandledReject
 all, made the handler answer, stopped unhandled rejections exiting the process, and added a test that
 every registered v2 prefix is guarded, public by design, or self-guarded, so the next module cannot
 ship open. Along the way: AR-24 decided (opt-in status codes for API tokens and Prefer).
+
+## 2026-09-04 — AR-53 functional sweep
+- 5 waves driven through the browser; every pass verified in Mongo or the network log.
+- 9 defects fixed in-branch (project-create redirect, chat channel folder prop, automation engine default + rule name, custom-field drawer fallback, invite without designations + authenticated invite call that returns the saved row when mail fails, relation search by key, timer reason).
+- Automation engine now defaults to on; `.env.example` updated.
+- Full table in the AR-53 comment; scratch notes in `ui-findings.md`.
