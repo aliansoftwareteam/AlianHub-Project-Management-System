@@ -82,6 +82,8 @@ sessionsSchema.index({ createdAt: 1 }, { expireAfterSeconds: Number(process.env.
 const referCodeSchema = new Schema(schema.refferalcodes, {strict: true, timestamps: true});
 const refferalmapping = new Schema(schema.refferalmapping, {strict: true, timestamps: true});
 const globalSettingsSchema = new Schema(schema.globalSettings, {strict: true, timestamps: true});
+const schemaVersionsSchema = new Schema(schema.schemaVersions, {strict: true, timestamps: false, minimize: false});
+const instanceSettingsSchema = new Schema(schema.instanceSettings, {strict: true, timestamps: false, minimize: false});
 const webhooksSchema = new Schema(schema.webhooks, {strict: true, timestamps: true});
 const webhookLogsSchema = new Schema(schema.webhookLogs, {strict: true, timestamps: true});
 // webhook logs: always read newest-first per webhook; cap retention by query.
@@ -384,5 +386,7 @@ module.exports = {
     userDashboard,
     referCodeSchema,
     refferalmapping,
-    globalSettingsSchema
+    globalSettingsSchema,
+    schemaVersionsSchema,
+    instanceSettingsSchema
 };

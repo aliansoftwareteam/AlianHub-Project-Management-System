@@ -1,8 +1,6 @@
 chargebee-setup
 paddle-setup
 server-storage-setup
-migrations
-/migrate-mongo-config.js
 .DS_Store
 node_modules
 jspm_packages
@@ -138,3 +136,5 @@ frontend/public/firebase-messaging-sw.js
 /storage/firebase-adminsdk.json
 /firebase-adminsdk.json
 package-lock.json
+# Backups written by Settings > Instance > Backups
+/backups

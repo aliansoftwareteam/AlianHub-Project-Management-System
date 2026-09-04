@@ -99,6 +99,8 @@ const SCHEMA_TYPE = {
     FORM_SUBMISSIONS: "form_submissions",
     PROJECT_CONTRACTS: "project_contracts",
     PROJECT_INVOICES: "project_invoices",
+    SCHEMA_VERSIONS: "schema_versions",
+    INSTANCE_SETTINGS: "instance_settings",
 }
 
 module.exports = {

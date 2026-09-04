@@ -1,3 +1,6 @@
+// Firebase push keys are read at build time (frontend/.env): the messaging service
+// worker is generated then and cannot ask the server. Kept here so the SPA and the
+// worker agree; docs/ADMIN-GUIDE.md#configure says so.
 let configs = {};
 
 configs = {

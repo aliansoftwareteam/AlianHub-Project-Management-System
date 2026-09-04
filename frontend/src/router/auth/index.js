@@ -1,6 +1,16 @@
 import registerRouter from "../../plugins/register/router";
 export default [
     {
+        path: '/setup',
+        name: 'Setup',
+        component: () => import(/* webpackChunkName: "setup" */ '@/views/Setup/SetupWizard.vue'),
+        meta: {
+            title: "Set up",
+            requiresAuth: false,
+            hideHeader: true,
+        },
+    },
+    {
         path: '/login',
         name: 'Log-in',
         component: () => import(/* webpackChunkName: "login" */ '@/views/Authentication/Login/Login.vue'),

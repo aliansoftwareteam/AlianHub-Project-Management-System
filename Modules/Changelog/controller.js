@@ -225,3 +225,7 @@ exports.getChangelog = async (req, res) => {
         return res.send({ status: false, statusText: error.message });
     }
 };
+
+exports.parseChangelog = parseChangelog;
+exports.withSelfHost = withSelfHost;
+exports.deriveRepoUrl = deriveRepoUrl;

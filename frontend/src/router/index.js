@@ -26,6 +26,7 @@ import dashboard from "../plugins/dashboard/router";
 import { apiRequestWithoutCompnay } from '@/services'
 import * as env from '@/config/env';
 import Cookies from 'js-cookie'
+import { readSetupStatus, isKnownInstalled } from './setupStatus';
 
 
 const routes = [
@@ -114,6 +115,13 @@ const router = createRouter({
 const jsonData = require('../../../brandSettings.json');
 const {setTitle} = useCustomComposable()
 router.beforeEach(async(to, _, next) => {
+	// A fresh instance has nowhere to go but the setup page, and a set-up one must never show it.
+	if (!isKnownInstalled()) {
+		const setup = await readSetupStatus();
+		if (setup && !setup.installed && to.name !== 'Setup') { next({ name: 'Setup' }); return; }
+	}
+	if (to.name === 'Setup' && isKnownInstalled()) { next({ name: 'Log-in' }); return; }
+
 	let query = to.query;
 	let fullPath = to.fullPath;
 	if (to.path == '/business' && to.query.code) {

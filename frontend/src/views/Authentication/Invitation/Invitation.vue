@@ -87,6 +87,7 @@ import { computed, inject, onMounted, reactive, ref } from "vue";
 defineOptions({ name: "InvitationPage" });
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { enabledProviders } from "@/config/publicConfig";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import AuthShell from "@/components/templates/AuthShell/AuthShell.vue";
@@ -109,11 +110,7 @@ const { logOut } = useAuth();
 const brand = computed(() => getters["brandSettingTab/brandSettings"] || {});
 const termsLink = computed(() => brand.value.termsLink || brand.value.termsOfService || "");
 const privacyLink = computed(() => brand.value.privacyLink || brand.value.privacyPolicy || "");
-const providers = [
-    process.env.VUE_APP_IS_GOOGLE_LOGIN === "true" && "google",
-    process.env.VUE_APP_IS_GITHUB_LOGIN === "true" && "github",
-    process.env.VUE_APP_IS_GITLAB_LOGIN === "true" && "gitlab"
-].filter(Boolean);
+const providers = computed(() => enabledProviders());
 
 const PASSWORD_RE = /^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).*$/;
 

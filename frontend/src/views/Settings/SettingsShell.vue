@@ -82,6 +82,8 @@ import CreateProjectSidebar from "@/components/organisms/CreateProject/CreatePro
 import { customField } from "@/plugins/customFieldView/helper.js";
 import chargebeeRouter from "@/plugins/chargebee/router";
 import paddleRouter from "@/plugins/paddle/router.js";
+import { apiRequestWithoutCompnay } from "@/services";
+import * as env from "@/config/env";
 
 defineOptions({ name: "SettingsShell" });
 
@@ -119,6 +121,15 @@ const membersVisible = () => checkPermission("settings.settings_role_management"
 
 const hasBilling = computed(() => !!(chargebeeRouter.upgradeTab || paddleRouter.upgradeTab) && isOwner.value && router.hasRoute("Upgrade"));
 
+// The Instance group belongs to the account that set the instance up (users.isProductOwner),
+// which the server decides; a member never sees it.
+const instanceAdmin = ref(false);
+onMounted(() => {
+    apiRequestWithoutCompnay("get", env.INSTANCE_ACCESS)
+        .then((res) => { instanceAdmin.value = res?.data?.data?.allowed === true; })
+        .catch(() => { instanceAdmin.value = false; });
+});
+
 const to = (name) => ({ name, params: { cid: companyId.value } });
 const label = (key) => (te(key) ? t(key) : key);
 
@@ -151,6 +162,18 @@ const rawGroups = computed(() => [
             { key: "timetracking", text: label("settingslider.Time Tracking"), icon: "time", to: to("Time Tracking"), names: ["Time Tracking"], show: true },
             { key: "audit", text: label("settingslider.Audit Log"), icon: "audit", to: to("AuditLog"), names: ["AuditLog"], show: isOwnerOrAdmin.value },
             { key: "billing", text: t("SettingsV2.nav_billing"), icon: "billing", to: to("Upgrade"), names: ["Upgrade"], show: hasBilling.value }
+        ]
+    },
+    {
+        key: "instance",
+        label: "InstanceV2.group",
+        items: [
+            { key: "instance-health", text: t("InstanceV2.nav_health"), icon: "monitor", to: to("InstanceHealth"), names: ["InstanceHealth"], show: instanceAdmin.value },
+            { key: "instance-settings", text: t("InstanceV2.nav_settings"), icon: "settings", to: to("InstanceSettings"), names: ["InstanceSettings"], show: instanceAdmin.value },
+            { key: "instance-backups", text: t("InstanceV2.nav_backups"), icon: "download", to: to("InstanceBackups"), names: ["InstanceBackups"], show: instanceAdmin.value },
+            { key: "instance-upgrade", text: t("InstanceV2.nav_upgrade"), icon: "refresh", to: to("InstanceUpgrade"), names: ["InstanceUpgrade"], show: instanceAdmin.value },
+            { key: "instance-logs", text: t("InstanceV2.nav_logs"), icon: "file", to: to("InstanceLogs"), names: ["InstanceLogs"], show: instanceAdmin.value },
+            { key: "instance-stats", text: t("InstanceV2.nav_stats"), icon: "reports", to: to("InstanceStats"), names: ["InstanceStats"], show: instanceAdmin.value }
         ]
     }
 ]);

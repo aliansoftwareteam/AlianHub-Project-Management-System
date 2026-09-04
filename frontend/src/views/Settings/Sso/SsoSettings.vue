@@ -156,6 +156,7 @@
 </template>
 
 <script setup>
+import { publicConfig } from "@/config/publicConfig";
 import { computed, inject, onMounted, reactive, ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -189,9 +190,9 @@ const form = reactive({
 });
 
 const oauthProviders = computed(() => [
-    { key: "google", name: "Google", icon: "google", env: "GOOGLE_CLIENT_ID", on: !!process.env.VUE_APP_GOOGLE_CLIENT_ID },
-    { key: "github", name: "GitHub", icon: "github", env: "GITHUB_CLIENT_ID", on: !!process.env.VUE_APP_GITHUB_CLIENT_ID },
-    { key: "gitlab", name: "GitLab", icon: "gitlab", env: "GITLAB_CLIENT_ID", on: !!process.env.VUE_APP_GITLAB_CLIENT_ID }
+    { key: "google", name: "Google", icon: "google", env: "GOOGLE_CLIENT_ID", on: publicConfig.auth.google.enabled },
+    { key: "github", name: "GitHub", icon: "github", env: "GITHUB_CLIENT_ID", on: publicConfig.auth.github.enabled },
+    { key: "gitlab", name: "GitLab", icon: "gitlab", env: "GITLAB_CLIENT_ID", on: publicConfig.auth.gitlab.enabled }
 ]);
 
 const enforcementOptions = [

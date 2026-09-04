@@ -68,21 +68,24 @@ COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
 # Copy backend source — order matters for layer caching, but at this
 # stage we're only running, not installing.
-COPY package.json ./
+COPY package.json CHANGELOG.md ./
 COPY brandSettings.json ./
-COPY index.js server.js ./
+COPY index.js server.js cron.js check-version.js ./
 COPY Config/ ./Config/
 COPY Modules/ ./Modules/
 COPY common-storage/ ./common-storage/
+COPY docs/ ./docs/
 COPY event/ ./event/
 COPY middlewares/ ./middlewares/
+COPY migrations/ ./migrations/
 COPY public/ ./public/
 COPY scripts/ ./scripts/
 COPY socket/ ./socket/
 COPY utils/ ./utils/
 
-# Persistent storage directory (mounted as a volume in compose)
-RUN mkdir -p /app/common-storage/uploads \
+# Writable directories: uploaded files (STORAGE_TYPE=server), logs, backups —
+# each mounted as a volume in compose so they survive an image update.
+RUN mkdir -p /app/storage /app/log /app/backups \
  && chown -R node:node /app
 
 # Drop to non-root user
@@ -91,12 +94,12 @@ USER node
 EXPOSE 4000
 
 ENV NODE_ENV=production \
-    PORT=4000
+    PORT=4000 \
+    STORAGE_TYPE=server
 
-# Health check — passes if the server responds (even with a 4xx),
-# fails only on connection errors or 5xx. No extra binary needed.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:'+(process.env.PORT||4000)+'/', r => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))"
+# /health answers 200 only when the database is reachable, 503 otherwise.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:'+(process.env.PORT||4000)+'/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
 
 # tini as PID 1 forwards signals correctly so Node shuts down gracefully
 ENTRYPOINT ["/sbin/tini", "--"]

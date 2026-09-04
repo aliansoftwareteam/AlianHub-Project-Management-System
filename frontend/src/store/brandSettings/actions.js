@@ -1,5 +1,18 @@
-import { apiRequestWithoutCompnay } from "@/services";
+import { apiRequestWithoutCompnay, apiRequestWithoutSecure } from "@/services";
 import * as env from '@/config/env';
+import { applyPublicConfig } from '@/config/publicConfig';
+
+export const setPublicConfig = ({ commit }) => apiRequestWithoutSecure('get', env.INSTANCE_PUBLIC_CONFIG)
+    .then((response) => {
+        const data = response?.data?.data || {};
+        commit('mutatePublicConfig', data);
+        applyPublicConfig(data);
+        return data;
+    })
+    .catch((error) => {
+        console.error('ERROR in set public config', error);
+        return {};
+    });
 
 export const setBrandSettings = ({commit}) => {
     return new Promise((resolve, reject) => {

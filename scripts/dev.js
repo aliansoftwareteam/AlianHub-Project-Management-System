@@ -8,15 +8,8 @@
  *   npm run setup -- --force   → wipe node_modules and reinstall
  *   npm run setup -- --no-open → don't auto-open a browser
  *
- * On a fresh system the server serves the installation wizard. You complete it
- * yourself — connecting MongoDB, choosing storage, and creating your OWN company
- * and admin account. Exactly like production: nothing is created automatically.
- *
- * The wizard's final step rebuilds the frontend and the process exits — the same
- * behaviour production relies on (pm2 then restarts the app). Locally there is no
- * process manager, so just run `npm start` again afterwards and sign in.
- *
- * All existing scripts (npm start, npm run nodemon) are untouched.
+ * On a fresh database the app opens its setup page (#/setup), where you create your
+ * own company and owner account. Nothing is created automatically.
  */
 'use strict';
 
@@ -118,11 +111,35 @@ async function installAll() {
   ]);
 }
 
+// A half-built dist from a Ctrl+C'd build must not pass as ready.
+function isDistValid(dir) {
+  return fs.existsSync(path.join(dir, 'index.html'));
+}
+
+// ─── Stage 2b : Build the app UI (one-time) ───────────────────────────────────
+async function buildFrontend() {
+  if (SKIP_INSTALL || isDistValid(FRONTEND_DIST)) return;
+  step('Building the app UI (one-time, 2-3 min)');
+  return new Promise(resolve => {
+    const child = spawn('npm', ['run', 'build'], { cwd: FRONTEND_DIR, shell: true, stdio: 'pipe' });
+    child.stdout.on('data', d =>
+      d.toString().split('\n').forEach(l => l.trim() && process.stdout.write(`${DIM}${tag('frontend', YELLOW)} ${l}\n${R}`))
+    );
+    child.stderr.on('data', d =>
+      d.toString().split('\n').forEach(l => l.trim() && process.stderr.write(`${DIM}${tag('frontend', YELLOW)} ${l}\n${R}`))
+    );
+    child.on('close', code => {
+      if (code !== 0) warn('Frontend build failed — the app will not display until `cd frontend && npm run build` succeeds.');
+      else tick('App UI built');
+      resolve();
+    });
+  });
+}
+
 // ─── Stage 3 : Bootstrap .env ────────────────────────────────────────────────
 // Ensures a valid .env exists so the server can boot (random secrets, a local
-// MongoDB default, server-side storage). This is environment scaffolding only —
-// the operator still connects MongoDB, chooses storage, and creates their
-// account in the wizard, exactly as in production.
+// MongoDB default, server-side storage). The operator still creates their own
+// account and company on the setup page.
 function bootstrapEnv() {
   step('Environment');
   if (fs.existsSync(ENV_PATH)) {
@@ -139,11 +156,12 @@ function bootstrapEnv() {
   src = src.replace(/^JWT_SECRET=.*$/m,    `JWT_SECRET="${crypto.randomBytes(16).toString('hex')}"`);
   src = src.replace(/^PRECOMPANYKEY=.*$/m, `PRECOMPANYKEY="${crypto.randomBytes(4).toString('hex')}"`);
   src = src.replace(/^STORAGE_TYPE=.*$/m,  'STORAGE_TYPE="server"');
+  src = src.replace(/^MONGODB_URL=.*$/m,   'MONGODB_URL="mongodb://localhost:27017"');
   src = src.replace(/^SERVICE_FILE=.*$/m,  'SERVICE_FILE="./firebase-adminsdk.json"');
 
   fs.writeFileSync(ENV_PATH, src, 'utf8');
-  tick('.env created (secrets auto-generated; STORAGE_TYPE=server for local dev)');
-  info('Wasabi / Firebase / AI / SMTP can be configured in the wizard or later via the admin UI.');
+  tick('.env created (secrets auto-generated; local MongoDB; STORAGE_TYPE=server)');
+  info('Mail, storage and AI are configured later under Settings > Instance.');
 }
 
 // Defensive: an existing .env created by an older bootstrap (or hand-edited)
@@ -190,14 +208,10 @@ function startServer(apiPort) {
   step('Starting the server');
   const child = spawnService('npm', ['start'], ROOT, 'SERVER', GREEN);
   child.on('close', code => {
-    // The installation wizard's final step rebuilds the frontend and calls
-    // process.exit() — the same flow production uses, where pm2 then restarts
-    // the app. We deliberately do NOT auto-respawn: a recursive restart wrapper
-    // previously exhausted the process table and took staging down (see
-    // server.js). Just tell the operator how to bring the app back up.
+    // No auto-respawn: a recursive restart wrapper once exhausted the process
+    // table and took staging down (see server.js).
     console.log(`\n${YELLOW}${BOLD}Server stopped${R}${DIM} (exit ${code}).${R}`);
-    console.log(`${DIM}  If you just finished the installation wizard, this is expected — the app was rebuilt.${R}`);
-    console.log(`${DIM}  Start it again:  ${R}${CYAN}npm start${R}${DIM}   then open ${R}${CYAN}http://localhost:${apiPort}${R}${DIM} and sign in.${R}\n`);
+    console.log(`${DIM}  Start it again:  ${R}${CYAN}npm start${R}${DIM}   then open ${R}${CYAN}http://localhost:${apiPort}${R}${DIM}.${R}\n`);
   });
   return child;
 }
@@ -245,15 +259,11 @@ function fetchJson(url, { timeoutMs = 10_000 } = {}) {
   });
 }
 
-// Best-effort: has installation finished already? Used only to tailor the
-// console banner (wizard vs. ready-to-sign-in). Any failure → treat as not done.
+// Best-effort, only tailors the banner (setup vs. ready-to-sign-in).
 async function isInstallationComplete(apiPort) {
   try {
-    const { body } = await fetchJson(`http://localhost:${apiPort}/api/v1/installstep/get`);
-    if (!body?.data || !Array.isArray(body.data)) return false;
-    const step7 = body.data.find(s => s.step === 7);
-    const step8 = body.data.find(s => s.step === 8);
-    return step7?.status === 'done' && step8?.status === 'done';
+    const { body } = await fetchJson(`http://localhost:${apiPort}/api/v2/setup/status`);
+    return body?.data?.installed === true;
   } catch {
     return false;
   }
@@ -294,6 +304,7 @@ async function main() {
   checkNode();
 
   await installAll();
+  await buildFrontend();
   bootstrapEnv();
 
   const apiPort = readApiPort();
@@ -319,13 +330,10 @@ async function main() {
     console.log(`  URL:   ${CYAN}${BOLD}${url}${R}`);
     console.log(`  ${DIM}Log in with the account you created during installation.${R}`);
   } else {
-    console.log(`  ${GREEN}${BOLD}✓  Server running — finish installation in your browser${R}`);
+    console.log(`  ${GREEN}${BOLD}✓  Server running — finish setup in your browser${R}`);
     console.log(`${GREEN}${bar}${R}\n`);
-    console.log(`  URL:   ${CYAN}${BOLD}${url}${R}`);
-    console.log(`  ${DIM}The wizard guides you to connect MongoDB, choose storage, and create${R}`);
-    console.log(`  ${DIM}your own company and admin account.${R}`);
-    console.log(`  ${DIM}When it finishes, the app rebuilds and the server stops (same as${R}`);
-    console.log(`  ${DIM}production). Run ${R}${CYAN}npm start${R}${DIM} again, then sign in.${R}`);
+    console.log(`  URL:   ${CYAN}${BOLD}${url}/#/setup${R}`);
+    console.log(`  ${DIM}Create your company and owner account there; the app opens right after.${R}`);
   }
   console.log(`  ${DIM}Stop:  Ctrl+C${R}`);
   console.log(`${GREEN}${bar}${R}\n`);

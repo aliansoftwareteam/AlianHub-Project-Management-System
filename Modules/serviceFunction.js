@@ -144,67 +144,6 @@ function parseDigestAuth(header) {
 
 
 /**
- * Update Under Maintenance
- * @param {Boolean} key 
- * @param {Function} cb 
- */
-exports.updateUnderMaintenance = (key, cb) => {
-    try {
-        const filePath = __dirname + "/../.env";
-        fs.readFile(filePath, 'utf8', (err, data) => {
-            if (err) {
-                logger.error(`Env File Read Errro: ${err}`);
-                cb({
-                    status: false,
-                    error: err
-                });
-                return;
-            }
-            if (data.indexOf("UNDER_MAINTENANCE") === -1) {
-                fs.appendFile(filePath, '\n'+`UNDER_MAINTENANCE=${key}`, function (err) {
-                    if (err) {
-                        logger.error(`Update ENV File Issue: ${filePath} : Error: ${err}`);
-                        cb({
-                            status: false,
-                            error: err
-                        });
-                        return;
-                    }
-                    cb({
-                        status: true,
-                        data: data + '\n'+`UNDER_MAINTENANCE=${key}`
-                    });        
-                });
-                return;
-            }
-            const finalData = data.replace(/UNDER_MAINTENANCE(.*)/, `UNDER_MAINTENANCE=${key}`);
-            fs.writeFile(filePath, finalData, (err, wData) => {
-                if (err) {
-                    logger.error(`Env File Create Issue: ${filePath} : Error: ${err}`);
-                    cb({
-                        status: false,
-                        error: err
-                    });
-                    return;
-                }
-                logger.info(`Write File: ${JSON.stringify(data)} `);
-                cb({
-                    status: true,
-                    data: finalData
-                })
-            })
-        });
-    } catch (error) {
-        logger.error(`Update Under Maintenance Issue: ${error?.message || error}`);
-        cb({
-            status: false,
-            error: error?.message || error
-        });
-    }
-};
-
-
-/**
  * Sanitize Input
  * @param {String} input 
  * @returns 
@@ -234,11 +173,11 @@ exports.mongoErrorMessage = (errorObj) => {
         }
 
         switch (errorObj?.errorResponse?.code) {
-            case 11000: {
+            case 11000:
+                // Handle duplicate key error
                 const key = Object.keys(errorObj?.errorResponse?.keyValue || {}).join(", ");
                 const value = Object.values(errorObj?.errorResponse?.keyValue || {}).join(", ");
                 return `The value '${value}' already exists for the field(s) '${key}'.`;
-            }
             case 13:
                 // Unauthorized error
                 return "Unauthorized: You do not have the necessary permissions to perform this action.";

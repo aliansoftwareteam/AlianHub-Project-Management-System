@@ -26,12 +26,14 @@ services:
     ports:
       - "${APP_PORT:-4000}:4000"
     environment:
-      # Required — connect to the bundled mongo service below
-      MONGODB_URL: mongodb://mongo:27017/alianhub
+      # Required — the app derives one database per company from this base URL,
+      # so give the server address only, never a database name.
+      MONGODB_URL: mongodb://mongo:27017
       # Required — generate a random string for each new install
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required — set it in .env}
       # Optional — public URL clients use to reach the API
       APIURL: ${APIURL:-http://localhost:4000/}
+      WEBURL: ${WEBURL:-http://localhost:4000}
       # Optional — "server" (local filesystem) or "wasabi" (S3-compatible)
       STORAGE_TYPE: ${STORAGE_TYPE:-server}
       # Optional — override port (uncommon)
@@ -41,8 +43,12 @@ services:
       - path: .env
         required: false
     volumes:
-      # Persists file uploads when STORAGE_TYPE=server
-      - alianhub_storage:/app/common-storage
+      # Uploaded files when STORAGE_TYPE=server
+      - alianhub_storage:/app/storage
+      # Rotating application logs, readable from Settings > Instance > Logs
+      - alianhub_logs:/app/log
+      # Backups taken from Settings > Instance > Backups
+      - alianhub_backups:/app/backups
     depends_on:
       mongo:
         condition: service_healthy
@@ -111,6 +117,10 @@ volumes:
     name: alianhub_mongo_data
   alianhub_storage:
     name: alianhub_storage
+  alianhub_logs:
+    name: alianhub_logs
+  alianhub_backups:
+    name: alianhub_backups
 
 networks:
   alianhub:
