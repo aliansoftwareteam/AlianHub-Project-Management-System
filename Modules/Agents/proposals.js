@@ -125,6 +125,13 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     const undoUntil = new Date(Date.now() + UNDO_WINDOW_MS);
     const updated = await setStatus(companyId, id, { status, changes, decidedBy: decider.userId, decidedAt: new Date(), undoUntil, auditIds });
     await audit.recordProposalDecision(companyId, decider, { proposalId: id, decision: status, agentName: p.agentName, runId: p.runId, changes: applied, ip });
+    // The run was waiting on this decision; without closing it here it sat in
+    // "waiting_approval" — and in every running count — after the work was done.
+    if (p.runId) {
+        const runs = require('./runs');
+        const okCount = applied.filter((a) => a.ok).length;
+        await runs.finish(companyId, p.runId, { status: runs.STATUS.DONE, outcome: `${status} by a person — ${okCount} of ${applied.length} change(s) applied` }).catch(() => {});
+    }
     return { proposal: updated, applied, undoToken: String(id), undoUntil };
 };
 
@@ -133,6 +140,7 @@ const decline = async (companyId, id, { decider, ip, reason }) => {
     if (!p) return { error: 'Proposal not found.', status: 404 };
     if (p.status !== STATUS.PENDING) return { error: `Proposal is already ${p.status}.`, status: 409 };
     const updated = await setStatus(companyId, id, { status: STATUS.DECLINED, decidedBy: decider.userId, decidedAt: new Date() });
+    if (p.runId) { const runs = require('./runs'); await runs.finish(companyId, p.runId, { status: runs.STATUS.DONE, outcome: 'declined by a person' }).catch(() => {}); }
     await audit.recordProposalDecision(companyId, decider, { proposalId: id, decision: `declined${reason ? `: ${String(reason).slice(0, 200)}` : ''}`, agentName: p.agentName, runId: p.runId, ip });
     return { proposal: updated };
 };

@@ -94,11 +94,14 @@ const evaluate = (key, params = {}, { allowedActions } = {}) => {
 };
 
 /* Autonomy levels (9c). Anything at or under the level runs; the rest is proposed. */
+/* Matches the ladder the product shows (L0 Assist · L1 Suggest · L2 Act in bounds ·
+ * L3 Scheduled). L1 used to act on low-risk actions, so an agent labelled
+ * "Suggest" filed subtasks on the board without anyone approving them. */
 const AUTONOMY = Object.freeze({
-    0: { label: 'Suggest everything', actsOn: [] },
-    1: { label: 'Act on low-risk, propose the rest', actsOn: [RISK.LOW] },
-    2: { label: 'Act on low and medium risk, propose the rest', actsOn: [RISK.LOW, RISK.MEDIUM] },
-    3: { label: 'Also run on a schedule', actsOn: [RISK.LOW, RISK.MEDIUM] },
+    0: { label: 'Assist — answers only, proposes nothing on its own', actsOn: [] },
+    1: { label: 'Suggest — proposes everything, a person approves', actsOn: [] },
+    2: { label: 'Act in bounds — low and medium risk directly, proposes the rest', actsOn: [RISK.LOW, RISK.MEDIUM] },
+    3: { label: 'Scheduled — as L2, and may run unattended', actsOn: [RISK.LOW, RISK.MEDIUM] },
 });
 
 const mayActDirectly = (autonomy, key) => {

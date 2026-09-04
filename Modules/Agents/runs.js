@@ -182,4 +182,15 @@ const executeSkill = async (companyId, run, agent, task, { proposals, actions, a
     }
 };
 
-module.exports = { STATUS, OPEN, canStart, create, patch, appendAction, finish, stop, recordSpend, list, summary, pauseAll, getAgent, executeSkill, monthKey };
+
+/* Which skill a run executes. Agents store skills as objects ({ key, name, … });
+ * an explicit slug wins, then the agent's first skill key, then the QA review. */
+const skillSlugOf = (agent, explicit) => {
+    if (explicit && typeof explicit === 'string') return explicit;
+    const first = agent && Array.isArray(agent.skills) ? agent.skills[0] : null;
+    if (!first) return 'qa-review';
+    if (typeof first === 'string') return first;
+    return first.key || first.slug || first.name || 'qa-review';
+};
+
+module.exports = { STATUS, OPEN, canStart, skillSlugOf, create, patch, appendAction, finish, stop, recordSpend, list, summary, pauseAll, getAgent, executeSkill, monthKey };

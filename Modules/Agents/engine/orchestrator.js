@@ -90,7 +90,12 @@ async function run({ skillSlug = 'qa-review', task, budget = {} }) {
     // ── 1. gather ────────────────────────────────────────────────────────────
     const url = extractUrl(task?.TaskName) || extractUrl(task?.description) || extractUrl(task?.rawDescription);
     if (!url) {
-        return { status: 'skipped', reason: 'no reviewable URL found in the task title or description',
+        const text = [task?.TaskName, task?.description, task?.rawDescription].join(' ');
+        const privateUrl = /https?:\/\/(localhost|127\.|10\.|192\.168\.|0\.0\.0\.0|\[?::1)/i.test(text);
+        return { status: 'skipped',
+                 reason: privateUrl
+                     ? 'the URL points at a private or local host, which agents do not fetch — use a public address'
+                     : 'no reviewable URL found in the task title or description',
                  skill: skill.slug, findings: [], usage, durationMs: Date.now() - started };
     }
 

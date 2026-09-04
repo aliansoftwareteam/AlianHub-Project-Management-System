@@ -35,9 +35,13 @@ const workEntry = (actor, hours = 0) => {
     return { actorId: a.actorId, actorType: a.actorType, agentId: a.agentId, viaAccount: a.viaAccount || 'workspace', hours };
 };
 
-const context = (actor, action) => ({
-    ruleId: null, ruleName: attribution(actor).label, runId: actor.runId || null, action: `agent.${action}`, depth: 0,
-});
+const context = (actor, action) => {
+    const a = attribution(actor);
+    return {
+        ruleId: null, ruleName: a.label, runId: actor.runId || null, action: `agent.${action}`, depth: 0,
+        userId: String(actor.userId || a.actorId || ''), actorType: a.actorType, agentId: a.agentId || null, viaAccount: a.viaAccount || null,
+    };
+};
 
 const findRunningTimer = (companyId, taskId, userId) => MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.TIMESHEET,

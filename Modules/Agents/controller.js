@@ -29,11 +29,26 @@ const humanActor = async (req) => {
 
 const privileged = async (companyId, uid) => isPrivileged(await getRoleType(companyId, uid));
 
+/* The wizard sends skills as objects; map(String) used to store "[object Object]"
+ * and every run of that agent then asked for a skill by that name. */
+const normaliseSkill = (skill) => {
+    if (!skill) return null;
+    if (typeof skill === 'string') return { key: skill.slice(0, 80), name: skill.slice(0, 80), enabled: true };
+    const key = String(skill.key || skill.slug || skill.name || '').slice(0, 80);
+    if (!key) return null;
+    return {
+        key,
+        name: String(skill.name || key).slice(0, 80),
+        enabled: skill.enabled !== false,
+        ...(Array.isArray(skill.actions) ? { actions: skill.actions.map(String).slice(0, 40) } : {}),
+    };
+};
+
 const agentPatchFields = (body) => {
     const set = {};
     if (body.name !== undefined) set.name = String(body.name).trim().slice(0, 80);
     if (body.description !== undefined) set.description = String(body.description).slice(0, 1000);
-    if (body.skills !== undefined && Array.isArray(body.skills)) set.skills = body.skills.map(String).slice(0, 20);
+    if (body.skills !== undefined && Array.isArray(body.skills)) set.skills = body.skills.slice(0, 20).map(normaliseSkill).filter(Boolean);
     if (body.allowedActions !== undefined && Array.isArray(body.allowedActions)) set.allowedActions = body.allowedActions.filter((a) => registry.has(a));
     if (body.projectIds !== undefined && Array.isArray(body.projectIds)) set.projectIds = body.projectIds.filter((id) => OBJECT_ID.test(String(id))).map(String);
     if (body.autonomy !== undefined) set.autonomy = Math.min(3, Math.max(0, Number(body.autonomy) || 0));
@@ -197,7 +212,12 @@ exports.startRun = async (req, res) => {
             if (!task) return fail(res, 'Task not found.', 404);
             if (agent.projectIds && agent.projectIds.length && !agent.projectIds.includes(String(task.ProjectID))) return fail(res, 'This agent is not scoped to that project.', 403);
         }
-        const run = await runs.create(companyId, { agent, taskId, projectId: task && task.ProjectID, skill: skill || (agent.skills && agent.skills[0]) || 'qa-review', trigger: TRIGGERS.includes(trigger) ? trigger : 'manual', startedBy: actor.userId, viaAccount: isAgent(actor) ? actor.viaAccount : agent.account, note });
+        if (!task) {
+            // Every executable skill works on a task. Without one the run used to be created,
+            // never executed and never finished — "running" forever in every counter.
+            return fail(res, 'This agent needs a task to run on. Start the run from a task, or mention the agent in a comment.');
+        }
+        const run = await runs.create(companyId, { agent, taskId, projectId: task && task.ProjectID, skill: runs.skillSlugOf(agent, skill), trigger: TRIGGERS.includes(trigger) ? trigger : 'manual', startedBy: actor.userId, viaAccount: isAgent(actor) ? actor.viaAccount : agent.account, note });
         if (task && registry.has('subtask.create')) {
             const runActor = { kind: 'agent', userId: actor.userId, agentId: String(agent._id), agentName: agent.name, runId: String(run._id), viaAccount: run.viaAccount, tokenId: null };
             setImmediate(() => runs.executeSkill(companyId, run, agent, task, { proposals, actions, actor: runActor }));
@@ -367,3 +387,5 @@ exports.releaseCandidate = async (req, res) => {
         return res.send({ status: true, data });
     } catch (e) { logger.error(`releaseCandidate: ${e.message}`); return fail(res, e.message); }
 };
+
+exports.normaliseSkill = normaliseSkill;
