@@ -127,6 +127,8 @@ app.use((req, res, next) => {
     res.set('Cache-Control', 'no-store');
     next();
 });
+// Real 4xx for API/MCP tokens and anyone sending Prefer: status-codes; the app keeps its 200 + {status:false}.
+app.use(require('./Config/strictStatus').strictStatus());
 
 function initializeControllers() {
     const envFile = fs.readFileSync(__dirname + "/.env");
