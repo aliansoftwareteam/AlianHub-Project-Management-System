@@ -49,6 +49,7 @@ const { checkProjectPlan, removeProjectCount } = require('../createProject/contr
 const { estimateAndPersist: estimateTaskTimeWithAI } = require('../EstimatedTime/aiTaskEstimator');
 const planRules = require('./planRules');
 const sseEmitter = require('./sseEmitter');
+const executeAgents = require('./executeAgents');
 
 // Concurrency cap for fire-and-forget AI estimates after bulk task insert —
 // keeps us well under the LLM provider's per-key rate limits when a single
@@ -963,7 +964,7 @@ function withTimeout(promise, ms, label) {
     ]);
 }
 
-async function executePlan({ plan, companyId, uid, userData, jobId }) {
+async function executePlan({ plan, companyId, uid, userData, jobId, approvedBrief, assumptions, guide }) {
     const tracker = {
         project: null,
         sprints: [],
@@ -972,8 +973,22 @@ async function executePlan({ plan, companyId, uid, userData, jobId }) {
         countIncremented: false,
     };
     const emit = (payload) => sseEmitter.emit(jobId, payload);
+    const withGuide = Boolean((approvedBrief && String(approvedBrief).trim()) || guide);
+    let agents = [];
+    const taskPairs = [];
 
     try {
+        // The split is recomputed here rather than read off the client's plan:
+        // zod strips it on re-validation, and the labels must be current.
+        try {
+            const leads = Array.isArray(plan.project.LeadUserId) ? plan.project.LeadUserId : [];
+            const prepared = await executeAgents.prepare({ plan, companyId, assumptions, fallbackAssignee: leads[0] || uid });
+            plan = prepared.plan;
+            agents = prepared.agents;
+        } catch (e) {
+            logger.warn(`[AIPG][${jobId}] split not attached (${e && e.message ? e.message : e}); every task is treated as a person's`);
+        }
+
         // 1. Plan-limit gate — INTENTIONALLY BYPASSED.
         //
         // We still call `checkProjectPlan` because internally it $inc's the
@@ -1029,6 +1044,7 @@ async function executePlan({ plan, companyId, uid, userData, jobId }) {
 
         // 4. Build project doc.
         const { projectDoc, statusUpdates } = buildProjectDoc({ plan, context, companyId, uid, projectCode });
+        Object.assign(projectDoc, executeAgents.projectFields({ approvedBrief, assumptions, guide }));
         tracker.projectName = projectDoc.ProjectName;
         logger.info(`[AIPG][${jobId}] step 4: buildProjectDoc done`);
 
@@ -1090,6 +1106,7 @@ async function executePlan({ plan, companyId, uid, userData, jobId }) {
                 userData,
             });
             for (const t of created) tracker.tasks.push(t._id.toString());
+            taskPairs.push(...executeAgents.pairDocs(sprint.tasks || [], created));
             completed += created.length;
             emit({ event: 'progress', step: 'tasks', status: 'progress', completed, total: totalTasks });
         }
@@ -1112,14 +1129,22 @@ async function executePlan({ plan, companyId, uid, userData, jobId }) {
         // 11. Cache busts (mirror createProject).
         try { removeCache('UserProjectData:', true); } catch (_e) { /* ignore */ }
 
+        // 12. Guide agent and the runs for agent-labelled tasks (task 015).
+        const agentWork = await executeAgents.start({
+            companyId, uid, projectId: tracker.project, projectName: projectDoc.ProjectName, pairs: taskPairs, agents, withGuide,
+        });
+
+        const totals = { sprints: tracker.sprints.length, tasks: tracker.tasks.length };
         emit({
             event: 'complete',
             projectId: tracker.project,
             projectName: projectDoc.ProjectName,
-            totals: { sprints: tracker.sprints.length, tasks: tracker.tasks.length },
+            totals,
+            splitSummary: plan.splitSummary || null,
+            ...agentWork,
         });
 
-        return { ok: true, projectId: tracker.project, totals: { sprints: tracker.sprints.length, tasks: tracker.tasks.length } };
+        return { ok: true, projectId: tracker.project, totals, ...agentWork };
     } catch (error) {
         logger.error(`[AIPG][${jobId}] orchestrator catch: ${error && error.message ? error.message : error}${error && error.stack ? '\n' + error.stack : ''}`);
         await rollback({ companyId, tracker });

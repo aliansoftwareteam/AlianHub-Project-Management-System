@@ -611,13 +611,17 @@ exports.execute = async (req, res) => {
 
         const jobId = token();
 
+        // Task 015: the approved brief, its assumptions and the generated guide
+        // travel with the plan and land on the project; the orchestrator owns them.
+        const { approvedBrief, assumptions, guide } = req.body || {};
+
         // Reply right away with the jobId; client opens SSE on /execute/events/:jobId.
         res.send({ status: true, jobId });
 
         // Tiny delay so the client has time to attach the SSE listener before
         // we start emitting (otherwise an instant-success run can race).
         setTimeout(() => {
-            orchestrator.executePlan({ plan, companyId, uid: String(uid), userData, jobId })
+            orchestrator.executePlan({ plan, companyId, uid: String(uid), userData, jobId, approvedBrief, assumptions, guide })
                 .catch((e) => {
                     logger.error(`AIPG execute error: ${e && e.message ? e.message : e}`);
                 });

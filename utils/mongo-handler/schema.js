@@ -796,6 +796,8 @@ const schema = {
         account: { type: String, default: 'workspace', required: false },
         model: { type: String, required: false },
         schedule: { type: Object, required: false },
+        // How the agent is meant to be started ('mention' for a project Guide). Informational; runs.canStart enforces the rest.
+        trigger: { type: String, required: false },
         rateLimitPerDay: { type: Number, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
@@ -2266,6 +2268,18 @@ const schema = {
         // Slugs from the company's `project_skills` settings list, so renames
         // are display-only and the value joins to a bid's skills downstream.
         skills: {
+            type: Array,
+            required: false,
+            default: []
+        },
+        // Guide instructions generated from the approved brief (task 015):
+        // { stages: [{ name, goal }], essentials, escalations, style, markdown }.
+        aiGuide: {
+            type: Object,
+            required: false
+        },
+        // Assumptions the AI plan was built on: [{ point, text }].
+        aiAssumptions: {
             type: Array,
             required: false,
             default: []
