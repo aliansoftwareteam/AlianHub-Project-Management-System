@@ -8,14 +8,14 @@ jest.mock('../Modules/Automations/engine/tools', () => ({ getTask: jest.fn() }))
 jest.mock('../Modules/Agents/engine/orchestrator', () => ({ run: jest.fn() }));
 jest.mock('../Modules/Agents/engine/findingMemory', () => ({ load: jest.fn(async () => new Map()), decide: jest.fn(), record: jest.fn(), touch: jest.fn() }));
 jest.mock('../Modules/AIProjectGenerator/usage', () => ({ summarize: jest.fn(() => ({ costUsd: 0, totalTokens: 0, model: 'm' })) }));
-jest.mock('../Modules/Notification/prepare-notification-data/controllerV2', () => ({ handleNotificationtFun: jest.fn(async () => ({ status: true })) }));
+jest.mock('../Modules/notification/prepare-notification-data/controllerV2', () => ({ handleNotificationtFun: jest.fn(async () => ({ status: true })) }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const tools = require('../Modules/Automations/engine/tools');
 const orchestrator = require('../Modules/Agents/engine/orchestrator');
 const memory = require('../Modules/Agents/engine/findingMemory');
 const { summarize } = require('../Modules/AIProjectGenerator/usage');
-const { handleNotificationtFun } = require('../Modules/Notification/prepare-notification-data/controllerV2');
+const { handleNotificationtFun } = require('../Modules/notification/prepare-notification-data/controllerV2');
 const runs = require('../Modules/Agents/runs');
 const ctrl = require('../Modules/Agents/controller');
 
