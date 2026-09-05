@@ -24,5 +24,21 @@ Notes for review
 - `Modules/Agents/agentRecord.js` duplicates `controller.createAgent` defaults; one-line dedupe once 016 lands (016 sets the default to L1 there).
 - Agents schema gained `trigger`; projects gained `aiGuide`, `aiAssumptions`.
 
+## 2026-09-05 — API sweep on beta (owner token, real model)
+Two-line brief: "A mobile app for a small gym so members can book classes and see their schedule. Needs to work on both phones."
+
+| Step | Result |
+|---|---|
+| `/clarify` | coverage: what_for_whom met, four missing; 3 questions, each on a missing point, each `allowUnknown` |
+| `/brief` (all three answered unknown) | five headed sections; 4 assumptions (one per unknown + the never-asked `team`), e.g. "No launch date or budget given; planning for a six-week first release on both iOS and Android" |
+| `/plan` with the approved brief | 10 tasks over 5 sprints; `splitSummary` agent 5 · agent-after 2 · person 3; assumptions echoed; `person` reasons include "It asks for a decision…" and "no agent here has a skill for this kind of work" |
+| `/guide` | 5 stages derived from the brief (Project Initialization → … → Testing and Launch Preparation), 4 essentials, 3 escalations; no fixed list |
+| `/execute` | project created with `aiGuide` (5 stages) and 4 `aiAssumptions`; "Gym Class Booking App Guide" at L1, actions task.get/task.comment/subtask.create, scoped to the project, trigger mention; `runsQueued` 5, `runsRefused` 0 |
+| the 5 runs | all ended `waiting_approval` as L1 requires; proposals carry a `rating` per change; spend $0.002–0.004 each, budget ledger $0.12 for the month |
+
+Finding for review: "Implement user login flow" and similar implementation tasks are labelled `agent` because Daily PM's planning skill fits the work kind and the task carries a brief. The reason text says "Daily PM can run project.plan on it", which is accurate, but the badge alone reads as "an agent will implement this". Consider a distinct label (or wording) when the only matching skill plans rather than does.
+
+Note: `/execute` requires the existing `source` field (upwork / fiverr / other); the UI already sends it. The sweep project "(sweep 015)" is left in the workspace for the browser look; trash it afterwards.
+
 Open
-- Browser sweep of the whole flow on the three domain briefs (owner), then member.
+- Browser sweep of the UI flow (owner), then member — needs a signed-in Browser pane.

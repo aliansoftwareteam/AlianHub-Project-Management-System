@@ -18,6 +18,14 @@ Notes for review
 - The 80/100 alert stamp is read-then-write; two runs finishing in the same instant could notify twice.
 - Stored proposals now keep each change's `rating`.
 
+## 2026-09-05 — API sweep on beta (owner token)
+- `GET /agents/registry`: 18 actions, 18 rated.
+- `GET /agents/settings`: undoHours 24, budget 0, provider openai with key, no region; `PUT {undoHours: 999}` → "undoHours must be a whole number between 1 and 168."
+- `GET /agents/budget`: month 2026-09, used $0.12, no alerts.
+- Throwaway L2 agent (brief.parse, task.get/comment/subtask.create) on a task with a 347-char brief: 8 changes, every one decided `act` with the reason "reversible task-scoped write with no money in it", run `done`, `decisions[]` has 8 entries, `windowEndsAt` = finishedAt + 24 h.
+- `POST /runs/:id/revert`: 8 reverted, 0 failed. **Defect found:** `revertedAt` / `revertedBy` / `revert` were not stored because the strict `agentRuns` schema lacked them, so a second revert was accepted. Fixed by declaring the fields (this PR); after the fix a second revert answers 409 "Run was already reverted at …".
+- A mixed batch (safe + risky) was not exercised on beta because the seeded agents' skills only emit task-scoped writes; covered by `agent-run-policy` tests.
+
 Open
-- Browser sweep as owner and member of: L2 run with a mixed batch, revert, budget alert, settings panel.
+- Browser sweep as owner and member of the L2 preview panel, run detail with Revert, and the instance console budget section — needs a signed-in Browser pane.
 - 019 evals should start from the `decisions[]` data this produces.

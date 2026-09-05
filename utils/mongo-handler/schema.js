@@ -822,6 +822,10 @@ const schema = {
         refusals: { type: Number, default: 0, required: false },
         // [{ action, decision: act | propose | refuse, reason, rating, at }] — one per change the policy reviewed
         decisions: { type: Array, default: [], required: false },
+        revertedAt: { type: Date, required: false },
+        revertedBy: { type: String, required: false },
+        // { reverted, failed: [{ action, auditId, reason }] }
+        revert: { type: Object, required: false },
         spendCapUsd: { type: Number, required: false },
         notifyMe: { type: Boolean, default: false, required: false },
         outcome: { type: String, required: false },
