@@ -55,13 +55,14 @@ const resolveActor = async (req) => {
             viaAccount: viaFromMode(req.agentRun.viaAccount) || 'workspace',
         };
     }
-    if (token && isAgentToken(token)) {
+    if (token && (isAgentToken(token) || req.mcp)) {
         const account = await userAgentAccount(userId);
+        const plainTokenViaMcp = !isAgentToken(token);
         return {
             ...base, kind: ACTOR_AGENT,
             agentId: token.agentId ? String(token.agentId) : null,
-            agentName: token.name || (account && account.label) || 'CLI agent',
-            viaAccount: viaFromMode(token.agentAccount && token.agentAccount.mode) || viaFromMode(account && account.mode) || 'personal',
+            agentName: token.name || (account && account.label) || (plainTokenViaMcp ? 'MCP' : 'CLI agent'),
+            viaAccount: viaFromMode(token.agentAccount && token.agentAccount.mode) || viaFromMode(account && account.mode) || (plainTokenViaMcp ? 'local' : 'personal'),
             provider: (token.agentAccount && token.agentAccount.provider) || (account && account.provider) || null,
             personName: (account && account.name) || '',
             projectIds: Array.isArray(token.projectIds) ? token.projectIds.map(String) : [],

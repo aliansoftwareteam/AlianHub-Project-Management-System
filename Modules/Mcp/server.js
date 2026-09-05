@@ -31,6 +31,7 @@ const authenticate = async (req) => {
 
     req.apiToken = token;
     req.uid = String(token.userId || '');
+    req.mcp = true;
     const actor = await resolveActor(req);
     return {
         companyId,
