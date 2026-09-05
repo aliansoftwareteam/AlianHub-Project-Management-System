@@ -818,6 +818,8 @@ const schema = {
         actions: { type: Array, default: [], required: false },
         proposals: { type: Array, default: [], required: false },
         refusals: { type: Number, default: 0, required: false },
+        spendCapUsd: { type: Number, required: false },
+        notifyMe: { type: Boolean, default: false, required: false },
         outcome: { type: String, required: false },
         error: { type: String, required: false },
     },

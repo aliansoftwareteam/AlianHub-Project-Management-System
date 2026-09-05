@@ -73,4 +73,13 @@ describe('F7 pause-all stops work in flight and leaves pending decisions alone',
         expect(r.body).toEqual({ status: true, statusText: 'All agents paused.', data: { stopped: 1 } });
         expect(mockDb.store[SCHEMA_TYPE.AGENT_RUNS].map((x) => x.status).sort()).toEqual(['stopped', 'waiting_approval']);
     });
+
+    it('POST /api/v2/agents/:id/pause stops only the running run and leaves the pending decision alone', async () => {
+        seedRun({ status: 'running' });
+        seedRun({ status: 'waiting_approval', proposals: ['prop1'] });
+        const r = res();
+        await ctrl.setPaused(true)({ headers: { companyid: C }, params: { id: AGENT_ID }, query: {}, body: {}, uid: 'owner1' }, r);
+        expect(r.body).toMatchObject({ status: true, statusText: 'Agent paused.' });
+        expect(mockDb.store[SCHEMA_TYPE.AGENT_RUNS].map((x) => x.status).sort()).toEqual(['stopped', 'waiting_approval']);
+    });
 });

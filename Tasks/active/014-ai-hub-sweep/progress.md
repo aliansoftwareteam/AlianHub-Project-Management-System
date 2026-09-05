@@ -62,7 +62,21 @@ First production build failed: `Parity.fit_no_history` was declared twice in en.
 
 Note for the next sweep: the Browser pane's synthetic clicks do not land on this app under an emulated 1280px viewport; drive clicks with `javascript_tool` and use screenshots for proof.
 
+## 2026-09-05 — API-sweep follow-ups landed (three parallel agents, merged cd5bad69…)
+
+| # | Defect | What changed | Test |
+|---|---|---|---|
+| F2 | PAT over MCP attributed as human | `Mcp/server.js` sets `req.mcp`; `actor.js` treats any MCP call as an agent actor named after the token, `viaAccount` from the token/user account or `personal` (an MCP client is the developer's own Claude Code / Cursor, per accounts.js). | `agent-mcp-actor` (8) |
+| F3 | `docs.read` returned "" | `pageText()` strips `content.html` first (rawText is a 5000-char excerpt), falls back to rawText, then blocks; cap 40000. | `mcp-docs-read` (5) |
+| F5 | Double audit rows per agent action | `actions.js` context carries `auditedByCaller`; the tool layer's `recordAutomationAudit` skips its row for it. Plain rules unchanged. | `agent-audit-single-row` (5) |
+| F6 | autonomy > 3 silently clamped | 400 "autonomy must be between 0 and 3" on create and update for any non-integer or out-of-range value. | `agent-autonomy-validation` (5) |
+| F7 | pause-all stopped waiting runs | `pauseAll` and single-agent pause stop only running/queued; waiting runs and their proposals stay for the human decision. | `agent-pause-all` (5) |
+| 14 | Picker options dropped server-side | `startRun` validates and persists `spendCapUsd` / `notifyMe`; `executeSkill` stops a run at its own cap ("Run spend cap reached ($x of $y)"); `notifyStarter` uses the existing notification pipeline on waiting/terminal writes. Schema fields added to `agentRuns`. | `agent-run-options` (9) |
+
+Gates: `npm test` 1461, `npm run lint` 0 errors.
+
+Not verified in the UI: how an `agent_run` notification renders in the web notification list (sender is the agent id, so its display name is empty). Worth one look during the member sweep.
+
 ## Open — next steps
-1. Backend follow-ups from the API sweep: F2 (PAT via MCP attributed as human), F3 (`docs.read` returns empty text), F5 (double audit rows per agent action), F6 (autonomy > 3 should be 400), F7 (pause-all should not stop `waiting_approval` runs).
-2. `startRun` should read `spendCapUsd` / `notifyMe` from the body (frontend already sends them, defect 14).
-3. Re-run the browser sweep on the merged branch (owner and member), then open the PR against `beta`.
+1. Member-role browser sweep: the workspace has only the owner plus four pending invites, so a real member account is needed (owner to create it).
+2. Check the `agent_run` notification row renders with a name.

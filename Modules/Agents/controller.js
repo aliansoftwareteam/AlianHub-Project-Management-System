@@ -137,7 +137,7 @@ exports.setPaused = (paused) => async (req, res) => {
         if (!updated) return fail(res, 'Agent not found.', 404);
         if (paused) {
             const open = await runs.list(companyId, { status: 'open', agentId: req.params.id });
-            for (const r of open || []) {
+            for (const r of (open || []).filter((x) => [runs.STATUS.RUNNING, runs.STATUS.QUEUED].includes(x.status))) {
                 // eslint-disable-next-line no-await-in-loop
                 await runs.stop(companyId, r._id, req.uid);
             }
