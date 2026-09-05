@@ -8,7 +8,8 @@ const registry = require('./registry');
 
 // Agent runs and spend. A run is the unit the rail footer counts ("2 running"),
 // the project header chip sums (elapsed, spend) and the audit log links to
-// (run #n). Spend caps are enforced before a run starts, not measured after.
+// (run #n). The agent's spend cap is enforced before a run starts; a run's own
+// cap is checked once its spend is recorded.
 
 const STATUS = Object.freeze({ QUEUED: 'queued', RUNNING: 'running', WAITING: 'waiting_approval', DONE: 'done', SKIPPED: 'skipped', FAILED: 'failed', STOPPED: 'stopped' });
 const OPEN = [STATUS.QUEUED, STATUS.RUNNING, STATUS.WAITING];
@@ -55,7 +56,7 @@ const canStart = async (agent, { trigger, viaAccount, companyId } = {}) => {
     return { ok: true, reason: '' };
 };
 
-const create = async (companyId, { agent, taskId, projectId, skill, trigger, startedBy, viaAccount, note }) => {
+const create = async (companyId, { agent, taskId, projectId, skill, trigger, startedBy, viaAccount, note, spendCapUsd, notifyMe }) => {
     const run = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AGENT_RUNS,
         data: {
@@ -65,6 +66,8 @@ const create = async (companyId, { agent, taskId, projectId, skill, trigger, sta
             spend: { tokens: 0, usd: 0, model: null, billedToWorkspace: (viaAccount || agent.account || 'workspace') === 'workspace' },
             actions: note ? [{ action: 'mention', note: String(note).slice(0, 2000), at: new Date() }] : [],
             proposals: [], refusals: 0,
+            ...(Number(spendCapUsd) > 0 ? { spendCapUsd: Number(spendCapUsd) } : {}),
+            notifyMe: Boolean(notifyMe),
         },
     }, 'save');
     emit(companyId, 'run', { run });
@@ -179,15 +182,18 @@ const countsByStatus = async (companyId, { projectId, agentId } = {}) => {
     return counts;
 };
 
+/* A run waiting on a person is left alone: stopping it would strand its pending
+ * proposal, and approving that later would mark the stopped run done anyway. */
 const pauseAll = async (companyId, reason) => {
     await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ deletedStatusKey: { $ne: 1 } }, { $set: { paused: true, pausedReason: reason || 'pause_all', pausedAt: new Date() } }] }, 'updateMany');
-    const open = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ status: { $in: OPEN } }, '_id'] }, 'find');
-    for (const r of open || []) {
+    const active = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ status: { $in: [STATUS.QUEUED, STATUS.RUNNING] } }, '_id status'] }, 'find');
+    let stopped = 0;
+    for (const r of active || []) {
         // eslint-disable-next-line no-await-in-loop
-        await finish(companyId, r._id, { status: STATUS.STOPPED, outcome: 'pause all' });
+        if (await finish(companyId, r._id, { status: STATUS.STOPPED, outcome: 'pause all', onlyIf: r.status })) stopped += 1;
     }
     emit(companyId, 'agent', { pausedAll: true });
-    return { stopped: (open || []).length };
+    return { stopped };
 };
 
 const subtaskChange = (task, f) => ({
@@ -221,6 +227,30 @@ const changesFor = async (companyId, task, result) => {
     return { changes, alreadyTracked };
 };
 
+/* The person who ticked "notify me" gets one in-app notification when the run
+ * needs them or is over. It goes through the task-notification pipeline so their
+ * notification settings still apply; the agent is the sender so the starter is
+ * not filtered out as "self". */
+const notifyStarter = async (companyId, run, task, { status, outcome, error }) => {
+    if (!run.notifyMe || !run.startedBy) return;
+    try {
+        const { handleNotificationtFun } = require('../Notification/prepare-notification-data/controllerV2');
+        const { Notification_key } = require('../../Config/notificationKey');
+        const detail = outcome || error || '';
+        const what = status === STATUS.WAITING ? 'needs your approval' : `is ${status}${detail ? ` — ${detail}` : ''}`;
+        const starter = String(run.startedBy);
+        await handleNotificationtFun({ body: {
+            createdAt: new Date(), updatedAt: new Date(),
+            key: Notification_key.TASK_NOTIFICATION, type: 'tasks', changeType: 'agent_run',
+            changeData: { runId: String(run._id), agentId: String(run.agentId), status, outcome: detail },
+            message: `${run.agentName || 'Agent'} run on ${task.TaskKey || task.TaskName || 'a task'} ${what}`,
+            companyId: String(companyId), projectId: String(run.projectId || task.ProjectID || ''), taskId: String(run.taskId || task._id || ''),
+            userId: String(run.agentId), assigneeUsers: [starter], notSeen: [starter],
+            isSelected: false, folderId: '', sprintId: '', comments_id: '',
+        } });
+    } catch (e) { logger.error(`[agent-run] ${run._id}: notify failed: ${e.message}`); }
+};
+
 /* Execute the run's skill. Findings land as a proposal (review mode) unless
  * autonomy lets the agent act. Resolves with the terminal state, or with
  * { status: 'abandoned' } when stop/pause-all took the run away mid-flight —
@@ -229,14 +259,17 @@ const executeSkill = async (companyId, run, agent, task, { proposals, actions, a
     const orchestrator = require('./engine/orchestrator');
     const memory = require('./engine/findingMemory');
     const abandoned = { status: 'abandoned', outcome: 'stopped before it finished' };
+    const handOff = async (state) => { await notifyStarter(companyId, run, task, state); return state; };
     const settle = async (status, outcome) => {
         const saved = await finish(companyId, run._id, { status, outcome, onlyIf: STATUS.RUNNING });
-        return saved ? { status, outcome, refusals: Number(saved.refusals || 0) } : abandoned;
+        return saved ? handOff({ status, outcome, refusals: Number(saved.refusals || 0) }) : abandoned;
     };
     try {
         const result = await orchestrator.run({ skillSlug: run.skill || 'qa-review', task, companyId, budget: { maxTokens: 4000 } });
         const spent = await recordSpend(companyId, run, result.usage, result.model);
         if (result.status !== 'success') return settle(result.status === 'skipped' ? STATUS.SKIPPED : STATUS.FAILED, result.reason);
+        const runCap = Number(run.spendCapUsd) > 0 ? Number(run.spendCapUsd) : 0;
+        if (runCap && spent.usd >= runCap) return settle(STATUS.STOPPED, `Run spend cap reached ($${spent.usd.toFixed(2)} of $${runCap})`);
 
         const { changes, alreadyTracked } = await changesFor(companyId, task, result);
         if (!changes.length) return settle(STATUS.DONE, `nothing new to file — ${alreadyTracked} finding(s) already tracked`);
@@ -274,11 +307,11 @@ const executeSkill = async (companyId, run, agent, task, { proposals, actions, a
             cost: { tokens: result.usage && result.usage.totalTokens, model: result.model, usd: spent && spent.usd },
         });
         const waiting = await patch(companyId, run._id, { status: STATUS.WAITING }, { $push: { proposals: String(proposal._id) } }, { onlyIf: STATUS.RUNNING });
-        return waiting ? { status: STATUS.WAITING, proposalId: String(proposal._id), refusals: 0 } : abandoned;
+        return waiting ? handOff({ status: STATUS.WAITING, proposalId: String(proposal._id), refusals: 0 }) : abandoned;
     } catch (e) {
         logger.error(`[agent-run] ${run._id}: ${e.message}`);
         const saved = await finish(companyId, run._id, { status: STATUS.FAILED, error: e.message, onlyIf: STATUS.RUNNING });
-        return saved ? { status: STATUS.FAILED, error: e.message } : abandoned;
+        return saved ? handOff({ status: STATUS.FAILED, error: e.message }) : abandoned;
     }
 };
 /* Which skill a run executes. Agents store skills as objects ({ key, name, … });
