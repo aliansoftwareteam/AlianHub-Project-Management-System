@@ -234,7 +234,7 @@ const changesFor = async (companyId, task, result) => {
 const notifyStarter = async (companyId, run, task, { status, outcome, error }) => {
     if (!run.notifyMe || !run.startedBy) return;
     try {
-        const { handleNotificationtFun } = require('../Notification/prepare-notification-data/controllerV2');
+        const { handleNotificationtFun } = require('../notification/prepare-notification-data/controllerV2');
         const { Notification_key } = require('../../Config/notificationKey');
         const detail = outcome || error || '';
         const what = status === STATUS.WAITING ? 'needs your approval' : `is ${status}${detail ? ` — ${detail}` : ''}`;
