@@ -141,6 +141,16 @@
                     Let AI decide
                 </button>
                 <button
+                    v-if="allowUnknown"
+                    type="button"
+                    class="cw__btn cw__btn--ghost"
+                    :class="{ 'cw__btn--unknown-active': isUnknownSelected }"
+                    :disabled="generating"
+                    @click="onUnknown"
+                >
+                    {{ $t('AiProject.unknown_yet') }}
+                </button>
+                <button
                     type="button"
                     class="cw__btn cw__btn--ghost"
                     :disabled="generating"
@@ -154,8 +164,8 @@
                     :disabled="!canAdvance || generating"
                     @click="onNext"
                 >
-                    <span v-if="generating">Generating plan…</span>
-                    <span v-else>{{ isLastQuestion ? 'Generate plan' : 'Next' }}</span>
+                    <span v-if="generating">{{ $t('AiProject.generating_plan') }}</span>
+                    <span v-else>{{ isLastQuestion ? $t('AiProject.continue') : 'Next' }}</span>
                     <kbd v-if="!generating" class="cw__kbd cw__kbd--inline">Enter</kbd>
                 </button>
             </footer>
@@ -183,6 +193,7 @@ const emit = defineEmits(['submit', 'back', 'retry', 'skip-all']);
 const currentIndex = ref(0);
 const answers = reactive({});
 const skipped = reactive({});
+const unknown = reactive({});
 const otherDraft = ref('');
 const customDraft = ref('');
 const textDraft = ref('');
@@ -194,6 +205,7 @@ watch(
         currentIndex.value = 0;
         for (const k of Object.keys(answers)) delete answers[k];
         for (const k of Object.keys(skipped)) delete skipped[k];
+        for (const k of Object.keys(unknown)) delete unknown[k];
         // Pre-fill recommended answers so the user can hit Enter to accept.
         for (const q of qs || []) {
             if (q && q.id && q.recommended != null && q.type !== 'text') {
@@ -239,6 +251,8 @@ const isFreeText = computed(() => currentQuestion.value?.type === 'text');
 const isMultiSelect = computed(() => currentQuestion.value?.type === 'toggle_chips');
 const isPresetChips = computed(() => currentQuestion.value?.type === 'preset_chips');
 const allowOther = computed(() => ['segmented', 'radio_cards', 'select_card'].includes(currentQuestion.value?.type));
+const allowUnknown = computed(() => !!currentQuestion.value && currentQuestion.value.allowUnknown !== false);
+const isUnknownSelected = computed(() => !!currentQuestion.value && !!unknown[currentQuestion.value.id]);
 
 // Render `toggle` as two synthetic Yes/No rows so the same row template
 // works across every type. For everything else we use the question's
@@ -300,6 +314,7 @@ function onOptionClick(value) {
     const q = currentQuestion.value;
     if (!q) return;
     if (skipped[q.id]) delete skipped[q.id];
+    if (unknown[q.id]) delete unknown[q.id];
 
     if (isMultiSelect.value) {
         const cur = Array.isArray(answers[q.id]) ? [...answers[q.id]] : [];
@@ -327,6 +342,7 @@ function selectOther() {
     const q = currentQuestion.value;
     if (!q || !allowOther.value) return;
     if (skipped[q.id]) delete skipped[q.id];
+    if (unknown[q.id]) delete unknown[q.id];
     answers[q.id] = { value: '__other__', customText: otherDraft.value };
 }
 
@@ -334,6 +350,7 @@ function onOtherDraftInput() {
     const q = currentQuestion.value;
     if (!q) return;
     if (skipped[q.id]) delete skipped[q.id];
+    if (unknown[q.id]) delete unknown[q.id];
     answers[q.id] = { value: '__other__', customText: otherDraft.value };
 }
 
@@ -347,6 +364,7 @@ function onTextDraftInput() {
     const q = currentQuestion.value;
     if (!q) return;
     if (skipped[q.id]) delete skipped[q.id];
+    if (unknown[q.id]) delete unknown[q.id];
     answers[q.id] = textDraft.value;
 }
 
@@ -372,7 +390,7 @@ function isAnswered(q) {
 const canAdvance = computed(() => {
     const q = currentQuestion.value;
     if (!q) return false;
-    if (skipped[q.id]) return true; // skipped means user chose to move on
+    if (skipped[q.id] || unknown[q.id]) return true;
     if (!q.required) return true;   // optional → can always advance
     return isAnswered(q);
 });
@@ -398,11 +416,7 @@ function onNext() {
     currentIndex.value += 1;
 }
 
-function onSkip() {
-    const q = currentQuestion.value;
-    if (!q || props.generating) return;
-    skipped[q.id] = true;
-    delete answers[q.id];
+function advanceOrSubmit() {
     if (isLastQuestion.value) {
         emit('submit', buildClarifications());
     } else {
@@ -410,23 +424,45 @@ function onSkip() {
     }
 }
 
+function onSkip() {
+    const q = currentQuestion.value;
+    if (!q || props.generating) return;
+    skipped[q.id] = true;
+    delete unknown[q.id];
+    delete answers[q.id];
+    advanceOrSubmit();
+}
+
+// "I don't know yet" is an answer in its own right: the brief states an
+// assumption for it, whereas a skip is silence.
+function onUnknown() {
+    const q = currentQuestion.value;
+    if (!q || props.generating) return;
+    unknown[q.id] = true;
+    delete skipped[q.id];
+    delete answers[q.id];
+    advanceOrSubmit();
+}
+
 function onLetAIDecideAll() {
     if (props.generating) return;
     emit('submit', buildClarifications({ skipAll: true }));
 }
 
-// Build the clarifications array the backend expects:
-//   [{ id, question, category, type, answer, skipped }]
+// [{ id, point, question, category, type, answer, skipped, unknown }]
 function buildClarifications({ skipAll = false } = {}) {
     return (props.questions || []).map((q) => {
-        const isSkipped = skipAll || !!skipped[q.id] || !isAnswered(q);
+        const isUnknown = !skipAll && !!unknown[q.id];
+        const isSkipped = !isUnknown && (skipAll || !!skipped[q.id] || !isAnswered(q));
         return {
             id: q.id,
+            point: q.point || null,
             question: q.question,
             category: q.category,
             type: q.type,
-            answer: isSkipped ? null : answers[q.id],
+            answer: isSkipped || isUnknown ? null : answers[q.id],
             skipped: isSkipped,
+            unknown: isUnknown,
         };
     });
 }
@@ -722,6 +758,11 @@ function onKeydown(evt) {
 .cw__btn--ghost:hover:not(:disabled) {
     background: #f4f5f7;
     border-color: #d1d5db;
+}
+.cw__btn--unknown-active {
+    background: #fff7ed;
+    border-color: #fdba74;
+    color: #9a3412;
 }
 .cw__btn--link {
     background: transparent;

@@ -39,6 +39,8 @@ module.exports.CREATE_PROJECT = "/api/v1/createProject";
 module.exports.AI_PROJECT_UPLOAD_BRIEF = "/api/v1/ai/project/upload-brief";
 module.exports.AI_PROJECT_PLAN = "/api/v1/ai/project/plan";
 module.exports.AI_PROJECT_CLARIFY = "/api/v1/ai/project/clarify";
+module.exports.AI_PROJECT_BRIEF = "/api/v1/ai/project/brief";
+module.exports.AI_PROJECT_GUIDE = "/api/v1/ai/project/guide";
 module.exports.AI_PROJECT_EXECUTE = "/api/v1/ai/project/execute";
 module.exports.AI_PROJECT_EVENTS = "/api/v1/ai-progress";
 // AHE-3777 — AI task generation into an EXISTING project. projectId is a

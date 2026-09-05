@@ -3,8 +3,9 @@ const qaReview = require('./qaReview');
 const briefParse = require('./briefParse');
 const prReview = require('./prReview');
 const digest = require('./digest');
+const projectGuide = require('./projectGuide');
 
-const ALL = [qaReview, briefParse, prReview, digest];
+const ALL = [qaReview, briefParse, prReview, digest, projectGuide];
 const BY_SLUG = new Map();
 ALL.forEach((s) => { BY_SLUG.set(s.slug, s); (s.aliases || []).forEach((a) => BY_SLUG.set(a, s)); });
 
