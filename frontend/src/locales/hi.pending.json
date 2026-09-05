@@ -1,7 +1,7 @@
 {
   "locale": "hi",
   "machineTranslated": false,
-  "updatedAt": "2026-09-05T06:58:38.362Z",
+  "updatedAt": "2026-09-05T09:43:53.424Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -5098,6 +5098,7 @@
     "AiProject.all_done": "All done!",
     "AiProject.building": "Building your project…",
     "AiProject.starting": "Starting…",
-    "AiProject.create_everything": "✓ Create everything"
+    "AiProject.create_everything": "✓ Create everything",
+    "AiProject.source_required": "Choose a source to continue — every project records where it came from."
   }
 }

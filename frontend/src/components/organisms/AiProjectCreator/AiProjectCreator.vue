@@ -110,6 +110,7 @@
                         <div class="aipg-skills-select">
                             <ProjectSourceSelect v-model="source"/>
                         </div>
+                        <p v-if="!hasSource" class="aipg-helper" data-test="source-required">{{ $t('AiProject.source_required') }}</p>
 
                         <label class="aipg-field-label aipg-field-label-stacked">
                             {{ $t('ProjectDetails.proposal_id') }}
@@ -171,14 +172,14 @@
                     <div v-if="hasGeneratedPlan" class="aipg-actions aipg-actions-split">
                         <button
                             class="aipg-btn aipg-btn-ghost"
-                            :disabled="!canGenerate || loading || briefUploading || clarifyLoading"
+                            :disabled="!canGenerate || !hasSource || loading || briefUploading || clarifyLoading"
                             @click="onGeneratePlan">
                             <span v-if="loading || clarifyLoading" class="aipg-spinner aipg-spinner-sm" aria-hidden="true"></span>
                             {{ clarifyLoading ? $t('AiProject.analyzing') : (loading ? $t('AiProject.generating_plan') : 'Re-Generate Plan') }}
                         </button>
                         <button
                             class="aipg-btn aipg-btn-primary"
-                            :disabled="loading || briefUploading || clarifyLoading"
+                            :disabled="!hasSource || loading || briefUploading || clarifyLoading"
                             @click="onNextWithExistingPlan">
                             Next →
                         </button>
@@ -186,14 +187,14 @@
                     <div v-else-if="hasGeneratedQuestions" class="aipg-actions aipg-actions-split">
                         <button
                             class="aipg-btn aipg-btn-ghost"
-                            :disabled="!canGenerate || loading || briefUploading || clarifyLoading"
+                            :disabled="!canGenerate || !hasSource || loading || briefUploading || clarifyLoading"
                             @click="onRegenerateQuestions">
                             <span v-if="clarifyLoading || loading" class="aipg-spinner aipg-spinner-sm" aria-hidden="true"></span>
                             {{ clarifyLoading ? $t('AiProject.analyzing') : (loading ? $t('AiProject.generating_plan') : 'Re-Generate Questions') }}
                         </button>
                         <button
                             class="aipg-btn aipg-btn-primary"
-                            :disabled="loading || briefUploading || clarifyLoading"
+                            :disabled="!hasSource || loading || briefUploading || clarifyLoading"
                             @click="onNextWithExistingQuestions">
                             Next →
                         </button>
@@ -202,7 +203,7 @@
                         <button
                             class="aipg-btn aipg-btn-primary"
                             data-test="start"
-                            :disabled="!canGenerate || loading || briefUploading || clarifyLoading"
+                            :disabled="!canGenerate || !hasSource || loading || briefUploading || clarifyLoading"
                             @click="onGeneratePlan">
                             <span v-if="loading || clarifyLoading" class="aipg-spinner aipg-spinner-sm" aria-hidden="true"></span>
                             {{ clarifyLoading ? $t('AiProject.analyzing') : (loading ? $t('AiProject.generating_plan') : (error ? $t('AiProject.try_again') : $t('AiProject.continue'))) }}
@@ -399,7 +400,7 @@
                         <div class="aipg-progress-row" :class="rowClass('tasks')">
                             <span class="aipg-progress-icon"><span v-html="stepIcon('tasks')" /></span>
                             <span class="aipg-progress-label">Tasks</span>
-                            <span class="aipg-progress-status">{{ progress.tasksDone }} / {{ progress.totalTasks || '…' }}</span>
+                            <span class="aipg-progress-status" data-test="progress-tasks">{{ progress.tasksDone }} / {{ progress.totalTasks || '…' }}</span>
                         </div>
                     </div>
 
@@ -572,6 +573,7 @@ export default defineComponent({
         const placeholderText = 'e.g. "A 3-month SaaS launch for a 5-person team building an invoicing tool with Stripe billing. Kanban workflow. GitHub + Slack integrations. MVP in 6 weeks; full launch in 12."';
 
         const canGenerate = computed(() => description.value.trim().length >= 20);
+        const hasSource = computed(() => PROJECT_SOURCES.includes(source.value));
 
         // True once a plan has been produced and is still held in memory.
         // Drives the dual-button layout on Step 1 (Next + Re-Generate)
@@ -627,10 +629,16 @@ export default defineComponent({
         }
 
         const totals = computed(() => {
-            if (!plan.value || !Array.isArray(plan.value.sprints)) return { sprints: 0, tasks: 0 };
-            let t = 0;
-            for (const sp of plan.value.sprints) t += (sp.tasks || []).length;
-            return { sprints: plan.value.sprints.length, tasks: t };
+            if (!plan.value || !Array.isArray(plan.value.sprints)) return { sprints: 0, tasks: 0, taskDocs: 0 };
+            let tasks = 0;
+            let taskDocs = 0;
+            for (const sp of plan.value.sprints) {
+                for (const task of sp.tasks || []) {
+                    tasks += 1;
+                    taskDocs += 1 + (Array.isArray(task.subtasks) ? task.subtasks.length : 0);
+                }
+            }
+            return { sprints: plan.value.sprints.length, tasks, taskDocs };
         });
 
         const briefAssumptions = computed(() => {
@@ -850,7 +858,7 @@ export default defineComponent({
         // Entry point from Step 1. Questions come back only for points the brief
         // misses; none at all (or a failed call) goes straight to the brief draft.
         async function onGeneratePlan() {
-            if (!canGenerate.value) return;
+            if (!canGenerate.value || !hasSource.value) return;
             error.value = '';
             clarifyError.value = '';
             resetBriefFlow();
@@ -1108,9 +1116,7 @@ export default defineComponent({
 
         async function onApprovePlan() {
             if (!plan.value) return;
-            // Enforced here rather than before plan generation: the AI doesn't
-            // need either value, so blocking step 1 would be friction for nothing.
-            if (!PROJECT_SOURCES.includes(source.value)) {
+            if (!hasSource.value) {
                 error.value = t('Projects.source_required');
                 step.value = 'input';
                 return;
@@ -1143,7 +1149,7 @@ export default defineComponent({
                 jobId.value = result.jobId;
                 step.value = 'executing';
                 progress.totalSprints = totals.value.sprints;
-                progress.totalTasks = totals.value.tasks;
+                progress.totalTasks = totals.value.taskDocs;
                 subscribe();
             } catch (e) {
                 error.value = friendlyErr(e);
@@ -1171,8 +1177,9 @@ export default defineComponent({
                     } else if (payload.step === 'tasks') {
                         progress.sprintState = 'done';
                         progress.tasksState = payload.status === 'done' ? 'done' : 'active';
+                        // The server's `total` counts parent tasks only while `completed`
+                        // includes subtasks; the plan-derived taskDocs total is the one that matches.
                         if (typeof payload.completed === 'number') progress.tasksDone = payload.completed;
-                        if (typeof payload.total === 'number') progress.totalTasks = payload.total;
                     }
                 } else if (payload.event === 'complete') {
                     progress.project = 'done';
@@ -1287,7 +1294,7 @@ export default defineComponent({
             plan, planId, editableProjectName,
             jobId, progress, createdProjectId,
             placeholderText,
-            canGenerate, hasGeneratedPlan, hasGeneratedQuestions, totals, isBusy,
+            canGenerate, hasSource, hasGeneratedPlan, hasGeneratedQuestions, totals, isBusy,
             runUsage, usageTooltip, formatTokens, formatCost, formatHours,
             renderTaskDescription, isStepDone, stepClass, stepDoneDot, rowClass, stepIcon, stepStatusLabel,
             onFileChosen, clearBrief,

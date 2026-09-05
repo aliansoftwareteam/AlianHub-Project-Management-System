@@ -1619,6 +1619,7 @@ export default {
         step_create: "Create",
         describe_label: "What is the project about?",
         min_chars: "{count} / {min} minimum characters",
+        source_required: "Choose a source to continue — every project records where it came from.",
         continue: "Continue →",
         analyzing: "Analyzing your brief…",
         analyzing_sub: "Checking which of the five points your description already covers.",

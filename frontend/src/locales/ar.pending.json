@@ -1,7 +1,7 @@
 {
   "locale": "ar",
   "machineTranslated": false,
-  "updatedAt": "2026-09-05T06:58:38.212Z",
+  "updatedAt": "2026-09-05T09:43:53.225Z",
   "keys": {
     "Scrum.stranded_head": "These {count} will stay in this sprint",
     "Scrum.stranded_hint": "They are unfinished, but their parent task is done — and a subtask moves with its parent. Finish them, or reopen the parent task, before completing the sprint.",
@@ -7239,6 +7239,7 @@
     "AiProject.all_done": "All done!",
     "AiProject.building": "Building your project…",
     "AiProject.starting": "Starting…",
-    "AiProject.create_everything": "✓ Create everything"
+    "AiProject.create_everything": "✓ Create everything",
+    "AiProject.source_required": "Choose a source to continue — every project records where it came from."
   }
 }

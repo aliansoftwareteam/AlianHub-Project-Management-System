@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
-import { h } from 'vue';
+import { h, nextTick } from 'vue';
 
 const { apiRequest, push, stub } = vi.hoisted(() => ({
     apiRequest: vi.fn(),
@@ -89,9 +89,20 @@ function mountCreator() {
     return mount(AiProjectCreator, { props: { visible: true }, global: { plugins: [store] } });
 }
 
+const describeProject = (wrapper) => wrapper.find('textarea.aipg-textarea').setValue('An online shop for makers selling handmade goods to hobbyists.');
+
 async function describeAndStart(wrapper) {
-    await wrapper.find('textarea.aipg-textarea').setValue('An online shop for makers selling handmade goods to hobbyists.');
+    await describeProject(wrapper);
+    wrapper.vm.source = 'other';
+    await nextTick();
     await wrapper.find('[data-test="start"]').trigger('click');
+    await flushPromises();
+}
+
+async function reachPreview(wrapper) {
+    await describeAndStart(wrapper);
+    await wrapper.find('[data-test="approve-brief"]').trigger('click');
+    await wrapper.find('[data-test="generate-plan"]').trigger('click');
     await flushPromises();
 }
 
@@ -229,7 +240,6 @@ describe('AiProjectCreator guided flow', () => {
         await wrapper.find('[data-test="generate-plan"]').trigger('click');
         await flushPromises();
 
-        wrapper.vm.source = 'other';
         await wrapper.find('[data-test="create-everything"]').trigger('click');
         await flushPromises();
 
@@ -240,7 +250,7 @@ describe('AiProjectCreator guided flow', () => {
         expect(wrapper.vm.step).toBe('executing');
 
         FakeEventSource.last.emit({
-            event: 'complete', projectId: 'proj-1', totals: { sprints: 1, tasks: 3 },
+            event: 'complete', projectId: 'proj-1', totals: { sprints: 1, tasks: 4 },
             guideAgentId: 'agent-9', runsQueued: 1,
             runsRefused: [{ taskId: 't2', taskName: 'Summarise the theme PR', reason: 'needs a person — a pull-request or branch link on the task' }]
         });
@@ -262,14 +272,74 @@ describe('AiProjectCreator guided flow', () => {
         await wrapper.find('[data-test="approve-brief"]').trigger('click');
         await wrapper.find('[data-test="generate-plan"]').trigger('click');
         await flushPromises();
-        wrapper.vm.source = 'other';
         await wrapper.find('[data-test="create-everything"]').trigger('click');
         await flushPromises();
-        FakeEventSource.last.emit({ event: 'complete', projectId: 'proj-1', totals: { sprints: 1, tasks: 3 } });
+        FakeEventSource.last.emit({ event: 'complete', projectId: 'proj-1', totals: { sprints: 1, tasks: 4 } });
         await flushPromises();
 
         await wrapper.find('[data-test="open-project"]').trigger('click');
         expect(wrapper.emitted('created')[0]).toEqual([{ projectId: 'proj-1' }]);
+    });
+
+    it('keeps Continue disabled and explains why until a source is chosen', async () => {
+        routes({ clarify: () => ({ coverage: allMet, round: 1, maxRounds: 2, questions: [] }) });
+        const wrapper = mountCreator();
+        await describeProject(wrapper);
+
+        const start = wrapper.find('[data-test="start"]');
+        expect(start.attributes('disabled')).toBeDefined();
+        expect(wrapper.find('[data-test="source-required"]').text()).toBe('AiProject.source_required');
+        await start.trigger('click');
+        await flushPromises();
+        expect(callsTo(env.AI_PROJECT_CLARIFY)).toHaveLength(0);
+        expect(wrapper.vm.step).toBe('input');
+
+        wrapper.vm.source = 'upwork';
+        await nextTick();
+        expect(wrapper.find('[data-test="start"]').attributes('disabled')).toBeUndefined();
+        expect(wrapper.find('[data-test="source-required"]').exists()).toBe(false);
+    });
+
+    it('never calls execute without a source and keeps the plan for the way back', async () => {
+        routes({ clarify: () => ({ coverage: allMet, round: 1, maxRounds: 2, questions: [] }) });
+        const wrapper = mountCreator();
+        await reachPreview(wrapper);
+
+        wrapper.vm.source = '';
+        await wrapper.find('[data-test="create-everything"]').trigger('click');
+        await flushPromises();
+
+        expect(callsTo(env.AI_PROJECT_EXECUTE)).toHaveLength(0);
+        expect(wrapper.vm.step).toBe('input');
+        expect(wrapper.text()).toContain('Projects.source_required');
+        expect(buttonByText(wrapper, 'Next →').attributes('disabled')).toBeDefined();
+
+        wrapper.vm.source = 'other';
+        await nextTick();
+        await buttonByText(wrapper, 'Next →').trigger('click');
+        expect(wrapper.vm.step).toBe('preview');
+        expect(callsTo(env.AI_PROJECT_PLAN)).toHaveLength(1);
+    });
+
+    it('counts subtasks in the task total so the done screen reads N / N', async () => {
+        routes({ clarify: () => ({ coverage: allMet, round: 1, maxRounds: 2, questions: [] }) });
+        const wrapper = mountCreator();
+        await reachPreview(wrapper);
+        await wrapper.find('[data-test="create-everything"]').trigger('click');
+        await flushPromises();
+
+        const counter = () => wrapper.find('[data-test="progress-tasks"]').text();
+        expect(counter()).toBe('0 / 4');
+
+        FakeEventSource.last.emit({ event: 'progress', step: 'tasks', status: 'started', total: 3 });
+        FakeEventSource.last.emit({ event: 'progress', step: 'tasks', status: 'progress', completed: 4, total: 3 });
+        await nextTick();
+        expect(counter()).toBe('4 / 4');
+
+        FakeEventSource.last.emit({ event: 'complete', projectId: 'proj-1', totals: { sprints: 1, tasks: 4 } });
+        await flushPromises();
+        expect(wrapper.vm.step).toBe('done');
+        expect(counter()).toBe('4 / 4');
     });
 
     it('falls back to the old plan path when the brief endpoint fails', async () => {
