@@ -3,7 +3,7 @@
 Status: proposed · 2026-09-05 · branch `feat/guided-project-brief` (from `beta`) · depends on 014 landing
 
 ## Goal
-When someone starts a project from a goal ("Shopify store from scratch"), the system gets a complete brief out of them with at most a handful of questions, drafts the improved brief for approval, and produces a plan where every task says up front whether an agent can do it or a person must.
+When someone starts any project from a goal (an online store, a mobile app, a multi-team platform), the system gets a complete brief out of them with at most a handful of questions, drafts the improved brief for approval, and produces a plan where every task says up front whether an agent can do it or a person must.
 
 ## What already exists (do not rebuild)
 `Modules/AIProjectGenerator` + `frontend/src/components/organisms/AiProjectCreator/AiProjectCreator.vue`, reached from the new-project sidebar's "Generate with AI" tile:
@@ -37,10 +37,11 @@ When someone starts a project from a goal ("Shopify store from scratch"), the sy
 - On execute, tasks labelled `agent` are queued through the existing run engine (`runs.create` → `executeSkill`) under the workspace's autonomy and spend rules; nothing bypasses the controls landed in 014. Tasks labelled `person` get the assignee from the plan and a due date inside their sprint.
 
 ### D · Evidence gate before UI work
-- Run the five-point scorer and the clarify prompt on three real thin briefs (one is "Shopify store from scratch", two-line). Keep only if at least two of three question sets are ones the owner would answer. Record the three transcripts in `evidence.md`.
+- Run the five-point scorer and the clarify prompt on three real thin briefs from three different domains: an online store, a mobile app, and a complex multi-team system (for example an ERP rollout). Keep only if at least two of three question sets are ones the owner would answer. Record the three transcripts in `evidence.md`.
+- No domain-specific code anywhere in the flow: the five points, the questions, the brief and the split must come from the brief and the workspace's skills, never from a hard-coded vertical.
 
 ## Out of scope (slice 2 candidates)
-- Vertical playbooks (a curated Shopify step list with pre-labelled agent/human steps). Slice 1 proves the generic path; the playbook fits in as a deterministic question and task source afterwards.
+- Learned patterns: reusing the questions and splits from this workspace's past projects as a prior for new ones. The flow stays generic; memory can sharpen it later.
 - New agent skills. The split uses the four skills that exist; a task no skill can do is `person`.
 - Re-planning after the project starts; editing the brief later regenerating the plan.
 - Member-role permissions for who may approve a brief (owner/admin/any member is a product decision; default: whoever creates the project).
@@ -52,7 +53,7 @@ When someone starts a project from a goal ("Shopify store from scratch"), the sy
 - [ ] Every task in the plan view carries `agent` / `agent-after` / `person` with a reason; the classification for a task equals what `/api/v2/agents/routable` + `agentFit` would give for the same task. (unit: shared module; API: one round trip)
 - [ ] Executing a plan with agent-labelled tasks creates runs that respect pause, spend cap and daily limit; a paused workspace creates none and says so. (`tests/ai-project-execute-agents.test.js`)
 - [ ] Every new string goes through i18n (`npm run i18n:check` green); `npm test`, frontend `vitest`, `npm run lint` green; production build succeeds.
-- [ ] Browser sweep of the whole flow as owner, recorded in `progress.md` with screenshots of: coverage questions, the brief diff, the split summary.
+- [ ] Browser sweep of the whole flow as owner on the three domain briefs from D, recorded in `progress.md` with screenshots of: coverage questions, the brief diff, the split summary.
 
 ## Workstreams (parallel, disjoint files)
 | | Owner | Files |
@@ -61,6 +62,6 @@ When someone starts a project from a goal ("Shopify store from scratch"), the sy
 | C backend | agent | new `Modules/Agents/taskSplit.js` (shared classifier, consumed by `agentFit.js` and the generator's plan post-processing), `Modules/AIProjectGenerator/execute` hook into `runs`, tests |
 | UI | agent | `AiProjectCreator.vue` (new Brief step, split badges, summary line), `frontend/src/locales/en.js` (`AiProject` namespace), unit specs |
 
-## Open questions for the owner
-1. Is Shopify a real first customer? If yes, slice 2 starts with its playbook; if it is an example, slice 2 is a second real vertical.
-2. In a two-founder company the "person" tasks land on the same person reading the plan. Should slice 1 already set due dates and reminders for them, or is the label enough for now?
+## Decisions
+- The flow is domain-agnostic by design (owner, 2026-09-05): it must work the same for an online store, an app, or a complex multi-team project. No vertical playbooks.
+- Person tasks get an assignee and a due date inside their sprint in slice 1 (already in scope C). Reminders stay out of scope until the notification row for agent runs is verified.
