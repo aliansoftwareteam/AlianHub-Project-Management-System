@@ -61,7 +61,7 @@
                 </button>
             </header>
             <div class="st__content ah-scroll">
-                <router-view />
+                <router-view v-if="!accessPending" />
             </div>
         </div>
 
@@ -122,8 +122,8 @@ const membersVisible = () => checkPermission("settings.settings_role_management"
 const hasBilling = computed(() => !!(chargebeeRouter.upgradeTab || paddleRouter.upgradeTab) && isOwner.value && router.hasRoute("Upgrade"));
 
 // The Instance group belongs to the account that set the instance up (users.isProductOwner),
-// which the server decides; a member never sees it.
-const instanceAdmin = ref(false);
+// which the server decides; a member never sees it. null = answer not in yet.
+const instanceAdmin = ref(null);
 onMounted(() => {
     apiRequestWithoutCompnay("get", env.INSTANCE_ACCESS)
         .then((res) => { instanceAdmin.value = res?.data?.data?.allowed === true; })
@@ -168,12 +168,12 @@ const rawGroups = computed(() => [
         key: "instance",
         label: "Instance.group",
         items: [
-            { key: "instance-health", text: t("Instance.nav_health"), icon: "monitor", to: to("InstanceHealth"), names: ["InstanceHealth"], show: instanceAdmin.value },
-            { key: "instance-settings", text: t("Instance.nav_settings"), icon: "settings", to: to("InstanceSettings"), names: ["InstanceSettings"], show: instanceAdmin.value },
-            { key: "instance-backups", text: t("Instance.nav_backups"), icon: "download", to: to("InstanceBackups"), names: ["InstanceBackups"], show: instanceAdmin.value },
-            { key: "instance-upgrade", text: t("Instance.nav_upgrade"), icon: "refresh", to: to("InstanceUpgrade"), names: ["InstanceUpgrade"], show: instanceAdmin.value },
-            { key: "instance-logs", text: t("Instance.nav_logs"), icon: "file", to: to("InstanceLogs"), names: ["InstanceLogs"], show: instanceAdmin.value },
-            { key: "instance-stats", text: t("Instance.nav_stats"), icon: "reports", to: to("InstanceStats"), names: ["InstanceStats"], show: instanceAdmin.value }
+            { key: "instance-health", text: t("Instance.nav_health"), icon: "monitor", to: to("InstanceHealth"), names: ["InstanceHealth"], show: instanceAdmin.value === true },
+            { key: "instance-settings", text: t("Instance.nav_settings"), icon: "settings", to: to("InstanceSettings"), names: ["InstanceSettings"], show: instanceAdmin.value === true },
+            { key: "instance-backups", text: t("Instance.nav_backups"), icon: "download", to: to("InstanceBackups"), names: ["InstanceBackups"], show: instanceAdmin.value === true },
+            { key: "instance-upgrade", text: t("Instance.nav_upgrade"), icon: "refresh", to: to("InstanceUpgrade"), names: ["InstanceUpgrade"], show: instanceAdmin.value === true },
+            { key: "instance-logs", text: t("Instance.nav_logs"), icon: "file", to: to("InstanceLogs"), names: ["InstanceLogs"], show: instanceAdmin.value === true },
+            { key: "instance-stats", text: t("Instance.nav_stats"), icon: "reports", to: to("InstanceStats"), names: ["InstanceStats"], show: instanceAdmin.value === true }
         ]
     }
 ]);
@@ -182,21 +182,25 @@ const groups = computed(() => rawGroups.value
     .map((g) => ({ ...g, items: g.items.filter((i) => i.show && router.hasRoute(i.to.name)).map((i) => ({ ...i, active: i.names.includes(route.name) })) }))
     .filter((g) => g.items.length));
 
+const currentItem = computed(() => rawGroups.value
+    .flatMap((g) => g.items.map((i) => ({ ...i, group: g.key })))
+    .find((i) => i.names.includes(route.name)));
+const accessPending = computed(() => currentItem.value?.group === "instance" && instanceAdmin.value === null);
+
 const pageTitle = computed(() => {
-    const hit = rawGroups.value.flatMap((g) => g.items).find((i) => i.names.includes(route.name));
     if (route.name === "changePassword") return label("settingslider.Change Password");
-    if (hit) return hit.text;
+    if (currentItem.value) return currentItem.value.text;
     const title = route.meta?.title || "";
     return te(`settingslider.${title}`) ? t(`settingslider.${title}`) : title;
 });
 
 function guardRoute() {
-    const hit = rawGroups.value.flatMap((g) => g.items).find((i) => i.names.includes(route.name));
-    if (hit && !hit.show) router.replace(to("My Profile"));
+    if (accessPending.value) return;
+    if (currentItem.value && !currentItem.value.show) router.replace(to("My Profile"));
 }
 
 onMounted(guardRoute);
-watch(() => route.name, guardRoute);
+watch([() => route.name, instanceAdmin], guardRoute);
 watch(narrow, (v) => { if (!v) drawer.value = false; });
 </script>
 
