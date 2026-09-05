@@ -25,10 +25,10 @@ beforeEach(() => {
 });
 
 describe('F2 — a plain personal token is an agent when it arrives over MCP', () => {
-    it('marks the caller as an agent named after the token, on a local account', async () => {
+    it('marks the caller as an agent named after the token, on a personal account', async () => {
         const actor = await resolveActor(req({ apiToken: pat(), mcp: true }));
-        expect(actor).toMatchObject({ kind: 'agent', userId: USER_ID, agentId: null, agentName: 'Laptop token', viaAccount: 'local', personName: 'Mevil', tokenName: 'Laptop token' });
-        expect(attribution(actor)).toMatchObject({ actorType: 'agent', actorId: USER_ID, viaAccount: 'local', label: 'Laptop token' });
+        expect(actor).toMatchObject({ kind: 'agent', userId: USER_ID, agentId: null, agentName: 'Laptop token', viaAccount: 'personal', personName: 'Mevil', tokenName: 'Laptop token' });
+        expect(attribution(actor)).toMatchObject({ actorType: 'agent', actorId: USER_ID, viaAccount: 'personal', label: 'Mevil via Laptop token' });
     });
 
     it('takes the account mode and provider from the user when they linked one', async () => {
@@ -72,7 +72,7 @@ describe('F2 — the MCP server marks the request before resolving the actor', (
         expect(apiTokens.verifyToken).toHaveBeenCalledWith(C, 'ah_abc');
         expect(r.mcp).toBe(true);
         expect(ctx).toMatchObject({ companyId: C, userId: USER_ID, canWrite: true });
-        expect(ctx.actor).toMatchObject({ kind: 'agent', agentName: 'Laptop token', viaAccount: 'local' });
+        expect(ctx.actor).toMatchObject({ kind: 'agent', agentName: 'Laptop token', viaAccount: 'personal' });
     });
 
     it('does not mark the request when the token is rejected', async () => {
