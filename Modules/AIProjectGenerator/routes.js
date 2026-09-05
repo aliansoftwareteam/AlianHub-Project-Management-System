@@ -44,6 +44,21 @@ exports.init = (app) => {
 
     /**
      * @swagger
+     * /api/v1/ai/project/brief:
+     *   post:
+     *     summary: Draft the brief (five sections + assumptions) the user approves before planning
+     *     tags: [AI Project Generator]
+     *     description: |
+     *       Rewrites description + uploaded brief + clarify answers into the
+     *       five headed sections, with one assumption per skipped or unknown
+     *       answer and per point still missing. Returns `brief.markdown`,
+     *       which the user edits and approves and /plan receives as
+     *       `approvedBrief`. Synchronous.
+     */
+    app.post('/api/v1/ai/project/brief', ctrl.brief);
+
+    /**
+     * @swagger
      * /api/v1/ai/project/execute:
      *   post:
      *     summary: Execute an approved plan and create the full project bootstrap
