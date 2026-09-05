@@ -15,6 +15,8 @@ const scope = require('./scope');
 const shipping = require('./shipping');
 const agentAudit = require('./agentAudit');
 const { inputsOf } = require('./taskInputs');
+const revert = require('./revert');
+const budget = require('./budget');
 
 const companyOf = (req) => req.headers['companyid'] || (req.query && req.query.companyId) || '';
 // 'mention' is a run started by @naming the agent in a comment (13b); it is
@@ -104,7 +106,7 @@ exports.createAgent = async (req, res) => {
         if (!set.name) return fail(res, 'name is required.');
         const saved = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AGENTS,
-            data: { autonomy: 0, spendCapUsd: 30, paused: false, account: 'workspace', deletedStatusKey: 0, ...set, ownerId: actor.userId },
+            data: { autonomy: 1, spendCapUsd: 30, paused: false, account: 'workspace', deletedStatusKey: 0, ...set, ownerId: actor.userId },
         }, 'save');
         return res.send({ status: true, statusText: 'Agent created.', data: saved });
     } catch (e) { logger.error(`createAgent: ${e.message}`); return fail(res, e.message, e.status || 200); }
@@ -281,6 +283,49 @@ exports.stopRun = async (req, res) => {
         if (out.error) return fail(res, out.error, 409);
         return res.send({ status: true, statusText: 'Run stopped.', data: out.run });
     } catch (e) { logger.error(`stopRun: ${e.message}`); return fail(res, e.message); }
+};
+
+/* POST /api/v2/agents/runs/:id/revert — owner/admin or the run's starter */
+exports.revertRun = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        const { actor, human } = await humanActor(req);
+        if (!companyId || !OBJECT_ID.test(req.params.id)) return fail(res, 'companyId and a valid run id are required.');
+        if (!human) return fail(res, 'Agents cannot revert runs.', 403);
+        const out = await revert.revertRun(companyId, req.params.id, { actor, isPrivileged: await privileged(companyId, actor.userId), ip: req.ip || '' });
+        if (out.error) return fail(res, out.error, out.status || 200);
+        return res.send({ status: true, statusText: 'Run reverted.', data: out });
+    } catch (e) { logger.error(`revertRun: ${e.message}`); return fail(res, e.message); }
+};
+
+/* GET / PUT /api/v2/agents/settings — undo window, monthly budget, provider (read-only) */
+exports.getSettings = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        if (!companyId) return fail(res, 'companyId is required.');
+        return res.send({ status: true, data: { ...(await budget.settings(companyId)), provider: budget.provider() } });
+    } catch (e) { logger.error(`getSettings: ${e.message}`); return fail(res, e.message); }
+};
+
+exports.putSettings = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        const { human } = await humanActor(req);
+        if (!companyId || !req.uid) return fail(res, 'Unauthorized.', 401);
+        if (!human || !(await privileged(companyId, req.uid))) return fail(res, 'Owner/admin only.', 403);
+        const out = await budget.updateSettings(companyId, req.body || {});
+        if (out.error) return fail(res, out.error, out.status || 200);
+        return res.send({ status: true, statusText: 'Settings updated.', data: { ...out.settings, provider: budget.provider() } });
+    } catch (e) { logger.error(`putSettings: ${e.message}`); return fail(res, e.message); }
+};
+
+/* GET /api/v2/agents/budget — this month's company spend against the budget */
+exports.getBudget = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        if (!companyId) return fail(res, 'companyId is required.');
+        return res.send({ status: true, data: await budget.status(companyId) });
+    } catch (e) { logger.error(`getBudget: ${e.message}`); return fail(res, e.message); }
 };
 
 /* GET /api/v2/agents/proposals?status=pending&bucket=primary|later&agentId= */

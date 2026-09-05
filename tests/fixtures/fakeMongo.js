@@ -5,9 +5,12 @@
 let seq = 1;
 const nextId = () => String(seq++).padStart(24, '0');
 
+const read = (doc, key) => key.split('.').reduce((v, k) => (v == null ? undefined : v[k]), doc);
+
 const matches = (doc, filter = {}) => Object.entries(filter).every(([key, cond]) => {
     if (key === '$or') return cond.some((f) => matches(doc, f));
-    const value = doc[key] === undefined ? undefined : (doc[key] instanceof Date ? doc[key].getTime() : (key === '_id' ? String(doc[key]) : doc[key]));
+    const raw = read(doc, key);
+    const value = raw === undefined ? undefined : (raw instanceof Date ? raw.getTime() : (key === '_id' ? String(raw) : raw));
     if (cond instanceof RegExp) return cond.test(String(value));
     if (cond && typeof cond === 'object' && !(cond instanceof Date) && !Array.isArray(cond) && Object.keys(cond).some((k) => k.startsWith('$'))) {
         return Object.entries(cond).every(([op, arg]) => {
@@ -24,11 +27,18 @@ const matches = (doc, filter = {}) => Object.entries(filter).every(([key, cond])
     return value === want;
 });
 
+const write = (doc, key, fn) => {
+    const path = key.split('.');
+    const last = path.pop();
+    const target = path.reduce((v, k) => { if (v[k] == null || typeof v[k] !== 'object') v[k] = {}; return v[k]; }, doc);
+    fn(target, last);
+};
+
 const apply = (doc, update = {}) => {
-    Object.entries(update.$set || {}).forEach(([k, v]) => { doc[k] = v; });
-    Object.entries(update.$inc || {}).forEach(([k, v]) => { doc[k] = Number(doc[k] || 0) + v; });
-    Object.entries(update.$push || {}).forEach(([k, v]) => { doc[k] = [...(doc[k] || []), v]; });
-    Object.entries(update.$unset || {}).forEach(([k]) => { delete doc[k]; });
+    Object.entries(update.$set || {}).forEach(([k, v]) => write(doc, k, (t, l) => { t[l] = v; }));
+    Object.entries(update.$inc || {}).forEach(([k, v]) => write(doc, k, (t, l) => { t[l] = Number(t[l] || 0) + v; }));
+    Object.entries(update.$push || {}).forEach(([k, v]) => write(doc, k, (t, l) => { t[l] = [...(t[l] || []), v]; }));
+    Object.entries(update.$unset || {}).forEach(([k]) => write(doc, k, (t, l) => { delete t[l]; }));
     return doc;
 };
 

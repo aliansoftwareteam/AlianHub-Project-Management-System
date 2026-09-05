@@ -1423,6 +1423,19 @@ const schema = {
             type: Object,
             required: false
         },
+        agentUndoHours: {
+            type: Number,
+            required: false
+        },
+        agentMonthlyBudgetUsd: {
+            type: Number,
+            required: false
+        },
+        // { month: 'YYYY-MM', '80': Date|null, '100': Date|null }
+        agentBudgetAlerts: {
+            type: Object,
+            required: false
+        },
         "legacyId": {
             type: String,
             required: false
