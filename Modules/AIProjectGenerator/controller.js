@@ -8,7 +8,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const multer = require('multer');
 
 const { getProvider, isAnyProviderConfigured } = require('./llmProvider');
-const { PlanSchema, ClarifyResponseSchema, TasksPlanSchema, TasksResponseSchema, TasksOnlyPlanSchema, TasksOnlyResponseSchema, SprintsOnlyPlanSchema, SprintsOnlyResponseSchema, sanitizeMemberIds, sanitizeTaskPlanMemberIds, tryParseJson } = require('./schemaValidator');
+const { COVERAGE_POINTS, PlanSchema, ClarifyResponseSchema, TasksPlanSchema, TasksResponseSchema, TasksOnlyPlanSchema, TasksOnlyResponseSchema, SprintsOnlyPlanSchema, SprintsOnlyResponseSchema, sanitizeMemberIds, sanitizeTaskPlanMemberIds, tryParseJson } = require('./schemaValidator');
 const { buildSystemPrompt, buildUserMessage, buildRepairPrompt, buildTasksSystemPrompt, buildTasksUserMessage } = require('./promptBuilder');
 const { briefUpload, extractFromFile, safeUnlink, MAX_BRIEF_BYTES } = require('./briefExtractor');
 const { usageFromResult, addUsage, summarize } = require('./usage');
@@ -119,10 +119,10 @@ async function loadActiveMembers(companyId) {
     }
 }
 
-async function callLlmForPlan({ description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills }) {
+async function callLlmForPlan({ description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills, approvedBrief, assumptions }) {
     const provider = getProvider();
     const systemPrompt = buildSystemPrompt();
-    const userMessage = buildUserMessage({ description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills });
+    const userMessage = buildUserMessage({ description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills, approvedBrief, assumptions });
     // A generous ask, not a target: each provider clamps this to its own output
     // ceiling, so requesting more than a given model supports is harmless. The
     // old 32000 predated tasks carrying estimates and sub-tasks — every
@@ -215,7 +215,7 @@ async function callLlmForPlan({ description, additionalRequirements, briefText, 
     };
 }
 
-async function generatePlanForJob({ jobId, uid, companyId, description, additionalRequirements, briefText, isPrivateSpace, clarifications, selectedSkills }) {
+async function generatePlanForJob({ jobId, uid, companyId, description, additionalRequirements, briefText, isPrivateSpace, clarifications, selectedSkills, approvedBrief, assumptions }) {
     const emit = (payload) => sseEmitter.emit(jobId, payload);
 
     try {
@@ -228,7 +228,7 @@ async function generatePlanForJob({ jobId, uid, companyId, description, addition
         // returned a job id, so slow LLM responses no longer trip the proxy.
         emit({ event: 'progress', phase: 'plan', step: 'ai', status: 'started' });
         const { result, usage, model, provider } = await callLlmForPlan({
-            description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills,
+            description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills, approvedBrief, assumptions,
         });
 
         let { plan } = result;
@@ -389,7 +389,11 @@ exports.plan = async (req, res) => {
         if (!companyId) return sendError(res, 403, 'Company access denied');
 
         const description = String((req.body && req.body.description) || '').trim();
-        if (description.length < 20) return sendError(res, 400, 'Description must be at least 20 characters');
+        // The approved brief supersedes the description; a client that sends
+        // only the brief is not asked for a description it no longer needs.
+        const approvedBrief = String((req.body && req.body.approvedBrief) || '').trim().slice(0, MAX_APPROVED_BRIEF_CHARS);
+        if (approvedBrief.length < 20 && description.length < 20) return sendError(res, 400, 'Description must be at least 20 characters');
+        const assumptions = sanitizeAssumptions(req.body && req.body.assumptions);
 
         // "Additional requirements" textarea from Step 1 of the wizard — the
         // single biggest "match my requirements" lever. Capped at 2000 chars
@@ -436,6 +440,8 @@ exports.plan = async (req, res) => {
                 isPrivateSpace: !!(req.body && req.body.isPrivateSpace),
                 clarifications,
                 selectedSkills,
+                approvedBrief,
+                assumptions,
             }).catch((error) => {
                 logger.error(`AIPG plan job outer error: ${error && error.message ? error.message : error}`);
                 sseEmitter.emit(jobId, {
@@ -478,16 +484,28 @@ exports.clarify = async (req, res) => {
             if (stash && stash.companyId === companyId) briefText = stash.text;
         }
 
-        const { understanding, questions, usage, model, provider } = await clarifier.generateClarifyingQuestions({
+        const previousAnswers = sanitizeClarifications(req.body && req.body.previousAnswers);
+        const round = Number(req.body && req.body.round) || undefined;
+
+        const result = await clarifier.generateClarifyingQuestions({
             description,
             additionalRequirements,
             briefText,
+            previousAnswers,
+            round,
         });
+        const { understanding, questions, coverage, maxRounds, usage, model, provider } = result;
 
+        // Top-level fields are what the existing wizard reads; `data` is the
+        // agreed contract shape for the new steps.
         return res.send({
             status: true,
             understanding,
             questions,
+            coverage,
+            round: result.round,
+            maxRounds,
+            data: { coverage, round: result.round, maxRounds, questions, understanding },
             tokensUsed: usage.totalTokens,
             usage,
             model,
@@ -521,14 +539,78 @@ function sanitizeClarifications(raw) {
         out.push({
             id,
             question,
+            point: COVERAGE_POINTS.includes(entry.point) ? entry.point : undefined,
             category: typeof entry.category === 'string' ? entry.category.slice(0, 40) : 'misc',
             type: typeof entry.type === 'string' ? entry.type.slice(0, 40) : 'text',
             answer: entry.answer === undefined ? null : entry.answer,
             skipped: !!entry.skipped,
+            unknown: !!entry.unknown,
         });
     }
     return out.length ? out : null;
 }
+
+const MAX_APPROVED_BRIEF_CHARS = 20000;
+
+function sanitizeAssumptions(raw) {
+    if (!Array.isArray(raw) || !raw.length) return [];
+    const out = [];
+    for (const entry of raw.slice(0, 30)) {
+        const text = typeof entry === 'string' ? entry : (entry && typeof entry.text === 'string' ? entry.text : '');
+        if (!text.trim()) continue;
+        const point = entry && COVERAGE_POINTS.includes(entry.point) ? entry.point : 'other';
+        out.push({ point, text: text.trim().slice(0, 500) });
+    }
+    return out;
+}
+
+// /brief rewrites description + upload + answers into the five headed
+// sections plus assumptions. The markdown it returns is what the user edits
+// and approves, and what /plan then receives as `approvedBrief`.
+exports.brief = async (req, res) => {
+    if (!isAnyProviderConfigured()) {
+        return sendError(res, 503, 'AI provider is not configured');
+    }
+    try {
+        const uid = req.uid;
+        if (!uid) return sendError(res, 401, 'Unauthorized');
+        const companyId = resolveCompanyId(req);
+        if (!companyId) return sendError(res, 403, 'Company access denied');
+
+        const description = String((req.body && req.body.description) || '').trim();
+        if (description.length < 20) return sendError(res, 400, 'Description must be at least 20 characters');
+
+        const additionalRequirements = String((req.body && req.body.additionalRequirements) || '').trim().slice(0, 2000);
+        let briefText = '';
+        if (req.body && req.body.briefId) {
+            const stash = myCache.get(cacheKey('brief', uid, req.body.briefId));
+            if (stash && stash.companyId === companyId) briefText = stash.text;
+        }
+        const answers = sanitizeClarifications(req.body && req.body.answers) || [];
+
+        const { brief, coverage, usage, model, provider } = await clarifier.draftBrief({
+            description,
+            additionalRequirements,
+            briefText,
+            answers,
+        });
+
+        return res.send({
+            status: true,
+            data: { brief, coverage },
+            brief,
+            coverage,
+            tokensUsed: usage.totalTokens,
+            usage,
+            model,
+            provider,
+        });
+    } catch (error) {
+        logger.error(`AIPG brief error: ${error && error.message ? error.message : error}`);
+        const httpCode = llmErrorToHttpStatus(error);
+        return sendError(res, httpCode, error && error.message ? error.message : 'Could not draft the brief. Please try again.');
+    }
+};
 
 exports.execute = async (req, res) => {
     try {

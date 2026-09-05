@@ -424,9 +424,36 @@ const QuestionOptionSchema = z.object({
     description: z.string().max(200).optional(),
 });
 
+// The five points a brief must cover before it is planned (task 015). Keys
+// are stable ids shared with the frontend; order is the order the brief's
+// sections are rendered in.
+const COVERAGE_POINTS = ['what_for_whom', 'done_when', 'existing', 'constraints', 'team'];
+const CoveragePointEnum = z.enum(COVERAGE_POINTS);
+const CoverageStateEnum = z.enum(['met', 'missing']);
+
+const CoverageMapSchema = z.object({
+    what_for_whom: CoverageStateEnum,
+    done_when: CoverageStateEnum,
+    existing: CoverageStateEnum,
+    constraints: CoverageStateEnum,
+    team: CoverageStateEnum,
+});
+
+const CoverageSchema = z.object({
+    coverage: CoverageMapSchema,
+    notes: z.object({
+        what_for_whom: z.string().max(300).optional().default(''),
+        done_when: z.string().max(300).optional().default(''),
+        existing: z.string().max(300).optional().default(''),
+        constraints: z.string().max(300).optional().default(''),
+        team: z.string().max(300).optional().default(''),
+    }).optional().default({}),
+});
+
 const ClarifyQuestionSchema = z.object({
     id: z.string().regex(/^[a-z][a-z0-9-]{0,40}$/, 'id must be kebab-case, 1–41 chars'),
-    category: QuestionCategoryEnum,
+    point: CoveragePointEnum,
+    category: QuestionCategoryEnum.optional().default('features'),
     question: z.string().min(5).max(240),
     rationale: z.string().max(280).optional().default(''),
     required: z.boolean().default(false),
@@ -517,6 +544,23 @@ const ClarifyQuestionsSchema = z.object({
     });
 });
 
+const BriefAssumptionSchema = z.object({
+    point: z.enum([...COVERAGE_POINTS, 'other']),
+    text: z.string().min(1).max(500),
+    questionId: z.string().max(60).optional(),
+});
+
+const BriefDraftSchema = z.object({
+    sections: z.object({
+        what_for_whom: z.string().min(1).max(3000),
+        done_when: z.string().min(1).max(3000),
+        existing: z.string().min(1).max(3000),
+        constraints: z.string().min(1).max(3000),
+        team: z.string().min(1).max(3000),
+    }),
+    assumptions: z.array(BriefAssumptionSchema).max(30).default([]),
+});
+
 /**
  * Strip ids that aren't in the allowed member list. Returns a cleaned plan
  * plus a list of removed ids for logging.
@@ -603,6 +647,9 @@ function tryParseJson(raw) {
 }
 
 module.exports = {
+    COVERAGE_POINTS,
+    CoverageSchema,
+    BriefDraftSchema,
     PlanSchema,
     ClarifyResponseSchema,
     ClarifyQuestionsSchema,
