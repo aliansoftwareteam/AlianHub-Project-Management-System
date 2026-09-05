@@ -11,6 +11,7 @@ const { getProvider, isAnyProviderConfigured } = require('./llmProvider');
 const { COVERAGE_POINTS, PlanSchema, ClarifyResponseSchema, TasksPlanSchema, TasksResponseSchema, TasksOnlyPlanSchema, TasksOnlyResponseSchema, SprintsOnlyPlanSchema, SprintsOnlyResponseSchema, sanitizeMemberIds, sanitizeTaskPlanMemberIds, tryParseJson } = require('./schemaValidator');
 const { buildSystemPrompt, buildUserMessage, buildRepairPrompt, buildTasksSystemPrompt, buildTasksUserMessage } = require('./promptBuilder');
 const { briefUpload, extractFromFile, safeUnlink, MAX_BRIEF_BYTES } = require('./briefExtractor');
+const { attachSplit } = require('./planSplit');
 const { usageFromResult, addUsage, summarize } = require('./usage');
 const planRules = require('./planRules');
 const sseEmitter = require('./sseEmitter');
@@ -277,7 +278,7 @@ async function generatePlanForJob({ jobId, uid, companyId, description, addition
             const issues = reCheck.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n');
             throw new Error(`Plan failed final validation: ${issues}`);
         }
-        plan = normalizePlanColors(reCheck.data);
+        plan = await attachSplit(normalizePlanColors(reCheck.data), { companyId, assumptions });
 
         const planId = token();
         myCache.set(cacheKey('plan', uid, planId), {
