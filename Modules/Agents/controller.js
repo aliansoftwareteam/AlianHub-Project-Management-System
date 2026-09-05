@@ -23,6 +23,22 @@ const TRIGGERS = ['manual', 'mention', 'schedule', 'rule', 'assignment'];
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 const fail = (res, statusText, code) => res.status(code || 200).send({ status: false, statusText, message: statusText });
+const invalid = (statusText) => Object.assign(new Error(statusText), { status: 400 });
+const AUTONOMY_MAX = 3;
+const numberOf = (value) => (typeof value === 'number' ? value : (typeof value === 'string' && value.trim() !== '' ? Number(value) : NaN));
+
+const autonomyOf = (value) => {
+    const n = numberOf(value);
+    if (!Number.isInteger(n) || n < 0 || n > AUTONOMY_MAX) throw invalid(`autonomy must be between 0 and ${AUTONOMY_MAX}`);
+    return n;
+};
+
+const runSpendCapOf = (value) => {
+    if (value === undefined || value === null) return undefined;
+    const n = numberOf(value);
+    if (!Number.isFinite(n) || n <= 0) throw invalid('spendCapUsd must be a number greater than 0');
+    return n;
+};
 
 const humanActor = async (req) => {
     const actor = req.agentActor || await resolveActor(req);
@@ -53,7 +69,7 @@ const agentPatchFields = (body) => {
     if (body.skills !== undefined && Array.isArray(body.skills)) set.skills = body.skills.slice(0, 20).map(normaliseSkill).filter(Boolean);
     if (body.allowedActions !== undefined && Array.isArray(body.allowedActions)) set.allowedActions = body.allowedActions.filter((a) => registry.has(a));
     if (body.projectIds !== undefined && Array.isArray(body.projectIds)) set.projectIds = body.projectIds.filter((id) => OBJECT_ID.test(String(id))).map(String);
-    if (body.autonomy !== undefined) set.autonomy = Math.min(3, Math.max(0, Number(body.autonomy) || 0));
+    if (body.autonomy !== undefined) set.autonomy = autonomyOf(body.autonomy);
     if (body.spendCapUsd !== undefined) set.spendCapUsd = Math.max(0, Number(body.spendCapUsd) || 0);
     if (body.account !== undefined && accounts.MODES.includes(body.account)) set.account = body.account;
     if (body.model !== undefined) set.model = String(body.model).slice(0, 120);
@@ -91,7 +107,7 @@ exports.createAgent = async (req, res) => {
             data: { autonomy: 0, spendCapUsd: 30, paused: false, account: 'workspace', deletedStatusKey: 0, ...set, ownerId: actor.userId },
         }, 'save');
         return res.send({ status: true, statusText: 'Agent created.', data: saved });
-    } catch (e) { logger.error(`createAgent: ${e.message}`); return fail(res, e.message); }
+    } catch (e) { logger.error(`createAgent: ${e.message}`); return fail(res, e.message, e.status || 200); }
 };
 
 /* PUT /api/v2/agents/:id — autonomy, spend cap, skills, scope */
@@ -106,7 +122,7 @@ exports.updateAgent = async (req, res) => {
         const updated = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ _id: oid(req.params.id) }, { $set: set }, { returnDocument: 'after' }] }, 'findOneAndUpdate');
         if (!updated) return fail(res, 'Agent not found.', 404);
         return res.send({ status: true, statusText: 'Agent updated.', data: updated });
-    } catch (e) { logger.error(`updateAgent: ${e.message}`); return fail(res, e.message); }
+    } catch (e) { logger.error(`updateAgent: ${e.message}`); return fail(res, e.message, e.status || 200); }
 };
 
 /* POST /api/v2/agents/:id/pause  |  /resume — the kill switch */
@@ -222,13 +238,14 @@ exports.getRun = async (req, res) => {
     } catch (e) { logger.error(`getRun: ${e.message}`); return fail(res, e.message); }
 };
 
-/* POST /api/v2/agents/runs  body: { agentId, taskId, skill?, trigger? } */
+/* POST /api/v2/agents/runs  body: { agentId, taskId, skill?, trigger?, note?, spendCapUsd?, notifyMe? } */
 exports.startRun = async (req, res) => {
     try {
         const companyId = companyOf(req);
         const { actor, human } = await humanActor(req);
-        const { agentId, taskId, skill, trigger, note } = req.body || {};
+        const { agentId, taskId, skill, trigger, note, notifyMe } = req.body || {};
         if (!companyId || !OBJECT_ID.test(String(agentId || ''))) return fail(res, 'companyId and a valid agentId are required.');
+        const spendCapUsd = runSpendCapOf((req.body || {}).spendCapUsd);
         const agent = await runs.getAgent(companyId, agentId);
         const check = await runs.canStart(agent, { trigger: trigger || 'manual', viaAccount: isAgent(actor) ? actor.viaAccount : undefined, companyId });
         if (!check.ok) return fail(res, check.reason, 409);
@@ -244,13 +261,13 @@ exports.startRun = async (req, res) => {
             // never executed and never finished — "running" forever in every counter.
             return fail(res, 'This agent needs a task to run on. Start the run from a task, or mention the agent in a comment.');
         }
-        const run = await runs.create(companyId, { agent, taskId, projectId: task && task.ProjectID, skill: runs.skillSlugOf(agent, skill), trigger: TRIGGERS.includes(trigger) ? trigger : 'manual', startedBy: actor.userId, viaAccount: isAgent(actor) ? actor.viaAccount : agent.account, note });
+        const run = await runs.create(companyId, { agent, taskId, projectId: task && task.ProjectID, skill: runs.skillSlugOf(agent, skill), trigger: TRIGGERS.includes(trigger) ? trigger : 'manual', startedBy: actor.userId, viaAccount: isAgent(actor) ? actor.viaAccount : agent.account, note, spendCapUsd, notifyMe: Boolean(notifyMe) });
         if (task && registry.has('subtask.create')) {
             const runActor = { kind: 'agent', userId: actor.userId, agentId: String(agent._id), agentName: agent.name, runId: String(run._id), viaAccount: run.viaAccount, tokenId: null };
             setImmediate(() => runs.executeSkill(companyId, run, agent, task, { proposals, actions, actor: runActor }));
         }
         return res.send({ status: true, statusText: 'Run started.', data: run });
-    } catch (e) { logger.error(`startRun: ${e.message}`); return fail(res, e.message); }
+    } catch (e) { logger.error(`startRun: ${e.message}`); return fail(res, e.message, e.status || 200); }
 };
 
 /* POST /api/v2/agents/runs/:id/stop */
