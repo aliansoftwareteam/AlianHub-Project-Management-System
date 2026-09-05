@@ -87,7 +87,7 @@
 import { computed, nextTick, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
-import { useAgents } from "./useAgents";
+import { useAgents, NEW_AGENT_DEFAULTS } from "./useAgents";
 import { AGENT_TEMPLATES } from "./agentTemplates";
 import { requirementsOf } from "./skillInputs";
 
@@ -109,9 +109,9 @@ const errors = reactive({ name: "", form: "" });
 const form = reactive({
     name: props.template ? props.template.name : "",
     description: "",
-    allowedActions: ["task.comment", "tasks.search", "task.get"],
-    autonomy: 1,
-    spendCapUsd: 30
+    allowedActions: [...NEW_AGENT_DEFAULTS.allowedActions],
+    autonomy: NEW_AGENT_DEFAULTS.autonomy,
+    spendCapUsd: NEW_AGENT_DEFAULTS.spendCapUsd
 });
 
 const writeActions = computed(() => (registryManifest.value.actions || []).filter((a) => !a.proposeOnly));

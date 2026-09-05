@@ -6,7 +6,7 @@ vi.mock('@/services', () => ({ apiRequest }));
 vi.mock('@/locales/main', () => ({ i18n: { global: { t: (key) => `t:${key}` } } }));
 vi.mock('@/components/organisms/Shell/shellState', () => ({ shellState: { agentsRunning: 0 } }));
 
-import { reasonOf, refusalCount, useAgents } from '@/views/Ai/useAgents';
+import { NEW_AGENT_DEFAULTS, canRevertRun, reasonOf, refusalCount, runOf, useAgents } from '@/views/Ai/useAgents';
 import { useParity } from '@/views/Ai/useParity';
 
 const okResponse = (data, extra = {}) => Promise.resolve({ data: { status: true, data, ...extra } });
@@ -81,6 +81,70 @@ describe('useAgents', () => {
         apiRequest.mockImplementation((type) => (type === 'delete' ? Promise.reject(httpError(409, 'Stop the running run first.')) : okResponse([])));
         await expect(deleteAgent('a1')).rejects.toThrow('Stop the running run first.');
         expect(apiRequest).toHaveBeenCalledWith('delete', '/api/v2/agents/a1', undefined);
+    });
+});
+
+describe('NEW_AGENT_DEFAULTS', () => {
+    it('starts a new agent at L1 Suggest', () => {
+        expect(NEW_AGENT_DEFAULTS.autonomy).toBe(1);
+    });
+});
+
+describe('runOf', () => {
+    it('unwraps the { run, audit } answer of GET /runs/:id and passes a bare run through', () => {
+        expect(runOf({ run: { _id: 'r1', decisions: [] }, audit: [{ id: 'a' }] })).toEqual({ _id: 'r1', decisions: [], audit: [{ id: 'a' }] });
+        expect(runOf({ _id: 'r2' })).toEqual({ _id: 'r2' });
+        expect(runOf(null)).toBeNull();
+    });
+});
+
+describe('canRevertRun', () => {
+    const now = Date.parse('2026-09-05T12:00:00Z');
+    const later = new Date(now + 3600e3).toISOString();
+    const earlier = new Date(now - 3600e3).toISOString();
+    const done = { status: 'done', startedBy: 'u1', windowEndsAt: later };
+
+    it('lets an owner/admin or the starter revert inside the window', () => {
+        expect(canRevertRun(done, { userId: 'u9', privileged: true, now })).toBe(true);
+        expect(canRevertRun(done, { userId: 'u1', privileged: false, now })).toBe(true);
+        expect(canRevertRun(done, { userId: 'u9', privileged: false, now })).toBe(false);
+    });
+
+    it('refuses once the window closed, the run was reverted, or it is still running', () => {
+        expect(canRevertRun({ ...done, windowEndsAt: earlier }, { privileged: true, now })).toBe(false);
+        expect(canRevertRun({ ...done, revertedAt: earlier }, { privileged: true, now })).toBe(false);
+        expect(canRevertRun({ ...done, status: 'running' }, { privileged: true, now })).toBe(false);
+        expect(canRevertRun(null, { privileged: true, now })).toBe(false);
+    });
+
+    it('leaves the window to the server when the payload carries none', () => {
+        expect(canRevertRun({ status: 'failed', startedBy: 'u1' }, { userId: 'u1', now })).toBe(true);
+    });
+});
+
+describe('useAgents run detail', () => {
+    beforeEach(() => { apiRequest.mockReset(); });
+
+    it('loads one run with its decisions', async () => {
+        const { loadRun } = useAgents();
+        apiRequest.mockImplementation(() => okResponse({ run: { _id: 'r1', decisions: [{ action: 'task.comment', decision: 'act', reason: 'reversible' }] }, audit: [] }));
+        const run = await loadRun('r1');
+        expect(apiRequest).toHaveBeenCalledWith('get', '/api/v2/agents/runs/r1', undefined);
+        expect(run.decisions).toHaveLength(1);
+    });
+
+    it('reverts through POST /runs/:id/revert and hands back the report', async () => {
+        const { revertRun } = useAgents();
+        apiRequest.mockImplementation(() => okResponse({ reverted: 5, failed: [{ action: 'chat.post', reason: 'no undo' }], windowEndsAt: '2026-09-06T12:00:00Z' }));
+        const out = await revertRun('r1');
+        expect(apiRequest).toHaveBeenCalledWith('post', '/api/v2/agents/runs/r1/revert', {});
+        expect(out).toEqual({ reverted: 5, failed: [{ action: 'chat.post', reason: 'no undo' }], windowEndsAt: '2026-09-06T12:00:00Z' });
+    });
+
+    it('surfaces the server statusText when the window has closed', async () => {
+        const { revertRun } = useAgents();
+        apiRequest.mockImplementation(() => Promise.reject(httpError(409, 'The undo window closed 2 hours ago.')));
+        await expect(revertRun('r1')).rejects.toThrow('The undo window closed 2 hours ago.');
     });
 });
 
