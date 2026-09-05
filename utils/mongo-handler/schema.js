@@ -818,6 +818,8 @@ const schema = {
         actions: { type: Array, default: [], required: false },
         proposals: { type: Array, default: [], required: false },
         refusals: { type: Number, default: 0, required: false },
+        // [{ action, decision: act | propose | refuse, reason, rating, at }] — one per change the policy reviewed
+        decisions: { type: Array, default: [], required: false },
         spendCapUsd: { type: Number, required: false },
         notifyMe: { type: Boolean, default: false, required: false },
         outcome: { type: String, required: false },
@@ -1420,6 +1422,19 @@ const schema = {
     companies: {
         // { allowedModes: ['workspace','personal','local'], requireCheckBeforeDone }
         agentPolicy: {
+            type: Object,
+            required: false
+        },
+        agentUndoHours: {
+            type: Number,
+            required: false
+        },
+        agentMonthlyBudgetUsd: {
+            type: Number,
+            required: false
+        },
+        // { month: 'YYYY-MM', '80': Date|null, '100': Date|null }
+        agentBudgetAlerts: {
             type: Object,
             required: false
         },

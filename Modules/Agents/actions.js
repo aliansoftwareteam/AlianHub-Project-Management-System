@@ -22,6 +22,47 @@ const oid = tools.oid;
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 const LINK_KINDS = ['pr', 'branch', 'doc', 'url'];
 
+// Risk rating per registry action, read by policy.js: at L2 an agent acts alone
+// only on a reversible, task-scoped write with no money in it; everything else
+// is proposed. `reversible` follows the registry's undoable flag so the rating
+// and the Inbox's "reversible" badge never disagree.
+const SCOPE = Object.freeze({ TASK: 'task', PROJECT: 'project', WORKSPACE: 'workspace' });
+const RATING_KEYS = Object.freeze(['write', 'reversible', 'scope', 'money']);
+const read = (scope) => Object.freeze({ write: false, reversible: true, scope, money: false });
+const write = (scope, reversible = true) => Object.freeze({ write: true, reversible, scope, money: false });
+const RATINGS = Object.freeze({
+    'tasks.next': read(SCOPE.WORKSPACE),
+    'tasks.search': read(SCOPE.WORKSPACE),
+    'task.get': read(SCOPE.TASK),
+    'docs.read': read(SCOPE.PROJECT),
+    'task.comment': write(SCOPE.TASK),
+    'task.status.set': write(SCOPE.TASK),
+    'task.link': write(SCOPE.TASK),
+    'task.assign': write(SCOPE.TASK),
+    'task.update': write(SCOPE.TASK),
+    'subtask.create': write(SCOPE.TASK),
+    'timelog.start': write(SCOPE.TASK),
+    'timelog.stop': write(SCOPE.TASK),
+    'task.sprint.move': write(SCOPE.PROJECT),
+    'task.create': write(SCOPE.PROJECT),
+    'page.draft': write(SCOPE.PROJECT),
+    'chat.post': write(SCOPE.TASK, false),
+    'reminder.create': write(SCOPE.TASK, false),
+    'deploy.staging': write(SCOPE.WORKSPACE, false),
+});
+
+const isCompleteRating = (r) => Boolean(r) && typeof r.write === 'boolean' && typeof r.reversible === 'boolean'
+    && Object.values(SCOPE).includes(r.scope) && typeof r.money === 'boolean';
+const rating = (key) => (isCompleteRating(RATINGS[String(key || '')]) ? { ...RATINGS[String(key)] } : null);
+const ratings = () => Object.fromEntries(Object.entries(RATINGS).map(([k, v]) => [k, { ...v }]));
+const unrated = (keys = registry.keys()) => keys.filter((k) => !isCompleteRating(RATINGS[k]));
+
+/* The registry manifest with each action's rating — what GET /agents/registry serves. */
+const manifest = () => {
+    const m = registry.manifest();
+    return { ...m, actions: m.actions.map((a) => ({ ...a, rating: rating(a.key) })), ratingKeys: [...RATING_KEYS], scopes: Object.values(SCOPE) };
+};
+
 const emitTask = (doc, updatedFields, actor) => {
     socketEmitter.emit('update', {
         type: 'update', module: 'task', data: doc, updatedFields,
@@ -196,13 +237,18 @@ const executors = {
     },
 };
 
-/* Run one action for an actor. Refusals are audited and thrown as RefusedError. */
-const perform = async ({ companyId, actor, action, params = {}, reason = '', cost = null, ip = '', allowedActions }) => {
+const refusal = async (companyId, actor, { action, params, reason, ip }) => {
+    const auditId = await audit.recordRefusal(companyId, actor, { action, reason, params, entityId: params.taskId, ip });
+    return new RefusedError(reason, auditId);
+};
+
+/* Run one action for an actor. Refusals are audited and thrown as RefusedError.
+ * A policy `decision` of refuse is honoured before the registry check, so a
+ * policy refusal leaves the same audit row as a registry one. */
+const perform = async ({ companyId, actor, action, params = {}, reason = '', cost = null, ip = '', allowedActions, decision = null }) => {
+    if (decision && decision.decision === 'refuse') throw await refusal(companyId, actor, { action, params, reason: decision.reason, ip });
     const check = registry.evaluate(action, params, { allowedActions });
-    if (!check.allowed) {
-        const auditId = await audit.recordRefusal(companyId, actor, { action, reason: check.reason, params, entityId: params.taskId, ip });
-        throw new RefusedError(check.reason, auditId);
-    }
+    if (!check.allowed) throw await refusal(companyId, actor, { action, params, reason: check.reason, ip });
     if (!check.action.write) return { result: null, auditId: null, undo: null };
     const exec = executors[action];
     if (!exec) throw new tools.DeterministicError(`${action} has no executor`);
@@ -222,8 +268,7 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
 const authorizeRead = async ({ companyId, actor, action, params = {}, ip = '', allowedActions }) => {
     const check = registry.evaluate(action, params, { allowedActions });
     if (check.allowed) return true;
-    const auditId = await audit.recordRefusal(companyId, actor, { action, reason: check.reason, params, entityId: params.taskId, ip });
-    throw new RefusedError(check.reason, auditId);
+    throw await refusal(companyId, actor, { action, params, reason: check.reason, ip });
 };
 
-module.exports = { perform, authorizeRead, RefusedError, executors, workEntry };
+module.exports = { perform, authorizeRead, RefusedError, executors, workEntry, SCOPE, RATING_KEYS, RATINGS, rating, ratings, unrated, isCompleteRating, manifest };

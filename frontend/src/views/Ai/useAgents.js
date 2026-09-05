@@ -51,6 +51,30 @@ const request = async (type, endpoint, body, fallbackKey) => {
 
 export const refusalCount = (run) => (Array.isArray(run?.refusals) ? run.refusals.length : Number(run?.refusals || 0));
 
+export const NEW_AGENT_DEFAULTS = Object.freeze({
+    autonomy: 1,
+    spendCapUsd: 30,
+    allowedActions: Object.freeze(["task.comment", "tasks.search", "task.get"])
+});
+
+const OPEN_RUN = ["queued", "running"];
+
+/* GET /runs/:id answers { run, audit }; older callers hand in the bare run. */
+export const runOf = (payload) => {
+    if (!payload) return null;
+    if (payload.run && typeof payload.run === "object") return { ...payload.run, audit: payload.audit || [] };
+    return payload;
+};
+
+/* A run can be reverted by an owner/admin or by whoever started it, once it has
+ * stopped touching things and only while the undo window is open. When the
+ * payload carries no windowEndsAt the server is left to decide. */
+export const canRevertRun = (run, { userId, privileged, now = Date.now() } = {}) => {
+    if (!run || run.revertedAt || OPEN_RUN.includes(run.status)) return false;
+    if (run.windowEndsAt && new Date(run.windowEndsAt).getTime() <= now) return false;
+    return Boolean(privileged) || (Boolean(userId) && String(run.startedBy || "") === String(userId));
+};
+
 export function autonomyOf(level) {
     return AUTONOMY.find((a) => a.level === Number(level)) || AUTONOMY[0];
 }
@@ -152,10 +176,15 @@ export function useAgents() {
         await loadAgents();
     };
 
+    const loadRun = async (runId) => runOf((await request("get", `${env.AGENT_RUNS}/${runId}`, undefined, "Ai.run_load_failed")).data);
+
+    const revertRun = async (runId) => (await request("post", `${env.AGENT_RUNS}/${runId}/revert`, {}, "Ai.revert_failed")).data;
+
     return {
         agents, proposals, counts, runSummary, spend, registryManifest, loading, lastError,
         running, waiting, AUTONOMY,
         loadAll, loadAgents, loadProposals, loadSummary, loadSpend, loadRegistry,
-        decide, setPaused, pauseAll, runNow, saveAgent, deleteAgent, activeRuns, loadActiveRuns, stopActive
+        decide, setPaused, pauseAll, runNow, saveAgent, deleteAgent, activeRuns, loadActiveRuns, stopActive,
+        loadRun, revertRun
     };
 }

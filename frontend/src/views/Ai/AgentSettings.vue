@@ -48,6 +48,27 @@
                             </label>
                         </div>
                         <p class="ai-ladder__rule">{{ $t('Ai.low_risk_note') }}</p>
+
+                        <div class="ai-preview" data-test="l2-preview">
+                            <div class="ah-label">{{ $t('Ai.l2_preview_title') }}</div>
+                            <p class="ai-lead" style="margin:6px 0 10px">{{ $t('Ai.l2_preview_lead') }}</p>
+                            <div class="ai-preview__cols">
+                                <div class="ai-preview__col" data-test="l2-acts">
+                                    <span class="ah-chip ah-chip--ok">{{ $t('Ai.l2_acts') }}</span>
+                                    <p v-if="!preview.acts.length" class="ah-small ai-preview__none">{{ $t('Ai.l2_none_act') }}</p>
+                                    <ul v-else class="ai-preview__list">
+                                        <li v-for="item in preview.acts" :key="item.key"><span class="ah-mono">{{ item.key }}</span><span class="ah-small">{{ $t(`Ai.l2_reason_${item.reason}`) }}</span></li>
+                                    </ul>
+                                </div>
+                                <div class="ai-preview__col" data-test="l2-proposes">
+                                    <span class="ah-chip ah-chip--warn">{{ $t('Ai.l2_proposes') }}</span>
+                                    <p v-if="!preview.proposes.length" class="ah-small ai-preview__none">{{ $t('Ai.l2_none_propose') }}</p>
+                                    <ul v-else class="ai-preview__list">
+                                        <li v-for="item in preview.proposes" :key="item.key"><span class="ah-mono">{{ item.key }}</span><span class="ah-small">{{ $t(`Ai.l2_reason_${item.reason}`) }}</span></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
                     </section>
 
                     <section class="ah-card ai-agent">
@@ -71,11 +92,16 @@
                         <div class="ah-label">{{ $t('Ai.recent_audit') }}</div>
                         <div v-if="!recentRuns.length" class="ah-empty" style="margin-top:8px">{{ $t('Ai.no_runs') }}</div>
                         <ul v-else class="ai-audit">
-                            <li v-for="run in recentRuns" :key="run._id" class="ai-audit__row">
-                                <span class="ah-mono ai-audit__at">{{ time(run.startedAt) }}</span>
-                                <span class="ai-audit__what">{{ run.skill || run.trigger || $t('Ai.run') }}</span>
-                                <span class="ah-chip" :class="runChip(run)">{{ run.status }}</span>
-                                <span v-if="refusalCount(run)" class="ah-chip ah-chip--warn">{{ $t('Ai.refused_n', { n: refusalCount(run) }) }}</span>
+                            <li v-for="run in recentRuns" :key="run._id" class="ai-audit__item">
+                                <div class="ai-audit__row">
+                                    <span class="ah-mono ai-audit__at">{{ time(run.startedAt) }}</span>
+                                    <span class="ai-audit__what">{{ run.skill || run.trigger || $t('Ai.run') }}</span>
+                                    <span class="ah-chip" :class="runChip(run)">{{ run.status }}</span>
+                                    <span v-if="run.revertedAt" class="ah-chip ah-chip--dark">{{ $t('Ai.reverted_chip') }}</span>
+                                    <span v-if="refusalCount(run)" class="ah-chip ah-chip--warn">{{ $t('Ai.refused_n', { n: refusalCount(run) }) }}</span>
+                                    <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="toggleRun(run._id)">{{ expandedRun === run._id ? $t('Ai.hide_details') : $t('Ai.run_details') }}</button>
+                                </div>
+                                <AgentRunDetail v-if="expandedRun === run._id" :run-id="run._id" @reverted="reloadRuns" />
                             </li>
                         </ul>
                     </section>
@@ -113,7 +139,9 @@ import { useToast } from "vue-toast-notification";
 import moment from "moment";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import AiSidebar from "./AiSidebar.vue";
+import AgentRunDetail from "./AgentRunDetail.vue";
 import { useAgents, refusalCount } from "./useAgents";
+import { splitPreview } from "./policyPreview";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 
@@ -139,9 +167,24 @@ const openRunCount = computed(() => (activeRuns.value[String(route.params.id)] |
 const AUTONOMY = computed(() => (registryManifest.value.autonomy || []).map((a) => ({ level: a.level, key: `L${a.level}` })));
 const never = computed(() => (registryManifest.value.never || []).join(" · "));
 const spendRow = computed(() => (spend.value.agents || []).find((a) => a.agentId === String(route.params.id)));
+const expandedRun = ref("");
+
+const allowedKeys = computed(() => {
+    const keys = new Set();
+    skills.value.filter((s) => s.enabled).forEach((s) => (s.actions || []).forEach((a) => keys.add(a)));
+    if (!keys.size) (agent.value.allowedActions || []).forEach((a) => keys.add(a));
+    return [...keys];
+});
+const preview = computed(() => splitPreview(allowedKeys.value, registryManifest.value.actions));
 
 const time = (at) => (at ? moment(at).format("HH:mm") : "");
 const runChip = (run) => (run.status === "failed" ? "ah-chip--danger" : run.status === "running" ? "ah-chip--brand" : run.status === "skipped" ? "ah-chip--warn" : "ah-chip--ok");
+const toggleRun = (id) => { expandedRun.value = expandedRun.value === id ? "" : id; };
+
+const reloadRuns = async () => {
+    const res = await apiRequest("get", `${env.AGENT_RUNS}?agentId=${route.params.id}&limit=5`);
+    if (res?.data?.status) recentRuns.value = res.data.data || [];
+};
 
 const load = async () => {
     await Promise.all([loadAgents(), loadSpend(), loadRegistry(), loadActiveRuns()]);
@@ -151,7 +194,7 @@ const load = async () => {
         return;
     }
     agent.value = found;
-    form.autonomy = Number(found.autonomy || 1);
+    form.autonomy = Number(found.autonomy ?? 1);
     form.rateLimitPerDay = Number(found.rateLimitPerDay || 40);
     form.spendCapUsd = Number(found.spendCapUsd || 30);
     skills.value = (found.skills || []).map((s) => ({
@@ -161,8 +204,7 @@ const load = async () => {
         enabled: s.enabled !== false
     }));
 
-    const res = await apiRequest("get", `${env.AGENT_RUNS}?agentId=${route.params.id}&limit=5`);
-    if (res?.data?.status) recentRuns.value = res.data.data || [];
+    await reloadRuns();
     loadingAgent.value = false;
 };
 
@@ -227,8 +269,16 @@ onMounted(load);
 .ai-radio { display: flex; align-items: center; gap: 9px; padding: 9px 11px; border: 1.5px solid var(--border); border-radius: 9px; cursor: pointer; font: var(--text-body); }
 .ai-radio.is-on { border-color: var(--brand); background: var(--brand-tint); }
 .ai-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 10px; }
+.ai-preview { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--hairline); }
+.ai-preview__cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.ai-preview__col { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.ai-preview__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; width: 100%; }
+.ai-preview__list li { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.ai-preview__list .ah-small { color: var(--ink-2); }
+.ai-preview__none { margin: 0; color: var(--ink-2); }
 .ai-audit { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.ai-audit__row { display: flex; align-items: center; gap: 10px; font: var(--text-small); }
+.ai-audit__item { display: flex; flex-direction: column; }
+.ai-audit__row { display: flex; align-items: center; gap: 10px; font: var(--text-small); flex-wrap: wrap; }
 .ai-audit__at { color: var(--ink-3); }
 .ai-audit__what { flex: 1; min-width: 0; color: var(--ink); }
 .ai-danger { border-color: var(--danger-ink, #b42318); }

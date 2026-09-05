@@ -52,7 +52,7 @@ const create = async (companyId, { agent, runId, taskId, projectId, what, why, c
         data: {
             agentId: String(agent._id), agentName: agent.name, runId: runId || null, taskId: taskId || null, projectId: projectId || null,
             what: String(what).slice(0, 300), why: String(why || '').slice(0, 2000),
-            changes: changes.map((c) => ({ action: c.action, params: c.params || {}, label: String(c.label || c.action).slice(0, 300), reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable) })),
+            changes: changes.map((c) => ({ action: c.action, params: c.params || {}, label: String(c.label || c.action).slice(0, 300), reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || null })),
             status: STATUS.PENDING, gate: gateOf(changes, gate), priority: priority || 'normal', cost: cost || null, auditIds: [],
         },
     }, 'save');
