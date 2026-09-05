@@ -41,6 +41,7 @@
 .ai-agent__skills { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 8px; }
 .ai-agent__today { font: var(--text-small); color: var(--ink-2); }
 .ai-agent__today b { color: var(--ink); font-weight: 600; }
+.ai-agent__needs { color: var(--ink-3); margin: 0; }
 .ai-agent__foot { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--hairline); }
 .ai-agent__trigger { margin-left: auto; font: var(--text-data); color: var(--ink-3); }
 .ai-agent--paused { opacity: .72; }
@@ -100,3 +101,11 @@
     .ai-inbox--detail .ai-inbox__list { display: none; }
     .ai-inbox:not(.ai-inbox--detail) .ai-detail { display: none; }
 }
+
+/* The small modals the AI pages open (agent wizard, run-on-task picker). */
+.aw-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); z-index: 70; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.aw { width: 560px; max-width: 100%; max-height: 86dvh; display: flex; flex-direction: column; border-radius: var(--r-modal); box-shadow: var(--shadow-modal); }
+.aw__head { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--hairline); }
+.aw__head .ah-btn { margin-left: auto; }
+.aw__body { padding: 16px; overflow: auto; display: flex; flex-direction: column; gap: 14px; }
+.aw__foot { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--hairline); }

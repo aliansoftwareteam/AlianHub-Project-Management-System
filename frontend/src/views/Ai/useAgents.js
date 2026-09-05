@@ -1,15 +1,22 @@
 import { computed, ref } from "vue";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
+import { i18n } from "@/locales/main";
 import { shellState } from "@/components/organisms/Shell/shellState";
 
+// The server clamps autonomy to L3; a fourth rung would promise a level no agent can reach.
 const AUTONOMY = [
     { level: 0, key: "L0", label: "Assist" },
     { level: 1, key: "L1", label: "Suggest" },
     { level: 2, key: "L2", label: "Act in bounds" },
-    { level: 3, key: "L3", label: "Scheduled" },
-    { level: 4, key: "L4", label: "Lifecycle" }
+    { level: 3, key: "L3", label: "Scheduled" }
 ];
+
+const INBOX_VIEWS = Object.freeze({
+    pending: { query: "?status=pending", statuses: ["pending"] },
+    done: { query: "?status=all&limit=200", statuses: ["approved", "edited"] },
+    declined: { query: "?status=declined", statuses: ["declined"] }
+});
 
 const agents = ref([]);
 const proposals = ref([]);
@@ -19,9 +26,30 @@ const spend = ref({});
 const registryManifest = ref({ actions: [], never: [] });
 const loading = ref(false);
 const lastError = ref("");
+const activeRuns = ref({});
 
 const ok = (res) => res?.data?.status === true;
 const rows = (res) => (ok(res) ? res.data.data : []);
+
+/* The service layer rejects on any non-2xx, so the API's own refusal ("Agent is
+ * paused", "Spend cap reached") lives on error.response — never on res.data. */
+export const reasonOf = (error, fallbackKey) => error?.response?.data?.statusText
+    || error?.response?.data?.message
+    || (error?.message && !/^Request failed with status code/.test(error.message) ? error.message : "")
+    || i18n.global.t(fallbackKey);
+
+const request = async (type, endpoint, body, fallbackKey) => {
+    let res;
+    try {
+        res = await apiRequest(type, endpoint, body);
+    } catch (error) {
+        throw new Error(reasonOf(error, fallbackKey));
+    }
+    if (!ok(res)) throw new Error(res?.data?.statusText || res?.data?.message || i18n.global.t(fallbackKey));
+    return res.data;
+};
+
+export const refusalCount = (run) => (Array.isArray(run?.refusals) ? run.refusals.length : Number(run?.refusals || 0));
 
 export function autonomyOf(level) {
     return AUTONOMY.find((a) => a.level === Number(level)) || AUTONOMY[0];
@@ -29,18 +57,18 @@ export function autonomyOf(level) {
 
 export function useAgents() {
     const running = computed(() => Number(runSummary.value.running || 0));
-    const waiting = computed(() => Number(counts.value.pending || 0));
+    const waiting = computed(() => Number(counts.value.waiting || 0));
 
     const loadAgents = async () => {
         const res = await apiRequest("get", env.AGENTS);
         agents.value = rows(res);
     };
 
-    const loadProposals = async (bucket = "pending") => {
-        const query = bucket === "pending" ? "?status=pending" : `?status=all&bucket=${encodeURIComponent(bucket)}`;
-        const res = await apiRequest("get", `${env.AGENT_PROPOSALS}${query}`);
+    const loadProposals = async (view = "pending") => {
+        const spec = INBOX_VIEWS[view] || INBOX_VIEWS.pending;
+        const res = await apiRequest("get", `${env.AGENT_PROPOSALS}${spec.query}`);
         if (!ok(res)) return;
-        proposals.value = res.data.data || [];
+        proposals.value = (res.data.data || []).filter((p) => spec.statuses.includes(p.status));
         counts.value = res.data.counts || {};
     };
 
@@ -67,71 +95,67 @@ export function useAgents() {
         try {
             await Promise.all([loadAgents(), loadProposals(), loadSummary(), loadSpend(), loadRegistry()]);
         } catch (error) {
-            lastError.value = error?.response?.data?.statusText || error.message;
+            lastError.value = reasonOf(error, "Ai.load_failed");
         } finally {
             loading.value = false;
         }
     };
 
-    const decide = async (id, verb, body = {}) => {
-        const res = await apiRequest("post", `${env.AGENT_PROPOSALS}/${id}/${verb}`, body);
-        if (!ok(res)) throw new Error(res?.data?.statusText || "That did not go through.");
-        return res.data.data;
-    };
+    const decide = async (id, verb, body = {}) => (await request("post", `${env.AGENT_PROPOSALS}/${id}/${verb}`, body, "Ai.decision_failed")).data;
 
     const setPaused = async (agentId, paused) => {
-        await apiRequest("post", `${env.AGENTS}/${agentId}/${paused ? "pause" : "resume"}`, {});
+        await request("post", `${env.AGENTS}/${agentId}/${paused ? "pause" : "resume"}`, {}, paused ? "Ai.pause_failed" : "Ai.resume_failed");
         await loadAgents();
     };
 
     const pauseAll = async () => {
-        await apiRequest("post", env.AGENT_PAUSE_ALL, {});
+        await request("post", env.AGENT_PAUSE_ALL, {}, "Ai.pause_failed");
         await Promise.all([loadAgents(), loadSummary()]);
     };
 
-    // Runs still open, by agent — so a card can offer Stop instead of leaving a stuck
-    // run to sit in every "n running" count.
-    const activeRuns = ref({});
     const loadActiveRuns = async () => {
         try {
-            const res = await apiRequest("get", `${env.AGENT_RUNS}?limit=50`);
-            const rows = ok(res) ? (res.data.data || []) : [];
+            const res = await apiRequest("get", `${env.AGENT_RUNS}?status=open&limit=50`);
             const map = {};
-            rows.filter((r) => ["running", "queued", "waiting_approval"].includes(r.status)).forEach((r) => { (map[r.agentId] = map[r.agentId] || []).push(r._id); });
+            rows(res).forEach((r) => { (map[r.agentId] = map[r.agentId] || []).push(r._id); });
             activeRuns.value = map;
         } catch (e) { activeRuns.value = {}; }
     };
+
     const stopActive = async (agentId) => {
         const ids = activeRuns.value[agentId] || [];
         for (const id of ids) {
             // eslint-disable-next-line no-await-in-loop
-            await apiRequest("post", `${env.AGENT_RUNS}/${id}/stop`, {});
+            await request("post", `${env.AGENT_RUNS}/${id}/stop`, {}, "Ai.stop_failed");
         }
         await loadActiveRuns();
         await loadSummary();
     };
 
-    const runNow = async (agentId) => {
-        const res = await apiRequest("post", env.AGENT_RUNS, { agentId, trigger: "manual" });
-        if (!ok(res)) throw new Error(res?.data?.statusText || "The run did not start.");
+    const runNow = async (agentId, taskId, extra = {}) => {
+        const out = await request("post", env.AGENT_RUNS, { agentId, taskId, trigger: "manual", ...extra }, "Ai.run_failed");
         await loadSummary();
         await loadActiveRuns();
-        return res.data.data;
+        return out.data;
     };
 
     const saveAgent = async (agent) => {
-        const res = agent._id
-            ? await apiRequest("put", `${env.AGENTS}/${agent._id}`, agent)
-            : await apiRequest("post", env.AGENTS, agent);
-        if (!ok(res)) throw new Error(res?.data?.statusText || "The agent was not saved.");
+        const out = agent._id
+            ? await request("put", `${env.AGENTS}/${agent._id}`, agent, "Ai.save_failed")
+            : await request("post", env.AGENTS, agent, "Ai.save_failed");
         await loadAgents();
-        return res.data.data;
+        return out.data;
+    };
+
+    const deleteAgent = async (agentId) => {
+        await request("delete", `${env.AGENTS}/${agentId}`, undefined, "Ai.delete_failed");
+        await loadAgents();
     };
 
     return {
         agents, proposals, counts, runSummary, spend, registryManifest, loading, lastError,
         running, waiting, AUTONOMY,
         loadAll, loadAgents, loadProposals, loadSummary, loadSpend, loadRegistry,
-        decide, setPaused, pauseAll, runNow, saveAgent, activeRuns, loadActiveRuns, stopActive
+        decide, setPaused, pauseAll, runNow, saveAgent, deleteAgent, activeRuns, loadActiveRuns, stopActive
     };
 }

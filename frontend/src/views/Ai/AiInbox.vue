@@ -15,18 +15,20 @@
                 <div class="ai-inbox__list ah-scroll">
                     <div class="ai-inbox__tabs">
                         <div class="ah-tabs">
-                            <button v-for="tab in tabs" :key="tab.key" type="button" class="ah-tab" :class="{ 'is-active': bucket === tab.key }" @click="switchBucket(tab.key)">
+                            <button v-for="tab in tabs" :key="tab.key" type="button" class="ah-tab" :class="{ 'is-active': view === tab.key }" @click="switchView(tab.key)">
                                 {{ $t(tab.label) }}<span v-if="tab.count" class="ai-side__count ah-mono">{{ tab.count }}</span>
                             </button>
                         </div>
                     </div>
 
                     <div v-if="loading" class="ah-empty" style="margin:14px">{{ $t('Ai.loading') }}</div>
-                    <div v-else-if="!proposals.length" class="ai-done">
-                        <div class="ai-done__n ah-mono">{{ counts.approved || 0 }}</div>
+                    <EmptyState v-else-if="loadError" :title="$t('Ai.load_failed')" :message="loadError" :action-label="$t('Ai.retry')" @action="switchView(view)" />
+                    <div v-else-if="!proposals.length && view === 'pending'" class="ai-done">
+                        <div class="ai-done__n ah-mono">{{ counts.doneByAi || 0 }}</div>
                         <p class="ah-h3">{{ $t('Ai.queue_clear') }}</p>
-                        <p class="ah-small">{{ $t('Ai.queue_clear_body', { approved: counts.approved || 0, declined: counts.declined || 0 }) }}</p>
+                        <p class="ah-small">{{ $t('Ai.queue_clear_body', { approved: counts.doneByAi || 0, declined: counts.declined || 0 }) }}</p>
                     </div>
+                    <EmptyState v-else-if="!proposals.length" :title="$t(view === 'done' ? 'Ai.empty_done_title' : 'Ai.empty_declined_title')" :message="$t(view === 'done' ? 'Ai.empty_done_body' : 'Ai.empty_declined_body')" />
 
                     <button
                         v-for="p in proposals"
@@ -40,6 +42,7 @@
                         <div class="ai-item__top">
                             <span class="ai-item__agent">{{ p.agentName }}</span>
                             <span v-if="p.gate" class="ah-chip ah-chip--warn ah-chip--mono">{{ $t('Ai.gated') }}</span>
+                            <span v-if="p.status !== 'pending'" class="ah-chip ah-chip--mono">{{ $t(`Ai.status_${p.status}`) }}</span>
                             <span class="ai-item__time ah-mono">{{ shortTime(p.createdAt) }}</span>
                         </div>
                         <div class="ai-item__what">{{ p.what }}</div>
@@ -76,18 +79,19 @@
 
                     <div v-if="selected.gate" class="auth__banner auth__banner--warn" style="margin-top:14px">
                         <ShellIcon name="shield" :size="15" />
-                        <span>{{ $t('Ai.gate_note') }}</span>
+                        <span>{{ canDecide ? $t('Ai.gate_note') : $t('Ai.gate_locked') }}</span>
                     </div>
 
                     <div v-if="error" class="ah-field__error" style="margin-top:12px">{{ error }}</div>
 
-                    <div class="ai-actions">
+                    <div v-if="selected.status === 'pending' && canDecide" class="ai-actions">
                         <button type="button" class="ah-btn ah-btn--primary" :disabled="busy || !editable.length" @click="onApprove">{{ $t('Ai.approve') }}</button>
                         <button type="button" class="ah-btn ah-btn--secondary" :disabled="busy" @click="editing = !editing">
                             {{ editing ? $t('Ai.done_editing') : $t('Ai.edit_then_approve') }}
                         </button>
                         <button type="button" class="ah-btn ah-btn--ghost" :disabled="busy" @click="onDecline">{{ $t('Ai.decline') }}</button>
                     </div>
+                    <p v-else-if="selected.status !== 'pending'" class="ah-small" style="margin-top:14px">{{ decidedLine }}</p>
 
                     <p class="ai-cost">{{ costLine }}</p>
                 </div>
@@ -99,19 +103,26 @@
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
 import { useToast } from "vue-toast-notification";
 import moment from "moment";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import AiSidebar from "./AiSidebar.vue";
-import { useAgents } from "./useAgents";
+import { useAgents, reasonOf } from "./useAgents";
 
 defineOptions({ name: "AiInboxPage" });
 
-const { t } = useI18n();
-const $toast = useToast();
-const { proposals, counts, loading, loadProposals, loadSummary, decide } = useAgents();
+const GATE_OWNER_ADMIN = "owner_admin";
 
-const bucket = ref("pending");
+const { t } = useI18n();
+const { getters } = useStore();
+const $toast = useToast();
+const { proposals, counts, loadProposals, loadSummary, decide } = useAgents();
+
+const view = ref("pending");
+const loading = ref(true);
+const loadError = ref("");
 const selected = ref(null);
 const editing = ref(false);
 const editable = ref([]);
@@ -119,11 +130,19 @@ const busy = ref(false);
 const error = ref("");
 const undo = ref(null);
 
+const privileged = computed(() => [1, 2].includes(Number(getters["settings/companyUserDetail"]?.roleType)));
+const canDecide = computed(() => !selected.value || selected.value.gate !== GATE_OWNER_ADMIN || privileged.value);
+
 const tabs = computed(() => [
-    { key: "pending", label: "Ai.waiting", count: counts.value.pending || 0 },
-    { key: "done", label: "Ai.done_by_ai", count: counts.value.approved || 0 },
+    { key: "pending", label: "Ai.waiting", count: counts.value.waiting || 0 },
+    { key: "done", label: "Ai.done_by_ai", count: counts.value.doneByAi || 0 },
     { key: "declined", label: "Ai.declined", count: counts.value.declined || 0 }
 ]);
+
+const decidedLine = computed(() => {
+    const p = selected.value || {};
+    return t("Ai.decided_line", { status: t(`Ai.status_${p.status || "pending"}`), at: p.decidedAt ? moment(p.decidedAt).fromNow() : "" });
+});
 
 const changesLabel = computed(() => {
     const list = editable.value;
@@ -150,16 +169,28 @@ watch(selected, (p) => {
     editable.value = p ? (p.changes || []).map((c) => ({ ...c })) : [];
 });
 
-const switchBucket = async (key) => {
-    bucket.value = key;
+const reload = async () => {
+    loading.value = true;
+    loadError.value = "";
+    try {
+        await loadProposals(view.value);
+    } catch (e) {
+        loadError.value = reasonOf(e, "Ai.load_failed");
+    } finally {
+        loading.value = false;
+    }
+};
+
+const switchView = async (key) => {
+    view.value = key;
     selected.value = null;
-    await loadProposals(key === "pending" ? "pending" : key);
+    await reload();
 };
 
 const afterDecision = async (message) => {
     const id = selected.value._id;
     selected.value = null;
-    await Promise.all([loadProposals(bucket.value === "pending" ? "pending" : bucket.value), loadSummary()]);
+    await Promise.all([reload(), loadSummary().catch(() => {})]);
     $toast.success(message, { position: "top-right" });
     return id;
 };
@@ -202,14 +233,14 @@ const onUndo = async () => {
     if (!id) return;
     try {
         await decide(id, "undo", {});
-        await loadProposals(bucket.value === "pending" ? "pending" : bucket.value);
+        await Promise.all([reload(), loadSummary().catch(() => {})]);
         $toast.success(t("Ai.undone"), { position: "top-right" });
     } catch (e) {
         $toast.error(e.message, { position: "top-right" });
     }
 };
 
-onMounted(() => loadProposals("pending"));
+onMounted(reload);
 </script>
 
 <style>

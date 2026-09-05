@@ -9,6 +9,9 @@
             </div>
 
             <div v-if="loading" class="ai-page__body"><div class="ah-empty">{{ $t('Pipeline.loading') }}</div></div>
+            <div v-else-if="loadError" class="ai-page__body">
+                <EmptyState :title="$t('Ai.load_failed')" :message="loadError" :action-label="$t('Ai.retry')" @action="load" />
+            </div>
 
             <div v-else class="rel">
                 <div class="rel__main ah-scroll">
@@ -160,8 +163,10 @@ import { computed, inject, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import moment from "moment";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import AiSidebar from "./AiSidebar.vue";
 import { useShipping } from "./useShipping";
+import { reasonOf } from "./useAgents";
 
 // 28c — the release candidate. Staging is a proposal an Owner or Admin approves;
 // production is not offered to any agent, and there is no deploy integration in
@@ -172,6 +177,7 @@ const { t } = useI18n();
 const companyId = inject("$companyId");
 const { release, changelog, loadRelease } = useShipping();
 const loading = ref(true);
+const loadError = ref("");
 
 const counts = computed(() => release.value?.counts || { done: 0, agentAssisted: 0, agents: 0, projects: 0 });
 const tasks = computed(() => release.value?.tasks || []);
@@ -243,9 +249,19 @@ const history = computed(() => {
 
 const historyEmpty = computed(() => (audit.value.visible ? t("Pipeline.hist_none") : t("Pipeline.hist_none_restricted")));
 
-onMounted(async () => {
-    try { await loadRelease(); } finally { loading.value = false; }
-});
+const load = async () => {
+    loading.value = true;
+    loadError.value = "";
+    try {
+        await loadRelease();
+    } catch (error) {
+        loadError.value = reasonOf(error, "Ai.load_failed");
+    } finally {
+        loading.value = false;
+    }
+};
+
+onMounted(load);
 </script>
 
 <style>

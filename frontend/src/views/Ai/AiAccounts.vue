@@ -10,7 +10,12 @@
                 <span v-else class="ah-chip ah-chip--mono">{{ $t('Accounts.not_linked') }}</span>
             </div>
 
-            <div class="acct-page__body ah-scroll">
+            <div v-if="loading" class="acct-page__body"><div class="ah-empty">{{ $t('Ai.loading') }}</div></div>
+            <div v-else-if="loadError" class="acct-page__body">
+                <EmptyState :title="$t('Ai.load_failed')" :message="loadError" :action-label="$t('Ai.retry')" @action="load" />
+            </div>
+
+            <div v-else class="acct-page__body ah-scroll">
                 <div class="ah-tabs">
                     <button v-for="tabKey in tabs" :key="tabKey" type="button" class="ah-tab" :class="{ 'is-active': tab === tabKey }" @click="tab = tabKey">
                         {{ $t(`Accounts.tab_${tabKey}`) }}
@@ -222,6 +227,7 @@
                                         </div>
                                     </div>
                                     <p class="acct-note" style="margin-top:8px">{{ minted ? $t('Accounts.cli_url_minted') : $t('Accounts.cli_url_guess') }}</p>
+                                    <p class="acct-note">{{ $t('Accounts.cli_others_note') }}</p>
                                 </div>
                             </section>
 
@@ -278,6 +284,7 @@
                                     </template>
 
                                     <div style="margin-top:12px">
+                                        <p v-if="revokeError" class="ah-field__error" style="margin-bottom:8px">{{ revokeError }}</p>
                                         <div v-for="tk in tokens" :key="tk._id" class="acct-token" :class="{ 'is-revoked': !tk.active }">
                                             <div class="acct-token__text">
                                                 <div class="acct-token__name">{{ tk.name }}</div>
@@ -404,10 +411,13 @@ import { computed, inject, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { useGetterFunctions } from "@/composable/index.js";
 import AiSidebar from "./AiSidebar.vue";
 import AccountAttribution from "./AccountAttribution.vue";
 import { useAccounts, MODES, PROVIDERS } from "./useAccounts";
+import { reasonOf } from "./useAgents";
+import { mcpUrlFor } from "./mcpUrl";
 
 // Coding-agent accounts (27a-d) and the CLI setup panel (26a). Every claim on
 // this page is one the backend actually makes: the modes and the policy come
@@ -448,6 +458,9 @@ const mintBusy = ref(false);
 const mintError = ref("");
 const minted = ref(null);
 const revoking = ref("");
+const revokeError = ref("");
+const loading = ref(true);
+const loadError = ref("");
 const copied = ref("");
 
 const form = reactive({ mode: "personal", provider: "claude-code", label: "", email: "" });
@@ -467,7 +480,7 @@ const accountMeta = computed(() => {
     return parts.filter(Boolean).join(" · ");
 });
 
-const mcpUrl = computed(() => (minted.value && minted.value.mcpUrl) || `${window.location.origin}/mcp?companyId=${companyId.value || ""}`);
+const mcpUrl = computed(() => mcpUrlFor(companyId.value));
 const tokenForCommand = computed(() => (minted.value ? minted.value.token : "ah_pat_••••••••"));
 const setupCommand = computed(() => `claude mcp add --transport http alianhub "${mcpUrl.value}" --header "Authorization: Bearer ${tokenForCommand.value}"`);
 
@@ -481,17 +494,19 @@ const cliLines = computed(() => {
     if (manifest.value.tools.length) {
         lines.push({ kind: "ok", text: t("Accounts.cli_connected", { n: manifest.value.tools.length, v: manifest.value.protocolVersion }) });
     }
-    lines.push({ kind: "blank", text: "" });
-    lines.push({ kind: "comment", text: `# ${t("Accounts.cli_comment_others")}` });
-    lines.push({ kind: "cmd", text: `antigravity mcp add alianhub --url ${mcpUrl.value}` });
-    lines.push({ kind: "cmd", text: `cursor mcp add alianhub --url ${mcpUrl.value}` });
-    lines.push({ kind: "cmd", text: `codex config mcp.alianhub.url=${mcpUrl.value}` });
     return lines;
 });
+
+const expiryOf = (tk) => {
+    if (!tk.expiresAt) return t("Accounts.no_expiry");
+    const at = new Date(tk.expiresAt);
+    return at.getTime() < Date.now() ? t("Accounts.expired_on", { d: at.toLocaleDateString() }) : t("Accounts.expires_on", { d: at.toLocaleDateString() });
+};
 
 const tokenMeta = (tk) => [
     tk.prefix ? `${tk.prefix}…` : "",
     tk.createdAt ? t("Accounts.created_on", { d: new Date(tk.createdAt).toLocaleDateString() }) : "",
+    expiryOf(tk),
     tk.lastUsedAt ? t("Accounts.used_on", { d: new Date(tk.lastUsedAt).toLocaleString() }) : t("Accounts.never_used"),
     tk.agentAccount && tk.agentAccount.mode ? t(`Accounts.mode_${tk.agentAccount.mode}`) : "",
     tk.projectIds && tk.projectIds.length ? t("Accounts.scoped_projects", { n: tk.projectIds.length }) : ""
@@ -640,10 +655,11 @@ const onMint = async () => {
 
 const onRevoke = async (tk) => {
     revoking.value = tk._id;
+    revokeError.value = "";
     try {
         await revokeToken(tk._id);
     } catch (error) {
-        mintError.value = error.message;
+        revokeError.value = error.message;
     } finally {
         revoking.value = "";
     }
@@ -659,16 +675,26 @@ const copy = async (text, key) => {
     }
 };
 
-onMounted(async () => {
-    await Promise.all([loadAccount(), loadTokens(), loadManifest(), loadRuns()]);
-    /* No runs means no bar, so the people total is never asked for — an
-       unbounded timesheet read for a card that will not render. */
-    const charted = runWindow.value;
-    if (charted) await loadPeopleHours(charted.start, charted.end);
-    draftModes.value = [...(policy.value.allowedModes || MODES)];
-    if (!allowed.value.includes(form.mode)) form.mode = allowed.value[0] || "personal";
-    if (!allowed.value.includes(tokenForm.mode)) tokenForm.mode = allowed.value[0] || "personal";
-});
+const load = async () => {
+    loading.value = true;
+    loadError.value = "";
+    try {
+        await Promise.all([loadAccount(), loadTokens(), loadManifest(), loadRuns()]);
+        /* No runs means no bar, so the people total is never asked for — an
+           unbounded timesheet read for a card that will not render. */
+        const charted = runWindow.value;
+        if (charted) await loadPeopleHours(charted.start, charted.end);
+        draftModes.value = [...(policy.value.allowedModes || MODES)];
+        if (!allowed.value.includes(form.mode)) form.mode = allowed.value[0] || "personal";
+        if (!allowed.value.includes(tokenForm.mode)) tokenForm.mode = allowed.value[0] || "personal";
+    } catch (error) {
+        loadError.value = reasonOf(error, "Ai.load_failed");
+    } finally {
+        loading.value = false;
+    }
+};
+
+onMounted(load);
 </script>
 
 <style>

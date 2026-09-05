@@ -43,7 +43,8 @@
                             <span class="ah-chip ah-chip--agent ah-chip--mono">{{ badgeOf(row) }}</span>
                             <span class="picker__fit ah-mono" :class="fitClass(row)">{{ fitLabel(row) }}</span>
                         </span>
-                        <span class="picker__row-why">{{ row.reason }}</span>
+                        <span class="picker__row-why">{{ fitReasonText(t, row) }}</span>
+                        <span class="picker__row-why picker__row-needs">{{ needsLine(row) }}</span>
                         <span v-if="row.eligible" class="picker__row-facts ah-mono">
                             <span>{{ estimateTime(row) }}</span>
                             <span>{{ estimateCost(row) }}</span>
@@ -103,7 +104,11 @@
             <div class="picker__also">
                 <div class="ah-label">{{ $t('Parity.also_set') }}</div>
                 <label class="picker__check"><input v-model="notifyMe" class="ah-check" type="checkbox" />{{ $t('Parity.notify_me') }}</label>
-                <label class="picker__check"><input v-model="capped" class="ah-check" type="checkbox" />{{ $t('Parity.stop_over_cap', { usd: '2' }) }}</label>
+                <label class="picker__check"><input v-model="capped" class="ah-check" type="checkbox" />{{ $t('Parity.stop_over_cap', { usd: capUsd }) }}</label>
+                <label v-if="capped" class="picker__check picker__cap">
+                    <span class="ah-small">{{ $t('Parity.cap_usd') }}</span>
+                    <input v-model.number="capUsd" class="ah-input" type="number" min="0.5" step="0.5" />
+                </label>
             </div>
 
             <p v-if="error" class="ah-field__error">{{ error }}</p>
@@ -124,6 +129,8 @@ import { useI18n } from "vue-i18n";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import AgentIdentity from "./AgentIdentity.vue";
 import { rankAgents } from "./agentFit";
+import { fitReasonText, workLabelText } from "./fitText";
+import { requirementsOf } from "./skillInputs";
 
 // The fit-ranked assignee picker (handoff 30a). Ranking is the pure helper in
 // agentFit.js; this component only draws it and states what it is about to do
@@ -144,10 +151,13 @@ const props = defineProps({
 const emit = defineEmits(["assign", "close"]);
 const { t } = useI18n();
 
+const DEFAULT_CAP_USD = 2;
+
 const query = ref("");
 const chosen = ref("");
 const notifyMe = ref(true);
 const capped = ref(false);
+const capUsd = ref(DEFAULT_CAP_USD);
 
 const matches = (name) => !query.value || String(name || "").toLowerCase().includes(query.value.trim().toLowerCase());
 
@@ -194,7 +204,12 @@ const fitClass = (row) => {
 
 const estimateTime = (row) => (row.estimate.minutes === null ? t("Parity.time_unknown") : t("Parity.about_minutes", { n: row.estimate.minutes }));
 const estimateCost = (row) => (row.estimate.usd === null ? t("Parity.cost_unknown") : t("Parity.about_usd", { usd: row.estimate.usd.toFixed(2) }));
-const willLabel = (row) => (row.coverage >= 1 ? row.work.label : t("Parity.comment_only"));
+const willLabel = (row) => (row.coverage >= 1 ? workLabelText(t, row.work) : t("Parity.comment_only"));
+
+const needsLine = (row) => {
+    const agent = props.agents.find((a) => String(a._id) === row.agentId) || {};
+    return t("Parity.agent_needs", { what: requirementsOf(agent).map((code) => t(`Ai.req_${code}`)).join(" · ") });
+};
 
 const personLine = (person) => {
     const bits = [];
@@ -231,7 +246,8 @@ const confirm = () => {
         id: chosen.value,
         fit: selectedAgent.value,
         notifyMe: notifyMe.value,
-        stopOverCap: capped.value
+        stopOverCap: capped.value,
+        capUsd: capped.value ? Number(capUsd.value) || DEFAULT_CAP_USD : 0
     });
 };
 </script>

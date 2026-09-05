@@ -240,7 +240,7 @@ describe('routing refuses a task that lacks what the agent\'s skills need (brows
         const t = task({ TaskName: 'Review https://github.com/a/b/pull/3' });
         const out = fit(reviewer, t, runs);
         expect(out.history).toMatchObject({ runs: 3, finished: 1, good: 1, skipped: 2, successRate: 1 });
-        expect(out.reason).toMatch(/1 finished clean, 2 skipped for missing input/);
+        expect(out.reason).toMatch(/1 finished clean\. 2 skipped for missing input/);
         const onlySkips = fit(reviewer, t, runs.slice(0, 2));
         expect(onlySkips.noHistory).toBe(true);
         expect(onlySkips.percent).toBeNull();

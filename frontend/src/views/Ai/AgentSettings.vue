@@ -11,7 +11,7 @@
                     <span>{{ agent.name || $t('Ai.agent') }}</span>
                 </div>
                 <div class="ah-toolbar__spacer"></div>
-                <button type="button" class="ah-btn ah-btn--danger ah-btn--sm" :disabled="busy" @click="stop">{{ $t('Ai.stop_agent') }}</button>
+                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="stop">{{ $t('Ai.stop_agent') }}</button>
             </div>
 
             <div class="ai-page__body ah-scroll">
@@ -51,12 +51,9 @@
                     </section>
 
                     <section class="ah-card ai-agent">
-                        <div class="ah-label">{{ $t('Ai.runs_schedule') }}</div>
+                        <div class="ah-label">{{ $t('Ai.runs_limits') }}</div>
+                        <p class="ai-lead" style="margin:6px 0 0">{{ $t('Ai.runs_manual_note') }}</p>
                         <div class="ai-fields">
-                            <div class="ah-field">
-                                <label class="ah-field__label" for="sched">{{ $t('Ai.schedule') }}</label>
-                                <input id="sched" v-model.trim="form.scheduleAt" type="text" class="ah-input" :placeholder="$t('Ai.schedule_hint')" />
-                            </div>
                             <div class="ah-field">
                                 <label class="ah-field__label" for="rate">{{ $t('Ai.rate_limit') }}</label>
                                 <input id="rate" v-model.number="form.rateLimitPerDay" type="number" min="1" max="500" class="ah-input" />
@@ -78,7 +75,7 @@
                                 <span class="ah-mono ai-audit__at">{{ time(run.startedAt) }}</span>
                                 <span class="ai-audit__what">{{ run.skill || run.trigger || $t('Ai.run') }}</span>
                                 <span class="ah-chip" :class="runChip(run)">{{ run.status }}</span>
-                                <span v-if="run.refusals && run.refusals.length" class="ah-chip ah-chip--warn">{{ $t('Ai.refused_n', { n: run.refusals.length }) }}</span>
+                                <span v-if="refusalCount(run)" class="ah-chip ah-chip--warn">{{ $t('Ai.refused_n', { n: refusalCount(run) }) }}</span>
                             </li>
                         </ul>
                     </section>
@@ -88,6 +85,20 @@
                         <button type="button" class="ah-btn ah-btn--primary" :disabled="busy" @click="save">{{ busy ? $t('Ai.saving') : $t('Ai.save') }}</button>
                         <router-link class="ah-btn ah-btn--secondary" :to="{ name: 'AiHub', params: { cid: companyId } }">{{ $t('Ai.cancel') }}</router-link>
                     </div>
+
+                    <section class="ah-card ai-agent ai-danger">
+                        <div class="ah-label">{{ $t('Ai.delete_agent') }}</div>
+                        <p class="ai-lead" style="margin:6px 0 10px">{{ openRunCount ? $t('Ai.delete_blocked_running', { n: openRunCount }) : $t('Ai.delete_body') }}</p>
+                        <div v-if="!openRunCount" class="ai-fields">
+                            <div class="ah-field">
+                                <label class="ah-field__label" for="del-confirm">{{ $t('Ai.delete_confirm_label', { name: agent.name }) }}</label>
+                                <input id="del-confirm" v-model.trim="deleteConfirm" type="text" class="ah-input" autocomplete="off" />
+                            </div>
+                        </div>
+                        <div class="ai-actions">
+                            <button type="button" class="ah-btn ah-btn--danger" :disabled="busy || Boolean(openRunCount) || deleteConfirm !== agent.name" @click="remove">{{ $t('Ai.delete_agent') }}</button>
+                        </div>
+                    </section>
                 </template>
             </div>
         </div>
@@ -102,7 +113,7 @@ import { useToast } from "vue-toast-notification";
 import moment from "moment";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import AiSidebar from "./AiSidebar.vue";
-import { useAgents } from "./useAgents";
+import { useAgents, refusalCount } from "./useAgents";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 
@@ -113,7 +124,7 @@ const $toast = useToast();
 const route = useRoute();
 const router = useRouter();
 const companyId = inject("$companyId");
-const { agents, spend, registryManifest, loadAgents, loadSpend, loadRegistry, saveAgent, setPaused } = useAgents();
+const { agents, spend, registryManifest, loadAgents, loadSpend, loadRegistry, saveAgent, setPaused, deleteAgent, activeRuns, loadActiveRuns } = useAgents();
 
 const loadingAgent = ref(true);
 const busy = ref(false);
@@ -121,17 +132,19 @@ const error = ref("");
 const agent = ref({});
 const skills = ref([]);
 const recentRuns = ref([]);
-const form = reactive({ autonomy: 1, scheduleAt: "", rateLimitPerDay: 40, spendCapUsd: 30 });
+const deleteConfirm = ref("");
+const form = reactive({ autonomy: 1, rateLimitPerDay: 40, spendCapUsd: 30 });
+const openRunCount = computed(() => (activeRuns.value[String(route.params.id)] || []).length);
 
 const AUTONOMY = computed(() => (registryManifest.value.autonomy || []).map((a) => ({ level: a.level, key: `L${a.level}` })));
 const never = computed(() => (registryManifest.value.never || []).join(" · "));
 const spendRow = computed(() => (spend.value.agents || []).find((a) => a.agentId === String(route.params.id)));
 
 const time = (at) => (at ? moment(at).format("HH:mm") : "");
-const runChip = (run) => (run.status === "failed" ? "ah-chip--danger" : run.status === "running" ? "ah-chip--brand" : "ah-chip--ok");
+const runChip = (run) => (run.status === "failed" ? "ah-chip--danger" : run.status === "running" ? "ah-chip--brand" : run.status === "skipped" ? "ah-chip--warn" : "ah-chip--ok");
 
 const load = async () => {
-    await Promise.all([loadAgents(), loadSpend(), loadRegistry()]);
+    await Promise.all([loadAgents(), loadSpend(), loadRegistry(), loadActiveRuns()]);
     const found = agents.value.find((a) => String(a._id) === String(route.params.id));
     if (!found) {
         router.replace({ name: "AiHub", params: { cid: companyId.value } });
@@ -139,7 +152,6 @@ const load = async () => {
     }
     agent.value = found;
     form.autonomy = Number(found.autonomy || 1);
-    form.scheduleAt = (found.schedule && (found.schedule.at || found.schedule.cron)) || "";
     form.rateLimitPerDay = Number(found.rateLimitPerDay || 40);
     form.spendCapUsd = Number(found.spendCapUsd || 30);
     skills.value = (found.skills || []).map((s) => ({
@@ -163,7 +175,6 @@ const save = async () => {
             autonomy: form.autonomy,
             rateLimitPerDay: form.rateLimitPerDay,
             spendCapUsd: form.spendCapUsd,
-            schedule: form.scheduleAt ? { at: form.scheduleAt } : {},
             skills: skills.value.map((s) => ({ key: s.key, name: s.name, actions: s.actions, enabled: s.enabled }))
         });
         $toast.success(t("Ai.saved"), { position: "top-right" });
@@ -180,6 +191,21 @@ const stop = async () => {
         await setPaused(agent.value._id, true);
         $toast.success(t("Ai.stopped"), { position: "top-right" });
         router.push({ name: "AiHub", params: { cid: companyId.value } });
+    } catch (e) {
+        $toast.error(e.message, { position: "top-right" });
+    } finally {
+        busy.value = false;
+    }
+};
+
+const remove = async () => {
+    busy.value = true;
+    try {
+        await deleteAgent(agent.value._id);
+        $toast.success(t("Ai.deleted", { name: agent.value.name }), { position: "top-right" });
+        router.push({ name: "AiHub", params: { cid: companyId.value } });
+    } catch (e) {
+        $toast.error(e.message, { position: "top-right" });
     } finally {
         busy.value = false;
     }
@@ -205,4 +231,5 @@ onMounted(load);
 .ai-audit__row { display: flex; align-items: center; gap: 10px; font: var(--text-small); }
 .ai-audit__at { color: var(--ink-3); }
 .ai-audit__what { flex: 1; min-width: 0; color: var(--ink); }
+.ai-danger { border-color: var(--danger-ink, #b42318); }
 </style>

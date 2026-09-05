@@ -110,7 +110,7 @@
                                     <span v-else-if="it.taskName" class="ibx__strong">{{ it.taskName }}</span>
                                 </template>
                             </span>
-                            <span v-if="it.agent" class="ah-chip ah-chip--agent ah-chip--mono ibx__agent">AGENT</span>
+                            <span v-if="it.agent" class="ah-chip ah-chip--agent ah-chip--mono ibx__agent">{{ $t('Inbox.agent_tag') }}</span>
                             <time class="ibx__when" :title="it.createdAt">{{ stamp(it.createdAt) }}</time>
                         </div>
 
@@ -558,7 +558,7 @@ const decideProposal = async (it, verb) => {
         busy.value = false;
     }
 };
-const reviewInAiInbox = () => router.push({ name: 'AiHub', params: { cid: companyId?.value } }).catch(() => {});
+const reviewInAiInbox = () => router.push({ name: 'AiInbox', params: { cid: companyId?.value } }).catch(() => {});
 
 const isTyping = (e) => ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName) || e.target?.isContentEditable;
 const focusCursor = async () => {

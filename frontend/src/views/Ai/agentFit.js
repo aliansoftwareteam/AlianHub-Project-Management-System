@@ -17,18 +17,23 @@ const WORK_KINDS = [
     {
         kind: 'human',
         label: 'a judgement call',
+        labelKey: 'human_decision',
+        whyKey: 'human_decision',
         test: /\b(decide|decision|choose|pick between|pricing|positioning|roadmap|strateg|approve|negotiat|hire|interview)\w*\b/i,
         why: 'It asks for a decision, and a decision needs someone accountable for it.'
     },
     {
         kind: 'human',
         label: 'talking to someone',
+        labelKey: 'human_talk',
+        whyKey: 'human_talk',
         test: /\b(call|phone|meet|meeting|vendor|customer|client visit|workshop|demo to)\w*\b/i,
         why: 'It happens outside the tool, with a person on the other end.'
     },
     {
         kind: 'code',
         label: 'change code and hand back a branch',
+        labelKey: 'code',
         test: /\b(fix|bug|refactor|implement|migrate|upgrade|bump|dependenc|snapshot|failing|test|patch|typo in code)\w*\b/i,
         actions: ['task.get', 'task.comment', 'task.status.set', 'task.link'],
         skills: ['code', 'repo', 'pr', 'test', 'refactor', 'dependency']
@@ -36,6 +41,7 @@ const WORK_KINDS = [
     {
         kind: 'review',
         label: 'find the problems and report them',
+        labelKey: 'review',
         test: /\b(audit|review|check|contrast|accessib|a11y|copy|consistency|qa|verify)\w*\b/i,
         actions: ['task.get', 'task.comment'],
         skills: ['review', 'qa', 'audit', 'a11y', 'accessibility', 'design', 'copy', 'risk']
@@ -43,6 +49,7 @@ const WORK_KINDS = [
     {
         kind: 'write',
         label: 'draft something for a person to approve',
+        labelKey: 'write',
         test: /\b(write|draft|summar|release notes|changelog|digest|report|document)\w*\b/i,
         actions: ['task.get', 'page.draft', 'task.comment'],
         skills: ['write', 'digest', 'summary', 'report', 'docs', 'release']
@@ -50,6 +57,7 @@ const WORK_KINDS = [
     {
         kind: 'plan',
         label: 'break the work down',
+        labelKey: 'plan',
         test: /\b(plan|break down|estimate|scope|backlog|groom|split)\w*\b/i,
         actions: ['task.get', 'subtask.create', 'task.update'],
         skills: ['plan', 'brief', 'project', 'intake', 'scope']
@@ -59,6 +67,7 @@ const WORK_KINDS = [
 const FALLBACK_KIND = {
     kind: 'general',
     label: 'read it and comment',
+    labelKey: 'general',
     actions: ['task.get', 'task.comment'],
     skills: []
 };
@@ -84,8 +93,8 @@ const classifyTask = (task = {}) => {
     const body = taskText(task);
     const found = WORK_KINDS.find((k) => k.test.test(body));
     if (!found) return { ...FALLBACK_KIND, needsPerson: false };
-    if (found.kind === 'human') return { kind: 'human', label: found.label, why: found.why, actions: [], skills: [], needsPerson: true };
-    return { kind: found.kind, label: found.label, actions: found.actions, skills: found.skills, needsPerson: false };
+    if (found.kind === 'human') return { kind: 'human', label: found.label, labelKey: found.labelKey, why: found.why, whyKey: found.whyKey, actions: [], skills: [], needsPerson: true };
+    return { kind: found.kind, label: found.label, labelKey: found.labelKey, actions: found.actions, skills: found.skills, needsPerson: false };
 };
 
 const allowed = (agent) => (Array.isArray(agent.allowedActions) ? agent.allowedActions : []);
@@ -99,10 +108,10 @@ const URL_RE = /https?:\/\/[^\s<>"')]+/gi;
 const PR_RE = /\/pull\/\d+|\/merge_requests\/\d+|\/compare\//;
 const PRIVATE_HOST = /^(localhost|127\.|10\.|192\.168\.|0\.0\.0\.0|\[?::1)/i;
 const SKILL_INPUTS = [
-    { match: /^(pr\.summary|risk\.flags)$/, needs: (i) => Boolean(i.prUrl), reason: 'it needs a pull request link on the task' },
-    { match: /^(qa-review|qa\.review)$/, needs: (i) => Boolean(i.publicUrl), reason: 'it needs a public URL to review' },
-    { match: /^(brief\.parse|project\.plan)$/, needs: (i) => i.briefChars >= MIN_BRIEF_CHARS, reason: `it needs a brief of at least ${MIN_BRIEF_CHARS} characters` },
-    { match: /^(digest\..*|risk\.today)$/, needs: () => false, reason: 'it reports on a whole project, not on one task' }
+    { match: /^(pr\.summary|risk\.flags)$/, code: 'pr_link', needs: (i) => Boolean(i.prUrl), reason: 'it needs a pull request link on the task' },
+    { match: /^(qa-review|qa\.review)$/, code: 'public_url', needs: (i) => Boolean(i.publicUrl), reason: 'it needs a public URL to review' },
+    { match: /^(brief\.parse|project\.plan)$/, code: 'brief', needs: (i) => i.briefChars >= MIN_BRIEF_CHARS, reason: `it needs a brief of at least ${MIN_BRIEF_CHARS} characters` },
+    { match: /^(digest\..*|risk\.today)$/, code: 'project_task', needs: () => false, reason: 'it reports on a whole project, not on one task' }
 ];
 
 const hostOf = (url) => { try { return new URL(url).hostname; } catch (e) { return ''; } };
@@ -122,15 +131,16 @@ const taskInputs = (task = {}) => {
     };
 };
 
-/* The reason none of the agent's skills can start on this task, or '' when at
- * least one can (or has no known requirement). */
+/* Why none of the agent's skills can start on this task, as { reason, code }
+ * (code = the Ai.req_* line), or null when at least one can or has no known
+ * requirement. */
 const missingInput = (agent, task) => {
     const inputs = taskInputs(task);
     const known = skillNames(agent).map((s) => ({ skill: s, rule: SKILL_INPUTS.find((r) => r.match.test(s)) })).filter((k) => k.rule);
-    if (!known.length) return '';
+    if (!known.length) return null;
     const unmet = known.filter((k) => !k.rule.needs(inputs));
-    if (unmet.length < known.length) return '';
-    return unmet[0].rule.reason;
+    if (unmet.length < known.length) return null;
+    return { reason: unmet[0].rule.reason, code: unmet[0].rule.code };
 };
 
 /* An agent with an empty allowedActions list has never been narrowed, so the
@@ -181,32 +191,42 @@ const coverage = (agent, work) => {
     return needed.filter((a) => canDo(agent, a)).length / needed.length;
 };
 
+/* Every reason carries a code and params next to its English text, so a
+ * component can render it through $t while this file stays free of i18n. */
+const NOT_BLOCKED = { text: '', code: '', params: {} };
+
 const ineligibility = (agent, work, task = {}) => {
-    if (work.needsPerson) return `This needs a person — ${work.why}`;
-    if (agent.paused) return `Paused${agent.pausedReason ? ` (${agent.pausedReason})` : ''}.`;
-    if (capReached(agent)) return `Spend cap reached — $${round2(monthSpend(agent))} of $${agent.spendCapUsd} this month.`;
+    if (work.needsPerson) return { text: `This needs a person — ${work.why}`, code: 'needs_person', params: { why: work.whyKey } };
+    if (agent.paused) return { text: `Paused${agent.pausedReason ? ` (${agent.pausedReason})` : ''}.`, code: 'paused', params: { reason: agent.pausedReason || '' } };
+    if (capReached(agent)) {
+        return { text: `Spend cap reached — $${round2(monthSpend(agent))} of $${agent.spendCapUsd} this month.`, code: 'cap_reached', params: { spent: round2(monthSpend(agent)).toFixed(2), cap: agent.spendCapUsd } };
+    }
     const projectId = task && task.ProjectID;
     if (projectId && Array.isArray(agent.projectIds) && agent.projectIds.length && !agent.projectIds.map(String).includes(String(projectId))) {
-        return 'Not scoped to this project.';
+        return { text: 'Not scoped to this project.', code: 'not_scoped', params: {} };
     }
-    if (!canDo(agent, 'task.get')) return 'It cannot read a task.';
-    if (coverage(agent, work) === 0) return `It has no allowed action that would ${work.label}.`;
+    if (!canDo(agent, 'task.get')) return { text: 'It cannot read a task.', code: 'cannot_read', params: {} };
+    if (coverage(agent, work) === 0) return { text: `It has no allowed action that would ${work.label}.`, code: 'no_action', params: { work: work.labelKey } };
     const missing = missingInput(agent, task);
-    if (missing) return `This task lacks what it needs — ${missing}.`;
-    return '';
+    if (missing) return { text: `This task lacks what it needs — ${missing.reason}.`, code: 'lacks_input', params: { need: missing.code } };
+    return NOT_BLOCKED;
 };
 
 const reasonFor = (agent, work, cover, history) => {
     const parts = [];
-    if (cover >= 1) parts.push(`Allowed to ${work.label}.`);
-    else parts.push(`Can start, but it may only ${allowed(agent).filter((a) => !READ_ACTIONS.includes(a)).length ? 'do part of this' : 'read and comment'} — you would get a list, not a fix.`);
+    if (cover >= 1) parts.push({ text: `Allowed to ${work.label}.`, code: 'allowed', params: { work: work.labelKey } });
+    else if (allowed(agent).filter((a) => !READ_ACTIONS.includes(a)).length) parts.push({ text: 'Can start, but it may only do part of this — you would get a list, not a fix.', code: 'partial', params: {} });
+    else parts.push({ text: 'Can start, but it may only read and comment — you would get a list, not a fix.', code: 'read_only', params: {} });
     if (history.runs) {
-        const scope = history.similar >= 3 ? `${history.similar} similar` : `${history.runs}`;
-        parts.push(`${scope} run${history.runs === 1 ? '' : 's'} here, ${history.good} finished clean${history.skipped ? `, ${history.skipped} skipped for missing input` : ''}.`);
+        const similar = history.similar >= 3;
+        const n = similar ? history.similar : history.runs;
+        const scope = similar ? `${history.similar} similar` : `${history.runs}`;
+        parts.push({ text: `${scope} run${history.runs === 1 ? '' : 's'} here, ${history.good} finished clean.`, code: similar ? 'history_similar' : 'history', params: { n, good: history.good } });
+        if (history.skipped) parts.push({ text: `${history.skipped} skipped for missing input.`, code: 'history_skipped', params: { n: history.skipped } });
     } else {
-        parts.push('No history in this workspace yet.');
+        parts.push({ text: 'No history in this workspace yet.', code: 'no_history', params: {} });
     }
-    return parts.join(' ');
+    return parts;
 };
 
 /* What it will and will not do, straight from the server registry so the copy
@@ -230,12 +250,14 @@ const estimateFor = (history) => {
 /* One agent against one task. */
 const fitFor = ({ agent, task, runs = [], registryActions = [], never = [] }) => {
     const work = classifyTask(task);
-    const blocked = ineligibility(agent, work, task);
+    const blockedBy = ineligibility(agent, work, task);
+    const blocked = blockedBy.text;
     const missing = missingInput(agent, task);
     const history = historyFor(agent, runs, work.kind);
     const cover = coverage(agent, work);
     const skill = skillOverlap(agent, work, task);
     const { will, wont } = boundaries(agent, registryActions, never);
+    const reasons = blocked ? [blockedBy] : reasonFor(agent, work, cover, history);
 
     // Weights renormalise when there is no history, so a new agent is ranked on
     // what it is allowed to do rather than penalised for a number it cannot have.
@@ -254,7 +276,8 @@ const fitFor = ({ agent, task, runs = [], registryActions = [], never = [] }) =>
         score: blocked ? 0 : Math.round(raw * 1000) / 1000,
         percent: blocked || !hasHistory ? null : Math.round(raw * 100),
         noHistory: !hasHistory,
-        reason: blocked || reasonFor(agent, work, cover, history),
+        reason: reasons.map((r) => r.text).join(' '),
+        reasons,
         coverage: Math.round(cover * 100) / 100,
         history,
         estimate: estimateFor(history),
@@ -282,12 +305,10 @@ const routeTasks = ({ tasks = [], agents = [], runs = [], registryActions = [], 
     const best = ranked.find((r) => r.eligible && r.score >= minScore) || null;
     const work = classifyTask(task);
     const lacking = best ? null : ranked.find((r) => r.missingInput);
-    let refusal = '';
-    if (!best) {
-        if (work.needsPerson) refusal = `needs a person — ${work.why}`;
-        else if (lacking) refusal = `needs a person — ${lacking.missingInput}`;
-        else refusal = 'no agent here is allowed to do this';
-    }
+    const refusal = best ? NOT_BLOCKED
+        : work.needsPerson ? { text: `needs a person — ${work.why}`, code: 'needs_person', params: { why: work.whyKey } }
+            : lacking ? { text: `needs a person — ${lacking.missingInput.reason}`, code: 'needs_input', params: { need: lacking.missingInput.code } }
+                : { text: 'no agent here is allowed to do this', code: 'no_agent', params: {} };
     return {
         taskId: String(task._id || task.taskId || ''),
         title: task.TaskName || '',
@@ -295,7 +316,9 @@ const routeTasks = ({ tasks = [], agents = [], runs = [], registryActions = [], 
         agent: best,
         ranked,
         routed: Boolean(best),
-        refusal
+        refusal: refusal.text,
+        refusalCode: refusal.code,
+        refusalParams: refusal.params
     };
 });
 
