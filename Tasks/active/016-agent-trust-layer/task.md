@@ -1,6 +1,6 @@
 # 016 — Agent trust layer: risk-rated actions, policy-reviewed L2, whole-run revert, budgets
 
-Status: backlog · depends on 015 · branch `feat/agent-trust-layer` (from `beta`)
+Status: planned · runs in parallel with 015 · branch `feat/agent-trust-layer` (from `beta`)
 
 ## Goal
 An owner can leave an agent at L2 and trust it: every action is rated for risk, a policy decides per action whether to act or to propose, any run can be reverted as a whole inside a window the owner sets, and spend is capped and alerted per company.
@@ -27,5 +27,6 @@ Anthropic's measurement (research [50]): people approve 97% of agent actions and
 - [ ] Gates: `npm test`, vitest, i18n check, lint, build, browser sweep as owner and member.
 
 ## Decisions
-- Default autonomy for a new agent: (to decide) L1 recommended.
-- Undo window default: (to decide) 24 h recommended.
+- Default autonomy for a new agent: **L1 Suggest** (owner, 2026-09-05).
+- Undo window default: 24 h, owner-set in the instance console.
+- Ships to beta; one release to main at the end of the programme.

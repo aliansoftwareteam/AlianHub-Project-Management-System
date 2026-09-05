@@ -1,6 +1,6 @@
 # 015 — Guided project start: complete brief, honest agent/human split
 
-Status: proposed · 2026-09-05 · branch `feat/guided-project-brief` (from `beta`) · depends on 014 landing
+Status: planned · 2026-09-05 · branch `feat/guided-project-brief` (from `beta`) · runs in parallel with 016 (file ownership in `Tasks/ROADMAP-agents.md`)
 
 ## Goal
 When someone starts any project from a goal (an online store, a mobile app, a multi-team platform), the system gets a complete brief out of them with at most a handful of questions, drafts the improved brief for approval, and produces a plan where every task says up front whether an agent can do it or a person must.
@@ -79,5 +79,6 @@ Where we differ, on purpose: Notion's agent talks; ours creates the sprints and 
 | UI | agent | `AiProjectCreator.vue` (new Brief step, split badges, summary line), `frontend/src/locales/en.js` (`AiProject` namespace), unit specs |
 
 ## Decisions
+- Runs in parallel with 016; a new agent (including the Guide agent) defaults to L1 Suggest; all slices land on beta with one release at the end (owner, 2026-09-05).
 - The flow is domain-agnostic by design (owner, 2026-09-05): it must work the same for an online store, an app, or a complex multi-team project. No vertical playbooks.
 - Person tasks get an assignee and a due date inside their sprint in slice 1 (already in scope C). Reminders stay out of scope until the notification row for agent runs is verified.
