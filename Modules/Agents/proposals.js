@@ -12,7 +12,9 @@ const audit = require('./agentAudit');
 // audited and undoable like any other agent action — and hands back an undo
 // token that is honoured for 30 seconds.
 
-const STATUS = Object.freeze({ PENDING: 'pending', APPROVED: 'approved', EDITED: 'edited', DECLINED: 'declined', UNDONE: 'undone' });
+// 'applying' is the claim a decider holds while the changes run, so a second
+// approve or decline racing the first finds the proposal already taken.
+const STATUS = Object.freeze({ PENDING: 'pending', APPLYING: 'applying', APPROVED: 'approved', EDITED: 'edited', DECLINED: 'declined', UNDONE: 'undone' });
 // 30s was a reflex window, not a review window: by the time a person opened the
 // Inbox to look at what an agent did, it had closed. The audit row keeps the undo
 // descriptor either way, so a longer window costs nothing.
@@ -87,20 +89,28 @@ const list = async (companyId, { status, bucket, agentId, limit = 100 } = {}) =>
 
 const get = (companyId, id) => MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [{ _id: oid(id) }] }, 'findOne');
 
-const setStatus = async (companyId, id, set) => {
+const setStatus = async (companyId, id, set, { onlyIf } = {}) => {
+    const filter = onlyIf ? { _id: oid(id), status: onlyIf } : { _id: oid(id) };
     const updated = await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [{ _id: oid(id) }, { $set: set }, { returnDocument: 'after' }],
+        type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [filter, { $set: set }, { returnDocument: 'after' }],
     }, 'findOneAndUpdate');
     if (updated) emit(companyId, updated);
     return updated;
 };
 
+const alreadyDecided = async (companyId, id) => {
+    const now = await get(companyId, id);
+    const state = now && now.status === STATUS.APPLYING ? 'being applied' : `already ${(now && now.status) || 'decided'}`;
+    return { error: `Proposal is ${state}.`, status: 409 };
+};
+
 /* Approve (optionally with edited changes). `decider` is the human actor;
- * the changes execute AS the agent, on the human's decision. */
+ * the changes execute AS the agent, on the human's decision, inside the
+ * agent's allowedActions. */
 const approve = async (companyId, id, { decider, isPrivileged, changes: edited, ip }) => {
     const p = await get(companyId, id);
     if (!p) return { error: 'Proposal not found.', status: 404 };
-    if (p.status !== STATUS.PENDING) return { error: `Proposal is already ${p.status}.`, status: 409 };
+    if (p.status !== STATUS.PENDING) return alreadyDecided(companyId, id);
     if (p.gate === GATE_OWNER_ADMIN && !isPrivileged) return { error: 'This proposal needs an Owner or Admin.', status: 403 };
 
     let changes = p.changes;
@@ -112,13 +122,20 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
         status = STATUS.EDITED;
     }
 
+    const runs = require('./runs');
+    const agent = await runs.getAgent(companyId, p.agentId);
+    if (!agent) return { error: 'This agent was deleted — decline the proposal instead.', status: 409 };
+
+    const claimed = await setStatus(companyId, id, { status: STATUS.APPLYING, decidedBy: decider.userId, decidedAt: new Date() }, { onlyIf: STATUS.PENDING });
+    if (!claimed) return alreadyDecided(companyId, id);
+
     const agentActor = { kind: 'agent', userId: decider.userId, agentId: p.agentId, agentName: p.agentName, runId: p.runId, viaAccount: 'workspace', tokenId: null };
     const auditIds = [];
     const applied = [];
     for (const c of changes) {
         try {
             // eslint-disable-next-line no-await-in-loop
-            const out = await actions.perform({ companyId, actor: agentActor, action: c.action, params: { ...c.params, __proposal: true }, reason: `approved proposal ${id} by ${decider.userId}`, ip });
+            const out = await actions.perform({ companyId, actor: agentActor, action: c.action, params: { ...c.params, __proposal: true }, reason: `approved proposal ${id} by ${decider.userId}`, ip, allowedActions: agent.allowedActions });
             if (out.auditId) auditIds.push(out.auditId);
             applied.push({ action: c.action, ok: true, result: out.result });
         } catch (e) {
@@ -126,12 +143,11 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
         }
     }
     const undoUntil = new Date(Date.now() + UNDO_WINDOW_MS);
-    const updated = await setStatus(companyId, id, { status, changes, decidedBy: decider.userId, decidedAt: new Date(), undoUntil, auditIds });
+    const updated = await setStatus(companyId, id, { status, changes, undoUntil, auditIds });
     await audit.recordProposalDecision(companyId, decider, { proposalId: id, decision: status, agentName: p.agentName, runId: p.runId, changes: applied, ip });
     // The run was waiting on this decision; without closing it here it sat in
     // "waiting_approval" — and in every running count — after the work was done.
     if (p.runId) {
-        const runs = require('./runs');
         const okCount = applied.filter((a) => a.ok).length;
         await runs.finish(companyId, p.runId, { status: runs.STATUS.DONE, outcome: `${status} by a person — ${okCount} of ${applied.length} change(s) applied` }).catch(() => {});
     }
@@ -141,8 +157,9 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
 const decline = async (companyId, id, { decider, ip, reason }) => {
     const p = await get(companyId, id);
     if (!p) return { error: 'Proposal not found.', status: 404 };
-    if (p.status !== STATUS.PENDING) return { error: `Proposal is already ${p.status}.`, status: 409 };
-    const updated = await setStatus(companyId, id, { status: STATUS.DECLINED, decidedBy: decider.userId, decidedAt: new Date() });
+    if (p.status !== STATUS.PENDING) return alreadyDecided(companyId, id);
+    const updated = await setStatus(companyId, id, { status: STATUS.DECLINED, decidedBy: decider.userId, decidedAt: new Date() }, { onlyIf: STATUS.PENDING });
+    if (!updated) return alreadyDecided(companyId, id);
     if (p.runId) { const runs = require('./runs'); await runs.finish(companyId, p.runId, { status: runs.STATUS.DONE, outcome: 'declined by a person' }).catch(() => {}); }
     await audit.recordProposalDecision(companyId, decider, { proposalId: id, decision: `declined${reason ? `: ${String(reason).slice(0, 200)}` : ''}`, agentName: p.agentName, runId: p.runId, ip });
     return { proposal: updated };

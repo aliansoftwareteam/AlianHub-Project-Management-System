@@ -91,6 +91,48 @@ const classifyTask = (task = {}) => {
 const allowed = (agent) => (Array.isArray(agent.allowedActions) ? agent.allowedActions : []);
 const skillNames = (agent) => (Array.isArray(agent.skills) ? agent.skills : []).map((s) => text(s.key || s.name || s).toLowerCase());
 
+/* What each executable skill needs from the task before it can do anything.
+ * `/api/v2/agents/routable` sends these as task.inputs; the picker derives them
+ * from the full task. Skills not listed here have no known requirement. */
+const MIN_BRIEF_CHARS = 40;
+const URL_RE = /https?:\/\/[^\s<>"')]+/gi;
+const PR_RE = /\/pull\/\d+|\/merge_requests\/\d+|\/compare\//;
+const PRIVATE_HOST = /^(localhost|127\.|10\.|192\.168\.|0\.0\.0\.0|\[?::1)/i;
+const SKILL_INPUTS = [
+    { match: /^(pr\.summary|risk\.flags)$/, needs: (i) => Boolean(i.prUrl), reason: 'it needs a pull request link on the task' },
+    { match: /^(qa-review|qa\.review)$/, needs: (i) => Boolean(i.publicUrl), reason: 'it needs a public URL to review' },
+    { match: /^(brief\.parse|project\.plan)$/, needs: (i) => i.briefChars >= MIN_BRIEF_CHARS, reason: `it needs a brief of at least ${MIN_BRIEF_CHARS} characters` },
+    { match: /^(digest\..*|risk\.today)$/, needs: () => false, reason: 'it reports on a whole project, not on one task' }
+];
+
+const hostOf = (url) => { try { return new URL(url).hostname; } catch (e) { return ''; } };
+const isPublic = (url) => { const h = hostOf(url); return Boolean(h) && !PRIVATE_HOST.test(h); };
+const plain = (html) => text(html).replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+
+const taskInputs = (task = {}) => {
+    if (task.inputs && typeof task.inputs === 'object') return { prUrl: task.inputs.prUrl || null, publicUrl: task.inputs.publicUrl || null, briefChars: Number(task.inputs.briefChars) || 0 };
+    const links = Array.isArray(task.links) ? task.links : [];
+    const urls = [task.TaskName, task.description, task.rawDescription].map(text).join(' ').match(URL_RE) || [];
+    const prLink = links.find((l) => /^(pr|branch)$/i.test(text(l.kind)) && l.url) || links.find((l) => PR_RE.test(text(l.url)));
+    const linkedPage = links.map((l) => text(l.url)).find((u) => /^https?:\/\//i.test(u) && !PR_RE.test(u) && isPublic(u));
+    return {
+        prUrl: prLink ? text(prLink.url) : (urls.find((u) => PR_RE.test(u)) || null),
+        publicUrl: linkedPage || urls.find((u) => !PR_RE.test(u) && isPublic(u)) || null,
+        briefChars: plain(task.description || task.rawDescription).length
+    };
+};
+
+/* The reason none of the agent's skills can start on this task, or '' when at
+ * least one can (or has no known requirement). */
+const missingInput = (agent, task) => {
+    const inputs = taskInputs(task);
+    const known = skillNames(agent).map((s) => ({ skill: s, rule: SKILL_INPUTS.find((r) => r.match.test(s)) })).filter((k) => k.rule);
+    if (!known.length) return '';
+    const unmet = known.filter((k) => !k.rule.needs(inputs));
+    if (unmet.length < known.length) return '';
+    return unmet[0].rule.reason;
+};
+
 /* An agent with an empty allowedActions list has never been narrowed, so the
  * registry's full vocabulary applies — the same rule the server guard uses. */
 const canDo = (agent, action) => {
@@ -107,12 +149,16 @@ const historyFor = (agent, runs = [], kind = '') => {
     const mine = runs.filter((r) => String(r.agentId) === String(agent._id));
     const similar = kind && kind !== 'general' ? mine.filter((r) => text(r.kind || r.skill).toLowerCase().includes(kind)) : [];
     const pool = similar.length >= 3 ? similar : mine;
+    // A skipped run (no URL, no PR, brief too short) says nothing about the agent,
+    // so it counts neither as clean nor as a failure.
     const finished = pool.filter((r) => ['done', 'failed', 'stopped'].includes(text(r.status)));
     const good = finished.filter((r) => r.status === 'done');
+    const skipped = pool.filter((r) => r.status === 'skipped');
     return {
         runs: pool.length,
         finished: finished.length,
         good: good.length,
+        skipped: skipped.length,
         similar: similar.length,
         successRate: finished.length ? good.length / finished.length : null,
         medianUsd: median(good.map((r) => Number((r.spend && r.spend.usd) || 0))),
@@ -135,15 +181,18 @@ const coverage = (agent, work) => {
     return needed.filter((a) => canDo(agent, a)).length / needed.length;
 };
 
-const ineligibility = (agent, work, { projectId } = {}) => {
+const ineligibility = (agent, work, task = {}) => {
     if (work.needsPerson) return `This needs a person — ${work.why}`;
     if (agent.paused) return `Paused${agent.pausedReason ? ` (${agent.pausedReason})` : ''}.`;
     if (capReached(agent)) return `Spend cap reached — $${round2(monthSpend(agent))} of $${agent.spendCapUsd} this month.`;
+    const projectId = task && task.ProjectID;
     if (projectId && Array.isArray(agent.projectIds) && agent.projectIds.length && !agent.projectIds.map(String).includes(String(projectId))) {
         return 'Not scoped to this project.';
     }
     if (!canDo(agent, 'task.get')) return 'It cannot read a task.';
     if (coverage(agent, work) === 0) return `It has no allowed action that would ${work.label}.`;
+    const missing = missingInput(agent, task);
+    if (missing) return `This task lacks what it needs — ${missing}.`;
     return '';
 };
 
@@ -153,7 +202,7 @@ const reasonFor = (agent, work, cover, history) => {
     else parts.push(`Can start, but it may only ${allowed(agent).filter((a) => !READ_ACTIONS.includes(a)).length ? 'do part of this' : 'read and comment'} — you would get a list, not a fix.`);
     if (history.runs) {
         const scope = history.similar >= 3 ? `${history.similar} similar` : `${history.runs}`;
-        parts.push(`${scope} run${history.runs === 1 ? '' : 's'} here, ${history.good} finished clean.`);
+        parts.push(`${scope} run${history.runs === 1 ? '' : 's'} here, ${history.good} finished clean${history.skipped ? `, ${history.skipped} skipped for missing input` : ''}.`);
     } else {
         parts.push('No history in this workspace yet.');
     }
@@ -181,7 +230,8 @@ const estimateFor = (history) => {
 /* One agent against one task. */
 const fitFor = ({ agent, task, runs = [], registryActions = [], never = [] }) => {
     const work = classifyTask(task);
-    const blocked = ineligibility(agent, work, { projectId: task && task.ProjectID });
+    const blocked = ineligibility(agent, work, task);
+    const missing = missingInput(agent, task);
     const history = historyFor(agent, runs, work.kind);
     const cover = coverage(agent, work);
     const skill = skillOverlap(agent, work, task);
@@ -199,6 +249,7 @@ const fitFor = ({ agent, task, runs = [], registryActions = [], never = [] }) =>
         name: agent.name || '',
         eligible: !blocked,
         blockedReason: blocked,
+        missingInput: missing,
         work,
         score: blocked ? 0 : Math.round(raw * 1000) / 1000,
         percent: blocked || !hasHistory ? null : Math.round(raw * 100),
@@ -230,6 +281,13 @@ const routeTasks = ({ tasks = [], agents = [], runs = [], registryActions = [], 
     const ranked = rankAgents({ agents, task, runs, registryActions, never });
     const best = ranked.find((r) => r.eligible && r.score >= minScore) || null;
     const work = classifyTask(task);
+    const lacking = best ? null : ranked.find((r) => r.missingInput);
+    let refusal = '';
+    if (!best) {
+        if (work.needsPerson) refusal = `needs a person — ${work.why}`;
+        else if (lacking) refusal = `needs a person — ${lacking.missingInput}`;
+        else refusal = 'no agent here is allowed to do this';
+    }
     return {
         taskId: String(task._id || task.taskId || ''),
         title: task.TaskName || '',
@@ -237,7 +295,7 @@ const routeTasks = ({ tasks = [], agents = [], runs = [], registryActions = [], 
         agent: best,
         ranked,
         routed: Boolean(best),
-        refusal: best ? '' : (work.needsPerson ? `needs a person — ${work.why}` : 'no agent here is allowed to do this')
+        refusal
     };
 });
 
@@ -247,4 +305,4 @@ const routingTotals = (rows = []) => {
     return { routed: routed.length, forPeople: rows.length - routed.length, usd: round2(usd), priced: routed.filter((r) => r.agent.estimate.usd !== null).length };
 };
 
-module.exports = { classifyTask, fitFor, rankAgents, routeTasks, routingTotals, historyFor, WORK_KINDS, READ_ACTIONS };
+module.exports = { classifyTask, fitFor, rankAgents, routeTasks, routingTotals, historyFor, taskInputs, missingInput, WORK_KINDS, READ_ACTIONS, SKILL_INPUTS };
