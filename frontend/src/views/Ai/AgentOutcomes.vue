@@ -14,9 +14,14 @@
                 <span class="ah-avatar ah-avatar--agent"><ShellIcon name="agent" :size="13" /></span>
                 <span><strong>{{ item.agentName }}:</strong> {{ item.reason }}</span>
             </div>
-            <div v-for="run in failed" :key="run._id" class="outcome__quote">
-                <span class="ah-avatar ah-avatar--agent"><ShellIcon name="agent" :size="13" /></span>
-                <span><strong>{{ run.agentName }}:</strong> {{ run.error || run.outcome || $t('Parity.failed_generic') }}</span>
+            <div v-for="run in failed" :key="run._id" class="outcome__quote outcome__quote--run">
+                <div class="outcome__quote-line">
+                    <span class="ah-avatar ah-avatar--agent"><ShellIcon name="agent" :size="13" /></span>
+                    <span class="outcome__quote-text"><strong>{{ run.agentName }}:</strong> {{ run.error || run.outcome || $t('Parity.failed_generic') }}</span>
+                    <span v-if="run.revertedAt" class="ah-chip ah-chip--dark">{{ $t('Ai.reverted_chip') }}</span>
+                    <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="toggle(run._id)">{{ expanded === run._id ? $t('Ai.hide_details') : $t('Ai.run_details') }}</button>
+                </div>
+                <AgentRunDetail v-if="expanded === run._id" :run-id="run._id" @reverted="$emit('reverted', run)" />
             </div>
             <p v-if="!declines.length && !failed.length" class="ah-empty">{{ $t('Parity.no_declines') }}</p>
             <p class="outcome__rule">{{ $t('Parity.declined_rule') }}</p>
@@ -28,9 +33,14 @@
                 <span class="outcome__title">{{ $t('Parity.handback_title') }}</span>
             </div>
             <p v-if="!handedBack.length" class="ah-empty">{{ $t('Parity.no_handbacks') }}</p>
-            <div v-for="run in handedBack" :key="run._id" class="outcome__quote">
-                <span class="ah-avatar ah-avatar--agent"><ShellIcon name="agent" :size="13" /></span>
-                <span><strong>{{ run.agentName }}:</strong> {{ run.outcome || $t('Parity.handback_generic') }}</span>
+            <div v-for="run in handedBack" :key="run._id" class="outcome__quote outcome__quote--run">
+                <div class="outcome__quote-line">
+                    <span class="ah-avatar ah-avatar--agent"><ShellIcon name="agent" :size="13" /></span>
+                    <span class="outcome__quote-text"><strong>{{ run.agentName }}:</strong> {{ run.outcome || $t('Parity.handback_generic') }}</span>
+                    <span v-if="run.revertedAt" class="ah-chip ah-chip--dark">{{ $t('Ai.reverted_chip') }}</span>
+                    <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="toggle(run._id)">{{ expanded === run._id ? $t('Ai.hide_details') : $t('Ai.run_details') }}</button>
+                </div>
+                <AgentRunDetail v-if="expanded === run._id" :run-id="run._id" @reverted="$emit('reverted', run)" />
             </div>
             <p class="outcome__rule">{{ $t('Parity.handback_rule') }}</p>
         </div>
@@ -61,8 +71,9 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import AgentRunDetail from "./AgentRunDetail.vue";
 
 // The three ways an assignment ends badly (30c), read off the real run list:
 // declined before starting, handed back partway, or going wrong and stopped.
@@ -75,9 +86,11 @@ const props = defineProps({
     stopping: { type: String, default: "" }
 });
 
-defineEmits(["stop"]);
+defineEmits(["stop", "reverted"]);
 
 const OPEN = ["queued", "running", "waiting_approval"];
+const expanded = ref("");
+const toggle = (id) => { expanded.value = expanded.value === id ? "" : id; };
 
 const failed = computed(() => props.runs.filter((r) => r.status === "failed").slice(0, 3));
 const handedBack = computed(() => props.runs.filter((r) => r.status === "waiting_approval" || (r.status === "done" && r.outcome)).slice(0, 3));
@@ -96,4 +109,7 @@ const capOf = (run) => {
 
 <style>
 @import "./parity.css";
+.outcome__quote--run { display: flex; flex-direction: column; align-items: stretch; }
+.outcome__quote-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.outcome__quote-text { flex: 1; min-width: 200px; }
 </style>

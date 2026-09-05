@@ -44,6 +44,8 @@
                     </div>
                 </div>
             </section>
+
+            <InstanceAgents v-if="group === 'ai'" />
         </template>
     </div>
 </template>
@@ -56,6 +58,7 @@ import { useToast } from "vue-toast-notification";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { apiRequestWithoutCompnay } from "@/services";
 import { useInstanceApi } from "./useInstanceApi";
+import InstanceAgents from "./InstanceAgents.vue";
 
 defineOptions({ name: "InstanceSettings" });
 
