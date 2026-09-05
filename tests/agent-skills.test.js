@@ -11,8 +11,8 @@ const task = { _id: 't1', TaskKey: 'AR-1', TaskName: 'Build the thing', ProjectI
 
 describe('the skill registry', () => {
     it('resolves every template skill and alias the wizard offers', () => {
-        for (const slug of ['qa-review', 'brief.parse', 'project.plan', 'pr.summary', 'risk.flags', 'digest.ceo', 'risk.today']) expect(getSkill(slug)).toBeTruthy();
-        expect(ALL.map((s) => s.slug)).toEqual(['qa-review', 'brief.parse', 'pr.summary', 'digest.ceo']);
+        for (const slug of ['qa-review', 'brief.parse', 'project.plan', 'pr.summary', 'risk.flags', 'digest.ceo', 'risk.today', 'project.guide']) expect(getSkill(slug)).toBeTruthy();
+        expect(ALL.map((s) => s.slug)).toEqual(['qa-review', 'brief.parse', 'pr.summary', 'digest.ceo', 'project.guide']);
     });
 });
 
