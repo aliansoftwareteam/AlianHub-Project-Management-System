@@ -83,7 +83,7 @@ const agentPatchFields = (body) => {
 };
 
 /* GET /api/v2/agents/registry */
-exports.getRegistry = (req, res) => res.send({ status: true, data: registry.manifest() });
+exports.getRegistry = (req, res) => res.send({ status: true, data: require('./actions').manifest() });
 
 /* GET /api/v2/agents */
 exports.listAgents = async (req, res) => {
@@ -236,7 +236,12 @@ exports.getRun = async (req, res) => {
         const run = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ _id: oid(req.params.id) }] }, 'findOne');
         if (!run) return fail(res, 'Run not found.', 404);
         const auditRows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: [{ 'meta.runId': String(run._id) }, {}, { sort: { createdAt: 1 }, limit: 200 }] }, 'find').catch(() => []);
-        return res.send({ status: true, data: { run, audit: auditRows || [] } });
+        const plain = typeof run.toObject === 'function' ? run.toObject() : { ...run };
+        if (plain.finishedAt && !plain.revertedAt) {
+            const { undoHours } = await require('./budget').settings(companyId).catch(() => ({ undoHours: 24 }));
+            plain.windowEndsAt = new Date(new Date(plain.finishedAt).getTime() + undoHours * 3600000);
+        }
+        return res.send({ status: true, data: { run: plain, audit: auditRows || [] } });
     } catch (e) { logger.error(`getRun: ${e.message}`); return fail(res, e.message); }
 };
 
