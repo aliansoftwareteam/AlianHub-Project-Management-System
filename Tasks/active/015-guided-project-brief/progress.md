@@ -40,5 +40,24 @@ Finding for review: "Implement user login flow" and similar implementation tasks
 
 Note: `/execute` requires the existing `source` field (upwork / fiverr / other); the UI already sends it. The sweep project "(sweep 015)" is left in the workspace for the browser look; trash it afterwards.
 
+## 2026-09-05 — UI sweep on beta (owner, Browser pane, real model)
+Same two-line gym brief through the "Create from a description" tile.
+
+| Step | Result |
+|---|---|
+| Describe | textarea + Continue; the Source field is not enforced here (see finding) |
+| Clarify, round 1 | coverage chips: What and for whom met, four missing; "Round 1 of 2 · only the missing points are asked"; question 1/3 with option cards and "I don't know yet"; all three answered unknown |
+| Clarify, round 2 | exactly one question, the never-asked Team point; answered "External developer or agency" |
+| Brief | chips now show Team met; original beside the drafted brief; three assumptions listed for the unknowns; **Generate plan disabled until Approve brief** (verified before/after) |
+| Plan | "3 sprints · 4 tasks · $0.09"; summary line "3 tasks an agent can start · 4 need a person · 1 need a person first"; assumptions carried; badge "⏳ Agent after: a public URL in the task title or description (QA review)" on a task row; guide preview with 6 stages from this brief, essentials, escalations |
+| Create everything | "All done!" — Project Done, Sprints 3/3, "⚡ 3 agent runs queued", "Open the Guide agent →"; the link opens the Guide agent's settings page at L1 with task.get / task.comment / subtask.create scoped to the project |
+
+Findings
+1. **Source not validated on step 1.** Continue is enabled without a Source; execute then fails with "Select where this project came from." and the wizard drops back to step 1. State survives the round trip (brief, plan and guide are kept, no new model call), but the check belongs on step 1.
+2. **Done-screen counter reads "Tasks 8 / 4"**: created subtasks are counted against the planned task total.
+3. As in the API sweep: implementation tasks labelled `agent` because a planning skill fits them; consider a distinct label when the only matching skill plans rather than does.
+
+Cleanup: two sweep projects exist now ("Gym Class Booking App (sweep 015)" from the API run and "Gym Class Booking App" from the UI run) with their Guide agents; trash both when done.
+
 Open
-- Browser sweep of the UI flow (owner), then member — needs a signed-in Browser pane.
+- Member-role pass — needs a member account.
