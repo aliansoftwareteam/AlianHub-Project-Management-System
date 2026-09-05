@@ -13,6 +13,8 @@ const tools = require('../Automations/engine/tools');
 const team = require('./team');
 const scope = require('./scope');
 const shipping = require('./shipping');
+const agentAudit = require('./agentAudit');
+const { inputsOf } = require('./taskInputs');
 
 const companyOf = (req) => req.headers['companyid'] || (req.query && req.query.companyId) || '';
 // 'mention' is a run started by @naming the agent in a comment (13b); it is
@@ -55,6 +57,8 @@ const agentPatchFields = (body) => {
     if (body.spendCapUsd !== undefined) set.spendCapUsd = Math.max(0, Number(body.spendCapUsd) || 0);
     if (body.account !== undefined && accounts.MODES.includes(body.account)) set.account = body.account;
     if (body.model !== undefined) set.model = String(body.model).slice(0, 120);
+    // `schedule` is stored for a scheduler that does not exist yet: nothing reads
+    // it, so the UI hides the field. `rateLimitPerDay` is enforced in runs.canStart.
     if (body.schedule !== undefined && typeof body.schedule === 'object') set.schedule = body.schedule;
     if (body.rateLimitPerDay !== undefined) set.rateLimitPerDay = Math.max(0, Number(body.rateLimitPerDay) || 0);
     return set;
@@ -126,6 +130,27 @@ exports.setPaused = (paused) => async (req, res) => {
     } catch (e) { logger.error(`setPaused: ${e.message}`); return fail(res, e.message); }
 };
 
+/* DELETE /api/v2/agents/:id — owner/admin or the agent's owner. A soft delete:
+ * runs, proposals and audit rows keep naming the agent. */
+exports.deleteAgent = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        const { human, actor } = await humanActor(req);
+        if (!companyId || !OBJECT_ID.test(req.params.id)) return fail(res, 'companyId and a valid agent id are required.');
+        if (!human) return fail(res, 'Agents cannot delete agents.', 403);
+        const agent = await runs.getAgent(companyId, req.params.id);
+        if (!agent) return fail(res, 'Agent not found.', 404);
+        if (String(agent.ownerId || '') !== String(actor.userId) && !(await privileged(companyId, actor.userId))) return fail(res, 'Only an Owner, an Admin or the agent\'s owner can delete it.', 403);
+        const active = await runs.list(companyId, { status: 'open', agentId: req.params.id });
+        const running = (active || []).filter((r) => [runs.STATUS.RUNNING, runs.STATUS.QUEUED].includes(r.status));
+        if (running.length) return fail(res, `This agent has ${running.length} run(s) in progress — stop them first.`, 409);
+        await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ _id: agent._id }, { $set: { deletedStatusKey: 1, deletedAt: new Date(), deletedBy: String(actor.userId), paused: true, pausedReason: 'deleted' } }] }, 'updateOne');
+        await agentAudit.recordAgentDeleted(companyId, actor, { agentId: String(agent._id), agentName: agent.name, ip: req.ip || '' });
+        runs.emitAgent(companyId, { agentId: String(agent._id), deleted: true });
+        return res.send({ status: true, statusText: 'Agent deleted. Its runs and audit history stay.', data: { agentId: String(agent._id) } });
+    } catch (e) { logger.error(`deleteAgent: ${e.message}`); return fail(res, e.message); }
+};
+
 /* POST /api/v2/agents/pause-all */
 exports.pauseAll = async (req, res) => {
     try {
@@ -179,7 +204,9 @@ exports.runSummary = async (req, res) => {
     try {
         const companyId = companyOf(req);
         if (!companyId) return fail(res, 'companyId is required.');
-        return res.send({ status: true, data: await runs.summary(companyId, { projectId: req.query && req.query.projectId }) });
+        const q = req.query || {};
+        const [live, counts] = await Promise.all([runs.summary(companyId, { projectId: q.projectId }), runs.countsByStatus(companyId, { projectId: q.projectId, agentId: q.agentId })]);
+        return res.send({ status: true, data: { ...live, counts } });
     } catch (e) { logger.error(`runSummary: ${e.message}`); return fail(res, e.message); }
 };
 
@@ -203,7 +230,7 @@ exports.startRun = async (req, res) => {
         const { agentId, taskId, skill, trigger, note } = req.body || {};
         if (!companyId || !OBJECT_ID.test(String(agentId || ''))) return fail(res, 'companyId and a valid agentId are required.');
         const agent = await runs.getAgent(companyId, agentId);
-        const check = runs.canStart(agent, { trigger: trigger || 'manual', viaAccount: isAgent(actor) ? actor.viaAccount : undefined });
+        const check = await runs.canStart(agent, { trigger: trigger || 'manual', viaAccount: isAgent(actor) ? actor.viaAccount : undefined, companyId });
         if (!check.ok) return fail(res, check.reason, 409);
         if (!human && !isAgent(actor)) return fail(res, 'Unauthorized.', 401);
         let task = null;
@@ -361,10 +388,18 @@ exports.routableTasks = async (req, res) => {
         const rows = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
             data: [{ deletedStatusKey: { $ne: 1 }, ProjectID: { $in: wanted }, statusType: { $nin: ['close', 'done', 'default_close'] } },
-                   'TaskName TaskKey status statusType Task_Priority ProjectID tagsArray AssigneeUserId totalEstimatedTime updatedAt',
+                   'TaskName TaskKey status statusType Task_Priority ProjectID tagsArray AssigneeUserId totalEstimatedTime updatedAt links description rawDescription',
                    { sort: { updatedAt: -1 }, limit }],
         }, 'find').catch(() => []);
-        return res.send({ status: true, data: rows || [] });
+        // The router needs to know what each task carries (PR link, public URL,
+        // brief length) — not the body itself, which can be long.
+        const data = (rows || []).map((t) => {
+            const o = typeof t.toObject === 'function' ? t.toObject() : { ...t };
+            const inputs = inputsOf(o);
+            delete o.description; delete o.rawDescription; delete o.links;
+            return { ...o, inputs };
+        });
+        return res.send({ status: true, data });
     } catch (e) { logger.error(`routableTasks: ${e.message}`); return fail(res, e.message); }
 };
 

@@ -47,7 +47,7 @@ const ACTION_PATTERNS = [
     { re: /^set the priority to\s+(.+)$/i, build: (m) => ({ action: 'set_priority', config: { priority: normPriority(m[1]) } }) },
     { re: /^post a comment saying\s+(.+)$/i, build: (m) => ({ action: 'add_comment', config: { body: unquote(m[1]) } }) },
     { re: /^create a subtask called\s+(.+)$/i, build: (m) => ({ action: 'create_subtask', config: { title: unquote(m[1]) } }) },
-    { re: /^run the\s+([a-z0-9-]+)\s+agent$/i, build: (m) => ({ action: 'run_agent', config: { skill: m[1] } }) },
+    { re: /^run the\s+([a-z0-9.-]+)\s+agent(?:\s+as\s+(.+))?$/i, build: (m) => ({ action: 'run_agent', config: m[2] ? { skill: m[1], agent: unquote(m[2]) } : { skill: m[1] } }) },
 ];
 
 const trim = (s) => String(s == null ? '' : s).trim();
@@ -233,7 +233,7 @@ const actionSentence = (step) => {
         case 'set_priority': return `set the priority to ${config.priority}`;
         case 'add_comment': return `post a comment saying "${config.body}"`;
         case 'create_subtask': return `create a subtask called "${config.title}"`;
-        case 'run_agent': return `run the ${config.skill} agent`;
+        case 'run_agent': return `run the ${config.skill} agent${config.agent ? ` as "${config.agent}"` : ''}`;
         default: return registry.getAction(step.action)?.label || step.action;
     }
 };
@@ -268,7 +268,7 @@ const grammar = () => ({
     actions: [
         'set the status to <status>', 'set the priority to <priority>',
         'post a comment saying "<text>"', 'create a subtask called "<text>"',
-        'run the <skill> agent',
+        'run the <skill> agent as "<agent name>"',
     ],
     shape: 'When <event>, if <condition> and <condition>, <action> and <action>.',
 });
