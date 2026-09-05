@@ -46,11 +46,13 @@
 <script setup>
 import { computed, inject, onBeforeUnmount, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useToast } from "vue-toast-notification";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { shellState } from "@/components/organisms/Shell/shellState";
 import { useAgentFinishToast } from "./useAgentFinishToast";
+import { reasonOf } from "./useAgents";
 
 // 28b surface 4 — one 40px line mixing people and agents. It is the only place
 // both are read from the same request, so the strip and the rail footer can
@@ -61,6 +63,7 @@ const POLL_MS = 30000;
 const MAX_ITEMS = 4;
 
 const { t } = useI18n();
+const $toast = useToast();
 const companyId = inject("$companyId", localStorage.getItem("selectedCompany") || "");
 const { toast, observe, dismiss, reset } = useAgentFinishToast();
 
@@ -106,8 +109,11 @@ const load = async () => {
 const onPauseAll = async () => {
     pausing.value = true;
     try {
-        await apiRequest("post", env.AGENT_PAUSE_ALL, {});
+        const res = await apiRequest("post", env.AGENT_PAUSE_ALL, {});
+        if (!ok(res)) throw new Error(res?.data?.statusText || t("Ai.pause_failed"));
         await load();
+    } catch (error) {
+        $toast.error(reasonOf(error, "Ai.pause_failed"), { position: "top-right" });
     } finally {
         pausing.value = false;
     }

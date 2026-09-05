@@ -23,6 +23,9 @@
                                 <option v-for="tpl in AGENT_TEMPLATES" :key="tpl.slug" :value="tpl.slug">{{ tpl.name }} — {{ tpl.skills.join(', ') }}</option>
                             </select>
                         </div>
+                        <ul v-if="requirements.length" class="aw__reqs">
+                            <li v-for="code in requirements" :key="code" class="ah-small"><ShellIcon name="info" :size="13" />{{ $t(`Ai.req_${code}`) }}</li>
+                        </ul>
                         <div class="ah-field">
                             <label class="ah-field__label" for="aw-desc">{{ $t('Ai.job_desc') }}</label>
                             <textarea id="aw-desc" v-model.trim="form.description" class="ah-input ah-textarea" maxlength="500" :placeholder="$t('Ai.job_desc_hint')"></textarea>
@@ -31,6 +34,7 @@
 
                     <template v-else-if="step === 2">
                         <p class="ai-lead">{{ $t('Ai.actions_lead') }}</p>
+                        <p v-if="requirements.length" class="ah-small aw__reqs-line">{{ $t('Ai.needs_line', { what: requirements.map((code) => $t(`Ai.req_${code}`)).join(' · ') }) }}</p>
                         <div class="aw__actions">
                             <label v-for="action in writeActions" :key="action.key" class="aw__action">
                                 <input v-model="form.allowedActions" type="checkbox" :value="action.key" class="ah-check" />
@@ -80,13 +84,14 @@
 </template>
 
 <script setup>
-import { computed, defineEmits, defineProps, nextTick, onMounted, reactive, ref } from "vue";
+import { computed, nextTick, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { useAgents } from "./useAgents";
+import { AGENT_TEMPLATES } from "./agentTemplates";
+import { requirementsOf } from "./skillInputs";
 
 defineOptions({ name: "AgentWizard" });
-import { AGENT_TEMPLATES } from "./agentTemplates";
 
 const props = defineProps({ template: { type: Object, default: null } });
 const emit = defineEmits(["close", "created"]);
@@ -97,6 +102,7 @@ const { registryManifest, loadRegistry, saveAgent } = useAgents();
 const step = ref(1);
 const chosenSlug = ref("");
 const effectiveTemplate = computed(() => props.template || AGENT_TEMPLATES.find((t) => t.slug === chosenSlug.value) || null);
+const requirements = computed(() => (effectiveTemplate.value ? requirementsOf({ skills: effectiveTemplate.value.skills }) : []));
 const busy = ref(false);
 const nameField = ref(null);
 const errors = reactive({ name: "", form: "" });
@@ -148,13 +154,11 @@ onMounted(async () => {
 </script>
 
 <style>
-.aw-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); z-index: 70; display: flex; align-items: center; justify-content: center; padding: 20px; }
-.aw { width: 560px; max-width: 100%; max-height: 86dvh; display: flex; flex-direction: column; border-radius: var(--r-modal); box-shadow: var(--shadow-modal); }
-.aw__head { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--hairline); }
-.aw__head .ah-btn { margin-left: auto; }
-.aw__body { padding: 16px; overflow: auto; display: flex; flex-direction: column; gap: 14px; }
-.aw__foot { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--hairline); }
+@import "./style.css";
 .aw__actions { display: flex; flex-direction: column; gap: 6px; max-height: 300px; overflow: auto; }
+.aw__reqs { list-style: none; margin: -6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.aw__reqs li { display: flex; align-items: center; gap: 6px; color: var(--ink-2); }
+.aw__reqs-line { margin: -8px 0 0; color: var(--ink-2); }
 .aw__action { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border: 1px solid var(--hairline); border-radius: 9px; cursor: pointer; }
 .aw__action-label { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 </style>

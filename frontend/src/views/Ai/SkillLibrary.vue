@@ -8,7 +8,11 @@
             <div class="ai-page__body ah-scroll">
                 <p class="ai-lead">{{ $t('Ai.skills_library_lead') }}</p>
 
-                <div class="ah-card ai-agent">
+                <div v-if="loading" class="ah-empty">{{ $t('Ai.loading') }}</div>
+                <EmptyState v-else-if="loadError" :title="$t('Ai.load_failed')" :message="loadError" :action-label="$t('Ai.retry')" @action="load" />
+                <EmptyState v-else-if="!actions.length" :title="$t('Ai.no_actions_title')" :message="$t('Ai.no_actions_body')" />
+
+                <div v-else class="ah-card ai-agent">
                     <div class="ah-label">{{ $t('Ai.available_actions') }}</div>
                     <table class="ai-table">
                         <thead>
@@ -33,7 +37,7 @@
                     </table>
                 </div>
 
-                <div class="ah-card ai-agent">
+                <div v-if="!loading && !loadError" class="ah-card ai-agent">
                     <div class="ah-label">{{ $t('Ai.never_available') }}</div>
                     <p class="ai-lead" style="margin:6px 0 10px">{{ $t('Ai.never_note') }}</p>
                     <div class="ai-agent__skills">
@@ -41,7 +45,7 @@
                     </div>
                 </div>
 
-                <div class="ah-card ai-agent">
+                <div v-if="!loading && !loadError" class="ah-card ai-agent">
                     <div class="ah-label">{{ $t('Ai.cli_agents') }}</div>
                     <p class="ai-lead" style="margin:6px 0 10px">{{ $t('Ai.cli_lead') }}</p>
                     <pre class="ai-code">{{ cliCommand }}</pre>
@@ -53,29 +57,44 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, inject, onMounted, ref } from "vue";
+import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import AiSidebar from "./AiSidebar.vue";
-import { useAgents } from "./useAgents";
-import { apiRequest } from "@/services";
+import { useAgents, reasonOf } from "./useAgents";
+import { mcpAddCommand } from "./mcpUrl";
+import { apiRequestWithoutCompnay } from "@/services";
 import * as env from "@/config/env";
 
 defineOptions({ name: "SkillLibraryPage" });
 
+const companyId = inject("$companyId");
 const { registryManifest, loadRegistry } = useAgents();
 const mcp = ref({ tools: [] });
+const loading = ref(true);
+const loadError = ref("");
 
 const actions = computed(() => registryManifest.value.actions || []);
 const never = computed(() => registryManifest.value.never || []);
 const mcpTools = computed(() => (mcp.value.tools || []).map((t) => t.name).join(", "));
-const cliCommand = computed(() => `claude mcp add alianhub --transport http ${env.API_URI}/mcp \\\n  --header "Authorization: Bearer <your token>"`);
+const cliCommand = computed(() => mcpAddCommand(companyId.value));
 
 const riskChip = (risk) => (risk === "high" ? "ah-chip--danger" : risk === "medium" ? "ah-chip--warn" : "ah-chip--ok");
 
-onMounted(async () => {
-    await loadRegistry();
-    const res = await apiRequest("get", "/mcp/manifest").catch(() => null);
-    if (res?.data?.status) mcp.value = res.data.data;
-});
+const load = async () => {
+    loading.value = true;
+    loadError.value = "";
+    try {
+        await loadRegistry();
+        const res = await apiRequestWithoutCompnay("get", env.MCP_MANIFEST).catch(() => null);
+        if (res?.data?.status) mcp.value = res.data.data;
+    } catch (error) {
+        loadError.value = reasonOf(error, "Ai.load_failed");
+    } finally {
+        loading.value = false;
+    }
+};
+
+onMounted(load);
 </script>
 
 <style>

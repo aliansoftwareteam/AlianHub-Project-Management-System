@@ -44,16 +44,17 @@
                             <span v-for="skill in agent.skills || []" :key="skill.key || skill" class="ah-chip">{{ skill.name || skill.key || skill }}</span>
                         </div>
 
-                        <p class="ai-agent__today">{{ todayLine(agent) }}</p>
+                        <p class="ai-agent__today">{{ monthLine(agent) }}</p>
+                        <p class="ah-small ai-agent__needs">{{ needsLine(agent) }}</p>
 
                         <div class="ai-agent__foot">
                             <router-link class="ah-btn ah-btn--secondary ah-btn--sm" :to="{ name: 'AiAgent', params: { cid: companyId, id: agent._id } }">{{ $t('Ai.open') }}</router-link>
-                            <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="agent.paused || busyId === agent._id" @click="onRunNow(agent)">{{ $t('Ai.run_now') }}</button>
+                            <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="agent.paused || busyId === agent._id" @click="picking = agent">{{ $t('Ai.run_now') }}</button>
                             <button v-if="activeRuns[agent._id]" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="busyId === agent._id" @click="onStop(agent)">{{ $t('Ai.stop') }}</button>
-                            <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="setPaused(agent._id, !agent.paused)">
+                            <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="busyId === agent._id" @click="onPause(agent)">
                                 {{ agent.paused ? $t('Ai.resume') : $t('Ai.pause') }}
                             </button>
-                            <span class="ai-agent__trigger">{{ triggerOf(agent) }}</span>
+                            <span class="ai-agent__trigger">{{ $t('Ai.manual_only') }}</span>
                         </div>
                     </article>
                 </div>
@@ -73,6 +74,7 @@
         </div>
 
         <AgentWizard v-if="creating" :template="wizardTemplate" @close="creating = false; wizardTemplate = null" @created="onCreated" />
+        <RunTaskPicker v-if="picking" :agent="picking" :busy="busyId === picking._id" :error="runError" @close="picking = null; runError = ''" @run="onRunNow" />
     </div>
 </template>
 
@@ -83,8 +85,10 @@ import { useToast } from "vue-toast-notification";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import AiSidebar from "./AiSidebar.vue";
 import AgentWizard from "./AgentWizard.vue";
+import RunTaskPicker from "./RunTaskPicker.vue";
 import { useAgents, autonomyOf } from "./useAgents";
 import { AGENT_TEMPLATES } from "./agentTemplates";
+import { requirementsOf } from "./skillInputs";
 
 defineOptions({ name: "AiHubPage" });
 
@@ -96,10 +100,25 @@ const { agents, spend, registryManifest, loading, lastError, AUTONOMY, loadAll, 
 const creating = ref(false);
 const wizardTemplate = ref(null);
 const busyId = ref("");
-const onStop = async (agent) => {
+const picking = ref(null);
+const runError = ref("");
+
+const withAgent = async (agent, work) => {
     busyId.value = agent._id;
-    try { await stopActive(agent._id); } finally { busyId.value = ""; }
+    try {
+        await work();
+    } catch (error) {
+        $toast.error(error.message, { position: "top-right" });
+    } finally {
+        busyId.value = "";
+    }
 };
+
+const onStop = (agent) => withAgent(agent, () => stopActive(agent._id));
+const onPause = (agent) => withAgent(agent, async () => {
+    await setPaused(agent._id, !agent.paused);
+    $toast.success(t(agent.paused ? "Ai.resumed_toast" : "Ai.paused_toast", { name: agent.name }), { position: "top-right" });
+});
 
 const templates = AGENT_TEMPLATES;
 
@@ -116,19 +135,13 @@ const scopeOf = (agent) => {
     return ids.length ? t("Ai.scope_projects", { n: ids.length }) : t("Ai.scope_all");
 };
 
-const triggerOf = (agent) => {
-    const s = agent.schedule || {};
-    if (s.cron) return s.cron;
-    if (s.at) return t("Ai.every_day_at", { at: s.at });
-    if (s.on) return s.on;
-    return t("Ai.manual_only");
+const monthLine = (agent) => {
+    const row = (spend.value.agents || []).find((a) => a.agentId === String(agent._id));
+    if (!row || !row.runs) return t("Ai.no_runs_month");
+    return t("Ai.month_runs", { runs: row.runs, usd: Number(row.usd || 0).toFixed(2) });
 };
 
-const todayLine = (agent) => {
-    const row = (spend.value.agents || []).find((a) => a.agentId === String(agent._id));
-    if (!row || !row.runs) return t("Ai.no_runs_today");
-    return t("Ai.today_runs", { runs: row.runs, usd: Number(row.usd || 0).toFixed(2) });
-};
+const needsLine = (agent) => t("Ai.needs_line", { what: requirementsOf(agent).map((code) => t(`Ai.req_${code}`)).join(" · ") });
 
 const startFromTemplate = (tpl) => {
     wizardTemplate.value = tpl;
@@ -142,13 +155,17 @@ const onCreated = () => {
     loadActiveRuns();
 };
 
-const onRunNow = async (agent) => {
+const onRunNow = async (task) => {
+    const agent = picking.value;
+    if (!agent) return;
+    runError.value = "";
     busyId.value = agent._id;
     try {
-        await runNow(agent._id);
-        $toast.success(t("Ai.run_started", { name: agent.name }), { position: "top-right" });
+        await runNow(agent._id, task._id);
+        picking.value = null;
+        $toast.success(t("Ai.run_started_on", { name: agent.name, task: task.TaskKey || task.TaskName }), { position: "top-right" });
     } catch (error) {
-        $toast.error(error.message, { position: "top-right" });
+        runError.value = error.message;
     } finally {
         busyId.value = "";
     }

@@ -13,7 +13,10 @@
             <div class="parity-page__body ah-scroll">
                 <p class="parity-lead">{{ $t('Parity.teammates_lead') }}</p>
 
-                <div class="parity-grid">
+                <div v-if="loading" class="ah-empty">{{ $t('Parity.loading') }}</div>
+                <EmptyState v-else-if="loadError" :title="$t('Ai.load_failed')" :message="loadError" :action-label="$t('Ai.retry')" @action="load" />
+
+                <div v-else class="parity-grid">
                     <section class="ah-card">
                         <div class="ah-card__head">
                             <span class="ah-h3">{{ $t('Parity.assign_to_agent') }}</span>
@@ -25,7 +28,8 @@
                                 <input id="task-find" v-model="taskQuery" class="ah-input" type="search" :placeholder="$t('Parity.find_task_hint')" @keyup.enter="findTasks" />
                             </div>
 
-                            <div v-if="taskResults.length" class="ah-pop" style="margin-top:8px">
+                            <p v-if="searchError" class="ah-field__error" style="margin-top:8px">{{ searchError }}</p>
+                            <div v-else-if="taskResults.length" class="ah-pop" style="margin-top:8px">
                                 <button v-for="found in taskResults" :key="found._id" type="button" class="ah-pop__item" @click="chooseTask(found)">
                                     <span class="ah-mono">{{ found.TaskKey || '—' }}</span><span>{{ found.TaskName }}</span>
                                 </button>
@@ -114,7 +118,7 @@
                     </section>
                 </div>
 
-                <section v-if="task" class="ah-card" style="padding:0;overflow:hidden">
+                <section v-if="task && !loading && !loadError" class="ah-card" style="padding:0;overflow:hidden">
                     <div class="ah-card__head">
                         <span class="ah-h3">{{ $t('Parity.picker_title') }}</span>
                         <span class="parity-count">{{ $t('Parity.picker_note') }}</span>
@@ -133,24 +137,28 @@
                     />
                 </section>
 
-                <AgentOutcomes :runs="runs" :agents="agents" :declines="declines" :stopping="stopping" @stop="onStop" />
+                <AgentOutcomes v-if="!loading && !loadError" :runs="runs" :agents="agents" :declines="declines" :stopping="stopping" @stop="onStop" />
             </div>
         </div>
     </div>
 </template>
 
 <script setup>
-import { inject, onMounted, ref } from "vue";
+import { computed, inject, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
 import { useToast } from "vue-toast-notification";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
+import { useGetterFunctions } from "@/composable";
+import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import AiSidebar from "./AiSidebar.vue";
 import AgentMemberRow from "./AgentMemberRow.vue";
 import AgentMentionBox from "./AgentMentionBox.vue";
 import AgentPicker from "./AgentPicker.vue";
 import AgentOutcomes from "./AgentOutcomes.vue";
 import { useParity } from "./useParity";
+import { reasonOf } from "./useAgents";
 
 // Agents as teammates (13b): they appear in Members with an AGENT tag, they can
 // be @mentioned into a run, and assigning one states its scope and limits first.
@@ -158,7 +166,10 @@ defineOptions({ name: "AgentTeammates" });
 
 const { t } = useI18n();
 const $toast = useToast();
+const { getters } = useStore();
+const { getUser } = useGetterFunctions();
 const companyId = inject("$companyId");
+const userId = inject("$userId");
 const { agents, registryManifest, runs, loadAgents, loadRegistry, loadRuns, startRun, stopRun } = useParity();
 
 const ROLE_NAMES = { 1: "owner", 2: "admin" };
@@ -176,6 +187,12 @@ const assignBusy = ref(false);
 const assignError = ref("");
 const stopping = ref("");
 const declines = ref([]);
+const loading = ref(true);
+const loadError = ref("");
+const searchError = ref("");
+
+const projectNameOf = (projectId) => ((getters["projectData/projects"]?.data || []).find((p) => String(p._id) === String(projectId)) || {}).ProjectName || "";
+const me = computed(() => getUser(userId.value) || {});
 
 const roleName = (roleType) => t(`Parity.role_${ROLE_NAMES[Number(roleType)] || "member"}`);
 
@@ -195,9 +212,15 @@ const mentionParts = (body) => String(body).split(/(@[\w-]+)/).filter(Boolean).m
 
 const findTasks = async () => {
     searched.value = true;
+    searchError.value = "";
     if (taskQuery.value.trim().length < 2) { taskResults.value = []; return; }
-    const res = await apiRequest("post", env.GLOBAL_SEARCH, { query: taskQuery.value.trim() });
-    taskResults.value = res?.data?.status ? (res.data.data.tasks || []) : [];
+    try {
+        const res = await apiRequest("post", env.GLOBAL_SEARCH, { query: taskQuery.value.trim() });
+        taskResults.value = res?.data?.status ? (res.data.data.tasks || []) : [];
+    } catch (error) {
+        taskResults.value = [];
+        searchError.value = reasonOf(error, "Ai.load_failed");
+    }
 };
 
 const chooseTask = (found) => {
@@ -228,19 +251,38 @@ const onMention = async ({ body, agent }) => {
     }
 };
 
-const onAssign = async ({ kind, id, fit }) => {
+/* The same PATCH the task panel's assignee control sends, so the history row,
+ * the notification and the watcher update all happen. */
+const assignPerson = async (personId) => {
+    const person = people.value.find((p) => p.id === personId) || {};
+    const res = await apiRequest("patch", env.V2_TASKS, {
+        action: "updateAssignee",
+        firebaseObj: { AssigneeUserId: personId },
+        projectData: { _id: task.value.ProjectID, CompanyId: companyId.value, ProjectName: projectNameOf(task.value.ProjectID) },
+        taskData: { _id: task.value._id, TaskName: task.value.TaskName, sprintId: task.value.sprintId, folderObjId: task.value.folderObjId || "", AssigneeUserId: task.value.AssigneeUserId || [] },
+        employeeName: person.name || "",
+        type: "assigneeAdd",
+        isUpdateTask: true,
+        userData: { Employee_Name: me.value.Employee_Name, id: userId.value, companyOwnerId: getters["settings/companyOwnerDetail"]?.userId }
+    });
+    if (!res?.data?.status) throw new Error(res?.data?.statusText || t("Parity.assign_failed"));
+    task.value = { ...task.value, AssigneeUserId: [...new Set([...(task.value.AssigneeUserId || []), personId])] };
+};
+
+const onAssign = async ({ kind, id, fit, notifyMe, stopOverCap, capUsd }) => {
     assignError.value = "";
-    if (kind !== "agent") {
-        $toast.success(t("Parity.person_assigned"), { position: "top-right" });
-        return;
-    }
     assignBusy.value = true;
     try {
-        await startRun({ agentId: id, taskId: task.value._id, trigger: "assignment", note: fit ? fit.reason : "" });
+        if (kind !== "agent") {
+            await assignPerson(id);
+            $toast.success(t("Parity.person_assigned"), { position: "top-right" });
+            return;
+        }
+        await startRun({ agentId: id, taskId: task.value._id, trigger: "assignment", note: fit ? fit.reason : "", notifyMe, spendCapUsd: stopOverCap ? capUsd : 0 });
         $toast.success(t("Parity.run_started", { name: fit ? fit.name : "" }), { position: "top-right" });
     } catch (error) {
-        assignError.value = error.message;
-        declines.value = [{ agentName: fit ? fit.name : "", reason: error.message }, ...declines.value].slice(0, 3);
+        assignError.value = reasonOf(error, "Parity.assign_failed");
+        if (kind === "agent") declines.value = [{ agentName: fit ? fit.name : "", reason: assignError.value }, ...declines.value].slice(0, 3);
     } finally {
         assignBusy.value = false;
     }
@@ -263,7 +305,19 @@ const loadPeople = async () => {
     if (res?.data?.status) people.value = res.data.data.people || [];
 };
 
-onMounted(() => Promise.all([loadAgents(), loadRegistry(), loadRuns(), loadPeople()]));
+const load = async () => {
+    loading.value = true;
+    loadError.value = "";
+    try {
+        await Promise.all([loadAgents(), loadRegistry(), loadRuns(), loadPeople()]);
+    } catch (error) {
+        loadError.value = reasonOf(error, "Ai.load_failed");
+    } finally {
+        loading.value = false;
+    }
+};
+
+onMounted(load);
 </script>
 
 <style>

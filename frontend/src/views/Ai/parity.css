@@ -60,6 +60,9 @@
 .picker__row-top { display: flex; align-items: center; gap: 7px; }
 .picker__row-top strong { font: 600 13px/1.2 var(--font-ui); }
 .picker__row-why { font: var(--text-small); color: var(--ink-label); line-height: 1.45; }
+.picker__row-needs { color: var(--ink-3); }
+.picker__cap { margin-left: 24px; }
+.picker__cap .ah-input { width: 90px; }
 .picker__row-over { color: var(--danger-ink); }
 .picker__row-facts { display: flex; flex-wrap: wrap; gap: 10px; color: var(--ink-2); margin-top: 2px; }
 .picker__row-limit { color: var(--warn-ink); }
