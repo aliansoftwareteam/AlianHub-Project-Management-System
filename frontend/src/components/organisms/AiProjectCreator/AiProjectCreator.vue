@@ -9,7 +9,7 @@
         <template #head-left>
             <span class="aipg-head-title">
                 <span class="aipg-spark" aria-hidden="true">✨</span>
-                Create project with AI
+                {{ $t('AiProject.title') }}
             </span>
         </template>
         <template #head-right>
@@ -22,33 +22,37 @@
         </template>
         <template #body>
             <div class="aipg-wrapper">
-                <!-- Stepper -->
                 <ol class="aipg-stepper" role="list">
                     <li class="aipg-step" :class="stepClass('input')">
                         <span class="aipg-step-dot">{{ stepDoneDot('input', '1') }}</span>
-                        <span class="aipg-step-label">Describe</span>
+                        <span class="aipg-step-label">{{ $t('AiProject.step_describe') }}</span>
                     </li>
                     <li class="aipg-step-line" :class="{ 'done': isStepDone('input') }"></li>
                     <li class="aipg-step" :class="stepClass('clarify')">
                         <span class="aipg-step-dot">{{ stepDoneDot('clarify', '2') }}</span>
-                        <span class="aipg-step-label">Clarify</span>
+                        <span class="aipg-step-label">{{ $t('AiProject.step_clarify') }}</span>
                     </li>
                     <li class="aipg-step-line" :class="{ 'done': isStepDone('clarify') }"></li>
+                    <li class="aipg-step" :class="stepClass('brief')">
+                        <span class="aipg-step-dot">{{ stepDoneDot('brief', '3') }}</span>
+                        <span class="aipg-step-label">{{ $t('AiProject.step_brief') }}</span>
+                    </li>
+                    <li class="aipg-step-line" :class="{ 'done': isStepDone('brief') }"></li>
                     <li class="aipg-step" :class="stepClass('preview')">
-                        <span class="aipg-step-dot">{{ stepDoneDot('preview', '3') }}</span>
-                        <span class="aipg-step-label">Review plan</span>
+                        <span class="aipg-step-dot">{{ stepDoneDot('preview', '4') }}</span>
+                        <span class="aipg-step-label">{{ $t('AiProject.step_plan') }}</span>
                     </li>
                     <li class="aipg-step-line" :class="{ 'done': isStepDone('preview') }"></li>
                     <li class="aipg-step" :class="stepClass('executing', 'done')">
-                        <span class="aipg-step-dot">{{ step === 'done' ? '✓' : '4' }}</span>
-                        <span class="aipg-step-label">Create</span>
+                        <span class="aipg-step-dot">{{ step === 'done' ? '✓' : '5' }}</span>
+                        <span class="aipg-step-label">{{ $t('AiProject.step_create') }}</span>
                     </li>
                 </ol>
 
                 <!-- STEP 1: INPUT -->
                 <section v-if="step === 'input'" class="aipg-section">
                     <div class="aipg-card">
-                        <label class="aipg-field-label">What is the project about?</label>
+                        <label class="aipg-field-label">{{ $t('AiProject.describe_label') }}</label>
                         <textarea
                             v-model="description"
                             class="aipg-textarea"
@@ -57,7 +61,7 @@
                             :disabled="loading"></textarea>
                         <div class="aipg-helper-row">
                             <span class="aipg-helper" :class="{ 'aipg-helper-ok': description.length >= 20 }">
-                                {{ description.length }} / 20 minimum characters
+                                {{ $t('AiProject.min_chars', { count: description.length, min: 20 }) }}
                             </span>
                         </div>
                     </div>
@@ -146,22 +150,19 @@
                     <transition name="aipg-fade">
                         <div v-if="error" class="aipg-alert aipg-alert-danger">
                             <div>{{ error }}</div>
-                            <p class="aipg-alert-hint">Click <strong>Generate plan</strong> again — the AI will retry from your description.</p>
+                            <p class="aipg-alert-hint">Click <strong>{{ $t('AiProject.continue') }}</strong> again — the AI will retry from your description.</p>
                         </div>
                     </transition>
 
-                    <!-- AI working status — visible while any LLM call is in flight -->
                     <transition name="aipg-fade">
                         <div v-if="clarifyLoading || loading" class="aipg-status-panel" role="status" aria-live="polite">
                             <span class="aipg-spinner aipg-status-spinner" aria-hidden="true"></span>
                             <div class="aipg-status-panel-text">
                                 <p class="aipg-status-panel-title">
-                                    {{ clarifyLoading ? 'Analyzing your brief…' : 'Generating project plan…' }}
+                                    {{ clarifyLoading ? $t('AiProject.analyzing') : $t('AiProject.generating_plan') }}
                                 </p>
                                 <p class="aipg-status-panel-sub">
-                                    {{ clarifyLoading
-                                        ? 'The AI is reading your requirements. This takes a moment.'
-                                        : 'Building your sprints and tasks — usually 15–30 seconds. Please wait.' }}
+                                    {{ clarifyLoading ? $t('AiProject.analyzing_sub') : $t('AiProject.generating_plan_sub') }}
                                 </p>
                             </div>
                         </div>
@@ -173,7 +174,7 @@
                             :disabled="!canGenerate || loading || briefUploading || clarifyLoading"
                             @click="onGeneratePlan">
                             <span v-if="loading || clarifyLoading" class="aipg-spinner aipg-spinner-sm" aria-hidden="true"></span>
-                            {{ clarifyLoading ? 'Analyzing brief…' : (loading ? 'Generating plan…' : 'Re-Generate Plan') }}
+                            {{ clarifyLoading ? $t('AiProject.analyzing') : (loading ? $t('AiProject.generating_plan') : 'Re-Generate Plan') }}
                         </button>
                         <button
                             class="aipg-btn aipg-btn-primary"
@@ -183,19 +184,12 @@
                         </button>
                     </div>
                     <div v-else-if="hasGeneratedQuestions" class="aipg-actions aipg-actions-split">
-                        <!--
-                            User came back to Step 1 after generating questions
-                            but before generating a plan. Offer a cheap "Next →"
-                            that reuses the cached questions (zero LLM cost),
-                            plus a "Re-Generate Questions" escape if they want a
-                            fresh set after editing the brief.
-                        -->
                         <button
                             class="aipg-btn aipg-btn-ghost"
                             :disabled="!canGenerate || loading || briefUploading || clarifyLoading"
                             @click="onRegenerateQuestions">
                             <span v-if="clarifyLoading || loading" class="aipg-spinner aipg-spinner-sm" aria-hidden="true"></span>
-                            {{ clarifyLoading ? 'Analyzing brief…' : (loading ? 'Generating plan…' : 'Re-Generate Questions') }}
+                            {{ clarifyLoading ? $t('AiProject.analyzing') : (loading ? $t('AiProject.generating_plan') : 'Re-Generate Questions') }}
                         </button>
                         <button
                             class="aipg-btn aipg-btn-primary"
@@ -207,29 +201,25 @@
                     <div v-else class="aipg-actions">
                         <button
                             class="aipg-btn aipg-btn-primary"
+                            data-test="start"
                             :disabled="!canGenerate || loading || briefUploading || clarifyLoading"
                             @click="onGeneratePlan">
                             <span v-if="loading || clarifyLoading" class="aipg-spinner aipg-spinner-sm" aria-hidden="true"></span>
-                            {{ clarifyLoading ? 'Analyzing brief…' : (loading ? 'Generating plan…' : (error ? 'Try again' : 'Generate plan')) }}
+                            {{ clarifyLoading ? $t('AiProject.analyzing') : (loading ? $t('AiProject.generating_plan') : (error ? $t('AiProject.try_again') : $t('AiProject.continue'))) }}
                         </button>
                     </div>
                 </section>
 
                 <!-- STEP 2: CLARIFY -->
                 <section v-else-if="step === 'clarify'" class="aipg-section">
-                    <!-- Plan-generation status — shows while LLM builds the plan
-                         after the user submits their answers. ClarifyStep dims
-                         itself (opacity + pointer-events) but this panel makes
-                         the wait state unmissable. -->
-                    <transition name="aipg-fade">
-                        <div v-if="loading" class="aipg-status-panel" role="status" aria-live="polite">
-                            <span class="aipg-spinner aipg-status-spinner" aria-hidden="true"></span>
-                            <div class="aipg-status-panel-text">
-                                <p class="aipg-status-panel-title">Generating project plan…</p>
-                                <p class="aipg-status-panel-sub">Building your sprints and tasks — usually 15–30 seconds. Please wait.</p>
-                            </div>
-                        </div>
-                    </transition>
+                    <div v-if="coverage" class="aipg-card aipg-coverage-card" data-test="coverage">
+                        <label class="aipg-field-label-sm">{{ $t('AiProject.coverage_title') }}</label>
+                        <CoverageChips :coverage="coverage"/>
+                        <p class="aipg-helper aipg-coverage-hint">
+                            {{ $t('AiProject.round_of', { round: clarifyRound, max: clarifyMaxRounds }) }}
+                            · {{ $t('AiProject.unknown_hint') }}
+                        </p>
+                    </div>
                     <ClarifyStep
                         :loading="clarifyLoading"
                         :generating="loading"
@@ -243,7 +233,33 @@
                     />
                 </section>
 
-                <!-- STEP 3: PREVIEW -->
+                <!-- STEP 3: BRIEF -->
+                <section v-else-if="step === 'brief'" class="aipg-section">
+                    <div v-if="coverage" class="aipg-card aipg-coverage-card">
+                        <label class="aipg-field-label-sm">{{ $t('AiProject.coverage_title') }}</label>
+                        <CoverageChips :coverage="coverage"/>
+                    </div>
+                    <BriefStep
+                        :original="description"
+                        :draft="briefMarkdown"
+                        :assumptions="briefAssumptions"
+                        :approved="briefApproved"
+                        :edited-since-approval="briefEditedSinceApproval"
+                        :loading="briefLoading"
+                        :generating="loading"
+                        :error-message="briefError"
+                        :plan-error="error"
+                        @update:draft="onBriefEdit"
+                        @approve="onApproveBrief"
+                        @generate="onGenerateFromBrief"
+                        @regenerate="startBrief"
+                        @retry="startBrief"
+                        @skip="onSkipBrief"
+                        @back="onBriefBack"
+                    />
+                </section>
+
+                <!-- STEP 4: PREVIEW -->
                 <section v-else-if="step === 'preview'" class="aipg-section">
                     <div class="aipg-plan-header">
                         <div class="aipg-plan-head-row">
@@ -273,10 +289,23 @@
                             </span>
                         </div>
                         <p class="aipg-plan-description">{{ plan.project.description }}</p>
+                        <p v-if="splitSummary" class="aipg-split-summary" data-test="split-summary">
+                            {{ $t('AiProject.split_summary', splitSummary) }}
+                        </p>
                         <div class="aipg-plan-skills">
                             <label class="aipg-field-label-sm">{{ $t('ProjectDetails.skills') }}</label>
                             <SkillsSelect v-model="skills" :bordered="true" :showAll="true"/>
                         </div>
+                    </div>
+
+                    <div v-if="planAssumptions.length" class="aipg-card aipg-card-accent" data-test="plan-assumptions">
+                        <label class="aipg-field-label">{{ $t('AiProject.assumptions_title') }}</label>
+                        <ul class="aipg-assumption-list">
+                            <li v-for="(a, i) in planAssumptions" :key="i">
+                                <span v-if="a.point" class="aipg-chip aipg-chip-app aipg-chip-xs">{{ $t(`AiProject.point_${a.point}`) }}</span>
+                                {{ a.text }}
+                            </li>
+                        </ul>
                     </div>
 
                     <div class="aipg-folder-list">
@@ -297,11 +326,14 @@
                             </summary>
                             <ul class="aipg-task-list">
                                 <li v-for="(task, ti) in sprint.tasks" :key="'t-'+si+'-'+ti" class="aipg-task">
-                                    <input
-                                        v-model="task.TaskName"
-                                        class="aipg-input-plain aipg-task-name"
-                                        maxlength="200"
-                                        :disabled="loading"/>
+                                    <div class="aipg-task-row">
+                                        <input
+                                            v-model="task.TaskName"
+                                            class="aipg-input-plain aipg-task-name"
+                                            maxlength="200"
+                                            :disabled="loading"/>
+                                        <SplitBadge :split="task.split"/>
+                                    </div>
                                     <details class="aipg-task-desc">
                                         <summary class="aipg-task-desc-trigger">
                                             <span class="aipg-chevron aipg-chevron-sm" aria-hidden="true">›</span>
@@ -309,12 +341,11 @@
                                         </summary>
                                         <pre class="aipg-task-desc-body">{{ renderTaskDescription(task) }}</pre>
                                     </details>
-                                    <!-- Sub-tasks and hours were generated but never shown, so a split
-                                         task looked identical to a flat one until after creation. -->
                                     <span v-if="task.estimatedHours" class="aipg-task-est">{{ formatHours(task.estimatedHours) }}</span>
                                     <div v-if="task.subtasks && task.subtasks.length" class="aipg-subs">
                                         <div v-for="(st, sti) in task.subtasks" :key="'st-'+si+'-'+ti+'-'+sti" class="aipg-sub">
                                             ↳ {{ st.TaskName }}<span v-if="st.estimatedHours" class="aipg-sub-est">{{ formatHours(st.estimatedHours) }}</span>
+                                            <SplitBadge :split="st.split"/>
                                         </div>
                                     </div>
                                 </li>
@@ -322,27 +353,37 @@
                         </details>
                     </div>
 
+                    <GuidePreview
+                        v-if="approvedBrief"
+                        :guide="guide"
+                        :markdown="guideMarkdown"
+                        :loading="guideLoading"
+                        :error-message="guideError"
+                        @retry="loadGuide"
+                        @update:markdown="(v) => guideMarkdown = v"
+                    />
+
                     <transition name="aipg-fade">
                         <div v-if="error" class="aipg-alert aipg-alert-danger">{{ error }}</div>
                     </transition>
 
                     <div class="aipg-actions aipg-actions-split">
-                        <button class="aipg-btn aipg-btn-ghost" @click="step = 'input'; error = ''" :disabled="loading">
-                            ← Back
+                        <button class="aipg-btn aipg-btn-ghost" @click="onPreviewBack" :disabled="loading">
+                            {{ $t('AiProject.back') }}
                         </button>
-                        <button class="aipg-btn aipg-btn-primary" :disabled="loading" @click="onApprovePlan">
+                        <button class="aipg-btn aipg-btn-primary" :disabled="loading" data-test="create-everything" @click="onApprovePlan">
                             <span v-if="loading" class="aipg-spinner aipg-spinner-sm" aria-hidden="true"></span>
-                            {{ loading ? 'Starting…' : '✓ Create everything' }}
+                            {{ loading ? $t('AiProject.starting') : $t('AiProject.create_everything') }}
                         </button>
                     </div>
                 </section>
 
-                <!-- STEP 3: EXECUTING / DONE -->
+                <!-- STEP 5: EXECUTING / DONE -->
                 <section v-else-if="step === 'executing' || step === 'done'" class="aipg-section">
                     <div class="aipg-exec-head">
                         <span v-if="step === 'executing'" class="aipg-spinner" aria-hidden="true"></span>
                         <span v-else class="aipg-success-tick" aria-hidden="true">✓</span>
-                        <h4 class="aipg-exec-title">{{ step === 'done' ? 'All done!' : 'Building your project…' }}</h4>
+                        <h4 class="aipg-exec-title">{{ step === 'done' ? $t('AiProject.all_done') : $t('AiProject.building') }}</h4>
                     </div>
                     <div class="aipg-progress-list">
                         <div class="aipg-progress-row" :class="rowClass('project')">
@@ -366,9 +407,32 @@
                         {{ progress.lastEvent }}
                     </p>
 
+                    <div v-if="step === 'done' && hasOutcome" class="aipg-card aipg-outcome" data-test="outcome">
+                        <p class="aipg-outcome-line">
+                            <span class="aipg-chip aipg-chip-app">⚡ {{ $t('AiProject.runs_queued', { n: outcome.runsQueued }) }}</span>
+                        </p>
+                        <div v-if="outcome.runsRefused.length" class="aipg-outcome-refused" data-test="runs-refused">
+                            <label class="aipg-field-label-sm">{{ $t('AiProject.runs_refused_title') }}</label>
+                            <ul class="aipg-assumption-list">
+                                <li v-for="(r, i) in outcome.runsRefused" :key="i">
+                                    <strong v-if="r.taskName || r.title">{{ r.taskName || r.title }}</strong>
+                                    <span v-if="r.reason"> — {{ r.reason }}</span>
+                                </li>
+                            </ul>
+                        </div>
+                        <button
+                            v-if="outcome.guideAgentId"
+                            type="button"
+                            class="aipg-btn-link aipg-outcome-guide"
+                            data-test="open-guide"
+                            @click="onOpenGuideAgent">
+                            {{ $t('AiProject.open_guide_agent') }}
+                        </button>
+                    </div>
+
                     <div v-if="step === 'done'" class="aipg-actions">
-                        <button class="aipg-btn aipg-btn-primary" @click="onOpenProject">
-                            Open project →
+                        <button class="aipg-btn aipg-btn-primary" data-test="open-project" @click="onOpenProject">
+                            {{ $t('AiProject.open_project') }}
                         </button>
                     </div>
                 </section>
@@ -394,8 +458,14 @@
 import { ref, reactive, computed, onBeforeUnmount, inject, defineComponent } from 'vue';
 import Sidebar from '@/components/molecules/Sidebar/Sidebar.vue';
 import ClarifyStep from './clarify/ClarifyStep.vue';
+import CoverageChips from './brief/CoverageChips.vue';
+import BriefStep from './brief/BriefStep.vue';
+import SplitBadge from './plan/SplitBadge.vue';
+import GuidePreview from './plan/GuidePreview.vue';
+import { POINTS } from './brief/points';
 import { useAiProjectGenerator } from '@/composable/aiProjectGenerator';
 import { useStore } from 'vuex';
+import { useRoute, useRouter } from 'vue-router';
 import SkillsSelect from '@/components/molecules/SkillsSelect/SkillsSelect.vue';
 import ProjectSourceSelect from '@/components/molecules/ProjectSourceSelect/ProjectSourceSelect.vue';
 import { PROJECT_SOURCES, checkProposalId } from '@/utils/projectSource';
@@ -403,7 +473,7 @@ import { useI18n } from 'vue-i18n';
 
 export default defineComponent({
     name: 'AiProjectCreator',
-    components: { Sidebar, ClarifyStep, SkillsSelect, ProjectSourceSelect },
+    components: { Sidebar, ClarifyStep, CoverageChips, BriefStep, SplitBadge, GuidePreview, SkillsSelect, ProjectSourceSelect },
     props: {
         visible: { type: Boolean, default: false },
     },
@@ -412,26 +482,46 @@ export default defineComponent({
         const clientWidth = inject('$clientWidth') || ref(window.innerWidth);
         const api = useAiProjectGenerator();
         const store = useStore();
+        const route = useRoute();
+        const router = useRouter();
         const { t } = useI18n();
 
-        const step = ref('input'); // input | clarify | preview | executing | done | error
+        const step = ref('input'); // input | clarify | brief | preview | executing | done | error
         const loading = ref(false);
         const briefUploading = ref(false);
         const error = ref('');
         const rolledBack = ref(false);
 
-        // ── Clarify step state ───────────────────────────────────────────
-        // The Clarify step is OPTIONAL. If the brief is already detailed
-        // enough the LLM returns zero questions and we skip it. If the
-        // /clarify call fails we also skip it — the user can still finish
-        // the flow with the existing plan generation.
-        const clarifyLoading = ref(false);   // true while we're fetching questions
-        const clarifyQuestions = ref([]);    // [{id, category, question, type, options, recommended, ...}]
-        const clarifyUnderstanding = ref('');// short "here's what I heard" line from the LLM
-        const clarifyError = ref('');        // error message inside the clarify step (recoverable)
-        // The answers/skips the user submitted from the Clarify step,
-        // sent verbatim into /plan as the `clarifications` array.
+        // Clarify is optional: zero questions (coverage all met) or a failed
+        // /clarify call both skip it, so the wizard never depends on it.
+        const clarifyLoading = ref(false);
+        const clarifyQuestions = ref([]);
+        const clarifyUnderstanding = ref('');
+        const clarifyError = ref('');
+        // Sent verbatim into /plan as `clarifications`; also the `answers` /brief gets.
         const clarifications = ref(null);
+        const coverage = ref(null);
+        const clarifyRound = ref(0);
+        const clarifyMaxRounds = ref(2);
+        // Answers accumulate across rounds; a round asks only about points still missing.
+        const answers = ref([]);
+
+        const briefLoading = ref(false);
+        const briefError = ref('');
+        const briefDraft = ref(null);
+        const briefMarkdown = ref('');
+        const briefApproved = ref(false);
+        const briefEditedSinceApproval = ref(false);
+        // Frozen at approval: what /plan, /guide and /execute receive. Editing after
+        // approval clears it so the plan can never be built from unapproved text.
+        const approvedBrief = ref('');
+
+        const guide = ref(null);
+        const guideMarkdown = ref('');
+        const guideLoading = ref(false);
+        const guideError = ref('');
+
+        const outcome = reactive({ guideAgentId: null, runsQueued: 0, runsRefused: [] });
 
         // True when ANY in-flight operation owns the modal — brief upload,
         // clarify LLM call, plan LLM call, or the orchestrator's execute
@@ -543,15 +633,52 @@ export default defineComponent({
             return { sprints: plan.value.sprints.length, tasks: t };
         });
 
+        const briefAssumptions = computed(() => {
+            const list = briefDraft.value && Array.isArray(briefDraft.value.assumptions) ? briefDraft.value.assumptions : [];
+            return list.filter((a) => a && a.text);
+        });
+
+        const planAssumptions = computed(() => {
+            const echoed = plan.value && Array.isArray(plan.value.assumptions) ? plan.value.assumptions.filter((a) => a && a.text) : [];
+            return echoed.length ? echoed : briefAssumptions.value;
+        });
+
+        // Older plans carry no split at all; counting the labels ourselves keeps the
+        // summary honest when the server forgot the totals but not the labels.
+        const splitSummary = computed(() => {
+            const p = plan.value;
+            if (!p) return null;
+            const s = p.splitSummary;
+            if (s && typeof s === 'object') {
+                return { agent: Number(s.agent) || 0, agentAfter: Number(s.agentAfter) || 0, person: Number(s.person) || 0 };
+            }
+            const counts = { agent: 0, agentAfter: 0, person: 0 };
+            let labelled = 0;
+            for (const sp of p.sprints || []) {
+                for (const task of sp.tasks || []) {
+                    const label = task.split && task.split.label;
+                    if (!label) continue;
+                    labelled += 1;
+                    if (label === 'agent') counts.agent += 1;
+                    else if (label === 'agent-after') counts.agentAfter += 1;
+                    else counts.person += 1;
+                }
+            }
+            return labelled ? counts : null;
+        });
+
+        const hasOutcome = computed(() => outcome.runsQueued > 0 || outcome.runsRefused.length > 0 || !!outcome.guideAgentId);
+
         // What this run cost. One wizard run can be two LLM calls — the clarify
         // round and the plan itself — so both are collected and added up;
         // reporting only the plan would undercount every run that asked
         // questions first.
         const clarifyUsage = ref(null);
+        const briefUsage = ref(null);
         const planUsage = ref(null);
 
         const runUsage = computed(() => {
-            const parts = [clarifyUsage.value, planUsage.value].filter(Boolean);
+            const parts = [clarifyUsage.value, briefUsage.value, planUsage.value].filter(Boolean);
             if (!parts.length) return null;
             const totalTokens = parts.reduce((sum, u) => sum + (Number(u.totalTokens) || 0), 0);
             if (!totalTokens) return null;
@@ -620,10 +747,7 @@ export default defineComponent({
         }
 
         function isStepDone(name) {
-            // Order includes the new 'clarify' step between input and preview.
-            // Steps not in this list (e.g. 'error') treat the step as not done,
-            // matching the existing behavior.
-            const order = ['input', 'clarify', 'preview', 'executing', 'done'];
+            const order = ['input', 'clarify', 'brief', 'preview', 'executing', 'done'];
             return order.indexOf(name) < order.indexOf(step.value);
         }
 
@@ -695,79 +819,83 @@ export default defineComponent({
             if (el) el.value = '';
         }
 
-        // Entry point from Step 1's "Generate plan" button. Tries to fetch
-        // clarifying questions first; if any are returned the user is sent
-        // into the Clarify step. If the LLM returns zero questions, or if
-        // the clarify call fails for any reason, we skip Q&A and run plan
-        // generation directly — the wizard MUST stay functional even if
-        // the Q&A feature is broken.
+        function resetBriefFlow() {
+            clarifications.value = null;
+            coverage.value = null;
+            clarifyRound.value = 0;
+            answers.value = [];
+            briefDraft.value = null;
+            briefMarkdown.value = '';
+            briefApproved.value = false;
+            briefEditedSinceApproval.value = false;
+            approvedBrief.value = '';
+            briefError.value = '';
+            guide.value = null;
+            guideMarkdown.value = '';
+            guideError.value = '';
+        }
+
+        function applyClarifyResponse(res) {
+            if (res && res.usage) clarifyUsage.value = res.usage;
+            if (res && res.coverage && typeof res.coverage === 'object') coverage.value = res.coverage;
+            if (res && Number(res.maxRounds) > 0) clarifyMaxRounds.value = Number(res.maxRounds);
+            const questions = res && res.status && Array.isArray(res.questions) ? res.questions : [];
+            if (!questions.length) return false;
+            clarifyRound.value = Number(res.round) > 0 ? Number(res.round) : clarifyRound.value + 1;
+            clarifyQuestions.value = questions;
+            clarifyUnderstanding.value = res.understanding || '';
+            return true;
+        }
+
+        // Entry point from Step 1. Questions come back only for points the brief
+        // misses; none at all (or a failed call) goes straight to the brief draft.
         async function onGeneratePlan() {
             if (!canGenerate.value) return;
             error.value = '';
             clarifyError.value = '';
-            clarifications.value = null;
-            // Stay on Step 1 during the clarify call — the "Generate plan"
-            // button shows "Analyzing brief…" via the clarifyLoading flag.
-            // We transition to the Clarify wizard ONLY if the LLM returns
-            // questions; if it returns `[]` (or fails) we go straight to
-            // plan generation without ever showing the wizard skeleton.
+            resetBriefFlow();
             clarifyLoading.value = true;
             try {
                 const res = await api.generateClarifyingQuestions({
                     description: description.value.trim(),
                     briefId: briefId.value,
                 });
-                if (res && res.usage) clarifyUsage.value = res.usage;
-                if (res && res.status && Array.isArray(res.questions) && res.questions.length) {
-                    // Questions came back — NOW move into the Clarify step.
-                    clarifyQuestions.value = res.questions;
-                    clarifyUnderstanding.value = res.understanding || '';
-                    clarifyLoading.value = false;
+                clarifyLoading.value = false;
+                if (applyClarifyResponse(res)) {
                     step.value = 'clarify';
-                    return; // user now answers; submit will call runPlanGeneration
+                    return;
                 }
-                // Empty array, status:false, or malformed — skip Q&A and
-                // go straight to plan generation. User never sees the
-                // wizard. clarifyLoading stays true → loading flips to
-                // `loading` inside runPlanGeneration, so the button text
-                // smoothly transitions from "Analyzing brief…" to
-                // "Generating plan…" without a state gap.
-                clarifyLoading.value = false;
-                await runPlanGeneration(null);
+                await startBrief();
             } catch (e) {
-                // Clarify failed — graceful fallback to plan generation.
-                // User stays on Step 1; runPlanGeneration handles its own
-                // error surfacing via error.value.
                 clarifyLoading.value = false;
-                await runPlanGeneration(null);
+                await startBrief();
             }
         }
 
-        // The actual plan-generation call. Separated from onGeneratePlan so
-        // both the post-clarify submit and the "skip clarify" fallback can
-        // share it without duplicating the SSE-wait + error handling.
         async function runPlanGeneration(clarificationsPayload) {
             loading.value = true;
             error.value = '';
+            const retryStep = approvedBrief.value ? 'brief' : 'input';
             try {
                 const result = await api.generatePlan({
                     description: description.value.trim(),
                     briefId: briefId.value,
                     isPrivateSpace: isPrivateSpace.value,
                     clarifications: clarificationsPayload,
-                    // Picked in step 1 and, until now, only used when saving the
-                    // finished project. The plan has to be built for the chosen
-                    // technology, not merely tagged with it afterwards.
+                    // The plan has to be built for the chosen technology, not
+                    // merely tagged with it afterwards.
                     skills: skills.value,
+                    approvedBrief: approvedBrief.value || null,
+                    assumptions: briefAssumptions.value,
                 });
                 if (!result || !result.status) {
                     error.value = (result && result.statusText) || 'Plan generation failed. Please try again.';
-                    step.value = 'input'; // back to Step 1 so user can retry
+                    step.value = retryStep;
                     return;
                 }
                 if (!result.plan) {
                     error.value = 'The AI did not return a plan. Please try again.';
-                    step.value = 'input';
+                    step.value = retryStep;
                     return;
                 }
                 plan.value = result.plan;
@@ -775,12 +903,117 @@ export default defineComponent({
                 planUsage.value = result.usage || null;
                 mergeSuggestedSkills(result.plan);
                 step.value = 'preview';
+                if (approvedBrief.value) loadGuide();
             } catch (e) {
                 error.value = friendlyErr(e);
-                step.value = 'input';
+                step.value = retryStep;
             } finally {
                 loading.value = false;
             }
+        }
+
+        async function startBrief() {
+            step.value = 'brief';
+            error.value = '';
+            briefError.value = '';
+            briefApproved.value = false;
+            briefEditedSinceApproval.value = false;
+            approvedBrief.value = '';
+            briefLoading.value = true;
+            try {
+                const res = await api.generateBrief({
+                    description: description.value.trim(),
+                    briefId: briefId.value,
+                    answers: answers.value,
+                });
+                if (res && res.usage) briefUsage.value = res.usage;
+                if (res && res.coverage && typeof res.coverage === 'object') coverage.value = res.coverage;
+                const draft = res && res.status && res.brief;
+                if (!draft || typeof draft.markdown !== 'string' || !draft.markdown.trim()) {
+                    briefError.value = (res && res.statusText) || t('AiProject.brief_failed');
+                    return;
+                }
+                briefDraft.value = draft;
+                briefMarkdown.value = draft.markdown;
+            } catch (e) {
+                briefError.value = friendlyErr(e);
+            } finally {
+                briefLoading.value = false;
+            }
+        }
+
+        function onBriefEdit(text) {
+            briefMarkdown.value = text;
+            if (briefApproved.value) {
+                briefApproved.value = false;
+                briefEditedSinceApproval.value = true;
+            }
+            approvedBrief.value = '';
+        }
+
+        function onApproveBrief() {
+            if (!briefMarkdown.value.trim()) return;
+            approvedBrief.value = briefMarkdown.value;
+            briefApproved.value = true;
+            briefEditedSinceApproval.value = false;
+        }
+
+        async function onGenerateFromBrief() {
+            if (!briefApproved.value || !approvedBrief.value) return;
+            await runPlanGeneration(clarifications.value);
+        }
+
+        // Escape hatch when /brief is unavailable: the plan is built the old way.
+        async function onSkipBrief() {
+            approvedBrief.value = '';
+            briefApproved.value = false;
+            await runPlanGeneration(clarifications.value);
+        }
+
+        function onBriefBack() {
+            error.value = '';
+            step.value = hasGeneratedQuestions.value ? 'clarify' : 'input';
+        }
+
+        function onPreviewBack() {
+            error.value = '';
+            step.value = approvedBrief.value ? 'brief' : 'input';
+        }
+
+        async function loadGuide() {
+            if (!approvedBrief.value || !plan.value) return;
+            guideLoading.value = true;
+            guideError.value = '';
+            try {
+                const res = await api.generateGuide({
+                    approvedBrief: approvedBrief.value,
+                    assumptions: planAssumptions.value,
+                    plan: plan.value,
+                });
+                const g = res && res.status && res.guide;
+                if (!g || typeof g !== 'object') {
+                    guideError.value = (res && res.statusText) || t('AiProject.guide_failed');
+                    return;
+                }
+                guide.value = g;
+                guideMarkdown.value = typeof g.markdown === 'string' ? g.markdown : '';
+            } catch (e) {
+                guideError.value = friendlyErr(e);
+            } finally {
+                guideLoading.value = false;
+            }
+        }
+
+        function guideForExecute() {
+            if (!guide.value) return null;
+            return { ...guide.value, markdown: guideMarkdown.value || guide.value.markdown || '' };
+        }
+
+        function applyOutcome(payload) {
+            if (!payload || typeof payload !== 'object') return;
+            if (payload.guideAgentId) outcome.guideAgentId = payload.guideAgentId;
+            if (typeof payload.runsQueued === 'number') outcome.runsQueued = payload.runsQueued;
+            if (Array.isArray(payload.runsRefused)) outcome.runsRefused = payload.runsRefused.filter(Boolean);
         }
 
         // User's picks first, then the model's — known slugs only, mirroring the
@@ -800,26 +1033,44 @@ export default defineComponent({
             skills.value = merged;
         }
 
-        // ── Clarify step handlers ────────────────────────────────────────
-        // Submitted from the ClarifyStep component with the full
-        // clarifications array (one entry per question, including skipped).
-        async function onClarifySubmit(clarificationsPayload) {
-            clarifications.value = clarificationsPayload;
-            await runPlanGeneration(clarificationsPayload);
+        // A second round is worth a call only while a missing point was never asked
+        // about; an answered, skipped or "don't know" point is settled for this brief.
+        function pointsStillUnasked(roundAnswers) {
+            const cov = coverage.value || {};
+            const asked = new Set(roundAnswers.map((a) => a.point).filter(Boolean));
+            const everAsked = new Set(answers.value.map((a) => a.point).filter(Boolean));
+            return POINTS.filter((p) => cov[p] === 'missing' && !asked.has(p) && !everAsked.has(p));
         }
 
-        // User clicked "← Back" on the Clarify step — return to Step 1 but
-        // KEEP the generated questions + answers in memory. Step 1 then
-        // shows the dual-button layout ("Re-Generate Questions" / "Next →")
-        // so the user can hop back into the Clarify step without paying
-        // for another LLM call. We only clear `clarifyError` since that's
-        // tied to a transient panel state, not to the questions themselves.
+        async function onClarifySubmit(roundAnswers) {
+            const list = Array.isArray(roundAnswers) ? roundAnswers : [];
+            const unasked = pointsStillUnasked(list);
+            answers.value = [...answers.value, ...list];
+            clarifications.value = answers.value;
+            if (clarifyRound.value < clarifyMaxRounds.value && unasked.length) {
+                clarifyLoading.value = true;
+                try {
+                    const res = await api.generateClarifyingQuestions({
+                        description: description.value.trim(),
+                        briefId: briefId.value,
+                        previousAnswers: answers.value,
+                    });
+                    clarifyLoading.value = false;
+                    if (applyClarifyResponse(res)) return;
+                } catch (e) {
+                    clarifyLoading.value = false;
+                }
+            }
+            await startBrief();
+        }
+
+        // Back keeps the questions and answers so Step 1 can re-enter Clarify
+        // without another LLM call.
         function onClarifyBack() {
             step.value = 'input';
             clarifyError.value = '';
         }
 
-        // Retry button inside the Clarify step's error panel.
         async function onClarifyRetry() {
             clarifyError.value = '';
             clarifyLoading.value = true;
@@ -827,25 +1078,18 @@ export default defineComponent({
                 const res = await api.generateClarifyingQuestions({
                     description: description.value.trim(),
                     briefId: briefId.value,
+                    previousAnswers: answers.value,
                 });
-                if (res && res.usage) clarifyUsage.value = res.usage;
-                if (res && res.status && Array.isArray(res.questions) && res.questions.length) {
-                    clarifyQuestions.value = res.questions;
-                    clarifyUnderstanding.value = res.understanding || '';
-                } else {
-                    // Still empty — just skip and generate.
-                    await runPlanGeneration(null);
-                }
-            } catch (e) {
-                clarifyError.value = friendlyErr(e);
-            } finally {
                 clarifyLoading.value = false;
+                if (!applyClarifyResponse(res)) await startBrief();
+            } catch (e) {
+                clarifyLoading.value = false;
+                clarifyError.value = friendlyErr(e);
             }
         }
 
-        // "Skip and generate plan" button inside the Clarify error panel.
         async function onClarifySkipAll() {
-            await runPlanGeneration(null);
+            await startBrief();
         }
 
         function buildEdits() {
@@ -887,11 +1131,15 @@ export default defineComponent({
                     proposalId: proposalId.value,
                     source: source.value,
                     skills: skills.value,
+                    approvedBrief: approvedBrief.value || null,
+                    assumptions: planAssumptions.value,
+                    guide: guideForExecute(),
                 });
                 if (!result || !result.status || !result.jobId) {
                     error.value = (result && result.statusText) || 'Execute failed';
                     return;
                 }
+                applyOutcome(result);
                 jobId.value = result.jobId;
                 step.value = 'executing';
                 progress.totalSprints = totals.value.sprints;
@@ -933,8 +1181,10 @@ export default defineComponent({
                     progress.sprintsDone = (payload.totals && payload.totals.sprints) || progress.sprintsDone;
                     progress.tasksDone = (payload.totals && payload.totals.tasks) || progress.tasksDone;
                     createdProjectId.value = payload.projectId;
+                    applyOutcome(payload);
+                    // `created` waits for "Open project": parents close the sidebar on
+                    // it, which would hide the queued-runs summary and the guide link.
                     step.value = 'done';
-                    emit('created', { projectId: payload.projectId });
                 } else if (payload.event === 'error') {
                     error.value = payload.error || 'Execution failed';
                     rolledBack.value = !!payload.rolledBack;
@@ -946,6 +1196,14 @@ export default defineComponent({
         function onOpenProject() {
             if (createdProjectId.value) emit('created', { projectId: createdProjectId.value });
             onClose();
+        }
+
+        function onOpenGuideAgent() {
+            const id = outcome.guideAgentId;
+            if (!id) return;
+            const cid = route && route.params ? route.params.cid : undefined;
+            onClose();
+            router.push({ name: 'AiAgent', params: { cid, id } });
         }
 
         function onRetry() {
@@ -998,12 +1256,17 @@ export default defineComponent({
             skills.value = [];
             clarifyUsage.value = null;
             planUsage.value = null;
-            // Reset clarify state too so re-opening the modal is a clean slate.
+            briefUsage.value = null;
             clarifyLoading.value = false;
             clarifyQuestions.value = [];
             clarifyUnderstanding.value = '';
             clarifyError.value = '';
-            clarifications.value = null;
+            briefLoading.value = false;
+            guideLoading.value = false;
+            resetBriefFlow();
+            outcome.guideAgentId = null;
+            outcome.runsQueued = 0;
+            outcome.runsRefused = [];
             emit('close');
         }
 
@@ -1030,10 +1293,15 @@ export default defineComponent({
             onFileChosen, clearBrief,
             onGeneratePlan, onNextWithExistingPlan,
             onRegenerateQuestions, onNextWithExistingQuestions,
-            onApprovePlan, onOpenProject, onRetry, onClose, onSidebarVisibleChange,
-            // Clarify step
+            onApprovePlan, onOpenProject, onOpenGuideAgent, onRetry, onClose, onSidebarVisibleChange, onPreviewBack,
             clarifyLoading, clarifyQuestions, clarifyUnderstanding, clarifyError,
+            coverage, clarifyRound, clarifyMaxRounds,
             onClarifySubmit, onClarifyBack, onClarifyRetry, onClarifySkipAll,
+            briefLoading, briefError, briefMarkdown, briefApproved, briefEditedSinceApproval, briefAssumptions, approvedBrief,
+            onBriefEdit, onApproveBrief, onGenerateFromBrief, onSkipBrief, onBriefBack, startBrief,
+            planAssumptions, splitSummary,
+            guide, guideMarkdown, guideLoading, guideError, loadGuide,
+            outcome, hasOutcome,
         };
     },
 });
@@ -1532,6 +1800,30 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
     font-weight: 500;
 }
 .aipg-chip-app { background: #eef2ff; color: #252D75; }
+.aipg-chip-xs { padding: 1px 8px; font-size: 11px; margin-right: 6px; }
+
+.aipg-coverage-card { display: flex; flex-direction: column; gap: 8px; }
+.aipg-coverage-hint { line-height: 1.5; }
+.aipg-split-summary {
+    margin: 8px 0 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: #2F3990;
+}
+.aipg-assumption-list {
+    margin: 4px 0 0;
+    padding-left: 18px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #1e1b4b;
+}
+.aipg-assumption-list li + li { margin-top: 4px; }
+.aipg-task-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.aipg-task-row .aipg-task-name { flex: 1 1 200px; }
+.aipg-outcome { display: flex; flex-direction: column; gap: 10px; }
+.aipg-outcome-line { margin: 0; }
+.aipg-outcome-refused .aipg-assumption-list { color: #475569; }
+.aipg-outcome-guide { align-self: flex-start; font-size: 13px; }
 
 /* ─────────────────────────────────────────────────────────────────────
    Folder / sprint / task tree
