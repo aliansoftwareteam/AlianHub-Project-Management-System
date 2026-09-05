@@ -1,4 +1,5 @@
 const ctrl = require('./controller');
+const guideCtrl = require('./guideController');
 
 exports.init = (app) => {
     /**
@@ -50,6 +51,15 @@ exports.init = (app) => {
      *     tags: [AI Project Generator]
      */
     app.post('/api/v1/ai/project/execute', ctrl.execute);
+
+    /**
+     * @swagger
+     * /api/v1/ai/project/guide:
+     *   post:
+     *     summary: Generate the project's Guide instructions from the approved brief (task 015)
+     *     tags: [AI Project Generator]
+     */
+    app.post('/api/v1/ai/project/guide', guideCtrl.guide);
 
     /**
      * @swagger
