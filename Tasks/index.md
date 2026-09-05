@@ -17,3 +17,5 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 010 | Redesign stage 4 — auditable AI agent system | active | high | 009 | active/010-redesign-ai-system |
 | 011 | Redesign stage 5 — money & scale | active | medium | 009 | active/011-redesign-money-scale |
 | 012 | Run the rest of the redesign from inside AlianHub (dogfood) | active | high | 009 | active/012-dogfood-in-alianhub |
+| 014 | AI hub full test and fixes | active | high | 006, 010 | active/014-ai-hub-sweep |
+| 015 | Guided project start — complete brief, agent/human split | proposed | high | 014 | active/015-guided-project-brief |
