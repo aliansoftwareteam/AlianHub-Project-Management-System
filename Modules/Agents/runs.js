@@ -54,6 +54,10 @@ const canStart = async (agent, { trigger, viaAccount, companyId } = {}) => {
         const today = Number(await runsToday(companyId, agent._id)) || 0;
         if (today >= Number(agent.rateLimitPerDay)) return { ok: false, reason: `Daily run limit reached (${today} of ${agent.rateLimitPerDay} today).` };
     }
+    if (companyId) {
+        const budget = await require('./budget').check(companyId);
+        if (!budget.ok) return budget;
+    }
     return { ok: true, reason: '' };
 };
 
@@ -129,6 +133,7 @@ const recordSpend = async (companyId, run, usage, model) => {
         spend: { tokens: priced.totalTokens, usd, model: priced.model || model || null, billedToWorkspace: billed, personalUsd: !billed && priced.costUsd ? priced.costUsd : 0 },
     });
     if (!billed) return { usd: 0, tokens: priced.totalTokens, capReached: false };
+    await require('./budget').alertIfCrossed(companyId, run).catch((e) => logger.error(`[agent-run] ${run._id}: budget alert failed: ${e.message}`));
     const agent = await getAgent(companyId, run.agentId);
     if (!agent) return { usd, tokens: priced.totalTokens, capReached: false };
     const month = agent.spendMonth && agent.spendMonth.month === monthKey() ? agent.spendMonth : { month: monthKey(), usd: 0, tokens: 0, runs: 0 };

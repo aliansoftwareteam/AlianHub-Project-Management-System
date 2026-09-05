@@ -15,12 +15,16 @@ exports.init = (app) => {
     app.get('/api/v2/agents/pipeline', ctrl.pipelineTasks);
     app.get('/api/v2/agents/release', ctrl.releaseCandidate);
     app.post('/api/v2/agents/pause-all', ctrl.pauseAll);
+    app.get('/api/v2/agents/settings', ctrl.getSettings);
+    app.put('/api/v2/agents/settings', ctrl.putSettings);
+    app.get('/api/v2/agents/budget', ctrl.getBudget);
 
     app.get('/api/v2/agents/runs/summary', ctrl.runSummary);
     app.get('/api/v2/agents/runs', ctrl.listRuns);
     app.post('/api/v2/agents/runs', ctrl.startRun);
     app.get('/api/v2/agents/runs/:id', ctrl.getRun);
     app.post('/api/v2/agents/runs/:id/stop', ctrl.stopRun);
+    app.post('/api/v2/agents/runs/:id/revert', ctrl.revertRun);
 
     app.get('/api/v2/agents/proposals', ctrl.listProposals);
     app.post('/api/v2/agents/proposals', ctrl.createProposal);
