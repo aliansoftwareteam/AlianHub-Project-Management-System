@@ -41,6 +41,15 @@ const getTask = async (companyId, taskId) => {
     return task;
 };
 
+const recordAutomationAudit = (companyId, context, entry) => {
+    if (context.auditedByCaller) return;
+    recordAudit(companyId, {
+        actorId: context.ruleId ? `rule:${context.ruleId}` : 'automation',
+        actorName: context.ruleName || 'Automation',
+        ...entry,
+    });
+};
+
 const emitAutomationUpdate = (doc, updatedFields, depth) => {
     socketEmitter.emit('update', {
         type: 'update',
@@ -68,9 +77,7 @@ const updateTask = async (companyId, taskId, set, context = {}) => {
     if (!updated || !updated._id) throw new DeterministicError(`task ${taskId} not found`);
 
     emitAutomationUpdate(updated, set, context.depth);
-    recordAudit(companyId, {
-        actorId: context.ruleId ? `rule:${context.ruleId}` : 'automation',
-        actorName: context.ruleName || 'Automation',
+    recordAutomationAudit(companyId, context, {
         action: context.action || 'automation.task.update',
         entityType: 'task',
         entityId: String(taskId),
@@ -115,9 +122,7 @@ const addComment = async (companyId, taskId, body, context = {}) => {
         },
     }, 'save');
 
-    recordAudit(companyId, {
-        actorId: context.ruleId ? `rule:${context.ruleId}` : 'automation',
-        actorName: context.ruleName || 'Automation',
+    recordAutomationAudit(companyId, context, {
         action: 'automation.task.comment',
         entityType: 'task',
         entityId: String(taskId),
@@ -234,9 +239,7 @@ const createSubtask = async (companyId, parentTaskId, { title, description = '' 
     }, 'findOneAndUpdate').catch(() => {});
 
     emitAutomationUpdate(saved, { ParentTaskId: String(parentTaskId) }, context.depth);
-    recordAudit(companyId, {
-        actorId: context.ruleId ? `rule:${context.ruleId}` : 'automation',
-        actorName: context.ruleName || 'Automation',
+    recordAutomationAudit(companyId, context, {
         action: 'automation.task.create_subtask',
         entityType: 'task',
         entityId: String(saved._id),
@@ -334,9 +337,7 @@ const createTask = async (companyId, projectId, { title, description = '', sprin
     const task = await getTask(companyId, saved._id);
 
     emitAutomationUpdate(task, { created: true }, context.depth);
-    recordAudit(companyId, {
-        actorId: context.ruleId ? `rule:${context.ruleId}` : 'automation',
-        actorName: context.ruleName || 'Automation',
+    recordAutomationAudit(companyId, context, {
         action: 'automation.task.create',
         entityType: 'task',
         entityId: String(task._id),

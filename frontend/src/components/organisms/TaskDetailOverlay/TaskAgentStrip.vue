@@ -2,7 +2,7 @@
     <div class="ah-agent-strip" :class="`is-${run.status || 'running'}`" role="status">
         <span class="ah-avatar ah-avatar--sm ah-avatar--agent" aria-hidden="true">◉</span>
         <span class="ah-agent-strip__name">{{ run.agentName || $t('TaskPanel.agent') }}</span>
-        <span class="ah-chip ah-chip--agent ah-chip--mono ah-agent-strip__tag">AGENT</span>
+        <span class="ah-chip ah-chip--agent ah-chip--mono ah-agent-strip__tag">{{ $t('TaskPanel.agent_tag') }}</span>
         <span class="ah-agent-strip__text">{{ statusText }}</span>
         <span v-if="elapsed" class="ah-agent-strip__elapsed ah-mono">{{ elapsed }}</span>
         <span v-if="run.status === 'running'" class="ah-dot ah-dot--ok ah-agent-strip__pulse" aria-hidden="true"></span>

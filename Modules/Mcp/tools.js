@@ -4,6 +4,10 @@ const registry = require('../Agents/registry');
 const actions = require('../Agents/actions');
 const { oid } = require('../Automations/engine/tools');
 const { buildBrief } = require('./brief');
+const { htmlToRawText } = require('../Pages/helpers/pageRules');
+const { blocksToRawText, contentToEditorData } = require('../Pages/helpers/pageContent');
+
+const PAGE_TEXT_MAX = 40000;
 
 const str = (v, max = 500) => String(v === undefined || v === null ? '' : v).slice(0, max);
 const clampLimit = (v, def = 10, max = 50) => Math.min(Math.max(parseInt(v, 10) || def, 1), max);
@@ -12,6 +16,14 @@ const scopeFilter = (ctx, extra = {}) => {
     const filter = { CompanyId: String(ctx.companyId), deletedStatusKey: { $ne: 1 }, ...extra };
     if (ctx.projectIds && ctx.projectIds.length) filter.ProjectID = { $in: ctx.projectIds };
     return filter;
+};
+
+/* Stored rawText is a 5000-char search excerpt, so the full body comes from the html. */
+const pageText = (page) => {
+    const content = page.content || {};
+    if (content.html) return htmlToRawText(content.html, PAGE_TEXT_MAX);
+    if (page.rawText) return String(page.rawText);
+    return blocksToRawText(contentToEditorData(content), PAGE_TEXT_MAX);
 };
 
 const taskRow = (t) => ({
@@ -147,7 +159,7 @@ const TOOLS = [
                 pageId: String(page._id),
                 title: page.title || '',
                 updatedAt: page.updatedAt || null,
-                text: str(page.plainText || page.html || '', 40000),
+                text: str(pageText(page), PAGE_TEXT_MAX),
             };
         },
     },

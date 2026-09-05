@@ -1,14 +1,36 @@
-const orchestrator = require('../../../Agents/engine/orchestrator');
-const { createSubtask, addComment } = require('../tools');
-const memory = require('../../../Agents/engine/findingMemory');
+const mongoose = require('mongoose');
+const { SCHEMA_TYPE } = require('../../../../Config/schemaType');
+const { MongoDbCrudOpration } = require('../../../../utils/mongo-handler/mongoQueries');
+const skillIndex = require('../../../Agents/skills');
 
-// The bridge between the two engines.
-//
-// ADR 002's central decision: the agent is NOT a separate system with its own
-// triggers, permissions and audit trail. It is one more automation action, so a
-// rule can read "when status changes to Done, run the QA agent, then do something
-// with the verdict" using the same builder, run log and audit rows as every other
-// action. That is what stops two engines becoming two products.
+// The bridge between the two engines (ADR 002): an agent is one more automation
+// action, not a second system. A rule-triggered run goes through the same
+// runs.create → executeSkill path as a manual one, so the agent's pause switch,
+// spend cap, daily limit, allowed actions, audit rows and undo all apply.
+
+const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
+const escapeRe = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const refuse = (reason) => {
+    const err = new Error(reason);
+    err.deterministic = true;
+    return err;
+};
+
+const findAgent = (companyId, ref) => {
+    const wanted = String(ref || '').trim();
+    if (!wanted) return null;
+    const match = OBJECT_ID.test(wanted)
+        ? { _id: new mongoose.Types.ObjectId(wanted) }
+        : { name: new RegExp(`^${escapeRe(wanted)}$`, 'i') };
+    return MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ ...match, deletedStatusKey: { $ne: 1 } }] }, 'findOne');
+};
+
+const ruleOwner = async (companyId, ruleId) => {
+    if (!OBJECT_ID.test(String(ruleId || ''))) return null;
+    const rule = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUTOMATION_RULES, data: [{ _id: new mongoose.Types.ObjectId(String(ruleId)) }, 'createdBy'] }, 'findOne').catch(() => null);
+    return rule && rule.createdBy ? String(rule.createdBy) : null;
+};
 
 module.exports = {
     key: 'run_agent',
@@ -16,89 +38,37 @@ module.exports = {
     appliesTo: ['task'],
     scopes: ['task.read', 'task.subtask.create', 'task.comment'],
     schema: {
-        skill: { type: 'select', label: 'Skill', required: true, options: ['qa-review'] },
-        fileSubtasks: { type: 'boolean', label: 'File each finding as a subtask', required: false },
-        postSummary: { type: 'boolean', label: 'Post a summary comment', required: false },
+        agent: { type: 'text', label: 'Agent (name)', required: true },
+        skill: { type: 'select', label: 'Skill', required: true, options: skillIndex.ALL.map((s) => s.slug) },
     },
     async run({ companyId, entity, config, context }) {
+        const runs = require('../../../Agents/runs');
+        const proposals = require('../../../Agents/proposals');
+        const actions = require('../../../Agents/actions');
         const task = context.task || {};
-        const result = await orchestrator.run({ skillSlug: config.skill || 'qa-review', task });
 
-        if (result.status !== 'success') {
-            // A skipped run is a legitimate outcome, not a failure: most tasks have
-            // no URL to review, and failing the whole rule for that would make the
-            // automation unusable on a normal board.
-            if (result.status === 'skipped') return { changed: false, verdict: 'skipped', reason: result.reason };
-            const err = new Error(result.reason || 'agent run failed');
-            err.deterministic = true;
-            throw err;
+        if (!String(config.agent || '').trim()) throw refuse('This rule does not name an agent — pick one so its pause switch, spend cap and allowed actions apply.');
+        const agent = await findAgent(companyId, config.agent);
+        if (!agent) throw refuse(`No agent named "${config.agent}" in this workspace.`);
+        const check = await runs.canStart(agent, { trigger: 'rule', companyId });
+        if (!check.ok) throw refuse(`${agent.name} cannot run: ${check.reason}`);
+        if (agent.projectIds && agent.projectIds.length && !agent.projectIds.map(String).includes(String(task.ProjectID))) {
+            throw refuse(`${agent.name} is not scoped to this project.`);
         }
 
-        const created = [];
-        const skipped = [];
-        const refiled = [];
-        if (config.fileSubtasks !== false) {
-            // Consult memory before writing anything. Without this a second run on
-            // the same task files every finding again — measured: 6 findings became
-            // 12 subtasks, and only 2 were string-identical, so the titles cannot
-            // be used to spot the repeats.
-            const known = await memory.load(companyId, entity.id);
-            const decisions = await memory.decide(companyId, entity.id, result.findings, known);
+        const startedBy = await ruleOwner(companyId, context.ruleId);
+        const run = await runs.create(companyId, {
+            agent, taskId: entity.id, projectId: task.ProjectID, skill: runs.skillSlugOf(agent, config.skill), trigger: 'rule',
+            startedBy, viaAccount: agent.account, note: context.ruleName ? `rule "${context.ruleName}"` : null,
+        });
+        const actor = { kind: 'agent', userId: startedBy, agentId: String(agent._id), agentName: agent.name, runId: String(run._id), viaAccount: run.viaAccount, tokenId: null };
+        const out = await runs.executeSkill(companyId, run, agent, task, { proposals, actions, actor });
 
-            for (const d of decisions) {
-                const f = d.finding;
-                if (d.action === 'skip') {
-                    skipped.push({ factId: f.factId, reason: d.reason });
-                    // eslint-disable-next-line no-await-in-loop
-                    await memory.touch(companyId, d.prior);
-                    continue;
-                }
-                const body = [
-                    f.why,
-                    f.fix ? `\nFix: ${f.fix}` : '',
-                    f.evidence ? `\nEvidence: ${f.evidence}` : '',
-                    d.action === 'refile' ? `\nRegression: this was filed before and closed, and the defect is present again.` : '',
-                    `\n— filed by the ${result.skill} agent from ${result.url}`,
-                ].filter(Boolean).join('');
-                // eslint-disable-next-line no-await-in-loop
-                const sub = await createSubtask(companyId, entity.id, { title: `[${f.severity}] ${f.title}`, description: body }, context);
-                created.push(sub.subtaskId);
-                if (d.action === 'refile') refiled.push(f.factId);
-                // eslint-disable-next-line no-await-in-loop
-                await memory.record(companyId, {
-                    projectId: task.ProjectID, taskId: entity.id, factId: f.factId, skill: result.skill,
-                    subtaskId: sub.subtaskId, title: f.title, severity: f.severity, prior: d.prior,
-                });
-            }
-        }
-
-        if (config.postSummary !== false) {
-            const lines = [
-                `QA Review — ${result.url}`,
-                result.summary,
-                ``,
-                `${result.checksPassed}/${result.checksRun} checks passed.`,
-                `${created.length} subtask(s) filed${refiled.length ? `, ${refiled.length} of them regressions` : ''}.`,
-                skipped.length ? `${skipped.length} already tracked or marked wontfix — not filed again.` : '',
-                result.degraded ? `Note: ran without the model (${result.degraded}).` : '',
-                result.dropped?.length ? `${result.dropped.length} proposed finding(s) rejected by the evidence gate.` : '',
-                ``,
-                `Not checked (needs a browser): ${result.blindSpots.join('; ')}.`,
-            ].filter(Boolean).join('\n');
-            await addComment(companyId, entity.id, lines, context);
-        }
-
-        return {
-            changed: created.length > 0,
-            verdict: result.findings.length ? 'issues_found' : 'clean',
-            skipped: skipped.length,
-            refiled: refiled.length,
-            url: result.url,
-            findings: result.findings.length,
-            subtasks: created,
-            checksRun: result.checksRun,
-            degraded: result.degraded || null,
-            tokens: result.usage?.totalTokens || 0,
-        };
+        const base = { runId: String(run._id), agent: agent.name, skill: run.skill, status: out.status };
+        if (out.status === runs.STATUS.SKIPPED) return { ...base, changed: false, verdict: 'skipped', reason: out.outcome };
+        if (out.status === runs.STATUS.FAILED) throw refuse(out.error || out.outcome || 'agent run failed');
+        if (out.status === 'abandoned') return { ...base, changed: false, verdict: 'stopped', reason: out.outcome };
+        if (out.status === runs.STATUS.WAITING) return { ...base, changed: false, verdict: 'proposed', proposalId: out.proposalId };
+        return { ...base, changed: out.status === runs.STATUS.DONE, verdict: 'applied', outcome: out.outcome, refusals: out.refusals || 0 };
     },
 };

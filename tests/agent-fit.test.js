@@ -191,3 +191,58 @@ describe('bulk routing', () => {
         expect(rows[0].refusal).toBe('no agent here is allowed to do this');
     });
 });
+
+describe('routing refuses a task that lacks what the agent\'s skills need (browser sweep)', () => {
+    const reviewer = agent({ _id: 'pr', name: 'Code Reviewer', skills: [{ key: 'pr.summary', name: 'Reviewer' }], allowedActions: ['task.get', 'task.comment'] });
+    const qa = agent({ _id: 'qa', name: 'QA', skills: [{ key: 'qa-review' }], allowedActions: ['task.get', 'task.comment'] });
+    const intake = agent({ _id: 'in', name: 'Intake', skills: [{ key: 'brief.parse' }], allowedActions: ['task.get', 'subtask.create', 'task.comment'] });
+    const reporter = agent({ _id: 'rep', name: 'Reporter', skills: [{ key: 'digest.ceo' }], allowedActions: ['task.get', 'task.comment'] });
+    const fit = (a, t, runs = []) => F.fitFor({ agent: a, task: t, runs, registryActions: REGISTRY_ACTIONS, never: NEVER });
+
+    test('pr.summary needs a PR link — typed link, github URL in the description, or none', () => {
+        const noPr = fit(reviewer, task({ TaskName: 'Review the checkout change' }));
+        expect(noPr.eligible).toBe(false);
+        expect(noPr.blockedReason).toBe('This task lacks what it needs — it needs a pull request link on the task.');
+        expect(fit(reviewer, task({ TaskName: 'Review the checkout change', links: [{ kind: 'pr', url: 'https://github.com/a/b/pull/12' }] })).eligible).toBe(true);
+        expect(fit(reviewer, task({ TaskName: 'Review', rawDescription: 'PR: https://github.com/a/b/pull/12' })).eligible).toBe(true);
+    });
+
+    test('qa-review needs a public http(s) URL; brief.parse needs 40 characters of brief; digests are never per task', () => {
+        expect(fit(qa, task({ TaskName: 'Check the landing page' })).blockedReason).toMatch(/needs a public URL/);
+        expect(fit(qa, task({ TaskName: 'Check http://localhost:8080/landing' })).blockedReason).toMatch(/needs a public URL/);
+        expect(fit(qa, task({ TaskName: 'Check https://example.com/landing' })).eligible).toBe(true);
+        expect(fit(intake, task({ TaskName: 'Plan the onboarding flow', description: 'tbd' })).blockedReason).toMatch(/brief of at least 40 characters/);
+        expect(fit(intake, task({ TaskName: 'Plan the onboarding flow', description: `<p>${'Goal and acceptance criteria written out in full here. '.repeat(2)}</p>` })).eligible).toBe(true);
+        expect(fit(reporter, task({ TaskName: 'Audit the digest' })).blockedReason).toMatch(/whole project, not on one task/);
+    });
+
+    test('the server-computed task.inputs win over deriving from the body, and an agent with any satisfiable skill stays eligible', () => {
+        expect(fit(reviewer, task({ TaskName: 'Review the checkout change', inputs: { prUrl: 'https://github.com/a/b/pull/1', publicUrl: null, briefChars: 0 } })).eligible).toBe(true);
+        const both = agent({ _id: 'b', name: 'Both', skills: [{ key: 'pr.summary' }, { key: 'qa-review' }], allowedActions: ['task.get', 'task.comment'] });
+        expect(fit(both, task({ TaskName: 'Check https://example.com' })).eligible).toBe(true);
+        expect(fit(agent({ skills: ['review', 'a11y'] }), task({ TaskName: 'Audit the copy' })).eligible).toBe(true);
+    });
+
+    test('bulk routing sends those tasks to a person with the reason instead of assigning them', () => {
+        const rows = F.routeTasks({
+            tasks: [task({ _id: '1', TaskName: 'Review the checkout change' }), task({ _id: '2', TaskName: 'Review https://github.com/a/b/pull/3' })],
+            agents: [reviewer], registryActions: REGISTRY_ACTIONS, never: NEVER
+        });
+        expect(rows[0].routed).toBe(false);
+        expect(rows[0].refusal).toBe('needs a person — it needs a pull request link on the task');
+        expect(rows[1].routed).toBe(true);
+        expect(rows[1].agent.name).toBe('Code Reviewer');
+        expect(F.routingTotals(rows)).toMatchObject({ routed: 1, forPeople: 1 });
+    });
+
+    test('skipped runs are neither clean nor failed in the history', () => {
+        const runs = [run({ agentId: 'pr', status: 'skipped' }), run({ _id: 'r2', agentId: 'pr', status: 'skipped' }), run({ _id: 'r3', agentId: 'pr', status: 'done' })];
+        const t = task({ TaskName: 'Review https://github.com/a/b/pull/3' });
+        const out = fit(reviewer, t, runs);
+        expect(out.history).toMatchObject({ runs: 3, finished: 1, good: 1, skipped: 2, successRate: 1 });
+        expect(out.reason).toMatch(/1 finished clean\. 2 skipped for missing input/);
+        const onlySkips = fit(reviewer, t, runs.slice(0, 2));
+        expect(onlySkips.noHistory).toBe(true);
+        expect(onlySkips.percent).toBeNull();
+    });
+});

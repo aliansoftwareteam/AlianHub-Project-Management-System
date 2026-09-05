@@ -20,9 +20,13 @@ const { updateStatus, stub, projectPayload } = vi.hoisted(() => ({
     }
 }));
 
+const { openRuns } = vi.hoisted(() => ({ openRuns: { rows: [] } }));
+
 vi.mock('@/services', () => ({
     apiRequest: vi.fn((method, url) => {
         if (String(url).includes('/taskData')) return Promise.resolve({ status: 200, data: [projectPayload] });
+        if (String(url).includes('/agents/runs?status=open')) return Promise.resolve({ status: 200, data: { status: true, data: openRuns.rows } });
+        if (String(url).includes('/agents/runs/') && String(url).endsWith('/stop')) return Promise.resolve({ status: 200, data: { status: true, data: {} } });
         return Promise.resolve({ status: 200, data: { status: false, data: [] } });
     })
 }));
@@ -86,5 +90,38 @@ describe('TaskDetailPanel', () => {
         const call = updateStatus.mock.calls[0][0];
         expect(call.newStatus).toMatchObject({ statusKey: 'st-done', statusType: 'close' });
         expect(call.task._id).toBe('task-1');
+    });
+
+    it('shows no agent strip when the task has no open run', async () => {
+        openRuns.rows = [];
+        const wrapper = mountPanel();
+        await flushPromises();
+        expect(wrapper.findComponent({ name: 'TaskAgentStrip' }).exists()).toBe(false);
+    });
+
+    it('feeds the agent strip from the open run on the task and stops it through the API', async () => {
+        const { apiRequest } = await import('@/services');
+        openRuns.rows = [{ _id: 'run-1', agentName: 'Reviewer', status: 'running', startedAt: '2026-09-04T10:00:00.000Z' }];
+        const wrapper = mountPanel();
+        await flushPromises();
+        const strip = wrapper.findComponent({ name: 'TaskAgentStrip' });
+        expect(strip.exists()).toBe(true);
+        const run = strip.vm.$attrs.run;
+        expect(run).toMatchObject({ agentName: 'Reviewer', status: 'running', startedAt: '2026-09-04T10:00:00.000Z' });
+        expect(apiRequest).toHaveBeenCalledWith('get', '/api/v2/agents/runs?status=open&taskId=task-1&limit=5');
+        openRuns.rows = [];
+        await run.onStop();
+        await flushPromises();
+        expect(apiRequest).toHaveBeenCalledWith('post', '/api/v2/agents/runs/run-1/stop', {});
+        expect(wrapper.findComponent({ name: 'TaskAgentStrip' }).exists()).toBe(false);
+    });
+
+    it('maps a run waiting for approval to the review state', async () => {
+        openRuns.rows = [{ _id: 'run-2', agentName: 'Intake', status: 'waiting_approval', startedAt: '2026-09-04T10:00:00.000Z' }];
+        const wrapper = mountPanel();
+        await flushPromises();
+        const run = wrapper.findComponent({ name: 'TaskAgentStrip' }).vm.$attrs.run;
+        expect(run.status).toBe('review');
+        expect(run.onStop).toBeNull();
     });
 });

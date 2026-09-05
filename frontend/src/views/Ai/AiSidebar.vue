@@ -30,12 +30,14 @@
 <script setup>
 import { computed, inject, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useToast } from "vue-toast-notification";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { useAgents } from "./useAgents";
 
 defineOptions({ name: "AiSidebar" });
 
 const { t } = useI18n();
+const $toast = useToast();
 const companyId = inject("$companyId");
 const { waiting, running, spend, pauseAll } = useAgents();
 const busy = ref(false);
@@ -61,6 +63,13 @@ const spendLabel = computed(() => {
 
 const onPauseAll = async () => {
     busy.value = true;
-    try { await pauseAll(); } finally { busy.value = false; }
+    try {
+        await pauseAll();
+        $toast.success(t("Ai.all_paused"), { position: "top-right" });
+    } catch (error) {
+        $toast.error(error.message, { position: "top-right" });
+    } finally {
+        busy.value = false;
+    }
 };
 </script>

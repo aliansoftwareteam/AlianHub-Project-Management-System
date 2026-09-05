@@ -23,8 +23,9 @@
                     </div>
                     <div class="ah-card__body">
                         <p v-if="loading" class="ah-empty">{{ $t('Parity.loading') }}</p>
+                        <EmptyState v-else-if="loadError" :title="$t('Ai.load_failed')" :message="loadError" :action-label="$t('Ai.retry')" @action="load" />
                         <p v-else-if="!routable.length" class="ah-empty">{{ $t('Parity.nothing_open') }}</p>
-                        <label v-for="item in routable" :key="item._id" class="route__row">
+                        <label v-for="item in loadError ? [] : routable" :key="item._id" class="route__row">
                             <input class="ah-check" type="checkbox" :value="String(item._id)" :checked="selected.includes(String(item._id))" @change="toggle(item)" />
                             <span class="route__title">{{ item.TaskName }}</span>
                             <span class="ah-mono ah-muted">{{ item.TaskKey || '' }}</span>
@@ -47,7 +48,7 @@
                                     <span class="ah-avatar ah-avatar--agent ah-avatar--sm"><ShellIcon name="agent" :size="11" /></span>
                                     <strong>{{ row.agent.name }}</strong>
                                 </template>
-                                <strong v-else>{{ row.refusal }}</strong>
+                                <strong v-else>{{ refusalText(t, row) }}</strong>
                             </span>
                         </div>
 
@@ -95,9 +96,13 @@ import { useToast } from "vue-toast-notification";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import AiSidebar from "./AiSidebar.vue";
 import { useParity } from "./useParity";
+import { reasonOf } from "./useAgents";
 import { routeTasks, routingTotals } from "./agentFit";
+import { refusalText, workLabelText } from "./fitText";
+import { skillKeyOf } from "./skillInputs";
 
 // Bulk routing (30b). The tasks it refuses to route are the point, so refusals
 // are rendered with the same weight as the assignments.
@@ -108,6 +113,7 @@ const $toast = useToast();
 const { agents, registryManifest, routable, runs, loadAgents, loadRegistry, loadRuns, loadRoutable, startRun } = useParity();
 
 const loading = ref(true);
+const loadError = ref("");
 const selected = ref([]);
 const accepted = ref([]);
 const proposed = ref(false);
@@ -176,17 +182,20 @@ const assign = async () => {
 };
 
 /* The rule the router offers is the routing decision written down: the kind of
- * work it just matched, and the agent it matched it to. */
-const ruleSentence = computed(() => {
+ * work it just matched, and the agent it matched it to. The compiler only reads
+ * the English grammar, so that form is kept apart from the sentence on screen. */
+const ruleParts = computed(() => {
     const first = rows.value.find((r) => r.routed);
-    if (!first) return t("Parity.no_rule_yet");
+    if (!first) return null;
     const agent = agents.value.find((a) => String(a._id) === first.agent.agentId) || {};
-    const skill = (agent.skills || [])[0] || "qa-review";
-    return `When a task is created, if the title contains "${first.work.kind}", run the ${String(skill).replace(/[^a-z0-9-]/gi, "-").toLowerCase()} agent.`;
+    const skill = skillKeyOf((agent.skills || [])[0]) || "qa-review";
+    return { kind: first.work.kind, work: workLabelText(t, first.work), skill: skill.replace(/[^a-z0-9-]/gi, "-").toLowerCase() };
 });
+const ruleSource = computed(() => (ruleParts.value ? `When a task is created, if the title contains "${ruleParts.value.kind}", run the ${ruleParts.value.skill} agent.` : ""));
+const ruleSentence = computed(() => (ruleParts.value ? t("Parity.rule_sentence", ruleParts.value) : t("Parity.no_rule_yet")));
 
 const compile = async () => {
-    const res = await apiRequest("post", env.AUTOMATIONS_COMPILE, { sentence: ruleSentence.value, name: t("Parity.rule_name") });
+    const res = await apiRequest("post", env.AUTOMATIONS_COMPILE, { sentence: ruleSource.value, name: t("Parity.rule_name") });
     if (!res?.data?.status) { ruleErrors.value = [res?.data?.statusText || t("Parity.compile_failed")]; return null; }
     ruleErrors.value = res.data.data.errors || [];
     compiled.value = res.data.data.rule;
@@ -200,6 +209,9 @@ const testRule = async () => {
         if (!rule) return;
         const res = await apiRequest("post", env.AUTOMATIONS_BACKTEST, { rule });
         if (res?.data?.status) backtest.value = res.data.data;
+        else ruleErrors.value = [res?.data?.statusText || t("Parity.compile_failed")];
+    } catch (error) {
+        ruleErrors.value = [reasonOf(error, "Parity.compile_failed")];
     } finally {
         testing.value = false;
     }
@@ -212,18 +224,29 @@ const saveRule = async () => {
         const rule = await compile();
         if (!rule) return;
         const res = await apiRequest("post", env.AUTOMATIONS_V2, { ...rule, name: t("Parity.rule_name"), enabled: false });
-        if (!res?.data?.status) { ruleErrors.value = res?.data?.errors || [res?.data?.statusText]; return; }
+        if (!res?.data?.status) { ruleErrors.value = res?.data?.errors || [res?.data?.statusText || t("Parity.compile_failed")]; return; }
         ruleSaved.value = true;
+    } catch (error) {
+        ruleErrors.value = [reasonOf(error, "Parity.compile_failed")];
     } finally {
         savingRule.value = false;
     }
 };
 
-onMounted(async () => {
-    await Promise.all([loadAgents(), loadRegistry(), loadRuns(), loadRoutable()]);
-    loading.value = false;
-    selected.value = routable.value.slice(0, 8).map((r) => String(r._id));
-});
+const load = async () => {
+    loading.value = true;
+    loadError.value = "";
+    try {
+        await Promise.all([loadAgents(), loadRegistry(), loadRuns(), loadRoutable()]);
+        selected.value = routable.value.slice(0, 8).map((r) => String(r._id));
+    } catch (error) {
+        loadError.value = reasonOf(error, "Ai.load_failed");
+    } finally {
+        loading.value = false;
+    }
+};
+
+onMounted(load);
 </script>
 
 <style>

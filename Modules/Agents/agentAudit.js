@@ -14,6 +14,7 @@ const ACTION_DONE = 'agent.action';
 const ACTION_REFUSED = 'agent.action_refused';
 const ACTION_UNDONE = 'agent.action_undone';
 const PROPOSAL_DECIDED = 'agent.proposal_decided';
+const AGENT_DELETED = 'agent.deleted';
 
 const clip = (v, n = 2000) => {
     try { const s = JSON.stringify(v); return s.length > n ? JSON.parse(s.slice(0, n - 1) + '"') : v; } catch (e) { return String(v).slice(0, n); }
@@ -93,6 +94,16 @@ const recordProposalDecision = async (companyId, actor, { proposalId, decision, 
     });
 };
 
+const recordAgentDeleted = async (companyId, actor, { agentId, agentName, ip }) => {
+    const a = attribution(actor);
+    return write(companyId, {
+        actorId: a.actorId, actorName: a.label, ip,
+        action: AGENT_DELETED,
+        entityType: 'agent', entityId: String(agentId), entityName: agentName || '',
+        meta: { ...baseMeta(actor), agentId: String(agentId), agentName: agentName || null },
+    });
+};
+
 const markUndone = async (companyId, auditId, byActorId) => {
     if (!/^[0-9a-fA-F]{24}$/.test(String(auditId))) return;
     await MongoDbCrudOpration(companyId, {
@@ -109,6 +120,6 @@ const findById = async (companyId, auditId) => {
 };
 
 module.exports = {
-    ACTION_DONE, ACTION_REFUSED, ACTION_UNDONE, PROPOSAL_DECIDED,
-    recordAction, recordRefusal, recordUndo, recordProposalDecision, markUndone, findById,
+    ACTION_DONE, ACTION_REFUSED, ACTION_UNDONE, PROPOSAL_DECIDED, AGENT_DELETED,
+    recordAction, recordRefusal, recordUndo, recordProposalDecision, recordAgentDeleted, markUndone, findById,
 };

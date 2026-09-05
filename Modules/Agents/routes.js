@@ -37,6 +37,7 @@ exports.init = (app) => {
     app.get('/api/v2/agents', ctrl.listAgents);
     app.post('/api/v2/agents', ctrl.createAgent);
     app.put('/api/v2/agents/:id', ctrl.updateAgent);
+    app.delete('/api/v2/agents/:id', ctrl.deleteAgent);
     app.post('/api/v2/agents/:id/pause', ctrl.setPaused(true));
     app.post('/api/v2/agents/:id/resume', ctrl.setPaused(false));
 };

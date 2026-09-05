@@ -20,6 +20,8 @@
 
                 <div v-if="loading" class="ah-empty">{{ $t('Pipeline.loading') }}</div>
 
+                <EmptyState v-else-if="loadError" :title="$t('Ai.load_failed')" :message="loadError" :action-label="$t('Ai.retry')" @action="load" />
+
                 <div v-else-if="!tasks.length" class="ah-card ah-card__body pipe-empty">
                     <h3 class="ah-h3">{{ $t('Pipeline.empty_title') }}</h3>
                     <p class="ah-small">{{ $t('Pipeline.empty_body') }}</p>
@@ -115,8 +117,10 @@ import { useRouter } from "vue-router";
 import moment from "moment";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { openTask } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
+import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import AiSidebar from "./AiSidebar.vue";
 import { useShipping, runElapsed } from "./useShipping";
+import { reasonOf } from "./useAgents";
 
 // 28a — one task through five stages. Stages 4 and 5 are not written here: the
 // gate and the hard stop are read from the registry manifest, so removing
@@ -133,6 +137,7 @@ const {
 
 const taskId = ref("");
 const loading = ref(true);
+const loadError = ref("");
 
 const hasIntegrationsRoute = computed(() => router.hasRoute("IntegrationsHub"));
 const task = computed(() => tasks.value.find((row) => row._id === taskId.value) || tasks.value[0] || {});
@@ -277,11 +282,20 @@ watch(taskId, async (id) => {
     await loadTaskActivity(id);
 });
 
-onMounted(async () => {
-    await Promise.all([loadRegistry(), loadPipelineTasks()]);
-    taskId.value = tasks.value[0]?._id || "";
-    loading.value = false;
-});
+const load = async () => {
+    loading.value = true;
+    loadError.value = "";
+    try {
+        await Promise.all([loadRegistry(), loadPipelineTasks()]);
+        taskId.value = tasks.value[0]?._id || "";
+    } catch (error) {
+        loadError.value = reasonOf(error, "Ai.load_failed");
+    } finally {
+        loading.value = false;
+    }
+};
+
+onMounted(load);
 </script>
 
 <style>

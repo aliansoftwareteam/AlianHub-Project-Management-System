@@ -52,7 +52,7 @@
             </div>
         </header>
 
-        <TaskAgentStrip v-if="agentRun" :run="agentRun" />
+        <TaskAgentStrip v-if="stripRun" :run="stripRun" />
 
         <div class="ah-detail__body">
             <div class="ah-detail__main ah-scroll" ref="mainEl">
@@ -795,8 +795,42 @@ function onCommentInsert(data) {
     if (String(data?.fullDocument?.taskId || "") === String(props.taskId)) summaryRef.value?.refresh?.();
 }
 
+/* The strip reads the open run on this task; a parent may still hand one in
+ * (agentRun) and that wins, since it already knows more than the poll does. */
+const STRIP_STATUS = { running: "running", queued: "running", waiting_approval: "review" };
+const AGENT_RUN_POLL_MS = 15000;
+const liveRun = ref(null);
+let agentRunPoll = null;
+const stripRun = computed(() => props.agentRun || liveRun.value);
+
+async function stopAgentRun(runId) {
+    try {
+        const res = await apiRequest("post", `${env.AGENT_RUNS}/${runId}/stop`, {});
+        if (!res?.data?.status) throw new Error(res?.data?.statusText || t("TaskPanel.agent_stop_failed"));
+        $toast.success(t("TaskPanel.agent_stopped"), { position: "top-right" });
+    } catch (error) {
+        $toast.error(error?.response?.data?.statusText || error.message, { position: "top-right" });
+    }
+    await loadAgentRun();
+}
+
+async function loadAgentRun() {
+    try {
+        const res = await apiRequest("get", `${env.AGENT_RUNS}?status=open&taskId=${encodeURIComponent(props.taskId)}&limit=5`);
+        const run = (res?.data?.status ? res.data.data || [] : [])[0];
+        liveRun.value = run
+            ? { agentName: run.agentName, status: STRIP_STATUS[run.status] || "running", startedAt: run.startedAt, onStop: run.status === "running" ? () => stopAgentRun(run._id) : null }
+            : null;
+    } catch (error) {
+        liveRun.value = null;
+    }
+    clearTimeout(agentRunPoll);
+    if (liveRun.value) agentRunPoll = setTimeout(loadAgentRun, AGENT_RUN_POLL_MS);
+}
+
 onMounted(async () => {
     loadTask();
+    loadAgentRun();
     document.addEventListener("visibilitychange", visibilityHandler);
     if (socket?.value?.on) socket.value.on("commentInsert", onCommentInsert);
     dispatch("projectData/getTaskDetailSnapShot", { taskId: props.taskId }).catch((error) => console.error(error));
@@ -809,6 +843,7 @@ onBeforeUnmount(() => {
     socket?.value?.off?.("commentInsert", onCommentInsert);
     socket?.value?.emit?.("leaveTaskDetail", `taskDetail_${props.taskId}**${socket.value.id}`);
     clearTimeout(debounceTimeout);
+    clearTimeout(agentRunPoll);
     document.removeEventListener("visibilitychange", visibilityHandler);
 });
 
