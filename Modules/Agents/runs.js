@@ -4,7 +4,8 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const socketEmitter = require('../../event/socketEventEmitter');
 const logger = require('../../Config/loggerConfig');
 const { summarize } = require('../AIProjectGenerator/usage');
-const registry = require('./registry');
+const policy = require('./policy');
+const { rating: ratingOf } = require('./actions');
 
 // Agent runs and spend. A run is the unit the rail footer counts ("2 running"),
 // the project header chip sums (elapsed, spend) and the audit log links to
@@ -65,7 +66,7 @@ const create = async (companyId, { agent, taskId, projectId, skill, trigger, sta
             startedBy: startedBy ? String(startedBy) : null, startedAt: new Date(), elapsedMs: 0,
             spend: { tokens: 0, usd: 0, model: null, billedToWorkspace: (viaAccount || agent.account || 'workspace') === 'workspace' },
             actions: note ? [{ action: 'mention', note: String(note).slice(0, 2000), at: new Date() }] : [],
-            proposals: [], refusals: 0,
+            proposals: [], refusals: 0, decisions: [],
             ...(Number(spendCapUsd) > 0 ? { spendCapUsd: Number(spendCapUsd) } : {}),
             notifyMe: Boolean(notifyMe),
         },
@@ -251,10 +252,12 @@ const notifyStarter = async (companyId, run, task, { status, outcome, error }) =
     } catch (e) { logger.error(`[agent-run] ${run._id}: notify failed: ${e.message}`); }
 };
 
-/* Execute the run's skill. Findings land as a proposal (review mode) unless
- * autonomy lets the agent act. Resolves with the terminal state, or with
- * { status: 'abandoned' } when stop/pause-all took the run away mid-flight —
- * then nothing more is written and no proposal is filed. */
+/* Execute the run's skill. Below L2 every change becomes one proposal. From L2
+ * the policy reviews each change: `act` performs it, `propose` holds it for one
+ * proposal filed at the end, `refuse` is counted and the run carries on. Resolves
+ * with the terminal state, or with { status: 'abandoned' } when stop/pause-all
+ * took the run away mid-flight — then nothing more is written and no proposal
+ * is filed. */
 const executeSkill = async (companyId, run, agent, task, { proposals, actions, actor }) => {
     const orchestrator = require('./engine/orchestrator');
     const memory = require('./engine/findingMemory');
@@ -271,43 +274,61 @@ const executeSkill = async (companyId, run, agent, task, { proposals, actions, a
         const runCap = Number(run.spendCapUsd) > 0 ? Number(run.spendCapUsd) : 0;
         if (runCap && spent.usd >= runCap) return settle(STATUS.STOPPED, `Run spend cap reached ($${spent.usd.toFixed(2)} of $${runCap})`);
 
-        const { changes, alreadyTracked } = await changesFor(companyId, task, result);
-        if (!changes.length) return settle(STATUS.DONE, `nothing new to file — ${alreadyTracked} finding(s) already tracked`);
+        const { changes: found, alreadyTracked } = await changesFor(companyId, task, result);
+        if (!found.length) return settle(STATUS.DONE, `nothing new to file — ${alreadyTracked} finding(s) already tracked`);
+        const changes = found.map((c) => ({ ...c, rating: ratingOf(c.action) }));
 
-        const mayAct = changes.every((c) => registry.mayActDirectly(agent.autonomy, c.action));
-        if (mayAct) {
-            let applied = 0;
-            let refusals = 0;
-            for (const c of changes) {
-                try {
-                    // eslint-disable-next-line no-await-in-loop
-                    const out = await actions.perform({ companyId, actor, action: c.action, params: c.params, reason: `${run.skill} finding`, allowedActions: agent.allowedActions });
-                    // eslint-disable-next-line no-await-in-loop
-                    await appendAction(companyId, run._id, { action: c.action, auditId: out.auditId, ok: true });
-                    applied += 1;
-                    // eslint-disable-next-line no-await-in-loop
-                    if (c.remember) await memory.record(companyId, { ...c.remember, subtaskId: out.result && out.result.subtaskId });
-                } catch (e) {
-                    if (e.name !== 'RefusedError') throw e;
-                    refusals += 1;
-                    // eslint-disable-next-line no-await-in-loop
-                    await patch(companyId, run._id, {}, { $inc: { refusals: 1 }, $push: { actions: { action: c.action, auditId: e.auditId || null, ok: false, refused: e.message, at: new Date() } } });
-                }
-            }
-            return settle(applied ? STATUS.DONE : STATUS.FAILED, `${applied} change(s) applied${refusals ? `, ${refusals} refused` : ''}${alreadyTracked ? `, ${alreadyTracked} already tracked` : ''}`);
+        const propose = async (toPropose, { what, outcome, refusals = 0 }) => {
+            if (!(await isRunning(companyId, run._id))) return abandoned;
+            const proposal = await proposals.create(companyId, {
+                agent, runId: String(run._id), taskId: String(task._id), projectId: String(task.ProjectID),
+                what,
+                // What the grounding check removed is part of the record a person reviews.
+                why: [result.summary, Array.isArray(result.dropped) && result.dropped.length ? `Dropped as unsupported by the data: ${result.dropped.map((d) => `"${String(d.text).slice(0, 80)}" (${d.reason})`).join('; ')}` : ''].filter(Boolean).join('\n\n'),
+                changes: toPropose,
+                cost: { tokens: result.usage && result.usage.totalTokens, model: result.model, usd: spent && spent.usd },
+            });
+            const waiting = await patch(companyId, run._id, { status: STATUS.WAITING, ...(outcome ? { outcome } : {}) }, { $push: { proposals: String(proposal._id) } }, { onlyIf: STATUS.RUNNING });
+            return waiting ? handOff({ status: STATUS.WAITING, proposalId: String(proposal._id), refusals, ...(outcome ? { outcome } : {}) }) : abandoned;
+        };
+
+        if (Number(agent.autonomy) < policy.REVIEW_LEVEL) {
+            return propose(changes, {
+                what: Array.isArray(result.changes) ? `${run.skill}: ${changes.length} change(s) on ${task.TaskKey || task.TaskName}` : `File ${result.findings.length - alreadyTracked} QA finding(s) on ${task.TaskKey || task.TaskName}`,
+            });
         }
 
-        if (!(await isRunning(companyId, run._id))) return abandoned;
-        const proposal = await proposals.create(companyId, {
-            agent, runId: String(run._id), taskId: String(task._id), projectId: String(task.ProjectID),
-            what: Array.isArray(result.changes) ? `${run.skill}: ${changes.length} change(s) on ${task.TaskKey || task.TaskName}` : `File ${result.findings.length - alreadyTracked} QA finding(s) on ${task.TaskKey || task.TaskName}`,
-            // What the grounding check removed is part of the record a person reviews.
-            why: [result.summary, Array.isArray(result.dropped) && result.dropped.length ? `Dropped as unsupported by the data: ${result.dropped.map((d) => `"${String(d.text).slice(0, 80)}" (${d.reason})`).join('; ')}` : ''].filter(Boolean).join('\n\n'),
-            changes,
-            cost: { tokens: result.usage && result.usage.totalTokens, model: result.model, usd: spent && spent.usd },
-        });
-        const waiting = await patch(companyId, run._id, { status: STATUS.WAITING }, { $push: { proposals: String(proposal._id) } }, { onlyIf: STATUS.RUNNING });
-        return waiting ? handOff({ status: STATUS.WAITING, proposalId: String(proposal._id), refusals: 0 }) : abandoned;
+        let applied = 0;
+        let refusals = 0;
+        const held = [];
+        for (const c of changes) {
+            const verdict = policy.decide({ agent, action: c.action, params: c.params, rating: c.rating, run, task });
+            const decision = { action: c.action, decision: verdict.decision, reason: verdict.reason, rating: verdict.rating, at: new Date() };
+            if (verdict.decision === policy.DECISION.PROPOSE) {
+                held.push(c);
+                // eslint-disable-next-line no-await-in-loop
+                await patch(companyId, run._id, {}, { $push: { decisions: decision } });
+                continue;
+            }
+            try {
+                // A refusal goes through perform() too, so it leaves the same audit row as a registry refusal.
+                // eslint-disable-next-line no-await-in-loop
+                const out = await actions.perform({ companyId, actor, action: c.action, params: c.params, reason: `${run.skill} finding`, allowedActions: agent.allowedActions, decision: verdict });
+                // eslint-disable-next-line no-await-in-loop
+                await patch(companyId, run._id, {}, { $push: { decisions: decision, actions: { action: c.action, auditId: out.auditId, ok: true, at: new Date() } } });
+                applied += 1;
+                // eslint-disable-next-line no-await-in-loop
+                if (c.remember) await memory.record(companyId, { ...c.remember, subtaskId: out.result && out.result.subtaskId });
+            } catch (e) {
+                if (e.name !== 'RefusedError') throw e;
+                refusals += 1;
+                // eslint-disable-next-line no-await-in-loop
+                await patch(companyId, run._id, {}, { $inc: { refusals: 1 }, $push: { decisions: decision, actions: { action: c.action, auditId: e.auditId || null, ok: false, refused: e.message, at: new Date() } } });
+            }
+        }
+        const outcome = [`${applied} change(s) applied`, held.length ? `${held.length} proposed` : '', refusals ? `${refusals} refused` : '', alreadyTracked ? `${alreadyTracked} already tracked` : ''].filter(Boolean).join(', ');
+        if (!held.length) return settle(applied ? STATUS.DONE : STATUS.FAILED, outcome);
+        return propose(held, { what: `${run.skill}: ${held.length} change(s) on ${task.TaskKey || task.TaskName}`, outcome, refusals });
     } catch (e) {
         logger.error(`[agent-run] ${run._id}: ${e.message}`);
         const saved = await finish(companyId, run._id, { status: STATUS.FAILED, error: e.message, onlyIf: STATUS.RUNNING });
