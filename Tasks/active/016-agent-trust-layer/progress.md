@@ -26,6 +26,14 @@ Notes for review
 - `POST /runs/:id/revert`: 8 reverted, 0 failed. **Defect found:** `revertedAt` / `revertedBy` / `revert` were not stored because the strict `agentRuns` schema lacked them, so a second revert was accepted. Fixed by declaring the fields (this PR); after the fix a second revert answers 409 "Run was already reverted at …".
 - A mixed batch (safe + risky) was not exercised on beta because the seeded agents' skills only emit task-scoped writes; covered by `agent-run-policy` tests.
 
+## 2026-09-05 — UI sweep on beta (owner, Browser pane)
+- **Agent settings, L1 default:** the Guide agent created by 015 opens at "L1 · Suggest"; the "What L2 will do without asking" panel lists task.get (read only), task.comment and subtask.create ("reversible, one task, no money") under "Acts without asking" and "Nothing" under "Proposes first".
+- **Policy on a real L2 run:** Run now on "Sweep Intake" (L2, actions task.get / task.comment / tasks.search) against GCBA2-3 → run `done`, "6 refused"; Details shows DECISIONS: six `subtask.create` refused ("outside this agent's allowed actions"), one `task.comment` acted ("reversible task-scoped write with no money in it"), "Can be reverted until 06/09/2026 15:01".
+- **Revert in the UI:** "Revert this run" → toast "Reverted 1 action(s).", row shows "Reverted 05/09/2026 15:02:44", button gone. (The schema fix in PR #547 is what makes the reverted state stick.)
+- **Instance console → Settings → AI:** "AI agents" section with undo window 24 h, monthly budget 0, "This month 2026-09 $0.14 · no cap", "80% alert not reached / 100% alert not reached" chips, provider openai · Region: any · "Key set".
+
+Finding (pre-existing, task 013 area): loading `/settings/instance/settings` directly bounces to My Profile because the shell checks instance access after mounting; navigating from inside the settings shell works. Worth a guard that waits for the access answer.
+
 Open
-- Browser sweep as owner and member of the L2 preview panel, run detail with Revert, and the instance console budget section — needs a signed-in Browser pane.
+- Member-role pass — needs a member account.
 - 019 evals should start from the `decisions[]` data this produces.
