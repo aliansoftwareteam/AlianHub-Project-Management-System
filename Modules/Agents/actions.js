@@ -35,11 +35,14 @@ const workEntry = (actor, hours = 0) => {
     return { actorId: a.actorId, actorType: a.actorType, agentId: a.agentId, viaAccount: a.viaAccount || 'workspace', hours };
 };
 
+// perform() writes the agent.action row (undo descriptor, attribution), so the
+// tool layer must not add its automation.task.* row for the same change.
 const context = (actor, action) => {
     const a = attribution(actor);
     return {
         ruleId: null, ruleName: a.label, runId: actor.runId || null, action: `agent.${action}`, depth: 0,
         userId: String(actor.userId || a.actorId || ''), actorType: a.actorType, agentId: a.agentId || null, viaAccount: a.viaAccount || null,
+        auditedByCaller: true,
     };
 };
 
