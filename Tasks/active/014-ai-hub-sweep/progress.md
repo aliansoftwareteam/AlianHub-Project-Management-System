@@ -49,6 +49,19 @@ Gates on the merged tree: `npm test` 1415 backend tests, `vitest` 36 frontend un
 | 24 | Members see Approve on gated proposals | `canDecide` hides the buttons unless owner/admin. |
 | — | Skill requirements never stated | `skillInputs.js` + `Ai.req_*` lines in the wizard and pickers. |
 
+## 2026-09-05 — local run on the merged branch (owner, 1280px, fresh `frontend/dist`)
+
+First production build failed: `Parity.fit_no_history` was declared twice in en.js (picker explainer vs. the new reason line). Renamed the explainer to `fit_no_history_note` (commit 3d6e80a4); the duplicate had also hidden the reason line from every other locale, backfilled.
+
+| Screen / flow | Result | Evidence |
+|---|---|---|
+| /ai hub cards | PASS | month-to-date line ("This month: 18 runs · $0.06"), requirement line per agent ("Needs: a pull-request or branch link on the task"), L4 rung gone, no console errors |
+| Run now | PASS | opens "Run QA Reviewer on a task" picker with the requirement stated and the open-task list |
+| AI Inbox counts | PASS | Waiting 4 · Done by AI 8 · Declined 2 (were 0/0/0) |
+| Routing 8 tasks | PASS | 5 → Daily PM, 3 "needs a person — this task lacks a public URL…"; "3 left for a person" (was 0) |
+
+Note for the next sweep: the Browser pane's synthetic clicks do not land on this app under an emulated 1280px viewport; drive clicks with `javascript_tool` and use screenshots for proof.
+
 ## Open — next steps
 1. Backend follow-ups from the API sweep: F2 (PAT via MCP attributed as human), F3 (`docs.read` returns empty text), F5 (double audit rows per agent action), F6 (autonomy > 3 should be 400), F7 (pause-all should not stop `waiting_approval` runs).
 2. `startRun` should read `spendCapUsd` / `notifyMe` from the body (frontend already sends them, defect 14).
