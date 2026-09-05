@@ -337,6 +337,11 @@
     "description": "openai | anthropic | deepseek",
     "default": ""
   },
+  "LLM_REGION": {
+    "group": "ai",
+    "description": "optional: the inference region the provider is pinned to; shown read-only in the agent settings (GET /api/v2/agents/settings)",
+    "default": ""
+  },
   "LOG_DATE_PATTERN": {
     "group": "logging",
     "description": "Date pattern appended to rotated log file names.",
