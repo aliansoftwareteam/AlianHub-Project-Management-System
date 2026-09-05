@@ -32,7 +32,7 @@ Notes for review
 - **Revert in the UI:** "Revert this run" → toast "Reverted 1 action(s).", row shows "Reverted 05/09/2026 15:02:44", button gone. (The schema fix in PR #547 is what makes the reverted state stick.)
 - **Instance console → Settings → AI:** "AI agents" section with undo window 24 h, monthly budget 0, "This month 2026-09 $0.14 · no cap", "80% alert not reached / 100% alert not reached" chips, provider openai · Region: any · "Key set".
 
-Finding (pre-existing, task 013 area): loading `/settings/instance/settings` directly bounces to My Profile because the shell checks instance access after mounting; navigating from inside the settings shell works. Worth a guard that waits for the access answer.
+Finding (pre-existing, task 013 area; fixed in PR #549): loading `/settings/instance/settings` directly bounces to My Profile because the shell checks instance access after mounting; navigating from inside the settings shell works. Worth a guard that waits for the access answer.
 
 Open
 - Member-role pass — needs a member account.

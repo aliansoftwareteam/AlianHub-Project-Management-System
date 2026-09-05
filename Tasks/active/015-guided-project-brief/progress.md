@@ -52,7 +52,7 @@ Same two-line gym brief through the "Create from a description" tile.
 | Plan | "3 sprints · 4 tasks · $0.09"; summary line "3 tasks an agent can start · 4 need a person · 1 need a person first"; assumptions carried; badge "⏳ Agent after: a public URL in the task title or description (QA review)" on a task row; guide preview with 6 stages from this brief, essentials, escalations |
 | Create everything | "All done!" — Project Done, Sprints 3/3, "⚡ 3 agent runs queued", "Open the Guide agent →"; the link opens the Guide agent's settings page at L1 with task.get / task.comment / subtask.create scoped to the project |
 
-Findings
+Findings (1 and 2 fixed in PR #549)
 1. **Source not validated on step 1.** Continue is enabled without a Source; execute then fails with "Select where this project came from." and the wizard drops back to step 1. State survives the round trip (brief, plan and guide are kept, no new model call), but the check belongs on step 1.
 2. **Done-screen counter reads "Tasks 8 / 4"**: created subtasks are counted against the planned task total.
 3. As in the API sweep: implementation tasks labelled `agent` because a planning skill fits them; consider a distinct label when the only matching skill plans rather than does.
