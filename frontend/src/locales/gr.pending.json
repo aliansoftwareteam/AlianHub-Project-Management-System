@@ -1,7 +1,7 @@
 {
   "locale": "gr",
   "machineTranslated": false,
-  "updatedAt": "2026-09-05T03:14:13.945Z",
+  "updatedAt": "2026-09-05T03:26:46.602Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -3219,7 +3219,7 @@
     "Parity.free_hours": "{n}h free this week",
     "Parity.fit_made_of": "WHAT FIT IS MADE OF",
     "Parity.fit_explainer": "The skills the agent declares, the actions it is allowed (an agent without repo write cannot be a 92% fit for a code task), and its own history on similar tasks in this workspace — not a vendor benchmark.",
-    "Parity.fit_no_history": "A new agent shows \"no history yet\" instead of a made-up percentage.",
+    "Parity.fit_no_history": "No history in this workspace yet.",
     "Parity.before_confirm": "BEFORE YOU CONFIRM",
     "Parity.pick_someone": "Pick someone to see exactly what will happen.",
     "Parity.runs_as": "Runs as",

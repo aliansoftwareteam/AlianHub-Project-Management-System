@@ -2361,7 +2361,7 @@ export default {
         free_hours: "{n}h free this week",
         fit_made_of: "WHAT FIT IS MADE OF",
         fit_explainer: "The skills the agent declares, the actions it is allowed (an agent without repo write cannot be a 92% fit for a code task), and its own history on similar tasks in this workspace — not a vendor benchmark.",
-        fit_no_history: "A new agent shows \"no history yet\" instead of a made-up percentage.",
+        fit_no_history_note: "A new agent shows \"no history yet\" instead of a made-up percentage.",
         before_confirm: "BEFORE YOU CONFIRM",
         pick_someone: "Pick someone to see exactly what will happen.",
         runs_as: "Runs as",

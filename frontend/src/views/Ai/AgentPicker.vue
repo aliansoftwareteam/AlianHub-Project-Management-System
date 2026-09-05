@@ -75,7 +75,7 @@
             <div class="ah-card picker__explain">
                 <div class="ah-label">{{ $t('Parity.fit_made_of') }}</div>
                 <p>{{ $t('Parity.fit_explainer') }}</p>
-                <p>{{ $t('Parity.fit_no_history') }}</p>
+                <p>{{ $t('Parity.fit_no_history_note') }}</p>
             </div>
         </div>
 
