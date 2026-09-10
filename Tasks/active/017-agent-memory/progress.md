@@ -16,4 +16,10 @@ Branch `feat/agent-memory` (from `beta` 64f4f507).
 - [ ] Gates + owner browser sweep
 
 ## Last step
-PRD written; waiting on owner confirmation.
+Contract agreed with the owner decision; workstreams A, B, C building in parallel.
+
+## 2026-09-10 — owner decision: build on LangChain
+- LangGraph JS is the engine and the store (see task.md "Decision"); PRD and contract rewritten for it.
+- Spike in the scratchpad: CommonJS load, interrupt/resume, per-db store all work.
+- Landed: `@langchain/langgraph`, `@langchain/core`, `@langchain/langgraph-checkpoint-mongodb` in package.json; `Modules/Agents/engine/persistence.js` with `tests/agent-persistence.test.js` (4 passing).
+- Three workstreams (A engine, B memory + prompts, C frontend) start on worktrees from this branch.
