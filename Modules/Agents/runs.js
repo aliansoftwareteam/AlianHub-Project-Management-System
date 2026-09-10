@@ -90,8 +90,10 @@ const patch = async (companyId, runId, set, extra = {}, { onlyIf } = {}) => {
 
 const appendAction = (companyId, runId, entry) => patch(companyId, runId, {}, { $push: { actions: { ...entry, at: new Date() } } });
 
+const get = (companyId, runId) => MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ _id: oid(runId) }] }, 'findOne');
+
 const finish = async (companyId, runId, { status = STATUS.DONE, outcome, error, episode, onlyIf } = {}) => {
-    const run = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ _id: oid(runId) }] }, 'findOne');
+    const run = await get(companyId, runId);
     if (!run) return null;
     const startedAt = run.startedAt ? new Date(run.startedAt).getTime() : Date.now();
     const set = { status, finishedAt: new Date(), elapsedMs: Date.now() - startedAt, outcome: outcome || null, error: error || null, ...(episode ? { episode } : {}) };
@@ -115,7 +117,7 @@ const reapStale = async (companyId) => {
 };
 
 const stop = async (companyId, runId, byUserId) => {
-    const run = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ _id: oid(runId) }] }, 'findOne');
+    const run = await get(companyId, runId);
     if (!run) return { error: 'Run not found.' };
     if (!OPEN.includes(run.status)) return { error: `Run is already ${run.status}.` };
     const stopped = await finish(companyId, runId, { status: STATUS.STOPPED, outcome: `stopped by ${byUserId || 'a person'}` });
@@ -277,4 +279,4 @@ const skillSlugOf = (agent, explicit) => {
     return first.key || first.slug || first.name || 'qa-review';
 };
 
-module.exports = { STATUS, OPEN, TERMINAL, canStart, runsToday, skillSlugOf, create, patch, appendAction, finish, isRunning, reapStale, stop, recordSpend, list, summary, countsByStatus, pauseAll, getAgent, emitAgent, changesFor, executeSkill, monthKey };
+module.exports = { STATUS, OPEN, TERMINAL, canStart, runsToday, skillSlugOf, create, get, patch, appendAction, finish, isRunning, reapStale, stop, recordSpend, list, summary, countsByStatus, pauseAll, getAgent, emitAgent, changesFor, executeSkill, monthKey };

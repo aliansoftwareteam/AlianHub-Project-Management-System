@@ -27,8 +27,11 @@ const dbName = (companyId) => {
     return id;
 };
 
+/* Under jest a suite that forgot useInMemory() fails at once instead of
+ * hanging on a driver connect for thirty seconds per test. */
 const mongoClient = () => {
     if (client) return client;
+    if (process.env.NODE_ENV === 'test' && !override) throw new Error('agent persistence reached Mongo inside a test; call persistence.useInMemory() first');
     const url = process.env.MONGODB_URL;
     if (!url) throw new Error('No database configured. Set MONGODB_URL.');
     const base = url.replace(/\/+$/, '');
@@ -52,7 +55,7 @@ const saverFor = (companyId) => {
         savers.set(db, new MongoDBSaver({
             client: mongoClient(), dbName: db,
             checkpointCollectionName: COLLECTIONS.CHECKPOINTS, checkpointWritesCollectionName: COLLECTIONS.CHECKPOINT_WRITES,
-            enableTimestamps: true, ttl: { defaultTtl: CHECKPOINT_TTL_SECONDS, refreshOnRead: false },
+            enableTimestamps: true, ttl: CHECKPOINT_TTL_SECONDS,
         }));
     }
     return savers.get(db);
