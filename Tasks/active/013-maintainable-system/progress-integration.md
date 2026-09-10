@@ -21,3 +21,20 @@
 | 2026-09-04 | PR #542 opened; AR-58 filed + In Review | done | MCP task.create without a list id failed schema validation → fixed (oldest live list); live check SPWC-11 created; jest 112 suites / 1376 tests |
 | 2026-09-04 | Drill: Docker (agent E) | PASS after 7 fixes | image 1.56 GB, build ~3.5 min; compose from empty volumes healthy in 12 s; setup/complete 200 with session; restart keeps data and login; teardown clean. Fixes: dropped check-version COPY, pageContent alias file copied, 4 GB heap for the webpack build, thumbnail.json shipped, JWT_ALGORITHM/JWT_EXP env defaults, TURN guard moved into the coturn container, seed icons shipped |
 | 2026-09-04 | Follow-ups (not in scope) | filed on AR-58 | History validation "UserId required" ×3 during the demo seed (Sprints/controller.js:173/235); wasabi "Some uploads failed" with empty detail; dead Modules/notification/routes.js; compose hardcodes container/volume names; restore leaves databases of companies created after the backup orphaned |
+
+## Verified remaining (2026-09-10)
+Checked against origin/beta (64f4f507).
+
+- B.1 — done: `.tmp-pr515/` deleted 2026-09-10 in the housekeeping PR (content at 374c19a9 and on
+  `origin/cursor/ai-native-pages-shell-c793`).
+- Duplicate id 005 — done: 005-first-run-experience closed 2026-09-10 and folded in here.
+- B.4 — `tenantOf`/`tenantDb` adopted only in Pages and Webhooks. Trash (`controller.js:11`),
+  Instance (`controller.js:292`), createProject (25 baseline reads) and Tasks bulk still read the
+  tenant directly.
+- B.2 — `.github/workflows/main.yml` still triggers on push to `staging`.
+- G10 (from the 005 fold) — `molecules/Setting/PermissionMatrix.vue` renders only the empty
+  seeded `rule.desc`; the 98 `PermissionDesc.*` sentences in `en.js` (~4762) have no consumer.
+  Re-wire `PermissionDesc.<key>` (te()-guarded) as the fallback when `rule.desc` is empty, or
+  delete the dead block deliberately.
+
+The AR-58 "not in scope" follow-ups in the table above are task 021, not this task's remaining.

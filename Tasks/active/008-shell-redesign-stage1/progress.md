@@ -9,9 +9,12 @@
 - [x] Task detail overlay
 - [x] Personal List
 - [x] Build + tests
+- [ ] Remove Roboto (`assets/css/font.css:3-35`, `App.vue:866`, `input.css:8`, `text.css:66`)
+- [ ] Replace the literal `#2F3990` in `components/organisms/Shell/style.css:22` with a token
+- [ ] Persist nav preferences on the user-settings endpoint, not only localStorage
 
 ## Last step
-Stage 1 complete and verified in the running app: build green, 776 backend tests pass, login/rail/Home/AI all render against real data.
+Stage 1 verified in the running app. Three scope items remain open as of 2026-09-10: Roboto still shipped, a literal `#2F3990` in `Shell/style.css:22`, and nav preferences in localStorage only. See the log.
 
 ## Blockers
 None. Kiln tokens retired (aliases kept in tokens.css until Pages is restyled).
@@ -38,3 +41,12 @@ None. Kiln tokens retired (aliases kept in tokens.css until Pages is restyled).
 - Verified live, logged in: login inline errors, rail + More + profile popovers, dark theme, Home Today & Overdue with sidebar and Planner, AI Hub, agent wizard creating a real agent, AI Inbox approve/decline with the queue-clear state.
 - Verified the safety boundary against the live API, not just unit tests: `task.delete` → "Agents cannot perform task.delete"; `status.set("Done")` → refused; `task.comment` → accepted.
 - Dark-theme bug found and fixed during verification: the compatibility rule that keeps legacy pages readable was also forcing light ink onto redesigned pages, so their text was near-invisible in dark mode. `.ah-page` now sets `var(--ink)` explicitly, and the redesigned pages built before that convention existed (Docs, Settings, Inbox, Chat, Approvals, Timesheet, Capacity, Variance) were given the class.
+
+### 2026-09-10 — verified remaining
+Checked against origin/beta (64f4f507). Everything else in scope verified. Still open:
+1. Roboto is still declared and used (`assets/css/font.css:3-35`, `App.vue:866`, `input.css:8`,
+   `text.css:66`) although scope said removed.
+2. The hard-coded brand hex `#2F3990` in `components/organisms/Shell/style.css:22` violates
+   "no new literal brand colours".
+3. Nav preferences (rail pins, theme, sidebar collapse) persist only in localStorage
+   (`Shell/shellState.js:4,24,38,55`), not on the user-settings endpoint as scoped.
