@@ -76,6 +76,29 @@ describe('AgentRunDetail', () => {
         expect(apiRequest.mock.calls.filter(([type]) => type === 'get')).toHaveLength(2);
     });
 
+    it('shows the episode above the decisions with the decline reason spelled out', async () => {
+        const episode = { proposed: 3, acted: 1, approved: 2, declined: 1, reverted: false, reason: 'too_many_changes' };
+        const wrapper = await mountDetail({ payload: { run: { ...run, episode }, audit: [] } });
+        const block = wrapper.find('[data-test="episode"]');
+        expect(block.exists()).toBe(true);
+        expect(block.element.compareDocumentPosition(wrapper.find('.run-decisions').element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(block.findAll('li').map((li) => li.text())).toEqual(['Ai.episode_proposed', 'Ai.episode_acted', 'Ai.episode_approved', 'Ai.episode_declined_reason', 'Ai.episode_reverted_no']);
+        expect(wrapper.find('[data-test="waiting"]').exists()).toBe(false);
+
+        const free = await mountDetail({ payload: { run: { ...run, episode: { ...episode, reason: 'sprint already locked', reverted: true } }, audit: [] } });
+        expect(free.find('[data-test="episode-reverted"]').text()).toBe('Ai.episode_reverted_yes');
+        expect(free.find('[data-test="episode-declined"]').text()).toBe('Ai.episode_declined_reason');
+
+        const none = await mountDetail();
+        expect(none.find('[data-test="episode"]').exists()).toBe(false);
+    });
+
+    it('says the run continues when a person decides while it waits for approval', async () => {
+        const wrapper = await mountDetail({ payload: { run: { ...run, status: 'waiting_approval', windowEndsAt: undefined }, audit: [] } });
+        expect(wrapper.find('[data-test="waiting"]').text()).toBe('Ai.episode_waiting');
+        expect(wrapper.find('[data-test="episode"]').exists()).toBe(false);
+    });
+
     it('puts the server refusal in the toast when the window has closed', async () => {
         const wrapper = await mountDetail();
         apiRequest.mockImplementation((type) => (type === 'post' ? Promise.reject(httpError(409, 'The undo window closed 3 hours ago.')) : ok({ run, audit: [] })));

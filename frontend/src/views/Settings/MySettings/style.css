@@ -47,6 +47,12 @@
 .ms__session-when { color: var(--ink-2); font-size: 10.5px; }
 .ms__signout { border: 0; background: transparent; color: var(--danger-ink); font: 600 11.5px/1 var(--font-ui); cursor: pointer; padding: 6px 4px; }
 .ms__signout:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 4px; }
+.ms__agents { display: flex; flex-direction: column; gap: 10px; }
+.ms__agents-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ms__agents-label { width: 96px; flex: none; color: var(--ink-label); font: 500 12.5px/1.3 var(--font-ui); }
+.ms__agents-actions { display: flex; }
+.ms__agents-candidates { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid var(--hairline); }
+.ms__candidate { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .ms__actions { display: flex; align-items: center; gap: 12px; }
 @media (max-width: 767px) {
     .ms__grid { grid-template-columns: 1fr; }
