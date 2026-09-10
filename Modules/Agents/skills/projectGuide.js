@@ -41,7 +41,7 @@ module.exports = {
     scopes: ['task.read', 'task.comment', 'task.subtask.create'],
     maxTokens: 1800,
 
-    async gather({ task, companyId, startedBy }) {
+    async gather({ task, companyId, startedBy, memory }) {
         const projectId = oid(task.ProjectID);
         if (!projectId) return { skip: 'the task has no project to guide' };
         const project = await MongoDbCrudOpration(companyId, {
@@ -60,7 +60,7 @@ module.exports = {
         return {
             projectName: project.ProjectName || '',
             guide: String(project.aiGuide.markdown).slice(0, 8000),
-            memory: await memoryStore.contextFor({ companyId, projectId: String(projectId), userId: startedBy }),
+            memory: memory === undefined ? await memoryStore.contextFor({ companyId, projectId: String(projectId), userId: startedBy }) : memory,
             plan: planRows(tasks),
             title: task.TaskName || '',
             brief: plain(task.rawDescription || task.description).slice(0, 2000),

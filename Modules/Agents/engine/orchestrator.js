@@ -122,11 +122,11 @@ const skipped = (skill, reason, started) => ({ status: 'skipped', reason, skill:
 
 /* PHASE 1 — gather. A generic skill collects its own input; the page audit
  * needs a public URL in the task. Either declines with `skipped`. */
-async function gather({ skillSlug = 'qa-review', task, companyId }) {
+async function gather({ skillSlug = 'qa-review', task, companyId, memory }) {
     const skill = requireSkill(skillSlug);
     const started = Date.now();
     if (skill.kind === 'generic') {
-        const context = await skill.gather({ task, companyId });
+        const context = await skill.gather({ task, companyId, memory });
         if (!context || context.skip) return skipped(skill, (context && context.skip) || 'nothing to work on', started);
         return { status: GATHERED, skill: skill.slug, context };
     }

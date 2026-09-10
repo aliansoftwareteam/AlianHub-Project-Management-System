@@ -61,10 +61,10 @@ const quietly = async (runId, what, fn) => {
 async function gather(state, config) {
     const { companyId } = config.context;
     const { run, task } = state;
-    const gathered = await orchestrator.gather({ skillSlug: slugOf(run), task, companyId });
+    const block = (await quietly(run._id, 'memory unavailable', () => memory.contextFor({ companyId, projectId: task.ProjectID, userId: run.startedBy }))) || '';
+    const gathered = await orchestrator.gather({ skillSlug: slugOf(run), task, companyId, memory: block });
     if (gathered.status === 'skipped') return { result: gathered };
-    const block = await quietly(run._id, 'memory unavailable', () => memory.contextFor({ companyId, projectId: task.ProjectID, userId: run.startedBy }));
-    return { context: { ...gathered.context, memory: block || '' } };
+    return { context: { ...gathered.context, memory: block } };
 }
 
 async function analyse(state, config) {
