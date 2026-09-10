@@ -2,6 +2,7 @@ const logger = require('../../../Config/loggerConfig');
 const { getProvider, isAnyProviderConfigured } = require('../../AIProjectGenerator/llmProvider');
 const { emptyUsage, usageFromResult, addUsage } = require('../../AIProjectGenerator/usage');
 const { audit, extractUrl } = require('./pageAudit');
+const { isBlockedHostname } = require('./safeFetch');
 const skillIndex = require('../skills');
 
 // A deterministic pipeline, not a free-roaming agent loop:
@@ -133,7 +134,7 @@ async function gather({ skillSlug = 'qa-review', task, companyId, memory }) {
     const url = extractUrl(task?.TaskName) || extractUrl(task?.description) || extractUrl(task?.rawDescription);
     if (url) return { status: GATHERED, skill: skill.slug, context: { url } };
     const text = [task?.TaskName, task?.description, task?.rawDescription].join(' ');
-    const privateUrl = /https?:\/\/(localhost|127\.|10\.|192\.168\.|0\.0\.0\.0|\[?::1)/i.test(text);
+    const privateUrl = (text.match(/https?:\/\/[^\s<>"')]+/gi) || []).some((u) => { try { return isBlockedHostname(new URL(u).hostname); } catch (e) { return false; } });
     return skipped(skill, privateUrl
         ? 'the URL points at a private or local host, which agents do not fetch — use a public address'
         : 'no reviewable URL found in the task title or description', started);

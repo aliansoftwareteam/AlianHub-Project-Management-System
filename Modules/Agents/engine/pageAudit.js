@@ -1,4 +1,4 @@
-const axios = require('axios');
+const { safeFetch, isBlockedHostname } = require('./safeFetch');
 
 // Deterministic static-HTML audit — the EVIDENCE layer.
 //
@@ -16,11 +16,6 @@ const TIMEOUT_MS = 15000;
 const MAX_BYTES = 3 * 1024 * 1024;
 const UA = 'AlianHub-QA-Agent/1.0 (+https://alianhub.com)';
 
-/* Block anything that is not a public http(s) host. An agent that follows a URL
- * out of a task description is a request forgery primitive if it can be pointed
- * at localhost or a metadata endpoint. */
-const PRIVATE_HOST = /^(localhost$|127\.|10\.|192\.168\.|169\.254\.|0\.0\.0\.0|\[?::1\]?$|172\.(1[6-9]|2\d|3[01])\.)/i;
-
 const extractUrl = (text) => {
     if (!text) return null;
     const m = String(text).match(/https?:\/\/[^\s<>"')]+/i)
@@ -30,7 +25,7 @@ const extractUrl = (text) => {
     try {
         const u = new URL(raw);
         if (!/^https?:$/.test(u.protocol)) return null;
-        if (PRIVATE_HOST.test(u.hostname)) return null;
+        if (isBlockedHostname(u.hostname)) return null;
         return u.toString();
     } catch { return null; }
 };
@@ -45,15 +40,13 @@ const attrs = (tag) => {
 const tagsOf = (html, name) => html.match(new RegExp(`<${name}\\b[^>]*>`, 'gi')) || [];
 
 async function fetchPage(url) {
-    const res = await axios.get(url, {
-        timeout: TIMEOUT_MS,
-        maxContentLength: MAX_BYTES,
+    const res = await safeFetch(url, {
+        timeoutMs: TIMEOUT_MS,
+        maxBytes: MAX_BYTES,
         maxRedirects: 5,
         headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml' },
-        validateStatus: () => true,
-        responseType: 'text',
     });
-    return { status: res.status, html: typeof res.data === 'string' ? res.data : '', bytes: Buffer.byteLength(String(res.data || '')) };
+    return { status: res.status, html: res.body, bytes: res.bytes };
 }
 
 /* Each check returns a fact: { id, ok, detail, evidence }. `evidence` is what the
@@ -158,4 +151,4 @@ async function audit(url) {
              facts: auditHtml(page.html, url), blindSpots: BLIND_SPOTS };
 }
 
-module.exports = { audit, auditHtml, extractUrl, fetchPage, BLIND_SPOTS, PRIVATE_HOST };
+module.exports = { audit, auditHtml, extractUrl, fetchPage, BLIND_SPOTS };

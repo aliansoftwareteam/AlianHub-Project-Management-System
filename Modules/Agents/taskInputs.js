@@ -2,15 +2,16 @@
 // brief. The router refuses an agent whose skills need an input the task lacks,
 // instead of starting a run that skips.
 
+const { isBlockedHostname } = require('./engine/safeFetch');
+
 const URL_RE = /https?:\/\/[^\s<>"')]+/gi;
 const PR_RE = /\/pull\/\d+|\/merge_requests\/\d+|\/compare\//;
-const PRIVATE_HOST = /^(localhost|127\.|10\.|192\.168\.|0\.0\.0\.0|\[?::1)/i;
 const MIN_BRIEF_CHARS = 40;
 
 const plain = (html) => String(html || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 
 const hostOf = (url) => { try { return new URL(url).hostname; } catch (e) { return ''; } };
-const isPublic = (url) => { const h = hostOf(url); return Boolean(h) && !PRIVATE_HOST.test(h); };
+const isPublic = (url) => { const h = hostOf(url); return Boolean(h) && !isBlockedHostname(h); };
 
 const urlsIn = (task) => [task.TaskName, task.description, task.rawDescription].map((v) => String(v || '')).join(' ').match(URL_RE) || [];
 
