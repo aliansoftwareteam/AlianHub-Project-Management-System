@@ -466,6 +466,219 @@ The first three are the ones to fix this week. Number eleven is the one most lik
 
 ---
 
+## Development and integration plan
+
+**Assumptions.** Two-week sprints. Two to three engineers on the AI layer, with the owner doing the API and browser sweeps as on every slice since task 014. Everything lands on `beta` behind the existing agents flag, one slice per pull request with the repository's checks green before merge, and one release from `beta` to `main` at the end of the programme, which is the owner's standing decision from 2026-09-05. Sizes follow the same scale as the existing roadmap, where task 016 was three weeks and task 017 two.
+
+**Ordering principles.** Close what is exploitable before building anything. Put the measurement in before the change it is meant to measure. Extract the core before anything that needs a per-call model choice. Make orchestration durable before making it multi-agent. Ship every authoring surface in the same sprint as the runtime it authors, because task 005 shipped an engine nobody could reach and task 007 is still open for it.
+
+### Sprint 0 · Stop the bleeding (one week)
+
+Goal: no exploitable finding survives, and spend accounting is correct everywhere.
+
+1. Merge the two open pull requests, housekeeping first and then task 017, so every later branch starts from the checkpointed engine.
+2. Outbound fetches resolve before they validate, check every resolved address against private ranges, revalidate on each redirect, and cap size and time.
+3. Retrieval applies the page visibility rule the other read paths already use; the MCP document-read tool applies the token's project scope and visibility; the MCP path re-checks company membership like the REST path does.
+4. Performing an agent action evaluates the holder's permission catalogue entry, not only the registry.
+5. Pricing fails closed: an unpriced model refuses to start a billed run with a reason that names the missing price, and defaults ship for every configured vendor.
+6. A test asserts the never-list and the action table can never overlap. A failed audit write fails the action. The undo path enforces the undo window and the caller's project visibility. Integration secrets are encrypted with the existing cloud-storage idiom, with a migration.
+
+*Integration.* Six small pull requests, each with a test that reproduces the defect first. The only schema change is the secrets migration, run by the migrations runner. No flags.
+
+*Exit gate.* The two data-access findings reproduce on the previous commit and fail to reproduce after; the in-process sweep books a non-zero cost on every configured provider.
+
+### Sprint 1 · The shared core and run correctness (two weeks)
+
+Goal: one AI core, and an agent run that cannot execute twice.
+
+1. Move the provider factory, usage and pricing, the instruction guard, the single model call and the persistence factory into `Modules/AICore/`, leaving re-export shims at every old path so the thirteen consumers and their test mocks keep working. Move the one direct-to-vendor call onto the factory.
+2. Agent runs gain an idempotency key and an in-flight claim: a partial unique index on agent, task and open status, checked with a duplicate-key catch rather than find-then-insert, and a reaper for proposals stuck in the applying state.
+3. Align the job lock with the model timeout per job, and set the server-level timeouts that are missing today.
+4. Thread loop depth from the originating envelope through agent actions instead of resetting it to zero.
+5. Record spend at the core boundary so every AI feature, not only agent runs, reaches the budget.
+6. Check the run spend cap before the model call from a token estimate, and reconcile after.
+
+*Integration.* The shims make this a pure move; tests move with the code in the same commit. Consumers are repointed one module per pull request after the core lands, then the shims are deleted.
+
+*Exit gate.* Full backend and frontend suites green; a double-submitted run start yields one run; a rule-triggered run under a slow model produces one execution.
+
+### Sprint 2 · Revisions and the skill record (two weeks)
+
+Goal: every run is reproducible, and a skill is data.
+
+1. Agent revisions and skill revisions as immutable documents; a run pins both at start; promote and roll back are pointer moves with an audit row.
+2. The skill record, its validator returning field-level errors like the automation rule validator, the frozen catalogues for inputs, readers, prompt partials and emitted actions, the manifest endpoint, and the hybrid resolver that reads a company's data skills first and the built-in code skills second.
+3. Save-time validation of emitted actions, and the effective-actions intersection with the agent's allowed actions and the registry.
+4. The intake skill re-expressed as a data skill. If it does not fit, the vocabulary is wrong and this sprint is where that is learned.
+
+*Integration.* A seed migration writes the built-in skills as revision one in every company database. Runs created before the change resolve to a synthetic revision zero so nothing old breaks. Every new field is declared in the strict schema before the first write.
+
+*Exit gate.* A run six weeks old can name the exact skill, prompt hash and model that produced it.
+
+### Sprint 3 · Observability foundation (two weeks)
+
+Goal: the eight questions in section H have a lookup, not an inference. This lands before routing because routing cannot be evaluated without it.
+
+1. OpenTelemetry with the trace identifier on the run row, every step row, every audit row and every log line; logs move to structured records.
+2. The replay record per model call: prompt hash and reference, retrieved chunk identifiers, raw response, model and parameters, agent and skill revisions, with a retention and redaction policy.
+3. A metrics endpoint behind admin auth: rate, errors and duration per workflow, step, agent and model; token and cost counters; approval, decline and revert rates.
+4. Provider error codes preserved end to end and grouped, so an error tracker has something to group.
+5. Alerts on rates: error rate per agent, approval rate falling, cost against forecast, queue age.
+
+*Integration.* The exporter is off unless an endpoint is configured, so self-hosters see no change; the replay record is written from the core's single model call, which is why sprint 1 comes first.
+
+*Exit gate.* From a run identifier, the prompt, the retrieved context, the raw response and every tool call are reachable in under a minute.
+
+### Sprint 4 · The model router (two weeks)
+
+Goal: any task can run on any configured provider, and the platform survives one being down.
+
+1. Model and provider on the chat options; a provider registry that includes a Google adapter alongside the three that exist; per-provider normalisation of output ceilings, structured-output mode, reasoning-model parameters and error codes.
+2. Task classes with a quality floor and latency target each; a per-tenant policy table; per-agent and per-skill model pins validated against a priced allowlist.
+3. Health tracking per provider and model with a circuit breaker, half-open probes, failover to the next candidate, and per-provider rate-limit budgets; retry with backoff on transient provider errors.
+4. Pre-flight token estimate, reservation against the tenant budget, reconciliation after.
+
+*Integration.* Behind a router flag whose default policy reproduces today's single-provider behaviour, so flipping it is a no-op until a policy is set. The Google adapter ships with the same contract tests the other three pass.
+
+*Exit gate.* With one provider blackholed in a test environment, agent runs continue on the fallback and the breaker state is visible.
+
+### Sprint 5 · The workflow engine (three weeks)
+
+Goal: multi-step, multi-agent work is durable, parallel where safe, and resumable at any step.
+
+1. Workflow runs and step runs as the unit of everything, generalised from the automation runner: dependencies, ready-set scheduling, per-tenant concurrency, a unique index on run and step, a compare-and-set claim, deterministic-versus-transient retries.
+2. Step types: agent run, tool call, human approval with owner, deadline and escalation, fan-out and fan-in, condition, and timer. A loop is a bounded re-entry with a maximum iteration count and a budget, which is how a monitoring and optimisation cycle is expressed without an unbounded graph.
+3. Agent runs become step executors; user-started runs go through the queue like rule-started ones already do.
+4. Dispatch rides the event bus with typed results; deadline and budget shrink per hop; the depth guard applies to agent hops.
+
+*Integration.* An existing automation rule is a one-node workflow, so rules run unchanged. The old direct execution path stays as a thin compatibility wrapper for one release, then goes.
+
+*Exit gate.* A fifteen-step workflow killed at step eleven resumes at eleven with no duplicate writes; an approval step reassigns and escalates on deadline.
+
+### Sprint 6 · Skill authoring and migration (two weeks)
+
+Goal: a workspace admin composes an agent from skills they wrote, in the product.
+
+1. The Skill Library becomes a library: create, edit, dry-run against a chosen task, risk preview from the union of emitted actions, retire. Agent settings pick skills from the manifest; the three duplicated input tables in the frontend are deleted with their parity test.
+2. The reporter and project-guide skills re-expressed as data; per-skill model pin exposed in the editor.
+
+*Integration.* The authoring surface ships in the same sprint as the last runtime piece it needs, and the owner sweeps it before merge.
+
+*Exit gate.* An admin creates a new skill, assigns it to an agent, runs it on a task and sees its outcome, with no deploy.
+
+### Sprint 7 · Knowledge and retrieval (three weeks)
+
+Goal: agents and Ask can reach what the workspace actually knows, and only what the caller may see.
+
+1. One retrieval interface with hybrid lexical and vector search; the lexical implementation ships first on the full-text indexes that already exist, with access control applied at query time from the caller's visible set.
+2. Ingestion off the event bus: extract, chunk on structure, embed, upsert against a content hash; tombstone on delete; cascade on project and user deletion; embedding model version on every chunk.
+3. Sources brought in order of value: page bodies, comments, meeting transcripts, uploaded files through text extraction, project guides, and workspace-level pages that have no project.
+4. The vector adapter for hosted deployments behind the interface.
+5. The regular-expression path in Ask is retired.
+
+*Integration.* The index is built per tenant by a background migration; retrieval is flagged per tenant; answer quality is compared on a held-out set of real questions before the flag defaults on.
+
+*Exit gate.* A question about a private page is answered for its owner and not for a colleague; a deleted page disappears from answers within a minute.
+
+### Sprint 8 · Security hardening (three weeks)
+
+Goal: authorization is enforced where the data is, and a leaked credential buys minutes.
+
+1. Server-side permission enforcement for browser sessions, after bringing the backend catalogue to parity with the frontend on per-project overrides; staged as report-only for two weeks, logging would-be denials, then enforced.
+2. Step-scoped short-lived credentials minted per step; provider keys and integration secrets in a secrets store referenced by handle; per-tenant provider keys.
+3. Agent egress through an allow-listing proxy per tenant.
+4. Audit as append-only with a per-tenant hash chain; audit retention at least as long as run retention.
+5. Http-only session cookies and a content security policy, which is frontend work with the socket and refresh flows adjusted.
+
+*Integration.* Report-only mode is the safety net for the enforcement change, since the last attempt caused false denials in production.
+
+*Exit gate.* The three critical findings from the defect list are closed by design, not by patch; a would-be denial report over two weeks shows no legitimate traffic blocked.
+
+### Sprint 9 · Evals and routing measurement (two weeks)
+
+Goal: a routing or prompt change is a measured business decision. This is task 019.
+
+1. A golden set of fifty to two hundred real tasks per class, graded on outcome, replayed in CI on every prompt or routing change.
+2. Online outcome metrics per model and class from what the trust layer already records: approval rate, decline reasons, revert rate, edit distance, repair rate; cost per approved change as the summary number; a held-out slice.
+3. Dashboards and the rate alerts from sprint 3 wired to these metrics.
+
+*Exit gate.* The cheaper-model scenario is answered from data for at least three task classes.
+
+### Sprint 10 · External agents (three weeks)
+
+Goal: an outside agent is a teammate with typed activities, not a token with a bearer header. This is task 018.
+
+1. OAuth 2.1 and scopes on the MCP server; more of the data model exposed with the same registry and rating discipline.
+2. Inbound external agent sessions as step executors, with typed activities and a human assignee kept on every delegated task.
+
+*Exit gate.* An external coding agent completes a step in a workflow, its actions appear in the audit with the right attribution, and a revoked grant stops it mid-step.
+
+### Dependencies at a glance
+
+| Sprint | Needs | Unblocks |
+|---|---|---|
+| 0 | Nothing | Everything |
+| 1 | 0 | 2, 3, 4 |
+| 2 | 1 | 6 |
+| 3 | 1 | 4, 9 |
+| 4 | 1, 3 | 5, 9 |
+| 5 | 1, 4 | 6, 10 |
+| 6 | 2, 5 | — |
+| 7 | 1 | 9 |
+| 8 | 1 | 10 |
+| 9 | 3, 4, 7 | — |
+| 10 | 5, 8 | — |
+
+Sprints 7 and 8 have no dependency on 5 or 6 and can run on a parallel track if a third engineer is available, which is how 015 and 016 were run.
+
+### What every sprint does the same way
+
+- Branch from `beta`, one slice per pull request, the four checks green, then the owner's API sweep and browser sweep recorded in the task's progress log before merge.
+- New behaviour behind a flag whose default reproduces today, so a merge is never a behaviour change on its own.
+- Schema fields declared before the first write, and any shape change ships its migration in the same pull request.
+- The in-process sweep against the real database and model runs on every merge, extended with the sprint's own checks.
+- Each sprint's task folder records deviations from this plan and the reasons, the way tasks 015 to 017 do.
+
+---
+
+## What the interface needs
+
+The architecture above changes what a person can see and do. This maps each area to its surfaces, marked **exists** where task 014 to 017 already shipped it, **extend** where a shipped screen grows, and **new** where nothing exists yet. Every string goes through the locale catalogue, and every new screen gets the owner and member browser sweeps that have gated each slice since task 014.
+
+| Area | Surface | State | What it must show or let a person do | Sprint |
+|---|---|---|---|---|
+| **A** Lifecycle | Agent settings → revision history | **new** | Numbered revisions with who changed what and when, a diff of autonomy, actions, skills, prompt and model between any two, promote and roll back as one click each, and the revision badge on every run | 2 |
+| **A** Lifecycle | Run detail → pinned revision | **extend** | Which agent revision and skill revision produced this run, linked | 2 |
+| **B** Communication | Workflow run → lineage | **new** | Who handed off to whom, with the typed result passed at each edge, and the accountable person on each step | 5 |
+| **C** Orchestration | Workflow builder | **new** | Compose steps from the manifest the way the automation sentence builder does today: agent, tool, approval, fan-out, condition, timer; declare dependencies; set a per-workflow budget and deadline; save disabled by default and dry-run against a real input | 5 |
+| **C** Orchestration | Workflow run view | **new** | The step graph with live status, duration and cost per step; retry, skip, resume and compensate as explicit controls on a failed step; a blocked workflow surfaced with the reason and the step it is waiting on | 5 |
+| **C** Approval | AI Inbox → approval steps | **extend** | Approvals that belong to a workflow show the owner, the deadline, the escalation path and a reassign control; the existing decline-reason step stays | 5 |
+| **C** Loops | Workflow run → iteration counter | **new** | For a monitoring and optimisation cycle: iterations used of the maximum, budget used of the cap, and a stop control | 5 |
+| **E** Knowledge | Instance console → knowledge sources | **new** | Which sources are indexed per workspace, index freshness and size per source, the embedding model in use, a re-index control, and an erasure control per document and per person | 7 |
+| **E** Knowledge | Ask → citations | **extend** | Every citation reflects the caller's visibility; a "why this answer" panel lists the retrieved passages with their source and permission, not just the titles | 7 |
+| **E** Memory | Project detail → what the agents remember | **exists** | Decisions, constraints, preferences and recent runs, with owner edit and retire, shipped on the open branch | — |
+| **F** Routing | Instance console → providers | **new** | Each configured provider and model with health, breaker state, rate-limit budget and whether it is priced; a loud warning when a pinned model has no price on file | 4 |
+| **F** Routing | Workspace settings → routing policy | **new** | Task class to model preferences with quality floor and latency target, editable per workspace, with the default shown as "same as today" | 4 |
+| **F** Routing | Agent and skill settings → model pin | **extend** | Pin a model per agent or per skill, chosen only from the priced allowlist | 4, 6 |
+| **F** Evaluation | AI hub → routing outcomes | **new** | Approval rate, decline reasons, revert rate, edit distance and cost per approved change, per model and per task class, with the held-out comparison | 9 |
+| **G** Security | Accounts → tokens | **extend** | Expiry mandatory with a default, scopes never empty, last use, and step-scoped credentials shown as such | 8 |
+| **G** Security | Instance console → egress allowlist | **new** | The hosts agents may fetch, per workspace, with the private-range rule stated | 8 |
+| **G** Security | Instance console → enforcement | **new** | Permission enforcement in report-only or enforce mode, with the would-be denial log to review before switching | 8 |
+| **G** Security | Audit log | **extend** | An integrity indicator per row from the hash chain, and a filter for refusals as the compromised-token signal | 8 |
+| **G** Undo | Run detail and audit → undo | **extend** | The undo window shown as a deadline and enforced, with the reason when it has passed, and undo hidden outside the caller's visible projects | 0 |
+| **H** Observability | Run detail → trace | **extend** | A timeline of steps, the model call and every tool call with durations, tokens, cost and the decision on each; a link to the replay record | 3 |
+| **H** Observability | Run detail → replay | **new** | The prompt sent, the retrieved passages, and the raw response, redacted per policy, shown to owners and admins | 3 |
+| **H** Observability | AI hub → health | **new** | Error rate, approval rate and cost per agent and per workflow over time, sortable, so the slow or failing one is found by looking rather than by asking | 3 |
+| **H** Cost | Instance console → AI agents | **extend** | Spend from every AI feature, not only agent runs, against the budget, with the alert thresholds already shown | 1 |
+| **H** Alerts | Notification settings | **extend** | Owners and admins choose which rate alerts reach them: error rate, approval falling, cost against forecast, queue age | 3 |
+| **I** Recovery | Workflow run → failed step | **new** | The error, whether it was deterministic, the attempts and backoff so far, and the single control that applies: retry, skip or compensate | 5 |
+| **Skills** | Skill Library | **extend** | Becomes a real library: create, edit, dry-run against a chosen task, the risk preview from emitted actions, retire; today it lists the action registry | 6 |
+| **Skills** | Agent settings → skills | **extend** | Pick skills from the manifest instead of toggling a fixed list; effective actions shown as the intersection with the agent's allowed actions | 6 |
+
+Three design constraints that apply across all of it. First, state is encoded in form as well as words: a breaker that is open, a step that is blocked, a model with no price, a token without an expiry each need a visible mark, not a sentence in a tooltip. Second, every destructive or irreversible control names its consequence in the control itself, the way the existing revert button does. Third, the member view and the owner view diverge more with every sprint, and each new surface is designed for both from the start rather than gated afterwards.
+
+---
+
 ## Appendix: what PR #552 changes
 
 Not shipped, green, and open. It moves the agent engine onto a checkpointed graph with per-company persistence, which closes several gaps above:
