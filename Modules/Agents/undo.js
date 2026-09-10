@@ -3,10 +3,29 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const socketEmitter = require('../../event/socketEventEmitter');
 const audit = require('./agentAudit');
+const budget = require('./budget');
+const scope = require('./scope');
 
 // Undo replays the inverse action and logs it as the person who pressed Undo.
 // Only the descriptors perform() wrote are understood; anything else is
-// "not undoable" rather than a guess.
+// "not undoable" rather than a guess. Every path that undoes — a single audit
+// row, a proposal, a whole run — goes through undoStateOf, so the company's
+// undo window and the caller's project visibility are checked exactly once.
+
+const HOUR_MS = 60 * 60 * 1000;
+const REASON = Object.freeze({
+    WINDOW_PASSED: 'undo_window_passed', NOT_VISIBLE: 'project_not_visible', ALREADY_UNDONE: 'already_undone', NOT_UNDOABLE: 'not_undoable',
+    PENDING: 'action_pending', FAILED: 'action_failed',
+});
+const MESSAGES = {
+    [REASON.WINDOW_PASSED]: (s) => `The undo window closed at ${s.undoUntil}.`,
+    [REASON.NOT_VISIBLE]: () => 'You cannot see the project this action touched.',
+    [REASON.ALREADY_UNDONE]: () => 'Already undone.',
+    [REASON.NOT_UNDOABLE]: () => 'not undoable',
+    [REASON.PENDING]: () => 'The action was never confirmed in the audit log; reconcile it by hand before undoing.',
+    [REASON.FAILED]: () => 'The action failed and changed nothing.',
+};
+const STATUS_OF = { [REASON.WINDOW_PASSED]: 410, [REASON.NOT_VISIBLE]: 403 };
 
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 
@@ -75,18 +94,75 @@ const inverses = {
 
 const isUndoable = (row) => Boolean(row && row.meta && row.meta.undo && inverses[row.meta.undo.kind] && !row.meta.undoneAt);
 
-/* Undo one audit row. Returns { ok, reason, result }. */
-const undoAuditRow = async (companyId, row, actor, ip) => {
+const runOf = async (companyId, row) => {
+    const runId = row && row.meta && row.meta.runId;
+    if (!runId || !oid(runId)) return null;
+    return MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ _id: oid(runId) }] }, 'findOne').catch(() => null);
+};
+
+/* A run's actions share one deadline, counted from when the run finished;
+ * a row outside any run counts from the row itself. */
+const undoUntilOf = (row, run, undoHours) => {
+    const anchor = (run && run.finishedAt) || row.createdAt || Date.now();
+    return new Date(new Date(anchor).getTime() + undoHours * HOUR_MS);
+};
+
+const projectIdOfRow = async (companyId, row, run) => {
+    const m = row.meta || {};
+    const direct = row.projectId || (run && run.projectId) || (m.params && m.params.projectId) || (m.undo && m.undo.projectId);
+    if (direct) return String(direct);
+    const entityId = row.entityId && oid(row.entityId);
+    if (entityId && row.entityType === 'task') {
+        const task = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: entityId }, { ProjectID: 1 }] }, 'findOne').catch(() => null);
+        return task && task.ProjectID ? String(task.ProjectID) : '';
+    }
+    return '';
+};
+
+/* ctx lets a caller that already holds the run, the settings or the caller's
+ * visible projects pass them in instead of re-reading them per row. */
+const undoContext = async (companyId, actor, ctx = {}) => ({
+    undoHours: ctx.undoHours !== undefined ? ctx.undoHours : (await budget.settings(companyId)).undoHours,
+    visibleProjectIds: ctx.visibleProjectIds || (await scope.visibleProjectIds(companyId, actor.userId)).map(String),
+    run: ctx.run,
+});
+
+const undoStateOf = async (companyId, row, actor, ctx = {}) => {
+    const state = (reason, undoUntil, projectId) => ({ undoable: !reason, reason: reason || '', undoUntil: undoUntil ? undoUntil.toISOString() : null, projectId: projectId || '' });
+    if (!row || row.action !== audit.ACTION_DONE) return state(REASON.NOT_UNDOABLE);
+    if (row.meta && row.meta.undoneAt) return state(REASON.ALREADY_UNDONE);
+    if (row.meta && row.meta.state === audit.STATE.PENDING) return state(REASON.PENDING);
+    if (row.meta && row.meta.state === audit.STATE.FAILED) return state(REASON.FAILED);
+    const full = await undoContext(companyId, actor, ctx);
+    const run = full.run !== undefined ? full.run : await runOf(companyId, row);
+    const undoUntil = undoUntilOf(row, run, full.undoHours);
+    const projectId = await projectIdOfRow(companyId, row, run);
+    if (!isUndoable(row)) return state(REASON.NOT_UNDOABLE, undoUntil, projectId);
+    if (!projectId || !full.visibleProjectIds.includes(projectId)) return state(REASON.NOT_VISIBLE, undoUntil, projectId);
+    if (Date.now() >= undoUntil.getTime()) return state(REASON.WINDOW_PASSED, undoUntil, projectId);
+    return state('', undoUntil, projectId);
+};
+
+const messageOf = (state) => (MESSAGES[state.reason] || (() => state.reason))(state);
+const statusOf = (reason) => STATUS_OF[reason] || 409;
+
+const refuse = async (companyId, actor, state, { entityType, entityId, action, ip }) => {
+    if (state.reason === REASON.WINDOW_PASSED || state.reason === REASON.NOT_VISIBLE) {
+        await audit.recordRefusal(companyId, actor, { action: action || 'undo', reason: state.reason, params: { undoUntil: state.undoUntil }, entityType, entityId, path: '', ip });
+    }
+    return { ok: false, reason: state.reason, message: messageOf(state), undoUntil: state.undoUntil, status: statusOf(state.reason) };
+};
+
+/* Undo one audit row. Returns { ok, reason, result } or, refused, { ok:false, reason, message, undoUntil, status }. */
+const undoAuditRow = async (companyId, row, actor, ip, ctx) => {
     if (!row || row.action !== audit.ACTION_DONE) return { ok: false, reason: 'Only agent actions can be undone.' };
-    if (row.meta && row.meta.undoneAt) return { ok: false, reason: 'Already undone.' };
-    if (row.meta && row.meta.state === audit.STATE.PENDING) return { ok: false, reason: 'The action was never confirmed in the audit log; reconcile it by hand before undoing.' };
-    if (row.meta && row.meta.state === audit.STATE.FAILED) return { ok: false, reason: 'The action failed and changed nothing.' };
-    const u = row.meta && row.meta.undo;
-    if (!u || !inverses[u.kind]) return { ok: false, reason: 'not undoable' };
+    const state = await undoStateOf(companyId, row, actor, ctx);
+    if (!state.undoable) return refuse(companyId, actor, state, { entityType: row.entityType, entityId: row.entityId, action: row.meta && row.meta.action, ip });
+    const u = row.meta.undo;
     const result = await inverses[u.kind](companyId, u);
     await audit.markUndone(companyId, row._id, actor.userId);
     await audit.recordUndo(companyId, actor, { originalId: row._id, action: row.meta.action, entityType: row.entityType, entityId: row.entityId, ip });
-    return { ok: true, reason: '', result };
+    return { ok: true, reason: '', result, undoUntil: state.undoUntil };
 };
 
-module.exports = { undoAuditRow, isUndoable, inverses };
+module.exports = { undoAuditRow, undoStateOf, undoContext, undoUntilOf, messageOf, statusOf, refuse, isUndoable, inverses, REASON };

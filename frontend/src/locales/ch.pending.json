@@ -1,7 +1,7 @@
 {
   "locale": "ch",
   "machineTranslated": false,
-  "updatedAt": "2026-09-10T12:53:19.177Z",
+  "updatedAt": "2026-09-10T12:54:12.669Z",
   "keys": {
     "errorPage.card_name": "card name",
     "Auth.welcome_back": "Welcome back",
@@ -5185,6 +5185,11 @@
     "Instance.agent_model_unpriced": "No price on file",
     "Instance.agent_model_unpriced_help": "Runs on this model are refused until a price is added under AI settings (Model prices).",
     "Instance.f_LLM_PRICING": "Model prices (USD per 1M tokens)",
-    "Instance.err_json": "Enter JSON like {\"model-id\":{\"input\":2,\"output\":8}} with non-negative numbers."
+    "Instance.err_json": "Enter JSON like {\"model-id\":{\"input\":2,\"output\":8}} with non-negative numbers.",
+    "Ai.undo_until": "Undo until {at}",
+    "Ai.undo_window_closed_at": "The undo window closed at {at}",
+    "Ai.undo_window_passed": "The undo window has passed.",
+    "Audit.undo_until": "Undo until {t}",
+    "Audit.undo_window_passed": "The undo window has passed."
   }
 }

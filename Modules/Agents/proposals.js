@@ -241,13 +241,16 @@ const undoApproval = async (companyId, id, { decider, ip }) => {
     const p = await get(companyId, id);
     if (!p) return { error: 'Proposal not found.', status: 404 };
     if (![STATUS.APPROVED, STATUS.EDITED].includes(p.status)) return { error: `Nothing to undo — proposal is ${p.status}.`, status: 409 };
-    if (!p.undoUntil || new Date(p.undoUntil).getTime() < Date.now()) return { error: 'The undo window has closed. Use the audit log to undo individual actions.', status: 410 };
+    const undoUntil = p.undoUntil ? new Date(p.undoUntil).toISOString() : null;
+    if (!undoUntil || new Date(undoUntil).getTime() < Date.now()) return { error: 'The undo window has closed. Use the audit log to undo individual actions.', status: 410, reason: undo.REASON.WINDOW_PASSED, undoUntil };
+    const ctx = await undo.undoContext(companyId, decider);
+    if (p.projectId && !ctx.visibleProjectIds.includes(String(p.projectId))) return { error: 'You cannot see the project this proposal touched.', status: 403, reason: undo.REASON.NOT_VISIBLE, undoUntil };
     const results = [];
     for (const auditId of [...(p.auditIds || [])].reverse()) {
         // eslint-disable-next-line no-await-in-loop
         const row = await audit.findById(companyId, auditId);
         // eslint-disable-next-line no-await-in-loop
-        results.push({ auditId, ...(await undo.undoAuditRow(companyId, row, decider, ip).catch((e) => ({ ok: false, reason: e.message }))) });
+        results.push({ auditId, ...(await undo.undoAuditRow(companyId, row, decider, ip, ctx).catch((e) => ({ ok: false, reason: e.message }))) });
     }
     const updated = await setStatus(companyId, id, { status: STATUS.UNDONE, undoUntil: null });
     await audit.recordProposalDecision(companyId, decider, { proposalId: id, decision: 'undone', agentName: p.agentName, runId: p.runId, changes: results, ip });
