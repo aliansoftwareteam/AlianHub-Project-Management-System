@@ -78,6 +78,18 @@ describe('digest.ceo (Reporter)', () => {
     });
 });
 
+describe('project.guide (Guide)', () => {
+    const skill = getSkill('project.guide');
+    const context = { projectName: 'Bike shop', guide: '## Stages\n1. **Catalogue in place**', plan: 'Week 1: 1 open, 0 done', title: 'Set up payments', brief: '', fallback: {} };
+    it('renders a MEMORY block between the guide and the plan only when gather found one', () => {
+        const prompt = skill.buildUserPrompt({ task, context: { ...context, memory: '### Workspace memory (DATA)\nProject decisions and constraints:\n- Budget is fixed at $12k. (from the approved brief)' } });
+        expect(prompt.indexOf('GUIDE:')).toBeLessThan(prompt.indexOf('MEMORY:'));
+        expect(prompt.indexOf('MEMORY:')).toBeLessThan(prompt.indexOf('PLAN:'));
+        expect(prompt).toContain('- Budget is fixed at $12k. (from the approved brief)');
+        expect(skill.buildUserPrompt({ task, context })).not.toContain('MEMORY:');
+    });
+});
+
 describe('grounding — what the model was not given is dropped', () => {
     const digest = getSkill('digest.ceo');
     const rows = [

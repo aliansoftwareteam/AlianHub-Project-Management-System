@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { DONE_STATUS_TYPES } = require('../registry');
+const memoryStore = require('../memory');
 
 const MAX_PROPOSED = 3;
 const MAX_PLAN_ROWS = 300;
@@ -40,7 +41,7 @@ module.exports = {
     scopes: ['task.read', 'task.comment', 'task.subtask.create'],
     maxTokens: 1800,
 
-    async gather({ task, companyId }) {
+    async gather({ task, companyId, startedBy }) {
         const projectId = oid(task.ProjectID);
         if (!projectId) return { skip: 'the task has no project to guide' };
         const project = await MongoDbCrudOpration(companyId, {
@@ -59,6 +60,7 @@ module.exports = {
         return {
             projectName: project.ProjectName || '',
             guide: String(project.aiGuide.markdown).slice(0, 8000),
+            memory: await memoryStore.contextFor({ companyId, projectId: String(projectId), userId: startedBy }),
             plan: planRows(tasks),
             title: task.TaskName || '',
             brief: plain(task.rawDescription || task.description).slice(0, 2000),
@@ -94,6 +96,7 @@ Return ONLY JSON:
             'GUIDE:',
             context.guide,
             '',
+            ...(context.memory ? ['MEMORY:', context.memory, ''] : []),
             'PLAN:',
             context.plan || '(no tasks yet)',
             '',

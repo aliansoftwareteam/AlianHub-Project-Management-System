@@ -17,6 +17,7 @@ const planRules = require('./planRules');
 const sseEmitter = require('./sseEmitter');
 const orchestrator = require('./orchestrator');
 const clarifier = require('./clarifier');
+const memoryStore = require('../Agents/memory');
 const { resolveProjectSkills, getActiveSkillSlugs } = require('../settings/ProjectSkills/helper');
 const { normaliseSource, cleanProposalId, numericProposalId, validateProposalId } = require('../Project/helpers/projectSourceRules');
 const { normalizePlanColors } = orchestrator;
@@ -120,10 +121,11 @@ async function loadActiveMembers(companyId) {
     }
 }
 
-async function callLlmForPlan({ description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills, approvedBrief, assumptions }) {
+async function callLlmForPlan({ description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills, approvedBrief, assumptions, companyId, userId }) {
     const provider = getProvider();
     const systemPrompt = buildSystemPrompt();
-    const userMessage = buildUserMessage({ description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills, approvedBrief, assumptions });
+    const memory = await memoryStore.contextFor({ companyId, userId });
+    const userMessage = buildUserMessage({ description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills, approvedBrief, assumptions, memory });
     // A generous ask, not a target: each provider clamps this to its own output
     // ceiling, so requesting more than a given model supports is harmless. The
     // old 32000 predated tasks carrying estimates and sub-tasks — every
@@ -229,7 +231,7 @@ async function generatePlanForJob({ jobId, uid, companyId, description, addition
         // returned a job id, so slow LLM responses no longer trip the proxy.
         emit({ event: 'progress', phase: 'plan', step: 'ai', status: 'started' });
         const { result, usage, model, provider } = await callLlmForPlan({
-            description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills, approvedBrief, assumptions,
+            description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills, approvedBrief, assumptions, companyId, userId: String(uid),
         });
 
         let { plan } = result;
@@ -494,6 +496,8 @@ exports.clarify = async (req, res) => {
             briefText,
             previousAnswers,
             round,
+            companyId,
+            userId: String(uid),
         });
         const { understanding, questions, coverage, maxRounds, usage, model, provider } = result;
 
@@ -594,6 +598,8 @@ exports.brief = async (req, res) => {
             additionalRequirements,
             briefText,
             answers,
+            companyId,
+            userId: String(uid),
         });
 
         return res.send({

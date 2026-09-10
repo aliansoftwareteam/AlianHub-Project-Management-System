@@ -14,6 +14,7 @@
 'use strict';
 
 const logger = require('../../Config/loggerConfig');
+const memoryStore = require('../Agents/memory');
 const { getProvider } = require('./llmProvider');
 const { usageFromResult, addUsage, summarize } = require('./usage');
 const { COVERAGE_POINTS, CoverageSchema, ClarifyQuestionsSchema, BriefDraftSchema, tryParseJson } = require('./schemaValidator');
@@ -138,11 +139,12 @@ async function callJson({ label, systemPrompt, userMessage, schema, check, maxTo
  *
  * @returns {Promise<{ coverage: object, notes: object, usage: object, model: string, provider: string }>}
  */
-async function scoreCoverage({ description, additionalRequirements, briefText, previousAnswers }) {
+async function scoreCoverage({ description, additionalRequirements, briefText, previousAnswers, companyId, userId, projectId, memory }) {
+    const block = memory !== undefined ? memory : await memoryStore.contextFor({ companyId, userId, projectId });
     const result = await callJson({
         label: 'coverage',
         systemPrompt: buildCoverageSystemPrompt(),
-        userMessage: buildCoverageUserMessage({ description, additionalRequirements, briefText, previousAnswers }),
+        userMessage: buildCoverageUserMessage({ description, additionalRequirements, briefText, previousAnswers, memory: block }),
         schema: CoverageSchema,
         maxTokens: COVERAGE_MAX_TOKENS,
         temperature: 0.0,
@@ -151,6 +153,7 @@ async function scoreCoverage({ description, additionalRequirements, briefText, p
     return {
         coverage: result.value.coverage,
         notes: result.value.notes || {},
+        memory: block,
         usage: result.usage,
         model: result.model,
         provider: result.provider,
@@ -196,8 +199,9 @@ function planRound({ coverage, previousAnswers, round }) {
  * @param {Array}  [args.previousAnswers] - [{ id, point, question, answer, skipped, unknown }]
  * @param {number} [args.round]
  */
-async function generateClarifyingQuestions({ description, additionalRequirements, briefText, previousAnswers, round }) {
-    const scored = await scoreCoverage({ description, additionalRequirements, briefText, previousAnswers });
+async function generateClarifyingQuestions({ description, additionalRequirements, briefText, previousAnswers, round, companyId, userId, projectId }) {
+    const memory = await memoryStore.contextFor({ companyId, userId, projectId });
+    const scored = await scoreCoverage({ description, additionalRequirements, briefText, previousAnswers, memory });
     const plan = planRound({ coverage: scored.coverage, previousAnswers, round });
     const base = {
         coverage: scored.coverage,
@@ -225,6 +229,7 @@ async function generateClarifyingQuestions({ description, additionalRequirements
             askPoints: plan.askPoints,
             round: plan.round,
             maxQuestions: plan.maxQuestions,
+            memory,
         }),
         schema: ClarifyQuestionsSchema,
         maxTokens: CLARIFY_MAX_TOKENS,
@@ -353,8 +358,9 @@ function renderBriefMarkdown(sections, assumptions) {
  * Rewrite description + upload + answers into the five sections plus one
  * assumption per skipped/unknown answer and per point still missing.
  */
-async function draftBrief({ description, additionalRequirements, briefText, answers }) {
-    const scored = await scoreCoverage({ description, additionalRequirements, briefText, previousAnswers: answers });
+async function draftBrief({ description, additionalRequirements, briefText, answers, companyId, userId, projectId }) {
+    const memory = await memoryStore.contextFor({ companyId, userId, projectId });
+    const scored = await scoreCoverage({ description, additionalRequirements, briefText, previousAnswers: answers, memory });
     const required = requiredAssumptionsFor({ answers, coverage: scored.coverage, notes: scored.notes });
 
     const drafted = await callJson({
@@ -368,6 +374,7 @@ async function draftBrief({ description, additionalRequirements, briefText, answ
             coverage: scored.coverage,
             notes: scored.notes,
             requiredAssumptions: required,
+            memory,
         }),
         schema: BriefDraftSchema,
         check: (value) => {
