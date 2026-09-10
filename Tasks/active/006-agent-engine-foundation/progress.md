@@ -12,11 +12,15 @@
 - [ ] Budgets enforced pre-call + usage accounting
 - [x] `run_agent` action (synchronous, so `waitForResult` is implicit)
 - [ ] Review inbox + `AGENT_REVIEW_ITEMS`
-- [ ] Two-week trial on a real sprint
+- [ ] Two-week trial on a real sprint — folds into 019 (evals)
+- [ ] Prompt-injection regression test on the agent run path
+- [ ] Evaluate `run.spendCapUsd` before the model call
+- [ ] Confidence floor in `verify()`
 
 ## Last step
-QA agent working end to end: a real status change on T-3 filed 6 subtasks from a live audit
-of khurat.com. Remaining: budgets, review inbox, and the two-week trial.
+Verified remaining on 2026-09-10 against beta: no prompt-injection regression test on the run
+path, `run.spendCapUsd` checked after the model call, no confidence floor, and the two-week trial
+folds into 019. Budgets at company and agent level are pre-call. See the log.
 
 ## Blockers
 None. Task 005 landed, so the tool layer and run log were available.
@@ -132,3 +136,15 @@ URL, platform, ignore-list, definition of done) and belongs on the project docum
 Recommend the context field stay mostly freeform prose with 2-3 typed fields — the same shape
 as this repo's own CLAUDE.md, which works precisely because it is not 20 form fields.
 
+### 2026-09-10 — verified remaining
+Checked against origin/beta (64f4f507). Still open:
+1. No prompt-injection regression test on the agent run path — only
+   `tests/ai-project-brief.test.js:20` covers the brief parser.
+2. The per-run cap `run.spendCapUsd` is evaluated after the model call (`runs.js` ~279; on the
+   017 branch it now sits inside the `engine/graph.js` analyse node). The company and agent
+   monthly caps are pre-call.
+3. Confidence floor not built — `verify()` keys on severity.
+4. The two-week 70% acceptance trial folds into 019 (evals and observability).
+
+Correction: the 180-day TTL index on `agent_runs` does exist
+(`utils/mongo-handler/createSchema.js:193`), so it is not an open item.
