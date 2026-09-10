@@ -72,11 +72,18 @@ const taskPatchGuard = withActor(async (req, res, next, actor) => {
     const check = registry.evaluate(action, params);
     if (!check.allowed) return refuse(req, res, actor, { action, reason: check.reason, params, entityId: params.taskId });
     req.agentAction = { action, params };
+    const companyId = req.headers['companyid'] || '';
+    let auditId;
+    try {
+        auditId = await audit.openAction(companyId, actor, { action, reason: 'via REST', params, entityId: params.taskId, ip: req.ip || '' });
+    } catch (e) {
+        return res.status(503).json({ status: false, message: e.message, statusText: audit.AUDIT_UNAVAILABLE });
+    }
     res.on('finish', () => {
-        if (res.statusCode >= 400) return;
-        audit.recordAction(req.headers['companyid'] || '', actor, {
-            action, reason: 'via REST', params, entityId: params.taskId, ip: req.ip || '', undo: null,
-        }).catch(() => {});
+        const settle = res.statusCode >= 400
+            ? audit.failAction(companyId, auditId, `HTTP ${res.statusCode}`)
+            : audit.applyAction(companyId, auditId, { undo: null });
+        settle.catch((e) => logger.error(`agent guard: ${e.message}`));
     });
     return next();
 });

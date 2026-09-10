@@ -10,9 +10,10 @@ const { attribution, isAgent } = require('./actor');
 const completionStore = require('../Tasks/helpers/completionStore');
 
 // The single place an agent's action is executed. MCP tools, approved proposals
-// and workspace-agent runs all call perform(): registry check → tool layer →
-// provenance → audit row with an undo descriptor. A human calling the same REST
-// routes never passes through here; the guard only watches them.
+// and workspace-agent runs all call perform(): registry check → pending audit
+// row → tool layer → provenance → row marked applied with its undo descriptor.
+// A human calling the same REST routes never passes through here; the guard
+// only watches them.
 
 class RefusedError extends Error {
     constructor(message, auditId) { super(message); this.name = 'RefusedError'; this.status = 403; this.auditId = auditId || null; }
@@ -253,14 +254,18 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
     const exec = executors[action];
     if (!exec) throw new tools.DeterministicError(`${action} has no executor`);
 
-    const out = await exec({ companyId, actor, params });
+    const auditId = await audit.openAction(companyId, actor, { action, reason, params, cost, ip, entityId: params.taskId });
+    let out;
+    try {
+        out = await exec({ companyId, actor, params });
+    } catch (e) {
+        await audit.failAction(companyId, auditId, e.message);
+        throw e;
+    }
     if (isAgent(actor) && params.taskId && action !== 'timelog.stop' && action !== 'task.status.set') {
         await completionStore.recordWork(companyId, params.taskId, workEntry(actor, 0));
     }
-    const auditId = await audit.recordAction(companyId, actor, {
-        action, reason, params, cost, undo: out.undo, ip,
-        entityType: out.entityType || 'task', entityId: out.entityId, entityName: out.entityName,
-    });
+    await audit.applyAction(companyId, auditId, { undo: out.undo, entityType: out.entityType || 'task', entityId: out.entityId, entityName: out.entityName });
     return { result: out.result, auditId, undo: out.undo, task: out.task || null };
 };
 

@@ -79,6 +79,8 @@ const isUndoable = (row) => Boolean(row && row.meta && row.meta.undo && inverses
 const undoAuditRow = async (companyId, row, actor, ip) => {
     if (!row || row.action !== audit.ACTION_DONE) return { ok: false, reason: 'Only agent actions can be undone.' };
     if (row.meta && row.meta.undoneAt) return { ok: false, reason: 'Already undone.' };
+    if (row.meta && row.meta.state === audit.STATE.PENDING) return { ok: false, reason: 'The action was never confirmed in the audit log; reconcile it by hand before undoing.' };
+    if (row.meta && row.meta.state === audit.STATE.FAILED) return { ok: false, reason: 'The action failed and changed nothing.' };
     const u = row.meta && row.meta.undo;
     if (!u || !inverses[u.kind]) return { ok: false, reason: 'not undoable' };
     const result = await inverses[u.kind](companyId, u);

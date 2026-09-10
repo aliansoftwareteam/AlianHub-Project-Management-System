@@ -34,7 +34,7 @@ const revertRun = async (companyId, runId, { actor, isPrivileged, ip }) => {
         return { error: `The revert window closed at ${windowEndsAt.toISOString()} (${undoHours} h after the run finished).`, status: 409 };
     }
 
-    const rows = (await actionRows(companyId, run._id)) || [];
+    const rows = ((await actionRows(companyId, run._id)) || []).filter((r) => !(r.meta && r.meta.state === audit.STATE.FAILED));
     const pending = rows.filter((r) => !(r.meta && r.meta.undoneAt));
     if (!rows.length) return { error: 'This run made no reversible changes.', status: 409 };
 

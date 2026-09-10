@@ -128,7 +128,11 @@ async function act(state, config) {
             // eslint-disable-next-line no-await-in-loop
             if (change.remember) await findingMemory.record(companyId, { ...change.remember, subtaskId: out.result && out.result.subtaskId });
         } catch (e) {
-            if (e.name !== 'RefusedError') throw e;
+            if (e.name !== 'RefusedError') {
+                // eslint-disable-next-line no-await-in-loop
+                await runs.patch(companyId, run._id, {}, { $push: { actions: { action: change.action, auditId: e.auditId || null, ok: false, error: e.message, at: new Date() } } });
+                throw e;
+            }
             refusals += 1;
             // eslint-disable-next-line no-await-in-loop
             await runs.patch(companyId, run._id, {}, { $inc: { refusals: 1 }, $push: { actions: { action: change.action, auditId: e.auditId || null, ok: false, refused: e.message, at: new Date() } } });
