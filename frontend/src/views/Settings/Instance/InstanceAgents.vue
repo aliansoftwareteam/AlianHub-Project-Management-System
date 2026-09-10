@@ -57,6 +57,10 @@
                         <span class="ah-small">{{ provider.region ? $t('Instance.agent_region', { region: provider.region }) : $t('Instance.agent_region_any') }}</span>
                     </template>
                     <span class="ah-chip" :class="provider.hasKey ? 'ah-chip--ok' : 'ah-chip--warn'" data-test="key-state">{{ provider.hasKey ? $t('Instance.agent_key_set') : $t('Instance.agent_key_missing') }}</span>
+                    <template v-if="provider.model">
+                        <span class="ah-mono" data-test="model">{{ provider.model }}</span>
+                        <span class="ah-chip" :class="provider.priced ? 'ah-chip--ok' : 'ah-chip--danger'" :title="provider.priced ? '' : $t('Instance.agent_model_unpriced_help')" data-test="price-state">{{ provider.priced ? $t('Instance.agent_model_priced') : $t('Instance.agent_model_unpriced') }}</span>
+                    </template>
                 </div>
             </div>
 
@@ -89,7 +93,7 @@ const loaded = ref(false);
 const busy = ref(false);
 const error = ref("");
 const budget = ref(null);
-const provider = ref({ name: "", hasKey: false, region: "" });
+const provider = ref({ name: "", hasKey: false, region: "", model: "", priced: null });
 const draft = reactive({ undoHours: 24, monthlyBudgetUsd: 0 });
 let baseline = { ...draft };
 
@@ -111,7 +115,7 @@ const unwrap = (res) => {
 function seed(settings) {
     draft.undoHours = Number(settings.undoHours ?? 24);
     draft.monthlyBudgetUsd = Number(settings.monthlyBudgetUsd ?? 0);
-    provider.value = { name: settings.provider?.name || "", hasKey: settings.provider?.hasKey === true, region: settings.provider?.region || "" };
+    provider.value = { name: settings.provider?.name || "", hasKey: settings.provider?.hasKey === true, region: settings.provider?.region || "", model: settings.provider?.model || "", priced: settings.provider?.priced === true };
     baseline = { undoHours: draft.undoHours, monthlyBudgetUsd: draft.monthlyBudgetUsd };
 }
 

@@ -52,6 +52,9 @@ const openaiProvider = {
     get isConfigured() {
         return Boolean(config.AI_API_KEY && config.AI_MODEL);
     },
+    get model() {
+        return config.AI_MODEL || null;
+    },
 
     /**
      * @param {import('./types').ChatOptions} opts

@@ -51,6 +51,9 @@ const deepseekProvider = {
     get isConfigured() {
         return Boolean(config.DEEPSEEK_API_KEY && config.DEEPSEEK_MODEL);
     },
+    get model() {
+        return config.DEEPSEEK_MODEL || null;
+    },
 
     /**
      * @param {import('./types').ChatOptions} opts

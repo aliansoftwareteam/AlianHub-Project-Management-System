@@ -35,6 +35,11 @@ const CATALOG = [
     field('ANTHROPIC_MODEL', 'ai', 'text', { default: 'claude-sonnet-4-5-20250929', label: 'Anthropic model' }),
     field('DEEPSEEK_API_KEY', 'ai', 'secret', { label: 'DeepSeek API key' }),
     field('DEEPSEEK_MODEL', 'ai', 'text', { default: 'deepseek-v4-flash', label: 'DeepSeek model' }),
+    field('LLM_PRICING', 'ai', 'text', {
+        label: 'Model prices (USD per 1M tokens)',
+        help: 'JSON keyed by model id, e.g. {"gpt-4.1":{"input":2,"output":8}}. Overrides the built-in list; a model with no price refuses to run. Use 0/0 for a free or self-hosted model.',
+        validate: (value) => (require('../AIProjectGenerator/usage').parsePricing(value).errors.length ? 'json' : null),
+    }),
 
     field('GOOGLE_LOGIN_ENABLED', 'auth', 'boolean', { default: 'false', label: 'Google sign-in' }),
     field('GOOGLE_CLIENT_ID', 'auth', 'text', { label: 'Google client id', public: true }),
@@ -80,6 +85,8 @@ function validateSettings(patch = {}) {
         if (def.type === 'number' && !/^\d+$/.test(value)) { errors[key] = 'number'; continue; }
         if (def.type === 'boolean' && !isBooleanString(value)) { errors[key] = 'boolean'; continue; }
         if (def.type === 'select' && !def.options.includes(value)) { errors[key] = 'option'; continue; }
+        const problem = def.validate ? def.validate(value) : null;
+        if (problem) { errors[key] = problem; continue; }
         values[key] = value;
     }
     return { values, errors, valid: Object.keys(errors).length === 0 };
