@@ -1626,7 +1626,8 @@ export default {
         episode_declined_reason: "declined {n} ({reason})",
         episode_reverted_yes: "reverted",
         episode_reverted_no: "not reverted",
-        episode_waiting: "Continues when a person decides."
+        episode_waiting: "Continues when a person decides.",
+        episode_not_reached: "Run ended before review"
     },
     AiProject: {
         title: "Create project with AI",
@@ -4794,6 +4795,11 @@ export default {
         agents_candidate_count: "{n} declines",
         agents_accept: "Accept",
         agents_dismiss: "Dismiss",
+        agents_retry: "Try again",
+        agents_candidate_too_many_changes: "Prefers fewer changes per proposal",
+        agents_candidate_wrong_tone: "Prefers a different tone — ask before rewriting",
+        agents_candidate_needs_person: "Wants a person to handle this kind of work",
+        agents_candidate_not_now: "Prefers proposals batched, not one at a time",
     },
     // One plain sentence per permission, shown under its name on the Security & Permissions
     // screen. Kept here rather than in the seeded `desc` field so companies that already exist

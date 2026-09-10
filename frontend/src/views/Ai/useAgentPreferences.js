@@ -1,4 +1,4 @@
-import { computed, reactive, ref, unref } from "vue";
+import { computed, reactive, ref } from "vue";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { i18n } from "@/locales/main";
@@ -20,7 +20,7 @@ const request = async (type, endpoint, body, fallbackKey) => {
 
 const pick = (value, allowed) => (allowed.includes(value) ? value : null);
 
-export function useAgentPreferences({ userId } = {}) {
+export function useAgentPreferences() {
     const draft = reactive({ tone: null, reviewDepth: null, notify: true });
     const baseline = reactive({ ...draft });
     const candidates = ref([]);
@@ -48,10 +48,14 @@ export function useAgentPreferences({ userId } = {}) {
         }
     };
 
+    const changes = () => Object.fromEntries(Object.keys(draft).filter((k) => draft[k] !== baseline[k]).map((k) => [k, draft[k]]));
+
     const save = async () => {
+        const body = changes();
+        if (!Object.keys(body).length) return;
         busy.value = true;
         try {
-            seed(await request("put", env.AGENT_PREFERENCES, { tone: draft.tone, reviewDepth: draft.reviewDepth, notify: draft.notify }, "Settings.agents_save_failed"));
+            seed(await request("put", env.AGENT_PREFERENCES, body, "Settings.agents_save_failed"));
         } finally {
             busy.value = false;
         }
@@ -60,7 +64,7 @@ export function useAgentPreferences({ userId } = {}) {
     const settle = async (candidate, status) => {
         busy.value = true;
         try {
-            await request("put", `${env.AGENT_MEMORY}/${encodeURIComponent(String(candidate.id))}`, { scopeId: unref(userId), status }, "Settings.agents_save_failed");
+            await request("put", `${env.AGENT_MEMORY}/${encodeURIComponent(String(candidate.id))}`, { status }, "Settings.agents_save_failed");
             candidates.value = candidates.value.filter((c) => c.id !== candidate.id);
         } finally {
             busy.value = false;

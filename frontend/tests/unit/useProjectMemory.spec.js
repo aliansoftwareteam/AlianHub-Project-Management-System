@@ -61,6 +61,49 @@ describe('useProjectMemory', () => {
         expect(memory.error.value).toBe('Memory is off for this workspace.');
     });
 
+    it('keeps the answer of the latest load when an earlier one lands last', async () => {
+        const pending = {};
+        apiRequest.mockImplementation((type, url) => new Promise((resolve) => { pending[url] = resolve; }));
+        const memory = useProjectMemory();
+        const first = memory.load('A');
+        const second = memory.load('B');
+        pending['/api/v2/agents/memory/project/B']({ data: { status: true, data: { rows: [row('b')] } } });
+        await second;
+        expect(memory.rows.value.map((r) => r.id)).toEqual(['b']);
+        expect(memory.loading.value).toBe(false);
+
+        pending['/api/v2/agents/memory/project/A']({ data: { status: true, data: { rows: [row('a')] } } });
+        await first;
+        expect(memory.rows.value.map((r) => r.id)).toEqual(['b']);
+        expect(memory.loading.value).toBe(false);
+        expect(memory.error.value).toBe('');
+    });
+
+    it('ignores a failure from a superseded load', async () => {
+        const pending = {};
+        apiRequest.mockImplementation((type, url) => new Promise((resolve, reject) => { pending[url] = { resolve, reject }; }));
+        const memory = useProjectMemory();
+        const first = memory.load('A');
+        const second = memory.load('B');
+        pending['/api/v2/agents/memory/project/B'].resolve({ data: { status: true, data: { rows: [row('b')] } } });
+        await second;
+        pending['/api/v2/agents/memory/project/A'].reject(httpError(403, 'No access to this project.'));
+        await first;
+        expect(memory.error.value).toBe('');
+        expect(memory.rows.value.map((r) => r.id)).toEqual(['b']);
+    });
+
+    it('replaces the row in place when an edit re-keys it', async () => {
+        apiRequest.mockImplementation((type) => (type === 'put'
+            ? ok({ id: 'project.decision:ship-in-q4', text: 'Ship in Q4', status: 'active' })
+            : ok({ rows: [row('project.decision:ship-in-march'), row('b')] })));
+        const memory = useProjectMemory();
+        await memory.load('p1');
+        const updated = await memory.updateRow('project.decision:ship-in-march', { projectId: 'p1', text: 'Ship in Q4' });
+        expect(updated).toMatchObject({ id: 'project.decision:ship-in-q4', text: 'Ship in Q4', kind: 'project.decision' });
+        expect(memory.rows.value.map((r) => r.id)).toEqual(['project.decision:ship-in-q4', 'b']);
+    });
+
     it('posts a new row and appends the answer', async () => {
         apiRequest.mockImplementation((type) => (type === 'post' ? ok(row('project.constraint:budget', { kind: 'project.constraint', text: 'Budget is fixed' })) : ok({ rows: [row('a')] })));
         const memory = useProjectMemory();
@@ -75,8 +118,8 @@ describe('useProjectMemory', () => {
         apiRequest.mockImplementation((type) => (type === 'put' ? ok({ id: 'a', text: 'Renamed', lastSeenAt: '2026-09-10T00:00:00Z' }) : ok({ rows: [row('a'), row('b')] })));
         const memory = useProjectMemory();
         await memory.load('p1');
-        const updated = await memory.updateRow('a', { scopeId: 'p1', text: 'Renamed' });
-        expect(apiRequest).toHaveBeenCalledWith('put', '/api/v2/agents/memory/a', { scopeId: 'p1', text: 'Renamed' });
+        const updated = await memory.updateRow('a', { projectId: 'p1', text: 'Renamed' });
+        expect(apiRequest).toHaveBeenCalledWith('put', '/api/v2/agents/memory/a', { projectId: 'p1', text: 'Renamed' });
         expect(updated).toMatchObject({ id: 'a', text: 'Renamed', status: 'active', lastSeenAt: '2026-09-10T00:00:00Z' });
         expect(memory.rows.value[1].id).toBe('b');
     });
@@ -86,7 +129,7 @@ describe('useProjectMemory', () => {
         const memory = useProjectMemory();
         await memory.load('p1');
         await memory.retireRow('project.decision:ci-first', 'p1');
-        expect(apiRequest).toHaveBeenCalledWith('put', '/api/v2/agents/memory/project.decision%3Aci-first', { scopeId: 'p1', status: 'retired' });
+        expect(apiRequest).toHaveBeenCalledWith('put', '/api/v2/agents/memory/project.decision%3Aci-first', { projectId: 'p1', status: 'retired' });
         expect(memory.rows.value[0].status).toBe('retired');
     });
 

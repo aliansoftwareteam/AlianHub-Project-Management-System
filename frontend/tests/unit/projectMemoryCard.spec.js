@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 
-const { apiRequest } = vi.hoisted(() => ({ apiRequest: vi.fn() }));
+const { apiRequest, echo } = vi.hoisted(() => ({ apiRequest: vi.fn(), echo: (key, params) => (params ? `${key} ${JSON.stringify(params)}` : key) }));
 
 vi.mock('@/services', () => ({ apiRequest }));
+vi.mock('@/composable', () => ({ useConvertDate: () => ({ convertDateFormat: (at, format, options) => `${String(at).slice(0, 10)}|${format}|${options.showDayName}` }) }));
+vi.mock('vue-i18n', async (importOriginal) => ({ ...(await importOriginal()), useI18n: () => ({ t: echo }) }));
 vi.mock('@/locales/main', () => ({ i18n: { global: { t: (key) => `t:${key}` } } }));
 vi.mock('@/components/organisms/Shell/shellState', () => ({ shellState: { agentsRunning: 0 } }));
 
@@ -26,7 +28,10 @@ const payload = {
         { id: 'project.decision:ci-first', kind: 'project.decision', text: 'CI before features', status: 'active', source: { origin: 'proposal.approve' }, occurrences: 1 },
         { id: 'project.decision:old', kind: 'project.decision', text: 'Old idea', status: 'retired', source: { origin: 'owner' }, occurrences: 1 }
     ],
-    episodes: [{ runId: 'r1', skill: 'project.guide', taskTitle: 'Set up CI', summary: 'proposed 3, approved 2', at: '2026-09-09T10:00:00Z' }]
+    episodes: [
+        { runId: 'r1', skill: 'project.guide', taskTitle: 'Set up CI', proposed: 3, acted: 0, approved: 2, declined: 1, declinedReason: 'wrong_tone', reverted: false, summary: 'proposed 3, approved 2, declined 1 (wrong tone)', at: '2026-09-09T10:00:00Z' },
+        { runId: 'r2', skill: 'brief.parse', proposed: 1, acted: 1, approved: 0, declined: 0, declinedReason: '', reverted: true, summary: 'proposed 1, acted 1, reverted', at: '2026-09-08T10:00:00Z' }
+    ]
 };
 const newRow = { id: 'project.constraint:ship-q4', kind: 'project.constraint', text: 'Ship in Q4', status: 'active', source: { origin: 'owner' }, occurrences: 1 };
 
@@ -71,10 +76,14 @@ describe('ProjectMemoryCard', () => {
         expect(rows[1].find('[data-test="source"]').text()).toBe('Memory.source_approved');
         expect(rows[1].find('.ah-chip').classes()).toContain('ah-chip--brand');
 
-        const episodes = wrapper.find('[data-test="episodes"]');
-        expect(episodes.findAll('.pm__episode')).toHaveLength(1);
-        expect(episodes.text()).toContain('project.guide');
-        expect(episodes.text()).toContain('Set up CI');
+        const episodes = wrapper.findAll('[data-test="episodes"] .pm__episode');
+        expect(episodes).toHaveLength(2);
+        expect(episodes[0].text()).toContain('project.guide');
+        expect(episodes[0].text()).toContain('Set up CI');
+        expect(episodes[0].find('.pm__at').text()).toBe('2026-09-09||false');
+        expect(episodes[0].find('[data-test="episode-summary"]').text()).toBe('Ai.episode_proposed {"n":3}, Ai.episode_approved {"n":2}, Ai.episode_declined_reason {"n":1,"reason":"Ai.decline_reason_wrong_tone"}');
+        expect(episodes[1].find('[data-test="episode-summary"]').text()).toBe('Ai.episode_proposed {"n":1}, Ai.episode_acted {"n":1}, Ai.episode_reverted_yes');
+        expect(episodes.map((e) => e.text()).join(' ')).not.toContain('wrong tone)');
         expect(wrapper.find('[data-test="empty"]').exists()).toBe(false);
     });
 
@@ -128,13 +137,13 @@ describe('ProjectMemoryCard', () => {
         await wrapper.find('[data-test="edit-text"]').setValue('Budget is fixed at 15k');
         await wrapper.find('[data-test="edit-save"]').trigger('click');
         await flushPromises();
-        expect(apiRequest).toHaveBeenCalledWith('put', '/api/v2/agents/memory/project.constraint%3Abudget', { scopeId: 'p1', text: 'Budget is fixed at 15k' });
+        expect(apiRequest).toHaveBeenCalledWith('put', '/api/v2/agents/memory/project.constraint%3Abudget', { projectId: 'p1', text: 'Budget is fixed at 15k' });
         expect(wrapper.find('[data-test="edit-text"]').exists()).toBe(false);
         expect(rowsOf(wrapper)[0].text()).toContain('Budget is fixed at 15k');
 
         await rowsOf(wrapper)[1].find('[data-test="retire"]').trigger('click');
         await flushPromises();
-        expect(apiRequest).toHaveBeenCalledWith('put', '/api/v2/agents/memory/project.decision%3Aci-first', { scopeId: 'p1', status: 'retired' });
+        expect(apiRequest).toHaveBeenCalledWith('put', '/api/v2/agents/memory/project.decision%3Aci-first', { projectId: 'p1', status: 'retired' });
         expect(rowsOf(wrapper)).toHaveLength(1);
         expect(wrapper.find('[data-test="toggle-retired"]').exists()).toBe(true);
     });

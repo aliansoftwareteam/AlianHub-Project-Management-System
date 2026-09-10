@@ -79,7 +79,7 @@
                         <span class="ah-mono pm__at">{{ when(e.at) }}</span>
                         <span class="pm__skill">{{ e.skill }}</span>
                         <span v-if="e.taskTitle" class="pm__task">· {{ e.taskTitle }}</span>
-                        <span v-if="e.summary" class="ah-small">{{ e.summary }}</span>
+                        <span class="ah-small" data-test="episode-summary">{{ episodeSummary(e, t) }}</span>
                     </li>
                 </ul>
             </div>
@@ -92,8 +92,11 @@
 <script setup>
 import { computed, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
+import { useConvertDate } from "@/composable";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { useProjectMemory } from "@/views/Ai/useProjectMemory";
+import { episodeSummary } from "@/views/Ai/episodeText";
 
 defineOptions({ name: "ProjectMemoryCard" });
 
@@ -102,6 +105,8 @@ const props = defineProps({ projectId: { type: String, required: true } });
 const ORIGIN_KEYS = { brief: "brief", "proposal.approve": "approved", owner: "owner", run: "run" };
 
 const { getters } = useStore();
+const { t } = useI18n();
+const { convertDateFormat } = useConvertDate();
 const { guide, assumptions, rows, episodes, loading, error, load, addRow, updateRow, retireRow } = useProjectMemory();
 
 const adding = ref(false);
@@ -125,7 +130,7 @@ const empty = computed(() => !guide.value && !assumptions.value.length && !rows.
 const kindKey = (kind) => (String(kind || "").endsWith("constraint") ? "constraint" : "decision");
 const kindChip = (kind) => (kindKey(kind) === "constraint" ? "ah-chip--warn" : "ah-chip--brand");
 const originKey = (source) => ORIGIN_KEYS[source?.origin] || "other";
-const when = (at) => (at ? new Date(at).toLocaleDateString() : "");
+const when = (at) => (at ? convertDateFormat(at, "", { showDayName: false }) : "");
 
 const reload = () => load(props.projectId);
 
@@ -166,11 +171,11 @@ const startEdit = (row) => {
 
 const saveEdit = async (row) => {
     if (!editText.value) return;
-    if (editText.value === row.text || await attempt(() => updateRow(row.id, { scopeId: props.projectId, text: editText.value }))) editingId.value = "";
+    if (editText.value === row.text || await attempt(() => updateRow(row.id, { projectId: props.projectId, text: editText.value }))) editingId.value = "";
 };
 
 const retire = (row) => attempt(() => retireRow(row.id, props.projectId));
-const restore = (row) => attempt(() => updateRow(row.id, { scopeId: props.projectId, status: "active" }));
+const restore = (row) => attempt(() => updateRow(row.id, { projectId: props.projectId, status: "active" }));
 
 watch(() => props.projectId, (id) => {
     adding.value = false;

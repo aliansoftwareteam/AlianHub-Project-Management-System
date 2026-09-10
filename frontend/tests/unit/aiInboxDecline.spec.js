@@ -70,13 +70,20 @@ describe('AiInbox decline', () => {
         expect(declineCall()[2]).toEqual({ reason: 'The sprint is already locked' });
     });
 
-    it('prefers the chip over the note when both are given', async () => {
+    it('keeps the chip and the note mutually exclusive', async () => {
         const wrapper = await openDecline();
         await wrapper.find('[data-test="decline-note"]').setValue('extra context');
         await wrapper.find('[data-reason="not_now"]').trigger('click');
+        expect(wrapper.find('[data-test="decline-note"]').element.value).toBe('');
+        expect(wrapper.find('[data-reason="not_now"]').classes()).toContain('is-on');
+
+        await wrapper.find('[data-test="decline-note"]').setValue('sprint is locked');
+        expect(wrapper.find('[data-reason="not_now"]').classes()).not.toContain('is-on');
+        expect(wrapper.find('[data-reason="not_now"]').attributes('aria-pressed')).toBe('false');
+
         await wrapper.find('[data-test="decline-send"]').trigger('click');
         await flushPromises();
-        expect(declineCall()[2]).toEqual({ reason: 'not_now' });
+        expect(declineCall()[2]).toEqual({ reason: 'sprint is locked' });
     });
 
     it('declines without a reason from the skip link', async () => {

@@ -3,7 +3,8 @@
         <div v-if="error" class="ah-field__error">{{ error }}</div>
         <div v-else-if="!run" class="ah-empty">{{ $t('Ai.loading') }}</div>
         <template v-else>
-            <div v-if="episode" class="run-episode" data-test="episode">
+            <p v-if="unreached" class="ah-small run-detail__waiting" data-test="episode-not-reached">{{ $t('Ai.episode_not_reached') }}</p>
+            <div v-else-if="episode" class="run-episode" data-test="episode">
                 <span class="ah-label">{{ $t('Ai.episode_title') }}</span>
                 <ul class="run-episode__stats">
                     <li>{{ $t('Ai.episode_proposed', { n: episode.proposed }) }}</li>
@@ -53,6 +54,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import { useAgents, canRevertRun } from "./useAgents";
+import { normaliseEpisode, declinedLine as declinedText } from "./episodeText";
 
 defineOptions({ name: "AgentRunDetail" });
 
@@ -75,20 +77,10 @@ const decisions = computed(() => (Array.isArray(run.value?.decisions) ? run.valu
 const windowOpen = computed(() => !run.value?.windowEndsAt || new Date(run.value.windowEndsAt).getTime() > Date.now());
 const revertable = computed(() => canRevertRun(run.value, { userId: userId?.value ?? userId, privileged: privileged.value }));
 
-const DECLINE_REASONS = ["too_many_changes", "wrong_tone", "needs_person", "not_now"];
-const count = (v) => Number(v || 0);
-const episode = computed(() => {
-    const e = run.value?.episode;
-    if (!e || typeof e !== "object") return null;
-    return { proposed: count(e.proposed), acted: count(e.acted), approved: count(e.approved), declined: count(e.declined), reverted: Boolean(e.reverted), reason: e.reason || e.declinedReason || "" };
-});
-const declinedLine = computed(() => {
-    const e = episode.value;
-    if (!e) return "";
-    if (!e.reason) return t("Ai.episode_declined", { n: e.declined });
-    const reason = DECLINE_REASONS.includes(e.reason) ? t(`Ai.decline_reason_${e.reason}`) : e.reason;
-    return t("Ai.episode_declined_reason", { n: e.declined, reason });
-});
+const UNREACHED = ["failed", "skipped", "stopped"];
+const unreached = computed(() => UNREACHED.includes(run.value?.status));
+const episode = computed(() => (unreached.value ? null : normaliseEpisode(run.value?.episode)));
+const declinedLine = computed(() => (episode.value ? declinedText(episode.value, t) : ""));
 
 const when = (at) => (at ? new Date(at).toLocaleString() : "");
 const chip = (decision) => (decision === "act" ? "ah-chip--ok" : decision === "refuse" ? "ah-chip--danger" : "ah-chip--warn");
