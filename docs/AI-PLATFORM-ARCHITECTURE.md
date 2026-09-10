@@ -780,6 +780,18 @@ Goal: an outside agent is a teammate with typed activities, not a token with a b
 
 *Exit gate.* An external coding agent completes a step in a workflow, its actions appear in the audit with the right attribution, and a revoked grant stops it mid-step.
 
+### Sprint 11 · Data skills reach outside (two weeks)
+
+Goal: a data skill can read declared external sources through the tenant's egress allowlist, which is ADR 003's phase 4 and had no sprint in the first version of this plan.
+
+1. Declared external reads join the skill vocabulary: URL and API readers with a declared host, capped size and time, resolved through the per-tenant egress proxy from sprint 8 and validated against the allowlist at save.
+2. The PR-review skill re-expressed as a data skill; QA review stays code by design because it measures page facts.
+3. The Skill Library editor exposes declared reads with the allowlist check, and the replay record captures what was fetched.
+
+*Integration.* Nothing new reaches the network that the sprint 8 proxy does not already govern; a non-allow-listed host is a save-time form error.
+
+*Exit gate.* An admin authors a skill that reads a declared endpoint, a non-allow-listed host is refused at save, and a fetched body appears in the replay record.
+
 ### Dependencies at a glance
 
 | Sprint | Needs | Unblocks |
@@ -795,6 +807,7 @@ Goal: an outside agent is a teammate with typed activities, not a token with a b
 | 8 | 1 | 10 |
 | 9 | 3, 4, 7 | — |
 | 10 | 5, 8 | — |
+| 11 | 6, 8 | — |
 
 Sprints 7 and 8 have no dependency on 5 or 6 and can run on a parallel track if a third engineer is available, which is how 015 and 016 were run.
 
@@ -841,6 +854,7 @@ The architecture above changes what a person can see and do. This maps each area
 | **I** Recovery | Workflow run → failed step | **new** | The error, whether it was deterministic, the attempts and backoff so far, and the single control that applies: retry, skip or compensate | 5 |
 | **Skills** | Skill Library | **extend** | Becomes a real library: create, edit, dry-run against a chosen task, the risk preview from emitted actions, retire; today it lists the action registry | 6 |
 | **Skills** | Agent settings → skills | **extend** | Pick skills from the manifest instead of toggling a fixed list; effective actions shown as the intersection with the agent's allowed actions | 6 |
+| **Skills** | Skill Library → declared reads | **extend** | A skill declares the hosts it reads, checked against the workspace allowlist at save | 11 |
 
 Three design constraints that apply across all of it. First, state is encoded in form as well as words: a breaker that is open, a step that is blocked, a model with no price, a token without an expiry each need a visible mark, not a sentence in a tooltip. Second, every destructive or irreversible control names its consequence in the control itself, the way the existing revert button does. Third, the member view and the owner view diverge more with every sprint, and each new surface is designed for both from the start rather than gated afterwards.
 
