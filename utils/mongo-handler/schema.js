@@ -874,12 +874,14 @@ const schema = {
         finishedAt: { type: Date, required: false },
     },
     // Integration connections — managed by Modules/Integrations (AUTO-04). Generic
-    // registry backing the marketplace, Slack and iframe apps. Secrets live in
-    // config but are redacted before reaching the client.
+    // registry backing the marketplace, Slack and iframe apps. Secret config keys
+    // are AES-256-GCM ciphertext (utils/secretField); secretsVersion 0 marks a row
+    // migration 007 has not sealed yet.
     integrationConnections: {
         type: { type: String, required: true },
         name: { type: String, required: false },
         config: { type: Object, default: {}, required: false },
+        secretsVersion: { type: Number, default: 0, required: false },
         status: { type: String, default: 'connected', required: false },
         enabled: { type: Boolean, default: true, required: false },
         createdBy: { type: String, required: false },

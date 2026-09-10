@@ -8,7 +8,7 @@ const S = require('./helpers/slackRules'); // AUTO-06
 
 // AUTO-04 — generic integration connections registry (per-company). Backs the
 // marketplace (AUTO-05), Slack (AUTO-06) and custom iframe apps (AUTO-07).
-// Secrets are stored in config but never returned (redact()).
+// Secrets are stored encrypted in config (R.sealConfig) and never returned (redact()).
 
 const companyOf = (req) => req.headers['companyid'] || (req.body && req.body.companyId) || (req.query && req.query.companyId);
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
@@ -39,6 +39,7 @@ exports.connect = async (req, res) => {
         const check = R.validateConnection(req.body || {});
         if (!check.valid) return res.send({ status: false, statusText: check.reason });
         const item = R.byKey(check.value.type);
+        const config = R.sealConfig(check.value.type, check.value.config);
         // Single-instance integrations update in place rather than duplicate.
         if (item && !item.multiple) {
             const existing = await MongoDbCrudOpration(companyId, {
@@ -47,14 +48,14 @@ exports.connect = async (req, res) => {
             if (existing) {
                 const upd = await MongoDbCrudOpration(companyId, {
                     type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS,
-                    data: [{ _id: existing._id }, { $set: { config: check.value.config, name: check.value.name, status: 'connected', enabled: true } }, { returnDocument: 'after' }],
+                    data: [{ _id: existing._id }, { $set: { config, name: check.value.name, status: 'connected', enabled: true, secretsVersion: R.SECRETS_VERSION } }, { returnDocument: 'after' }],
                 }, 'findOneAndUpdate');
                 removeCache(`integration_connections:${companyId}`);
                 return res.send({ status: true, statusText: 'Updated.', data: R.redact(upd) });
             }
         }
         const data = {
-            _id: new mongoose.Types.ObjectId(), type: check.value.type, name: check.value.name, config: check.value.config,
+            _id: new mongoose.Types.ObjectId(), type: check.value.type, name: check.value.name, config, secretsVersion: R.SECRETS_VERSION,
             status: 'connected', enabled: true, createdBy: String(req.uid || ''), connectedAt: new Date(), deletedStatusKey: 0,
         };
         const saved = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS, data }, 'save');
@@ -103,10 +104,11 @@ exports.slackCommand = async (req, res) => {
         const conn = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS, data: [{ type: 'slack', deletedStatusKey: { $ne: 1 } }],
         }, 'findOne').catch(() => null);
-        if (!conn || conn.enabled === false || !conn.config || !conn.config.verification_token) {
+        const verificationToken = conn && conn.config ? R.openConfig('slack', conn.config).verification_token : null;
+        if (!conn || conn.enabled === false || !verificationToken) {
             return res.json(S.ephemeral('Slack isn’t connected for this workspace yet — add it in AlianHub → Integrations → Marketplace.'));
         }
-        if (!S.verifyToken(conn.config.verification_token, req.body && req.body.token)) {
+        if (!S.verifyToken(verificationToken, req.body && req.body.token)) {
             return res.status(401).json(S.ephemeral('Verification failed.'));
         }
         const { sub } = S.parseCommand(req.body && req.body.text);

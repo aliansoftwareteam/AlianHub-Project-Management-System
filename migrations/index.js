@@ -97,6 +97,28 @@ async function runMigrations({ store, migrations, makeContext, logger = console,
     }
 }
 
+/* Reverts one applied migration that defines down(ctx, options) and forgets its
+ * record so `up` can apply it again. Only the caller's explicit options reach the
+ * migration; a rollback that rewrites data guards itself on them. */
+async function rollbackMigration({ store, migrations, makeContext, logger = console, owner = `${os.hostname()}:${process.pid}` }, id, options = {}) {
+    const migration = migrations.find((m) => m.id === id);
+    if (!migration) throw new Error(`unknown migration "${id}"`);
+    if (typeof migration.down !== 'function') throw new Error(`${id} has no down()`);
+    const record = (await store.all()).find((r) => r._id === id);
+    if (!record || !record.ok) throw new Error(`${id} is not applied`);
+    const locked = await store.tryLock(owner, LOCK_TTL_MS);
+    if (!locked) return { skipped: 'locked' };
+    try {
+        const ctx = makeContext();
+        logger.info(`[migrations] rolling back ${id} (${migration.scope})`);
+        await migration.down(ctx, options);
+        await store.remove(id);
+        return { skipped: false, id, companies: ctx.companies };
+    } finally {
+        await store.unlock(owner);
+    }
+}
+
 async function migrationStatus({ store, migrations }) {
     const { applied, pending, failed } = planRuns(migrations, await store.all());
     return {
@@ -160,4 +182,4 @@ async function runMigrationsAtBoot({ auto = process.env.MIGRATIONS_AUTO !== 'fal
     }
 }
 
-module.exports = { LOCK_ID, LOCK_TTL_MS, listMigrations, validateMigration, planRuns, buildContext, runMigrations, migrationStatus, refreshMigrationState, liveDeps, runMigrationsAtBoot };
+module.exports = { LOCK_ID, LOCK_TTL_MS, listMigrations, validateMigration, planRuns, buildContext, runMigrations, rollbackMigration, migrationStatus, refreshMigrationState, liveDeps, runMigrationsAtBoot };
