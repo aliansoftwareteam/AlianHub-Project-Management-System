@@ -71,7 +71,12 @@ const configuredProviderName = () => {
 const provider = () => {
     const selected = (process.env.LLM_PROVIDER || '').trim().toLowerCase();
     const name = configuredProviderName() || (PROVIDER_KEYS[selected] ? selected : null);
-    return { name, hasKey: Boolean(name && process.env[PROVIDER_KEYS[name]]), region: (process.env.LLM_REGION || '').trim() || null };
+    const usage = require('../AIProjectGenerator/usage');
+    const model = usage.configuredModel();
+    return {
+        name, hasKey: Boolean(name && process.env[PROVIDER_KEYS[name]]), region: (process.env.LLM_REGION || '').trim() || null,
+        model, priced: model ? usage.priceFor(model).priced : null,
+    };
 };
 
 const spentThisMonth = async (companyId, month) => {

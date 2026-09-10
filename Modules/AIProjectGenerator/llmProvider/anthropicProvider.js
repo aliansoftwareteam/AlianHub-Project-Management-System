@@ -29,6 +29,9 @@ const anthropicProvider = {
     get isConfigured() {
         return Boolean(process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_MODEL && AnthropicSdk);
     },
+    get model() {
+        return process.env.ANTHROPIC_MODEL || null;
+    },
 
     /**
      * @param {import('./types').ChatOptions} opts

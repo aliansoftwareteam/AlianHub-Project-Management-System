@@ -37,7 +37,7 @@ afterEach(() => { ENV.forEach((k) => { if (saved[k] === undefined) delete proces
 describe('GET /agents/settings', () => {
     it('answers the defaults when the company has nothing stored', async () => {
         const r = await get();
-        expect(r.body).toEqual({ status: true, data: { undoHours: 24, monthlyBudgetUsd: 0, provider: { name: null, hasKey: false, region: null } } });
+        expect(r.body).toEqual({ status: true, data: { undoHours: 24, monthlyBudgetUsd: 0, provider: { name: null, hasKey: false, region: null, model: null, priced: null } } });
     });
 
     it('falls back to the defaults when the stored values are out of range', async () => {
@@ -58,23 +58,23 @@ describe('provider block', () => {
         process.env.ANTHROPIC_API_KEY = 'sk-ant-secret-123';
         process.env.LLM_REGION = 'eu';
         const r = await get();
-        expect(r.body.data.provider).toEqual({ name: 'anthropic', hasKey: true, region: 'eu' });
+        expect(r.body.data.provider).toEqual({ name: 'anthropic', hasKey: true, region: 'eu', model: null, priced: null });
         expect(JSON.stringify(r.body)).not.toContain('secret');
         expect(getProvider).toHaveBeenCalled();
     });
 
     it('takes the name the provider module resolves, and reports a missing key', async () => {
         getProvider.mockReturnValueOnce({ name: 'openai' });
-        expect(budget.provider()).toEqual({ name: 'openai', hasKey: false, region: null });
+        expect(budget.provider()).toEqual({ name: 'openai', hasKey: false, region: null, model: null, priced: null });
         process.env.AI_API_KEY = 'k';
         getProvider.mockReturnValueOnce({ name: 'openai' });
-        expect(budget.provider()).toEqual({ name: 'openai', hasKey: true, region: null });
+        expect(budget.provider()).toEqual({ name: 'openai', hasKey: true, region: null, model: null, priced: null });
     });
 
     it('ignores an unknown LLM_PROVIDER', async () => {
         process.env.LLM_PROVIDER = 'mystery';
         process.env.DEEPSEEK_API_KEY = 'k';
-        expect(budget.provider()).toEqual({ name: null, hasKey: false, region: null });
+        expect(budget.provider()).toEqual({ name: null, hasKey: false, region: null, model: null, priced: null });
     });
 });
 
@@ -102,7 +102,7 @@ describe('PUT /agents/settings', () => {
     it('stores valid values, clears the company cache and answers the settings shape', async () => {
         const r = await put({ undoHours: '48', monthlyBudgetUsd: 25.5 });
         expect(r.code).toBe(200);
-        expect(r.body).toEqual({ status: true, statusText: 'Settings updated.', data: { undoHours: 48, monthlyBudgetUsd: 25.5, provider: { name: null, hasKey: false, region: null } } });
+        expect(r.body).toEqual({ status: true, statusText: 'Settings updated.', data: { undoHours: 48, monthlyBudgetUsd: 25.5, provider: { name: null, hasKey: false, region: null, model: null, priced: null } } });
         expect(company()).toMatchObject({ agentUndoHours: 48, agentMonthlyBudgetUsd: 25.5 });
         expect(removeCache).toHaveBeenCalledWith(`companyData_${C}`);
         expect((await get()).body.data).toMatchObject({ undoHours: 48, monthlyBudgetUsd: 25.5 });

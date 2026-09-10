@@ -3,7 +3,7 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const socketEmitter = require('../../event/socketEventEmitter');
 const logger = require('../../Config/loggerConfig');
-const { summarize } = require('../AIProjectGenerator/usage');
+const usage = require('../AIProjectGenerator/usage');
 
 // Agent runs and spend. A run is the unit the rail footer counts ("2 running"),
 // the project header chip sums (elapsed, spend) and the audit log links to
@@ -37,11 +37,15 @@ const runsToday = (companyId, agentId) => MongoDbCrudOpration(companyId, {
 const canStart = async (agent, { trigger, viaAccount, companyId } = {}) => {
     if (!agent) return { ok: false, reason: 'Agent not found.' };
     if (agent.paused) return { ok: false, reason: `Agent is paused${agent.pausedReason ? ` (${agent.pausedReason})` : ''}.` };
+    const via = viaAccount || agent.account || 'workspace';
+    if (via !== 'local') {
+        const price = usage.checkConfiguredModelPriced();
+        if (!price.ok) return { ok: false, reason: price.reason, code: price.code, model: price.model };
+    }
     const month = agent.spendMonth && agent.spendMonth.month === monthKey() ? agent.spendMonth : { usd: 0 };
     if (Number(agent.spendCapUsd) > 0 && Number(month.usd || 0) >= Number(agent.spendCapUsd)) {
         return { ok: false, reason: `Spend cap reached ($${Number(month.usd).toFixed(2)} of $${agent.spendCapUsd}).` };
     }
-    const via = viaAccount || agent.account || 'workspace';
     if (trigger === 'schedule' && via === 'personal') {
         return { ok: false, reason: 'Personal accounts cannot run unattended — scheduled runs need the workspace key.' };
     }
@@ -126,9 +130,16 @@ const stop = async (companyId, runId, byUserId) => {
 
 /* Record tokens/cost on the run and the agent's month. Personal-account spend is
  * the developer's own and never billed to the workspace (27a). */
-const recordSpend = async (companyId, run, usage, model) => {
-    const priced = summarize(usage || {}, model);
+const recordSpend = async (companyId, run, tokens, model) => {
+    const priced = usage.summarize(tokens || {}, model);
     const billed = run.viaAccount !== 'personal' && run.viaAccount !== 'local';
+    if (priced.priced === false && priced.totalTokens > 0 && run.viaAccount !== 'local') {
+        const message = `refusing to book ${priced.totalTokens} tokens as $0: ${usage.unpricedMessage(priced.model || model)}`;
+        logger.error(`[agent-run] ${run._id}: ${message}`);
+        const error = new Error(message);
+        error.code = usage.UNPRICED_MODEL;
+        throw error;
+    }
     const usd = billed && priced.costUsd ? priced.costUsd : 0;
     await patch(companyId, run._id, {
         spend: { tokens: priced.totalTokens, usd, model: priced.model || model || null, billedToWorkspace: billed, personalUsd: !billed && priced.costUsd ? priced.costUsd : 0 },

@@ -7,7 +7,7 @@ jest.mock('../Modules/Agents/actor', () => ({ resolveActor: jest.fn(async (req) 
 jest.mock('../Modules/Automations/engine/tools', () => ({ getTask: jest.fn() }));
 jest.mock('../Modules/Agents/engine/orchestrator', () => ({ gather: jest.fn(async () => ({ status: 'gathered', context: {} })), analyse: jest.fn() }));
 jest.mock('../Modules/Agents/engine/findingMemory', () => ({ load: jest.fn(async () => new Map()), decide: jest.fn(), record: jest.fn(), touch: jest.fn() }));
-jest.mock('../Modules/AIProjectGenerator/usage', () => ({ summarize: jest.fn(() => ({ costUsd: 0, totalTokens: 0, model: 'm' })) }));
+jest.mock('../Modules/AIProjectGenerator/usage', () => ({ checkConfiguredModelPriced: () => ({ ok: true, reason: '' }), unpricedMessage: (m) => `No price on file for ${m}`, UNPRICED_MODEL: 'unpriced_model', summarize: jest.fn(() => ({ costUsd: 0, totalTokens: 0, model: 'm' })) }));
 jest.mock('../Modules/notification/prepare-notification-data/controllerV2', () => ({ handleNotificationtFun: jest.fn(async () => ({ status: true })) }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');

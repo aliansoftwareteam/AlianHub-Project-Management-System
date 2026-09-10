@@ -1,7 +1,7 @@
 {
   "locale": "gu",
   "machineTranslated": false,
-  "updatedAt": "2026-09-10T07:34:29.275Z",
+  "updatedAt": "2026-09-10T12:53:19.278Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -5180,6 +5180,11 @@
     "Settings.agents_candidate_too_many_changes": "Prefers fewer changes per proposal",
     "Settings.agents_candidate_wrong_tone": "Prefers a different tone — ask before rewriting",
     "Settings.agents_candidate_needs_person": "Wants a person to handle this kind of work",
-    "Settings.agents_candidate_not_now": "Prefers proposals batched, not one at a time"
+    "Settings.agents_candidate_not_now": "Prefers proposals batched, not one at a time",
+    "Instance.agent_model_priced": "Priced",
+    "Instance.agent_model_unpriced": "No price on file",
+    "Instance.agent_model_unpriced_help": "Runs on this model are refused until a price is added under AI settings (Model prices).",
+    "Instance.f_LLM_PRICING": "Model prices (USD per 1M tokens)",
+    "Instance.err_json": "Enter JSON like {\"model-id\":{\"input\":2,\"output\":8}} with non-negative numbers."
   }
 }
